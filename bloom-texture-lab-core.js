@@ -152,14 +152,19 @@ function classify(names) {
   else if (organ === 'stem') feature = 'stem';
   return { organ, feature };
 }
-const STACK_NAMES = new Set([...EMITTERS, 'buildSepalsInto', 'buildSepalTierInto', 'buildLeafInto', 'buildCompoundLeafInto', 'emitTubeRings', 'buildStamenInto', 'buildStyleInto', 'buildHubInto', 'buildStemInto', 'buildPetalInto']);
+const STACK_NAMES = new Set([...EMITTERS, 'emitPanelLattice', 'emitPanelShipped', 'buildSepalsInto', 'buildSepalTierInto', 'buildLeafInto', 'buildCompoundLeafInto', 'emitTubeRings', 'buildStamenInto', 'buildStyleInto', 'buildHubInto', 'buildStemInto', 'buildPetalInto']);
 
 /* Build `state` exactly as the generator does (export mode by default) and
    return the soup, a per-triangle (organ, feature) tag, and the organ
    instances' own mid-surface records for B. */
-export function buildTagged(state, { exportMode = true } = {}) {
-  const acc = new G.MeshBuilder({ exportMode, captureGrid: true });
-  const organIx = [], featIx = [];
+export function buildTagged(state, { exportMode = true, geometry = null, beforeBuild = null } = {}) {
+  /* `geometry` / `beforeBuild` are T2's door (bloom-texture-lab-lattice.js):
+     the patched copy of the geometry, and the call that switches its lattice
+     on for THIS accumulator. With neither, this is T1's build exactly. */
+  const GG = geometry || G;
+  const acc = new GG.MeshBuilder({ exportMode, captureGrid: true });
+  const organIx = [], featIx = [], latIx = [], panelIx = [];
+  const latticeOn = beforeBuild ? beforeBuild(acc) : false;
   const origTri = acc.tri.bind(acc);
   const cache = new Map();
   const oldLimit = Error.stackTraceLimit;
@@ -174,10 +179,14 @@ export function buildTagged(state, { exportMode = true } = {}) {
     let cls = cache.get(key);
     if (!cls) { cls = classify(names); cache.set(key, cls); }
     organIx.push(ORGANS.indexOf(cls.organ)); featIx.push(FEATURES.indexOf(cls.feature));
+    /* LATTICE-NATIVE (T2): emitted by the lattice arm, or a Voronoi cell refined in its own plan */
+    latIx.push(latticeOn && (names.includes('emitPanelLattice') || (names.includes('emitInfillPanel') && !names.includes('emitPanel'))) ? 1 : 0);
+    /* 2 = a ladder FACE (emitPanel's skins; T2's TX1 subject), 1 = any other triangle of a petal/sepal/leaf panel or a Voronoi cell region, 0 = not a panel (the tube ring is not one: it stays on T1's split) */
+    panelIx.push(names.includes('emitTubeRings') ? 0 : names.includes('emitPanel') && !names.includes('emitRimLoop') ? 2 : (names.includes('emitPanel') || names.includes('emitInfillPanel')) ? 1 : 0);
     return origTri(a, b, c);
   };
   let built;
-  try { built = G.buildBloomInto(acc, state, { below: null }); }
+  try { built = GG.buildBloomInto(acc, state, { below: null }); }
   finally { Error.stackTraceLimit = oldLimit; }
   const triCount = acc.positions.length / 9;
   /* INSTANCES: contiguous triangle ranges the builder itself reports, each
@@ -198,7 +207,7 @@ export function buildTagged(state, { exportMode = true } = {}) {
     let l0 = built.leafTriRange[0];
     for (const q of built.leavesBuilt) { if (!q) continue; instances.push({ organ: 'leaf', from: l0, to: l0 + q.tris, samples: leafSamples(q) }); l0 += q.tris; }
   }
-  return { positions: acc.positions, organIx: Int8Array.from(organIx), featIx: Int8Array.from(featIx), triCount, built, instances, minThickness: acc.minThickness };
+  return { positions: acc.positions, organIx: Int8Array.from(organIx), featIx: Int8Array.from(featIx), latIx: Uint8Array.from(latIx), panelIx: Uint8Array.from(panelIx), triCount, built, instances, minThickness: acc.minThickness, acc };
 }
 function gridSamples(grid) {
   const out = [];
@@ -217,12 +226,25 @@ function leafSamples(q) {
 }
 
 /* ------------------------------------------------------ indexed mesh */
-export function weld(soup) {
+/* `groups` (T2): weld only WITHIN a group — the organ instance a triangle came
+   from, or its organ where it belongs to none — so two DIFFERENT closed shells
+   that happen to put a vertex on one float32 position (Q17: the lattice's foot
+   vertices land on the hub's split points) stay two shells. Measured on the
+   default at 0.4 mm: without it the lattice mesh welds 9 shells into 1 and the
+   wall ray reads the buried foot as the hub's own material (317 hub samples
+   "thinned" at H = 0.1 mm, every one by exactly its own displacement). */
+export function weld(soup, { groups = false } = {}) {
   const { positions, triCount } = soup;
+  let grp = null;
+  if (groups) {
+    grp = new Int32Array(triCount);
+    for (let t = 0; t < triCount; t++) grp[t] = 100000 + soup.organIx[t];
+    (soup.instances || []).forEach((it, k) => { for (let t = it.from; t < it.to; t++) grp[t] = k; });
+  }
   const key = new Map(); const P = []; const T = new Int32Array(triCount * 3);
   for (let i = 0; i < triCount * 3; i++) {
     const x = positions[i * 3], y = positions[i * 3 + 1], z = positions[i * 3 + 2];
-    const k = `${Math.fround(x)},${Math.fround(y)},${Math.fround(z)}`;
+    const k = grp ? `${grp[(i / 3) | 0]}|${Math.fround(x)},${Math.fround(y)},${Math.fround(z)}` : `${Math.fround(x)},${Math.fround(y)},${Math.fround(z)}`;
     let id = key.get(k);
     if (id === undefined) { id = P.length / 3; key.set(k, id); P.push(x, y, z); }
     T[i] = id;
@@ -270,16 +292,35 @@ export function weld(soup) {
    against an ideal of ~9,621. tools/bloom-texture-lab-quality.mjs requires
    this split to FAIL the triangle-quality check on the stem. */
 export const SPLITS = Object.freeze(['rows', 'redgreen']);
-export function subdivide(mesh, edgeMm, attrs = [], { split = 'rows', canPair = null } = {}) {
+export function subdivide(mesh, edgeMm, attrs = [], { split = 'rows', canPair = null, keep = null, snap = false } = {}) {
   if (split === 'redgreen') return subdivideRedGreen(mesh, edgeMm, attrs);
   if (split !== 'rows') throw new Error(`unknown split ${split}`);
-  return subdivideRows(mesh, edgeMm, attrs, canPair);
+  return subdivideRows(mesh, edgeMm, attrs, canPair, keep, snap);
 }
-function subdivideRows(mesh, edgeMm, attrs, canPair) {
+/* `snap` (T2, Q16): every count decision reads the edge length SNAPPED to
+   2^-20 mm first, so it is one both engines take. Measured, the reason: the
+   shipped stamen rod has edges EXACTLY 0.6 mm long by construction, and at
+   e = 0.6 the unsnapped ceil(L / e) is decided by the last bit — L / e read
+   1.0000000000000004 in Node and 0.99999999999999967 in Chromium on the same
+   edge, so the two engines split 13 stamen triangles differently (15,680 /
+   15,672 on the whole bloom: T1's own Q16 disagreement of 8). OFF by default,
+   so T1's figures reproduce; T2's remainder split takes it ON. */
+export const SNAP_GRID_MM = 1 / 1048576;
+/* `keep(soupTri)` (T2): a triangle already on B's lattice is emitted AS IS and
+   every edge it uses is FROZEN — never cut — so a T1-split neighbour that
+   happens to weld to it cannot put a vertex in the interior of its edge. */
+function subdivideRows(mesh, edgeMm, attrs, canPair, keep = null, snap = false) {
   const P = mesh.P.slice();
   attrs = attrs.map((a) => a.slice());
   const e2 = edgeMm * edgeMm;
-  const segs = (i, j) => { const d = dist2(P, i, j); return d <= e2 ? 1 : Math.ceil(Math.sqrt(d) / edgeMm); };
+  const frozen = new Set();
+  if (keep) for (let t = 0; t < mesh.tri.length / 3; t++) if (keep(mesh.src[t])) for (let k = 0; k < 3; k++) { const i = mesh.tri[t * 3 + k], j = mesh.tri[t * 3 + (k + 1) % 3]; frozen.add(i < j ? i * 4294967296 + j : j * 4294967296 + i); }
+  const segs = (i, j) => {
+    if (frozen.size && frozen.has(i < j ? i * 4294967296 + j : j * 4294967296 + i)) return 1;
+    const d = dist2(P, i, j);
+    if (snap) { const L = Math.round(Math.sqrt(d) / SNAP_GRID_MM) * SNAP_GRID_MM; return L <= edgeMm ? 1 : Math.ceil(L / edgeMm); }
+    return d <= e2 ? 1 : Math.ceil(Math.sqrt(d) / edgeMm);
+  };
   const addPoint = (i, j, t) => {
     const id = P.length / 3;
     P.push(P[i * 3] + (P[j * 3] - P[i * 3]) * t, P[i * 3 + 1] + (P[j * 3 + 1] - P[i * 3 + 1]) * t, P[i * 3 + 2] + (P[j * 3 + 2] - P[i * 3 + 2]) * t);
@@ -302,9 +343,11 @@ function subdivideRows(mesh, edgeMm, attrs, canPair) {
   };
   const tri = [], src = [], pairs = [];
   const nT = mesh.tri.length / 3;
-  const pairOf = quadPairs(mesh, P, e2, segs, canPair);
+  segs.snap = snap;
+  const pairOf = quadPairs(mesh, P, e2, segs, keep ? (x, y) => !keep(x) && !keep(y) && (!canPair || canPair(x, y)) : canPair);
   for (let t = 0; t < nT; t++) {
     const a = mesh.tri[t * 3], b = mesh.tri[t * 3 + 1], c = mesh.tri[t * 3 + 2], s = mesh.src[t];
+    if (keep && keep(s)) { tri.push(a, b, c); src.push(s); continue; }
     if (pairOf[t] >= 0) {
       const u = pairOf[t];
       if (u < t) continue; // emitted with its partner
@@ -410,7 +453,8 @@ function quadPairs(mesh, P, e2, segs, canPair) {
   for (let t = 0; t < nT; t++) {
     if (pairOf[t] >= 0) continue;
     const [kt, dt] = longest(t);
-    if (dt <= e2) continue;
+    if (dt <= e2 && !segs.snap) continue;
+    if (segs.snap) { const [bi, bj] = [Math.floor(kt / 4294967296), kt % 4294967296]; if (segs(bi, bj) === 1) continue; }
     const users = use.get(kt);
     if (users.length !== 2) continue;
     const u = users[0] === t ? users[1] : users[0];
@@ -553,8 +597,12 @@ function faceNormal(P, a, b, c) {
 /* Prepare once per (state, edge): weld, assign B's mid-surface attribute to
    every original vertex, subdivide. Both arms then displace the SAME mesh, so
    any difference between them is the arm and never the lattice. */
-export function prepare(soup, edgeMm, { split = 'rows', pairs = true } = {}) {
-  const base = weld(soup);
+export function prepare(soup, edgeMm, { split = 'rows', pairs = true, lattice = null, groups = !!lattice } = {}) {
+  /* `lattice` (T2): the context the soup was built under. Its triangles are
+     kept as emitted (`keep`) and its skin vertices take the EXACT mid-surface
+     point and normal the lattice arm evaluated them from, where the emulation
+     otherwise reads the nearest captured ladder sample. */
+  const base = weld(soup, { groups });
   const nV = base.P.length / 3;
   /* per original vertex: the mid-surface sample of the instance it belongs to */
   const midAttr = new Array(nV).fill(null);
@@ -579,13 +627,26 @@ export function prepare(soup, edgeMm, { split = 'rows', pairs = true } = {}) {
     const d = (p[0] - s.m[0]) * n[0] + (p[1] - s.m[1]) * n[1] + (p[2] - s.m[2]) * n[2];
     midAttr[v] = { m: [p[0] - d * n[0], p[1] - d * n[1], p[2] - d * n[2]], n: [n[0], n[1], n[2]], foot: s.foot };
   }
+  let exactN = 0;
+  if (lattice && lattice.rows) {
+    const ex = new Map();
+    for (const r of lattice.rows) for (let j = 0; j < r.top.length; j++) {
+      const P = r.Ps[j], n = r.Ns[j], foot = r.u === 0;
+      ex.set(`${r.top[j][0]},${r.top[j][1]},${r.top[j][2]}`, { m: P, n, foot });
+      ex.set(`${r.bot[j][0]},${r.bot[j][1]},${r.bot[j][2]}`, { m: P, n, foot });
+    }
+    for (let v = 0; v < nV; v++) {
+      const q = ex.get(`${base.P[v * 3]},${base.P[v * 3 + 1]},${base.P[v * 3 + 2]}`);
+      if (q) { midAttr[v] = { m: [q.m[0], q.m[1], q.m[2]], n: [q.n[0], q.n[1], q.n[2]], foot: q.foot }; exactN++; }
+    }
+  }
   /* pairs: false cuts every triangle alone — the T1 intermediate, kept so §11's 119-fold figure reproduces */
-  const sub = subdivide(base, edgeMm, [midAttr], { split, canPair: pairs ? pairPredicate(soup) : () => false });
+  const sub = subdivide(base, edgeMm, [midAttr], { split, canPair: pairs ? pairPredicate(soup) : () => false, keep: lattice ? (s) => soup.latIx[s] === 1 : null, snap: !!lattice });
   const mid = sub.attrs[0];
   for (const a of mid) if (a) { const L = Math.hypot(a.n[0], a.n[1], a.n[2]) || 1; a.n[0] /= L; a.n[1] /= L; a.n[2] /= L; }
   const triOrgan = new Int8Array(sub.tri.length / 3), triFeat = new Int8Array(sub.tri.length / 3);
   for (let t = 0; t < triOrgan.length; t++) { triOrgan[t] = soup.organIx[sub.src[t]]; triFeat[t] = soup.featIx[sub.src[t]]; }
-  const prep = { P: sub.P, tri: sub.tri, src: sub.src, mid, triOrgan, triFeat, edgeMm, split, baseTris: base.tri.length / 3 };
+  const prep = { P: sub.P, tri: sub.tri, src: sub.src, mid, triOrgan, triFeat, edgeMm, split: lattice ? 'lattice' : split, baseTris: base.tri.length / 3, exactMid: exactN };
   prep.N = vertexNormals(prep.P, prep.tri);
   prep.vFeat = vertexFeature(prep);
   prep.shell = shells(prep);

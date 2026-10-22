@@ -3,7 +3,11 @@
 **Status: DISCOVERY, RULED (§0). Merged as reference — the prototype page, this doc and the sheet. Nothing shipped.**
 **T1 DONE (Oct 22, §11): the prototype's split is fixed and the prototype re-measured, outward only. Every
 stem figure in §4, §5 and §7 before §11 was the red-green split's and is replaced there; prototype files only,
-still nothing shipped.** `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`,
+still nothing shipped.**
+**T2 DONE (Oct 22, §12): B's own lattice — sub-rows and sub-columns on the true surface for petals, sepals and
+leaves, the ladder unmoved to the bit, checked by TX0–TX4 with a must-fail, counted against the conforming
+floor (Q14), engine-agreed (Q16), and B re-measured: it still thins nothing. A patched copy of the geometry;
+prototype files only, still nothing shipped.** `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`,
 `bloom.html`, `bloom.css` and every gate are untouched (predeclared before a line was written,
 checked by `git diff --stat origin/main` at close — §9). The prototype is new files only, none of
 which any workflow names, so no CI run is triggered by this PR:
@@ -19,6 +23,9 @@ which any workflow names, so no CI run is triggered by this PR:
 | `tools/bloom-texture-lab-quality.mjs` | **T1:** triangle quality per organ and the TQ check, with its must-fail (§11.1) |
 | `docs/data/bloom-surface-texture-*-t1.json` | **T1:** the quality, the outward re-measure and the budget on the fixed split (§11) |
 | `docs/img/bloom-surface-texture-t1-stem.png` | **T1:** the stem before / after the split fix, one camera |
+| `bloom-texture-lab-lattice.js` | **T2:** B's own lattice, a runtime-patched copy of `bloom-geometry.js` (§12.1) |
+| `tools/bloom-texture-lab-lattice.mjs` | **T2:** TX0–TX4, `--control`, `--browser` (engine agreement), `--budget` (§12.2–12.5) |
+| `docs/data/bloom-surface-texture-*-t2*.json` | **T2:** the TX runs, parity, budget and the outward re-measure on the lattice (§12) |
 
 ## 0. Eva's rulings (Oct 22, on #436)
 
@@ -586,7 +593,9 @@ only; centred / inward / emboss removed, their §4 rows kept as the record); the
 *Acceptance:* the stem at a 0.6 mm edge within 1.5× of its ideal 9,621 triangles, and 0 outward folds on
 the bore.
 
-**T2 · B'S OWN-COORDINATE LATTICE (the budget item).** *Shipped geometry, no relief yet. Gated on T1.
+**T2 · B'S OWN-COORDINATE LATTICE (the budget item).** **[DONE Oct 22 as a PROTOTYPE — §12. The brief said
+prototype only, so it is a patched copy and not shipped geometry (§12.8 item 22); TX0–TX4 as below plus a
+must-fail; the count bar is the conforming floor (Q14).]** *Shipped geometry, no relief yet. Gated on T1.
 Blocked by Q9 for its acceptance bar.* `emitPanel` evaluates SUB-ROWS and SUB-COLUMNS between the ladder's
 stations through the existing front door, `petalSurface(...).rowAt(u).sect(v)` (session 37's evaluator),
 so new points lie ON the surface and the ladder — `bladeStations`, `NU`, `CURL_START_MIN`, A7/A8, the
@@ -600,8 +609,10 @@ clause 2) is taught that a refined panel reports its ladder rows and its sub-row
 grid capture keeps the ladder's rows (the captured mid-surface is the ladder's, decided here rather than
 left implicit). **TX0–TX2:** sub-points lie on the surface (restated through `petalSurface`, not read
 from the emitter), the shared edges between panels and between a panel and its rim agree exactly, and the
-triangle count is within a declared factor of 2A/e². *Acceptance (pending Q9):* the default bloom near
-99,000 triangles at 0.4 mm where the prototype's split made 403,616; the infill cost corner's figure
+triangle count is within a declared factor of 2A/e². *Acceptance (pending Q9):* ~~the default bloom near
+99,000 triangles at 0.4 mm where the prototype's split made 403,616;~~ **[STRUCK by Q14, Oct 22 — 2A/e² is
+not reachable by a refinement that keeps the shipped edges (§11.7 item 14); the bar is the conforming floor,
+derived per organ. §12.7.]** the infill cost corner's figure
 reported against the budget, refused or floored per Q9.
 
 **T3 · THE FIELD, THE GUARD, AND OUTWARD RELIEF ON SHEETS.** *Gated on T2. Blocked by Q2 and Q13; the
@@ -911,14 +922,17 @@ the red-green split's density, which the stem's fans had inflated. Q9 stands, at
     quads paired — reads 183,168 (1.85×). The ⌈L/e⌉ rounding is the cause and a T2 sub-lattice has it too:
     a 1.6 mm column goes to 4 × 0.4 and a 0.6 mm row to 2 × 0.3, so a cell is 0.4 × 0.3 mm against the
     ideal's 0.4 × 0.4. Should T2's bar be a ratio of the ideal (which ratio?), or the conforming floor TQ1
-    already uses? **Joins Q9; blocks T2's acceptance.**
+    already uses? **Joins Q9; blocks T2's acceptance.** **[RULED Oct 22: the conforming floor, derived, never a
+    typed ratio of 2A/e². Whether "the floor" means ≤ 1.0× or TQ1's 2.0× is item 18 — §12.3, §12.8.]**
 15. **OPEN — does B refine the stem's BORE at all, and in whose coordinates does T5 refine the stem?**
     §10 T5 says the bore is never relieved. Then B need not refine it, which would roughly halve the
     stem's cost (bore and outer wall each 48 × 94 × 2 at 0.6 mm), and the same holds for every buried face
     Q7 decides to leave plain. Separately: the quad pairing that fixed the bore here applies only to
     COPLANAR quads; a noded stem's wall quads are not coplanar, so a split of its emitted triangles would
     bring the 0.014 mm sliver-apex crossing back. T5 refining the stem in its own (s, θ) — the way T2 refines
-    a panel in its own (u, v) — would not have it. **Shapes T5's stem half and the budget (Q9).**
+    a panel in its own (u, v) — would not have it. **Shapes T5's stem half and the budget (Q9).** **[T2 (§12.4):
+    the stem stays on T1's split, 20,242 / 30,580 at 0.6 / 0.4 mm, the bore 44 % of it; the bore was not
+    refined for T2. Still open.]**
 16. **OPEN — the split's discrete decisions are not cross-engine.** The page (Chromium) and Node build the
     same whole-bloom soup (59,012 triangles both) and subdivide it to **204,432 vs 204,440** ('rows', 0.6
     mm) and **723,686 vs 723,690** (red-green); the default agrees exactly (183,168). Not diagnosed further:
@@ -926,9 +940,277 @@ the red-green split's density, which the stem's fans had inflated. Q9 stands, at
     bits. Inside an emitter (T2) the triangle count must agree between Chromium and Node exactly (X0
     rebuilds the page's STL in Node), so a sub-lattice count has to come from quantities both engines agree
     on — integers, or values quantised onto a grid the way `infillSnap` does. **A T2 design constraint.**
+    **[T2 (§12.5): DIAGNOSED — stamen rod edges exactly 0.6 mm long, ⌈L/e⌉ deciding on the last bit; T2's
+    counts are decided on lengths snapped to 2⁻²⁰ mm and agree in both engines on all 12 rows.]**
 17. **NOTED, not a question — the float32 census reads non-manifold edges the index census does not.**
     Overlapping closed shells (the feet in the hub, the tube ring on the hub) can have split points of two
     DIFFERENT shells land on one float32 position, which the STL gates' census reads as a shared edge with
     four triangles: 60 on the default at 0.6 mm, 0 at 0.4, every shell index-clean. It is the export
     contract's overlap, not an open shell, and it moves with the edge target. Any TX gate that counts
     non-manifold edges on a relieved mesh needs to know which census it is reading.
+
+## 12. T2 — B's own lattice (Oct 22)
+
+**Prototype only.** Two new files beside T1's — `bloom-texture-lab-lattice.js` (the lattice, a
+runtime-patched COPY of `bloom-geometry.js`) and `tools/bloom-texture-lab-lattice.mjs` (the TX check, its
+must-fail, the engine comparison and the budget) — two prototype files edited (`bloom-texture-lab-core.js`,
+`tools/bloom-texture-lab-measure.mjs`) and their data (`docs/data/bloom-surface-texture-*-t2*.json`). **No
+shipped file, no gate, no matrix row, no frozen phase, no workflow** (§12.9). Rulings in force: attachment B,
+outward only, no coupon, relief on release and in the export only, /plot has no say, and **Q14 (Oct 22):
+T2's triangle bar is the CONFORMING FLOOR**, TQ1's — the least a split that keeps every shipped edge can
+emit, Σ max(n_ab + n_bc + n_ca − 2, 2A/e²) over the shipped triangles — derived, never a typed ratio of 2A/e².
+**Mode and sampling, named, for every figure below:** EXPORT geometry; the lattice for petals, sepals and
+leaves and T1's 'rows' split (snapped — §12.5) for everything else; edge targets 0.6 and 0.4 mm; the
+wall/gap rays as §4 and §11.3 (every 5th vertex of the subdivided mesh — §12.6 shows where that sampling
+misleads); outward relief only.
+
+### 12.1 What the lattice is
+
+**A patched copy, never an edit.** `bloom-texture-lab-lattice.js` reads `bloom-geometry.js`' text, applies
+anchored edits (each must match exactly once, or it refuses), and imports the result (a temp file in Node, a
+Blob URL in the browser). `emitPanel` becomes a dispatcher: OFF it calls `emitPanelShipped`, which is the
+shipped function's text verbatim (TX0 holds that to the float); ON, for the accumulator the lattice was
+switched on for, it calls `emitPanelLattice`.
+
+**Sub-rows and sub-columns, evaluated on the surface.** Between two ladder stations the lattice inserts
+sub-rows at uniform u through the organ's own row law — `petalSurface(...).rowAt(u)` for petals and sepals
+(a sepal IS the petal builder on its ring), `leafSurface`'s `rowAt(u)` for leaves and leaflets — and
+across a row it inserts sub-columns through the row's own `sect(v)`. So every new point sits on the true
+surface, and **the shipped ladder never moves**: every ladder row and every shipped column is evaluated
+exactly as the shipped emitter evaluates it (TX1). The counts are integers decided on snapped lengths:
+m sub-rows = ⌈snap(d_max)/e⌉ over the row pair's chords, raised until every consecutive pair of the placed
+chain is within e (a leaf's tooth sinus lies between two rows and needed it), and c sub-columns per row from
+its own longest column gap. **Every per-row quantity the skin depends on** — the bead's room, the margin arc
+`sM`, the buried-end ramp `g`, the radius, the inset, the taper distance — **is decided on the shipped rows
+and columns and read interpolated on the sub-points**, which is what keeps the shipped skin vertices
+bit-identical (the `the-margin-arc-is-read-on-the-lattice` mutant is that rule broken). Rows of different
+column counts are zipped by the integer parameter rule, taking the shorter diagonal where the two candidate
+edges differ by more than `ZIP_SLACK_MM` (1e-6): a tooth flank read a 1.80e edge without it.
+
+**What is not refined in u, and why — each one a decision made without a ruling (§12.8):**
+- a petal's FOOT rows and the seam gap (the foot-to-blade clearance law is a fold guard; a sub-row inside it
+  is a row the law never cleared) — columns only;
+- a BUCKLED petal (`trueNormalRows`' normal is a lattice quantity against the NEIGHBOURING rows, so a
+  sub-row changes the shipped rows' normals) — columns only;
+- a tube-lobe row reshaped by the tube (`sect !== ownSect`) — columns only;
+- the TUBE RING (`periodic` / `thinAt` panels) — refused to the lattice, so it takes T1's split: it has no
+  row law to evaluate (`emitTubeRings` hands `emitPanel` rows it built itself);
+- the throwaway accumulators (the sepal angle scan's trial builds, the inflorescence's floret units) — the
+  lattice is switched on for ONE accumulator, so a floret is drawn unrefined into a lattice bloom. No demo
+  state has an inflorescence; the corner does not either.
+
+**The infill's cell region** goes through its own refiner (`emitInfillPanel`'s longest-edge bisection in
+the plan, points through `surface.at`) with its threshold capped at min(the lattice's longest edge, e).
+That is the shipped mechanism at a smaller bar, not a lattice, and §12.3 shows what it costs.
+
+**The grid capture keeps the ladder's rows** (TX1(b)) — §10's "decided here rather than left implicit".
+
+### 12.2 TX0–TX4, and the must-fail
+
+`node tools/bloom-texture-lab-lattice.mjs` — the TQ check extended to the lattice. Every state, 0.6 and 0.4
+mm, all PASS; data `docs/data/bloom-surface-texture-lattice-t2-{default,whole,infill,tube}.json`.
+
+| clause | asserts | reference (owner) |
+|---|---|---|
+| **TX0** | the patched copy with the lattice OFF emits the shipped stream, every float positionally under `Object.is` | the shipped module's own build |
+| **TX1** | (a) every vertex of every shipped ladder-face triangle of a petal, sepal or leaf is in the lattice emission as the same doubles; (b) every organ instance's captured ladder samples identical | the shipped module's own build |
+| **TX2** | every lattice skin vertex is its row law's own point (recomputed in the tool through the shipped row object or the organ's `rowAt(u)`, to the bit); sub-row u strictly between its neighbours; columns strictly increasing in v | the organ's row law, called from the tool |
+| **TX3** | 0 boundary edges in index space, no non-manifold edge the shipped soup did not have, 0 unmatched DIRECTED edges on the lattice's own triangles | — |
+| **TX4** | each organ's lattice triangles ≤ **2.0×** the conforming floor of the shipped panel triangles they replace (TQ1's bar); the strict ≤ 1.0× reported beside it (§12.3) | the floor, from the shipped triangles |
+
+Checked to the bit: 38,256 (default 0.6) to 69,504 (default 0.4) skin vertices per state on TX2; 9,120 /
+18,120 ladder-face vertices on TX1(a). **The chord a sub-point would have been on stands 0.099 mm off the
+surface on the default petal at 0.6 mm, 0.135 at 0.4** — what the lattice resolves that a split cannot.
+
+**`--control` — 9 of 9 behave** (on the whole bloom at 0.6 mm, plus a curled control state, curl 180 × cup
+0.6 with leaves): the clean tree passes; `a-shipped-row-moves` (every ladder row re-evaluated 1e-9 of u
+up) → TX1, 17,280 of 18,120 vertices missing; `sub-rows-on-flat-chords` → TX2, 23,987 of 60,934 off the row
+law, and on the curled state 24,992 of 51,536 with the chord **0.101 mm** off the surface (so it is not
+firing on rounding); `sub-columns-on-flat-chords` → TX2; `the-margin-arc-is-read-on-the-lattice` → TX1 (235
+ladder vertices); `the-grid-captures-the-lattice` → TX1(b); `the-zip-winds-the-bottom-skin-backwards` → TX3
+(83,944 unmatched directed edges); `the-off-path-moves` → TX0. The two the ruling named — a lattice that
+moves a shipped row, a lattice on flat chords instead of the surface — are the first three.
+
+**What TX does not cover, named.** TQ2 (no fans) and TQ3 (pieces sum to the shipped triangle's area) are
+T1's and are not restated: TQ3 is false BY DESIGN on a lattice whose points leave the shipped chords, and
+fans are reported (under-1° counts, §12.3) rather than asserted per region.
+
+### 12.3 Against the conforming floor (Q14), per organ, per state
+
+The lattice's own triangles against the floor of the shipped panel triangles they replace; the hub, stem,
+rods and tube ring are T1's split and are shown against their own floor for completeness. **Node and
+Chromium agree on every figure here** (§12.5).
+
+| state | organ | e | shipped | **lattice** | floor | **× floor** | T1 rows | quality: min-angle p1 / p50 · <1° · <5° (T1 rows) |
+|---|---|---|---|---|---|---|---|---|
+| default | petal | 0.6 | 24,496 | **87,376** | 98,960 | **0.88** | 98,800 | 5.95 / 41.5 · 144 · 640 (5.95 / 37.8 · 400 · 896) |
+| default | petal | 0.4 | 24,496 | **152,464** | 146,625 | **1.04** | 173,568 | 7.53 / 44.0 · 144 · 928 (7.63 / 41.8 · 432 · 928) |
+| whole | petal | 0.6 / 0.4 | as default | 87,376 / 152,464 | | 0.88 / 1.04 | 98,800 / 173,568 | |
+| whole | leaf | 0.6 | 9,132 | **32,004** (+744 petiole) | 33,288 | **0.96** | 33,894 | 4.03 / 39.7 · 72 · 357 (4.28 / 34.4 · 168 · 444) |
+| whole | leaf | 0.4 | 9,132 | **55,476** (+1,044) | 49,434 | **1.12** | 59,748 | 6.31 / 42.7 · 72 · 372 (6.11 / 37.7 · 174 · 447) |
+| whole | sepal | 0.6 | 15,310 | **21,690** | 31,250 | **0.69** | 28,970 | 1.89 / 40.0 · 90 · 590 (1.89 / 35.7 · 250 · 570) |
+| whole | sepal | 0.4 | 15,310 | **47,250** | 54,290 | **0.87** | 52,670 | 3.70 / 41.5 · 0 · 590 (3.91 / 39.4 · 250 · 570) |
+| infill | petal | 0.6 | 108,736 | **213,104** | 208,592 | **1.02** | 197,680 | 0.19 / 13.0 · 10,592 · 60,264 (0.22 / 17.9 · 6,736 · 38,424) |
+| infill | petal | 0.4 | 108,736 | **310,800** | 352,945 | **0.88** | 348,496 | 0.07 / 12.0 · 19,520 · 90,024 (0.23 / 19.2 · 11,016 · 59,816) |
+| tube | petal | 0.6 | 20,256 | **58,464** | 81,642 | **0.72** | 84,586 | 4.22 / 42.0 · 144 · 640 (4.22 / 39.3 · 400 · 896) |
+| tube | petal | 0.4 | 20,256 | **100,672** | 123,018 | **0.82** | 152,644 | 5.95 / 41.9 · 144 · 928 (7.35 / 41.3 · 432 · 928) |
+
+T1's split on the rest, same states: hub 4,608 / 9,600 (default), 4,992 / 12,000 (whole); stem 20,242 /
+30,580; stamens 16,080 / 24,000; style 1,900 / 3,200; tube ring 22,016 / 36,256 — at 0.6 / 0.4 mm.
+
+**Under 1.0× the floor is possible and is not a contradiction**: the floor is per shipped TRIANGLE, and a
+lattice cell spans two of them — the quad's diagonal is never cut, the same reason T1's paired quads read
+under 1×. **Edge lengths:** every refined face's longest edge is within **1.27e** (p99 1.09–1.23e); the
+exempt faces — the foot rows and the seam gap left unrefined in u — keep edges up to **1.80 mm**, which B
+masks (`maskFeet`) and which T3 must not relieve unmasked.
+
+**THE STRICT READING OF Q14 IS MISSED ON THREE ROWS, AND THE CAUSE IS STRUCTURAL.** Against TQ1's 2.0× bar
+every organ passes (worst 1.12×). Against the floor itself (≤ 1.0×): the petal at 0.4 mm (1.04×), the leaf at
+0.4 mm (1.12×) and the infill petal at 0.6 mm (1.02×) are over. A lattice cell's count is a PRODUCT of two
+ceilings — ⌈row gap / e⌉ × ⌈column gap / e⌉ — where the floor is a SUM of per-edge segment counts on each
+shipped triangle; where both directions round up at once the product overshoots the polygon count. Which of
+the two Q14 means is **question 18** (§12.8). **The infill's cell region is WORSE than T1** at 0.6 mm
+(213,104 against 197,680) and on quality at both edges (19,520 triangles under 1° at 0.4 mm against T1's
+11,016): the shipped refiner's plan-space bisection at a smaller bar makes slivers where T1's rows did not —
+**question 19**.
+
+### 12.4 Budget — the four states and the two corners
+
+`node tools/bloom-texture-lab-lattice.mjs --budget` (data `docs/data/bloom-surface-texture-budget-t2.json`),
+against the 1,500,000 export budget, beside T1's split **re-measured on this tree**
+(`docs/data/bloom-surface-texture-budget-t1-on-t2-tree.json`). **Over budget is reported, not failed: Q9 is
+open** and T2 only reports it.
+
+| state | shipped | T1 rows 0.6 | **T2 0.6** | T1 rows 0.4 | **T2 0.4** |
+|---|---|---|---|---|---|
+| default | 24,688 | 103,408 (6.9 %) | **91,984 (6.1 %)** | 183,168 (12.2 %) | **162,064 (10.8 %)** |
+| whole bloom | 59,012 | 204,440 (13.6 %) | **185,028 (12.3 %)** | 355,766 (23.7 %) | **326,014 (21.7 %)** |
+| Voronoi infill | 108,928 | 202,288 (13.5 %) | **217,712 (14.5 %)** | 358,096 (23.9 %) | **320,400 (21.4 %)** |
+| tube | 24,672 | 111,210 (7.4 %) | **85,088 (5.7 %)** | 198,500 (13.2 %) | **146,528 (9.8 %)** |
+| `INFILL: x 40 petals x 3 whorls` | 1,035,632 (69.0 %) | 1,866,764 (124.5 %) | **1,880,512 (125.4 %)** | 3,301,322 (220.1 %) | **2,940,832 (196.1 %)** |
+| whole bloom × 40 × 3 | 401,956 (26.8 %) | 1,200,440 (80.0 %) | **1,001,892 (66.8 %)** | 2,121,698 (141.4 %) | **1,795,890 (119.7 %)** |
+
+**§11.4's infill corner is stale on this tree and is not compared against.** It read 1,121,152 shipped and
+3,587,358 at 0.4 mm; #435 (root support, merged after T1) caps the foot at its ring's own arc and moved the
+corner to 1,035,632 shipped, so T1 re-measured here reads 3,301,322. Every T1 figure in this section is the
+re-measurement.
+
+**What it says.** The lattice saves 10–26 % against T1's split on every state at 0.4 mm and on all but the
+infill at 0.6 mm; the infill corner is over the budget at both edges either way (125 % / 196 %), the whole
+corner fits at 0.6 mm (66.8 %) and not at 0.4 mm (119.7 %). Q9 stands, at these numbers.
+
+**The stem (Q15).** It stays on T1's split — T2 does not refine it — and costs **20,242 at 0.6 mm and 30,580
+at 0.4 mm** (0.52× / 0.53× its floor). Of that, the BORE is **9,024 / 13,440** (44.6 % / 43.9 %), the outer
+wall 9,912 / 14,974 and the two ends 1,308 / 2,166 (classified by face normal on T1's split; the shipped
+stem is 286 outer, 96 bore, 188 end triangles). A stem whose bore is left at its shipped 96 would be about
+**11,300 / 17,200** — an estimate, not a build: the bore and the end annuli share edges, and leaving one
+unrefined is T5's construction to make (Q15 is still open on whether to).
+
+### 12.5 Engine agreement (Q16)
+
+`node tools/bloom-texture-lab-lattice.mjs --browser` (data `docs/data/bloom-surface-texture-lattice-t2-
+parity.json`; Chromium 141.0.7390.37 through Playwright against Node 22): **every count agrees, organ by
+organ, on all 12 rows** — the four states and both corners at 0.6 and 0.4 mm, the lattice's own triangles
+and T1's split of the rest. Each discrete decision records its margin from its threshold, and the smallest
+are far above the ~1e-13 mm the engines disagree by: row ≥ 8.7e-5 mm, column ≥ 4.7e-4, infill bisection ≥
+1.4e-5, snapped ceilings ≥ 2.7e-11, diagonal ties exactly the 1e-6 slack.
+
+**Q16 diagnosed — T1's split on the stamen rods, and fixed for T2's use only.** With T1's split unchanged,
+the whole bloom at 0.6 mm read **15,680 stamen triangles in Node and 15,672 in Chromium**: the stamen rod's
+edges are 0.6 mm long to the last bits, and L/e came out 1.0000000000000004 in one engine and
+0.99999999999999967 in the other, so ⌈L/e⌉ was 2 in one and 1 in the other. `subdivide` now takes an
+opt-in `snap` (edge lengths onto `SNAP_GRID_MM` = 2⁻²⁰ mm before the ceiling, the `infillSnap` precedent),
+and T2's split of the rest uses it — which is why T2's stamens read 16,080 where T1's read 15,680. **T1's
+default is unchanged** (its tools reproduce §11 exactly; re-run at close), so §11.7's 204,432 / 204,440 stays
+true of T1 and is now explained.
+
+### 12.6 Print reality on the lattice — outward relief re-measured
+
+`node tools/bloom-texture-lab-measure.mjs --lattice` (data `docs/data/bloom-surface-texture-measure-t2.json`),
+§11.3's columns, totals over every class at pebble 0.3 mm (the default's other rows likewise):
+
+| state | mesh T1 → T2 | arm | newly < 1.0 (T1 → T2) | folds (T1 → T2) | gaps newly < 1.0 (T1 → T2) | hole bar newly < 1.5 |
+|---|---|---|---|---|---|---|
+| default 0.4 | 183,168 → 162,064 | A | 2 → **0** | 2 → **0** | 8 → 11 | — |
+| | | **B** | 0 → **0** | 0 → **0** | 4 → 5 | — |
+| whole 0.6 | 204,440 → 185,028 | A | 16 → 15 | 25 → 15 | 370 → 345 | — |
+| | | **B** | 0 → **0** | 0 → **0** | 328 → 316 | — |
+| whole 0.4 | 355,766 → 326,014 | A | 13 → 11 | 22 → 11 | 484 → 589 | — |
+| | | **B** | 0 → **0** | 0 → **0** | 428 → 555 | — |
+| infill 0.4 | 358,096 → 320,400 | A | 736 → 1,304 | 712 → 848 | 141 → 81 | 263 → 238 |
+| | | **B** | 0 → **0** | 0 → **0** | 6 → 6 | 0 → 0 |
+| tube 0.4 | 198,500 → 146,528 | A | 1 → 0 | 1 → 0 | 9 → 0 | — |
+| | | **B** | 0 → **0** | 0 → **0** | 1 → 0 | — |
+
+**B STILL THINS NOTHING** — 0 newly under 1.0 mm and 0 folds on every class of every state, on the default
+at every height and relief type (H 0.1–0.5 pebble, cellular, ribbing), with B's direction on every lattice
+vertex the EXACT sheet normal the lattice evaluated it from (69,518 such vertices on the default at 0.4 mm,
+115,266 on the whole bloom), not the nearest ladder sample. Every displaced mesh: 0 boundary edges.
+
+**The whole bloom's closed gaps at 0.4 mm (428 → 555) are a SAMPLING artefact, not the lattice — measured.**
+The rays sample every 5th vertex of the subdivided mesh, and the two meshes number their vertices
+differently, so the 2,731 rod samples are different vertices (finite-gap rays 749 on T1, 933 on T2). Over
+EVERY rod vertex (13,656 in both meshes — the rods are T1's split in both) the count is **1,311 on T1 and
+1,314 on T2**. Durable rule 1 in this tool: a per-vertex count off a 1-in-5 sample is not comparable across
+two meshes; the shares are.
+
+**A on the infill is worse on the lattice** (cell skins 36 → 877 newly under 1.0 mm): A's averaged mesh
+normal over the cell region's bisection slivers (§12.3) — A is not the ruled arm, recorded and not pursued.
+**The infill's float32 census reads 80 non-manifold edges on the lattice against 224 shipped and 2,456 on
+T1's split**; all 80 lie on shipped coincident-sheet edges (cell margin against cell margin, checked
+segment by segment, worst distance 0); the 144 shipped cell-margin-against-cell-skin coincidences are gone
+because the cell skin is refined at points the margin wall is not. 0 new. **The tube at 0.6 mm reads 96
+float32 non-manifold edges** on the lattice, 0 in index space — §11.7 item 17's overlap census, at a new
+edge target.
+
+**A measurement defect found on the way, and fixed in the instrument.** The first lattice re-measure read
+317 of 927 hub samples "thinned" at H 0.1 mm, every one by exactly its own displacement: the measure's
+float32 weld put lattice foot vertices and the hub's split points on one key and merged all 9 shells into
+1, so the hub's inward ray found the buried foot as its own material. `weld` now takes `groups` (weld only
+within an organ instance), on by default for the lattice; on T1's split it changes nothing (the same 9
+shells, the same vertex arrays, verified), so the T1 rows remain comparable.
+
+### 12.7 §10's T2 bar, struck (Q14)
+
+§10 wrote T2's acceptance as *"the default bloom near 99,000 triangles at 0.4 mm"* — 2A/e² for the default.
+**Struck by Q14 (Oct 22):** no refinement that keeps the shipped edges can reach 2A/e² (the ⌈L/e⌉ rounding,
+§11.7 item 14), so the bar is the conforming floor, derived per organ from the shipped triangles. Measured:
+the default reads **162,064** at 0.4 mm against a floor of 146,625 for its petals (1.04×) plus the hub on
+T1's split.
+
+### 12.8 Open questions T2 raises (written down, not acted on)
+
+18. **OPEN — Q14's floor: strict (≤ 1.0×) or TQ1's 2.0× bar?** The lattice passes 2.0× everywhere (worst
+    1.12×) and misses 1.0× on three rows (§12.3) because a lattice cell is a product of two ceilings and the
+    floor a sum. TX4 asserts 2.0× and reports the strict reading. Meeting 1.0× everywhere would need
+    sub-column counts chosen jointly across a row pair (or fewer than ⌈gap/e⌉ where a neighbour already
+    under-runs), which is a new decision on lengths.
+19. **OPEN — the infill's cell region.** Its shipped refiner, at a smaller bar, is worse than T1's split at
+    0.6 mm on count (1.02× vs 0.95×) and at both edges on quality (19,520 triangles under 1° at 0.4 mm
+    against 11,016). The cells have no (u, v) row law to sub-sample; giving them one is T4's (the Voronoi
+    walls) or a ruling that the cell region keeps T1's split.
+20. **OPEN — the tube ring has no row law.** `emitTubeRings` builds its rows itself and hands them to
+    `emitPanel` as `periodic`; T2 leaves it on T1's split. A ring evaluator (the `petalSurface` shape for the
+    tube) is T3's to build if the tube ring is relieved (Q5).
+21. **OPEN — what is NOT refined in u: the petal foot and seam gap, buckled petals, tube-lobe rows,
+    florets.** Each is a decision made without a ruling (§12.1) and each keeps edges up to 1.80 mm.
+    Florets matter only once an inflorescence is textured.
+22. **NOTED — §10 called T2 "shipped geometry"; the brief said prototype only.** The brief was followed: the
+    lattice lives in a patched copy, so §10's "Off by branch … the byte partition" and its gates-moved list
+    apply to the session that ports it into `bloom-geometry.js`, not to this one. Not resolved here.
+
+### 12.9 Reproduce, and what was not touched
+
+```
+npm i --no-save three@0.161.0 playwright-core      # --browser serves the page's own module graph
+node tools/bloom-texture-lab-lattice.mjs --out <json> --only default            # TX0–TX4, one state at a time
+node tools/bloom-texture-lab-lattice.mjs --control                              # the must-fail, 9 legs, under 10 min
+node tools/bloom-texture-lab-lattice.mjs --browser --out docs/data/bloom-surface-texture-lattice-t2-parity.json --resume
+node --max-old-space-size=12000 tools/bloom-texture-lab-lattice.mjs --budget --resume --out docs/data/bloom-surface-texture-budget-t2.json
+timeout 590 node tools/bloom-texture-lab-measure.mjs --lattice --resume --only <state> --out docs/data/bloom-surface-texture-measure-t2.json
+```
+
+Every long run in the FOREGROUND, one state at a time under `timeout`, with `--resume` (the corners take
+~4.5 min at 0.4 mm). **Predeclared untouched and verified by `git diff --stat origin/main...HEAD` at close:**
+every shipped bloom file, every gate, every workflow, the matrix and the frozen phases. **No workflow's path
+filter names any file this PR changes**, so it starts no Actions run.
