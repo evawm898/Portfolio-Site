@@ -174,8 +174,32 @@ the floor wins (40 petals × 6 whorls, inner rings).
 - `frozen/phase82` is the **1,485 rows at `8403b47`**, registered in both maps and proved
   deep-equal.
 
-*(the byte partition, the census re-records and the combination gate — §6a–§6c — are
-filled in from the runs below)*
+### 6a. Bytes
+
+*(filled from the byte partition run below)*
+
+### 6b. Census
+
+*(filled from CI's X1 / X2 and the edge-profile gate)*
+
+### 6c. Combination gate
+
+Re-run whole (`node tools/bloom-combination-gate.mjs`, plus `--control`). **The
+sepal-self cells did not move** (a sepal's root thickens, and `measureWall` reads the
+lamina's own approach, which the root's thickness does not reach on any grid cell).
+**Leaf-stem moved, and every move is the root law, re-recorded by value, never widened:**
+
+| cell | before | after | why |
+|---|---|---|---|
+| `leafangle-x-stem @ 70 x stem 6 / 3 / 12` | 0.821 / 0.822 / 0.821 | 0.540 / 0.541 / 0.540 | the 52 mm leaf is ×1.499 at its root (1.80 mm on the 1.20 mm sheet), and the blade's base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it |
+| `leafangle-x-tooth @ 70 x tooth 0.26 / 0.6 / 1` | 0.821 × 3 | 0.540 × 3 | the same state through the serration pair |
+| `lobedwidth-x-leafangle @ 70 x width 34 / 10 / 40` | 0.6544 / 0.5865 / 0.6991 | 0.4071 × 3 | the 46 mm lobed leaf is ×1.318 at its root; the near point moves to the thickened base, which no lobed control reaches |
+
+So two axes went **bit-identically inert** and are declared in `COMBINATION_INERT` at
+`maxMoveMm: 0` with their numbers — `lobedwidth-x-leafangle @ lobedWidth` (3.346 / 2.214 /
+0.407 / 0.000 mm at leafAngle 35 / 50 / 70 / 85 for every width) and `lobedround-x-sinus
+@ lobedRound` (3.346 / 3.405 / 3.346 across the sinus for every roundness). CG7 fails the
+day either reaches the measure again. No verdict changed, no pair added or retired.
 
 ## 7. Sheet
 
