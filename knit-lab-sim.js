@@ -113,12 +113,31 @@ export const PARAMS = {
                                // PLATE_CLOSE_FRAMES. A decrease stacks two heads between a third yarn's
                                // legs; at depth 1 there is not a diameter between them to draw it in.
   PLATE_CLOSE_FRAMES: 90,
-  PLATE_HALF_GAP: 1.6,         // the swatch lies between two frictionless plates: every yarn
+  FIXTURE: 'clamp',            // 'clamp' (phase 3, after review): a tensile fixture — the top jaw CLAMPS every
+                               // point of the last course across the full width (and the yarn's tail), the
+                               // cast-on is the bottom jaw, the side edges are free, and there are NO plates:
+                               // the free edges curl as stockinette does. 'comb': phases 1-3 — a comb of pins
+                               // through the live loops and the swatch between two plates (PLATE_HALF_GAP).
+  PLATE_HALF_GAP: Infinity,    // (the 'comb' fixture's plates; 1.6 there) the swatch lay between two frictionless plates: every yarn
                                // CENTRELINE keeps |z| <= this, in d (the loops' own depth is
                                // ±(LOOP_DEPTH + ½) d). Without them a frictionless, weightless
                                // stockinette swatch rolls its free side edges up indefinitely and
                                // the rolling shortens it (measured: the comb load creeps up by
-                               // ~6,000 over 1,400 frames after "settling"). Infinity = no plates.
+                               // ~6,000 over 1,400 frames after "settling"). Infinity = no plates. The plates
+                               // also made the frictionless cycle lose 9% of its work: the stockinette buckled
+                               // out of plane between them into more than one rest shape.
+  START_HALF_GAP: 1.6,         // the deep drawn start is squeezed to this half-depth over PLATE_CLOSE_FRAMES while
+                               // the yarn reels in to length, and released after: a START-UP device only (with
+                               // no squeeze the loops shorten while still deep and the swatch crumples). It
+                               // touches nothing once the swatch starts to settle.
+  START_RELEASE_FRAMES: 60,    // ...and opens linearly to nothing over this many frames after closing.
+  OUT_OF_PLANE_K: 0,           // a weak spring holding the fabric's MID-SURFACE near z = 0 (no plates): each
+                               // INTERIOR loop (not in an edge wale or an edge course) feels -K x the z of
+                               // its own centroid, in model load units per d, spread evenly over its points —
+                               // so a loop keeps its own depth and the edges are free to curl. Along z only:
+                               // it never reaches a jaw's load (read along x or y).
+  COURSE_EDGE_LOAD: 0,         // in a course test the live loops ride a NEEDLE (the pins, each free along x)
+                               // that is force-controlled to this load: 0 = the top edge is free.
   PIN_RADIUS: 0.5,             // comb pin radius, in d.
   TAIL_TIED: 1.5,              // this much of the yarn's end, in d, is tied to the comb.
   COMB_FOLLOW: 1e-3,           // while settling the comb is FORCE-controlled: it moves at this
@@ -315,6 +334,11 @@ export class KnitSim {
     this.closing = 0; this.subIndex = 0; this.zStart = 0; for (let i = 0; i < y.n; i++) this.zStart = Math.max(this.zStart, Math.abs(y.pos[3 * i + 2]));
     // which loop every point belongs to (-1: a selvedge turn), for the topology check
     this.loopOf = y.loopOf; this.uOf = y.uOf;
+    { const nl = topo.loops.length, last = topo.rows.length - 1, cnt = new Float64Array(nl);
+      this.interior = new Uint8Array(nl);
+      for (let c = 1; c < last; c++) { const row = topo.rows[c]; for (let k = 1; k < row.length - 1; k++) this.interior[row[k]] = 1; }
+      for (let i = 0; i < y.n; i++) if (y.loopOf[i] >= 0) cnt[y.loopOf[i]]++;
+      this.loopCount = cnt; this.loopZ = new Float64Array(nl); }
     this.prev = new Float64Array(n * 3);
     this.v = new Float64Array(n * 3);
     this.w = new Float64Array(n).fill(1);           // inverse mass
@@ -326,8 +350,12 @@ export class KnitSim {
     this.tieBase = new Float64Array(n * 3);
     const tail = Math.ceil(P.TAIL_TIED * P.YARN_DIAMETER / this.seg);
     // (it is drawn deep like the rest and moves to its own depth while the plates close)
-    this.tieStart = new Float64Array(n * 3); this.tieFlat = y.flatPos;
+    this.tieStart = new Float64Array(n * 3); this.tieFlat = y.flatPos; this.tailFrom = n - tail;
     for (let i = n - tail; i < n; i++) { this.grip[i] = 2; this.w[i] = 0; for (let k = 0; k < 3; k++) this.tieBase[3 * i + k] = this.tieStart[3 * i + k] = this.x[3 * i + k]; }
+    // FIXTURE 'clamp': the top jaw clamps every point of the last course, across the full width, where
+    // it is drawn (it moves from the deep drawing to the true one over PLATE_CLOSE_FRAMES like the tail)
+    this.clampTop = P.FIXTURE === 'clamp';
+    if (this.clampTop) { const last = topo.rows.length - 1; for (let i = 0; i < n; i++) if (this.course[i] === last) { this.grip[i] = 2; this.w[i] = 0; for (let k = 0; k < 3; k++) this.tieBase[3 * i + k] = this.tieStart[3 * i + k] = this.x[3 * i + k]; } }
     this.rest = new Float64Array(n - 1);
     for (let i = 0; i < n - 1; i++) this.rest[i] = this.dist(i, i + 1);
     this.restStart = new Float64Array(this.rest);      // reeled in to seg over PLATE_CLOSE_FRAMES
@@ -617,8 +645,14 @@ export class KnitSim {
   }
 
   solvePlates() {
-    let lim = this.P.PLATE_HALF_GAP * this.P.YARN_DIAMETER; if (!Number.isFinite(lim)) return;
-    if (this.frame < this.P.PLATE_CLOSE_FRAMES) lim += (this.zStart - lim) * Math.max(0, 1 - this.closing);
+    let lim = this.P.PLATE_HALF_GAP * this.P.YARN_DIAMETER;
+    if (!Number.isFinite(lim)) {                     // no plates: only the start-up squeeze, then nothing
+      const P = this.P, f = this.frame - P.PLATE_CLOSE_FRAMES;
+      if (!P.START_HALF_GAP || f >= P.START_RELEASE_FRAMES) return;
+      lim = P.START_HALF_GAP * P.YARN_DIAMETER;
+      if (f < 0) lim += (this.zStart - lim) * Math.max(0, 1 - this.closing);
+      else lim += (this.zStart - lim) * (f / P.START_RELEASE_FRAMES);
+    } else if (this.frame < this.P.PLATE_CLOSE_FRAMES) lim += (this.zStart - lim) * Math.max(0, 1 - this.closing);
     const x = this.x, w = this.w;
     for (let i = 0; i < this.n; i++) { if (w[i] === 0) continue; const z = x[3 * i + 2]; if (z > lim) x[3 * i + 2] = lim; else if (z < -lim) x[3 * i + 2] = -lim; }
   }
@@ -645,8 +679,12 @@ export class KnitSim {
     } else if (g[i] === 4) {                             // the right side jaw is driven along x
       x[3 * i] = this.tieBase[3 * i] + this.sideOffset; x[3 * i + 1] = this.tieBase[3 * i + 1]; x[3 * i + 2] = this.tieBase[3 * i + 2];
     }
+    const K = P.OUT_OF_PLANE_K, lo = this.loopOf, LZ = this.loopZ;
+    if (K) { LZ.fill(0); for (let i = 0; i < n; i++) { const l = lo[i]; if (l >= 0 && this.interior[l]) LZ[l] += x[3 * i + 2]; }
+      for (let l = 0; l < LZ.length; l++) if (this.interior[l]) LZ[l] = -K * (LZ[l] / this.loopCount[l]) / this.loopCount[l] * dt; }   // dv_z per point
     for (let i = 0; i < n; i++) {
       if (w[i] === 0) continue;
+      if (K) { const l = lo[i]; if (l >= 0 && this.interior[l]) v[3 * i + 2] += LZ[l]; }
       let f = (x[3 * i + 1] - yB) / span; f = f < 0 ? 0 : f > 1 ? 1 : f;
       const ref = combV * f;
       let fx = sideV ? (x[3 * i] - xL) / wspan : 0; fx = fx < 0 ? 0 : fx > 1 ? 1 : fx;
@@ -668,7 +706,7 @@ export class KnitSim {
       // is the one met exactly, and a knit yarn is inextensible before it is impenetrable.
       const m = this.solveContacts(P.CONTACT_COMPLIANCE / dt2, it === 0);
       if (it === 0) this.lastMinPre = Math.sqrt(m);
-      this.solvePins();
+      if (!this.clampTop || this.pinsFree) this.solvePins();
       this.solvePlates();
       this.solveRail();
       this.solveBend(P.BEND_COMPLIANCE / dt2);
@@ -705,7 +743,8 @@ export class KnitSim {
       // force-controlled comb while settling, and through a course test (it holds the preload while the
       // width changes); speed-limited so a contact spike cannot fling it off the loops
       if (this.phase === 'settling' || (course && this.phase !== 'held' && !this.combFixed)) {
-        const v = Math.max(-P.COMB_MAX_SPEED, Math.min(P.COMB_MAX_SPEED, -P.COMB_FOLLOW * (this.combLoad - P.PRELOAD)));
+        const target = course && this.clampTop ? P.COURSE_EDGE_LOAD : P.PRELOAD;
+        const v = Math.max(-P.COMB_MAX_SPEED, Math.min(P.COMB_MAX_SPEED, -P.COMB_FOLLOW * (this.combLoad - target)));
         this.pullOffset += v * dt;
       }
       if (this.phase === 'pulling' && this.pullAuto) {
@@ -874,8 +913,16 @@ export class KnitSim {
   }
   // Course test, part 1: free the width. The cast-on rides a rail (y, z kept, x free), the comb's pins
   // slide along x, the comb keeps the preload; the swatch settles again at its own width.
+  // FIXTURE 'clamp': the cast-on is let go entirely and the top jaw opens onto a NEEDLE (the pins,
+  // each free along x, the needle force-controlled to COURSE_EDGE_LOAD): top and bottom edges free.
   releaseWidth() {
     this.dir = 'course'; this.pinsFree = true;
+    if (this.clampTop) {
+      for (let i = 0; i < this.n; i++) if (this.grip[i] === 1 || (this.grip[i] === 2 && i < this.tailFrom)) { this.grip[i] = 0; this.w[i] = 1; }
+      this.v.fill(0); this.builtAt = null;
+      this.phase = 'freeing'; this.freeFrames = 0; this.spanHist = []; this.freeDrift = Infinity;
+      return;
+    }
     this.railY = new Float64Array(this.n); this.railZ = new Float64Array(this.n);
     for (let i = 0; i < this.n; i++) if (this.grip[i] === 1) { this.grip[i] = 5; this.w[i] = 1; this.railY[i] = this.x[3 * i + 1]; this.railZ[i] = this.x[3 * i + 2]; }
     this.v.fill(0); this.builtAt = null;
