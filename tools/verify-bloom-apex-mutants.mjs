@@ -214,6 +214,9 @@ const STEM_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 60, stemDiameter: 
    to avoid. `builtOn` above cannot serve: it reads the PETAL's grid, and
    every quantity here is about where a SECOND HEAD stands. */
 const INFLO_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 120, inflorescence: 'RACEME', ...over });
+/* THE UMBEL'S WITNESS STATE (the umbel session): six florets, the head OFF —
+   the spider lily's own default — on the shipping 6 mm stem. */
+const UMBEL_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 120, inflorescence: 'UMBEL', umbelFlorets: 6, umbelHead: 'OFF', ...over });
 function infloFacts(M, over = {}) {
   try {
     const st = INFLO_STATE(over);
@@ -1454,13 +1457,55 @@ const MUTANTS = [
        names. Caught by the anchor scan above before any mutant ran, which is
        exactly what that scan exists for, and fixed by giving the expression
        ONE OWNER (`rodWallRootMm`) rather than by narrowing the string. */
-    find: '  const rootR = rodWallRootMm(stem);\n  const embedMm = rodWallEmbedMm(stem);',
-    into: '  const rootR = 0;\n  const embedMm = rodWallEmbedMm(stem);', names: ['ID2'],
+    /* RE-ANCHORED by the umbel session: the line gained the umbel's arm (its
+       root is the KNOT's ring); the mutation still lands on the RACEME arm. */
+    find: '  const rootR = umbel ? knot.rho : rodWallRootMm(stem);\n  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);',
+    into: '  const rootR = umbel ? knot.rho : 0;\n  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);', names: ['ID2'],
     witness: (M, C) => {
       const [m, c] = infloPair(M, C);
       const t = bothBuilt(m, c); if (t) return t;
       return (m.rootR === 0 && c.rootR > 0) ? null
         : `the pedicel roots at r = ${m.rootR} on the mutant and ${c.rootR} on the clean tree — the root did not move to the axis`;
+    } },
+
+  /* ---- THE UMBEL (the umbel session, Oct 22) — four mutants, each witnessed
+     on the MUTATED module's own build of an umbel, scoped to the two umbel
+     rows (`rows`), the rows scoped back to them (`for`). ---- */
+  { id: 'the-umbel-pedicel-roots-off-the-junction', rows: /^an umbel/,
+    why: "the umbel's pedicels root on a ring TWICE the knot's radius out — every root disc OUTSIDE the junction, held to the knot by nothing but overlapping florets: watertight, and one piece wherever the florets touch",
+    find: '  const rootR = umbel ? knot.rho : rodWallRootMm(stem);',
+    into: '  const rootR = umbel ? 2 * knot.radiusMm : rodWallRootMm(stem);', names: ['UM2'],
+    witness: (M, C) => {
+      const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); const q = b.inflorescenceBuilt.placed[0]; const K = b.inflorescenceBuilt.knot; return Math.hypot(q.root[0] - K.centre[0], q.root[1] - K.centre[1]) - K.radiusMm; };
+      const m = f(M), c = f(C);
+      return (m > 0 && c < 0) ? null : `the root stands ${m.toFixed(3)} mm past the knot's surface on the mutant and ${c.toFixed(3)} on the clean tree`;
+    } },
+  { id: 'the-head-is-built-while-toggled-off', rows: /^an umbel/,
+    why: "the head toggle is read and ignored: a spider lily asked with no head builds the whole head at the stem's top anyway — a perfectly good closed solid, watertight, one piece",
+    find: '  const headOff = umbelHeadIsAbsent(state) && !!(stemPlanned && stemPlanned.present);',
+    into: '  const headOff = false && umbelHeadIsAbsent(state) && !!(stemPlanned && stemPlanned.present);', names: ['UM0'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).petalsBuilt;
+      const m = f(M), c = f(C);
+      return (m > 0 && c === 0) ? null : `the head built ${m} petals on the mutant and ${c} on the clean tree with the head OFF`;
+    } },
+  { id: 'the-knot-is-typed', rows: /^an umbel/,
+    why: "the junction knot is a typed 6 mm sphere instead of the size the count and the pedicel radius derive — at twelve florets the pedicels then root on a ring wider than the knot",
+    find: '  const radiusMm = rho + rP + MIN_FEATURE_MM / 2;',
+    into: '  const radiusMm = 6;', names: ['UM1', 'UM2'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE({ umbelFlorets: 12 })).inflorescenceBuilt.knot.radiusMm;
+      const m = f(M), c = f(C);
+      return (Math.abs(m - 6) < 1e-9 && Math.abs(c - 6) > 1e-6) ? null : `the knot is ${m} mm on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-umbel-sits-on-the-cut-end', rows: /^an umbel/,
+    why: "the head-off umbel's node is put at the stem's TIP — the end the florist's cut is on — so the knot swallows the cut and the umbel hangs from the free end: watertight, one piece",
+    find: '  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.topZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;',
+    into: '  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.tipZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;', names: ['UM3', 'UM4'],
+    witness: (M, C) => {
+      const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); return b.inflorescenceBuilt.knot.centre[2] - b.stem.tipZ; };
+      const m = f(M), c = f(C);
+      return (Math.abs(m) < 1e-6 && c > 100) ? null : `the knot stands ${m.toFixed(3)} mm above the stem's tip on the mutant and ${c.toFixed(3)} on the clean tree`;
     } },
 
   /* ---- THE REACH INSET (inflorescence build 3, Phase A — #355) ---- */
@@ -3855,6 +3900,12 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'sheetThickness', value: '0.6' }] },
   { label: 'a raceme on 250 mm pedicels (past the head\'s own stem range — the ceiling is the pedicel\'s)',
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'pedicelLength', value: '250' }] },
+  /* THE UMBEL (the umbel session): six florets with the head OFF, and twelve
+     with the head ON — scoped to the four umbel mutants and they to these. */
+  { label: 'an umbel: six florets, the head OFF (the spider lily\'s default)', for: /umbel|head-is-built|knot-is-typed/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }] },
+  { label: 'an umbel: twelve florets, the head ON', for: /umbel|head-is-built|knot-is-typed/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '12' }, { id: 'umbelHead', value: 'ON' }] },
   /* (iv) A RACEME ASKED FOR WITH NO RACHIS, and it is the ONLY state ID0 can
      speak on — measured, not reasoned. ID0 compares the geometry's guard
      against the registry's predicate, and the two agree on every state where
@@ -4176,7 +4227,7 @@ async function famsOn(rows) {
        reach the table through a call the table captures under another
        family's prefix is silent by construction. */
     for (const msg of await inflorescenceAssertions(page, row)) {
-      const mm = /^(ID\d+|NV\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(ID\d+|NV\d+|UM\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE SIZE FIELD (organic variance, build 1) — the rule once more, and the
        first family whose subject is a per-SLOT quantity: every clause is

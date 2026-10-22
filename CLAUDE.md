@@ -6609,6 +6609,37 @@ corymb solves level only up to an 81 mm rachis at the defaults; raising the 120 
 ruling. #231 blocks the 544 % corner from ever being a row.
 Sheet: `node tools/shot-bloom-node-laws.mjs <png>`.
 
+**A BLOOM CAN BE AN UMBEL: FLORETS ON PEDICELS FROM ONE KNOT AT THE STEM'S TOP, THE HEAD A TOGGLE THAT
+SHIPS OFF** (the umbel session, Oct 22 — Eva's rulings of Oct 21–22, the spider lily; read
+`docs/bloom-umbel-outcome.md` before touching `umbelKnot`, `umbelIsAbsent` / `umbelHeadIsAbsent`, `HUB_ABSENT`,
+`inflorescencePlan`'s umbel arm, the knot in `buildInflorescenceInto`, `headPresent` / `racemePresent`,
+`umbelClauses` (UM0–UM4) or block 77).
+- **The raceme was probed first and cannot do it**: `floretNodes 1` whorled is exactly three florets, 66 mm
+  down (`LEAF_NODE_SOLO`), rooted in the wall, the head always on. UMBEL is a third TYPE of the one
+  inflorescence plan — the floret build, the memo, the placement, the area rule and the reach inset are the
+  raceme's own on ONE node; never a second law.
+- `inflorescence` UMBEL with `umbelFlorets` (2–12, default 6) and `umbelHead` (OFF / ON, default OFF). The
+  raceme's node count, phyllotaxy, corymb and gradient hide and are inert under UMBEL (`racemePresent`).
+- **The knot is derived**: the root ring `rho = max((rP + gap/2)/sin(pi/n), head ON ? outerR + rP + gap : 0)`
+  (one printable gap between neighbours — the 90-deg parallel case — and, with the head ON, off the stem that
+  runs on past the knot); the knot is the sphere `rho + rP + gap/2` (the least one is an exact tangency that
+  WELDS — 749 within-shell pairs at 90 deg head ON). Head OFF: centred on the stem's top end, which ends
+  there; the florist's cut stays on the free end (UM4). Head ON: on the stem at the reach-inset depth.
+- **Head OFF builds no head at all**: `buildBloomBody` emits no petal, hub, stamen, style or sepal and reports
+  `HUB_ABSENT` (`absent: true`) in place of the hub record; every head-only family (form, J, ST4+, JS, JG, SP, Z,
+  VS5, coverage, crowding, ST9's sphere channel) stands down on that record, and UM0 holds it true against the
+  controls both ways. The PETAL controls stay visible and the Petal section's label says they shape the FLORETS.
+- **Found on main and fixed**: the `shown` record `fmt` reads never carried the inflorescence plan, so the Type
+  read-out said "no stem to carry it" on every raceme and the gradient cap's hatch was never drawn.
+- `frozen/phase83` is the 1,506 rows at `e4ce6eb` (56f91f4 bloom-wise; its workflow files are main HEAD's).
+- **The florets of one umbel overlap by construction** (no internode): every row but the two-floret ones reads
+  0.0000 mm floret-to-floret — declared by value in `INFLO_APPROACH_XFAIL` and in the combination gate's
+  `umbel-florets-x-angle`, never clamped. ST9 names the knot by its own `triRange`.
+- Budget corner (12 x 12 petals x 1.00, head ON): 1,381,266 export tris, 92.1%, measured before building.
+- Gates: UM0–UM4 in both STL gates; four witnessed mutants in the apex table (`/^an umbel/` rows); panel route
+  (ao) (THIRTY-TWO routes); three combination pairs; block 77 (27 rows, 1,533), smoke block 77 (8, `--conn`).
+  Sheet: `node tools/shot-bloom-umbel.mjs <dir> --png docs/img/umbel.png`.
+
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of
 `docs/bloom-organic-variance-discovery.md`; read `docs/bloom-organic-variance-size-outcome.md`

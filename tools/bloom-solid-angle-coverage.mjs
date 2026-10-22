@@ -424,6 +424,9 @@ export async function measure(page, { capability = null, wantMask = false, mutat
        part of its own, so R1 would compare a FREE re-emission against a fused
        bloom. The tube's own instrument is tools/verify-bloom-tube.mjs
        (TU0-TU6). */
+    /* AN UMBEL WITH ITS HEAD OFF — a LABELLED, LOUD SKIP: there is no head, so
+       there is no crown to cover; the florets are counted, never rasterised. */
+    if (builtFull.hubBuilt && builtFull.hubBuilt.absent) return { bad, r: null, skipped: 'UMBEL, HEAD OFF: there is no head and so no crown to cover — the florets are UM0-UM4\'s and ID\'s' };
     if (builtFull.tube && builtFull.tube.active) return { bad, r: null, skipped: 'TUBE: a fused whorl — this raster re-emits each petal FREE and cannot rebuild the petals the ring reshapes; the fusion is tools/verify-bloom-tube.mjs\'s (TU0-TU6) — RECORDED, NOT BUILT' };
 
     /* ---------------- THE CAPTURE (plan-coverage's wiring, verbatim) ---------------- */

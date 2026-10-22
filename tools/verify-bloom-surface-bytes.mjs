@@ -436,6 +436,22 @@ const PREDICATE_MOVERS = {
      row — a strand record on an INDEPENDENT coil among them — and the GATED
      rows (radius 0, the braid under SPHERE, count 0) must hold to the bit in
      both modes: that is "NONE and INDEPENDENT byte-identical", measured. */
+  /* THE UMBEL (the umbel session). A row moves iff the BASE tree builds a
+     STEM on it (its own `stemPlan` record — the rachis an umbel needs) AND the
+     row asks for an UMBEL. The base tree has no UMBEL value: `baseState` hands
+     it the choice's default (NONE), so the umbel half is read off the
+     CONTROLS. Every other row — every NONE and every RACEME, the GATED rows
+     carrying the umbel's two controls at their extremes under NONE and under
+     a RACEME among them — must hold to the bit in both modes: that is
+     "UMBEL is a new choice value, so every existing row holds BY BRANCH",
+     measured. */
+  'umbel': (st) => {
+    if (String(st.inflorescence) !== 'UMBEL') return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    const fr = base.footRing(bs, acc);
+    return !!(fr.hub && base.stemPlan(bs, fr.hub, acc).present);
+  },
   'stamen-braid': (st) => {
     if (String(st.stamenCoil) !== 'BRAIDED' || !(Number(st.stamenCoilRadius) > 0)) return false;
     const fr = base.footRing(baseState(st), new base.MeshBuilder({ exportMode: true }));

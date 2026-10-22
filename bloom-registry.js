@@ -37,6 +37,7 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
+import { UMBEL_FLORET_RANGE, UMBEL_HEAD_VALUES } from './bloom-geometry.js';
 import { INFLORESCENCE_TYPES, FLORET_NODE_RANGE, FLORET_PETAL_RANGE, FLORET_SCALE_RANGE,
   PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE, PEDICEL_GRADIENT_RANGE, PEDICEL_CORYMB_VALUES } from './bloom-geometry.js';
 import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WALL_MM, INFILL_DENSITY_SWEEP,
@@ -816,7 +817,19 @@ export const PREDICATES = {
      The enum ITSELF is gated on `stemPresent` alone, so a visitor who has a
      stem sees the choice and a visitor who has none does not see a control
      that could do nothing. */
-  inflorescencePresent: { all: [{ id: 'stemLength', min: 1 }, { id: 'inflorescence', oneOf: ['RACEME'] }] },
+  inflorescencePresent: { all: [{ id: 'stemLength', min: 1 }, { id: 'inflorescence', oneOf: ['RACEME', 'UMBEL'] }] },
+  /* THE TWO LAWS UNDER ONE PLAN (the umbel session). A RACEME's controls
+     (nodes, arrangement, gradient, level tops) are hidden AND inert under an
+     UMBEL, whose one node carries `umbelFlorets` evenly spread pedicels. */
+  racemePresent: { all: [{ ref: 'inflorescencePresent' }, { id: 'inflorescence', oneOf: ['RACEME'] }] },
+  umbelPresent: { all: [{ ref: 'inflorescencePresent' }, { id: 'inflorescence', oneOf: ['UMBEL'] }] },
+  /* THE HEAD'S ONE STATEMENT — the twin of the geometry's
+     `umbelHeadIsAbsent` (UM0 checks the two per row, the harness at load).
+     The head is absent exactly on an umbel with `umbelHead` OFF; there the
+     head-only controls (the head's petal COUNT, the per-layer and per-petal
+     scope toggles) are hidden AND inert, and the PETAL section's label says
+     that its controls now shape the FLORETS. */
+  headPresent: { not: { all: [{ ref: 'umbelPresent' }, { id: 'umbelHead', oneOf: ['OFF'] }] } },
 
   /* THE INFILL'S ONE STATEMENT — the twin of the geometry's
      `infillIsAbsent`, and the two are checked against each other at harness
@@ -932,18 +945,18 @@ export const PREDICATES = {
      azimuth, so the leaf's node COUNT and ARRANGEMENT are the pedicels' and
      the two controls are HIDDEN AND INERT. The geometry's half is
      `leafPlan`'s `shared` flag; SN0 checks the two statements per row. */
-  leafNodesOwn: { all: [{ ref: 'leafPresent' }, { not: { ref: 'inflorescencePresent' } }] },
+  leafNodesOwn: { all: [{ ref: 'leafPresent' }, { not: { ref: 'racemePresent' } }] },
   /* THE NODE COUNT'S OWN VISIBILITY (stem session 2 merged with the node-laws
      session). Ruling 6 put the count under Stem and shows it whenever there is
      a stem; the node-laws session made it the PEDICELS' on a raceme, where it
      moves neither the nodes (inert under an inflorescence) nor the leaves (the
      shared node takes the pedicels' count). So: a stem, and no raceme. The
      ARRANGEMENT keeps `leafNodesOwn` — it also needs leaves. */
-  leafNodeCountLive: { all: [{ ref: 'stemPresent' }, { not: { ref: 'inflorescencePresent' } }] },
+  leafNodeCountLive: { all: [{ ref: 'stemPresent' }, { not: { ref: 'racemePresent' } }] },
   /* THE GRADIENT IS A RAMP AND THE CORYMB A SOLVE OVER THE SAME LENGTHS, so
      with the corymb ON the gradient is hidden and inert — one owner of the
      lengths at a time. */
-  pedicelGradientLive: { all: [{ ref: 'inflorescencePresent' }, { id: 'pedicelCorymb', oneOf: ['OFF'] }] },
+  pedicelGradientLive: { all: [{ ref: 'racemePresent' }, { id: 'pedicelCorymb', oneOf: ['OFF'] }] },
   /* THE NODE IS TWO CONTROLS (Eva's ruling, Oct 6), and a node exists when
      EITHER half is away from 0 — the geometry's `stemNodesAbsent` is the same
      disjunction, and ST12 compares the two statements per row. */
@@ -1227,7 +1240,7 @@ const TUBE_UNAVAILABLE = {
     if (Math.abs(Number(ui.buckleAmp)) >= 0.005) why.push('the margin buckle differs petal to petal');
     if (Number(ui.fringeCount) >= 1) why.push('a fringe splits the blade into panels');
     if (String(ui.petalInfill) === 'VORONOI') why.push('the petals are infilled');
-    if (Number(ui.stemLength) >= 1 && String(ui.inflorescence) === 'RACEME') why.push('the bloom is an inflorescence');
+    if (Number(ui.stemLength) >= 1 && ['RACEME', 'UMBEL'].includes(String(ui.inflorescence))) why.push('the bloom is an inflorescence');
     return `Tube needs one RADIAL whorl of identical petals — ${why.join('; ')}.`;
   },
 };
@@ -1285,7 +1298,13 @@ export const SECTIONS = [
 
      DECLARED DIRECTLY BEFORE ITS CHILDREN, which verifySections() requires
      and the panel gate's census compares against document order. */
-  { id: 'petal', label: 'Petal', open: false },
+  /* THE PETAL SECTION'S LABEL IS DERIVED (the umbel session): on an umbel
+     with its head OFF there is no head, and every control in here shapes the
+     FLORETS instead (they still feed `floretState`) — the panel says so on the
+     section itself rather than leaving a visitor to infer it. Panel route
+     (ao) reads it back both ways. */
+  { id: 'petal', labelFrom: (ui) => (Number(ui.stemLength) >= 1 && String(ui.inflorescence) === 'UMBEL' && String(ui.umbelHead) !== 'ON'
+    ? 'Petal — the head is off: these shape the umbel\'s FLORETS' : 'Petal'), open: false },
   { id: 'shape', label: 'Petal shape', open: false, parent: 'petal' },
   /* LOBES (session 38, PR 2) — a drop-down INSIDE Petal shape, declared in
      render order directly after its parent. A lobe is a cut in the OUTLINE
@@ -1981,7 +2000,7 @@ export const CONTROLS = [
        the derived total so it is still on screen. Named gate rows assert this
        is hidden AND inert: FAN at petalCount 40 must be bit-identical to FAN
        at petalCount 8. */
-    visibleWhen: { not: { id: 'placement', oneOf: ['FAN'] } } },
+    visibleWhen: { all: [{ not: { id: 'placement', oneOf: ['FAN'] } }, { ref: 'headPresent' }] } },
   /* BIG PETALS (Oct 21 — Eva's ruling 1): the maximum is 100 mm, the default
      does not move. A petal past the reference length (the default, 35 mm,
      `ROOT_TAPER_REF_MM`) thickens at its root by the cantilever law
@@ -3456,7 +3475,7 @@ export const CONTROLS = [
     ],
     label: 'Per-petal values', fmt: scopeToggleFmt('petals'),
     tier: 'standard', role: 'arrangement',
-    visibleWhen: { id: 'placement', oneOf: ['FAN'] } },
+    visibleWhen: { all: [{ id: 'placement', oneOf: ['FAN'] }, { ref: 'headPresent' }] } },
 
   /* ===================================================================
      LAYERS — multiple whorls, the shape the registry predicted for this
@@ -3594,7 +3613,7 @@ export const CONTROLS = [
     ],
     label: 'Per-layer values', fmt: scopeToggleFmt('layers'),
     tier: 'standard', role: 'arrangement',
-    visibleWhen: { id: 'placement', oneOf: [...SCOPE_LAYER_PLACEMENTS] } },
+    visibleWhen: { all: [{ id: 'placement', oneOf: [...SCOPE_LAYER_PLACEMENTS] }, { ref: 'headPresent' }] } },
 
   /* ===================================================================
      ORGANIC VARIANCE, BUILD 1 OF 3 — SIZE (Eva's rulings, §9 of
@@ -4256,7 +4275,7 @@ export const CONTROLS = [
        "length (midrib / rachis)") — from the petiole's end to the terminal
        leaflet's stalk; the leaflets carry their own lengths. */
     fmt: (v, ui) => (Number(v) === 0 ? 'none — no leaves are built'
-      : String(ui.leafType) === 'COMPOUND' && !(String(ui.inflorescence) === 'RACEME') ? `${v} mm of rachis, from the petiole to the terminal leaflet's stalk` : `${v} mm from the petiole to the tip`),
+      : String(ui.leafType) === 'COMPOUND' && !(String(ui.inflorescence) === 'RACEME' && Number(ui.stemLength) >= 1) ? `${v} mm of rachis, from the petiole to the terminal leaflet's stalk` : `${v} mm from the petiole to the tip`),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
   /* THE LEAF'S TYPE (Eva's architecture ruling, Oct 6 — leaf/stem build S3):
      a SIMPLE leaf is one blade on its petiole; a COMPOUND leaf is ONE leaf —
@@ -4709,6 +4728,7 @@ export const CONTROLS = [
     options: [
       { value: 'NONE', label: 'None (one flower)' },
       { value: 'RACEME', label: 'Raceme (flowers on pedicels down the stem)' },
+      { value: 'UMBEL', label: 'Umbel (flowers on pedicels from one point at the top)' },
     ],
     label: 'Type',
     fmt: (v, ui, shown) => {
@@ -4717,10 +4737,47 @@ export const CONTROLS = [
       const p = shown && shown.inflorescence;
       if (!p || !p.present) return 'a raceme — but there is no stem to carry it, so nothing is built';
       const per = p.perNode;
+      if (p.umbel) return `an umbel · ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'} from one knot ${(2 * p.knot.radiusMm).toFixed(2)} mm across, ${p.headOff ? 'with NO head — the stem ends at the knot' : `${p.nodeDepthsMm[0].toFixed(1)} mm below the head`}`
+        + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris a floret, ${b.tris.toLocaleString('en-US')} in all` : '');
       return `a raceme · ${p.nodes} node${p.nodes === 1 ? '' : 's'} x ${per} = ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'}`
         + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris ${b.units && b.units.length > 1 ? `at the top node (${b.units.length} floret builds, one per distinct pedicel length)` : 'each'}, ${b.tris.toLocaleString('en-US')} in all` : '');
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'stemPresent' } },
+
+  /* THE UMBEL'S TWO (the umbel session, Eva's rulings Oct 21-22). The COUNT
+     is its own control rather than a reuse: `floretNodes` counts NODES and
+     `floretPetals` a floret's petals, and an umbel has one node of N pedicels
+     — a count with a third meaning is a third control. The range is the
+     geometry's (`UMBEL_FLORET_RANGE`, imported). The HEAD toggle is OFF by
+     default under UMBEL (the spider lily): OFF builds no head at all and the
+     stem ends at the junction knot; ON keeps the head at the stem's top and
+     roots the pedicels below it by the raceme's own reach-inset law. */
+  { id: 'umbelFlorets', section: 'inflorescence', kind: 'slider',
+    min: UMBEL_FLORET_RANGE[0], max: UMBEL_FLORET_RANGE[1], step: 1, default: 6,
+    label: 'Florets',
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      const p = shown && shown.inflorescence;
+      const base = `${n} pedicels from one point, ${(360 / n).toFixed(1)} deg apart`;
+      if (!p || !p.present || !p.knot) return base;
+      return `${base} · rooted on a ring ${(2 * p.knot.rho).toFixed(2)} mm across that holds them one ${p.knot.gapMm.toFixed(2)} mm gap apart, inside a knot ${(2 * p.knot.radiusMm).toFixed(2)} mm across (derived from the count and the ${(2 * p.pedicelR).toFixed(2)} mm pedicel)`
+        + (p.sameNodeMayTouch ? ' · neighbouring florets may touch (measured, declared — two florets fusing is over-connection, never clamped)' : '');
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelPresent' } },
+  { id: 'umbelHead', section: 'inflorescence', kind: 'choice', default: UMBEL_HEAD_VALUES[0],
+    options: [
+      { value: UMBEL_HEAD_VALUES[0], label: 'Off — no head; the stem ends at the umbel (a spider lily)' },
+      { value: UMBEL_HEAD_VALUES[1], label: 'On — the head stands at the top, the umbel below it' },
+    ],
+    label: 'Head',
+    fmt: (v, ui, shown) => {
+      const p = shown && shown.inflorescence;
+      if (String(v) !== 'ON') return 'off — no head is built; the PETAL controls shape the florets, and the head\'s own petal count and per-layer / per-petal values are hidden and inert';
+      if (!p || !p.present) return 'on — the head at the top';
+      return `on — the head at the top, the umbel ${p.nodeDepthsMm[0].toFixed(1)} mm below it so the florets' own petals (reaching ${p.reachMm.toFixed(1)} mm above their knot) clear it by ${p.insetGapMm.toFixed(2)} mm`
+        + (p.insetNeededMm > p.nodeDepthsMm[0] ? ' — CLAMPED: the florets reach further than the stem is long, so they stand among the head\'s petals (told, never refused)' : '');
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelPresent' } },
 
   { id: 'floretNodes', section: 'inflorescence', kind: 'slider',
     min: FLORET_NODE_RANGE[0], max: FLORET_NODE_RANGE[1], step: 1, default: 5,
@@ -4736,7 +4793,7 @@ export const CONTROLS = [
       if (!p || !p.present || !p.nodesClamped) return base;
       return `${base} — CLAMPED to ${p.nodesBuilt}: the span between the head and the stem's end holds no more at a ${(2 * p.pedicelR).toFixed(2)} mm pitch floor`;
     },
-    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'racemePresent' } },
 
   /* THE PHYLLOTAXIS READS `leafAzimuths` — the SAME three laws on the SAME
      stem, and the geometry calls that one function rather than restating it.
@@ -4752,7 +4809,7 @@ export const CONTROLS = [
     label: 'Arrangement',
     fmt: (v, ui) => { const per = v === 'opposite' ? 2 : v === 'whorled' ? 3 : 1;
       return `${per} floret${per > 1 ? 's' : ''} a node · ${Math.round(Number(ui.floretNodes)) * per} in all`; },
-    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'racemePresent' } },
 
   /* THE PEDICEL IS THE FLORET'S OWN STEM, so this is the floret's
      `stemLength`; its range is the PEDICEL'S OWN (0..250 mm, Eva's Oct 4
@@ -4775,7 +4832,7 @@ export const CONTROLS = [
       return `${base} · ${(2 * p.pedicelR).toFixed(2)} mm across`
         + (p.pedicelRClamped ? ` — FLOORED: the area rule asks ${(2 * p.areaRuleR).toFixed(2)} mm for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem, and no rod here prints thinner than ${(2 * p.pedicelRFloor).toFixed(2)} mm`
           : ` — the area rule's own answer for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem`)
-        + ` · crosses ${p.crossesSolidMm.toFixed(2)} mm of the stem's wall`;
+        + (p.umbel ? ` · crosses ${p.crossesSolidMm.toFixed(2)} mm of the umbel's knot` : ` · crosses ${p.crossesSolidMm.toFixed(2)} mm of the stem's wall`);
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 
@@ -4830,7 +4887,7 @@ export const CONTROLS = [
         + (b && b.headSpreadMm !== null ? ` · the heads span ${b.headSpreadMm.toFixed(3)} mm in height` : '')
         + (p.lengthsClamped ? ` — CLAMPED at ${p.lenCeilMm} mm, so the lowest heads stand below the level` : '');
     },
-    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'racemePresent' } },
 
   /* THE ANGLE IS THE LEAF'S OWN RANGE AND THE LEAF'S OWN DEFAULT (Eva ruled
      35 deg for leaves): the quantity is the same quantity — a rod's angle
@@ -4845,6 +4902,7 @@ export const CONTROLS = [
       const p = shown && shown.inflorescence;
       const base = `${a.toFixed(0)} deg from horizontal · ${a > 0 ? 'ascending' : a < 0 ? 'descending' : 'level'}`;
       if (!p || !p.present) return base;
+      if (p.umbel) return `${base} · every pedicel leaves the knot at this angle`;
       return `${base} · the top node sits ${p.insetMm.toFixed(1)} mm below the head`
         + (p.insetClamped ? ` — PUSHED DOWN from ${p.insetAskedMm.toFixed(1)} mm so the top floret's own petals (reaching ${p.reachMm.toFixed(1)} mm above its node) clear it by ${p.insetGapMm.toFixed(2)} mm` : '')
         + (p.insetSatisfied ? '' : ' — and it still does not clear the head: the florets reach further than the stem is long, so they stand among the petals (told, never refused)');

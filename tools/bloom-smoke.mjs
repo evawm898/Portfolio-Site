@@ -1802,6 +1802,39 @@ export const SMOKE_BLOCKS = [
       { label: 'ROOT SUPPORT: width 46 x 40 petals',
         path: "FC1 the foot cap restated from the ring's radius x 2 pi / n and the asked foot, the told flag both ways, the emitted foot rows at the capped width; Z3 the ring's foot restated through the cap; J4 the floors" },
     ],
+  },  {
+    n: 77, title: 'the umbel (Oct 22)',
+    anchor: 'UMBEL: 2 florets, head OFF',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       UMBEL arm of the inflorescence plan (one node, N evenly spread pedicels
+       through the whorl primitive), the derived JUNCTION KNOT the pedicels root
+       in, and the HEAD TOGGLE (OFF builds no head and the stem ends at the
+       knot; ON keeps the head and roots the umbel below it by the reach law).
+       The subset covers the count's two ends, both head states, the angle's
+       two extremes (90: every pedicel parallel, the ring's one-gap spacing is
+       what keeps them apart; -60: descending onto the stem), the sessile
+       floret on the knot, the spider lily, and the GATED umbel controls under
+       a raceme. --conn is REQUIRED: the knot is the only join here, and every
+       pedicel reaching it is the connectedness claim. */
+    conn: true,
+    rows: [
+      { label: 'UMBEL: 2 florets, head OFF',
+        path: "UM1 the knot restated from two pedicels (the area rule's own 4.24 mm, the ring one gap apart), UM2 both roots in the emitted knot at 0 and 180 deg, UM3 the knot on the stem's emitted top end, UM4 the florist's cut on the stem's FREE end with the knot clear of it, UM0 no head emitted" },
+      { label: 'UMBEL: 12 florets, head ON',
+        path: "UM1 the knot at twelve floored pedicels, UM2 twelve roots at 30 deg, UM3 the knot on the stem below the head and the florets one gap under its floor, UM0 the head built, ID1 the knot's triangles in the tally, ID9 (e) the umbel's node at the reach law's depth" },
+      { label: 'UMBEL: 12 florets at 90 deg, head OFF (twelve parallel pedicels, one gap apart)',
+        path: "UM2 twelve parallel pedicels rooted on the one-gap ring, ID10 (d) the florets of one node measured and declared, ST9 every pedicel excused by name" },
+      { label: 'UMBEL: 6 florets at -60 deg, head ON',
+        path: "UM2 descending pedicels rooted in the knot, UM3 the knot on the stem under the head, ID10 (d) florets against the stem" },
+      { label: 'UMBEL: SESSILE — pedicel 0 (the florets\' hubs on the knot)',
+        path: "UM2 every sessile floret's rooted point inside the knot, ID2 the crossing null where every node is sessile" },
+      { label: 'UMBEL: THE SPIDER LILY — 6 florets, head OFF, recurved narrow petals, buckled margin, long upturned stamens',
+        path: "UM0 the head's stamens not emitted (the florets carry them), UM1/UM2 the knot and the six roots, JS4 the head emits no stamen, X1/X2 the census on recurved buckled florets" },
+      { label: 'UMBEL: x leaves (the stem\'s OWN node law — the shared node is the raceme\'s)',
+        path: "LF0/SN0 the leaves on the stem's own node law under an umbel (the shared node is the raceme's), UM3 the knot above them" },
+      { label: 'UMBEL: GATED — the umbel controls at their extremes under a RACEME (hidden AND inert)',
+        path: "UM0 the head's two statements on a raceme (the head present), ID1 the raceme's nodes untouched by the umbel's count" },
+    ],
   },
 ];
 

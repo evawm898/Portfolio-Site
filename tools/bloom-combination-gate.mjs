@@ -907,6 +907,51 @@ export const PAIRS = [
     cite: 'docs/bloom-inflorescence-node-laws-outcome.md — the corymb solve lands every head on one level, so the heads stand side by side at one height',
     why: 'level tops put every head in one plane; a shallow angle spreads them far apart in length and a steep one stacks them close',
   },
+  /* ---------------------------------------------- THE UMBEL (Oct 22)
+     Every floret on ONE node at the stem's top, evenly round the KNOT, so the
+     internode that clears a raceme's florets does not exist. Three pairs, the
+     inflorescence's own measures (tools/bloom-inflo-approach.mjs), the KNOT
+     excluded as the umbel's join region exactly as the rachis is a raceme's. */
+  {
+    id: 'umbel-florets-x-angle',
+    tier: 2,
+    label: 'umbelFlorets x pedicelAngle — the umbel\'s florets against each other',
+    measure: 'floret-floret',
+    base: { stemLength: 120, inflorescence: 'UMBEL' },
+    a: { id: 'umbelFlorets', values: [6, 2, 5, 12] },
+    b: { id: 'pedicelAngle', values: [35, -60, 90] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-umbel-outcome.md — every floret of an umbel stands on one node, so the florets are spaced by their count round the knot and by the angle alone',
+    why: 'more florets round one knot sit closer; the angle sets how far out each floret stands before its petals open',
+  },
+  {
+    id: 'umbel-length-x-angle',
+    tier: 2,
+    label: 'pedicelLength x pedicelAngle — an umbel floret against the stem below it',
+    measure: 'floret-stem',
+    base: { stemLength: 120, inflorescence: 'UMBEL' },
+    a: { id: 'pedicelLength', values: [20, 5, 60, 250] },
+    b: { id: 'pedicelAngle', values: [35, -60, 90] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-umbel-outcome.md — a downturned or short pedicel stands its floret against the stem the knot sits on',
+    why: 'a pedicel turned down past the horizontal carries its floret back along the stem; a short one keeps the floret beside it',
+  },
+  {
+    id: 'umbel-head-length-x-angle',
+    tier: 2,
+    label: 'pedicelLength x pedicelAngle — an umbel floret against the head ON',
+    measure: 'floret-head',
+    base: { stemLength: 120, inflorescence: 'UMBEL', umbelHead: 'ON' },
+    a: { id: 'pedicelLength', values: [20, 5, 60] },
+    b: { id: 'pedicelAngle', values: [35, -60, 90] },
+    /* CLEARS, measured: the reach inset puts the knot so the florets' highest
+       point stands one gap under the head, and the nearest cell is the 5 mm
+       pedicel at 35 deg, 1.087 mm. KEPT so the day a floret reaches the head
+       this grid says so. */
+    verdict: 'clears',
+    cite: 'docs/bloom-umbel-outcome.md — with the head ON the knot sits below it at the reach inset, which clears the TOP of the floret and not its sides',
+    why: 'a steep pedicel lifts its floret beside the head the inset was derived to clear from below',
+  },
 
   /* ------------------------------------------- THE SEPALS (R6, Oct 9)
      Eva's ruling R6 (docs/bloom-sepal-discovery.md §6): the sepal is measured
@@ -1531,6 +1576,20 @@ export const COMBINATION_XFAIL = Object.freeze({
   'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=35': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=0': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-corymb-angle-x-length @ pedicelAngle=60 x pedicelLength=0': { mm: 0.2144, note: 'RE-RECORDED by build 3 ruling 1 (the florets\' own internode floor): read 0.000 (an edge crossing) through builds 2 and 3 Phase A; under the floor the three level-topped heads on a 60 mm rachis stand 0.2144 mm apart — the ONE corymb cell still under the bar, an INTERIOR cell (the sessile top at 60 deg), so the pair is PRODUCT-ONLY now. The floor is derived for EQUAL pedicels and the corymb lengthens the lower ones to one level, which is why the floor clears the other eight cells and not this one' + ' — measured by build 3 (ruling 1), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+
+  /* THE UMBEL (Oct 22) — docs/bloom-umbel-outcome.md §7. */
+  'umbel-florets-x-angle @ umbelFlorets=6 x pedicelAngle=35': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=6 x pedicelAngle=-60': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=6 x pedicelAngle=90': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=2 x pedicelAngle=90': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=5 x pedicelAngle=35': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=5 x pedicelAngle=-60': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=5 x pedicelAngle=90': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=12 x pedicelAngle=35': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=12 x pedicelAngle=-60': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=12 x pedicelAngle=90': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-length-x-angle @ pedicelLength=20 x pedicelAngle=-60': { mm: 0, note: "at -60 deg the pedicel turns DOWN from the knot on the stem's top end and its floret's petals reach back onto the stem below (floret-stem, the floret's own rod excluded); a 20 mm or a 5 mm pedicel leaves the floret beside the stem, 60 mm and longer carry it clear — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-length-x-angle @ pedicelLength=5 x pedicelAngle=-60': { mm: 0, note: "at -60 deg the pedicel turns DOWN from the knot on the stem's top end and its floret's petals reach back onto the stem below (floret-stem, the floret's own rod excluded); a 20 mm or a 5 mm pedicel leaves the floret beside the stem, 60 mm and longer carry it clear — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
   /* ===== THE FOOT JOINS THE MEASURE (gate-hygiene session, Oct 6) — 34 cells
      that cleared while `measureWall` dropped the foot rows and read under the bar
      once the foot is a SELF target. Every one is a tip coiling onto its own foot:
