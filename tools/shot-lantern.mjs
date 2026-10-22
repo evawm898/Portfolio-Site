@@ -83,23 +83,7 @@ await T(() => window.__lantern.set('backingColours', 3)); await T(() => window._
 save('backing-dusk.png', await shotOf('.ln-preview'), 'three colours, the dusk palette');
 await page.locator('#secBacking').evaluate((d) => { d.open = true; }); await page.locator('#secBacking').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
 save('backing-panel.png', await shotOf('#secBacking'), 'the Backing section: on / off, colours, the palette and its swatches');
-await T(() => window.__lantern.view('lit')); await T(() => window.__lantern.fold.fit()); await page.waitForTimeout(800);
-save('lit.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'the Lit view, the page\'s opening view: a warm LED inside the star, the paper glowing, the cuts bright, the pattern thrown onto the wall and floor behind (the backing\'s tissue tinting the glow)');
-await T(() => window.__lantern.set('backing', false)); await T(() => window.__lantern.set('litRoom', 0.3)); await page.waitForTimeout(600);
-save('lit-day.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'room darkness 30 %: the lamp against daylight, the thrown pattern fading into a lit room');
-await T(() => window.__lantern.set('litRoom', 1)); await T(() => window.__lantern.set('litWarmth', 2000)); await T(() => window.__lantern.set('litWall', 1.2)); await page.waitForTimeout(600);
-save('lit-candle.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'a 2000 K candle-warm lamp, the room black, the wall close behind the star (1.2 radii — the slider\'s floor is 1.1, past the tips) so the thrown pattern is sharp and small');
-await page.locator('#secLit').evaluate((d) => { d.open = true; }); await page.locator('#secLit').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
-save('lit-panel.png', await shotOf('#secLit', LIT_SHOT_MS), 'the Light section: warmth, brightness, room darkness, wall distance — view settings, saved with the design');
-// Leave the Lit view through Folded and wait for ONE frame to complete before hiding the canvas: a lit frame on the
-// runner's software GL takes 55-120 s, and hiding the canvas while one is in flight left the next screenshot waiting on
-// it past 120 s (runs 39777729024, 39780364382). The first Folded frame also pays the recompile of every material (the
-// lit flip), so it gets the Lit cells' budget — two frames at 180 s did not arrive (run 39789531435).
-await T(() => window.__lantern.view('folded'));
-await page.waitForFunction((n0) => window.__lantern.fold.frames() > n0, await T(() => window.__lantern.fold.frames()), { timeout: LIT_SHOT_MS });
-await T(() => window.__lantern.view('build'));   // the canvas is stopped and hidden in Build, so putting the lit values back costs no lit render
-await T(() => window.__lantern.set('litRoom', 0.85)); await T(() => window.__lantern.set('litWarmth', 2700)); await T(() => window.__lantern.set('litWall', 1.4)); await T(() => window.__lantern.set('backing', true));   // four lit rebuilds with the shadow pass on the runner's software GL hung the next screenshot for 120 s (run 39777729024)
-await page.waitForTimeout(400);
+await T(() => window.__lantern.view('build')); await page.waitForTimeout(400);
 save('build.png', await shotOf('.ln-preview'), 'the Build view: the eleven steps with this star\'s own counts, and the machine settings table (starting values)');
 {
   const grid = await T(() => window.__lantern.testGridSvg());
@@ -109,9 +93,22 @@ save('build.png', await shotOf('.ln-preview'), 'the Build view: the eleven steps
   await gp.close();
 }
 await T(() => window.__lantern.set('backing', false)); await T(() => window.__lantern.view('folded'));
+const before = await T(() => window.__lantern.state());   // the clamp cell's infeasible target is undone before the Lit cells
 await T(() => window.__lantern.setState({ ...window.__lantern.state(), points: 5, slender: 0.38, depthFrac: 0.2, edgeMode: 'straight', edge: { mode: 'single', points: [[0, 0], [1, 0]] } }));
 await page.waitForTimeout(300);
 save('clamp.png', await shotOf('.ln-panel'), 'an infeasible target (slender 0.38 at 0.2 × width): Checks says the depth was clamped to the nearest closing depth and why');
+// The Lit cells come LAST in this session, after Build, the grid and the clamp cell: once the Lit view has rendered,
+// every later frame on the runner's software GL costs 55-120 s and a screenshot after it hangs past its budget whatever
+// view is showing (runs 39777729024, 39780364382, 39789531435, 39795357136). Nothing after them touches the canvas.
+await T((snap) => window.__lantern.setState(snap), before); await T(() => window.__lantern.set('backing', true));
+await T(() => window.__lantern.view('lit')); await T(() => window.__lantern.fold.fit()); await page.waitForTimeout(800);
+save('lit.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'the Lit view, the page\'s opening view: a warm LED inside the star, the paper glowing, the cuts bright, the pattern thrown onto the wall and floor behind (the backing\'s tissue tinting the glow)');
+await T(() => window.__lantern.set('backing', false)); await T(() => window.__lantern.set('litRoom', 0.3)); await page.waitForTimeout(600);
+save('lit-day.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'room darkness 30 %: the lamp against daylight, the thrown pattern fading into a lit room');
+await T(() => window.__lantern.set('litRoom', 1)); await T(() => window.__lantern.set('litWarmth', 2000)); await T(() => window.__lantern.set('litWall', 1.2)); await page.waitForTimeout(600);
+save('lit-candle.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'a 2000 K candle-warm lamp, the room black, the wall close behind the star (1.2 radii — the slider\'s floor is 1.1, past the tips) so the thrown pattern is sharp and small');
+await page.locator('#secLit').evaluate((d) => { d.open = true; }); await page.locator('#secLit').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
+save('lit-panel.png', await shotOf('#secLit', LIT_SHOT_MS), 'the Light section: warmth, brightness, room darkness, wall distance — view settings, saved with the design');
 await s.close();
 const m = await openLantern({ storage: '', viewport: { width: 390, height: 844 }, dsf: 2 });
 await m.page.waitForTimeout(600);
