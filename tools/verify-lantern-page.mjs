@@ -27,6 +27,20 @@
      P8  at phone width the page loads clean and the preview comes first.
      P9  the Checks badge reads ok on the defaults and the dimensions read-out
          prints finished AND flat sizes with inches.
+     P10 THE PATTERN IS ON THE PAGE: the defaults carry a judged pattern (cuts
+         on every facet, no island), the Flat view draws 2N × the per-facet
+         cuts, the folded view draws its parts through alpha-mapped materials,
+         and the front SVG's CUT layer carries the cuts.
+     P11 the Pattern section: the generator select changes the cut count and
+         the thumbnails exist; "none" empties the cuts and the SVG's CUT layer
+         goes back to the outline, tabs and holes; alternate-solid halves the
+         placed polygons; reseed changes the layout; undo brings it back.
+     P12 a cut finding is CLICKABLE: with auto-bridge off on a dense lace, the
+         Checks list shows an island as a problem (badge "problem"), clicking
+         it switches to the Flat view zoomed on the finding with a focus ring,
+         and a click on the drawing restores the whole sheet.
+     P13 the random pattern button yields a pattern with no island and the
+         note says so; the pattern survives a reload.
 
    --negative-control re-serves deliberately broken copies of lantern.js and
    requires each to fail the check that names it. Every anchor is checked
@@ -125,7 +139,7 @@ async function run(override = null) {
       await T(() => window.__lantern.flush());
       const st = await T(() => window.__lantern.state());
       await page.waitForFunction(() => window.__lantern.thumbsReady(), null, { timeout: 15000 });
-      const thumbs = await T(() => [...document.querySelectorAll('.ln-preset svg path')].length);
+      const thumbs = await T(() => [...document.querySelectorAll('#shapePresets .ln-preset svg path')].length);
       await page.click('#randomShape');
       await T(() => window.__lantern.flush());
       const rm = await T(() => { const m = window.__lantern.model(); return { ok: m.ok, clamped: m.clampedDepth, steep: m.infeasible }; });
@@ -164,7 +178,69 @@ async function run(override = null) {
     {
       await page.click('#resetAll'); await T(() => window.__lantern.flush());
       const badge = await T(() => document.getElementById('flagCount').textContent), dims = await T(() => window.__lantern.dimsText());
-      ok(badge === 'ok' && /finished/.test(dims) && /flat/.test(dims) && /″/.test(dims) && /mm deep/.test(dims), `P9: the badge reads "${badge}" and the read-out prints finished and flat sizes with inches`);
+      ok(/^(ok|\d+ notes?)$/.test(badge) && /finished/.test(dims) && /flat/.test(dims) && /″/.test(dims) && /mm deep/.test(dims), `P9: the badge reads "${badge}" (no problem) and the read-out prints finished and flat sizes with inches`);
+    }
+    // P10 the pattern is on the page
+    {
+      const pat = await T(() => window.__lantern.pattern());
+      const placed = await T(() => window.__lantern.placedCuts());
+      const N = await T(() => window.__lantern.model().N);
+      await T(() => window.__lantern.view('flat')); await page.waitForTimeout(150);
+      const drawn = await T(() => document.querySelectorAll('#flatSvg .cutpat').length);
+      await T(() => window.__lantern.view('folded')); await page.waitForTimeout(150);
+      const mats = await T(() => window.__lantern.fold.materials());
+      const svg = await T(() => window.__lantern.svgText('front'));
+      const cutLayer = (svg.split('<g id="CUT"')[1] || '').split('</g>')[0];
+      const paths = (cutLayer.match(/<path/g) || []).length;
+      ok(pat && pat.validated && pat.counts.island === 0 && pat.cuts[0] > 20 && placed === 2 * N * pat.cuts[0] && drawn === placed && mats.length >= 2 && mats.every((m) => m === 'cut') && paths === placed + 1 + 2 * N,
+        `P10: ${pat && pat.cuts[0]} cuts per facet, ${pat && pat.counts.island} islands, ${placed} placed, ${drawn} drawn in the Flat view, folded materials [${mats.join(', ')}], the SVG's CUT layer holds ${paths} paths (outline + ${2 * N} tabs + ${placed} cuts)`);
+    }
+    // P11 the Pattern section
+    {
+      const c0 = await T(() => window.__lantern.pattern().cuts[0]);
+      await T(() => window.__lantern.set('patMode', 'geometric'));
+      const c1 = await T(() => window.__lantern.pattern().cuts[0]);
+      await page.waitForTimeout(300);
+      const thumbs = await T(() => document.querySelectorAll('#patternPresets .ln-preset svg path').length);
+      await T(() => window.__lantern.set('patMode', 'none'));
+      const none = await T(() => ({ placed: window.__lantern.placedCuts(), svgPaths: ((window.__lantern.svgText('front').split('<g id="CUT"')[1] || '').split('</g>')[0].match(/<path/g) || []).length }));
+      await T(() => window.__lantern.set('patMode', 'paisley'));
+      const full = await T(() => window.__lantern.placedCuts());
+      await T(() => window.__lantern.set('patSolidAlt', true));
+      const half = await T(() => window.__lantern.placedCuts());
+      await T(() => window.__lantern.set('patSolidAlt', false));
+      const seed0 = await T(() => window.__lantern.state().patSeed);
+      const a = await T(() => JSON.stringify(window.__lantern.pattern()));
+      await page.click('#patReseed'); await T(() => window.__lantern.flush());
+      const seed1 = await T(() => window.__lantern.state().patSeed), b = await T(() => JSON.stringify(window.__lantern.pattern()));
+      await T(() => window.__lantern.undo()); await T(() => window.__lantern.flush());
+      const seed2 = await T(() => window.__lantern.state().patSeed);
+      ok(c0 !== c1 && c1 > 20 && thumbs > 12 && none.placed === 0 && none.svgPaths === 11 && full > 0 && half === full * 3 / 5 && seed1 !== seed0 && a !== b && seed2 === seed0,
+        `P11: paisley ${c0} → geometric ${c1} cuts; ${thumbs} thumbnail paths; none → ${none.placed} placed and ${none.svgPaths} CUT paths; alternate solid ${full} → ${half}; reseed ${seed0} → ${seed1} (layout ${a === b ? 'unchanged' : 'moved'}); undo → ${seed2}`);
+    }
+    // P12 a clickable finding
+    {
+      await T(() => window.__lantern.setState({ ...window.__lantern.state(), patMode: 'paisley', patSeed: 7, patDensity: 0.6, patIntricacy: 0.7, patAutoBridge: false }));
+      await page.waitForTimeout(150);
+      const flags = await T(() => window.__lantern.flags());
+      const badge = await T(() => document.getElementById('flagCount').textContent);
+      const island = flags.find((f) => f.id === 'islands');
+      // dispatched clicks, not page.click: under a mutant the element may be hidden or absent, and a wait for visibility is a hang where a red check is owed
+      await T(() => { const li = document.querySelector('#flags li[data-flag="islands"]'); if (li) li.click(); }); await page.waitForTimeout(200);
+      const z = await T(() => ({ view: window.__lantern.view(), focus: window.__lantern.flatFocus(), ring: document.querySelectorAll('#flatSvg .issue.is-focus').length, text: [...document.querySelectorAll('#flatSvg text')].map((t) => t.textContent).join(' ') }));
+      await T(() => document.getElementById('flatSvg').dispatchEvent(new MouseEvent('click', { bubbles: true }))); await page.waitForTimeout(150);
+      const back = await T(() => ({ focus: window.__lantern.flatFocus(), text: [...document.querySelectorAll('#flatSvg text')].map((t) => t.textContent).join(' ') }));
+      ok(island && island.kind === 'bad cut' && /problem/.test(badge) && z.view === 'flat' && z.focus && z.focus.kind === 'island' && z.ring === 1 && /zoomed on an island/.test(z.text) && !back.focus && /flat sheet/.test(back.text),
+        `P12: with auto-bridge off, Checks lists ${island ? '"' + island.text.slice(0, 50) + '…" as ' + island.kind : 'no island'} (badge "${badge}"); click → view ${z.view}, focus ${z.focus && z.focus.kind}, ${z.ring} focus ring, "${z.text.slice(0, 40)}…"; click the drawing → ${back.focus ? 'still zoomed' : 'the whole sheet'}`);
+      await T(() => window.__lantern.view('folded'));
+    }
+    // P13 the random pattern, and it survives a reload
+    {
+      await page.click('#randomPattern'); await T(() => window.__lantern.flush());
+      const pat = await T(() => window.__lantern.pattern()), note = await T(() => document.getElementById('patternNote').textContent), st = await T(() => window.__lantern.state());
+      await page.reload(); await page.waitForTimeout(600);
+      const st2 = await T(() => window.__lantern.state());
+      ok(pat.counts.island === 0 && /random/.test(note) && st2.patMode === st.patMode && st2.patSeed === st.patSeed, `P13: random pattern — ${st.patMode} #${st.patSeed}, ${pat.counts.island} islands, note "${note}"; after a reload ${st2.patMode} #${st2.patSeed}`);
     }
   } finally { await s.close(); }
   // P7b fresh profile and P8 phone
@@ -184,11 +260,17 @@ async function run(override = null) {
 
 const MUTANTS = [
   { id: 'the-view-toggle-does-not-switch', file: 'lantern.js', from: "$('flatSvg').toggleAttribute('hidden', name !== 'flat');", to: "$('flatSvg').toggleAttribute('hidden', true);", breaks: ['P1'] },
-  { id: 'undo-is-dead', file: 'lantern.js', from: 'function undo() { if (!history.past.length) return;', to: 'function undo() { return;', breaks: ['P2'] },
+  { id: 'undo-is-dead', file: 'lantern.js', from: 'function undo() { if (!history.past.length) return;', to: 'function undo() { return;', breaks: ['P2', 'P11'] },
   { id: 'the-editor-ignores-the-drag', file: 'lantern.js', from: "edit({ op: 'move', side: 'left', i: drag.i, xy: q([v.x, -v.y]) }, { during: true });", to: '0;', breaks: ['P3'] },
   { id: 'a-preset-is-not-applied', file: 'lantern.js', from: 'state = { ...state, ...st, width: state.width };     // a preset is a shape; the size is hers', to: 'state = { ...state };', breaks: ['P4'] },
   { id: 'the-clamp-is-not-shown', file: 'lantern.js', from: "li.className = n.kind === 'clamp' ? 'warn' : n.kind;", to: "li.className = 'info';", breaks: ['P5'] },
-  { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7'] },
+  { id: 'the-cuts-are-not-drawn-flat', file: 'lantern.js', from: "flatSvg.append(el('path', { class: 'cutpat', d: path(c.poly, true) }));", to: '0;', breaks: ['P10'] },
+  { id: 'the-svg-has-no-cuts', file: 'lantern.js', from: "const exportSvg = (which) => G.flatSvg(model, which, { cuts: state.patMode === 'none' ? [] : PAT.placeCuts(model, pattern, state).map((c) => c.poly) });", to: "const exportSvg = (which) => G.flatSvg(model, which);", breaks: ['P10'] },
+  { id: 'the-folded-view-has-no-cuts', file: 'lantern.js', from: "fold.setModel([front, back], { fit: !meshFitted || Math.abs(lastFitRadius - model.flatSpan) > 1e-6, bounds: model.rt, textureOf: texOf });", to: "fold.setModel([front, back], { fit: !meshFitted || Math.abs(lastFitRadius - model.flatSpan) > 1e-6, bounds: model.rt });", breaks: ['P10'] },
+  { id: 'an-island-is-not-a-problem', file: 'lantern.js', from: "if (pc.island) cutFindings.push({ kind: 'bad',", to: "if (pc.island) cutFindings.push({ kind: 'info',", breaks: ['P12'] },
+  { id: 'a-finding-click-does-not-zoom', file: 'lantern.js', from: "if (n.issue) { li.title = 'show in the Flat view'; li.addEventListener('click', () => focusIssue(n.issue)); }", to: "if (n.issue) { li.title = 'show in the Flat view'; }", breaks: ['P12'] },
+  { id: 'the-random-pattern-keeps-islands', file: 'lantern.js', from: "const score = pat.counts.island * 100 + pat.counts.thin + pat.counts.narrow + pat.counts.keepout;", to: "const score = 0;", breaks: ['P13'] },
+  { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7', 'P13'] },
 ];
 
 function print(res, label) { let f = 0; for (const [p, m] of res) { console.log(`${p ? 'ok  ' : 'FAIL'} ${m}`); if (!p) f++; } console.log(`\n${label}: ${res.length - f} of ${res.length} passed`); return f; }
