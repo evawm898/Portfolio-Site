@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -786,7 +786,8 @@ function refreshLabels(ui, shown = null, scopedUi = null) {
   for (const c of CONTROLS) {
     if (valSpans[c.id].dataset.editing) continue;
     const u = scopedUi && SCOPE_IDS.has(c.id) ? scopedUi : ui;
-    valSpans[c.id].textContent = c.fmt(u[c.id], u, shown) + (seedNotes[c.id] ? ` · ${seedNotes[c.id]}` : '');
+    valSpans[c.id].textContent = c.fmt(u[c.id], u, shown) + (seedNotes[c.id] ? ` · ${seedNotes[c.id]}` : '')
+      + (c.enabledWhen !== undefined && !evalPredicate(c.enabledWhen, ui) ? ` · ${c.disabledReason(ui)}` : '');
   }
   /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3; its first
      user, the rosette's hood group, was retired with the roles). Same snapshot, same pass, same owner
@@ -850,6 +851,16 @@ function applyVisibility() {
      other control is the whole bloom's and is decided on the whole bloom. */
   const vui = scopeView ? viewUi(ui) : ui;
   for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, scopeView && idsFor(scopeView).has(c.id) ? vui : ui);
+  /* GREYED, NOT HIDDEN (T3, Q9): a control whose `enabledWhen` is false stays
+     on screen, disabled — its value is still read by readUI() and still saved,
+     and nothing switches it. This is the ONLY setter of a control's disabled
+     state, as the loop above is of hidden. */
+  for (const c of CONTROLS) {
+    if (c.enabledWhen === undefined) continue;
+    const on = evalPredicate(c.enabledWhen, ui);
+    wrappers[c.id].classList.toggle('bl-ctrl--disabled', !on);
+    inputs[c.id].disabled = !on;
+  }
   /* CHILDREN BEFORE PARENTS — ONE PASS, AT ANY DEPTH. A section's answer
      READS its children's, so every child must have settled before its parent
      is reached. verifySections() refuses a section declared before its parent,
@@ -1680,8 +1691,11 @@ let lastShownMode = 'live';
 let dragActive = false;
 let lightOnScreen = false;
 let lightBuildCount = 0;   // how many light builds this page has made — the drag-preview gate's witness
-const DRAG_LIGHT_OVERRIDE = Object.freeze({ petalInfill: 'NONE' });
-function dragLight() { return dragActive && !infillIsAbsent(readUI()); }
+/* (T3) A HELD SLIDER DROPS THE TEXTURE TOO (Eva's ruling 4: a light preview
+   while dragging, the full relief on release and in the export) — the same
+   override, one more guard. */
+const DRAG_LIGHT_OVERRIDE = Object.freeze({ petalInfill: 'NONE', petalTexture: 'NONE' });
+function dragLight() { const ui = readUI(); return dragActive && (!infillIsAbsent(ui) || !textureIsAbsent(ui)); }
 
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
@@ -1790,6 +1804,8 @@ let lastVariance = null, lastNeighbour = null, lastVarianceAbsent = true, lastPe
 let lastFormVariance = null, lastFormAbsent = true;
 let lastSpacingVariance = null, lastSpacingAbsent = true;
 let lastInfill = null, lastInfillAbsent = true;
+/* THE SURFACE TEXTURE (T3): the builder's whole-bloom record and the guard's own answer */
+let lastTexture = null, lastTextureAbsent = true;
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
    there is no registry row, no DOM input, and no listener that writes it —
@@ -1895,6 +1911,8 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
        already names, so the `?.` is load-bearing and not a tidiness. */
     lastInfill = (built.petalsAll && built.petalsAll[0] && built.petalsAll[0].infill) || null;
     lastInfillAbsent = infillIsAbsent(uiForBuild);
+    lastTexture = built.texture || null;
+    lastTextureAbsent = textureIsAbsent(uiForBuild);
     lastPetalsAll = built.petalsAll || [];
     builtPetalWidth = Number(uiForBuild.petalWidth);   // what a refused width drag goes back to (F6-sym-2)
     builtCup = { petalCup: Number(uiForBuild.petalCup), petalCupGradient: Number(uiForBuild.petalCupGradient) };   // what a refused cup goes back to (spine-cup-fold)
@@ -2058,7 +2076,7 @@ function materialLines(ui, mode) {
    reader has to infer, and the toggle's whole reason to exist is that live
    and printed are different objects now. Reads shownMode(); owns nothing. */
 const DRAG_LINE = 'on screen while dragging: the infill cells are dropped — full print geometry rebuilds on release\n';
-let lastFullShownInfill = null;
+let lastFullShownInfill = null, lastFullShownTexture = null;
 function showingLine(mode) {
   return mode === 'export'
     ? `on screen: PRINT PREVIEW — export floor ${MIN_FEATURE_MM.toFixed(2)} mm applied to sheet, tip and foot, ring re-derived from the floored feet\n`
@@ -2663,6 +2681,23 @@ function lobeLine(petals) {
    line that printed only the asked number would be naming a thing that is not
    the thing. It reads the BUILDER's own record; nothing here re-derives a
    count. Every reason the pattern is absent is a WORD, never a silence. */
+/* THE TEXTURE LINE (T3): the pattern, the height, the lattice, every organ's
+   count against its floor, and every refusal — a refusal is a word, never a
+   silence. Null at the guard. */
+function textureLine(T) {
+  if (!T) return '';
+  const word = T.type === 'PEBBLE' ? 'PEBBLE' : 'CELLULAR';
+  if (T.refused === 'infill') return `TEXTURE NOT BUILT — ${word} asked while the petals are INFILLED: texture and infill are exclusive (Q9); told, not picked. Set one of them to None.\n`;
+  const organs = Object.entries(T.organs || {});
+  if (!organs.length) return `TEXTURE ${word} ${T.heightMm.toFixed(2)} mm — no sheet carries it on this build\n`;
+  const parts = organs.map(([k, q]) => {
+    const ref = Object.entries(q.refused || {}).map(([w, n]) => `${n} ${k}${n === 1 ? '' : 's'} refused (${w})`).join(', ');
+    const ratio = q.floorTris ? (q.skinTris / q.floorTris).toFixed(2) : '—';
+    return `${k}: ${q.panels} panel${q.panels === 1 ? '' : 's'}, ${q.subRows} sub-rows, columns x${q.cfMax}, skin ${q.skinTris} tris = ${ratio}x its floor (the builder's own estimate — TX4 reads the untextured twin, ~0.1 lower)${q.floorTris && q.skinTris / q.floorTris > TEXTURE_LATTICE_BAR ? ` (PAST THE ${TEXTURE_LATTICE_BAR}x BAR BY THIS ESTIMATE)` : ''}, relief 0..${q.reliefMaxMm.toFixed(3)} mm${ref ? `; ${ref}` : ''}`;
+  });
+  const clamp = (T.heightClamped ? ' · height CLAMPED to its range' : '') + (T.sizeClamped ? ' · feature size CLAMPED to its range' : '');
+  return `TEXTURE ${word}: ${T.heightMm.toFixed(2)} mm peak to valley, ${T.sizeMm.toFixed(1)} mm features, outward only over the bead, on a ${T.edgeMm.toFixed(1)} mm lattice${clamp} — ${parts.join(' · ')}. The hub, stem, rods and tube ring stay smooth (T5).\n`;
+}
 function infillLine(petals) {
   const F = petals && petals[0] && petals[0].infill;
   if (!F) return '';
@@ -3605,6 +3640,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + apexLine(petals)
        + tipRowBudgetLine(lastTipRowBudget)
        + infillLine(petals)
+       + textureLine(built ? built.texture : null)
        + edgeProfileLine(petals)
        + fringeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
@@ -3714,6 +3750,9 @@ function regenerate() {
                      the first BUILT petal because the plan is a property of a
                      blade; null where no blade carries one. */
                   infill: light ? lastFullShownInfill : ((built.petalsAll && built.petalsAll[0] && built.petalsAll[0].infill) || null),
+                  /* THE TEXTURE's record (T3), for the Texture controls' own read-outs — the
+                     last FULL build's while a light build is on screen */
+                  texture: light ? lastFullShownTexture : (built.texture || null),
                   /* THE SEPALS' record: the count ceiling and the angle limit are
                      the OWNER's numbers (footRing's and the builder's own scan),
                      printed on the two controls and hatched on their tracks; the
@@ -3731,7 +3770,7 @@ function regenerate() {
                   scopes: built.scopes || null };
   /* A LIGHT BUILD CARRIES NO INFILL PLAN, so the infill controls keep the
      last FULL build's numbers through a drag rather than flickering to none. */
-  if (!light) lastFullShownInfill = shown.infill;
+  if (!light) { lastFullShownInfill = shown.infill; lastFullShownTexture = shown.texture; }
   /* THE SCOPE VIEW (Scoping-b): the bar is re-synced against the build just
      made (a pick that no longer names a scope of this arrangement ends,
      writing nothing), and while a scope is picked the spans, the caps and the
@@ -4842,6 +4881,11 @@ window.__bloomMetrics = () => ({
        read-out speaks — and `widthsMm`, which is one scalar a cell. */
     widthsMm: [...lastInfill.widthsMm] } : null,
   infillAbsent: lastInfillAbsent,
+  /* THE SURFACE TEXTURE (T3): the builder's own record (every organ's lattice
+     count against its floor, the relief's extremes, the refusals) and the
+     GEOMETRY's own guard answer through the page — TX0's two statements. */
+  texture: lastTexture ? JSON.parse(JSON.stringify(lastTexture)) : null,
+  textureAbsent: lastTextureAbsent,
   /* THE GEOMETRY'S OWN ANSWER TO "MAY THIS STATE HAVE A STEM", read from the
      module that is actually running. ST0 compares it against the REGISTRY's
      declaration, and it has to arrive through the page: a gate calling the
