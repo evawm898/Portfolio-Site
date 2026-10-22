@@ -1,0 +1,85 @@
+# /lantern — the paper star lantern (lantern-design-doc.md §13).
+#
+# geometry: tools/verify-lantern.mjs, pure Node — the fold solver closes on
+#   every fixture, both halves' rims match, the 3D facet is an isometry of the
+#   flat one, infeasible targets clamp and tell, the SVG's layers, the design
+#   JSON round trip, the tabs — then its negative control (every mutant of
+#   lantern-geometry.js caught by the clause that names it).
+# page: tools/verify-lantern-page.mjs, headless Chromium with real pointer
+#   events and downloads, then its negative control (broken copies of
+#   lantern.js re-served).
+#
+# PATH SCOPE: the lantern's own files, bloom-curve.js (the one module it
+# imports from another generator), and the shared harness helper. Nothing else
+# here reads them, and no other gate reads these.
+name: lantern-gate
+
+on:
+  pull_request:
+    paths:
+      - lantern.html
+      - lantern.css
+      - 'lantern*.js'
+      - bloom-curve.js
+      - 'tools/verify-lantern*.mjs'
+      - 'tools/lantern-*.mjs'
+      - tools/chromium-harness.mjs
+      - lantern-design-doc.md
+      - .github/workflows/lantern-gate.yml
+  push:
+    branches: [main]
+    paths:
+      - lantern.html
+      - lantern.css
+      - 'lantern*.js'
+      - bloom-curve.js
+      - 'tools/verify-lantern*.mjs'
+      - 'tools/lantern-*.mjs'
+      - tools/chromium-harness.mjs
+      - lantern-design-doc.md
+      - .github/workflows/lantern-gate.yml
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  geometry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Gate (every fixture, the sweep, the randomizer)
+        run: node tools/verify-lantern.mjs
+      - name: Negative control (every mutant caught by the clause that names it)
+        run: node tools/verify-lantern.mjs --negative-control
+
+  page:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps
+        run: npm i --no-save playwright@1.62.1 three@0.161.0 jszip@3.10.1 jspdf@2.5.1
+      - name: Drop Google's Chrome apt source (it is not used, and it broke CI)
+        run: |
+          sudo rm -fv /etc/apt/sources.list.d/google-chrome* || true
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Page gate (real pointer events, downloads)
+        run: node tools/verify-lantern-page.mjs
+      - name: Negative control (broken copies of lantern.js, each caught by its check)
+        run: node tools/verify-lantern-page.mjs --negative-control
+      - name: Contact sheet
+        run: node tools/shot-lantern.mjs lantern-sheet
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lantern-contact-sheet
+          path: lantern-sheet

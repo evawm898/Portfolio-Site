@@ -11561,3 +11561,28 @@ numbered steps and ±1 mm figure, P23 a fresh profile opens on 4 × 3). Sheet:
 pin, B in use at 90° and 60°). Phase 2 (image → tile)
 is designed in §10 and not built. Nothing has been printed: every printability number there is a
 declared rule of thumb.
+
+## `/lantern` — the paper star lantern (pointer only)
+
+Hidden generative page (`lantern.html`, `lantern.css`, `lantern.js`,
+`lantern-geometry.js`, `lantern-view.js`; `noindex`, unlinked). Its governing
+document is **`lantern-design-doc.md`** — read §2 before touching the solver.
+The law: `solveLantern(state)` in `lantern-geometry.js` is the ONE owner of the
+geometry — the FINISHED star is what the user specifies and the FLAT pattern is
+derived (the inverse problem); every view, export and gate reads the same model.
+**Two mirrored halves glued at a planar rim cannot be made of rigid flat
+triangles (the rim edge would have to shrink), so a facet is a PLEATED CONE
+from the raised centre, and the one freedom that closes it is a convex bow on
+the flat edge, solved by bisection** (doc §2.2–2.3, with the measured closure
+table: a slender straight-edged pentagram closes at depth ≈ 0.41 × width — the
+commercial proportion — and slender-and-shallow has no planar rim at all; the
+solver clamps the depth to the nearest closing one and tells). The point
+outline reuses `bloom-curve.js` (the value, the PCHIP sampler, `proposeEdit`)
+with its own SVG editor in `lantern.js`. Gates, both in CI (`lantern-gate.yml`,
+path-scoped to the lantern's files plus `bloom-curve.js`): `node
+tools/verify-lantern.mjs` (L0–L11 + the sweep, `--negative-control` nine
+mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P9 in
+Chromium, `--negative-control` six mutants of the page). Sheet: `node
+tools/shot-lantern.mjs <dir>`. Phase 1 (geometry, shell, Flat + Folded) is
+built; the pattern system, the material model, export, backing, instructions
+and the lit view are the doc's phases 2–6.
