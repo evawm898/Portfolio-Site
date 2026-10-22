@@ -69,7 +69,7 @@ jobs:
 
   page:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60   # the gate plus its 15-mutant negative control is ~30 min on the runner and the contact sheet ~9: 40 cancelled a green job two seconds after its artifact uploaded
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
