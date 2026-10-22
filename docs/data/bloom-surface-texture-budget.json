@@ -1,0 +1,133 @@
+{
+ "budget": 1500000,
+ "edges": [
+  0.6,
+  0.4,
+  0.3,
+  0.25
+ ],
+ "built": {
+  "default": {
+   "shippedTris": 24688,
+   "areaMm2": 7919.5,
+   "byEdge": {
+    "0.6": {
+     "tris": 162592,
+     "pctBudget": 10.8
+    },
+    "0.4": {
+     "tris": 403616,
+     "pctBudget": 26.9
+    },
+    "0.3": {
+     "tris": 639200,
+     "pctBudget": 42.6
+    },
+    "0.25": {
+     "tris": 836672,
+     "pctBudget": 55.8
+    }
+   }
+  },
+  "whole": {
+   "shippedTris": 59012,
+   "areaMm2": 14921.5,
+   "byEdge": {
+    "0.6": {
+     "tris": 723690,
+     "pctBudget": 48.2
+    },
+    "0.4": {
+     "tris": 1921732,
+     "pctBudget": 128.1
+    },
+    "0.3": {
+     "tris": 2660164,
+     "pctBudget": 177.3
+    }
+   }
+  },
+  "infill": {
+   "shippedTris": 108928,
+   "areaMm2": 6712.2,
+   "byEdge": {
+    "0.6": {
+     "tris": 264452,
+     "pctBudget": 17.6
+    },
+    "0.4": {
+     "tris": 557248,
+     "pctBudget": 37.1
+    },
+    "0.3": {
+     "tris": 892522,
+     "pctBudget": 59.5
+    }
+   }
+  },
+  "tube": {
+   "shippedTris": 24672,
+   "areaMm2": 8695.3,
+   "byEdge": {
+    "0.6": {
+     "tris": 183130,
+     "pctBudget": 12.2
+    },
+    "0.4": {
+     "tris": 440256,
+     "pctBudget": 29.4
+    },
+    "0.3": {
+     "tris": 718776,
+     "pctBudget": 47.9
+    }
+   }
+  }
+ },
+ "projected": {
+  "INFILL: x 40 petals x 3 whorls": {
+   "shippedTris": 1121152,
+   "areaMm2": 75989.1,
+   "byEdge": {
+    "0.6": {
+     "projectedTris": 1560105,
+     "pctBudget": 104
+    },
+    "0.4": {
+     "projectedTris": 3872783,
+     "pctBudget": 258.2
+    },
+    "0.3": {
+     "projectedTris": 6133263,
+     "pctBudget": 408.9
+    },
+    "0.25": {
+     "projectedTris": 8028049,
+     "pctBudget": 535.2
+    }
+   }
+  },
+  "whole bloom x 40 petals x 3 whorls": {
+   "shippedTris": 401956,
+   "areaMm2": 89190.7,
+   "byEdge": {
+    "0.6": {
+     "projectedTris": 1831142,
+     "pctBudget": 122.1
+    },
+    "0.4": {
+     "projectedTris": 4545601,
+     "pctBudget": 303
+    },
+    "0.3": {
+     "projectedTris": 7198793,
+     "pctBudget": 479.9
+    },
+    "0.25": {
+     "projectedTris": 9422761,
+     "pctBudget": 628.2
+    }
+   }
+  }
+ }
+}

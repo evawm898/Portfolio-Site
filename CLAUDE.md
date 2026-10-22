@@ -1240,6 +1240,28 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   E7 edge (`E7_INSET_XFAIL`) until the width reached 46, where it reads 0 and the entry came off.
 - Sheet: `node tools/shot-bloom-big-petals.mjs <dir> --png docs/img/big-petals.png` (2b: the root rim side-on).
 
+**SURFACE TEXTURE IS RULED AND PLANNED, NOT BUILT: B, OUTWARD ONLY, HEIGHT A CONTROL WITH A FLOOR**
+(Eva's rulings on #436, Oct 22 — read `docs/bloom-surface-texture-discovery.md` §0, §8 and §10 before any
+texture work). The prototype is `bloom-texture-lab.html` / `bloom-texture-lab-core.js` (unlinked,
+`noindex`, imports the shipped geometry read-only; nothing shipped imports it).
+- **Attachment B**: one world-space field sampled INSIDE the emitters. A (post-pass) and A′ (union
+  re-mesh) are not built; A′ is parked with its costing.
+- **Outward only — relief never thins a sheet.** Centred, inward and emboss are dropped.
+- **No coupon first; height is ruled from renders and ships as a control with a FLOOR**, never a default
+  that assumes it prints (the floor's value is open, Q13).
+- **Visibility**: a light preview while dragging, the full relief on release and in the export (the
+  print preview's F7 pattern); never rebuilt live on every drag.
+- **/plot gets no say in bloom decisions** (a downstream consumer).
+- **Texture sessions run long measurements in the FOREGROUND, chunked and checkpointed (`--resume`), with
+  no background waiter and no scheduled check-in** — the discovery lost a 40-minute run to a container
+  restart.
+- **The prototype's red-green split is DEFECTIVE on long slivers** (the stem's 570 triangles → 429,378 at
+  0.6 mm against an ideal 9,621), so every stem figure it prints measures the split. T1 of the plan fixes
+  it before anything is re-measured.
+- Plan: T1 split fix (prototype) → T2 own-coordinate lattice through `petalSurface` → T3 field, guard and
+  outward relief on sheets → T4 Voronoi walls (the midline ridge) → T5 hub/stem/rod fallback → T6 sheet.
+  Gate family **TX**.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
