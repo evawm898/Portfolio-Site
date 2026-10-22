@@ -2950,18 +2950,20 @@
     const courseCpi = m.course.per_inch != null ? m.course.per_inch.toFixed(2) : "—";
     const d = m.loop_lattice_debug;
     const isCounted = m.wale_source === "loop_count";
-    // What actually fed the wale consensus for this region: its counted
-    // spacing (from the loop-lattice detector's own accepted columns)
-    // when trustworthy, its periodicity estimate otherwise -- see the
-    // module comment above _wale_count_candidate in gauge_analysis.py.
-    const waleUsedWpi = isCounted && d && d.wale_per_inch != null ? d.wale_per_inch.toFixed(2) : waleWpi;
+    // What fed the wale consensus for this region is always its own
+    // periodicity reading; a trustworthy loop-lattice count that AGREES
+    // with it corroborates it and supplies the vote's confidence, never
+    // the value -- see the module comments above _wale_count_candidate
+    // and _wale_count_harmonic_note in gauge_analysis.py.
+    const waleUsedWpi = waleWpi;
+    const countedWpi = d && d.wale_per_inch != null ? d.wale_per_inch.toFixed(2) : "?";
 
     roiDiagContent.innerHTML = `
       <div class="tgr-roi-diag-card">
         <div class="tgr-roi-diag-card__row"><span>Source</span><span>${m.source === "manual" ? "Manual" : "Auto-proposed"}</span></div>
         <div class="tgr-roi-diag-card__row"><span>Wale ${roiDiagTag("", waleIncluded)}</span><span>${waleUsedWpi}/in &middot; ${Math.round(m.wale.confidence * 100)}% (internal, uncalibrated)</span></div>
-        <div class="tgr-roi-diag-card__row"><span>Wale evidence used</span><span>${isCounted ? `counted (${d ? d.column_count : "?"} columns)` : "periodicity"}</span></div>
-        ${isCounted ? "" : `<div class="tgr-roi-diag-card__row"><span>Periodicity estimate</span><span>${waleWpi}/in</span></div>`}
+        <div class="tgr-roi-diag-card__row"><span>Wale evidence used</span><span>${isCounted ? `periodicity, corroborated by a count of ${d ? d.column_count : "?"} columns (${countedWpi}/in)` : "periodicity"}</span></div>
+        ${m.wale_count_note ? `<div class="tgr-roi-diag-card__row"><span>Count not used</span><span>${m.wale_count_note}</span></div>` : ""}
         <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}% (internal, uncalibrated)</span></div>
         <div class="tgr-roi-diag-card__row"><span>ROI quality</span><span>${(m.quality_score * 100).toFixed(0)}%</span></div>
         ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} of ${d.columns_considered != null ? d.columns_considered : "?"} candidate columns accepted</span></div>` : ""}

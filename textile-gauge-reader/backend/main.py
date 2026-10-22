@@ -798,6 +798,7 @@ async def analyze_multi(
             loop_lattice_debug=_loop_lattice_to_out(m.loop_lattice, pixels_per_mm) if m.loop_lattice else None,
             wale_source=m.wale_source,
             wale_count_confidence=m.wale_count_confidence,
+            wale_count_note=m.wale_count_note,
         )
         for m in result.per_roi
     ]
