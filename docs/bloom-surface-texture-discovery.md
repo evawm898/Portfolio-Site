@@ -1,6 +1,6 @@
 # Bloom surface texture — discovery and standalone prototype
 
-**Status: DISCOVERY. Nothing shipped.** `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`,
+**Status: DISCOVERY, RULED (§0). Merged as reference — the prototype page, this doc and the sheet. Nothing shipped.** `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`,
 `bloom.html`, `bloom.css` and every gate are untouched (predeclared before a line was written,
 checked by `git diff --stat origin/main` at close — §9). The prototype is new files only, none of
 which any workflow names, so no CI run is triggered by this PR:
@@ -13,6 +13,18 @@ which any workflow names, so no CI run is triggered by this PR:
 | `tools/bloom-texture-lab-budget.mjs` | the triangle cost, built for the demo states and projected for the cost corners |
 | `tools/shot-bloom-texture-lab.mjs` | the ruling sheet → `docs/img/bloom-surface-texture.png` |
 | `docs/data/bloom-surface-texture-*.json` | every number in §4 and §5, as measured |
+
+## 0. Eva's rulings (Oct 22, on #436)
+
+| # | ruling |
+|---|---|
+| **1** | **ATTACHMENT: B** — one shared world-space field sampled INSIDE the emitters. A and A′ are not built; A′'s costing stays in this doc (§8 Q1) and is PARKED. |
+| **2** | **DISPLACEMENT: OUTWARD ONLY. Relief never thins a sheet.** Centred, inward and emboss are dropped; Q11 is moot. Their rows in §4 stay as the measured record that ruled them out, not as options. |
+| **3** | **No coupon before integration.** Relief height is ruled FROM RENDERS, so height ships as a CONTROL WITH A FLOOR — never a hardcoded default that assumes it prints. |
+| **4** | **VISIBILITY: a light preview while dragging, the full relief on release and in the export** — the always-on print preview's pattern (F7, `dragLight`). Never rebuilt live on every drag. |
+| **5** | **/plot is a downstream consumer and gets no say in bloom decisions.** It is out of the collision list. |
+
+The plan these rulings set is §10.
 
 The goal as asked: **surface relief applied as ONE layer over the whole bloom** — petals, leaves,
 sepals, stamens, hub, stem — not a per-organ feature, and distinct from the Voronoi infill (no
@@ -69,8 +81,7 @@ world-space field. It knows nothing about organs.
   — a held slider would have to drop the relief the way it drops the infill cells), the read-out.
 - `bloom-registry.js`: the controls (type, height, feature size, mode) and a guard predicate;
   `bloom-file.js` gets them as ordinary fields.
-- **the captured channels go stale**: `captureGrid` (the /plot glTF and every gate that reads the
-  mid-surface), `captureLamina`, `captureNormals` (the bead's closed-form shading normal) all
+- **the captured channels go stale**: `captureGrid` (every gate that reads the mid-surface), `captureLamina`, `captureNormals` (the bead's closed-form shading normal) all
   describe the undisplaced sheet.
 
 **Gates it would move, and how.** With the relief OFF by branch, nothing moves (byte-identical by
@@ -87,7 +98,7 @@ captured grid, which A does not move), the smoke subset (needs relief rows), and
 
 **What it collides with.** Nothing open on GitHub (the only open PRs are #230 and #111). The
 collisions are with code merged this month that is still being worked: the budget wrapper, the inflorescence re-entrancy, the F7
-drag build, the grid glTF consumers (/plot).
+drag build.
 
 ### (B) a shared world-space field sampled inside each emitter
 
@@ -401,67 +412,87 @@ sections:
     at a whole-bloom distance** (sheet §4). Whether it RESOLVES in PA12 at that scale is not
     knowable from this repository (§8 Q10).
 
-## 8. Open questions for Eva
+## 8. Open questions for Eva — five RULED (Oct 22), eight still open
 
-Every one of these is a contradiction or an ambiguity the session found and did NOT resolve.
+Every one of these is a contradiction or an ambiguity the session found and did NOT resolve. The
+ruled ones keep their text so the ruling can be read against what it answered.
 
-1. **Which "final assembled solid"?** The export is overlapping closed shells unioned by the slicer;
-   there is no one outer surface. (A) as built textures every shell's own surface, buried parts
-   included. (A′) — a true union first (voxel/SDF re-mesh or a mesh boolean), then one displacement
-   of the outer skin — would make the seams vanish and textures nothing buried, but it re-meshes the
-   whole bloom (every gate that reads emitted structure — rows, beads, the captured grid — loses its
-   subject) and at a 0.1 mm voxel (a tenth of the 1.0 mm sheet, so a 0.3 mm relief is three voxels
-   deep) the default bloom's measured 81.4 × 81.4 × 15.7 mm box is ~104 M voxels. Not built. Did you mean A or A′?
-2. **What does "relief height" measure?** Built as PEAK-TO-VALLEY H (the field spans [0, H]).
-   Amplitude (±H) would double every thinning figure in §4.
-3. **Does the relief count against the 1.0 mm floor, or does the sheet thicken to make room?** On
-   the shipped 1.20 mm sheet there is 0.20 mm of budget: measured in §4, `inward` breaks the floor at
-   any height ≥ 0.1 mm and `centred` at 0.2 mm. The alternatives are (a) outward-only, (b) relief
-   rides on a sheet thickened by H (every T-family gate and the root taper move), (c) emboss (B only),
-   (d) accept sub-floor valleys as "texture, not wall" — which is a new printing claim nothing here
-   can back.
-4. **The edge-profile ruling says the bead's apex stays ON the original boundary — the silhouette
-   does not move.** A whole-bloom relief that covers the beads (A cannot avoid it) moves the
-   silhouette by up to H at every rim. Which wins: "one layer covering everything" or the ruled rim?
-5. **Should the relief reach the beads, the Voronoi hole rims and the tube ring at all?** B can
-   leave them alone; the sheet shows both. Measured: on a 1.0 mm Voronoi wall a 0.6 mm fade from
-   both rims leaves only the wall's MIDLINE at full relief, so B's masked relief becomes a sharp
-   ridge along every wall (sheet §2, the masked hole cell). With the rims textured, outward relief
-   narrows the 1.50 mm hole bar (§4). One of those has to give on an infilled bloom.
-6. **"Directional ribbing" — directional relative to what?** Built as radial spokes about the
-   bloom axis (one world field; it converges to a moiré at the hub centre and becomes vertical
-   fluting on the stem). The alternatives: a fixed world direction (parallel corrugation across the
-   whole bloom), or along each organ's own length (veins — but that is a PER-ORGAN field in each
-   organ's own (u, v), which contradicts "one layer, one shared field", and only B can do it).
-7. **Buried surfaces** — the petal feet inside the hub, the stem's root band, every overlap the
-   export contract relies on. A textures them (it cannot tell). A bump on a buried face within H of
-   the visible surface would poke through it (reasoned, NOT measured — no instrument here counts it).
-   On the flat default the feet's skins are COPLANAR with the hub's faces, take the same field value
-   along the same normal and stay coplanar (the no-relief control shows their z-fight seam lines;
-   both arms erase them). Texture buried faces, or not?
-8. **Live view or print only?** Showing the relief on screen means drawing the subdivided mesh on
-   every rebuild (the default goes 24,688 → 403,616 triangles at 0.4 mm), and the F7 drag build
-   would have to drop it as it drops the infill cells.
-9. **The triangle budget.** The shipped infill cost corner (74.7 % of the budget plain) projects
-   to 258 % at a 0.4 mm edge through a post-pass split and ~63 % through an ideal lattice; the whole-bloom demo state reads 128 % at 0.4 mm in the prototype, but 1.27 M of that
-   is the prototype's own stem defect (§7.6) — without it, 43 %. Options: a feature-size floor (the relief's λ sets the edge), an
-   emitter-native lattice (B) near the ideal 2A/e², a higher budget, or relief only on some organs —
-   which contradicts the ask.
-10. **Feature size against print resolution.** The edge-profile ruling put SLS Nylon 12 White's
-    resolvable detail at ~0.35–0.4 mm. A relief whose height or feature is under that may simply
-    not print, and nothing here has been printed. Is a coupon (the parked cantilever coupon, plus a
-    relief strip) owed before any of this is ruled?
-11. **Emboss is B's best print number and it is not "surface texture" in the usual sense**: the
-    sheet bends, so the underside carries the mirror relief. Is that wanted?
-12. **Stamens and the style are 1.2 mm rods** (one sheet, floored with it): any inward relief takes
-    them under the floor and outward relief thickens a filament the slenderness line already reports.
-    Exempt the rods?
+1. **RULED — B (§0 ruling 1). A′ PARKED.** *The question was:* which "final assembled solid"? The
+   export is overlapping closed shells unioned by the slicer; there is no one outer surface. (A) as
+   built textures every shell's own surface, buried parts included. **A′'s costing, kept as the record
+   of the parked option:** a true union first (voxel/SDF re-mesh or a mesh boolean), then one
+   displacement of the outer skin — the seams would vanish and nothing buried would be textured, but it
+   re-meshes the whole bloom (every gate that reads emitted structure — rows, beads, the captured grid
+   — loses its subject), and at a 0.1 mm voxel (a tenth of the 1.0 mm sheet, so a 0.3 mm relief is three
+   voxels deep) the default bloom's measured 81.4 × 81.4 × 15.7 mm box is ~104 M voxels before the
+   marching-cubes surface, whose triangle count is that of a 0.1 mm lattice over the whole area (the
+   default's 7,919 mm² at 2A/e² is ~1.6 M — over the export budget on the shipping default alone).
+2. **OPEN — what does "relief height" measure?** Built as PEAK-TO-VALLEY H: the field spans
+   [0, H], so under outward-only H is also the most any surface rises. The alternative is the MEAN
+   rise (H/2 for a symmetric field such as the pebble), which is closer to what a viewer reads as
+   "how raised". It decides what the control's number means on the panel and the units of its floor
+   (Q13). **Blocks T3.**
+3. **RULED — OUTWARD ONLY; relief never thins a sheet (§0 ruling 2).** *The question was:* does the
+   relief count against the 1.0 mm floor? On the shipped 1.20 mm sheet there is 0.20 mm of budget:
+   measured in §4, `inward` breaks the floor at any height ≥ 0.1 mm and `centred` at 0.2 mm.
+4. **OPEN — the edge-profile ruling says the bead's apex stays ON the original boundary; the
+   silhouette does not move.** Outward relief on a bead moves the silhouette out by up to H at every
+   rim. Which wins at the rim: "one layer covering everything" or the ruled rim? Until ruled, T3
+   ships the bead UNRELIEVED (the ruled rim holds by construction) with the fade law of §10 T3.
+   **Blocks the bead half of T3, not T3.**
+5. **OPEN — should the relief reach the Voronoi hole rims and the tube ring?** Measured: on a 1.0 mm
+   Voronoi wall a 0.6 mm fade from both rims leaves only the wall's MIDLINE at full relief, so masked
+   relief becomes a sharp ridge along every wall (sheet §2, the masked hole cell). With the rims
+   textured, outward relief narrows the 1.50 mm hole bar (§4: 286 hole-rim samples, 1.2 %, through A;
+   B was not measured with the rims unmasked). T4 costs both remedies (§10). **Blocks T4.**
+6. **OPEN — "directional ribbing": directional relative to what?** Built as radial spokes about the
+   bloom axis (one world field; it converges to a moiré at the hub centre and becomes vertical fluting
+   on the stem). The alternatives: a fixed world direction (parallel corrugation across the whole
+   bloom), or along each organ's own length (veins — but that is a PER-ORGAN field in each organ's own
+   (u, v), which contradicts "one layer, one shared field"). **Blocks the ribbing value of T3's choice
+   control; pebble and cellular do not wait for it.**
+7. **OPEN — buried surfaces** — the petal feet inside the hub, the stem's root band, every overlap the
+   export contract relies on. A bump on a buried face within H of the visible surface would poke
+   through it (reasoned, NOT measured — no instrument here counts it; T5 owes the instrument). On the
+   flat default the feet's skins are COPLANAR with the hub's faces, take the same field value along the
+   same normal and stay coplanar. Texture buried faces, or not? **Blocks T5's hub half.**
+8. **RULED — a light preview while dragging, the full relief on release and in the export (§0 ruling
+   4),** the always-on print preview's pattern. *The question was:* live view or print only? Drawing
+   the subdivided mesh costs the default 24,688 → 403,616 triangles at 0.4 mm through the prototype's
+   split (T2's lattice lowers that, §5).
+9. **OPEN — the triangle budget.** The shipped infill cost corner (74.7 % of the budget plain)
+   projects to 258 % at a 0.4 mm edge through a post-pass split and ~63 % through an ideal lattice;
+   the whole-bloom demo state reads 128 % at 0.4 mm in the prototype, but 1.27 M of that is the
+   prototype's own stem defect (§7.6) — without it, 43 %. B's own-coordinate lattice (T2) is the
+   ruled route toward the ideal; what stays open is what happens at the corners even then: a
+   feature-size floor (λ sets the edge, so the refinement is bounded by the floor), a higher budget,
+   or relief refused above the budget the way the export already refuses (XR1). **Blocks T2's
+   acceptance bar.**
+10. **RULED — no coupon before integration (§0 ruling 3).** Height is ruled from renders and ships as
+    a control with a floor. *The question was:* is a coupon owed first? The edge-profile ruling put SLS
+    Nylon 12 White's resolvable detail at ~0.35–0.4 mm; that figure is the only reference this repo has
+    for the floor and is a declared guess.
+11. **MOOT — emboss is dropped (§0 ruling 2).** *The question was:* is a sheet that bends, carrying
+    the mirror relief underneath, wanted?
+12. **OPEN — stamens and the style are 1.2 mm rods** (one sheet, floored with it). Under outward-only
+    nothing thins them, but relief thickens a filament the slenderness line already reports and closes
+    the gaps between them (904 of the whole bloom's 1,101 newly-closed gaps are rods, §7.1). Texture the
+    rods, or exempt them? **Blocks T5's rod half.**
+13. **OPEN, NEW (from ruling 3) — the height control's FLOOR: what value, and in what units?** Ruling 3
+    says the height ships with a floor and never a default that assumes it prints, and names no number.
+    The candidates this repo can cite are all guesses: ~0.35–0.4 mm (the edge-profile ruling's SLS
+    resolvable detail), `MIN_FEATURE_MM` 1.0 (a gap/wall floor, not a height), or a fraction of the
+    feature size. Whether the floor is the slider's MINIMUM (so 0 is not reachable and NONE is the
+    choice control's job) or a told threshold below which the relief is marked "may not print" is part of
+    the question. **Blocks T3.**
 
 ## 9. Reproduce, and what was not touched
 
 ```
 npm i --no-save three@0.161.0            # the page and the sheet serve three from node_modules
-node tools/bloom-texture-lab-measure.mjs --out docs/data/bloom-surface-texture-measure.json   # ~60 min, Node only
+# ~60 min, Node only: run in the FOREGROUND in timeout-bounded chunks; each run checkpoints the JSON
+# and --resume skips what is already in it (a container restart killed one unchunked run, §10)
+timeout 560 node tools/bloom-texture-lab-measure.mjs --resume --out docs/data/bloom-surface-texture-measure.json   # repeat until "done (complete)"
 node tools/bloom-texture-lab-budget.mjs  --out docs/data/bloom-surface-texture-budget.json    # ~3 min
 node tools/shot-bloom-texture-lab.mjs <dir> --png docs/img/bloom-surface-texture.png         # ~2 min, Chromium
 ```
@@ -484,3 +515,111 @@ sheet. Both now cast along the shipped surface's normal from the old and the new
 baseline (no material within 2.5 mm along an in-plane bead normal) is excluded from "newly under",
 because a ray newly grazing a neighbouring bump there is not a thinning. The wall cannot see a
 thinning between sampled vertices, and the sampling is every 5th vertex.
+
+## 10. B's session plan (proposed, Oct 22 — for ruling)
+
+The Voronoi port's shape (`docs/bloom-infill-port-plan.md` §6): each session is one mechanism,
+prototype-first where the numbers would otherwise be measured on a state that will not ship. Every
+session **(i)** touches no shipped file it does not name, **(ii)** proves the guard byte-identical
+(relief NONE moves 0 floats over the whole matrix in both modes — `verify-bloom-surface-bytes`'
+partition, movers predeclared from the BASE tree's record), and **(iii) runs every long measurement
+in the FOREGROUND, chunked and checkpointed (`--resume`), with no background waiter and no scheduled
+check-in** (Eva, Oct 22 — this session lost one 40-minute run to a container restart, §9). The new
+gate family is **TX** (free; checked against every assertion prefix in `tools/`), written and seen red
+before the geometry it guards, each clause with a must-fail.
+
+**T1 · THE SPLIT, FIXED; THE PROTOTYPE RE-MEASURED.** *Prototype only. No gate dependency. No open
+question blocks it.* **FIRST**, for the infill S1's reason: every number below it — the stem rows, the
+rods, the budget — is a property of the split and moves when the split is fixed. Builds: the
+**edge-count-aware split** for the stem-sliver defect (§7.6) — each edge into ⌈L/e⌉ equal segments, the
+count a pure function of the unordered edge so two triangles sharing it agree, and the triangle filled
+by a pattern that takes three per-edge counts (no red-green fan), with a must-fail that restores the fan
+and requires the stem fold count back; the prototype page and tools cut to the ruled modes (outward
+only; centred / inward / emboss removed, their §4 rows kept as the record); the §4 outward rows and the
+§5 budget re-measured, the stem column valid for the first time. **Gates moved: none** (no shipped file).
+*Acceptance:* the stem at a 0.6 mm edge within 1.5× of its ideal 9,621 triangles, and 0 outward folds on
+the bore.
+
+**T2 · B'S OWN-COORDINATE LATTICE (the budget item).** *Shipped geometry, no relief yet. Gated on T1.
+Blocked by Q9 for its acceptance bar.* `emitPanel` evaluates SUB-ROWS and SUB-COLUMNS between the ladder's
+stations through the existing front door, `petalSurface(...).rowAt(u).sect(v)` (session 37's evaluator),
+so new points lie ON the surface and the ladder — `bladeStations`, `NU`, `CURL_START_MIN`, A7/A8, the
+nib's arc rows, the lobe demand — does not move: refinement is a factor on the panel, never a station.
+Off by branch (factor 1 is the shipped emission, the same doubles). Reachable only through a capability
+hook in T2 — no control exists until T3 needs it. The leaf builders (`leafSurface`) and the tube rings
+(`emitTubeRings` → `emitPanel` with `periodic`) take the same sub-lattice; the rim (`emitRimLoop`) takes
+the refined perimeter as its profile count. **Gates moved:** none at factor 1 (byte partition); at a
+factor > 1 every gate that reads EMITTED ROWS (C1, A6, AN3, L, FR, OC0–OC5, SP5b, LF, E, the grid gate's
+clause 2) is taught that a refined panel reports its ladder rows and its sub-rows as two channels — the
+grid capture keeps the ladder's rows (the captured mid-surface is the ladder's, decided here rather than
+left implicit). **TX0–TX2:** sub-points lie on the surface (restated through `petalSurface`, not read
+from the emitter), the shared edges between panels and between a panel and its rim agree exactly, and the
+triangle count is within a declared factor of 2A/e². *Acceptance (pending Q9):* the default bloom near
+99,000 triangles at 0.4 mm where the prototype's split made 403,616; the infill cost corner's figure
+reported against the budget, refused or floored per Q9.
+
+**T3 · THE FIELD, THE GUARD, AND OUTWARD RELIEF ON SHEETS.** *Gated on T2. Blocked by Q2 and Q13; the
+ribbing value by Q6; the bead half by Q4.* The big one. Builds: **one field module**, pure, world-space,
+deterministic across engines (X0 compares Chromium's STL against a Node rebuild at an 8-ulp bar, and
+`atan2`/`cos` are not correctly rounded — so the field is built from products, `floor`, `sqrt` and an
+integer hash, or quantised onto a grid the way `infillSnap` is); the controls in the registry — a CHOICE
+guard (NONE / PEBBLE / CELLULAR [/ RIBBING per Q6]; a CHOICE so the blanket sweep cannot reach it and
+`ALL MAX` stays untextured, the infill's precedent), a **height slider whose minimum is the floor of
+Q13** (ruling 3: no default that assumes it prints), a feature-size slider whose minimum is tied to
+T2's lattice (λ ≥ 4e); **outward relief on the skins of petals, sepals, leaves and the tube ring**,
+displaced along the emitter's own sheet normal off the mid-surface it already holds (`emitPanel`'s
+`P ± n·t/2` becomes `P ± n·(t/2 + s⁺)`, s⁺ ≥ 0 on the outward side of each skin only); the bead
+unrelieved and the skin's relief faded to 0 over a length from the bead's own room (not the prototype's
+typed 0.6 mm) until Q4 is ruled; **ruling 4's visibility**: the drag-light build drops the relief
+(`DRAG_LIGHT_OVERRIDE` gains the guard), the release and the export build it, gated by the existing D
+family. **Gates moved:** X1/X2 on every relief row (a new matrix block, re-recorded, never a widened
+band); T0–T4 restated so the exported skin is at least the sheet everywhere (**TX3: relief never thins
+— the outward-only ruling as a clause**, measured on the exported file against the shipped thickness
+law); the grid gate's clause 2 re-derived to mid ± n·(t/2 + s⁺) with s⁺ restated from the controls; E
+unchanged by construction while the bead is unrelieved (and asserted unchanged); panel route, design-file
+fields, D family, defaults-bar row for the ruled default; byte partition (0 at the guard); a frozen phase
+(rows added); smoke block. **TX4:** the field restated in the harness (a second statement, on purpose —
+JS8's precedent) against the emitted displacement.
+
+**T4 · VORONOI WALLS — THE MIDLINE RIDGE.** *Gated on T3. Blocked by Q5.* The sheet's §2 masked-hole cell and Q5's finding: a fade
+from both rims on a 1.0 mm wall leaves only the midline at full relief, which draws as a sharp ridge
+along every wall. Outward-only rules out cutting into the wall, so the two remedies are costed here for
+the ruling and one is built: **(a) the wall's own WIDTH sets the relief** — the amplitude scales by
+`clamp((halfWall − beadRoom) / fadeLength, 0, 1)`, read from the infill plan's own wall width (one
+owner), so a 1.0 mm wall carries ~0 and a broad cell carries the full relief: no ridge because no
+relief; or **(b) the rims take the relief too** — the wall is textured edge to edge with no fade, so no
+ridge; but outward relief on a hole rim narrows the aperture, so the PLAN's hole bar must be held at
+1.50 mm + 2H for the emitted aperture to keep 1.50 (a plan change; ruling 3 of the infill counts holes
+achieved, so the achieved count falls). Plus the margin bead of the infill outline (Q4's answer carries
+over). **Gates moved:** the I family (I1's hole bar read on the RELIEVED loops; I11's wall), H0–H3, MB,
+the infill byte partition, the infill budget B family. **TX5:** no relief ridge — the relief's own
+second difference across a wall is bounded, measured on emitted vertices.
+
+**T5 · HUB, STEM AND RODS — THE NO-MID-SURFACE FALLBACK.** *Gated on T3. The hub half blocked by Q7; the
+rod half by Q12.* The prototype had no captured mid-surface for these and fell back to A's mesh normal
+(§3); a real B gives each emitter its own analytic normal: the hub's slab faces ±z and its rim radial,
+the dome and sphere arms their sphere's normal, the join its own profile normal, the stem's outer wall
+radial (the BORE is not visible and is never relieved), the cut face its plane, rods and petioles and the
+rachis radial from their own axis (`rodInto`'s frame), anthers and stigma from `tipInto`'s outline.
+**Hard edges** (the hub's rim, every buried end wall, the stem's cut and plug): the relief fades to 0
+at an edge over a length the emitter owns — the halo the sheet shows in §1 — or runs to the edge on a
+face that has no neighbour to shed into; which, per face class, is a look ruling from the sheet.
+**Buried faces** per Q7, with the instrument Q7 says is missing: a poke-through count (a relieved
+buried vertex outside the enclosing shell, by ray parity against that shell). **Gates moved:** J1–J9
+(hub), ST family (ST3/ST10 on the outer wall only), JS/JG (rods read emitted rings — re-derived to the
+relieved radius), LF (petiole, rachis), both coverage instruments' R1, the crowding raster (feet on the
+hub surface), the combination gate's `leaf-stem` and the floret measures (gaps close by up to 2H — the
+outward-only cost, §7.1). **TX6:** each fallback's direction restated from the part's own axis or
+surface, not from the mesh.
+
+**T6 · THE SHEET AND THE REMAINING RULINGS.** *Gated on T5.* `tools/shot-bloom-texture-lab.mjs`
+rebuilt on the shipped generator: the type square, a height sweep starting AT the floor with the
+floor's status in every caption, seams between every organ pair, the Voronoi walls under T4's remedy,
+the budget corners with their triangle counts and refusals. Rendering may start on the prototype
+earlier; what waits for T5 is rendering the thing that ships.
+
+**What stays open after the plan, named:** the relief's interaction with self-intersection on folded
+states (X2 reads the census, and a relieved fold may read deeper — re-records, not a new class);
+the cross-shell gaps outward relief closes (§7.1: 904 rod pairs on the whole bloom), which are
+over-connection and not a print failure under the crowding ruling, but are the combination gate's
+subject the day a pair names them.
