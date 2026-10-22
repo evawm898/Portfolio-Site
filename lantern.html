@@ -56,6 +56,16 @@
     </div>
   </details>
 
+  <details class="ln-sec" open id="secPattern">
+    <summary>Pattern</summary>
+    <div class="ln-sec-body">
+      <div class="ln-presets" id="patternPresets" aria-label="Pattern presets"></div>
+      <div class="ln-row"><button class="ln-btn" id="randomPattern" title="A new pattern that passes every check">⚄ random pattern</button><button class="ln-btn ln-btn--sm" id="patReseed" title="Same settings, another arrangement">↻ reseed</button><span class="ln-note" id="patternNote"></span></div>
+      <div id="patternCtrls"></div>
+      <p class="ln-note">every point carries the same pattern, mirrored about its ridge; the spine and the fold lines stay solid paper</p>
+    </div>
+  </details>
+
   <details class="ln-sec" id="secProfile">
     <summary>Profile</summary>
     <div class="ln-sec-body" id="profileCtrls"></div>
@@ -63,7 +73,7 @@
 
   <details class="ln-sec" open id="secChecks">
     <summary>Checks <span class="ln-count" id="flagCount"></span></summary>
-    <div class="ln-sec-body"><ul class="ln-flags" id="flags"></ul></div>
+    <div class="ln-sec-body"><ul class="ln-flags" id="flags"></ul><p class="ln-note" id="flagHint" hidden>click a cut finding to see it in the Flat view</p></div>
   </details>
 
   <details class="ln-sec" open id="secExport">

@@ -28,6 +28,24 @@ for (const id of ['alt8', 'sunburst12', 'flower', 'puffy6']) {
   await T((i) => window.__lantern.preset(i), id); await T(() => window.__lantern.flush()); await page.waitForTimeout(500);
   save(`preset-${id}.png`, await shotOf('.ln-preview'), `preset ${id}, folded`);
 }
+await T(() => window.__lantern.preset('classic5')); await T(() => window.__lantern.flush());
+for (const id of ['lace', 'botanical', 'geometric', 'celestial', 'alternate']) {
+  await T((i) => window.__lantern.patternPreset(i), id); await T(() => window.__lantern.flush()); await page.waitForTimeout(500);
+  save(`pattern-${id}.png`, await shotOf('.ln-preview'), `pattern preset ${id} on the default star, folded`);
+}
+await T(() => window.__lantern.patternPreset('victorian')); await T(() => window.__lantern.flush()); await page.waitForTimeout(200);
+await T(() => window.__lantern.fold.lookAt([0, 0, 0], [0.1, 0.95, 0.3], 520)); await page.waitForTimeout(200);
+save('pattern-close.png', await shotOf('.ln-preview'), 'the default Victorian scroll pattern, close: the stem, the volutes, the rim beads, cut through both halves');
+await T(() => window.__lantern.view('flat')); await page.waitForTimeout(200);
+save('pattern-flat.png', await shotOf('.ln-preview'), 'the Flat view with the cuts: every point carries the pattern mirrored about its ridge; amber rings mark the judge\'s thin-paper notes');
+await T(() => window.__lantern.setState({ ...window.__lantern.state(), patAutoBridge: false })); await page.waitForTimeout(200);
+await T(() => window.__lantern.focusIssue('island')); await page.waitForTimeout(200);
+save('pattern-island.png', await shotOf('.ln-preview'), 'auto-bridge off: the Flat view zoomed on an island finding (red ring) after clicking it in Checks');
+await page.locator('#secPattern').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
+save('pattern-panel.png', await shotOf('#secPattern'), 'the Pattern section: presets with facet thumbnails, the randomizer, reseed, generator, density, intricacy, rim band, alternate-solid, auto-bridge');
+await page.locator('#secChecks').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
+save('pattern-checks.png', await shotOf('#secChecks'), 'Checks with auto-bridge off: the island as a problem, the thin-paper notes, each clickable into the Flat view');
+await T(() => window.__lantern.setState({ ...window.__lantern.state(), patAutoBridge: true })); await T(() => window.__lantern.view('folded'));
 await T(() => window.__lantern.setState({ ...window.__lantern.state(), points: 5, slender: 0.38, depthFrac: 0.2, edgeMode: 'straight', edge: { mode: 'single', points: [[0, 0], [1, 0]] } }));
 await page.waitForTimeout(300);
 save('clamp.png', await shotOf('.ln-panel'), 'an infeasible target (slender 0.38 at 0.2 × width): Checks says the depth was clamped to the nearest closing depth and why');

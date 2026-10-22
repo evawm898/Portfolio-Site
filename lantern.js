@@ -6,6 +6,7 @@
    Read lantern-design-doc.md before changing any of it. */
 
 import * as G from './lantern-geometry.js';
+import * as PAT from './lantern-pattern.js';
 import { curveFunction, proposeEdit, nearestOnCurve, quantise, curveEquals, cloneCurve } from './bloom-curve.js';
 import { createFoldedView } from './lantern-view.js';
 
@@ -15,11 +16,13 @@ const $ = (id) => document.getElementById(id);
 const inch = (mm) => (mm / G.MM_PER_IN).toFixed(1) + '″';
 
 /* ---------------- state and history ---------------- */
-let state = { ...G.DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) };
+let state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) };
+let pattern = null;      // the pattern laid onto the model's facets, judged (see rebuildNow)
+let flatFocus = null;    // a cut finding the Flat view is zoomed on: { x, y, r } in flat mm
 let model = null;
 let view = 'folded';
 const history = { past: [], future: [], max: 80 };
-const stats = { solves: 0, solveMs: 0, flatDraws: 0, edits: 0 };
+const stats = { solves: 0, solveMs: 0, flatDraws: 0, edits: 0, patterns: 0, patternMs: 0, textures: 0 };
 const snap = (s) => JSON.stringify(s);
 function pushHistory(prev) { if (history.past.length && history.past[history.past.length - 1] === snap(prev)) return; history.past.push(snap(prev)); if (history.past.length > history.max) history.past.shift(); history.future.length = 0; syncHistory(); }
 function syncHistory() { $('undo').disabled = !history.past.length; $('redo').disabled = !history.future.length; }
@@ -45,6 +48,12 @@ const CONTROLS = [
   { id: 'opening', sec: 'mountCtrls', kind: 'range', label: 'Back opening', min: 20, max: 80, step: 1, fmt: (v) => `⌀ ${v} mm`, tip: 'The hole in the back half\'s centre for the cord kit\'s socket. 40 mm fits a standard E26 pendant kit; measure yours.' },
   { id: 'ringWidth', sec: 'mountCtrls', kind: 'range', label: 'Reinforcing ring width', min: 10, max: 40, step: 1, fmt: (v) => `${v} mm`, tip: 'A separate ring glued around the opening on the inside, so the cord kit\'s grip has stock to hold.' },
   { id: 'hangHole', sec: 'mountCtrls', kind: 'check', label: 'Hang hole at one tip', tip: 'A 6 mm hole on one point\'s ridge, 15 mm from the tip, for hanging by a point instead of the cord.' },
+  { id: 'patMode', sec: 'patternCtrls', kind: 'select', label: 'Generator', options: [['paisley', 'paisley & scroll'], ['lace', 'lace'], ['botanical', 'botanical'], ['geometric', 'geometric'], ['celestial', 'celestial'], ['none', 'none — solid paper']], tip: 'The family the pattern is drawn from. Every point carries it, mirrored about its ridge.' },
+  { id: 'patDensity', sec: 'patternCtrls', kind: 'range', label: 'Density', min: 0.2, max: 1, step: 0.05, fmt: (v) => `${(v * 100).toFixed(0)}%`, when: (s) => s.patMode !== 'none', tip: 'How much of each facet is cut. More light, less paper — the checks say when the paper gets too thin.' },
+  { id: 'patIntricacy', sec: 'patternCtrls', kind: 'range', label: 'Intricacy', min: 0.2, max: 1, step: 0.05, fmt: (v) => `${(v * 100).toFixed(0)}%`, when: (s) => s.patMode !== 'none', tip: 'Fewer, larger motifs at the left; finer detail at the right, down to the smallest cut the stock allows.' },
+  { id: 'patRim', sec: 'patternCtrls', kind: 'select', label: 'Rim band', options: [['none', 'none'], ['beads', 'beads'], ['picot', 'picot'], ['scallop', 'scallop arcs'], ['dashes', 'dashes']], when: (s) => s.patMode !== 'none', tip: 'A row of small cuts inside the rim margin, along each edge.' },
+  { id: 'patSolidAlt', sec: 'patternCtrls', kind: 'check', label: 'Alternate points solid', when: (s) => s.patMode !== 'none', tip: 'Every other point left uncut — the lantern reads as pattern / plain / pattern.' },
+  { id: 'patAutoBridge', sec: 'patternCtrls', kind: 'check', label: 'Auto-bridge islands', when: (s) => s.patMode !== 'none', tip: 'A piece of paper enclosed by a cut would fall out; on, the generator splits the cut to leave a bridge. Off, the island is reported instead.' },
   { id: 'profile', sec: 'profileCtrls', kind: 'select', label: 'Side profile', options: [['straight', 'straight — classic triangle'], ['faceted', 'faceted curve (phase 6, not yet)']], disabledOptions: ['faceted'], tip: 'Straight: the ridge runs straight from centre to tip. Faceted: extra creases round the body (not built yet).' },
 ];
 const SECS = {};
@@ -79,6 +88,7 @@ function syncControls() {
   }
   for (const b of $('edgeModes').children) b.classList.toggle('is-on', b.dataset.mode === state.edgeMode);
   for (const b of $('shapePresets').children) b.classList.toggle('is-on', presetMatches(b.dataset.preset));
+  for (const b of $('patternPresets').children) b.classList.toggle('is-on', patternPresetMatches(b.dataset.preset));
 }
 
 /* THE ONE WRITE PATH for a control value. `commit` pushes history and persists. */
@@ -114,6 +124,31 @@ function applyPreset(p) {
   rebuild({ commit: true });
 }
 
+/* ---------------- pattern presets and the randomizer ---------------- */
+function patternPresetMatches(id) { const p = PAT.PATTERN_PRESETS.find((q) => q.id === id); return !!p && PAT.PATTERN_FIELDS.every((k) => (k in p.state ? p.state[k] === state[k] : true)); }
+function applyPatternPreset(p) {
+  const prev = { ...state, edge: cloneCurve(state.edge) };
+  state = { ...state, ...p.state };
+  pushHistory(prev); $('patternNote').textContent = p.name; rebuild({ commit: true });
+}
+/* a random pattern is kept only if the judge passes it with no island and no thin paper: up to eight draws, the best of them otherwise, told */
+function randomPattern() {
+  const prev = { ...state, edge: cloneCurve(state.edge) };
+  let best = null;
+  for (let k = 0; k < 8; k++) {
+    const cand = PAT.randomPattern((Math.random() * 2 ** 31) >>> 0);
+    const pat = PAT.patternForModel(model, { ...state, ...cand }, PAT.RULES_DEFAULT, { validate: true });
+    const score = pat.counts.island * 100 + pat.counts.thin + pat.counts.narrow + pat.counts.keepout;
+    if (!best || score < best.score) best = { cand, score };
+    if (score === 0) break;
+  }
+  state = { ...state, ...best.cand };
+  pushHistory(prev);
+  $('patternNote').textContent = best.score === 0 ? `random — passes every check` : `random — the best of eight draws, see Checks`;
+  rebuild({ commit: true });
+}
+function reseedPattern() { const prev = { ...state, edge: cloneCurve(state.edge) }; state = { ...state, patSeed: (Math.random() * 2 ** 31) >>> 0 }; pushHistory(prev); $('patternNote').textContent = `seed #${state.patSeed.toString(36)}`; rebuild({ commit: true }); }
+
 /* ---------------- the rebuild ---------------- */
 let pending = 0;
 function rebuild({ commit = true } = {}) {
@@ -124,6 +159,9 @@ function rebuildNow({ commit = true } = {}) {
   if (!G.SHAPE_PRESETS.some((p) => presetMatches(p.id))) $('presetNote').textContent = $('presetNote').textContent.startsWith('random') ? $('presetNote').textContent : '';
   model = G.solveLantern(state);
   stats.solves++; stats.solveMs = performance.now() - t0;
+  const t1 = performance.now();
+  pattern = PAT.patternForModel(model, state, PAT.RULES_DEFAULT, { validate: commit });   // mid-gesture the raster judge is skipped; the commit runs it
+  stats.patternMs = performance.now() - t1; stats.patterns++;
   syncControls();
   drawDims();
   drawFlags();
@@ -131,9 +169,25 @@ function rebuildNow({ commit = true } = {}) {
   if (view === 'flat') drawFlat(); else pushMesh();
   if (commit) persist();
 }
+const textureCache = new Map();   // per facet type record: the canvas the alpha map was painted on
+function textureFor(rec, solid) {
+  const key = solid ? 'solid' : rec;
+  let cv = textureCache.get(key);
+  if (cv) return cv;
+  if (textureCache.size > 8) textureCache.clear();
+  cv = document.createElement('canvas');
+  const px = Math.min(2048 / rec.box.Ro, 2048 / (2 * rec.box.yMax), 6);   // ≤ 2048 on a side, at most 6 px per mm
+  cv.width = Math.max(4, Math.round(rec.box.Ro * px)); cv.height = Math.max(4, Math.round(2 * rec.box.yMax * px));
+  PAT.paintFacetTexture(cv.getContext('2d'), rec, cv.width, cv.height, { solid });
+  stats.textures++;
+  textureCache.set(key, cv);
+  return cv;
+}
 function pushMesh() {
-  const front = G.foldedMesh(model, 1), back = G.foldedMesh(model, -1, { opening: true });
-  fold.setModel([front, back], { fit: !meshFitted || Math.abs(lastFitRadius - model.flatSpan) > 1e-6, bounds: model.rt });
+  const solidAlt = !!state.patSolidAlt && state.patMode !== 'none';
+  const front = G.foldedMesh(model, 1, { solidAlternate: solidAlt }), back = G.foldedMesh(model, -1, { opening: true, solidAlternate: solidAlt });
+  const texOf = (part) => (state.patMode === 'none' ? null : textureFor(pattern.types[model.alternate ? (part.type === 'short' ? 1 : 0) : 0], part.solid));
+  fold.setModel([front, back], { fit: !meshFitted || Math.abs(lastFitRadius - model.flatSpan) > 1e-6, bounds: model.rt, textureOf: texOf });
   meshFitted = true; lastFitRadius = model.flatSpan;
 }
 let meshFitted = false, lastFitRadius = 0;
@@ -154,14 +208,37 @@ function drawFlags() {
     const li = document.createElement('li'); li.className = n.kind === 'clamp' ? 'warn' : n.kind; li.dataset.flag = n.id; li.textContent = n.text; ul.append(li);
     if (n.kind === 'bad') bad++; else if (n.kind === 'warn' || n.kind === 'clamp') warn++;
   }
-  if (!model.notes.length) { const li = document.createElement('li'); li.className = 'ok'; li.textContent = 'closes with no bow at this depth; the rim lies flat and both halves match.'; ul.append(li); }
-  else if (!bad && !warn) { const li = document.createElement('li'); li.className = 'ok'; li.textContent = 'the fold closes; both halves\' rims match.'; ul.append(li); }
+  const pc = pattern ? pattern.counts : { island: 0, thin: 0, narrow: 0, keepout: 0 };
+  const cutFindings = [];
+  if (pc.island) cutFindings.push({ kind: 'bad', id: 'islands', text: `${pc.island} island${pc.island > 1 ? 's' : ''} per facet — paper enclosed by a cut falls out when weeded${state.patAutoBridge ? ' (the auto-bridge could not reach it)' : ' (auto-bridge is off)'}`, issue: 'island' });
+  if (pc.thin) cutFindings.push({ kind: 'warn', id: 'thin', text: `${pc.thin} spot${pc.thin > 1 ? 's' : ''} per facet of paper thinner than the ${PAT.RULES_DEFAULT.bridge} mm bridge — it will cut, and may tear in weeding`, issue: 'thin' });
+  if (pc.narrow) cutFindings.push({ kind: 'warn', id: 'narrow', text: `${pc.narrow} cut${pc.narrow > 1 ? 's' : ''} per facet narrower than the stock's minimum (${PAT.RULES_DEFAULT.minCut} mm stroke, ${PAT.RULES_DEFAULT.minHole} mm hole)`, issue: 'narrow' });
+  if (pc.keepout) cutFindings.push({ kind: 'warn', id: 'keepout', text: `${pc.keepout} cut${pc.keepout > 1 ? 's' : ''} per facet inside a keep-out (spine, fold or rim margin)`, issue: 'keepout' });
+  if (pattern && pattern.bridged) cutFindings.push({ kind: 'info', id: 'bridged', text: `${pattern.bridged} island${pattern.bridged > 1 ? 's' : ''} per facet bridged automatically` });
+  for (const n of cutFindings) {
+    const li = document.createElement('li'); li.className = n.kind + (n.issue ? ' cut' : ''); li.dataset.flag = n.id; li.textContent = n.text;
+    if (n.issue) { li.title = 'show in the Flat view'; li.addEventListener('click', () => focusIssue(n.issue)); }
+    ul.append(li);
+    if (n.kind === 'bad') bad++; else if (n.kind === 'warn') warn++;
+  }
+  $('flagHint').hidden = !cutFindings.some((n) => n.issue);
+  if (!model.notes.length && !cutFindings.length) { const li = document.createElement('li'); li.className = 'ok'; li.textContent = 'closes with no bow at this depth; the rim lies flat and both halves match.'; ul.append(li); }
+  else if (!bad && !warn && !cutFindings.length) { const li = document.createElement('li'); li.className = 'ok'; li.textContent = 'the fold closes; both halves\' rims match.'; ul.append(li); }
   const c = $('flagCount'); c.textContent = bad ? `${bad} problem${bad > 1 ? 's' : ''}` : warn ? `${warn} note${warn > 1 ? 's' : ''}` : 'ok';
   c.className = 'ln-count' + (bad ? ' is-bad' : warn ? ' is-warn' : '');
 }
 
 /* ---------------- the Flat view ---------------- */
 const flatSvg = $('flatSvg');
+let focusIndex = 0;
+/* zoom the Flat view onto the next finding of a kind (clicking the same finding again walks through them) */
+function focusIssue(kind) {
+  const list = PAT.placeIssues(model, pattern, state).filter((i) => i.kind === kind);
+  if (!list.length) return;
+  const i = list[focusIndex++ % list.length];
+  flatFocus = { x: i.flat[0], y: i.flat[1], r: Math.max(12, i.r * 6), kind, at: i.at, j: i.j };
+  if (view !== 'flat') setView('flat'); else drawFlat();
+}
 function drawFlat() {
   stats.flatDraws++;
   const h = G.halfOutline(model, 'front'), hb = G.halfOutline(model, 'back');
@@ -171,8 +248,9 @@ function drawFlat() {
   const bb = flatSvg.getBoundingClientRect(); const W = bb.width || 800, Hh = bb.height || 600;
   const ringW = hb.ring ? 2 * hb.ring.outer + 24 : 0;
   const w = x1 - x0 + ringW, hgt = y1 - y0;
-  const s = Math.min((W - 60) / w, (Hh - 70) / hgt);
-  const ox = W / 2 - s * (x0 + x1 + ringW) / 2, oy = Hh / 2 - 8 + s * (y0 + y1) / 2;
+  let s = Math.min((W - 60) / w, (Hh - 70) / hgt);
+  let ox = W / 2 - s * (x0 + x1 + ringW) / 2, oy = Hh / 2 - 8 + s * (y0 + y1) / 2;
+  if (flatFocus) { s = Math.min(W, Hh) / (2 * flatFocus.r); ox = W / 2 - s * flatFocus.x; oy = Hh / 2 + s * flatFocus.y; }
   const P = (p) => `${(ox + s * p[0]).toFixed(1)},${(oy - s * p[1]).toFixed(1)}`;
   const path = (pts, closed) => `M${pts.map(P).join('L')}${closed ? 'Z' : ''}`;
   const el = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); if (text != null) e.textContent = text; return e; };
@@ -181,12 +259,15 @@ function drawFlat() {
   flatSvg.append(el('path', { class: 'outline', d: path(h.outline, true) }));
   for (const t of h.tabs) if (t) flatSvg.append(el('path', { class: 'tab', d: path(t.poly, true) }));
   for (const c of h.creases) flatSvg.append(el('line', { class: c.kind, x1: ox + s * c.from[0], y1: oy - s * c.from[1], x2: ox + s * c.to[0], y2: oy - s * c.to[1] }));
+  if (pattern && state.patMode !== 'none') for (const c of PAT.placeCuts(model, pattern, state)) flatSvg.append(el('path', { class: 'cutpat', d: path(c.poly, true) }));
+  if (pattern && state.patMode !== 'none') for (const i of PAT.placeIssues(model, pattern, state)) flatSvg.append(el('circle', { class: `issue ${i.kind}${flatFocus && flatFocus.at === i.at && flatFocus.j === i.j ? ' is-focus' : ''}`, cx: ox + s * i.flat[0], cy: oy - s * i.flat[1], r: Math.max(6, s * i.r) }));
   for (const o of hb.holes) flatSvg.append(el('circle', { class: 'hole', cx: ox + s * o.cx, cy: oy - s * o.cy, r: s * o.r }));
   if (hb.ring) {
     const cx = ox + s * (x1 + 12 + hb.ring.outer), cy = oy - s * 0;
     flatSvg.append(el('circle', { class: 'ring', cx, cy, r: s * hb.ring.outer }), el('circle', { class: 'ring', cx, cy, r: s * hb.ring.inner }));
     flatSvg.append(el('text', { class: 'dim', x: cx, y: cy + s * hb.ring.outer + 14, 'text-anchor': 'middle' }, 'ring (back)'));
   }
+  if (flatFocus) { flatSvg.append(el('text', { class: 'dim', x: 12, y: 22 }, `zoomed on ${flatFocus.kind === 'island' ? 'an island' : 'a ' + flatFocus.kind} finding on point ${flatFocus.j + 1} — click the drawing to see the whole sheet`)); return; }
   // the flat span dimension line
   const yd = oy - s * y0 + 22;
   flatSvg.append(el('line', { class: 'dimline', x1: ox + s * x0, y1: yd, x2: ox + s * x1, y2: yd }));
@@ -301,6 +382,27 @@ function buildPresets() {
   setTimeout(() => { for (const b of host.children) { const p = G.SHAPE_PRESETS.find((q) => q.id === b.dataset.preset); b.querySelector('svg').outerHTML = thumb(G.presetState(p)); } thumbsReady = true; }, 60);
 }
 let thumbsReady = false;
+function patternThumb(p) {
+  const m = G.solveLantern({ ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...p.state, points: 6, slender: 0.5, depthFrac: 0.4 });
+  const t = m.facets[0]; const st = { ...PAT.PATTERN_STATE_DEFAULTS, ...p.state };
+  const lay = st.patMode === 'none' ? { placed: [] } : PAT.layoutFacet(t, PAT.patternOf(st));
+  const cuts = PAT.taggedCuts(lay.placed);
+  // a square crop of the facet's middle, both halves, scaled to fill the box — a whole facet at 56 px is a sliver nobody can read
+  const F = PAT.facetField(t, PAT.RULES_DEFAULT), x0 = F.xMin + (F.xMax - F.xMin) * 0.3, half = Math.max(F.yHi(x0), 6);
+  const s = 56 / (2 * half), x1 = x0 + 2 * half;
+  const PT = (q, side) => `${(s * (q[0] - x0)).toFixed(1)},${(28 - s * side * q[1]).toFixed(1)}`;
+  return `<svg viewBox="0 0 56 56"><rect width="56" height="56" style="fill:rgba(237,237,232,.14)"/>${[1, -1].map((side) => cuts.filter((c) => c.poly.some((q) => q[0] > x0 - 5 && q[0] < x1 + 5)).map((c) => `<path d="M${c.poly.map((q) => PT(q, side)).join('L')}Z" style="fill:var(--ink);stroke:none"/>`).join('')).join('')}</svg>`;
+}
+function buildPatternPresets() {
+  const host = $('patternPresets');
+  for (const p of PAT.PATTERN_PRESETS) {
+    const b = document.createElement('button'); b.className = 'ln-preset ln-thumb--pat'; b.dataset.preset = p.id; b.title = p.name; b.innerHTML = `<svg viewBox="0 0 56 56"></svg>${p.name}`;
+    b.addEventListener('click', () => applyPatternPreset(p));
+    host.append(b);
+  }
+  setTimeout(() => { for (const b of host.children) { const p = PAT.PATTERN_PRESETS.find((q) => q.id === b.dataset.preset); b.querySelector('svg').outerHTML = patternThumb(p); } patThumbsReady = true; }, 120);
+}
+let patThumbsReady = false;
 function buildEdgeModes() {
   const host = $('edgeModes');
   for (const m of G.EDGE_MODES) { const b = document.createElement('button'); b.className = 'ln-btn ln-btn--sm'; b.dataset.mode = m; b.textContent = m; if (m === 'custom') b.title = 'what a dragged point makes'; b.addEventListener('click', () => { if (m !== 'custom') setEdgeMode(m); }); host.append(b); }
@@ -316,6 +418,7 @@ function setView(name) {
   if (name === 'folded') { fold.start(); pushMesh(); } else { fold.stop(); drawFlat(); }
 }
 for (const b of $('views').children) b.addEventListener('click', () => setView(b.dataset.view));
+flatSvg.addEventListener('click', () => { if (flatFocus) { flatFocus = null; drawFlat(); } });
 
 /* ---------------- exports ---------------- */
 function download(name, text, type = 'image/svg+xml') {
@@ -324,8 +427,10 @@ function download(name, text, type = 'image/svg+xml') {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 const stamp = () => `lantern-${state.points}pt-${state.width}mm`;
-$('svgFront').addEventListener('click', () => { download(`${stamp()}-front.svg`, G.flatSvg(model, 'front')); $('exportMsg').textContent = 'front half written: one sheet, layers CUT / SCORE / PERF. Phase 3 nests modules to a bed.'; });
-$('svgBack').addEventListener('click', () => { download(`${stamp()}-back.svg`, G.flatSvg(model, 'back')); $('exportMsg').textContent = 'back half written: the opening, the ring beside it.'; });
+const exportSvg = (which) => G.flatSvg(model, which, { cuts: state.patMode === 'none' ? [] : PAT.placeCuts(model, pattern, state).map((c) => c.poly) });
+const exportNote = (text) => { const pc = pattern ? pattern.counts : null; const open = pc ? pc.island + pc.thin + pc.narrow + pc.keepout : 0; return open ? `${text} WARNING: ${open} open cut finding${open > 1 ? 's' : ''} per facet (see Checks) — the file is written as is.` : text; };
+$('svgFront').addEventListener('click', () => { download(`${stamp()}-front.svg`, exportSvg('front')); $('exportMsg').textContent = exportNote('front half written: one sheet, layers CUT / SCORE / PERF. Phase 3 nests modules to a bed.'); });
+$('svgBack').addEventListener('click', () => { download(`${stamp()}-back.svg`, exportSvg('back')); $('exportMsg').textContent = exportNote('back half written: the opening, the ring beside it.'); });
 $('saveDesign').addEventListener('click', () => { download(`${stamp()}.json`, G.serializeDesign(state), 'application/json'); $('designMsg').textContent = 'design saved.'; });
 $('openDesign').addEventListener('change', async (ev) => {
   const f = ev.target.files && ev.target.files[0]; if (!f) return;
@@ -337,8 +442,10 @@ $('openDesign').addEventListener('change', async (ev) => {
   $('designMsg').textContent = r.notes.length ? `opened with notes: ${r.notes.join('; ')}` : 'opened — a clean read, nothing reported.';
   ev.target.value = '';
 });
+$('randomPattern').addEventListener('click', randomPattern);
+$('patReseed').addEventListener('click', reseedPattern);
 $('undo').addEventListener('click', undo); $('redo').addEventListener('click', redo);
-$('resetAll').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; state = { ...G.DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) }; pushHistory(prev); rebuild({ commit: true }); });
+$('resetAll').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) }; pushHistory(prev); rebuild({ commit: true }); });
 $('randomShape').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; const seed = (Math.random() * 2 ** 31) >>> 0; const st = G.randomShape(seed); state = { ...state, ...st, width: state.width }; pushHistory(prev); $('presetNote').textContent = `random #${seed.toString(36)}`; rebuild({ commit: true }); });
 document.addEventListener('keydown', (ev) => {
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); }
@@ -347,7 +454,7 @@ document.addEventListener('keydown', (ev) => {
 
 /* ---------------- boot ---------------- */
 for (const c of CONTROLS) makeControl(c);
-buildPresets(); buildEdgeModes();
+buildPresets(); buildEdgeModes(); buildPatternPresets();
 try { const saved = localStorage.getItem(STORE); if (saved) { const r = G.readDesign({ format: G.DESIGN_FORMAT, version: G.DESIGN_VERSION, state: JSON.parse(saved) }, state); if (r.ok) state = r.state; } } catch { /* a bad save is ignored */ }
 new ResizeObserver(() => { fold.resize(); if (view === 'flat' && model) drawFlat(); }).observe($('foldCanvas').parentElement);
 rebuildNow({ commit: false });
@@ -366,8 +473,14 @@ window.__lantern = {
   editor: { pointScreen: editor.pointScreen, curveScreen: editor.curveScreen, counts: editor.counts },
   history: () => ({ past: history.past.length, future: history.future.length }), undo, redo,
   flatCounts: () => ({ outline: flatSvg.querySelectorAll('.outline').length, tabs: flatSvg.querySelectorAll('.tab').length, mountain: flatSvg.querySelectorAll('.mountain').length, valley: flatSvg.querySelectorAll('.valley').length, holes: flatSvg.querySelectorAll('.hole').length, ring: flatSvg.querySelectorAll('.ring').length }),
-  svgText: (which) => G.flatSvg(model, which), design: () => G.serializeDesign(state),
-  fold: { frames: () => fold.frames, triangles: () => fold.triangles, camera: fold.camera, lookAt: fold.lookAt, pixel: fold.pixel, running: fold.isRunning, renderOnce: fold.renderOnce },
+  svgText: (which) => exportSvg(which), design: () => G.serializeDesign(state),
+  fold: { frames: () => fold.frames, triangles: () => fold.triangles, camera: fold.camera, lookAt: fold.lookAt, pixel: fold.pixel, running: fold.isRunning, renderOnce: fold.renderOnce, materials: fold.materials },
   flags: () => [...document.querySelectorAll('#flags li')].map((li) => ({ kind: li.className, id: li.dataset.flag || 'ok', text: li.textContent })),
   dimsText: () => $('dims').textContent,
+  pattern: () => pattern && { counts: { ...pattern.counts }, bridged: pattern.bridged, validated: pattern.validated, cuts: pattern.types.map((t) => t.cuts.length), issues: pattern.issues.length },
+  placedCuts: () => PAT.placeCuts(model, pattern, state).length,
+  focusIssue, flatFocus: () => flatFocus,
+  patternPreset: (id) => applyPatternPreset(PAT.PATTERN_PRESETS.find((p) => p.id === id)), patternPresetIds: () => PAT.PATTERN_PRESETS.map((p) => p.id), patThumbsReady: () => patThumbsReady,
+  randomPattern, reseedPattern,
+  textures: () => [...textureCache.values()].map((c) => ({ w: c.width, h: c.height })),
 };

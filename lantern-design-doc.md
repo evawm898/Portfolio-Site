@@ -263,18 +263,92 @@ flat span (2 R_o), the facet angle, the derived bow, the tab width.
 
 ---
 
-## 4. Pattern system (phase 2 — plan)
+## 4. Pattern system (phase 2 — built)
 
-Point-oriented layout per facet, in the facet's own (along-the-point,
-across) frame: a solid SPINE along the ridge crease (width from the material
-model), a RIM BAND along the outer edge with a border motif (scallop, beads,
-picot, dashed), an INTERIOR FIELD of motifs oriented along the point axis and
-scaled by the local facet width so detail tapers toward the tip and never
-violates bridge / hole rules; the tip degrades to a simpler motif or to solid.
-Generators (kaleidoscope, seeded): paisley/scroll (default), lace/filigree,
-botanical, geometric, celestial. Then SVG-into-wedge and SVG-across-face.
-Validity: no islands (paper must stay one connected piece), bridge width, min
-hole, fold and rim keep-out; a badge; the randomizer only yields valid designs.
+**`lantern-pattern.js` lays out, `lantern-validate.js` judges; the geometry
+knows nothing of either.** A facet's pattern lives in the facet's own frame —
+x along the ridge from the centre (the tip at x = R_o), y across toward the
+valley — on the HALF facet (y ≥ 0); the other half is its mirror, so the
+pattern is symmetric about every ridge and every point carries it. One
+layout per facet TYPE (long / short when alternating), judged once, placed
+2N times.
+
+### 4.1 Elements, cuts, the field
+
+A cut is a closed polygon in mm. An element is either a STROKE (a centreline
+and a half-width law `hw(u)`, so a scroll tapers) or a SOLID (a dot, a leaf,
+a teardrop, or an ARC of a loop stroke tagged `arc` so the judge holds it to
+the stroke floor, not the hole floor). `facetField(t, R)` is the region cuts
+may occupy: above the spine band (`spine / 2`), below the rim margin
+(measured along the rim's own slope) and the valley keep-out, from `xMin`
+(where a stroke and its two bridges first fit) to `xT − rimMargin`. Every
+element is tested as a chain of discs against every placed one (`bridge`
+apart; a branch's first discs may touch its parent — that is the junction).
+
+### 4.2 The scroll skeleton (paisley / lace / botanical)
+
+Not a row of motifs: a STEM (a gentle smoothed wave down the field's middle,
+base to tip, tapering from 1.1 × the stroke width to the minimum cut),
+VOLUTES rooted on the stem (their turns capped so the paper between turns
+holds a bridge: `turns ≤ r (1 − inner) / (bridge + 1.05 × stroke)`), eye dots
+and teardrops in the volutes, leaflets, counter-curls, free S-scroll fillers
+in the gaps, and leaf / dot fillers; lace adds rings and picots, botanical
+leaves and buds. GEOMETRIC is a lattice of diamonds and triangles graded to
+the width; CELESTIAL stars, crescents and dots. The RIM BAND (beads, picot,
+scallop arcs, dashes) runs inside the rim margin along each edge, skipping the
+valley keep-out and anywhere a sharp tip brings it back within the margin.
+
+### 4.3 The judge (raster, `RES` = 0.25 mm/px)
+
+The half facet is drawn as paper and void (the ridge, the valley and the base
+continue into the sheet, so only the rim and the cuts are boundaries), then:
+
+- **island** — paper the flood from the spine cannot reach. A real failure: it
+  falls out when the cuts are weeded. Reported with its area; components under
+  `MIN_FLAG_AREA` (0.6 mm²) are raster slivers at junctions and are not.
+- **thin** — paper the opening by `bridge / 2` loses (a crotch between two
+  strokes, two turns too close). It cuts, and may tear in weeding: a warning.
+- **narrow** — a stroke under `minCut` or a hole under `minHole`, by the
+  opening of the CUT mask at `(floor − RES) / 2`: one pixel of grace, because a
+  cut AT the floor rasterises 3 or 4 px wide depending on where it falls and
+  the judge must not flag its own sampling.
+- **keepout** — cut pixels in the spine band, within `foldKeepout` of the
+  valley, or within `rimMargin` of the void (a distance transform).
+
+`autoBridgeElements` repairs islands at the ELEMENT level, so every cut stays
+the vector it was drawn as: the shortest route from the island through cut
+pixels to reachable paper names the element it crosses; a stroke is SPLIT
+there (its centreline cut into two, `bridge` plus its own width apart) and
+anything else is DROPPED (a loop's arc removed opens the ring; a dot cannot
+hold an island). Three passes. A raster re-trace was built first and rejected:
+it turned a spiral into a jagged outline and a marching-squares corner into a
+blob.
+
+The defaults open with 0 islands and about nine thin notes per facet (crotches
+where a branch leaves the stem at an acute angle) — reported, not hidden;
+export is allowed with the warning in the message.
+
+### 4.4 On the page
+
+- The Pattern section: seven presets with thumbnails (a facet of a 6-point
+  star), a valid-only randomizer (eight draws, the first with no island and no
+  thin paper wins, else the best, told), reseed, the generator, density,
+  intricacy, rim band, alternate points solid, auto-bridge.
+- Flat view: the cuts drawn as filled paths; the judge's findings as rings
+  (red island, amber otherwise); a finding in Checks is clickable and zooms
+  the Flat view on it with a focus ring; a click on the drawing restores the
+  sheet.
+- Folded view: each facet type's half-facet pattern is painted to a canvas
+  (≤ 2048 px, ≤ 6 px/mm) and used as an ALPHA MAP (`alphaTest` 0.5) on a
+  mesh part per type; the mesh carries UVs in the facet frame
+  (`uvBox`: x / R_o, (y + y_max) / 2 y_max), exact because every triangle
+  lies along generators where the flat → 3D map is affine. With alternate
+  points solid the odd points get their own part with an uncut material.
+- SVG: the cuts join the CUT layer; the design file carries the seven
+  pattern fields (version 2; a v1 file reads with them reported missing).
+- Cost: a layout is ~25 ms, the judge ~150 ms a type; the judge runs on a
+  commit (a slider's release), never mid-gesture, and the result is memoised
+  on the facet and the pattern state.
 
 ## 5. Material model (phase 3 — plan)
 
@@ -336,7 +410,7 @@ Phone width stacks the preview over the panel.
 ## 12. Phases
 
 1. Geometry core, page shell, Flat + Folded, curve editor, presets, gates.
-2. Pattern system + validity.
+2. Pattern system + validity — built (§4).
 3. Material model + modularization + export.
 4. Backing + settings + test grid + coupon + instructions + ring.
 5. Lit simulation.
@@ -391,6 +465,21 @@ to the lantern's own files (and `bloom-curve.js`, which it imports).
 6. Collapsible lock / clip: not built (§2.9).
 7. Phase 1 opens on the Folded view; Lit becomes the default when it lands.
 8. Preset names and the randomizer's ranges (§3) are placements.
+9. **The pattern's default is the Victorian scroll at density 0.6, intricacy
+   0.7, beads on the rim** (§4.2), chosen by eye from the facet renders; the
+   stroke width 1.6 mm, bridge 1.2, minimum cut 1.0, minimum hole 1.5, fold
+   keep-out 4, rim margin 5 and spine 10 are phase 3's material constants
+   carried as `RULES_DEFAULT` for now.
+10. The judge's **thin-paper notes are warnings, not problems**, and the
+    defaults open with about nine per facet at the stem's junctions. Options:
+    accept (a crotch wedge is paper attached on two sides), or widen the
+    junction rule so branches leave the stem squarer.
+11. Islands are AUTO-BRIDGED by default (a stroke split, an arc dropped). The
+    alternative is to leave the island reported and the cut as drawn.
+12. "Alternate points solid" leaves the ODD points uncut (point 2, 4, …);
+    on an odd count the pattern / plain rhythm breaks once at the last point.
+13. The folded view shows the cuts as holes with the far half visible through
+    them (no light yet — phase 5).
 
 ## 15. Out of scope, named
 
