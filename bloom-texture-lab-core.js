@@ -25,30 +25,29 @@
        and every sheet vertex is tied to the mid-surface the emitter itself
        recorded (`grid` on each petal and sepal record, `rowCentre` /
        `rowNormal` on each leaf). With that, B can do what only an emitter can:
-       displace along the SHEET normal rather than a faceted average, mask a
-       feature (the rim bead, a Voronoi hole rim, a buried foot, a crease) and
-       EMBOSS — move both skins of a sheet together so the thickness does not
-       change. What the emulation does NOT do, and a real B would: re-evaluate
-       the surface law at the finer lattice (here, as in A, new points lie on
-       the facets' chords), and refine row placement through the ladder.
+       displace along the SHEET normal rather than a faceted average, and mask
+       a feature (the rim bead, a Voronoi hole rim, a buried foot, a crease).
+       (The discovery's B also EMBOSSED — both skins of a sheet moved together;
+       ruling 2 dropped it, T1 removed it.) What the emulation does NOT do,
+       and a real B would: re-evaluate the surface law at the finer lattice
+       (here, as in A, new points lie on the facets' chords), and refine row
+       placement through the ladder.
 
    SUBDIVISION, SHARED BY BOTH. The shipped lattice is far too coarse to carry
    a millimetre relief (petal columns are ~1.6 mm apart), so both arms first
-   split every edge longer than `edgeMm` (red-green: a triangle with 1/2/3
-   marked edges splits into 2/3/4, repeated). Midpoints are keyed on the
-   welded edge, so a split is the same split on both triangles that share it
-   and every closed shell stays closed. Welding is on Math.fround positions —
-   the float32 view the STL gates take.
+   split every edge longer than `edgeMm`, by the 'rows' split (T1; its own
+   header is at `subdivide`): every edge into ceil(L/e) equal segments cached
+   on the welded edge, so every closed shell stays closed by construction; a
+   coplanar strip quad cut as one unit; any other triangle filled by rows
+   from the corner opposite its least-cut edge. Welding is on Math.fround
+   positions — the float32 view the STL gates take.
 
-   ITS KNOWN DEFECT, MEASURED: red-green bisection of a LONG SLIVER makes a fan
-   of near-degenerate triangles. The shipped stem is 570 triangles with edges
-   up to 55.89 mm (a straight tube is exact at two stations), and the split
-   turns it into 429,378 at a 0.6 mm edge where a regular lattice needs 9,621;
-   the vertex normals of those fans are bad enough that outward relief reads
-   as folds on the bore in BOTH arms. Every stem figure this prototype prints
-   is therefore about the split, not the relief (discovery doc §7.6). The fix —
-   each long edge into ceil(L/e) equal segments, shared edges agreeing — is
-   not built.
+   The discovery's red-green split is kept, behind `{ split: 'redgreen' }`,
+   as the must-fail: it fanned the shipped stem's 55.89 x 0.39 mm slivers into
+   429,378 triangles at 0.6 mm and its fans' normals read as outward "folds"
+   on the bore in both arms. tools/bloom-texture-lab-quality.mjs is the check
+   (TQ0-TQ3) and its --control requires red-green to FAIL it on the stem;
+   discovery doc §11 has the re-measured figures.
    =================================================================== */
 import * as G from './bloom-geometry.js';
 
@@ -116,16 +115,15 @@ export function reliefField(type, lambda, seed = 7) {
   throw new Error(`unknown relief type ${type}`);
 }
 
-/* THE SIGN CONVENTION. `outward`: the surface only ever rises out of the
-   solid; `inward`: it only ever cuts in; `centred`: half and half about the
-   shipped surface. `emboss` is B's alone: both skins of a sheet move together
-   along the sheet's own normal, so the thickness is unchanged by
-   construction, and every non-sheet surface falls back to `centred`. */
-export const RELIEF_MODES = Object.freeze(['outward', 'inward', 'centred', 'emboss']);
+/* THE SIGN CONVENTION — OUTWARD ONLY (Eva's ruling 2, Oct 22: relief never
+   thins a sheet). The surface only ever rises out of the solid, s in [0, H].
+   The discovery also built `inward`, `centred` and B's `emboss`; they are
+   removed (T1), and their measured rows stay in the discovery doc §4 as the
+   record that ruled them out (docs/data/bloom-surface-texture-measure.json). */
+export const RELIEF_MODES = Object.freeze(['outward']);
 export function signedRelief(mode, f) {
-  if (mode === 'outward') return f;
-  if (mode === 'inward') return f - 1;
-  return f - 0.5;
+  if (mode !== 'outward') throw new Error(`relief mode ${mode} is ruled out (outward only — discovery doc §0 ruling 2)`);
+  return f;
 }
 
 /* ------------------------------------------------------- tagged build */
@@ -240,9 +238,237 @@ export function weld(soup) {
   return { P, tri, src };
 }
 
-/* Red-green subdivision to a maximum edge length. `attr` is an optional
-   per-vertex vector attribute array-of-arrays that midpoints average. */
-export function subdivide(mesh, edgeMm, attrs = []) {
+/* SUBDIVISION TO A MAXIMUM EDGE LENGTH. Two splits, one interface; `attrs`
+   is an optional list of per-vertex attribute arrays new points interpolate.
+
+   'rows' (THE SHIPPED SPLIT, T1). Every edge is cut into n = ceil(L / e)
+   EQUAL segments, n a pure function of the unordered edge, and the points are
+   computed from the LOWER vertex id and cached on the edge key — so the two
+   triangles sharing an edge share the very same vertices and every closed
+   shell stays closed by construction, not by a matching rule. A triangle is
+   then filled by ROWS: its apex is the corner opposite the edge with the
+   fewest segments (ties: the shorter edge), K = the larger of the two side
+   counts, row k runs between the two sides' own points k/K of the way down
+   (a side with fewer points gives consecutive rows a shared end), each row
+   is cut to the same ceil(L / e) law, and consecutive rows are ZIPPED along
+   the shorter diagonal. Every emitted triangle is wound as its source; an
+   index-degenerate one (where two rows share an end) is skipped, which is
+   exact, since its two equal edges cancel. A COPLANAR STRIP QUAD — two
+   triangles sharing their mutual longest edge, convex, both rails at least as
+   long as either end (`quadPairs`) — is cut as ONE unit, rows running across
+   it between its two long sides, and its diagonal is never cut. That is what
+   the shipped stem's walls need: each 55.89 x 0.39 mm (outer) / 0.20 mm (bore)
+   wall quad cut as two separate triangles still leaves each sliver's apex
+   with vertices 0.014 mm apart whose mesh normals differ by 3.75 degrees, and
+   outward relief crossed them (measured: 119 bore "folds" at 0.6 mm in both
+   arms, where red-green read 4,058; as quads, 0).
+
+   'redgreen' (THE DISCOVERY'S SPLIT, KEPT AS THE MUST-FAIL). A triangle with
+   1/2/3 edges over the limit splits into 2/3/4 by midpoints, repeated. It is
+   conforming too, but bisecting a long sliver along its one long side makes
+   fans of near-degenerate triangles: 570 stem triangles -> 429,378 at 0.6 mm
+   against an ideal of ~9,621. tools/bloom-texture-lab-quality.mjs requires
+   this split to FAIL the triangle-quality check on the stem. */
+export const SPLITS = Object.freeze(['rows', 'redgreen']);
+export function subdivide(mesh, edgeMm, attrs = [], { split = 'rows', canPair = null } = {}) {
+  if (split === 'redgreen') return subdivideRedGreen(mesh, edgeMm, attrs);
+  if (split !== 'rows') throw new Error(`unknown split ${split}`);
+  return subdivideRows(mesh, edgeMm, attrs, canPair);
+}
+function subdivideRows(mesh, edgeMm, attrs, canPair) {
+  const P = mesh.P.slice();
+  attrs = attrs.map((a) => a.slice());
+  const e2 = edgeMm * edgeMm;
+  const segs = (i, j) => { const d = dist2(P, i, j); return d <= e2 ? 1 : Math.ceil(Math.sqrt(d) / edgeMm); };
+  const addPoint = (i, j, t) => {
+    const id = P.length / 3;
+    P.push(P[i * 3] + (P[j * 3] - P[i * 3]) * t, P[i * 3 + 1] + (P[j * 3 + 1] - P[i * 3 + 1]) * t, P[i * 3 + 2] + (P[j * 3 + 2] - P[i * 3 + 2]) * t);
+    for (const a of attrs) a.push(lerpAttr(a[i], a[j], t));
+    return id;
+  };
+  /* the points of an edge, from `i` to `j` inclusive; built once from the lower id */
+  const edgeCache = new Map();
+  const edgePts = (i, j) => {
+    const lo = i < j ? i : j, hi = i < j ? j : i, k = lo * 4294967296 + hi;
+    let pts = edgeCache.get(k);
+    if (!pts) {
+      const n = segs(lo, hi);
+      pts = [lo];
+      for (let s = 1; s < n; s++) pts.push(addPoint(lo, hi, s / n));
+      pts.push(hi);
+      edgeCache.set(k, pts);
+    }
+    return i === lo ? pts : pts.slice().reverse();
+  };
+  const tri = [], src = [], pairs = [];
+  const nT = mesh.tri.length / 3;
+  const pairOf = quadPairs(mesh, P, e2, segs, canPair);
+  for (let t = 0; t < nT; t++) {
+    const a = mesh.tri[t * 3], b = mesh.tri[t * 3 + 1], c = mesh.tri[t * 3 + 2], s = mesh.src[t];
+    if (pairOf[t] >= 0) {
+      const u = pairOf[t];
+      if (u < t) continue; // emitted with its partner
+      pairs.push([s, mesh.src[u]]);
+      splitQuad(t, u, s);
+      continue;
+    }
+    const ab = edgePts(a, b), bc = edgePts(b, c), ca = edgePts(c, a);
+    if (ab.length === 2 && bc.length === 2 && ca.length === 2) { tri.push(a, b, c); src.push(s); continue; }
+    const n0 = faceNormal(P, a, b, c);
+    /* the apex is opposite the edge with the fewest segments */
+    const cand = [[bc, a, b, c, dist2(P, b, c)], [ca, b, c, a, dist2(P, c, a)], [ab, c, a, b, dist2(P, a, b)]];
+    cand.sort((x, y) => (x[0].length - y[0].length) || (x[4] - y[4]));
+    const [base, A, B, Cc] = cand[0];
+    const sB = edgePts(A, B), sC = edgePts(A, Cc);
+    const n1 = sB.length - 1, n2 = sC.length - 1, K = Math.max(n1, n2);
+    let prev = [A];
+    for (let k = 1; k <= K; k++) {
+      let row;
+      if (k === K) row = base; // B .. C, the edge's own points
+      else {
+        const L = sB[Math.round(k * n1 / K)], R = sC[Math.round(k * n2 / K)];
+        const m = segs(L, R);
+        row = [L];
+        for (let q = 1; q < m; q++) row.push(addPoint(L, R, q / m));
+        row.push(R);
+      }
+      zipRows(P, prev, row, n0, tri, src, s);
+      prev = row;
+    }
+  }
+  /* A PAIRED QUAD is cut as one unit: its loop is j -> p -> i -> q (t = i j p
+     wound i->j, u = j i q), the two opposite sides with MORE segments are the
+     rails, rows run between them from one short side to the other, and the
+     shared diagonal — which no other triangle uses — is never cut, so no
+     point is put on it. The rows lie in the quad's plane, so every new point
+     is still on the shipped facets. */
+  function splitQuad(t, u, s) {
+    const T = [mesh.tri[t * 3], mesh.tri[t * 3 + 1], mesh.tri[t * 3 + 2]];
+    const U = [mesh.tri[u * 3], mesh.tri[u * 3 + 1], mesh.tri[u * 3 + 2]];
+    let r = 0; while (U.includes(T[(r + 2) % 3])) r++;          // T[r]->T[r+1] is the shared edge
+    const i = T[r], j = T[(r + 1) % 3], p = T[(r + 2) % 3], q = U.find((x) => x !== i && x !== j);
+    const n0 = faceNormal(P, i, j, p);
+    const loop = railLoop([j, p, i, q], segs);
+    const [v0, v1, v2, v3] = loop;
+    const rA = edgePts(v0, v1), rB = edgePts(v3, v2);
+    const n1 = rA.length - 1, n2 = rB.length - 1, K = Math.max(n1, n2);
+    let prev = edgePts(v0, v3);
+    for (let k = 1; k <= K; k++) {
+      let row;
+      if (k === K) row = edgePts(v1, v2);
+      else {
+        const L = rA[Math.round(k * n1 / K)], R = rB[Math.round(k * n2 / K)];
+        const m = segs(L, R);
+        row = [L];
+        for (let w = 1; w < m; w++) row.push(addPoint(L, R, w / m));
+        row.push(R);
+      }
+      zipRows(P, prev, row, n0, tri, src, s);
+      prev = row;
+    }
+  }
+  return { P, tri, src, attrs, pairs };
+}
+/* Two shipped triangles may be cut as one quad only if they carry the same
+   organ and feature tag and belong to the same organ instance (B reads its
+   mid-surface per instance). */
+export function pairPredicate(soup) {
+  const inst = new Int32Array(soup.triCount).fill(-1);
+  soup.instances.forEach((it, k) => { for (let t = it.from; t < it.to; t++) inst[t] = k; });
+  return (a, b) => soup.organIx[a] === soup.organIx[b] && soup.featIx[a] === soup.featIx[b] && inst[a] === inst[b];
+}
+/* QUAD PAIRS. Two triangles are cut as one quad when the edge they share is
+   the LONGEST edge of both, no other triangle uses it, it needs cutting, the
+   four points are coplanar (the fourth within PAIR_PLANE_MM of the others'
+   plane — every point a row puts down then lies on a shipped facet), the quad
+   is convex, and `canPair` (the caller's tags) agrees. The shipped stem's
+   walls are exactly such quads: 55.89 x 0.39 mm (outer) and 0.20 mm (bore).
+   Cut as two triangles, each sliver's apex holds vertices 0.014 mm apart
+   with mesh normals 3.75 degrees apart — the diagonal's points beside the
+   axial edge's — and outward relief along those normals crosses one over the
+   other (measured: 119 bore "folds" at 0.6 mm in BOTH arms). */
+const PAIR_PLANE_MM = 1e-9;
+/* the rotation of a quad loop [v0 v1 v2 v3] whose rails (v0 -> v1, v3 -> v2)
+   are the opposite pair with the larger SHORTER side */
+function railLoop(L, segs) {
+  const a = Math.min(segs(L[0], L[1]), segs(L[3], L[2])), b = Math.min(segs(L[1], L[2]), segs(L[0], L[3]));
+  return b > a ? [L[1], L[2], L[3], L[0]] : L;
+}
+function quadPairs(mesh, P, e2, segs, canPair) {
+  const nT = mesh.tri.length / 3, pairOf = new Int32Array(nT).fill(-1);
+  const ek = (i, j) => (i < j ? i * 4294967296 + j : j * 4294967296 + i);
+  const use = new Map();
+  for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) {
+    const key = ek(mesh.tri[t * 3 + k], mesh.tri[t * 3 + (k + 1) % 3]);
+    const l = use.get(key); if (l) l.push(t); else use.set(key, [t]);
+  }
+  const longest = (t) => {
+    let best = -1, bk = 0;
+    for (let k = 0; k < 3; k++) { const i = mesh.tri[t * 3 + k], j = mesh.tri[t * 3 + (k + 1) % 3], d = dist2(P, i, j); if (d > best) { best = d; bk = ek(i, j); } }
+    return [bk, best];
+  };
+  for (let t = 0; t < nT; t++) {
+    if (pairOf[t] >= 0) continue;
+    const [kt, dt] = longest(t);
+    if (dt <= e2) continue;
+    const users = use.get(kt);
+    if (users.length !== 2) continue;
+    const u = users[0] === t ? users[1] : users[0];
+    if (pairOf[u] >= 0 || longest(u)[0] !== kt) continue;
+    if (canPair && !canPair(mesh.src[t], mesh.src[u])) continue;
+    const T = [mesh.tri[t * 3], mesh.tri[t * 3 + 1], mesh.tri[t * 3 + 2]];
+    const q = [mesh.tri[u * 3], mesh.tri[u * 3 + 1], mesh.tri[u * 3 + 2]].find((x) => !T.includes(x));
+    if (q === undefined) continue;
+    let r = 0; while ([mesh.tri[u * 3], mesh.tri[u * 3 + 1], mesh.tri[u * 3 + 2]].includes(T[(r + 2) % 3])) r++;
+    const i = T[r], j = T[(r + 1) % 3], p = T[(r + 2) % 3];
+    const [nx, ny, nz] = faceNormal(P, i, j, p);
+    const off = (P[q * 3] - P[i * 3]) * nx + (P[q * 3 + 1] - P[i * 3 + 1]) * ny + (P[q * 3 + 2] - P[i * 3 + 2]) * nz;
+    if (Math.abs(off) > PAIR_PLANE_MM) continue;
+    /* convex: every corner of j -> p -> i -> q turns the same way about the normal */
+    const L = [j, p, i, q];
+    let convex = true;
+    for (let k = 0; k < 4 && convex; k++) {
+      const A = L[k], B = L[(k + 1) % 4], Cq = L[(k + 2) % 4];
+      const ux = P[B * 3] - P[A * 3], uy = P[B * 3 + 1] - P[A * 3 + 1], uz = P[B * 3 + 2] - P[A * 3 + 2];
+      const vx = P[Cq * 3] - P[B * 3], vy = P[Cq * 3 + 1] - P[B * 3 + 1], vz = P[Cq * 3 + 2] - P[B * 3 + 2];
+      if ((uy * vz - uz * vy) * nx + (uz * vx - ux * vz) * ny + (ux * vy - uy * vx) * nz <= 0) convex = false;
+    }
+    if (!convex) continue;
+    /* a STRIP only: both rails at least as long, in segments, as either end.
+       Two fan triangles off a hub's centre share a radial spoke and make a
+       coplanar convex kite whose "rails" are a spoke and a rim chord — rows
+       between those converge on the chord, a fan, which is the defect. */
+    const [w0, w1, w2, w3] = railLoop(L, segs);
+    if (Math.min(segs(w0, w1), segs(w3, w2)) < Math.max(segs(w0, w3), segs(w1, w2))) continue;
+    pairOf[t] = u; pairOf[u] = t;
+  }
+  return pairOf;
+}
+/* fill the strip between two chains whose first points lie on one side of
+   the triangle and last points on the other (ends may coincide) */
+function zipRows(P, L, R, n0, tri, src, s) {
+  const emit = (x, y, z) => {
+    if (x === y || y === z || x === z) return;
+    const f = faceNormal(P, x, y, z);
+    if (f[0] * n0[0] + f[1] * n0[1] + f[2] * n0[2] < 0) tri.push(x, z, y); else tri.push(x, y, z);
+    src.push(s);
+  };
+  let i = 0, j = 0;
+  const a = L.length - 1, b = R.length - 1;
+  while (i < a || j < b) {
+    const advL = j === b || (i < a && dist2(P, L[i + 1], R[j]) <= dist2(P, L[i], R[j + 1]));
+    if (advL) { emit(L[i], L[i + 1], R[j]); i++; } else { emit(L[i], R[j + 1], R[j]); j++; }
+  }
+}
+function lerpAttr(x, y, t) {
+  if (x == null || y == null) return x == null ? y : x;
+  if (typeof x === 'number') return x + (y - x) * t;
+  if (Array.isArray(x)) return x.map((v, i) => v + (y[i] - v) * t);
+  const o = {};
+  for (const k of Object.keys(x)) o[k] = typeof x[k] === 'boolean' ? (x[k] || y[k]) : Array.isArray(x[k]) ? x[k].map((v, i) => v + (y[k][i] - v) * t) : x[k] + (y[k] - x[k]) * t;
+  return o;
+}
+function subdivideRedGreen(mesh, edgeMm, attrs = []) {
   let { P, tri, src } = mesh;
   P = P.slice(); tri = tri.slice(); src = src.slice();
   attrs = attrs.map((a) => a.slice());
@@ -327,7 +553,7 @@ function faceNormal(P, a, b, c) {
 /* Prepare once per (state, edge): weld, assign B's mid-surface attribute to
    every original vertex, subdivide. Both arms then displace the SAME mesh, so
    any difference between them is the arm and never the lattice. */
-export function prepare(soup, edgeMm) {
+export function prepare(soup, edgeMm, { split = 'rows', pairs = true } = {}) {
   const base = weld(soup);
   const nV = base.P.length / 3;
   /* per original vertex: the mid-surface sample of the instance it belongs to */
@@ -347,17 +573,19 @@ export function prepare(soup, edgeMm) {
     if (!s) continue;
     const n = s.n;
     /* the vertex projected onto its sheet's mid-surface (tangent plane of the
-       nearest sample): top and bottom skins land on the same point, so an
-       emboss samples ONE field value for both and the thickness holds */
+       nearest sample): top and bottom skins land on the same point (the
+       discovery's emboss sampled the field there; outward relief reads the
+       sheet normal off it) */
     const d = (p[0] - s.m[0]) * n[0] + (p[1] - s.m[1]) * n[1] + (p[2] - s.m[2]) * n[2];
     midAttr[v] = { m: [p[0] - d * n[0], p[1] - d * n[1], p[2] - d * n[2]], n: [n[0], n[1], n[2]], foot: s.foot };
   }
-  const sub = subdivide(base, edgeMm, [midAttr]);
+  /* pairs: false cuts every triangle alone — the T1 intermediate, kept so §11's 119-fold figure reproduces */
+  const sub = subdivide(base, edgeMm, [midAttr], { split, canPair: pairs ? pairPredicate(soup) : () => false });
   const mid = sub.attrs[0];
   for (const a of mid) if (a) { const L = Math.hypot(a.n[0], a.n[1], a.n[2]) || 1; a.n[0] /= L; a.n[1] /= L; a.n[2] /= L; }
   const triOrgan = new Int8Array(sub.tri.length / 3), triFeat = new Int8Array(sub.tri.length / 3);
   for (let t = 0; t < triOrgan.length; t++) { triOrgan[t] = soup.organIx[sub.src[t]]; triFeat[t] = soup.featIx[sub.src[t]]; }
-  const prep = { P: sub.P, tri: sub.tri, src: sub.src, mid, triOrgan, triFeat, edgeMm, baseTris: base.tri.length / 3 };
+  const prep = { P: sub.P, tri: sub.tri, src: sub.src, mid, triOrgan, triFeat, edgeMm, split, baseTris: base.tri.length / 3 };
   prep.N = vertexNormals(prep.P, prep.tri);
   prep.vFeat = vertexFeature(prep);
   prep.shell = shells(prep);
@@ -441,7 +669,7 @@ function adjacency(prep) {
 
 /* THE DISPLACEMENT. Returns new positions (Float64Array) and the per-vertex
    displacement along its normal, for both arms.
-   opts: { type, lambda, heightMm, mode, seed,
+   opts: { type, lambda, heightMm, mode ('outward', the only ruled mode), seed,
            // B only:
            maskBeads, maskHoleRims, maskFeet, maskCreases, fadeMm } */
 export function displace(prep, arm, opts) {
@@ -471,23 +699,15 @@ export function displace(prep, arm, opts) {
     let dir = [prep.N[v * 3], prep.N[v * 3 + 1], prep.N[v * 3 + 2]];
     let s;
     if (arm === 'A') {
-      s = H * signedRelief(opts.mode === 'emboss' ? 'centred' : opts.mode, f(p));
+      s = H * signedRelief(opts.mode, f(p));
     } else {
       const m = prep.mid[v];
-      const sheet = m && (prep.vFeat[v] === FEATURES.indexOf('skin') || prep.vFeat[v] === FEATURES.indexOf('cellSkin') || prep.vFeat[v] === FEATURES.indexOf('bead') || prep.vFeat[v] === FEATURES.indexOf('holeRim') || prep.vFeat[v] === FEATURES.indexOf('cellMargin'));
-      if (opts.mode === 'emboss' && sheet) {
-        /* both skins along the SHEET normal, one field value from the mid-surface */
-        dir = m.n;
-        s = H * (f(m.m) - 0.5);
-      } else {
-        if (sheet && prep.vFeat[v] !== FEATURES.indexOf('bead') && prep.vFeat[v] !== FEATURES.indexOf('holeRim') && prep.vFeat[v] !== FEATURES.indexOf('cellMargin')) {
-          /* the analytic sheet normal, signed to this skin's outward side */
-          const sg = Math.sign(dir[0] * m.n[0] + dir[1] * m.n[1] + dir[2] * m.n[2]) || 1;
-          dir = [sg * m.n[0], sg * m.n[1], sg * m.n[2]];
-        }
-        s = H * signedRelief(opts.mode === 'emboss' ? 'centred' : opts.mode, f(p));
+      if (m && (prep.vFeat[v] === FEATURES.indexOf('skin') || prep.vFeat[v] === FEATURES.indexOf('cellSkin'))) {
+        /* the analytic sheet normal, signed to this skin's outward side */
+        const sg = Math.sign(dir[0] * m.n[0] + dir[1] * m.n[1] + dir[2] * m.n[2]) || 1;
+        dir = [sg * m.n[0], sg * m.n[1], sg * m.n[2]];
       }
-      s *= mask[v];
+      s = H * signedRelief(opts.mode, f(p)) * mask[v];
     }
     amount[v] = s;
     out[v * 3] += s * dir[0]; out[v * 3 + 1] += s * dir[1]; out[v * 3 + 2] += s * dir[2];
@@ -609,3 +829,25 @@ export const DEMO_STATES = Object.freeze({
   infill: { petalInfill: 'VORONOI' },
   tube: { tubeLayer1: 0 },
 });
+
+/* ------------------------------------------------- triangle quality */
+/* Per triangle: the smallest interior angle (degrees) and the aspect
+   Lmax^2 / (2 area) — the longest edge over the altitude onto it (2/sqrt(3)
+   = 1.155 for an equilateral, unbounded for a sliver). Degenerate (zero-area)
+   triangles read minAngle 0 and aspect Infinity. */
+export function triangleQuality(P, tri) {
+  const n = tri.length / 3, minAngle = new Float64Array(n), aspect = new Float64Array(n);
+  for (let t = 0; t < n; t++) {
+    const a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2];
+    const la = dist2(P, b, c), lb = dist2(P, c, a), lc = dist2(P, a, b);
+    const area = faceNormal(P, a, b, c)[3];
+    const Lmax = Math.max(la, lb, lc);
+    if (!(area > 0)) { minAngle[t] = 0; aspect[t] = Infinity; continue; }
+    /* the smallest angle is opposite the shortest edge; sin = 2A / (product of the two others) */
+    const sorted = [la, lb, lc].sort((x, y) => x - y);
+    const sinMin = (2 * area) / Math.sqrt(sorted[1] * sorted[2]);
+    minAngle[t] = Math.asin(Math.min(1, sinMin)) * 180 / Math.PI;
+    aspect[t] = Lmax / (2 * area);
+  }
+  return { minAngle, aspect };
+}

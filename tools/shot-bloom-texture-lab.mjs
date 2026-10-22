@@ -51,7 +51,7 @@ await page.goto(`http://localhost:${PORT}/bloom-texture-lab.html`);
 await page.waitForFunction(() => window.__lab && window.__lab.ready, null, { timeout: 120000 });
 await page.evaluate(() => window.__lab.ready);
 
-const BASE = { type: 'pebble', height: 0.3, lambda: 2, mode: 'outward', edge: 0.4, maskBeads: true, maskHoleRims: true, maskFeet: true, maskCreases: true, flat: false };
+const BASE = { type: 'pebble', height: 0.3, lambda: 2, mode: 'outward', split: 'rows', edge: 0.4, maskBeads: true, maskHoleRims: true, maskFeet: true, maskCreases: true, flat: false };
 const cells = [];
 async function shot(id, section, caption, opts, view) {
   const t0 = Date.now();
@@ -83,9 +83,13 @@ if (!QUICK) {
   await shot('s2-hole-masked', S2, 'hole rims — B masks hole rims and margin beads', { state: 'infill' }, 'hole');
   await shot('s2-hole-unmasked', S2, 'hole rims — B relief on the rims (masks off)', { state: 'infill', maskBeads: false, maskHoleRims: false }, 'hole');
 }
-const S3 = '3 · outward-only vs centred (and inward, and B-only emboss)';
-for (const mode of ['outward', 'centred', 'inward', 'emboss']) {
-  await shot(`s3-${mode}`, S3, `${mode} — pebble 0.3 mm, petal tip`, { state: 'default', mode }, 'tip');
+/* §3 was outward vs centred / inward / emboss. Ruling 2 left outward only and
+   T1 removed the other modes, so the committed docs/img/bloom-surface-texture.png
+   (rendered on the red-green split, before T1) is the record of that section
+   and this tool no longer reproduces it. §3 is now the split itself. */
+const S3 = '3 · the split: the discovery\'s red-green against T1\'s rows (whole bloom, the stem)';
+for (const split of ['redgreen', 'rows']) {
+  await shot(`s3-${split}`, S3, `${split} split — pebble 0.3 mm outward, stem at 0.6 mm`, { state: 'whole', split, edge: 0.6 }, 'stem');
 }
 if (!QUICK) {
   const S4 = '4 · the three relief types (outward 0.3 mm, whole default bloom)';
@@ -103,8 +107,8 @@ const html = `<!doctype html><meta charset="utf-8"><title>Bloom surface texture 
 h1{font-size:18px;margin:0 0 4px}h2{font-size:14px;color:#6fb7ae;margin:18px 0 6px}p{color:#8b8a86;margin:0 0 8px}
 .grid{display:grid;grid-template-columns:600px 600px;gap:10px 16px}.c img{width:600px;display:block;border:1px solid #2a2a30}.c div{font-size:11px;color:#c9c6bf;margin-top:2px}</style>
 <h1>Bloom surface texture — A (left of each pair) vs B (right of each pair)</h1>
-<p>Discovery prototype, not shipped. A: post-pass on the finished triangle soup, mesh normals, no knowledge. B: the same world-space field applied with each emitter's own knowledge (emulated): sheet normal, feature masks, emboss. Export-mode geometry, subdivided to the edge in each caption. Feature size 2 mm unless noted. No pixel deltas are quoted.</p>
-${sections.map((s) => `<h2>${s}</h2><div class="grid">${cells.filter((c) => c.section === s).map((c) => `<div class="c"><img src="${c.file}"><div>${c.caption} · ${c.opts.state} · ${c.opts.mode} · edge ${c.opts.edge} mm · ${c.info.tris.toLocaleString()} tris (shipped ${c.info.shippedTris.toLocaleString()})</div></div>`).join('')}</div>`).join('')}`;
+<p>Discovery prototype, not shipped. A: post-pass on the finished triangle soup, mesh normals, no knowledge. B: the same world-space field applied with each emitter's own knowledge (emulated): sheet normal, feature masks. Outward only (ruling 2). Export-mode geometry, subdivided to the edge in each caption. Feature size 2 mm unless noted. No pixel deltas are quoted.</p>
+${sections.map((s) => `<h2>${s}</h2><div class="grid">${cells.filter((c) => c.section === s).map((c) => `<div class="c"><img src="${c.file}"><div>${c.caption} · ${c.opts.state} · ${c.opts.mode} · ${c.opts.split} split · edge ${c.opts.edge} mm · ${c.info.tris.toLocaleString()} tris (shipped ${c.info.shippedTris.toLocaleString()})</div></div>`).join('')}</div>`).join('')}`;
 fs.writeFileSync(path.join(DIR, 'index.html'), html);
 if (PNG) {
   const p2 = await browser.newPage({ viewport: { width: 1272, height: 900 } });
