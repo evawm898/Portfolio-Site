@@ -11626,8 +11626,16 @@ outline reuses `bloom-curve.js` (the value, the PCHIP sampler, `proposeEdit`)
 with its own SVG editor in `lantern.js`. Gates, both in CI (`lantern-gate.yml`,
 path-scoped to the lantern's files plus `bloom-curve.js`): `node
 tools/verify-lantern.mjs` (L0–L11 + the sweep, `--negative-control` nine
-mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P9 in
-Chromium, `--negative-control` six mutants of the page). Sheet: `node
+mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P13 in
+Chromium, `--negative-control` twelve mutants of the page). Sheet: `node
 tools/shot-lantern.mjs <dir>`. Phase 1 (geometry, shell, Flat + Folded) is
-built; the pattern system, the material model, export, backing, instructions
-and the lit view are the doc's phases 2–6.
+built. **Phase 2 is built too (doc §4): `lantern-pattern.js` lays out a scroll
+skeleton (a stem, stem-rooted volutes, fillers, a rim band) or a lattice per
+facet TYPE in the facet's own frame, and `lantern-validate.js` judges it on a
+0.25 mm raster — islands (a real failure, auto-bridged at the ELEMENT level by
+splitting a stroke, never by re-tracing a raster), thin paper, narrow cuts and
+keep-outs — with every finding clickable into the Flat view; the folded view
+carries the cuts as per-type alpha maps on UVs the geometry emits in the facet
+frame.** `node tools/verify-lantern-pattern.mjs` (PA0–PA10, ten mutants) rides
+beside the other two, and the page gate is P0–P13 with twelve mutants. The
+material model, export, backing, instructions and the lit view are phases 3–6.

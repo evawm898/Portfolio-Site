@@ -37,7 +37,7 @@ export const HANG_HOLE_MM = 6;
 export const HANG_HOLE_INSET_MM = 15;
 export const EDGE_SAMPLES = 256;                   // the development quadrature's resolution per facet edge
 export const DESIGN_FORMAT = 'lantern-design';
-export const DESIGN_VERSION = 1;
+export const DESIGN_VERSION = 2;   // 2: the pattern's fields (phase 2); a v1 file reads with them reported missing
 
 /* The edge curve's spec, in the chord frame: x along the chord from the tip
    (0) to the inner vertex (1), y the OUTWARD normal offset as a fraction of
@@ -410,14 +410,19 @@ function rim3dOf(facet) {
    crease lines, `sign` +1 for the front (centre at +H) and −1 for the back.
    Fans from the centre to each facet's rim; with an opening, a strip from the
    opening ring (on each generator at ρ = r_h) to the rim. */
-export function foldedMesh(model, sign = 1, { opening = false } = {}) {
+export function foldedMesh(model, sign = 1, { opening = false, solidAlternate = false } = {}) {
   const { N, facets, H, tip3d } = model;
   const typeOf = (j) => (model.alternate ? facets[j % 2] : facets[0]);
   const tris = [];
   const creases = [];
   const C = [0, 0, sign * H];
   const rh = opening ? model.opening / 2 : 0;
-  const push = (p) => tris.push(p[0], p[1], p[2]);
+  // per facet TYPE: its own position and uv streams, so a pattern texture per type maps onto exactly its facets
+  // with "alternate points solid" the odd points carry no pattern: they get their own parts, flagged, so the view can give them an uncut material
+  const parts = facets.flatMap((t) => (solidAlternate ? [{ type: t.type, solid: false, pos: [], uv: [], box: uvBox(t) }, { type: t.type, solid: true, pos: [], uv: [], box: uvBox(t) }] : [{ type: t.type, solid: false, pos: [], uv: [], box: uvBox(t) }]));
+  const partOf = (facet, j) => parts[facets.indexOf(facet) * (solidAlternate ? 2 : 1) + (solidAlternate && j % 2 === 1 ? 1 : 0)];
+  let cur = null, curFlat = null;
+  const push = (p, flat) => { tris.push(p[0], p[1], p[2]); cur.pos.push(p[0], p[1], p[2]); cur.uv.push(flat[0] / cur.box.Ro, (flat[1] + cur.box.yMax) / (2 * cur.box.yMax)); };
   const onGen = (Q, rho, frac) => [C[0] + (Q[0] - C[0]) * frac, C[1] + (Q[1] - C[1]) * frac, C[2] + (Q[2] - C[2]) * frac];
   for (let j = 0; j < N; j++) {
     const t = typeOf(j), tn = typeOf((j + 1) % N);
@@ -427,22 +432,34 @@ export function foldedMesh(model, sign = 1, { opening = false } = {}) {
     const rimL = rim3dOf(tn).map(([r, th]) => [r * Math.cos(gN - th), r * Math.sin(gN - th), 0]).reverse();
     for (const rim of [rimR, rimL]) {
       const facet = rim === rimR ? t : tn;
+      cur = partOf(facet, rim === rimR ? j : (j + 1) % N);   // the left rim of point j belongs to point j+1's facet
+      // the flat (facet-local) coordinate of each rim sample: the right half uses the edge as drawn, the left half its mirror
+      const flatOf = (k) => { const q = rim === rimR ? facet.edge.pts[k] : facet.edge.pts[rim.length - 1 - k]; return rim === rimR ? q : [q[0], -q[1]]; };
+      const O = [0, 0];
       for (let k = 1; k < rim.length; k++) {
-        const Q0 = rim[k - 1], Q1 = rim[k];
+        const Q0 = rim[k - 1], Q1 = rim[k], F0 = flatOf(k - 1), F1 = flatOf(k);
         const rho0 = rim === rimR ? facet.dev.rho[k - 1] : facet.dev.rho[rim.length - k], rho1 = rim === rimR ? facet.dev.rho[k] : facet.dev.rho[rim.length - 1 - k];
         if (rh > 0) {
           const A = onGen(Q0, rho0, rh / rho0), B = onGen(Q1, rho1, rh / rho1);
+          const FA = [F0[0] * rh / rho0, F0[1] * rh / rho0], FB = [F1[0] * rh / rho1, F1[1] * rh / rho1];
           // outward-facing winding for the front (sign +1): (Q0, Q1, B), (Q0, B, A)
-          if (sign > 0) { push(Q0); push(Q1); push(B); push(Q0); push(B); push(A); } else { push(Q1); push(Q0); push(B); push(B); push(Q0); push(A); }
-        } else if (sign > 0) { push(C); push(Q0); push(Q1); } else { push(C); push(Q1); push(Q0); }
+          if (sign > 0) { push(Q0, F0); push(Q1, F1); push(B, FB); push(Q0, F0); push(B, FB); push(A, FA); } else { push(Q1, F1); push(Q0, F0); push(B, FB); push(B, FB); push(Q0, F0); push(A, FA); }
+        } else if (sign > 0) { push(C, O); push(Q0, F0); push(Q1, F1); } else { push(C, O); push(Q1, F1); push(Q0, F0); }
       }
     }
     const tipP = rimR[0], valP = rimR[rimR.length - 1];
     creases.push({ kind: 'mountain', from: C, to: tipP });
     creases.push({ kind: 'valley', from: C, to: valP });
   }
-  return { positions: new Float32Array(tris), creases, triangles: tris.length / 9 };
+  return { positions: new Float32Array(tris), creases, triangles: tris.length / 9, parts: parts.filter((p) => p.pos.length).map((p) => ({ type: p.type, solid: p.solid, positions: new Float32Array(p.pos), uvs: new Float32Array(p.uv), box: p.box })) };
 }
+/* The flat box a facet type's pattern texture covers: x in [0, Ro] along the
+   ridge, y in [−yMax, yMax] across both halves. One owner, read by the mesh's
+   UVs and by the page's texture painter. */
+export function uvBox(facet) { let yMax = 1e-6; for (const p of facet.edge.pts) yMax = Math.max(yMax, Math.abs(p[1])); return { Ro: facet.Ro, yMax }; }
+/* Facet-local frame of point j, side +1 (right of the ridge) or −1: a flat
+   placement function for the pattern's cuts and the gate. */
+export function facetPlacer(model, j, side = 1) { const g = model.flatTip[j]; return (p) => rot(side > 0 ? p : mirY(p), g); }
 
 /* The whole rim of one half in 3D, as a closed polyline (xyz), from the
    facets' developments — what the rim-match gate compares between halves. */
@@ -476,7 +493,7 @@ export const inches = (mm) => `${(mm / MM_PER_IN).toFixed(1)}″`;
    mountains, PERF green for valleys), mm user units. Phase 3 replaces the
    valley lines with real perforation dashes and nests pieces; this is the
    half as one sheet. */
-export function flatSvg(model, which = 'front', { margin = 10 } = {}) {
+export function flatSvg(model, which = 'front', { margin = 10, cuts = [] } = {}) {
   const h = halfOutline(model, which);
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const grow = (p) => { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); };
@@ -488,6 +505,7 @@ export function flatSvg(model, which = 'front', { margin = 10 } = {}) {
   const cut = [], score = [], perf = [];
   cut.push(`<path d="${path(h.outline, true)}"/>`);
   for (const t of h.tabs) if (t) cut.push(`<path d="${path(t.poly, true)}"/>`);
+  for (const c of cuts) cut.push(`<path d="${path(c, true)}"/>`);
   for (const o of h.holes) cut.push(`<circle cx="${(o.cx + tx).toFixed(3)}" cy="${(ty - o.cy).toFixed(3)}" r="${o.r.toFixed(3)}"/>`);
   for (const c of h.creases) (c.kind === 'mountain' ? score : perf).push(`<path d="${path([c.from, c.to], false)}"/>`);
   // the tabs' fold lines are scores along the rim edge: part of the outline on the front (the edge is a crease, not a cut, where a tab is)
@@ -505,9 +523,14 @@ ${ring}
 
 /* ---- the design file ----------------------------------------------------- */
 export const STATE_FIELDS = ['points', 'width', 'depthFrac', 'slender', 'alternate', 'altRatio', 'edgeMode', 'edge', 'scallops', 'scallopDepth', 'tip', 'tipRadius', 'profile', 'opening', 'ringWidth', 'hangHole'];
+/* Other modules register their own state fields here (the pattern's), each
+   with a reader that clamps; the file then carries them beside the shape's. */
+export const EXTRA_FIELDS = [];   // [{ fields: [...ids], read: (state) => cleanState }]
+export function registerDesignFields(fields, read) { EXTRA_FIELDS.push({ fields, read }); }
+const allFields = () => [...STATE_FIELDS, ...EXTRA_FIELDS.flatMap((e) => e.fields)];
 export function serializeDesign(state) {
   const out = { format: DESIGN_FORMAT, version: DESIGN_VERSION, state: {} };
-  for (const k of STATE_FIELDS) out.state[k] = k === 'edge' ? cloneCurve(state[k]) : state[k];
+  for (const k of allFields()) out.state[k] = k === 'edge' ? cloneCurve(state[k]) : state[k];
   return JSON.stringify(out, null, 1);
 }
 /* Reads a design: `{ ok, state, notes }`. A newer version is refused whole; a
@@ -520,13 +543,15 @@ export function readDesign(text, current = DEFAULTS) {
   if (!(doc.version <= DESIGN_VERSION)) return { ok: false, notes: [`version ${doc.version} is newer than this page reads (${DESIGN_VERSION})`] };
   const notes = [];
   const st = { ...current };
-  for (const k of STATE_FIELDS) {
+  const fields = allFields();
+  for (const k of fields) {
     if (!(k in (doc.state || {}))) { notes.push(`missing ${k} — kept ${JSON.stringify(current[k])}`); continue; }
     st[k] = doc.state[k];
   }
-  for (const k of Object.keys(doc.state || {})) if (!STATE_FIELDS.includes(k)) notes.push(`unknown field ${k} ignored`);
-  const clean = readState(st);
-  for (const k of STATE_FIELDS) if (k !== 'edge' && JSON.stringify(clean[k]) !== JSON.stringify(st[k])) notes.push(`${k}: ${JSON.stringify(st[k])} → ${JSON.stringify(clean[k])} (clamped)`);
+  for (const k of Object.keys(doc.state || {})) if (!fields.includes(k)) notes.push(`unknown field ${k} ignored`);
+  let clean = readState(st);
+  for (const e of EXTRA_FIELDS) clean = { ...clean, ...e.read(st) };
+  for (const k of fields) if (k !== 'edge' && JSON.stringify(clean[k]) !== JSON.stringify(st[k])) notes.push(`${k}: ${JSON.stringify(st[k])} → ${JSON.stringify(clean[k])} (clamped)`);
   return { ok: true, state: clean, notes };
 }
 

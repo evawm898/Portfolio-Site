@@ -1,6 +1,7 @@
 # /lantern — the paper star lantern (lantern-design-doc.md §13).
 #
-# geometry: tools/verify-lantern.mjs, pure Node — the fold solver closes on
+# geometry: tools/verify-lantern.mjs and tools/verify-lantern-pattern.mjs, pure
+#   Node — the fold solver closes on
 #   every fixture, both halves' rims match, the 3D facet is an isometry of the
 #   flat one, infeasible targets clamp and tell, the SVG's layers, the design
 #   JSON round trip, the tabs — then its negative control (every mutant of
@@ -57,6 +58,10 @@ jobs:
         run: node tools/verify-lantern.mjs
       - name: Negative control (every mutant caught by the clause that names it)
         run: node tools/verify-lantern.mjs --negative-control
+      - name: Pattern gate (the layouts, the judge, the auto-bridge, the texture, the design fields)
+        run: node tools/verify-lantern-pattern.mjs
+      - name: Pattern negative control
+        run: node tools/verify-lantern-pattern.mjs --negative-control
 
   page:
     runs-on: ubuntu-latest

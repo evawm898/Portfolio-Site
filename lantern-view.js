@@ -38,15 +38,41 @@ export function createFoldedView(canvas) {
 
   function clear() { for (const m of meshes) { group.remove(m); m.geometry.dispose(); } meshes = []; }
   /* `halves` is [{ positions: Float32Array, creases: [{from, to}] }, …] in the model's own mm, z-up. */
-  function setModel(halves, { fit = true, bounds = null } = {}) {
+  const texCache = new Map();   // canvas -> THREE.CanvasTexture
+  const cutMats = new Map();    // canvas -> material carrying it as an alpha map
+  function matFor(canvas) {
+    if (!canvas) return paperMat;
+    let m = cutMats.get(canvas);
+    if (m) { const t = texCache.get(canvas); t.needsUpdate = true; return m; }
+    const t = new THREE.CanvasTexture(canvas); t.colorSpace = THREE.NoColorSpace; t.flipY = false;
+    texCache.set(canvas, t);
+    m = new THREE.MeshStandardMaterial({ color: PAPER, roughness: 0.92, metalness: 0, side: THREE.DoubleSide, alphaMap: t, alphaTest: 0.5, transparent: false });
+    cutMats.set(canvas, m);
+    if (cutMats.size > 12) { const [k] = cutMats.keys(); cutMats.get(k).dispose(); texCache.get(k).dispose(); cutMats.delete(k); texCache.delete(k); }
+    return m;
+  }
+  /* `halves` is [{ positions, creases, parts? }, …]; with `textureOf(part)` returning a canvas (or null) the
+     parts are drawn each with its own alpha-mapped material, so the cuts show as holes in the folded paper. */
+  function setModel(halves, { fit = true, bounds = null, textureOf = null } = {}) {
     clear();
     let maxR = 1;
     for (const h of halves) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.BufferAttribute(h.positions, 3));
-      g.computeVertexNormals();
-      const mesh = new THREE.Mesh(g, paperMat);
-      group.add(mesh); meshes.push(mesh);
+      if (textureOf && h.parts) {
+        for (const part of h.parts) {
+          const g = new THREE.BufferGeometry();
+          g.setAttribute('position', new THREE.BufferAttribute(part.positions, 3));
+          g.setAttribute('uv', new THREE.BufferAttribute(part.uvs, 2));
+          g.computeVertexNormals();
+          const mesh = new THREE.Mesh(g, matFor(textureOf(part)));
+          group.add(mesh); meshes.push(mesh);
+        }
+      } else {
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(h.positions, 3));
+        g.computeVertexNormals();
+        const mesh = new THREE.Mesh(g, paperMat);
+        group.add(mesh); meshes.push(mesh);
+      }
       const p = h.positions;
       for (let i = 0; i < p.length; i += 3) maxR = Math.max(maxR, Math.hypot(p[i], p[i + 1], p[i + 2]));
       if (h.creases && h.creases.length) {
@@ -96,6 +122,7 @@ export function createFoldedView(canvas) {
     lookAt: (target, dir, dist) => { controls.target.set(...target); camera.position.set(target[0] + dir[0] * dist, target[1] + dir[1] * dist, target[2] + dir[2] * dist); lastUser = performance.now(); controls.update(); dirty = true; renderOnce(); },
     pixel: (x, y) => { const gl = renderer.getContext(); const px = new Uint8Array(4); const r = renderer.getPixelRatio(); gl.readPixels(Math.round(x * r), Math.round((canvas.height / r - y) * r), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return [...px]; },
     isRunning: () => running,
+    materials: () => meshes.filter((m) => m.isMesh).map((m) => (m.material.alphaMap ? 'cut' : 'paper')),
     THREE, scene, group, renderer, controlsRef: controls,
   };
 }
