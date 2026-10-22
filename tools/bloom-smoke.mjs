@@ -1801,6 +1801,34 @@ export const SMOKE_BLOCKS = [
         path: "FC1 the foot cap restated from the ring's radius x 2 pi / n and the asked foot, the told flag both ways, the emitted foot rows at the capped width; Z3 the ring's foot restated through the cap; J4 the floors" },
     ],
   },
+  {
+    n: 77, title: 'surface texture T3 (Oct 22)',
+    anchor: 'TEXTURE: PEBBLE at the shipped height (0.4 mm) and size (4 mm)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       lattice (sub-rows and sub-columns through the organ's own surface),
+       the outward relief on both skins and over the bead, the shared
+       world-space field on every sheet (petal, sepal, leaf, a floret), the
+       refusals (the LOBED leaf, the infill — BOTH ON), and the choice guard.
+       The subset adds the other pattern at the height ceiling (the bead
+       close-up the clearance tool measures), the whole bloom (three organs
+       under one field, the hub / stem / rods untextured), the tube (the ring
+       untextured beside textured lobes), BOTH ON and the GATED holder.
+       --conn is REQUIRED (a relieved bead is a junction overlap of its own on
+       every petal, and the tube's untextured ring meets textured lobes). */
+    conn: true,
+    rows: [
+      { label: 'TEXTURE: CELLULAR x textureHeight max (1.5)',
+        path: 'TX1 the relief at the height ceiling outward on both skins, TX2 the Worley field restated at the builder\'s samples, TX5 the bead relieved along its own w, TX4 the petal lattice under the 1.25x bar, T1/T2 the file in [w, w + 2H]' },
+      { label: 'TEXTURE: the WHOLE BLOOM — 8 sepals, a stem, a simple leaf (the hub, stem and rods stay out)',
+        path: 'TX2 one world field on petal, sepal and leaf samples, TX4 per organ against its own untextured twin, TX7 the three organs\' lattice counts engine-agreed, T4/T5 the sepal and leaf files in the band, ST9 the stem untextured' },
+      { label: 'TEXTURE: PEBBLE x the TUBE (6 of 8 fused — the ring stays out, the lobes textured)',
+        path: 'TX4 the textured lobes against the twin, TU0/TU1 the ring built untextured beside them, TX8 the representative lobe on its surface' },
+      { label: 'TEXTURE: BOTH ON — the VORONOI infill wins, the texture is REFUSED and told (Q9)',
+        path: 'TX6 refused with the word infill, nothing displaced, the read-out NOT BUILT; I0-I13 the infill built as before' },
+      { label: 'TEXTURE: GATED — the two sliders at their maxima under NONE (the choice guard holds the bytes)',
+        path: 'TX0 the two statements under the guard, no record; the byte partition holds the row' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

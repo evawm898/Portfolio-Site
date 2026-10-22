@@ -126,7 +126,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, settleMsForRow, fullStat
          thicknessAssertions, THICKNESS_SCOPE, apexNibAssertions, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE,
-         leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, tubeAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
+         leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, tubeAssertions, textureAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { parseShard, shardOf, matrixHash, writeCensus, slimConn, summarizeConn } from './bloom-connectedness-shards.mjs';
 import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE, infloApproachAssertions, rootTaperAssertions } from './bloom-harness.mjs';
@@ -418,6 +418,11 @@ for (const [rowIndex, row] of rows.entries()) {
      header. The fusion itself (TU2-TU6) is tools/verify-bloom-tube.mjs's. */
   const tu = await tubeAssertions(page, row);
   if (tu.length) { validity.push(`${row.label}: ${tu.join('; ')}`); continue; }
+  /* SURFACE TEXTURE (TX0-TX7) — both STL gates are blind to a relief that goes
+     inward, a bead left flat, a field sampled per organ, a lattice off the
+     surface and the exclusivity dropped; see textureAssertions()'s header. */
+  const tx = await textureAssertions(page, row);
+  if (tx.length) { validity.push(`${row.label}: ${tx.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z6) — see zygoAssertions()'s header. This gate is as blind
      to the layer as the export gate is: the foot is never written by anything
      a role may override, and the hub disc spans every ring, so no reachable
