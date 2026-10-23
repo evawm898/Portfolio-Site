@@ -1363,6 +1363,40 @@ texture work). The prototype is `bloom-texture-lab.html` / `bloom-texture-lab-co
   outward relief on sheets → T4 Voronoi walls (the midline ridge) → T5 hub/stem/rod fallback → T6 sheet.
   Gate family **TX**.
 
+**SURFACE TEXTURE T3 SHIPS: ONE WORLD FIELD OVER THE SHEETS, OUTWARD, OVER THE BEAD, ON A 0.4 mm LATTICE,
+BEHIND A CHOICE GUARD THAT SHIPS OFF — AND THE WORST-CORNER CAP IS EVA'S OPEN QUESTION** (Oct 22 — read
+`docs/bloom-surface-texture-t3-outcome.md` before touching `textureField`, `textureFor`, `emitPanel`'s
+lattice or relief, `textureContext`, `TEXTURE_*`, `TEXTURE_BAR_XFAIL`, TX0–TX8, panel route (ao) or block 77).
+- `petalTexture` (NONE / PEBBLE / CELLULAR, a CHOICE — out of the blanket sweep, `ALL MAX` untextured),
+  `textureHeight` (0.4–1.5 mm PEAK-TO-VALLEY, default the 0.4 floor — Eva's Q13, UNVALIDATED), `textureSize`
+  (1.6–12 mm; four lattice edges is the floor). The field is built from floor / imul / products / sqrt ONLY
+  (engine-agreed; TX2 restates it at 2.8e-17). No ribbing (Q6).
+- **THE LATTICE REACHES ONLY WHERE `g > 0`.** The first cut refined the foot rows, put a sub-column at `v = 0`
+  on the hub's rim vertex and WELDED every petal to the hub (5,808 within-shell pairs on every textured row).
+- **Texture and the Voronoi infill are EXCLUSIVE (Q9): greyed, never switched; BOTH ON (a loaded design) greys
+  neither, the texture is REFUSED with the word `infill` and TOLD** — an ON control is never greyed, which is
+  what keeps both-on reachable to undo. `bloom-file.js` reports the conflict; F2 expects it exactly there.
+- The relief runs OVER the bead (Q4/Q5): a textured petal's outline moves out by up to H (apex measured
+  0.36–1.5 mm), an untextured one is byte-identical. The hub, stem, rods and tube ring stay out (T5). A
+  LOBED leaf is out (no row law), told. Sepals, leaves, leaflets and florets (each in its own frame) are in.
+- **TX4's bar is 1.25× the untextured twin's conforming floor per organ; the default petal reads 1.033× (TX4's owner: skin + rim against the twin); the read-out's `x its floor` is the BUILDER's own estimate, 1.147× there, a different owner ~0.1–0.2 above the gate's.**
+  `TEXTURE: PEBBLE x cup 1.2 x curl 180` reads **1.577×** and is declared in `TEXTURE_BAR_XFAIL` (±0.005 both
+  ways): the column factor is ROW-UNIFORM and a curled, cupped row's columns differ 2–3× in length. A
+  per-span count is a lengths decision, not built.
+- **Two relief folds declared by value** (0 untextured, 0 lattice-only): the compound CELLULAR leaflets' free
+  bases (59 / 0.1963) and the cup × curl tips (147 / 0.0918). **Three more fold at the 1.5 mm MAXIMUM and are
+  REPORTED WITH RENDERS, not masked and not rows**: the 0.40 mm nib at PEBBLE 1.5 (19 / 0.5011), cup × curl at
+  1.5 on both patterns (1,588 / 0.2727, 1,298 / 0.2975). At the 0.4 mm default nothing measured folds but the
+  declared row. The default's neighbour clearance is 0.000 textured AND untextured (the accepted crossing).
+- Cost: the default 24,688 → **151,792** at PEBBLE 0.4; **40 × 3 whorls is 1,542,832 (102.9%) and REFUSES**.
+  The cap's three mechanisms are measured and NONE is picked (refuse as today; cap the head count — 38 of
+  40 fit at 3 whorls; coarsen the edge — 0.5 mm is the finest that fits). WAITING ON EVA.
+- Gates: TX0–TX8 in both STL gates, five witnessed apex mutants, panel route (ao) (THIRTY-TWO routes) with
+  the section's geometry witness, block 77 (19 rows, 1,525), smoke block 77, E carves relieved parts out BY
+  NAME, the texture sliders are `SCOPE_UNSCOPED`. `frozen/phase83` = the 1,506 rows at `56f91f4` (row-for-row `d60e734`'s); 0 frozen
+  rows name a texture id. Sheet: `node tools/shot-bloom-texture-t3.mjs` → `docs/img/bloom-texture-t3.png`;
+  `tools/bloom-texture-bead.mjs` and `tools/bloom-texture-corner.mjs` are the measurements.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

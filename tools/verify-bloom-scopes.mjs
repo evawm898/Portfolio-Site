@@ -191,9 +191,12 @@ async function nodeClauses(G, F, R, rec) {
   /* SO0 — the census, restated from the registry */
   {
     const p = [];
-    if (JSON.stringify([...G.SCOPE_UNSCOPED]) !== JSON.stringify(['sheetThickness'])) p.push(`SCOPE_UNSCOPED is ${JSON.stringify(G.SCOPE_UNSCOPED)}`);
+    /* the material (Q3.6) and, since T3, the texture's two sliders — ONE
+       world-space field over the whole bloom, never a layer's or a pair's */
+    const UNSCOPED_RESTATED = ['sheetThickness', 'textureHeight', 'textureSize'];
+    if (JSON.stringify([...G.SCOPE_UNSCOPED]) !== JSON.stringify(UNSCOPED_RESTATED)) p.push(`SCOPE_UNSCOPED is ${JSON.stringify(G.SCOPE_UNSCOPED)}`);
     const whorl = ['petalCount', 'footDelicacy', 'tubeLayer1', 'tubeLayer2', 'tubeLayer3', 'tubeLayer4', 'tubeLayer5', 'tubeLayer6', 'tubeHeight', 'tubeBlend'];
-    const want = REG.CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && c.id !== 'sheetThickness' && !whorl.includes(c.id)).map((c) => c.id);
+    const want = REG.CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && !UNSCOPED_RESTATED.includes(c.id) && !whorl.includes(c.id)).map((c) => c.id);
     if (JSON.stringify([...F.SCOPEABLE_IDS]) !== JSON.stringify(want)) p.push(`SCOPEABLE_IDS (${F.SCOPEABLE_IDS.length}) differ from the restated census (${want.length}): ${want.filter((x) => !F.SCOPEABLE_IDS.includes(x)).concat(F.SCOPEABLE_IDS.filter((x) => !want.includes(x))).join(', ')}`);
     if (F.SCOPEABLE_IDS.includes('sheetThickness')) p.push('sheetThickness is scopeable');
     /* THE ROLE TABLE IS RETIRED (Q3.4): the 47 ids, written down here rather
@@ -989,9 +992,12 @@ const MUTANTS = [
     to: '    { const so = scopeTerm !== null && base in scopeTerm.offsets ? scopeTerm.offsets[base] : 0; out[base] = clamp(composed - so, b.min, b.max) + so; }\n    /* WHICH BASES THE CLAMP ACTUALLY BIT',
     witness: (G) => G.resolvePetalTerms({ ...REG.DEFAULTS }, null, null, null, { offsets: { petalCup: 5 }, bounds: {} }).petalCup > 1.2 },
   { id: 'thickness-is-scoped', breaks: ['SO0', 'SO5'],
-    from: "export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness']);",
-    to: 'export const SCOPE_UNSCOPED = Object.freeze([]);',
-    witness: (G) => G.SCOPE_UNSCOPED.length === 0 },
+    /* RE-ANCHORED (SURFACE TEXTURE T3): the list carries the texture's two
+       sliders beside the sheet now, so the mutation drops the SHEET alone —
+       the thing Q3.6 is about — and the witness reads its absence. */
+    from: "export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness',",
+    to: "export const SCOPE_UNSCOPED = Object.freeze([",
+    witness: (G) => !G.SCOPE_UNSCOPED.includes('sheetThickness') },
   /* ---- Scoping-b: the toggles ---- */
   /* (SO7 came off this claim with the retirement: it carried the RADIAL
      petal entry that must stay inert, and the migration clause that replaced

@@ -41,7 +41,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import crypto from 'node:crypto';
 import { shardOf } from './bloom-export-shards.mjs';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, curlAssertions, stamenAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, curlAssertions, stamenAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions, textureAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -740,6 +740,17 @@ const TIER_ROWS = /^SEPAL TIERS:/;
    scoped to each other for the shard cap's sake (the tier rows' own reason). */
 const SEPC_MUTANTS = /^(a-sepal-curve-read-from-the-petals|a-tier-curve-leaks-to-every-tier|the-sepal-limit-drawn-on-the-slider-spine|the-fold-limit-skipped-for-sepals)$/;
 const SEPC_ROWS = /^SEPAL CURVES:/;
+const TEX_ROWS = /^surface texture/;
+const TEX_MUTANTS = /^(the-relief-goes-inward|the-bead-is-left-flat|the-field-is-sampled-per-organ|the-lattice-leaves-the-surface|the-exclusivity-is-dropped)$/;
+/* the texture facts a witness reads off a MUTATED module's own build */
+function texFacts(G, st) {
+  try {
+    const b = G.buildBloomInto(new G.MeshBuilder({ exportMode: true }), st, {});
+    const T = b.texture; if (!T) return { none: true };
+    const o = T.organs || {};
+    return { refused: T.refused || null, organs: Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { displaced: v.displaced, min: v.reliefMinMm, max: v.reliefMaxMm, skin: v.skinSamples || [], apex: v.apexSamples || [] }])) };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
 /* THE LEAF CURVES (curves-leaves): the eight geometry mutants and the rows they
    run over, scoped to each other for the shard cap's sake (the seed's own
    mutants are the panel gate's, route (am)). */
@@ -2603,8 +2614,8 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.tiers[0].curveMode === true && c.tiers[0].curveMode === false && c.tiers[1].curveMode === true) ? null : `tier 1's curve mode reads ${m.tiers[0].curveMode} on the mutant against ${c.tiers[0].curveMode} clean (tier 2 ${c.tiers[1] && c.tiers[1].curveMode})`; } },
   { id: 'the-sepal-limit-drawn-on-the-slider-spine', rows: SEPC_ROWS, why: "the angle limit's trial sepal is built with the curl mode forced to SLIDER, so an incurved drawn sepal is cleared against the petals as if it were straight — and stands through them",
-    find: "  const p = buildPetalInto(acc, sepalBladeState(state, angleDeg, unclamped), sepals.ring, slot, null, false);\n  return { lamina: laminaFromPanels(",
-    into: "  const p = buildPetalInto(acc, { ...sepalBladeState(state, angleDeg, unclamped), petalCurlMode: 'SLIDER' }, sepals.ring, slot, null, false);\n  return { lamina: laminaFromPanels(", names: ['SP8'],
+    find: "  const p = buildPetalInto(acc, sepalBladeState(state, angleDeg, unclamped), sepals.ring, slot, { noTexture: true }, false);\n  return { lamina: laminaFromPanels(",
+    into: "  const p = buildPetalInto(acc, { ...sepalBladeState(state, angleDeg, unclamped), petalCurlMode: 'SLIDER' }, sepals.ring, slot, { noTexture: true }, false);\n  return { lamina: laminaFromPanels(", names: ['SP8'],
     witness: (M, C) => { const m = sepcFacts(M, SEPC_LIMIT), c = sepcFacts(C, SEPC_LIMIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.tiers[0].limit > c.tiers[0].limit + 5) ? null : `the limit reads ${m.tiers[0].limit} on the mutant against ${c.tiers[0].limit} clean — the trial still drew the curve`; } },
@@ -2953,6 +2964,55 @@ const MUTANTS = [
      gynoecium family, so JG1 cannot fire here (measured: SILENT) — the same
      `rootSpan` reaches the style, and JG1 is held by both STL gates on the
      mum's style and stigma rows, where the root's span is what moves. */
+  /* ===================================================================
+     SURFACE TEXTURE (T3, Oct 22). Five mutants, each witnessed on the MUTATED
+     module's own texture record (never the clause it names), run on the three
+     `surface texture` rows alone (`TEX_MUTANTS` / `TEX_ROWS`).
+     =================================================================== */
+  { id: 'the-relief-goes-inward', rows: TEX_ROWS, why: "the top skin is displaced AGAINST its normal: the relief thins the sheet by up to H (ruling 2 forbids it), every scalar record still reads 0 <= s <= H, and the solid exports watertight at the identical triangle count",
+    find: "        const hT = [pT[0] + n[0] * sT, pT[1] + n[1] * sT, pT[2] + n[2] * sT];",
+    into: "        const hT = [pT[0] - n[0] * sT, pT[1] - n[1] * sT, pT[2] - n[2] * sT];", names: ['TX1'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', textureHeight: 1.5 }; const m = texFacts(M, st), c = texFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const along = (F) => { let worst = 0; for (const q of F.organs.petal.skin) if (q.side === 'top') { const a = (q.p1[0] - q.p0[0]) * q.n[0] + (q.p1[1] - q.p0[1]) * q.n[1] + (q.p1[2] - q.p0[2]) * q.n[2]; if (a < worst) worst = a; } return worst; };
+      const am = along(m), ac = along(c);
+      return (am < -0.05 && ac >= -1e-12) ? null : `the mutant's top skin moves ${am} mm along its normal at worst (clean ${ac})`; } },
+  { id: 'the-bead-is-left-flat', rows: TEX_ROWS, why: "the apex is never relieved — the bead stays on the fixed outline while both skins rise around it, a groove along every margin (Q4/Q5 says the relief runs OVER the bead); the skins' records are untouched and the solid is watertight",
+    find: "    const sA = sOf(apex);\n    pts[APEX] = [apex[0] + (wx / aLen0) * sA, apex[1] + (wy / aLen0) * sA, apex[2] + (wz / aLen0) * sA];",
+    into: "    const sA = 0;\n    pts[APEX] = apex;", names: ['TX5'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', textureHeight: 1.5 }; const m = texFacts(M, st), c = texFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const maxA = (F) => F.organs.petal.apex.reduce((x, q) => Math.max(x, q.s), 0);
+      return (maxA(m) === 0 && maxA(c) > 0.2) ? null : `the mutant's apex relief peaks at ${maxA(m)} mm (clean ${maxA(c)})`; } },
+  { id: 'the-field-is-sampled-per-organ', rows: TEX_ROWS, why: "the sepals and leaves read the field at a point 37 mm from where they stand: three organs, three fields, where ruling 1 says ONE world-space field — the petals are unchanged and every organ still exports watertight",
+    find: "  return { organ, rep, relief: { heightMm: T.heightMm, f: T.f }, lattice: { edgeMm: T.edgeMm, rowAt, firstSub, noSubRows }, panels: [] };",
+    into: "  return { organ, rep, relief: { heightMm: T.heightMm, f: organ === 'petal' ? T.f : (p) => T.f([p[0] + 37, p[1], p[2]]) }, lattice: { edgeMm: T.edgeMm, rowAt, firstSub, noSubRows }, panels: [] };", names: ['TX2'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'CELLULAR', sepalCount: 8, stemLength: 60, leafLength: 60 }; const m = texFacts(M, st), c = texFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      /* a SEPAL is the petal builder on a second ring (its context says 'petal'),
+         so the organ the mutation moves is the LEAF */
+      const sm = m.organs.leaf.skin, sc = c.organs.leaf.skin;
+      let moved = 0; for (let i = 0; i < Math.min(sm.length, sc.length); i++) if (Math.abs(sm[i].s - sc[i].s) > 1e-6) moved++;
+      const pm = m.organs.petal.skin, pc = c.organs.petal.skin; let pMoved = 0; for (let i = 0; i < Math.min(pm.length, pc.length); i++) if (pm[i].s !== pc[i].s) pMoved++;
+      return (moved > sm.length / 4 && pMoved === 0) ? null : `${moved} of ${sm.length} leaf samples changed and ${pMoved} petal samples — the field moved on the wrong organ or not at all`; } },
+  { id: 'the-lattice-leaves-the-surface', rows: TEX_ROWS, why: "a sub-row is LERPED between its two shipped neighbours instead of evaluated on the organ's own surface: the relief is drawn on a chord across a curved sheet, every count and every record unchanged, the file watertight",
+    find: "        const row = L.rowAt(u);\n        const sp = [s.sp[0] + (s2.sp[0] - s.sp[0]) * f, s.sp[1] + (s2.sp[1] - s.sp[1]) * f];",
+    into: "        const row = { ...L.rowAt(u), sect: (v) => { const a = s.row.sect(v), c = s2.row.sect(v); return { ...a, P: [a.P[0] + (c.P[0] - a.P[0]) * f, a.P[1] + (c.P[1] - a.P[1]) * f, a.P[2] + (c.P[2] - a.P[2]) * f] }; } };\n        const sp = [s.sp[0] + (s2.sp[0] - s.sp[0]) * f, s.sp[1] + (s2.sp[1] - s.sp[1]) * f];", names: ['TX8'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', petalCup: 0.6 }; const m = texFacts(M, st), c = texFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const subs = (F) => F.organs.petal.skin.filter((q) => q.sIdx < 0 && q.rep === true);
+      const sm = subs(m), sc = subs(c);
+      let worst = 0; for (let i = 0; i < Math.min(sm.length, sc.length); i++) worst = Math.max(worst, Math.hypot(sm[i].mid[0] - sc[i].mid[0], sm[i].mid[1] - sc[i].mid[1], sm[i].mid[2] - sc[i].mid[2]));
+      return (sm.length && worst > 1e-4) ? null : `${sm.length} sub-row samples, the mid-surface moved ${worst} mm at most — the lerp did not leave the surface`; } },
+  { id: 'the-exclusivity-is-dropped', rows: TEX_ROWS, why: "the refusal is dropped: with the infill on the record reports NOTHING refused and the read-out says nothing (Q9 says told, never silently picked) — measured, the infilled petal's cell panels never reach emitPanel's relief, so the sheet stays flat while the record claims a texture",
+    /* (the witness is the RECORD's word, not a displacement: on this tree an
+       infilled petal structurally carries no relief, which is exactly why a
+       dropped refusal is a silent lie rather than a visible fold) */
+    find: "  const refused = !infillIsAbsent(state) ? 'infill' : null;",
+    into: "  const refused = null;", names: ['TX6'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', petalInfill: 'VORONOI' }; const m = texFacts(M, st), c = texFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.refused === null && c.refused === 'infill') ? null : `the mutant reports refused ${m.refused} (clean refused ${c.refused})`; } },
   { id: 'the-part-root-spans-the-sheet', why: 'a stamen and the style are rooted one SHEET deep on a thickened hub: their roots sit inside the plate and both stand shorter than asked',
     find: '  const rootSpan = hubThickness;',
     into: '  const rootSpan = thickness;', names: ['JS1'], rows: /the roots span the thickened hub/,
@@ -3966,6 +4026,13 @@ const ROWS = [
   { label: 'a scoped spine — FAN pair 2 owns the incurve on a slider fan', for: SPS_MUTANTS,
     scopes: { layers: [], petals: [{ layer: 0, slot: 2, offsets: {}, values: { petalCurlMode: 'CURVE', petalSpineCurve: SP_INCURVE } }], tiers: [] },
     set: [{ id: 'placement', value: 'FAN' }, { id: 'scopePetals', value: 'ON' }, { id: 'petalSpineCurl', value: '30' }] },
+  /* SURFACE TEXTURE (T3): three rows, scoped to the texture mutants — the
+     shipped PEBBLE, the whole bloom (a sepal and a leaf under the one field,
+     the per-organ mutant's witness) and BOTH ON (the exclusivity's). */
+  { label: 'surface texture — PEBBLE at the shipped height and size', for: TEX_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }] },
+  { label: 'surface texture — CELLULAR x 8 sepals x a 60 mm leaf on a 60 mm stem (one field, three organs)', for: TEX_MUTANTS,
+    set: [{ id: 'petalTexture', value: 'CELLULAR' }, { id: 'sepalCount', value: '8' }, { id: 'stemLength', value: '60' }, { id: 'leafLength', value: '60' }] },
+  { label: 'surface texture — BOTH ON (the infill wins, the texture refused)', for: TEX_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalInfill', value: 'VORONOI' }] },
   { label: 'an asymmetric outline curve — a LOPSIDED blade (the right half narrower)', for: ASYM_MUTANTS,
     set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
   { label: 'an asymmetric outline curve — a PINWHEEL x 5 petals', for: ASYM_MUTANTS,
@@ -4208,6 +4275,12 @@ async function famsOn(rows) {
        anchor, and a bare `C` would read `CA`/`CG` messages nobody pushes here. */
     for (const msg of await curlAssertions(page, row)) {
       const mm = /^(C\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+    }
+    /* SURFACE TEXTURE (T3) — the rule once more: the table never ran the TX
+       family until the texture's five mutants named it. `TX\d+` and not `T\d+`
+       (the root taper's own capture is anchored on a digit after the T). */
+    for (const msg of await textureAssertions(page, row)) {
+      const mm = /^(TX\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
   }
   return seen;

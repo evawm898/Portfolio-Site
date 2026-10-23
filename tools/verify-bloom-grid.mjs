@@ -1082,8 +1082,12 @@ const MUTANTS = [
        rather than a green sweep. The anchor stops at `normal: oN[k]` now and
        the replacement re-closes the object with the field that follows, so a
        later addition AFTER `material` cannot disarm it a third time. */
-    from: 'mid: oP[k], normal: oN[k], material:',
-    to: 'mid: oP[k], normal: oN[k].map(() => rows[i].N), material:',
+    /* RE-ANCHORED a THIRD time by SURFACE TEXTURE T3, whose lattice refactor
+       renamed the captured arrays (`b.Ps` / `b.Ns`, one captured row per
+       emitted row, sub-rows excluded) — again found by this pre-check, in CI,
+       not by a sweep. */
+    from: 'mid: b.Ps, normal: b.Ns, material:',
+    to: 'mid: b.Ps, normal: b.Ns.map(() => rows[i].N), material:',
   },
   {
     /* THE APEX IS RECOMPUTED INSTEAD OF PUSHED. `emitPanel` places the

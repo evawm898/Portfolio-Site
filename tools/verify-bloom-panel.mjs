@@ -520,6 +520,21 @@
          Two mutants under --negative-control (both bloom.js): the picker
          listing no strands, and every pick binding strand 1. Three edits: this
          entry, the block, the negative control's flags and banner.
+     (ao) SURFACE TEXTURE — THE LINE, THE SLIDERS, THE GREYING (T3, Oct 22 —
+         docs/bloom-surface-texture-t3-outcome.md; Eva's rulings Q9, Q13). The
+         default: no TEXTURE line, the height and size sliders hidden, nothing
+         greyed. PEBBLE on: the line carries the petal lattice's own skin count
+         against its floor and the height; the sliders show; the INFILL choice is
+         GREYED (disabled + `bl-ctrl--disabled`), still shown, its read-out
+         naming the texture — restated from the registry's own `enabledWhen` on
+         the page's state. BOTH ON: refused with the word infill, NOT BUILT
+         told, and NEITHER control greyed (a control that is ON is never greyed,
+         or a loaded design with both could never be turned off). The infill
+         alone greys the texture choice. The guard OFF with both sliders at
+         their maxima: no line, hidden and inert. Two mutants under
+         --negative-control (both bloom.js): the greying never applied, and the
+         TEXTURE line never printed. Three edits: this entry, the block, the
+         negative control's flags and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -669,6 +684,14 @@ const WITNESS = {
      At 40 the achieved count is 14, the SAME as the ruled default's, so half
      this witness would have been a number printed twice — the `leafToothCount`
      row's own finding, in the next entry but one. */
+  /* THE TEXTURE (T3) — a drop-down inside Petal, collapsed at first load;
+     witnessed by the HEIGHT through the builder's own texture record: the
+     petal organ's reliefMaxMm (the largest outward displacement the emitter
+     actually applied, which the slider cannot write — at the guard the record
+     is null) and its skin-triangle count on the lattice. The row needs the
+     guard off, hence the pre. */
+  texture: { id: 'textureHeight', value: '1.2', pre: [{ id: 'petalTexture', value: 'PEBBLE' }],
+             read: (m) => `${m.texture && m.texture.organs.petal && m.texture.organs.petal.reliefMaxMm}/${m.texture && m.texture.organs.petal && m.texture.organs.petal.skinTris}`, what: 'texture.organs.petal.reliefMaxMm/skinTris' },
   infill: { id: 'infillDensity', value: '24', pre: [{ id: 'petalInfill', value: 'VORONOI' }],
             read: (m) => `${m.infill && m.infill.achieved}/${m.infill && m.infill.passesUsed}`,
             what: 'infill.achieved/infill.passesUsed' },
@@ -4716,6 +4739,86 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (ao) SURFACE TEXTURE — THE LINE, THE SLIDERS, THE GREYING (T3) -----
+   See the header. Every claim is read off the BUILDER's record
+   (`__bloomMetrics().texture`) and the registry's own predicates evaluated
+   on the page's read-back state — never the inputs this route set. */
+{
+  const tag = '[texture]';
+  const snap = (pg) => pg.evaluate(() => {
+    const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+    const wrap = (id) => document.getElementById(id).closest('.bl-ctrl');
+    const st = (id) => ({ hidden: wrap(id).hidden, disabled: document.getElementById(id).disabled, greyed: wrap(id).classList.contains('bl-ctrl--disabled'), said: wrap(id).querySelector('.bl-val').textContent });
+    return { T: m.texture, absent: m.textureAbsent, line: /TEXTURE ([^\n]*)/.exec(txt), notBuilt: /TEXTURE NOT BUILT — ([^\n]*)/.exec(txt),
+      tex: st('petalTexture'), inf: st('petalInfill'), h: st('textureHeight'), z: st('textureSize'), ui: window.__bloomUIState() };
+  });
+  const run = async (pg, label, sets, want) => {
+    const bad = sets.length ? await applyConfig(pg, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const r = await snap(pg);
+    const p = [];
+    const present = evalPredicate({ ref: 'texturePresent' }, r.ui), infOn = evalPredicate({ ref: 'infillPresent' }, r.ui);
+    if (!!r.T !== present) p.push(`the builder reports ${r.T ? 'a record' : 'no record'} while the registry reads the texture ${present ? 'present' : 'absent'}`);
+    if (!!r.line !== !!r.T) p.push(`the TEXTURE line is ${r.line ? 'shown' : 'absent'} while the builder reports ${r.T ? 'a record' : 'no record'}`);
+    if (r.h.hidden !== !present || r.z.hidden !== !present) p.push(`the height / size sliders are ${r.h.hidden ? 'hidden' : 'shown'} / ${r.z.hidden ? 'hidden' : 'shown'} with the texture ${present ? 'on' : 'off'}`);
+    if (r.tex.hidden || r.inf.hidden) p.push('a choice is HIDDEN — Q9 greys, never hides');
+    /* THE GREYING, both ways, restated from the registry's own predicates on
+       the page's state: a control is greyed iff its `enabledWhen` is false,
+       and a control that is ON is never greyed (both on must stay reachable) */
+    const regInf = evalPredicate(CONTROLS.find((c) => c.id === 'petalInfill').enabledWhen, r.ui), regTex = evalPredicate(CONTROLS.find((c) => c.id === 'petalTexture').enabledWhen, r.ui);
+    if (r.inf.disabled !== !regInf || r.inf.greyed !== !regInf) p.push(`the infill choice is ${r.inf.disabled ? 'disabled' : 'enabled'} / ${r.inf.greyed ? 'greyed' : 'plain'} where its own enabledWhen reads ${regInf}`);
+    if (r.tex.disabled !== !regTex || r.tex.greyed !== !regTex) p.push(`the texture choice is ${r.tex.disabled ? 'disabled' : 'enabled'} / ${r.tex.greyed ? 'greyed' : 'plain'} where its own enabledWhen reads ${regTex}`);
+    if (want.infGreyed !== undefined && !regInf !== want.infGreyed) p.push(`the registry greys the infill ${!regInf} where this route expects ${want.infGreyed}`);
+    if (want.texGreyed !== undefined && !regTex !== want.texGreyed) p.push(`the registry greys the texture ${!regTex} where this route expects ${want.texGreyed}`);
+    if (!regInf && !/texture/i.test(r.inf.said)) p.push(`the greyed infill's read-out does not name the texture: "${r.inf.said}"`);
+    if (!regTex && !/infill/i.test(r.tex.said)) p.push(`the greyed texture's read-out does not name the infill: "${r.tex.said}"`);
+    if (r.T) {
+      if ((r.T.refused || null) !== (want.refused ?? null)) p.push(`the builder says refused=${r.T.refused} and the route expects ${want.refused ?? 'nothing'}`);
+      if (r.line) {
+        if (want.refused) { if (!r.notBuilt || !/infill/i.test(r.notBuilt[1])) p.push('the read-out does not say NOT BUILT for the infill while the builder refused'); }
+        else {
+          if (r.notBuilt) p.push('the read-out says NOT BUILT while the builder relieved the sheet');
+          const o = r.T.organs && r.T.organs.petal;
+          if (!o || !new RegExp(`\\b${o.skinTris}\\b`).test(r.line[1])) p.push(`the TEXTURE line does not carry the petal lattice's own skin count ${o && o.skinTris}: "${r.line[1].slice(0, 120)}"`);
+          if (!/x its floor/.test(r.line[1])) p.push('the TEXTURE line does not state the lattice against its floor');
+          if (!new RegExp(`${r.T.heightMm}`).test(r.line[1])) p.push(`the TEXTURE line does not carry the height ${r.T.heightMm}`);
+        }
+      }
+      if (!want.refused && !/\bmm\b/.test(r.h.said)) p.push(`the height control's read-out is not in millimetres: "${r.h.said}"`);
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${r.T ? (r.T.refused ? `refused ${r.T.refused}` : `${r.T.type} H ${r.T.heightMm}`) : 'no record'}`);
+  };
+  const { browser: b1, page: p1 } = await launchPage();
+  await openBloom(p1, port);
+  if (NEGATIVE_CONTROL) {
+    await p1.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  await run(p1, 'the shipping default — no line, the sliders hidden, nothing greyed', [], { infGreyed: false, texGreyed: false });
+  await run(p1, 'PEBBLE on — the line with the lattice count and the bar, the sliders shown, the INFILL greyed and told', [{ id: 'petalTexture', value: 'PEBBLE' }], { infGreyed: true, texGreyed: false });
+  await run(p1, 'CELLULAR at the height ceiling', [{ id: 'petalTexture', value: 'CELLULAR' }, { id: 'textureHeight', value: '1.5' }], { infGreyed: true, texGreyed: false });
+  await run(p1, 'BOTH ON — refused with the word infill, NOT BUILT told, NEITHER control greyed (each stays reachable)', [{ id: 'petalInfill', value: 'VORONOI' }], { refused: 'infill', infGreyed: false, texGreyed: false });
+  await run(p1, 'the infill alone — the TEXTURE choice greyed and told, no line', [{ id: 'petalTexture', value: 'NONE' }], { infGreyed: false, texGreyed: true });
+  await run(p1, 'the guard OFF with both sliders at their maxima — no line, the sliders hidden (hidden AND inert)', [{ id: 'petalInfill', value: 'NONE' }, { id: 'textureHeight', value: '1.5' }, { id: 'textureSize', value: '12' }], { infGreyed: false, texGreyed: false });
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the greying is never applied', from: "    wrappers[c.id].classList.toggle('bl-ctrl--disabled', !on);\n    inputs[c.id].disabled = !on;\n", to: "    wrappers[c.id].classList.toggle('bl-ctrl--disabled', false);\n    inputs[c.id].disabled = false;\n" },
+      { name: 'the texture line is never printed', from: "       + textureLine(built ? built.texture : null)\n", to: "       + ''\n" },
+    ];
+    for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (appSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: appSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name}) PEBBLE on`, [{ id: 'petalTexture', value: 'PEBBLE' }], { infGreyed: true, texGreyed: false });
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -4750,6 +4853,8 @@ if (NEGATIVE_CONTROL) {
     const sawKeptStamens = fail.some((f) => /^\[stamens\] .*kept clause (is shown|names)/.test(f));
     const sawKeptStyle = fail.some((f) => /^\[style\] .*kept clause (is shown|names)/.test(f));
     const sawCap = fail.some((f) => /^\[stamens\] .*cap mark is absent/.test(f));
+    const sawTextureGrey = fail.some((f) => /^\[texture\] MUTANT \(the greying is never applied\).*infill choice is enabled/.test(f));
+    const sawTextureLine = fail.some((f) => /^\[texture\] MUTANT \(the texture line is never printed\).*TEXTURE line is absent while the builder reports a record/.test(f));
     const sawFlag = fail.some((f) => /^\[flag\]: .*FILAMENT AGAINST STYLE flag is absent while the owner reports a crossing/.test(f));
     /* ROUTE (w), THE STEM CHANNEL. It is REQUIRED here and not merely allowed:
        route (w)'s own biconditionals catch a line stuck on or off, but nothing
@@ -4853,8 +4958,9 @@ if (NEGATIVE_CONTROL) {
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-ONE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawTextureGrey && sawTextureLine
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-TWO ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

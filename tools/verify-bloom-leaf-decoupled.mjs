@@ -37,8 +37,12 @@ const G = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href)
 const { DEFAULTS, CONTROLS } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
 const CONTROL = process.argv.includes('--control');
 
-/* THE DECLARED EXCEPTION, and the only one. */
-const SHARED = new Set(['sheetThickness']);
+/* THE DECLARED EXCEPTIONS: the sheet is the MATERIAL, and the SURFACE TEXTURE
+   (T3) is ONE world field over every sheet of the bloom by Eva's ruling — a leaf
+   carries the same relief as the petals, read from the same three controls, so
+   those reach the leaf BY DESIGN (the texture's own gate, TX2, holds every organ
+   to the one field). Nothing else may. */
+const SHARED = new Set(['sheetThickness', 'petalTexture', 'textureHeight', 'textureSize']);
 /* The leaf's own controls are not "petal-side" — moving them SHOULD move the
    leaf, which is what every other clause is about. */
 const isPetalSide = (c) => !c.id.startsWith('leaf') && !SHARED.has(c.id)
@@ -117,7 +121,7 @@ for (const c of CONTROLS.filter(isPetalSide)) {
   }
 }
 console.log(`\nleaf decoupling — ${swept} petal-side control values x 2 modes, ${ref.live.length.toLocaleString('en-US')} leaf floats a build, Object.is`);
-console.log(`  shared by declaration: ${[...SHARED].join(', ')} (the MATERIAL, not a petal control)`);
+console.log(`  shared by declaration: ${[...SHARED].join(', ')} (the MATERIAL, and the one surface-texture field every sheet carries — T3)`);
 console.log(`  values that moved a leaf float: ${moved}`);
 for (const f of findings.slice(0, 10)) console.log(`    - ${f}`);
 if (findings.length > 10) console.log(`    … and ${findings.length - 10} more`);
