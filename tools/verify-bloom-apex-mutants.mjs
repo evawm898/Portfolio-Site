@@ -745,6 +745,17 @@ const SEPC_MUTANTS = /^(a-sepal-curve-read-from-the-petals|a-tier-curve-leaks-to
 const SEPC_ROWS = /^SEPAL CURVES:/;
 const TEX_ROWS = /^surface texture/;
 const TEX_MUTANTS = /^(the-relief-goes-inward|the-bead-is-left-flat|the-field-is-sampled-per-organ|the-lattice-leaves-the-surface|the-exclusivity-is-dropped)$/;
+/* T5 (Oct 23): the organs' four mutants and the two rows they run over */
+const T5_ROWS = /^surface texture T5/;
+const T5_MUTANTS = /^(a-buried-face-is-textured|the-hub-is-skipped|the-stem-normal-points-inward|the-tube-ring-has-its-own-field)$/;
+/* the organs' records as the MUTATED module builds them */
+function organFacts(G, st) {
+  try {
+    const b = G.buildBloomInto(new G.MeshBuilder({ exportMode: true }), st, {});
+    const o = (b.texture && b.texture.organs) || {};
+    return Object.fromEntries(['hub', 'stem', 'tube'].map((k) => [k, o[k] && o[k].organ ? { ...o[k].organ, displaced: o[k].displaced, skin: o[k].skinSamples || [] } : null]));
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
 /* THE EDGE CAP (Eva, Oct 23): its three mutants run on the `texture edge cap`
    rows (the corner, a state past the cap) plus the shipped PEBBLE row, where
    a typed edge moves the default. */
@@ -3066,6 +3077,39 @@ const MUTANTS = [
       let worst = 0; for (let i = 0; i < Math.min(sm.length, sc.length); i++) worst = Math.max(worst, Math.hypot(sm[i].mid[0] - sc[i].mid[0], sm[i].mid[1] - sc[i].mid[1], sm[i].mid[2] - sc[i].mid[2]));
       return (sm.length && worst > 1e-4) ? null : `${sm.length} sub-row samples, the mid-surface moved ${worst} mm at most — the lerp did not leave the surface`; } },
   /* ===================================================================
+     SURFACE TEXTURE T5 — THE ORGANS (Oct 23). Four mutants, each witnessed on
+     the MUTATED module's own organ records (never the clause it names), run
+     on the two `surface texture T5` rows alone (`T5_MUTANTS` / `T5_ROWS`).
+     =================================================================== */
+  { id: 'a-buried-face-is-textured', rows: T5_ROWS, why: "every organ vertex reads VISIBLE: the stem's top inside the hub, the hub's underside inside the stem, the rim under the petals' roots and the ring under the petals are all relieved through the part that covers them (Q7 says buried faces stay smooth) — every count is unchanged and the union still exports watertight, as one piece",
+    find: "export function textureVertexVisible(G, q, n, delta = TEXTURE_VISIBILITY_OFFSET_MM) {\n",
+    into: "export function textureVertexVisible(G, q, n, delta = TEXTURE_VISIBILITY_OFFSET_MM) {\n  return true;\n", names: ['TX11'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.stem && m.hub && m.stem.buried === 0 && m.hub.buried === 0 && c.stem.buried > 0 && c.hub.buried > 0) ? null : `the mutant's stem buries ${m.stem && m.stem.buried} and hub ${m.hub && m.hub.buried} (clean ${c.stem && c.stem.buried} / ${c.hub && c.hub.buried})`; } },
+  { id: 'the-hub-is-skipped', rows: T5_ROWS, why: "the hub is emitted as shipped and never latticed or relieved: a textured bloom stands on a smooth hub (T5 says the hub takes the field) — 0 floats move on the hub and every count is a plausible one",
+    find: "  else if (T5) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); }",
+    into: "  else if (false) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); }", names: ['TX10'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (!m.hub && c.hub && c.hub.displaced > 0 && m.stem && m.stem.displaced > 0) ? null : `the mutant's hub record ${m.hub ? 'exists' : 'is absent'} (clean ${c.hub ? `${c.hub.displaced} displaced` : 'absent'})`; } },
+  { id: 'the-stem-normal-points-inward', rows: T5_ROWS, why: "the stem wall's normal is its own axis's radial NEGATED: the wall is relieved into the stem, thinning it by up to H (ruling 2 forbids it) — every scalar record still reads 0 <= s <= H and the displacement lies along the recorded normal, so TX1 and TX2 cannot see it",
+    find: "      return L > 0 ? [dx / L, dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') return [0, 0, 1];",
+    into: "      return L > 0 ? [-dx / L, -dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') return [0, 0, 1];", names: ['TX10'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const inward = (F) => F.stem.skin.filter((q) => { const r = Math.hypot(q.p0[0], q.p0[1]); return r > 2.9 && (q.p1[0] * q.p0[0] + q.p1[1] * q.p0[1]) / r < r - 0.01; }).length;
+      return (inward(m) > 0 && inward(c) === 0) ? null : `${inward(m)} of the mutant's wall samples moved toward the axis (clean ${inward(c)})`; } },
+  { id: 'the-tube-ring-has-its-own-field', rows: T5_ROWS, why: "the tube ring reads the field at 1.7x the feature size: a second field on one organ where ruling 1 says ONE world-space field — the petals, the hub and the stem are untouched and the ring exports watertight",
+    find: "      const s = w * (H * T.f(q));",
+    into: "      const s = w * (H * (O.organ === 'tube' ? textureField(T.type, T.sizeMm * 1.7) : T.f)(q));", names: ['TX2'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', petalCount: 6, tubeLayer1: 0 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (!m.tube || !c.tube) return 'no tube record on the witness state';
+      let moved = 0; for (let i = 0; i < Math.min(m.tube.skin.length, c.tube.skin.length); i++) if (Math.abs(m.tube.skin[i].s - c.tube.skin[i].s) > 1e-6) moved++;
+      const hubSame = m.hub.skin.every((q, i) => c.hub.skin[i] && q.s === c.hub.skin[i].s);
+      return (moved > 0 && hubSame) ? null : `${moved} tube samples changed, hub unchanged ${hubSame}`; } },
+  /* ===================================================================
      THE TEXTURE EDGE CAP (Eva's ruling of Oct 23). Three mutants, each
      witnessed on the MUTATED module's own edge-cap record, scoped to
      `CAP_ROWS` (the corner builds take the refused rows' settle allowance).
@@ -4123,6 +4167,9 @@ const ROWS = [
   { label: 'surface texture — CELLULAR x 8 sepals x a 60 mm leaf on a 60 mm stem (one field, three organs)', for: TEX_MUTANTS,
     set: [{ id: 'petalTexture', value: 'CELLULAR' }, { id: 'sepalCount', value: '8' }, { id: 'stemLength', value: '60' }, { id: 'leafLength', value: '60' }] },
   { label: 'surface texture — BOTH ON (the infill wins, the texture refused)', for: TEX_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalInfill', value: 'VORONOI' }] },
+  /* T5: the hub and the stem, and a closed tube — scoped to the organ mutants */
+  { label: 'surface texture T5 — PEBBLE x a 60 mm stem (the hub, the stem)', for: T5_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'stemLength', value: '60' }] },
+  { label: 'surface texture T5 — PEBBLE x a closed tube (6 petals, k 0)', for: T5_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '6' }, { id: 'tubeLayer1', value: '0' }] },
   /* THE EDGE CAP (Oct 23): the corner the ruling is about and a state past
      the cap, scoped to the cap mutants; the shipped PEBBLE row above also
      runs under them (CAP_ROWS) for the typed-edge mutant. */

@@ -538,7 +538,10 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     if (fr.sepals) mod.buildSepalsInto(accST, ui, fr, petalSites, stPlan, capParts);
 
     const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
-    if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) bad.push(`solid R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a whole-bloom build has ${accFull.triangleCount}`);
+    /* THE ORGANS' LATTICE (texture T5): the re-emitted hub and stem are the
+       SHIPPED parts; the record says how many triangles each lattice added */
+    const t5Extra = Object.values((builtFull.texture && builtFull.texture.organs) || {}).reduce((n, r) => n + (r.organ ? r.organ.refinedTris - r.organ.shippedTris : 0), 0);
+    if (petalTris + accHC.triangleCount + accST.triangleCount + t5Extra !== accFull.triangleCount) bad.push(`solid R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) + the organs' lattice (${t5Extra}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount + t5Extra}, but a whole-bloom build has ${accFull.triangleCount}`);
     if (petalsBuilt !== builtFull.petalsBuilt) bad.push(`solid R2: captured ${petalsBuilt} petals but builtFull.petalsBuilt is ${builtFull.petalsBuilt}`);
     if (bad.length) return { bad };
 

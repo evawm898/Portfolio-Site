@@ -1330,9 +1330,11 @@ texture work). The prototype is `bloom-texture-lab.html` / `bloom-texture-lab-co
 - **Visibility**: a light preview while dragging, the full relief on release and in the export (the
   print preview's F7 pattern); never rebuilt live on every drag.
 - **/plot gets no say in bloom decisions** (a downstream consumer).
-- **Texture sessions run long measurements in the FOREGROUND, chunked and checkpointed (`--resume`), with
-  no background waiter and no scheduled check-in** — the discovery lost a 40-minute run to a container
-  restart.
+- **Session discipline (Eva, Oct 23 — replaces the "FOREGROUND only" wording that stood here): a run
+  longer than the foreground ceiling may run as a HARNESS-TRACKED background task, chunked with
+  `--resume`. No scheduled check-ins, no sleeping waiters, no PR subscriptions** (drop any the system
+  adds). The discovery lost a 40-minute run to a container restart, which is why a long run is chunked
+  and checkpointed whichever way it runs.
 - **T1 IS DONE (Oct 22, §11 of the doc): the prototype's red-green split is replaced by the 'rows' split**
   (each edge into ⌈L/e⌉ equal segments, coplanar strip quads cut as one unit, rows from the corner opposite
   the least-cut edge). Stem 429,378 → 20,244 triangles at 0.6 mm, its outward bore folds 4,058 → 0 in both
@@ -1360,7 +1362,9 @@ texture work). The prototype is `bloom-texture-lab.html` / `bloom-texture-lab-co
   **The measure's weld is per organ instance now** (`weld(soup, { groups })`): a global float32 weld merged
   the lattice's 9 shells into 1 and read buried feet as the hub's material.
 - Plan: T1 split fix (prototype) → T2 own-coordinate lattice through `petalSurface` → T3 field, guard and
-  outward relief on sheets → T4 Voronoi walls (the midline ridge) → T5 hub/stem/rod fallback → T6 sheet.
+  outward relief on sheets → ~~T4 Voronoi walls (the midline ridge)~~ → T5 hub/stem/rod fallback → T6 sheet.
+  **[Oct 23: T4 STRUCK (texture and infill are exclusive); T5 DONE for the hub, stem and tube ring, the rods
+  DEFERRED pending BONE; T6 folded into T5's sheet — the T5 block below.]**
   Gate family **TX**.
 
 **SURFACE TEXTURE T3 SHIPS: ONE WORLD FIELD OVER THE SHEETS, OUTWARD, OVER THE BEAD, ON A 0.4 mm LATTICE,
@@ -1424,6 +1428,41 @@ block beside `textureFor`, `buildBloomInto`'s outer wrapper, `TEXTURE_EDGE_IN_FO
   past 0.5); block 79 (3 rows, 1,555), smoke block 79, `EXPORT_REFUSED_XFAIL` + XR1 on the refusal; capped rows
   take the refused rows' 120 s settle. `frozen/phase85` = the 1,552 rows at `908221c`. Sheet §6: the corner at
   0.4 (pinned, refused) beside the derived edge with relief close-ups and the counts in the captions.
+
+**SURFACE TEXTURE T5: THE HUB, THE STEM AND THE TUBE RING TAKE THE ONE FIELD, VISIBLE FACES ONLY, DERIVED;
+THE RODS ARE DEFERRED PENDING BONE; THE PLAN IS CLOSED** (Oct 23 — Eva's rulings Q7 / Q12 / Q15; read
+`docs/bloom-surface-texture-t5-outcome.md` before touching `organLatticeInto`, `organReliefPass`,
+`organNormalOf`, `faceTag` / `normalSink`, `textureVertexVisible`, `TEXTURE_CONTACT_FADE_K`, the export
+decision twin in `buildBloomCore`, TX10 / TX11 or block 80).
+- **No new control.** Same field, height, size and derived edge as the sheets (TX2 reads the organs too).
+  Untextured is the shipped tree BY BRANCH (`organT5For` null): the default 24,688 and its bytes unmoved.
+- **No row law, so each organ is refined ON ITS OWN SHIPPED LATTICE**: edges into ceil(L/e) on 2^-20-snapped
+  lengths, coplanar strip quads, a closed centre fan (≥ 8 spokes within 1.5×) re-meshed as rings sized by
+  circumference, rows elsewhere. The TUBE RING the same way on its own emitted (row, column) lattice, with
+  its own law's normals handed over as emitted (`acc.normalSink`); 164 wall vertices with none stay smooth.
+- **Counts are decided on the EXPORT mesh** — an untextured export TWIN on a live build with sheet < 1 mm —
+  so tris(live) === tris(export) by construction. The relief is written at the END of the build, in place.
+- **Normals are the organ's own, per face** (the emitter tags each triangle); a crease takes the summed normal.
+- **Q7, VISIBLE = an escape ray** from `q + 1e-4 n` along a tilted n or 14 rotated world directions misses
+  every emitted triangle (closed 1e-9 acceptance — an open one let rays slip down shared edges). Buried
+  vertices take nothing; the relief fades in over a GEODESIC 2H (`TEXTURE_CONTACT_FADE_K`, typed — flagged).
+  **The hub top under the feet IS textured** (coincident faces are outside the union): the feet still meet
+  it and 0 printable gaps close at any height (flagged). CAVITY faces (the bore, the void caps, the sphere's
+  inner sphere) are excluded BY NAME and never refined — Q15: 0 of 240 mid-wall bore probes see air, but the
+  bore's top ring on the hub's top plane does (a coplanar knife edge), which is why it is the name and not the ray.
+- **Rods take nothing (Q12)**; a floret build passes `pedicel: true` so its stem (a pedicel) stays smooth.
+- **Measured (EXPORT):** leaf-stem at leafAngle 70 untextured 0.544 emitted / 0.540 gate → **0.252 at H 0.4,
+  touching (0.001–0.010) from H 0.8** — the gate's analytic cylinder cannot see it (flagged); at 35° 3.847 →
+  2.532 at H 1.5. Feet / sepals to hub: 0 gaps closed, narrowest gaps WIDEN (the fade). Budget: five §7b
+  states coarsen one or two rungs (40 × 3 0.41 → 0.42), none newly refused; block 79's refusal re-recorded
+  1,795,898 → 1,873,730. PEBBLE default 151,792 → 158,912 (hub 192 → 7,312).
+- **Gates:** TX10 (organs predicted from the untextured twin, ranges, 1.25× floor, normals against the
+  emitted facets), TX11 (visibility restated, read off the PAGE's organ mesh via `__bloomOrganMesh`), four
+  witnessed mutants (`a-buried-face-is-textured`, `the-hub-is-skipped`, `the-stem-normal-points-inward`,
+  `the-tube-ring-has-its-own-field`), block 80 (13 rows, 1,568), smoke block 80; coverage R1 counts the
+  organ lattice delta; ST1 reads the SHIPPED stem count. `frozen/phase86` = the 1,555 rows at `b3163de`.
+  T4 is STRUCK (texture and infill are exclusive), T6 folded into `docs/img/bloom-texture-t5.png`
+  (`tools/shot-bloom-texture-t5.mjs`); measurements `node tools/bloom-texture-t5.mjs`.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
@@ -5886,7 +5925,11 @@ then closes in six `timeout 555` chunks inside single Bash calls — the tool's 
 waiting in-turn. **A `send_later` check-in is NOT the thing that fails** — it wakes the
 session reliably; what does not survive is the PROCESS, so a check-in that expects to read a
 finished background run reads a dead one. Do not re-derive this by backgrounding a sweep and
-coming back to it.
+coming back to it. **[Oct 23: SUPERSEDED IN PART by Eva's session-discipline ruling (the texture block): a run
+longer than the foreground ceiling may run as a HARNESS-TRACKED background task (one the harness
+itself started and reports the end of — never a `nohup` the turn walks away from), chunked with
+`--resume`; no scheduled check-ins, no sleeping waiters, no PR subscriptions. The measurement above
+is what a process the harness does not track does, and it still holds for one.]**
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a

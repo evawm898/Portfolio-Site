@@ -198,6 +198,16 @@ const ROW_DEF_MOVED_BY_PRED = {
   /* THE TEXTURE EDGE CAP (Oct 23): block 79's three rows; no base row is
      redefined. */
   'texture-edge-cap': { added: 3, rows: {} },
+  /* SURFACE TEXTURE T5 (Oct 23): block 80's thirteen rows; two block-77
+     labels are RELABELLED with their sets unchanged — they said the hub, stem
+     and ring stayed out, which T5 ends. */
+  't5-organs': {
+    added: 13,
+    rows: {
+      'TEXTURE: the WHOLE BLOOM — 8 sepals, a stem, a simple leaf (the hub and stem textured since T5, the rods smooth)': 'relabelled, the same set: the base label said the hub, stem and rods stayed out (T5 textures the hub and the stem)',
+      'TEXTURE: PEBBLE x the TUBE (6 of 8 fused — the lobes and, since T5, the ring textured)': 'relabelled, the same set: the base label said the ring stayed out (T5 textures it)',
+    },
+  },
   'root-support': {
     added: 21,
     rows: {
@@ -305,6 +315,18 @@ const PREDICATE_MOVERS = {
     const acc = new base.MeshBuilder({ exportMode: true });
     base.buildBloomInto(acc, { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
     return acc.triangleCount > base.EXPORT_TRI_BUDGET;
+  },
+  /* SURFACE TEXTURE T5 (Oct 23). A row moves iff it is textured (texture on,
+     infill off — with the infill on the texture is refused, Q9) AND the BASE
+     tree's own build of it has an organ T5 relieves: a hub (any head not
+     switched off), a stem, a tube ring, or a floret (every floret carries a
+     hub). Read off the base builder's record, never this tree's organ records
+     (the quantity under test). Every untextured row holds by branch. */
+  't5-organs': (st, row) => {
+    if (String(st.petalTexture ?? 'NONE') === 'NONE' || String(st.petalInfill ?? 'NONE') !== 'NONE') return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
+    return !!((b.hubBuilt && !b.hubBuilt.absent) || (b.stem && b.stem.present) || (b.tube && b.tube.rings && b.tube.rings.length) || (b.inflorescence && b.inflorescence.present));
   },
   /* RULING 6 — NODES DECOUPLED FROM LEAVES (stem session 2). A row moves iff
      it asks for nodes on a BARE stem: a stem, a prominence away from 0, no
