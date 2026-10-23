@@ -655,8 +655,14 @@ def write_readme(card: dict, path: Optional[str] = None) -> bool:
 if __name__ == "__main__":
     card = build_scorecard()
     if "--json" in sys.argv:
-        print(json.dumps({part: {str(k): v for k, v in card[part].items()} for part in card},
-                         indent=1, sort_keys=True, default=str))
+        def _strkeys(o):
+            # tuple keys live two levels down too ("resolution" -> "rows" -> (fixture, scale, axis))
+            if isinstance(o, dict):
+                return {str(k): _strkeys(v) for k, v in o.items()}
+            if isinstance(o, (list, tuple)):
+                return [_strkeys(v) for v in o]
+            return o
+        print(json.dumps(_strkeys(card), indent=1, sort_keys=True, default=str))
     elif "--write-readme" in sys.argv:
         print("README updated" if write_readme(card) else "README already current")
     else:

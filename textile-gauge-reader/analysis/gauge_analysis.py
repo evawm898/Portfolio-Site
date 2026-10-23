@@ -1323,6 +1323,11 @@ class _PeriodDecision:
     corrected: bool   # True if the final period differs from the raw autocorrelation estimate
     validated: bool    # True if independent loop-center evidence was actually available/used
     candidate_details: List[CandidateInfo] = field(default_factory=list)
+    # False when a loop-center pitch WAS offered and was set aside because it
+    # agreed with no member of the candidate family (see _reconcile_period's
+    # center_log_tolerance) -- the caller then draws positions from the 1D
+    # signal, as it does when no pitch was offered at all.
+    center_pitch_used: bool = True
 
 
 def _labeled_candidates(p0: float, min_plausible: float) -> List[Tuple[float, str]]:
@@ -1347,6 +1352,7 @@ def _reconcile_period(
     p_centers: Optional[float],
     min_plausible: float,
     signal: Optional[np.ndarray] = None,
+    center_log_tolerance: Optional[float] = None,
 ) -> _PeriodDecision:
     """
     Decide the final period for one direction, given:
@@ -1361,6 +1367,20 @@ def _reconcile_period(
         Passed only for the wale axis (see `analyze_gauge`) — course
         periodicity doesn't have the V-leg-symmetry failure mode this
         targets, and this keeps course detection byte-for-byte unchanged.
+
+      - center_log_tolerance: when given, the loop-center pitch may only
+        CORROBORATE a member of the 0.5x/1x/2x family -- pick the one it
+        agrees with within this log-ratio -- and never pull the pick to a
+        harmonic it does not itself match. A pitch further than this from
+        EVERY candidate is not evidence about this family at all (noise
+        from an over-dense detection, or the detector's own minimum-
+        separation floor: see the course note in analyze_gauge) and is set
+        aside, exactly as if none had been offered; the decision says so
+        and reports center_pitch_used=False. `_analyze_direction` passes
+        HARMONIC_MATCH_LOG_TOLERANCE, the same ~1.4x the v3 scorer's
+        _center_pitch_agreement uses for the wale axis. None keeps the
+        original contract (nearest candidate on a log scale, whatever the
+        distance), which the unit tests pin.
 
     Rather than trusting p0's strongest autocorrelation peak outright,
     explicitly evaluate 0.5x / 1x / 2x of it and prefer whichever
@@ -1391,6 +1411,27 @@ def _reconcile_period(
         fold_scores = {c: _fold_consistency(signal, c, min_plausible) for c in candidates}
 
     p0_key = min(candidates, key=lambda c: abs(c - round(p0, 3)))
+
+    # Agreement gate (see the docstring): a loop-center pitch that matches
+    # none of the family within center_log_tolerance is set aside here, so
+    # the branch below sees exactly what it sees when no pitch was offered.
+    center_pitch_note: Optional[str] = None
+    if (
+        center_log_tolerance is not None
+        and p_centers is not None
+        and p_centers >= min_plausible
+    ):
+        nearest = min(candidates, key=lambda c: abs(math.log(c / p_centers)))
+        gap = abs(math.log(nearest / p_centers))
+        if gap > center_log_tolerance:
+            center_pitch_note = (
+                f"loop-center spacing ({p_centers:.1f}px) matched none of the 0.5x/1x/2x candidates "
+                f"({', '.join(f'{c:.1f}' for c in candidates)}px) -- the nearest, {nearest:.1f}px, is "
+                f"{math.exp(gap):.2f}x away against a {math.exp(center_log_tolerance):.2f}x agreement "
+                f"tolerance -- so it is not evidence about this family and was not used; the "
+                f"autocorrelation period ({p0:.1f}px) stands as-is (may be a harmonic — treat with caution)"
+            )
+            p_centers = None
 
     # The single most fold-consistent candidate (a genuine complete-loop
     # repeat should reproduce nearly the same waveform shape every period;
@@ -1435,15 +1476,20 @@ def _reconcile_period(
                 f"candidate whose repeats actually look like each other"
             )
             corrected = abs(math.log(fold_override / p0)) > 0.05
-            return _PeriodDecision(fold_override, candidates, reason, corrected, True, _details(fold_override))
+            return _PeriodDecision(
+                fold_override, candidates, reason, corrected, True, _details(fold_override),
+                center_pitch_used=False,
+            )
         return _PeriodDecision(
             p0,
             candidates,
-            "no independent loop-center evidence available; used the autocorrelation period as-is "
+            center_pitch_note
+            or "no independent loop-center evidence available; used the autocorrelation period as-is "
             "(may be a harmonic — treat with caution)",
             False,
             False,
             _details(p0_key),
+            center_pitch_used=False,
         )
 
     # Pick whichever harmonic candidate is closest to the loop-center
@@ -1728,10 +1774,17 @@ def _analyze_direction(
     loop_centers: np.ndarray,
     center_axis_index: int,
     use_fold_consistency: bool = False,
+    center_log_tolerance: Optional[float] = HARMONIC_MATCH_LOG_TOLERANCE,
 ) -> AxisResult:
     decision = _reconcile_period(
-        p0, p_centers, MIN_PLAUSIBLE_SPACING_PX, signal=signal if use_fold_consistency else None
+        p0, p_centers, MIN_PLAUSIBLE_SPACING_PX, signal=signal if use_fold_consistency else None,
+        center_log_tolerance=center_log_tolerance,
     )
+    # A loop-center pitch the reconciliation set aside (it agreed with no
+    # candidate) is set aside for the overlay positions too: one decision
+    # about that evidence, not two.
+    if not decision.center_pitch_used:
+        p_centers = None
 
     if decision.period is None:
         return AxisResult(
