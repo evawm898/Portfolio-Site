@@ -154,12 +154,13 @@ byte moves.
   umbel arm — the anchor scan said so before anything ran) and still fires ID2.
 * **Panel gate**: PASS; `--negative-control` — all THIRTY-THREE routes observed
   their failure, route (ap)'s two mutants among them.
-* **Byte partition** (`verify-bloom-surface-bytes --base <56f91f4> --movers-predicate
-  umbel`, both modes, three ranges merged): **25 movers / 1,508 holders, 0
-  floats moved on any holder** over 1,803,869,496 export floats and 82,156,516
-  captured-grid values; every predeclared mover moved (block 78 less its two
-  GATED rows); `--control` fires both clauses. Every existing row holds by
-  branch.
+* **Byte partition** (`verify-bloom-surface-bytes --base <89bb3bf> --movers-predicate
+  umbel`, both modes, two ranges merged — re-run after merging T3): **25 movers /
+  1,527 holders, 0 floats moved on any holder** over 1,860,556,356 export floats
+  and 82,324,856 captured-grid values; every predeclared mover moved (block 78
+  less its two GATED rows); T3's nineteen block-77 rows are holders. Every
+  existing row holds by branch. (Before the merge, against `56f91f4`: 25 / 1,508,
+  0 floats, `--control` firing both clauses.)
 * **Combination gate**: three umbel pairs; `umbel-florets-x-angle` and
   `umbel-length-x-angle` SINGLE-REACHES (12 cells declared by value),
   `umbel-head-length-x-angle` CLEARS (nearest 1.087 mm, a 5 mm pedicel at 35).
