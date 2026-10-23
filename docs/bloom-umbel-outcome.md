@@ -48,6 +48,9 @@ shape the umbel's FLORETS` (a derived section label, the hood's mechanism).
 
 ## 3. The junction knot — derived, never typed
 
+**[Oct 23: the SPHERE below is SUPERSEDED by the boss, §9 — the ring `rho` and
+its two gaps are unchanged; the solid built around it is.]**
+
 The pedicels root on a horizontal ring about the knot's centre, at the whorl
 law's own evenly spread azimuths (`buildWhorlInto`'s RADIAL arm — no third
 azimuth owner). Two lengths decide the ring, both from radii:
@@ -124,7 +127,9 @@ pinned:
   UM0 is what holds that record true.
 * **Four mutants** in the apex table, each with a witness on the mutated
   module: the pedicel rooted off the junction, the head built while toggled off,
-  a typed knot, the umbel on the cut end.
+  a typed knot, the umbel on the cut end. **[Oct 23: five — the typed knot is
+  re-anchored onto the boss's rim (`the-boss-radius-is-typed`) and a typed band
+  height added (`the-boss-height-is-typed`); §9.]**
 * **Panel route (ap)** (THIRTY-THREE routes): the umbel controls appear and the
   raceme's hide under UMBEL, the head-off label, two registry mutants.
 
@@ -193,11 +198,77 @@ The sheet's measured approaches (EXPORT, emitted vertices against triangles):
   the knot** (floret-stem 0.000; 60 mm and longer clear) — declared in the
   combination gate.
 
-## 8. Open for Eva
+## 8. Open for Eva — RULED Oct 23
 
-* The defaults: `umbelFlorets` 6 and `umbelHead` OFF ship as declared
-  defaults; neither is a ruling on the numbers.
-* The knot is a sphere; whether the junction should read as a sphere, a
-  flattened boss, or flare into the stem is a look question.
-* `pedicelAngle` keeps the raceme's range (−60..90); at −60 the florets reach
-  the stem below the knot (declared).
+* **RULED Oct 23: 6 florets, head OFF is the default.** (`umbelFlorets` 6,
+  `umbelHead` OFF, unchanged.)
+* **RULED Oct 23: the floret-stem contact at -60° is accepted as declared.**
+  (The combination gate's `umbel-length-x-angle` declarations stand.)
+* **RULED Oct 23: the knot becomes a flatter boss (this session).** §9.
+
+## 9. The boss (Oct 23, Eva's third ruling)
+
+The least sphere read as a BALL — 12.00 mm across at six florets and
+19.45 mm at twelve on a 6 mm stem. It is replaced by a squat solid of
+revolution about the stem axis (`umbelBoss`), whose profile in (r, z) about
+the ring's centre is a flat-topped BAND of radius `R` and half-height `h`,
+its underside a 45° cone running in to the stem's wall:
+
+    (0, +h) — (R, +h) — (R, -h) — (rF, -h - (R - rF)) — (0, -h - (R - rF))
+
+Every length is DERIVED, none typed:
+
+* **`R` holds the root disc ACROSS**: the farthest point of a pedicel's root
+  disc (radius `rP`, normal to a pedicel at `a` from horizontal, centred on the
+  ring `rho`) from the axis is
+  `max over phi sqrt((rho - rP sin phi sin a)^2 + rP^2 cos^2 phi)`, closed form
+  in `umbelRootDiscReachMm`; plus half a gap.
+* **`h` holds the root disc UP AND DOWN**: the disc reaches `rP |cos a|` above
+  and below the ring's plane, plus half a gap. Every pedicel of an umbel stands
+  at the one `pedicelAngle`, so that disc IS the steepest pedicel's — a
+  pedicel at -60 and one at 90 get different bands (2.50 and 1.00 mm tall at
+  six florets), never a typed fraction.
+* **Half a gap, never zero, on both**: a disc whose rim lies ON the boss is
+  the tangency that welded on the sphere (749 within-shell pairs).
+* **The underside is the overhang law**: 45° is the steepest overhang that
+  prints unsupported, so the band never hangs a flat ledge `R - outerR` wide
+  over the stem. It runs in to `rF = outerR - gap/2` — inside Eva's 1.5 mm
+  wall, never ON the stem's cylinder — and closes there on a flat disc across
+  the stem. Head OFF the stem's top end lies inside the band and the boss reads
+  as the stem flaring into it; head ON the stem runs on through it to the head.
+  The ring `rho` is unchanged (one gap between neighbours; head ON, one gap off
+  the stem).
+
+Measured before it was built (6 mm stem; across = `2R`; tall = band + flare):
+
+| | sphere across = tall | boss across | band | flare | boss tall |
+|---|---|---|---|---|---|
+| OFF, 2 florets, -60° | 10.49 | 9.92 | 3.12 | 2.46 | 5.58 |
+| OFF, 2 florets, 35° | 10.49 | 8.68 | 4.48 | 1.84 | 6.31 |
+| OFF, 2 florets, 90° | 10.49 | 10.49 | 1.00 | 2.74 | 3.74 |
+| OFF, 6 florets, -60° | 12.00 | 11.60 | 2.50 | 3.30 | 5.80 |
+| OFF, 6 florets, 35° | 12.00 | 10.72 | 3.46 | 2.86 | 6.32 |
+| OFF, 6 florets, 90° | 12.00 | 12.00 | 1.00 | 3.50 | 4.50 |
+| OFF, 12 florets, -60° | 19.45 | 19.05 | 2.50 | 7.03 | 9.53 |
+| OFF, 12 florets, 35° | 19.45 | 18.18 | 3.46 | 6.59 | 10.05 |
+| OFF, 12 florets, 90° | 19.45 | 19.45 | 1.00 | 7.23 | 8.23 |
+| ON, 6 florets, 35° | 15.00 | 13.72 | 3.46 | 4.36 | 7.82 |
+
+The boss is never wider than the sphere (it equals it at 90°, where the disc
+lies flat on the ring) and is 0.36–0.59 as tall as it is wide where the
+sphere was 1.00. **The underside is most of its height at twelve florets**
+(7 of 10 mm) — the price of no unsupported ledge. A flat underside (the band
+alone) would be 0.18 as tall as wide at twelve; it is not built, and is the
+one-branch alternative if the cone reads too heavy.
+
+**Triangles: 288 against the sphere's 2,208** (three rings of 48: the flat
+bottom fan, the cone, the rim, the flat top fan; 192 where there is no cone).
+The spider lily drops 1,920 triangles; nothing else moves.
+
+**The pedicel crosses less solid**, and at 90° exactly the floor: a vertical
+pedicel's root disc lies half a gap under the band's top face, so it crosses
+0.500 mm of the boss — ID2's own half-feature floor for a weld, met and not
+exceeded (the sphere gave several mm). At 35° on six florets it crosses
+1.661 mm (through the rim). Reported, not widened: holding the disc is the
+ruling's law, and a deeper band at 90° would be a typed height.
+
