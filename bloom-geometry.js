@@ -12820,6 +12820,17 @@ function textureEdgeInForce(cap) {
   if (cap && cap.textureEdgeMm > 0) return cap.textureEdgeMm;
   return TEXTURE_EDGE_IN_FORCE === null ? TEXTURE_EDGE_MM : TEXTURE_EDGE_IN_FORCE;
 }
+/* FOR AN INSTRUMENT THAT COPIES buildBloomInto's ORCHESTRATION (the two
+   coverage censuses re-emit every part through the builders directly, and
+   their R1 sums the parts against a whole build): the parts must be emitted
+   under the edge the whole build DERIVED, exactly as buildBloomInto emits them
+   — so this runs `fn` with that edge in force and the cap's own re-entrancy
+   flag set (a nested floret build derives nothing), and restores both. */
+export function withTextureEdgeInForce(edgeMm, fn) {
+  const prevE = TEXTURE_EDGE_IN_FORCE, prevA = TEXTURE_CAP_ACTIVE;
+  if (edgeMm > 0) { TEXTURE_EDGE_IN_FORCE = edgeMm; TEXTURE_CAP_ACTIVE = true; }
+  try { return fn(); } finally { TEXTURE_EDGE_IN_FORCE = prevE; TEXTURE_CAP_ACTIVE = prevA; }
+}
 /* the per-blade context `emitPanel` reads: the relief closure, the lattice's
    row law and what it may not refine, and the panel records it appends */
 function textureContext(T, organ, rowAt, firstSub, noSubRows, rep = null) {
