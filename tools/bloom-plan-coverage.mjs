@@ -229,6 +229,10 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        clause can be made against this tool's own answer as well as the
        app's. Decided BEFORE the split-whorl skip and before a petal is
        built, from the owner's own flag. */
+    /* (decided BEFORE the sphere's skip: a headless umbel has no sphere either)
+       AN UMBEL WITH ITS HEAD OFF — a LABELLED, LOUD SKIP: there is no head, so
+       there is no crown to cover; the florets are counted, never rasterised. */
+    if (builtFull.hubBuilt && builtFull.hubBuilt.absent) return { bad, r: null, skipped: 'UMBEL, HEAD OFF: there is no head and so no crown to cover — the florets are UM0-UM4\'s and ID\'s' };
     if (fr.sphereMode) return { bad, r: null, sphere: true, skipped: 'FULL SPHERE (hubShape SPHERE): a plan raster cannot read a sphere — the far hemisphere projects into the same disc from below and would read as a false clean; the solid-angle instrument is tools/bloom-solid-angle-coverage.mjs (session 19), NOT WIRED pending Eva\'s ruling on which rows pin it' };
     /* THE LABELLED SKIP (session 16): a split whorl is out of R3's scope —
        reported as such, loudly, before a petal is built. */

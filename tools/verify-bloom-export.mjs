@@ -306,7 +306,8 @@ for (const [rowIndex, row] of rows.entries()) {
   const ori = orientationAssertions(stlPos, row, await page.evaluate(() => {
     const m = window.__bloomMetrics(), S = m.stem;
     return {
-      sphere: m.sphereMode === true,
+      /* an UMBEL WITH ITS HEAD OFF builds no hub, so no SPHERE inner face */
+      sphere: m.sphereMode === true && m.headAbsent !== true,
       /* A SEPARATE INWARD SHELL NEEDS BOTH ENDS SHUT IN THE MESH, which is
          narrower than "the bore survives" and was corrected by measurement:
          O1 read `0 of 10 shells are wound INWARD` against a baseline of 1 on
@@ -396,7 +397,8 @@ for (const [rowIndex, row] of rows.entries()) {
      the tool's answer alone — a tool that forgot to skip would also forget
      to say `sphere`. And in the other direction: a row the app says is not a
      sphere may not be skipped as one. */
-  const isSphere = await page.evaluate(() => window.__bloomMetrics().sphereMode === true);
+  /* a headless umbel has no sphere to read (its florets are UM/ID's) */
+  const isSphere = await page.evaluate(() => window.__bloomMetrics().sphereMode === true && window.__bloomMetrics().headAbsent !== true);
   if (isSphere && (cov.r !== null || !cov.skipped || cov.sphere !== true)) { validity.push(`${row.label}: COVERAGE: a FULL-SPHERE row emitted a plan-coverage reading (${JSON.stringify(cov.r)}) — a plan raster reads a sphere as a FALSE CLEAN; SPHERE rows must be a labelled skip`); continue; }
   if (!isSphere && cov.sphere === true) { validity.push(`${row.label}: COVERAGE: the raster skipped this row as a sphere while the app reports sphereMode false`); continue; }
   if (cov.skipped && row.coverage) { validity.push(`${row.label}: this row ASSERTS coverage but the raster skipped it — ${cov.skipped}`); continue; }

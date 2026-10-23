@@ -462,7 +462,8 @@ for (const [rowIndex, row] of rows.entries()) {
   const ori = orientationAssertions(stlPos, row, await page.evaluate(() => {
     const m = window.__bloomMetrics(), S = m.stem;
     return {
-      sphere: m.sphereMode === true,
+      /* an UMBEL WITH ITS HEAD OFF builds no hub, so no SPHERE inner face */
+      sphere: m.sphereMode === true && m.headAbsent !== true,
       /* A SEPARATE INWARD SHELL NEEDS BOTH ENDS SHUT IN THE MESH, which is
          narrower than "the bore survives" and was corrected by measurement:
          O1 read `0 of 10 shells are wound INWARD` against a baseline of 1 on

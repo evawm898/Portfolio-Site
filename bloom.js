@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, umbelHeadIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -1720,7 +1720,7 @@ let lastSepals = null, lastSepalsBuilt = null, lastSepalsAbsent = true, lastSepa
    is written down: the claim it would serve is already a MEASURED zero the
    builder reports as `placementResidual`, by a second expression beside the
    method under test. */
-let lastInflo = null, lastInfloBuilt = null, lastInfloAbsent = true, lastInfloTris = 0;
+let lastInflo = null, lastInfloBuilt = null, lastInfloAbsent = true, lastInfloTris = 0, lastUmbelHeadAbsent = false;
 let lastNodeVarianceAbsent = true;
 /* THE SPHERE'S STEM CHANNEL (the sphere-stem session) — which slots were NOT
    built, and how near the stem every one of them came. Null wherever the
@@ -1949,6 +1949,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastInfloBuilt = built.inflorescenceBuilt || null;
     lastInfloTris = built.inflorescenceBuilt ? built.inflorescenceBuilt.tris : 0;
     lastInfloAbsent = inflorescenceIsAbsent(uiForBuild);
+    lastUmbelHeadAbsent = umbelHeadIsAbsent(uiForBuild);
     lastNodeVarianceAbsent = nodeVarianceIsAbsent(uiForBuild);
     lastFootDigest = footFramesDigest(built);
     lastFootBySlot = footFramesBySlot(built);
@@ -3703,7 +3704,11 @@ function regenerate() {
      androecium's saturation did: `buckleAmp`'s read-out and its slider MARK
      must print the OWNER's cap rather than re-derive it from the sliders.
      The petal's own form telemetry is where it lives; null on a flat build. */
+  /* THE INFLORESCENCE (the umbel session): the plan and the placements, for the
+     Type / pedicel read-outs that quote them. Missing before, so the Type
+     read-out said "no stem to carry it" on every raceme — found on main. */
   const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium, tube: built.tube || null,
+                  inflorescence: built.inflorescence || null, inflorescenceBuilt: built.inflorescenceBuilt || null,
                   /* THE LEAVES' records (leaf/stem build S3), for the leaf controls'
                      own read-outs. `leafArch`, `leafCup` and `leafTipShape` have
                      read `shown.leaf` since S2 and the tip-shape session — and
@@ -4717,6 +4722,11 @@ window.__bloomMetrics = () => ({
     pedicelLensMm: lastInflo.pedicelLensMm.slice(), pedicelLensAskedMm: lastInflo.pedicelLensAskedMm.slice(),
     lengthsClamped: lastInflo.lengthsClamped, lenCeilMm: lastInflo.lenCeilMm,
     sessileNodes: lastInflo.sessileNodes.slice(), stemTipZ: lastInflo.stemTipZ,
+    /* THE UMBEL (the umbel session): the type, the head toggle as the plan
+       read it, the count and the DECLARED knot — UM1 restates the knot from
+       the controls and holds the EMITTED one (below) to it. */
+    type: lastInflo.type, umbel: !!lastInflo.umbel, headOff: !!lastInflo.headOff, umbelCount: lastInflo.umbelCount ?? null,
+    knot: lastInflo.knot ? { ...lastInflo.knot, centre: lastInflo.knot.centre.slice() } : null,
   } : null,
   /* WHAT THE BUILDER EMITTED. `unitPositions` is deliberately NOT here — the
      floret unit's whole triangle stream is up to 270k floats and the claim it
@@ -4731,6 +4741,10 @@ window.__bloomMetrics = () => ({
     placementResidual: lastInfloBuilt.placementResidual,
     placementCompared: lastInfloBuilt.placementCompared,
     rachisApproachMm: lastInfloBuilt.rachisApproachMm,
+    /* THE KNOT AS EMITTED — its centre and radius read back off its own
+       vertices by the builder, and its triangle range in the stream (ST9's
+       excusal names it by that range). */
+    knot: lastInfloBuilt.knot ? { ...lastInfloBuilt.knot, centre: lastInfloBuilt.knot.centre.slice(), triRange: lastInfloBuilt.knot.triRange.slice() } : null,
     floretState: { ...lastInfloBuilt.floretState },
     unit: {
       petalsBuilt: lastInfloBuilt.unit.petalsBuilt,
@@ -4811,6 +4825,8 @@ window.__bloomMetrics = () => ({
      and can never disagree (session 41's L7). ID0 compares it against the
      REGISTRY's declaration. */
   inflorescenceAbsent: lastInfloAbsent,
+  /* THE GEOMETRY'S OWN HEAD STATEMENT, from the running module (UM0's half). */
+  umbelHeadAbsent: lastUmbelHeadAbsent,
   nodeVarianceAbsent: lastNodeVarianceAbsent,
   /* ORGANIC VARIANCE (build 1, size): the builder's own field record — null
      at amount 0, which VS0 reads as the guard's own answer — with one factor
@@ -5168,6 +5184,9 @@ window.__bloomMetrics = () => ({
      passing 0. */
   ringGuardResidual: lastFoot.guardResidual,
   petalsBuilt: lastPetalsBuilt,
+  /* THE UMBEL'S HEAD TOGGLE: true exactly when the builder reported the
+     ABSENT hub record (`HUB_ABSENT`) — no head was built at all. */
+  headAbsent: !!(lastHubBuilt && lastHubBuilt.absent),
   /* WHAT EACH RING'S PETAL WAS ACTUALLY BUILT WITH, read from the builder's
      own effective state and never from the resolver, with the scope term it
      was handed. This is the only thing in the codebase that can see a scope

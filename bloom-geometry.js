@@ -3928,6 +3928,9 @@ export function spacingVarianceField(state, fr) {
    `verify-bloom-surface-bytes` measures rather than argues. */
 export function footList(built) {
   const fr = built.foot;
+  /* an UMBEL WITH ITS HEAD OFF builds no head whorl, so there is no foot on
+     any base — the base itself is absent (`HUB_ABSENT`) */
+  if (built.hubBuilt && built.hubBuilt.absent) return [];
   const feet = [];
   const rec = (d, az, layer, slot) => ({ radius: d.radius, overhang: d.overhang, width: d.width, az, ring: d.index, layer, slot, z: d.z, slope: d.slope, arc: d.arc });
   /* A FOOT THE STEM CHANNEL DID NOT BUILD IS NOT ON THE BASE (the sphere-stem
@@ -17617,7 +17620,7 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
      shared node's seating and floret cap were measured on the simple blade.) */
   const askedCompound = leafIsCompound(state) || leafIsLobed(state);
   const typeAsked = String(state.leafType);
-  if (askedCompound && inflo && inflo.present) state = { ...state, ...SHARED_NODE_LEAF_PINS };
+  if (askedCompound && inflo && inflo.present && !inflo.umbel) state = { ...state, ...SHARED_NODE_LEAF_PINS };
   const lengthMm = Number(state.leafLength);
   /* A LOBED LEAF'S WIDTH IS ITS ENVELOPE's (`lobedWidth`, the twin) */
   const lobed = leafIsLobed(state);
@@ -17654,7 +17657,10 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
      lose their leaf are a SUFFIX, and the plan's node list is the prefix that
      keeps one — `nodeIndex` stays the floret's own, which is what lets the
      shared-node family pair a leaf with its pedicel by index. */
-  const shared = !!(inflo && inflo.present);
+  /* A RACEME'S leaves stand one under each pedicel (the shared node); an
+     UMBEL's pedicels all leave ONE point, so its leaves keep the stem's own
+     node law — the shared arm is the raceme's alone. */
+  const shared = !!(inflo && inflo.present && !inflo.umbel);
   let sharedRec = null;
   if (shared) {
     /* (root support: the mode-free rod the offset reads carries the blade's
@@ -22016,7 +22022,94 @@ function petalLaminaInMode(site, state, exportMode) {
    =================================================================== */
 
 /* The law enum's values. NONE is the default and is the guard. */
-export const INFLORESCENCE_TYPES = Object.freeze(['NONE', 'RACEME']);
+export const INFLORESCENCE_TYPES = Object.freeze(['NONE', 'RACEME', 'UMBEL']);
+/* ===================================================================
+   THE UMBEL (Eva's rulings, Oct 21-22 — read `docs/bloom-umbel-outcome.md`).
+   Florets on pedicels radiating from ONE point at the top of the stem: the
+   spider lily. It is NOT a second inflorescence law. It is the raceme's own
+   plan (`inflorescencePlan`) with three things put differently, each a
+   BRANCH on `type === 'UMBEL'`, so every RACEME row forms the expressions it
+   always did:
+
+   1. ONE NODE carrying `umbelFlorets` (2..12) pedicels, their azimuths the
+      whorl primitive's own RADIAL law (`buildWhorlInto`, phase 0) — never a
+      third owner of "azimuth of the i-th organ".
+   2. THE PEDICELS ROOT ON A JUNCTION KNOT, not in the stem's wall: a solid
+      sphere about the stem's axis whose size is DERIVED from the count and
+      the pedicel radius (`umbelKnot`, below), never typed.
+   3. THE HEAD IS OPTIONAL (`umbelHead`, OFF by default — the spider lily).
+      OFF: no head is built and the stem ENDS at the knot, centred on the
+      stem's own top end (`topZ`). ON: the head stands at the stem top as
+      always and the knot sits on the stem `insetNeeded` below it — the
+      raceme's own reach-inset law, unchanged.
+
+   The pedicel radius is the area rule read downward from the ASKED count
+   (the build-1 fixed-point argument, unchanged), the pedicel length is
+   `pedicelLength`, the angle `pedicelAngle` (its meaning — a rod's angle from
+   horizontal at its node — carries over exactly). One floret build, N
+   appends: build time stays O(1) in the count.
+   =================================================================== */
+export const UMBEL_FLORET_RANGE = Object.freeze([2, 12]);
+export const UMBEL_HEAD_VALUES = Object.freeze(['OFF', 'ON']);
+export function umbelIsAbsent(state) { return inflorescenceIsAbsent(state) || String(state.inflorescence) !== 'UMBEL'; }
+/* THE HEAD'S TWO STATEMENTS — this is the geometry's half; the registry's
+   twin is `PREDICATES.headPresent`, checked per row by UM0 and at harness
+   load. The head is absent exactly on an umbel whose head toggle is OFF. */
+export function umbelHeadIsAbsent(state) { return !umbelIsAbsent(state) && String(state.umbelHead ?? UMBEL_HEAD_VALUES[0]) !== 'ON'; }
+/* THE JUNCTION KNOT — derived from the count `n` and the pedicel radius
+   `rP`, and nothing else typed but the project's one printable gap.
+
+   THE ROOT RING. The pedicels root on a horizontal ring of radius `rho`
+   about the knot's centre, at their own evenly spread azimuths. `rho` is the
+   least radius on which `n` rods of radius `rP` stand ONE PRINTABLE GAP
+   apart: adjacent roots are `2 rho sin(pi/n)` apart, so
+       rho = (rP + MIN_FEATURE_MM / 2) / sin(pi / n).
+   That is the case the gap is for: at `pedicelAngle` 90 every pedicel is
+   VERTICAL and parallel to its neighbours along its whole length, and two
+   rods exactly tangent there share a line of vertices (measured on paper
+   first: at n = 2 a ring of exactly `rP` puts rod A's vertex at angle pi and
+   rod B's at angle 0 on the SAME double, an edge of four triangles). At any
+   lower angle the rods diverge from the ring, so the gap only grows.
+
+   THE KNOT is the sphere of radius `rho + rP + gap/2` about the ring's centre:
+   half a gap past the least sphere that holds every pedicel's ROOT DISC (each
+   disc's points are at most `rho + rP` from the centre) — so every pedicel is
+   rooted INSIDE solid by construction — and, by the area rule, it is always
+   wider than the stem it crowns (`rho + rP >= 1.2 outerR` at every count), so
+   the stem's top end sits inside it too. One expression, read by the plan,
+   the builder and UM1's restatement's owner-independent twin in the harness. */
+export function umbelKnot(n, rP, stemR = 0) {
+  const ringRho = (rP + MIN_FEATURE_MM / 2) / Math.sin(Math.PI / n);
+  /* WITH THE HEAD ON the stem runs ON past the knot to the head, so a pedicel
+     at 90 deg rises PARALLEL TO THE STEM: its ring must stand one printable
+     gap off the stem's own surface too, `stemR + rP + gap` (measured before it
+     was derived: 623 within-shell pairs, the six pedicels inside the stem wall
+     above a 6 mm stem's knot, on `UMBEL: 6 florets at 90 deg, head ON`). With
+     the head OFF the stem ENDS at the knot and `stemR` is 0 — nothing runs
+     beside the pedicels to clear. A floor taken by `max`, so the ring is the
+     count's own wherever that already clears the stem. */
+  const stemRho = stemR > 0 ? stemR + rP + MIN_FEATURE_MM : 0;
+  const rho = Math.max(ringRho, stemRho);
+  /* THE ROOT DISCS SIT HALF A PRINTABLE GAP INSIDE THE KNOT, never ON it: the
+     least sphere holding them is an exact TANGENCY at a disc's outermost point,
+     where the two emitted surfaces can land on one double and weld into one
+     shell — measured, 749 within-shell pairs on `UMBEL: 6 florets at 90 deg,
+     head ON`, every one at that point. Half the gap, the same half the ring's
+     own spacing gives each rod. */
+  const radiusMm = rho + rP + MIN_FEATURE_MM / 2;
+  return { rho, radiusMm, gapMm: MIN_FEATURE_MM, ringRho, stemRho, stemBound: stemRho > ringRho };
+}
+/* THE KNOT'S LATTICE — the stem's own sector count round, half of it from
+   pole to pole. Constants of the knot's DRAWING, not of its size. */
+export const UMBEL_KNOT_BANDS = HUB_SECTORS / 2;
+/* THE ABSENT HUB'S RECORD — what `buildBloomBody` reports in place of
+   `buildHubInto`'s record when an umbel's head is OFF. Every field says
+   NOTHING WAS BUILT (`absent`, zero triangles, no join, no faces) rather than
+   leaving every reader of the hub record to learn a null; a reader that needs
+   a hub must ask `absent` first, and UM0 asserts the record is this one iff
+   the head is off. */
+export const HUB_ABSENT = Object.freeze({ absent: true, tris: 0, dome: null, joinActive: false, joinThickness: null, joinBlendRadius: null,
+  undersideMagnitude: null, underside: Object.freeze([]), topFaceZ: null });
 /* THE RANGES, exported so the registry IMPORTS them rather than restating
    them (Q6's discipline, session 29: a slider wider than the law was proved on
    makes a ruling false with nothing failing, and the harness fails at module
@@ -22383,6 +22476,17 @@ export function floretPairClasses(phyllo, n, dMax) {
   return out;
 }
 
+/* THE UMBEL'S PAIRS — one node, so every pair is a SAME-NODE pair (`d` 0):
+   the internode floor has nothing to do and the plan reports only whether
+   two florets of the umbel may touch (`sameNodeMayTouch`), which they do by
+   nature and which is MEASURED, declared and never clamped. */
+export function umbelPairClasses(azimuths) {
+  const red = (x) => { let w = x % TAU; if (w < 0) w += TAU; return w; };
+  const out = [];
+  for (let p = 0; p < azimuths.length; p++) for (let q = p + 1; q < azimuths.length; q++) out.push({ a: red(azimuths[p]), b: red(azimuths[q]), d: 0 });
+  return out;
+}
+
 /* inflorescencePlan — THE ONE OWNER of where the florets are and what they
    are made of. Reads the RACHIS's plan for the four lengths it needs
    (`boreR`, `outerR`, `rootZ`, `lengthMm`) and computes nothing the stem
@@ -22395,11 +22499,18 @@ export function inflorescencePlan(state, stem, acc) {
     return { present: false, type: String(state.inflorescence ?? 'NONE'), nodes: 0, azimuths: [], nodeDepthsMm: [], built: 0 };
   }
   const type = String(state.inflorescence);
-  const nodesAsked = Math.round(Number(state.floretNodes));
+  const umbel = type === 'UMBEL';
+  const headOff = umbel && umbelHeadIsAbsent(state);
+  const umbelCount = umbel ? Math.round(Number(state.umbelFlorets)) : 0;
+  /* THE UMBEL'S AZIMUTHS ARE THE WHORL PRIMITIVE'S OWN RADIAL LAW, collected
+     from its blade callback rather than restated (phase 0). */
+  const umbelAz = [];
+  if (umbel) buildWhorlInto({ count: umbelCount, radius: 0, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0, placement: 'RADIAL', blade: (sl) => { umbelAz.push(sl.azimuth); } });
+  const nodesAsked = umbel ? 1 : Math.round(Number(state.floretNodes));
   const angleDeg = Number(state.pedicelAngle);
-  const phyllo = String(state.floretPhyllotaxy);
+  const phyllo = umbel ? 'umbel' : String(state.floretPhyllotaxy);
   const pedicelLenMm = Number(state.pedicelLength);
-  const perNode = phyllo === 'opposite' ? 2 : phyllo === 'whorled' ? 3 : 1;
+  const perNode = umbel ? umbelCount : phyllo === 'opposite' ? 2 : phyllo === 'whorled' ? 3 : 1;
 
   /* THE PEDICEL'S RADIUS IS DERIVED BY THE AREA RULE AND IS NOT A CONTROL.
      `r_parent^2 = SUM r_child^2` is this project's own junction law and the
@@ -22432,8 +22543,12 @@ export function inflorescencePlan(state, stem, acc) {
      above about 75 degrees because its escape length runs away as
      `outerR / cos(th)`, while a rod rooted at mid-thickness gets MORE embedded
      as the angle steepens. Measured there, reused here unchanged. */
-  const rootR = rodWallRootMm(stem);
-  const embedMm = rodWallEmbedMm(stem);
+  /* UNDER AN UMBEL the pedicels root on the KNOT's ring, not in the wall: the
+     root point IS the ring point (the root disc lies inside the knot by the
+     knot's own construction, so no embed along the pedicel is needed — 0). */
+  const knot = umbel ? umbelKnot(umbelCount, pedicelR, headOff ? 0 : stem.outerR) : null;
+  const rootR = umbel ? knot.rho : rodWallRootMm(stem);
+  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);
   /* THE FLORET'S OWN PETAL SIZE — a MULTIPLIER on the head's two, clamped into
      each base control's OWN range and TOLD (the `labellumSize` precedent:
      "SIZE x SATURATES, AND IT IS TOLD"). Size comes from PARAMETERS and never
@@ -22524,7 +22639,7 @@ export function inflorescencePlan(state, stem, acc) {
      makes the TOP node's inset conservative for every node (each lower node is
      deeper by at least the pitch), and the distinct azimuths are few (two,
      four, or whorled's rotating set), each a pass over the unit's vertices. */
-  const reachAzimuths = [...new Set(Array.from({ length: Math.max(1, nodesAsked) }, (_, i) => leafAzimuths(phyllo, i, DISTICHOUS_TURN)).flat())];
+  const reachAzimuths = umbel ? umbelAz.slice() : [...new Set(Array.from({ length: Math.max(1, nodesAsked) }, (_, i) => leafAzimuths(phyllo, i, DISTICHOUS_TURN)).flat())];
   const reachOf = (exportMode) => {
     let top = -Infinity;
     for (const az of reachAzimuths) {
@@ -22548,13 +22663,16 @@ export function inflorescencePlan(state, stem, acc) {
   const headFloorZ = Math.min(stem.rootZ, Number.isFinite(stem.lowestHubZ) ? stem.lowestHubZ : stem.rootZ);
   const insetAskedMm = LEAF_NODE_TOP * stem.lengthMm;
   const insetNeededMm = Math.max(0, reachMm + (stem.rootZ - headFloorZ) + MIN_FEATURE_MM);
-  const insetMm = Math.max(insetAskedMm, insetNeededMm);
-  const insetClamped = insetNeededMm > insetAskedMm;
+  /* THE UMBEL'S ONE NODE: with the head OFF it is the stem's own top end
+     (`topZ`, a negative depth below `rootZ`); with the head ON it is the
+     reach-inset law's own depth, nothing asked above it. */
+  const insetMm = umbel ? (headOff ? 0 : insetNeededMm) : Math.max(insetAskedMm, insetNeededMm);
+  const insetClamped = umbel ? false : insetNeededMm > insetAskedMm;
   /* CLAMPED AND TOLD, both directions, and `insetSatisfied` keeps the leaf's
      biconditional shape (ID9 asserts it against the emitted florets) — a floret
      through the head is legal geometry (overlapping closed shells) and an
      aesthetic fact, never an invariant violation. */
-  const insetSatisfied = insetNeededMm <= LEAF_NODE_BOTTOM * stem.lengthMm;
+  const insetSatisfied = headOff ? true : insetNeededMm <= LEAF_NODE_BOTTOM * stem.lengthMm;
   /* THE PITCH FLOOR IS TWO PEDICEL RADII — the leaf's own rule with the
      pedicel's own radius, so adjacent pedicels cannot merge. The COUNT is what
      gives when the span is short: clamped, told, never refused. */
@@ -22580,7 +22698,7 @@ export function inflorescencePlan(state, stem, acc) {
   };
   const extentMm = Math.max(unitExtentMm(false), unitExtentMm(true));
   const dMax = Math.max(1, Math.ceil((extentMm + MIN_FEATURE_MM) / pitchFloorRodMm));
-  const pairClasses = floretPairClasses(phyllo, Math.max(1, nodesAsked), dMax);
+  const pairClasses = umbel ? umbelPairClasses(umbelAz) : floretPairClasses(phyllo, Math.max(1, nodesAsked), dMax);
   const pitchOf = (exportMode) => floretPitchFloorMm((az) => {
     const U = unitMemo.get(pedicelLenMm, exportMode, az);
     return { positions: U.sub.positions, M: pedicelPlacement(pre, 0, az, U.tipZLocal, sessileTop).M };
@@ -22592,9 +22710,10 @@ export function inflorescencePlan(state, stem, acc) {
   const pitchFloorIsFlorets = pitchFloretMm > pitchFloorRodMm;
   const pitchFloorAt = pitchLive.floorMm >= pitchExport.floorMm ? { ...pitchLive.at, mode: 'live' } : { ...pitchExport.at, mode: 'export' };
   const sameNodeMayTouch = pitchLive.sameNodeMayTouch || pitchExport.sameNodeMayTouch;
-  const nodeDepthsMm = leafNodeDepthsMm(nodesAsked, stem.lengthMm, insetMm, pitchFloorMm);
+  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.topZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;
+  const nodeDepthsMm = umbel ? [umbelDepthMm] : leafNodeDepthsMm(nodesAsked, stem.lengthMm, insetMm, pitchFloorMm);
   const nodesClamped = nodeDepthsMm.length < nodesAsked;
-  const azimuths = nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i, DISTICHOUS_TURN));
+  const azimuths = umbel ? [umbelAz.slice()] : nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i, DISTICHOUS_TURN));
 
   /* ===================================================================
      THE PER-NODE PEDICEL LENGTH (the node-laws session). Two derived laws on
@@ -22679,14 +22798,18 @@ export function inflorescencePlan(state, stem, acc) {
      wall, which `buildInflorescenceInto` measures off the emitted floret
      (`wallReachR`) — so it is not in this minimum; `null` where every node is
      sessile. At one length the minimum is the one value, the same double. */
+  /* UNDER AN UMBEL the solid a pedicel crosses is the KNOT: from its root on
+     the ring out along its direction to the knot's surface, in closed form. */
+  const knotCrossMm = umbel ? (() => { const c = Math.cos((angleDeg * Math.PI) / 180); return -knot.rho * c + Math.sqrt(knot.rho * knot.rho * c * c - knot.rho * knot.rho + knot.radiusMm * knot.radiusMm); })() : null;
   const crossings = pedicelLensMm.map((L) => (L > 0
-    ? rodWallCrossingMm({ boreR: stem.boreR, outerR: stem.outerR, rootR }, (angleDeg * Math.PI) / 180, L, embedMm)
+    ? (umbel ? Math.min(knotCrossMm, L) : rodWallCrossingMm({ boreR: stem.boreR, outerR: stem.outerR, rootR }, (angleDeg * Math.PI) / 180, L, embedMm))
     : null));
   const stalked = crossings.filter((c) => c !== null);
   const crossesSolidMm = stalked.length ? Math.min(...stalked) : null;
 
+  const knotRec = umbel ? { rho: knot.rho, radiusMm: knot.radiusMm, gapMm: knot.gapMm, centre: [0, 0, stem.rootZ - umbelDepthMm], crossMm: knotCrossMm } : null;
   return {
-    present: true, type, phyllotaxy: phyllo, perNode,
+    present: true, type, umbel, headOff, umbelCount: umbel ? umbelCount : null, knot: knotRec, phyllotaxy: phyllo, perNode,
     nodes: nodeDepthsMm.length, nodesAsked, nodesBuilt: nodeDepthsMm.length, nodesClamped,
     nodeDepthsMm, azimuths, angleDeg, pedicelLenMm, pedicelR, pedicelRClamped, areaRuleR, pedicelRFloor,
     rootR, embedMm, crossesSolidMm, crossings,
@@ -22996,6 +23119,29 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
     return units.length - 1;
   };
   for (let i = 0; i < plan.nodes; i++) for (const az of plan.azimuths[i]) unitFor(plan.pedicelLensMm[i], az);
+  /* THE UMBEL'S JUNCTION KNOT — emitted FIRST, one closed sphere about the
+     plan's own centre at the plan's own derived radius (`umbelKnot`), through
+     the pill's emitter (`revolveInto`, explicit apex fans at both poles). Its
+     MEASURED side — the centre and the radius read back off the vertices it
+     emitted — is what UM1 holds every pedicel's root against, so a knot
+     emitted somewhere other than where the plan says is visible. */
+  let knotBuilt = null;
+  if (plan.umbel && plan.knot) {
+    const K = plan.knot, c = K.centre, R = K.radiusMm, NB = UMBEL_KNOT_BANDS;
+    const t0 = acc.triangleCount;
+    const rings = [];
+    for (let k = 1; k < NB; k++) {
+      const ph = (k * Math.PI) / NB;
+      rings.push({ C: [c[0], c[1], c[2] - R * Math.cos(ph)], e1: [1, 0, 0], e2: [0, 1, 0], r: R * Math.sin(ph) });
+    }
+    const pts = revolveInto(acc, rings, [c[0], c[1], c[2] - R], [c[0], c[1], c[2] + R], new Array(HUB_SECTORS).fill(1));
+    let sx = 0, sy = 0, sz = 0, n = 0;
+    for (const ring of pts) for (const q of ring) { sx += q[0]; sy += q[1]; sz += q[2]; n++; }
+    const cen = [sx / n, sy / n, sz / n];
+    let rMax = 0, rMin = Infinity;
+    for (const ring of pts) for (const q of ring) { const d = Math.hypot(q[0] - cen[0], q[1] - cen[1], q[2] - cen[2]); if (d > rMax) rMax = d; if (d < rMin) rMin = d; }
+    knotBuilt = { centre: cen, radiusMm: rMax, radiusMinMm: rMin, tris: acc.triangleCount - t0, triRange: [t0, acc.triangleCount] };
+  }
   const sub = units[0].sub, fs = units[0].fs, unit = units[0].rec;
   const unitTris = units[0].tris;
   const tipZLocal = units[0].tipZLocal;
@@ -23164,7 +23310,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
   const headZ = placed.map((q) => q.headAt[2]);
   const headSpreadMm = headZ.length ? Math.max(...headZ) - Math.min(...headZ) : null;
   return {
-    present: true, unitTris, tipZLocal, count: placed.length, placed, headSpreadMm,
+    present: true, unitTris, tipZLocal, count: placed.length, placed, headSpreadMm, knot: knotBuilt,
     floretsMaxZ: Number.isFinite(floretsMaxZ) ? floretsMaxZ : null,
     floretsMaxZByNode: floretsMaxZByNode.map((z) => (Number.isFinite(z) ? z : null)),
     /* EVERY DISTINCT UNIT, in node order — unit 0 is the topmost node's and
@@ -23768,7 +23914,7 @@ export function tubeEligible(state) {
      `tubeLaw`), so the ring, the sinus and the slit edges read the LAW
      outline they always read. */
   if (state.petalInfill === 'VORONOI') return false;
-  if (Number(state.stemLength) >= 1 && state.inflorescence === 'RACEME') return false;
+  if (!inflorescenceIsAbsent(state)) return false;
   return true;
 }
 /* THE PLAN: per layer, the asked k, the built k and whether it fuses. */
@@ -24404,6 +24550,10 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      stands, so the omission mask probes each slot at its mapped azimuth. */
   const spacingField = spacingVarianceField(state, fr);
   const omission = stemOmission(state, fr, capability, stemPlanned, sizeField, formField, spacingField);
+  /* THE UMBEL'S HEAD TOGGLE (Eva's ruling 2, Oct 21): OFF builds no head at
+     all — no head petal, no hub, no centre, no sepals — and the stem ends at
+     the umbel's knot. The geometry's half of the two statements. */
+  const headOff = umbelHeadIsAbsent(state) && !!(stemPlanned && stemPlanned.present);
   /* ONE FACTOR ROW PER WHORL, parallel to `slotAzimuths` (the same shape, the
      same indexing, one entry per SLOT whether or not a petal was built on it),
      null when the field is — the metrics hook's per-slot applied record, which
@@ -24423,7 +24573,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      conditional on a sepal whorl. The capture moves no byte — verify-bloom-grid's
      clause 1 — and costs the row arrays alone. */
   acc.captureLamina = true;
-  if (fr.continuousMode) {
+  if (headOff) { /* THE UMBEL WITH ITS HEAD OFF builds no head petal (see `umbelHeadIsAbsent`) */ } else if (fr.continuousMode) {
     /* ONE WHORL, so one azimuth row — the continuous sequence's own. */
     const azOf = new Array(fr.rings.length);
     const fOf = varianceFactors ? new Array(fr.rings.length) : null;
@@ -24549,7 +24699,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   acc.captureLamina = laminaWas;
   /* every triangle before this index is a petal's (the TU family's probe set) */
   const petalTriEnd = acc.positions.length / 9;
-  const hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
+  const hubBuilt = headOff ? HUB_ABSENT : buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
   const hubTriEnd = acc.positions.length / 9;
   /* THE STEM (session 43) — ONE closed solid on the axis, rooted THROUGH the
      hub wall, overlapping it exactly as every stamen and the style already do.
@@ -24591,7 +24741,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      `freeEnds` is the builder's own tally, JS4's independent quantity. */
   const stamens = [];
   let freeEnds = 0;
-  if (fr.androecium) {
+  if (fr.androecium && !headOff) {
     const A = fr.androecium;
     buildWhorlInto({
       count: A.count,
@@ -24616,12 +24766,12 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      and inert). Its free end is its own census (JG4), never folded into the
      androecium's. */
   const styles = [];
-  if (fr.gynoecium) styles.push(buildStyleInto(acc, fr.gynoecium));
+  if (fr.gynoecium && !headOff) styles.push(buildStyleInto(acc, fr.gynoecium));
   /* THE SEPALS (sepals, part 1) — the petal builder a second time, on the
      hub's rim, at the angle the drawn limit allows, EMITTED LAST so the
      stream of a bloom without them is a prefix of the stream with them.
      Null by branch at sepalCount 0 and under SPHERE. */
-  const sepalsBuilt = buildSepalsInto(acc, state, fr, sites, stemPlanned, capability);
+  const sepalsBuilt = headOff ? null : buildSepalsInto(acc, state, fr, sites, stemPlanned, capability);
   /* THE INFLORESCENCE (this session) — N copies of ONE floret unit, each a
      whole bloom with its own pedicel built at the origin by this very
      function, appended under a rigid transform. EMITTED LAST, after the
@@ -24696,7 +24846,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   const at = Math.max(0, petals.findIndex((p) => p !== null && p !== undefined));
   /* THE TOLD FLAG, after every solid is emitted (it reads records and moves
      no byte): assembled here so its feet list can carry the sepals'. */
-  const neighbour = neighbourFlag({ foot: fr, slotAzimuths, petalsAll, stemOmission: omission, sepals: sepalsBuilt });
+  const neighbour = headOff ? null : neighbourFlag({ foot: fr, slotAzimuths, petalsAll, stemOmission: omission, sepals: sepalsBuilt });
   /* THE SCOPES THIS BUILD WAS HANDED (Scoping-a), summarised for the read-out
      and the gate — null on every build with none, which is every shipped one. */
   /* `layersLive` / `petalsLive` (Scoping-b): whether the toggle that lets each
