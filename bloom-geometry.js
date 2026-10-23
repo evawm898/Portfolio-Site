@@ -10539,11 +10539,10 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
      only on a BUCKLED petal (its normal is `trueNormalRows`' lattice quantity).
      A capability hook may pin it off (`noTexture`) for a trial build that
      reads the lamina alone. */
-  /* `cap.textureEdgeMm` (a capability hook no control reaches): the corner
-     instrument (tools/bloom-texture-corner.mjs) coarsens the lattice edge to
-     cost the step-6 mechanisms; the shipped edge is the constant. */
-  const texR0 = textureFor(ps);
-  const texR = texR0 && cap && cap.textureEdgeMm > 0 ? { ...texR0, edgeMm: cap.textureEdgeMm } : texR0;
+  /* `cap.textureEdgeMm` (a capability hook no control reaches) PINS the
+     lattice edge for every organ and switches the budget-derived cap off; see
+     THE EDGE CAP beside `textureFor`. */
+  const texR = textureFor(ps, cap);
   const tex = texR && !texR.refused && !(cap && cap.noTexture) ? textureContext(texR, 'petal', surface.rowAt, footS.length, form && form.buckle !== null ? 'buckle' : null, isRep) : null;
   for (const panel of panels) {
     const useInfill = infill && !infill.refused && panel === panels[0];
@@ -12773,7 +12772,7 @@ export function textureField(type, lambda, seed = TEXTURE_SEED) {
 }
 /* THE CONTROLS AS READ, ONE OWNER. Null at the guard. A height or size past
    its range is clamped (the reader clamps a file's value too) and said. */
-export function textureFor(state) {
+export function textureFor(state, cap = null) {
   if (textureIsAbsent(state)) return null;
   const type = String(state.petalTexture);
   if (!TEXTURE_TYPES.includes(type)) throw new Error(`petalTexture ${JSON.stringify(state.petalTexture)} is not one of ${TEXTURE_TYPES.join(' / ')}`);
@@ -12781,7 +12780,56 @@ export function textureFor(state) {
   const hAsked = Number(state.textureHeight ?? TEXTURE_HEIGHT_DEFAULT), sAsked = Number(state.textureSize ?? TEXTURE_SIZE_DEFAULT);
   const heightMm = clampTo(hAsked, TEXTURE_HEIGHT_RANGE), sizeMm = clampTo(sAsked, TEXTURE_SIZE_RANGE);
   const refused = !infillIsAbsent(state) ? 'infill' : null;
-  return { type, heightMm, sizeMm, edgeMm: TEXTURE_EDGE_MM, heightClamped: heightMm !== hAsked, sizeClamped: sizeMm !== sAsked, refused, f: refused ? null : textureField(type, sizeMm) };
+  return { type, heightMm, sizeMm, edgeMm: textureEdgeInForce(cap), heightClamped: heightMm !== hAsked, sizeClamped: sizeMm !== sAsked, refused, f: refused ? null : textureField(type, sizeMm) };
+}
+/* ===================================================================
+   THE EDGE CAP (Eva's ruling of Oct 23, on the worst corner: COARSEN THE EDGE,
+   TOLD). A textured build that would exceed `EXPORT_TRI_BUDGET` at the ruled
+   0.4 mm lattice edge is rebuilt on the FINEST edge that fits, never coarser
+   than `TEXTURE_EDGE_CAP_MM` (0.5); if even 0.5 does not fit the build stands
+   at 0.5 and the export is REFUSED as today, said on the read-out. THE EDGE IS
+   DERIVED FROM THE BUDGET, NEVER TYPED PER STATE: `textureEdgeCapDecision`
+   (inside `buildBloomInto`) builds at 0.4 into the caller's own accumulator
+   first — so every build that fits pays nothing — and only when that count is
+   over the budget bisects the rungs of `TEXTURE_EDGE_GRID_MM` between 0.4 and
+   0.5 with real whole-bloom trial builds (a count is an integer and the lattice
+   counts fall with a coarser edge, so the finest fitting rung is what the
+   bisection returns). ONE EDGE FOR THE WHOLE BLOOM: `TEXTURE_EDGE_IN_FORCE` is
+   the rung under trial, read by every organ (petal, sepal, leaf, leaflet, a
+   floret) through `textureEdgeInForce`, so no two sheets of one bloom are
+   latticed differently. `cap.textureEdgeMm` (a capability hook no control
+   reaches) PINS the edge for every organ and switches the derivation OFF — it
+   is how the corner instrument measures coarser edges than the cap allows, how
+   the sheet renders the refused 0.4 mm corner, and how TX9 rebuilds the next
+   finer rung to show it does not fit. The rungs are `(40 + k) / 100`, the
+   correctly rounded decimals, so a pinned 0.45 and a derived 0.45 are one
+   double. The decision reads `acc.triangleCount` in the caller's own mode:
+   the two STL gates hold `tris(live) === tris(export)` on every row, which is
+   what makes the derived edge mode-free. The record (`texture.edgeCap`) names
+   the asked edge, the edge used, the cap, every trial's count and whether the
+   used edge fits; the read-out prints the edge used whenever it differs from
+   0.4 (the ruling's own wording). */
+export const TEXTURE_EDGE_CAP_MM = 0.5;
+export const TEXTURE_EDGE_GRID_MM = 0.01;
+/* the rung index k -> the edge, one owner (k 0 is the ruled edge, k 10 the cap) */
+export function textureEdgeRung(k) { return (Math.round(TEXTURE_EDGE_MM * 100) + k * Math.round(TEXTURE_EDGE_GRID_MM * 100)) / 100; }
+export const TEXTURE_EDGE_CAP_RUNGS = Math.round((TEXTURE_EDGE_CAP_MM - TEXTURE_EDGE_MM) / TEXTURE_EDGE_GRID_MM);
+let TEXTURE_EDGE_IN_FORCE = null;
+let TEXTURE_CAP_ACTIVE = false;
+function textureEdgeInForce(cap) {
+  if (cap && cap.textureEdgeMm > 0) return cap.textureEdgeMm;
+  return TEXTURE_EDGE_IN_FORCE === null ? TEXTURE_EDGE_MM : TEXTURE_EDGE_IN_FORCE;
+}
+/* FOR AN INSTRUMENT THAT COPIES buildBloomInto's ORCHESTRATION (the two
+   coverage censuses re-emit every part through the builders directly, and
+   their R1 sums the parts against a whole build): the parts must be emitted
+   under the edge the whole build DERIVED, exactly as buildBloomInto emits them
+   — so this runs `fn` with that edge in force and the cap's own re-entrancy
+   flag set (a nested floret build derives nothing), and restores both. */
+export function withTextureEdgeInForce(edgeMm, fn) {
+  const prevE = TEXTURE_EDGE_IN_FORCE, prevA = TEXTURE_CAP_ACTIVE;
+  if (edgeMm > 0) { TEXTURE_EDGE_IN_FORCE = edgeMm; TEXTURE_CAP_ACTIVE = true; }
+  try { return fn(); } finally { TEXTURE_EDGE_IN_FORCE = prevE; TEXTURE_CAP_ACTIVE = prevA; }
 }
 /* the per-blade context `emitPanel` reads: the relief closure, the lattice's
    row law and what it may not refine, and the panel records it appends */
@@ -12794,14 +12842,15 @@ function textureRecord(T, tex) {
   return { type: T.type, heightMm: T.heightMm, sizeMm: T.sizeMm, edgeMm: T.edgeMm, heightClamped: T.heightClamped, sizeClamped: T.sizeClamped, refused: T.refused || null, panels: tex ? tex.panels : [] };
 }
 /* the whole bloom's record, from every organ's own */
-function textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt) {
-  const T = textureFor(state);
+function textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, cap = null) {
+  const T = textureFor(state, cap);
   if (!T) return null;
   const organs = {};
   const add = (name, rec) => {
     if (!rec) return;
-    const o = organs[name] || (organs[name] = { blades: 0, refused: {}, panels: 0, subRows: 0, cfMax: 1, skinTris: 0, floorTris: 0, rimTris: 0, reliefMaxMm: 0, reliefMinMm: Infinity, displaced: 0, skinSamples: [], apexSamples: [] });
+    const o = organs[name] || (organs[name] = { blades: 0, refused: {}, panels: 0, subRows: 0, cfMax: 1, skinTris: 0, floorTris: 0, rimTris: 0, reliefMaxMm: 0, reliefMinMm: Infinity, displaced: 0, skinSamples: [], apexSamples: [], edgeMismatch: 0 });
     o.blades++;
+    if (rec.edgeMm !== T.edgeMm) o.edgeMismatch++;   // ONE edge for the whole bloom (the edge cap); TX9 reads it
     if (rec.refused) { o.refused[rec.refused] = (o.refused[rec.refused] || 0) + 1; return; }
     for (const p of rec.panels) {
       o.panels++; o.subRows += p.subRows; if (p.cfMax > o.cfMax) o.cfMax = p.cfMax;
@@ -18312,13 +18361,13 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
 function leafRootBase(plan, o, R, z) {
   return o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];
 }
-export function buildLeafInto(acc, plan, state, nodeIndex, az) {
+export function buildLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
   /* A COMPOUND LEAF (leaf/stem build S3) is its own builder, chosen by the
      PLAN — the one owner of the leaf's type — and never by the state, so a
      raceme's shared node, which pins the type to SIMPLE in the plan, cannot be
      overridden by a control the plan has already overruled. A BRANCH: a simple
      leaf runs every line below exactly as before. */
-  if (plan.compound) return buildCompoundLeafInto(acc, plan, state, nodeIndex, az);
+  if (plan.compound) return buildCompoundLeafInto(acc, plan, state, nodeIndex, az, cap);
   const tris0 = acc.triangleCount;
   const S = leafSurface(acc, plan, state, nodeIndex, az);
   const { R, T, D0, base, pLen, Lmm, nu, prof, t, form, law } = S;
@@ -18383,7 +18432,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
      Jacobian), and a sub-row between two chevron rows is a row that law never
      measured. A decision made without a ruling; the record says `refused:
      'lobed'` and the read-out speaks it. */
-  const texR = textureFor(state);
+  const texR = textureFor(state, cap);
   const texRefused = texR && !texR.refused && lobedRow0 ? { ...texR, refused: 'lobed' } : texR;
   const texC = texRefused && !texRefused.refused ? textureContext(texRefused, 'leaf', S.rowAt, 0, null) : null;
   const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false, { ...(lobedRow0 ? { tipProf: S.profE, wantSkin: true, stations: lobedSt, ...rootT } : leafSt ? { stations: leafSt, ...rootT } : rootT), texture: texC });
@@ -20601,7 +20650,7 @@ const ringRadius = (ring) => {
    rachis, terminal stalk: ONE polyline, one shell), then each lateral stalk,
    then every leaflet blade, laterals pair by pair (left, right) and the
    terminal last — the layout's own order. */
-function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
+function buildCompoundLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
   const tris0 = acc.triangleCount;
   const cp = plan.compound;
   const th = (plan.angleDeg * Math.PI) / 180;
@@ -20729,7 +20778,7 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
     const lfT = lfTaper === null ? null : { tAt: lfTAt };
     /* (T3) every leaflet is a blade of the one blade law and takes the texture
        through its own `rowAt`; the free base is relieved to its edge (g is 1) */
-    const texR = textureFor(state);
+    const texR = textureFor(state, cap);
     const texC = texR && !texR.refused ? textureContext(texR, 'leaf', rowAt, 0, null) : null;
     const Bl = emitLeafBladeInto(acc, rowAt, nu, t, prof, sp.L, sp.W, sp.role === 'terminal' ? 'leaflet T' : `leaflet ${sp.side > 0 ? 'L' : 'R'}${sp.k + 1}`, true, { ...(lSt ? { stations: lSt, ...lfT } : lfT), texture: texC });
     return {
@@ -23739,7 +23788,8 @@ function buildSepalTierInto(acc, state, fr, sepals, sites, stemPlanned, cap, unc
     blade: (slot) => {
       azimuths[slot.index] = slot.azimuth;
       slots[slot.index] = slot;
-      const p = buildPetalInto(acc, bs, sepals.ring, slot, null, built.length === 0);
+      /* a sepal reads the texture edge PIN and nothing else of the row's capability (the petal hooks are the petals') */
+      const p = buildPetalInto(acc, bs, sepals.ring, slot, cap && cap.textureEdgeMm > 0 ? { textureEdgeMm: cap.textureEdgeMm } : null, built.length === 0);
       /* THE STATE THIS BLADE WAS BUILT FROM, keyed by the petal name the law
          reads — SP6 compares it against the page's own sepal* read-back, an
          owner the builder does not write. */
@@ -24349,6 +24399,60 @@ function buildBloomCore(acc, state, opts = {}) {
 }
 
 export function buildBloomInto(acc, state, opts = {}) {
+  /* THE EDGE CAP (see THE EDGE CAP beside `textureFor`): decided OUTSIDE the
+     ramp's own budget decision, over whole builds; a nested floret build
+     inherits the rung in force and decides nothing. */
+  if (TEXTURE_CAP_ACTIVE) return buildBloomRamped(acc, state, opts);
+  const capT = textureFor(state, (opts && opts.capability) || null);
+  const pinned = !!(opts && opts.capability && opts.capability.textureEdgeMm > 0);
+  if (!capT || capT.refused || pinned) {
+    const built = buildBloomRamped(acc, state, opts);
+    if (built.texture) built.texture.edgeCap = capT && !capT.refused ? { askedMm: TEXTURE_EDGE_MM, usedMm: capT.edgeMm, capMm: TEXTURE_EDGE_CAP_MM, gridMm: TEXTURE_EDGE_GRID_MM, budget: EXPORT_TRI_BUDGET, pinned: true, trials: [{ edgeMm: capT.edgeMm, tris: acc.triangleCount }], fits: acc.triangleCount <= EXPORT_TRI_BUDGET } : null;
+    return built;
+  }
+  const spawnLike = () => new MeshBuilder({ exportMode: acc.exportMode, captureGrid: acc.captureGrid, captureLamina: acc.captureLamina, captureRim: acc.captureRim, captureNormals: acc.captureNormals });
+  const copyAccInto = (dst, src) => { dst.positions = src.positions; dst.normals = src.normals; dst.minThickness = src.minThickness; dst.lo = src.lo; dst.hi = src.hi; };
+  const trials = [];
+  const trial = (k, into) => {
+    TEXTURE_EDGE_IN_FORCE = textureEdgeRung(k);
+    const built = buildBloomRamped(into, state, opts);
+    trials.push({ edgeMm: TEXTURE_EDGE_IN_FORCE, tris: into.triangleCount });
+    return { built, acc: into, tris: into.triangleCount, k };
+  };
+  TEXTURE_CAP_ACTIVE = true;
+  try {
+    /* the ruled edge first, straight into the caller's accumulator: a build
+       that fits pays nothing more */
+    const base = trial(0, acc);
+    const capOn = true;   // the cap's own switch: the mutant table turns it off
+    let pick = base;
+    if (capOn && base.tris > EXPORT_TRI_BUDGET) {
+      /* the cap first: if even that rung is over, the build stands at the cap
+         and the export is refused (never coarser without a ruling) */
+      const topK = TEXTURE_EDGE_CAP_RUNGS;   // the ladder's top: the cap, never coarser without a ruling
+      const top = trial(topK, spawnLike());
+      pick = top;
+      if (top.tris <= EXPORT_TRI_BUDGET) {
+        /* bisect: lo does not fit, hi fits; the finest fitting rung is hi */
+        let lo = 0, hi = topK;
+        while (hi - lo > 1) {
+          const mid = (lo + hi) >> 1;
+          const t = trial(mid, spawnLike());
+          if (t.tris <= EXPORT_TRI_BUDGET) { hi = mid; pick = t; } else lo = mid;
+        }
+      }
+      copyAccInto(acc, pick.acc);
+    }
+    trials.sort((a, b) => a.edgeMm - b.edgeMm);
+    if (pick.built.texture) pick.built.texture.edgeCap = { askedMm: TEXTURE_EDGE_MM, usedMm: textureEdgeRung(pick.k), capMm: TEXTURE_EDGE_CAP_MM, gridMm: TEXTURE_EDGE_GRID_MM, budget: EXPORT_TRI_BUDGET, pinned: false, trials, fits: pick.tris <= EXPORT_TRI_BUDGET };
+    return pick.built;
+  } finally {
+    TEXTURE_EDGE_IN_FORCE = null;
+    TEXTURE_CAP_ACTIVE = false;
+  }
+}
+
+function buildBloomRamped(acc, state, opts = {}) {
   /* RE-ENTRANCY: `buildBloomCore` calls `buildBloomInto` again, once per
      FLORET, for an inflorescence. The budget is a property of the WHOLE
      composite plant, not of one floret in isolation, so a decision already
@@ -24729,7 +24833,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
     for (let i = 0; i < leafPlanned.azimuths.length; i++) {
       /* A NODE WHOSE CAP LEAVES NO BLADE BUILDS NO LEAF (told by the plan). */
       if (leafPlanned.nodeLengthsMm && !(leafPlanned.nodeLengthsMm[i] > 0)) continue;
-      for (const az of leafPlanned.azimuths[i]) { const lb = buildLeafInto(acc, leafPlanned, state, i, az); lb.nodeIndex = i; leavesBuilt.push(lb); }
+      for (const az of leafPlanned.azimuths[i]) { const lb = buildLeafInto(acc, leafPlanned, state, i, az, capability); lb.nodeIndex = i; leavesBuilt.push(lb); }
     }
   }
   const leafTriRange = [leafTris0, acc.triangleCount];
@@ -24895,7 +24999,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   /* THE TEXTURE'S WHOLE-BLOOM RECORD (T3): the controls as read, every
      organ's lattice count against its conforming floor, the relief's extremes
      and the refusals — what the TX family and the read-out read. */
-  const texture = textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt);
+  const texture = textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, capability);
   return { petalTriEnd, hubTriEnd, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt, texture,
     /* THE SIZE FIELD'S OWN RECORD (organic variance, build 1) — null at amount
        0, which is the guard every consumer of it branches on. The closure is

@@ -195,6 +195,9 @@ const ROW_DEF_MOVED_BY_PRED = {
   /* SURFACE TEXTURE (T3, Oct 22): block 77's nineteen rows; no base row is
      redefined — the choice guard keeps every slider sweep where it was. */
   'texture': { added: 19, rows: {} },
+  /* THE TEXTURE EDGE CAP (Oct 23): block 79's three rows; no base row is
+     redefined. */
+  'texture-edge-cap': { added: 3, rows: {} },
   'root-support': {
     added: 21,
     rows: {
@@ -290,6 +293,19 @@ const PREDICATE_MOVERS = {
      sliders moved under NONE) and BOTH ON must HOLD. A textured row whose
      only sheets are LOBED leaves would hold too; no such row exists. */
   'texture': (st) => String(st.petalTexture ?? 'NONE') !== 'NONE' && String(st.petalInfill ?? 'NONE') === 'NONE',
+  /* THE TEXTURE EDGE CAP (Eva, Oct 23). A row moves iff the BASE tree's own
+     textured build (texture on, infill off) exceeds EXPORT_TRI_BUDGET at the
+     ruled 0.4 mm edge — read off the base builder's tally, never this tree's
+     cap record (the quantity under test). Every textured row under the budget
+     holds by branch (the first trial IS the old build, into the caller's own
+     accumulator); every untextured row holds untouched. On this tree no base
+     row trips it — the three capped rows are ADDED. */
+  'texture-edge-cap': (st, row) => {
+    if (String(st.petalTexture ?? 'NONE') === 'NONE' || String(st.petalInfill ?? 'NONE') !== 'NONE') return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    base.buildBloomInto(acc, { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
+    return acc.triangleCount > base.EXPORT_TRI_BUDGET;
+  },
   /* RULING 6 — NODES DECOUPLED FROM LEAVES (stem session 2). A row moves iff
      it asks for nodes on a BARE stem: a stem, a prominence away from 0, no
      raceme, and no leaves. Written from the CONTROLS — the ruling's own
