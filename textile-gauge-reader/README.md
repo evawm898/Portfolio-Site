@@ -3263,6 +3263,54 @@ Choosing the working scale for a lucky placement on a ground-truth fixture is tu
 instrument to the test set; 180 is chosen on a property and left the knit_05 defect visible,
 which is what §2 fixes. **Do not move `ROI_PROPOSAL_WORKING_PX_PER_INCH` to rescue a reading.**
 
+**The proposer's fixed-pixel constants, audited at the working scale** (Eva's ruling on the
+first cut, which had re-run `tests/test_roi_proposal.py::test_proposed_regions_avoid_a_ruler_like_block`
+red: the proposer's own ruler-avoidance test, a 203 px/in synthetic that the front door now
+downsamples to 180, chose a 3-inch window dipping 18 px into the ruler band). Each constant
+below is reasoned from the scale (7.09 px/mm at 180 px/in) and the span it was tuned over, never
+from the test; the test then passes unmodified.
+
+| constant | at 180 px/in | why it stands or moves |
+|---|---|---|
+| `ROI_PROPOSAL_BACKGROUND_BLOCK_PX` / `ROI_PROPOSAL_ANOMALY_BLOCK_PX` = 16 px | 2.26 mm | the anomaly gate's 0.5 fraction, 4-MAD multiplier and 10-grey-level fabric floor were swept on the jersey at 166 px/in (16 px = 2.45 mm) and the teal at 273 (1.49 mm); 2.26 mm is inside that span. **Unchanged.** |
+| minimum sizes: 20 px half-crop in `_periodicity_consistency_score`, 4 blocks in `_local_anomaly_fraction`, `MIN_ROI_DIM_PX * 2` | 5.6 / 9.0 / 11.3 mm | all well under the smallest window tried (0.75 in = 135 px). **Unchanged.** |
+| kernels: 3×3 Gaussian and Sobel (`_enhance_texture`), `SMOOTHING_WINDOW_PX` 3, `MIN_PLAUSIBLE_SPACING_PX` 3; CLAHE 8×8 and the 4×4 texture grid | 0.42 mm (60 repeats/in); counts | the analyser's own primitives, finer than any knit; the grids are counts, not pixels. **Unchanged.** |
+| the sharpness ceiling, Laplacian variance / 500 | — | **no value is consistent at any scale; replaced by the photo's own baseline** (below). |
+
+The ceiling is the one that broke, and the reason is a measurement rather than a retune. The
+variance of the Laplacian has no fixed-pixel meaning across scales: on a textile photo it is
+dominated by sensor noise, JPEG blocking and in-camera sharpening, which no resampling law
+predicts. On the eight real fixtures' KNOWN-CLEAN pinned crops, native → the 180 px/in working
+copy (INTER_AREA), it reads knit_09 1019 → 453 at a resample factor of 0.963, knit_05 193 → 96,
+knit_01 1445 → 1099, knit_08 1016 → 715, knit_06 879 → **1355 (up)**, knit_02 144 → **608 (up
+4.2× at a factor of 0.152)**, against the s⁴ a smooth texture would follow (0.001 .. 0.86 over
+the same rows). Clean fabric at the working scale therefore spans **96 .. 1355**, so no number
+typed at 180 px/in is "the level sharp fabric reaches": whichever it is, some clean photo sits
+under it, and on that photo any window borrowing a strip of ruler -- whose print reads
+5,000-7,000 at the working scale, above fabric at every scale -- wins the sharpness term
+outright. That is exactly how the regression entered: the synthetic's 711 at native was pixel
+noise (σ 6 white noise through the 3×3 Laplacian is 720 by arithmetic), INTER_AREA averaged it
+to 265, under the 500 ceiling (sharpness 0.53), while the ruler strip's hard edges kept the
+dipping window at 1.0, and 0.47 × the 0.15 weight outranked the clean windows' better texture
+consistency. At native scale both saturated at 1.0 and the term never decided anything.
+
+So the production ceiling is now **the photo's own clean-fabric level**, `_global_sharpness_
+baseline`: the median per-16-px-block Laplacian variance over the blocks `_fabric_mask` already
+calls textured, computed once per proposal run at the scale the proposer runs at -- the same
+construction as the anomaly gate's `_global_local_std_baseline`, and a median for the same
+reason (a ruler band a sixth of the photo at twenty times fabric's variance cannot move it; a
+mean would be dragged to a level no fabric window reaches). A window at that level is as sharp
+as this fabric gets (1.0); under it is softer than the fabric around it (defocus, a curled edge);
+above it is sharper than fabric can be -- a ruler, a label -- and is capped, never rewarded. The
+old 500 survives as `ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING`, reached only by a caller with no
+photo to measure (the unit tests score single crops) or a photo with under five textured blocks.
+Measured on the real fixtures at the working scale, the proposer's chosen windows read 0.96-1.55
+of their photo's baseline (every one saturates but knit_08's first area at 0.96); on the ruler
+synthetic the clean windows read 265 against a baseline of 267 (1.0) and the dipping window 796
+(capped at 1.0), so the ranking falls to texture consistency, 0.998 against 0.888, and the four
+proposals end at or above y 628, 1055 and 841 against the ruler's 1250. `ProposedRoi.sharpness`
+is relative to the photo from here on.
+
 The proposer is 2-12× faster on large photos (it scans a ≤180 px/in copy). The whole request
 is SLOWER wherever areas now exist that did not before, because every area is analysed at full
 resolution (§4).
@@ -3356,10 +3404,16 @@ q92) and calibrated correctly, local, nothing else running on the box. Compare w
 
 | photo @4000 | propose main → here | areas main → here | analyze main → here | whole request main → here |
 |---|---|---|---|---|
-| jersey (4000x2674) | 1.61 → 0.34 s | 0 → 2 | 0.00 → 4.76 s | 1.61 → **5.10 s** |
-| knit_01 (4000x3517) | 2.16 → 1.11 s | 2 → 4 | 1.46 → 9.13 s | 3.62 → **10.24 s** |
-| knit_02 (4000x2667) | 1.34 → 0.11 s | 0 → 4 | 0.00 → 15.31 s | 1.34 → **15.42 s** (over 15 s) |
-| teal (3200x4000) | 3.58 → 0.24 s | 2 → 4 | 1.73 → 21.90 s | 5.31 → **22.13 s** (over 15 s) |
+| jersey (4000x2674) | 1.61 → 0.50 s | 0 → 2 | 0.00 → 4.84 s | 1.61 → **5.33 s** |
+| knit_01 (4000x3517) | 2.16 → 1.08 s | 2 → 4 | 1.46 → 9.41 s | 3.62 → **10.49 s** |
+| knit_02 (4000x2667) | 1.34 → 0.15 s | 0 → 4 | 0.00 → 14.71 s | 1.34 → **14.86 s** |
+| teal (3200x4000) | 3.58 → 0.24 s | 2 → 4 | 1.73 → 23.00 s | 5.31 → **23.24 s** (over 15 s) |
+
+(Re-run after the constants audit of §1, alone on the box; the pre-audit tree read 5.10 / 10.24 /
+15.42 / 22.13 s, so the photo-own sharpness baseline -- one Laplacian and three box filters over
+the ≤180 px/in copy, once per request -- costs nothing measurable, and knit_02 crossing back
+under 15 s is run-to-run variance, not a saving. **Accepted for this PR (Eva, Oct 23); analysis
+at a working resolution is the next PR.**)
 
 The proposer is 2-15× faster (it scans a ≤180 px/in copy). The whole request is slower because
 areas now exist, or more and larger ones, and each is analysed at full resolution: ~4-5 s per
@@ -3413,8 +3467,32 @@ flip because the full box's baseline is the doubled 98.3); knit_01 half_roi cour
 (58.5 → 116 px against an 8.9 px baseline that is a sub-feature either way); knit_07 (no course
 truth, its wale truth excluded by the ground-truth file) moves its baseline 64 → 108 px and six
 cells with it, one ok → drift. These two instruments are the cost of the fix and are stated here
-rather than tuned around; `tests/test_ground_truth_scorecard.py`'s knit_01 course pin is left
-where it was and reads red on this tree until it is re-pinned on purpose.
+rather than tuned around. **Both accepted (Eva, Oct 23):** `tests/test_ground_truth_scorecard.py`'s
+knit_01 course row is re-pinned at **−46.9%** as a strict xfail in `KNOWN_BEYOND_BAR` (that
+file's known-and-wrong list), labelled *doubled course seed, exposed by #456, future target*,
+with the mechanism above in its reason -- main's −1.8% on that crop came from the same coin as
+knit_05's +87%, a loop-center pitch 1.6-1.7× from every candidate deciding the period, and
+landed the other way. And the sweep's **118 / 12 / 5 / 12 / 7** is recorded as the baseline:
+
+| fixture | resize/wale | resize/course | rotate90/wale | rotate90/course | mirror/wale | mirror/course | half_roi/wale | half_roi/course | jpeg60/wale | jpeg60/course | downsample2x/wale | downsample2x/course | crop_shift/wale | crop_shift/course |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| knit_sample_01 | ok (1.000) | drift (1.040) | harmonic_flip (0.501) | ok (1.000) | ok (1.000) | ok (0.998) | ok (0.982) | **lost (12.983)** | ok (1.000) | ok (0.994) | ok (0.997) | skipped | ok (1.000) | ok (1.012) |
+| knit_sample_02 | lost (0.014) | ok (1.008) | ok (0.998) | ok (1.001) | ok (1.001) | ok (1.000) | skipped | lost (80.806) | ok (1.001) | ok (1.002) | ok (1.018) | skipped | ok (0.960) | ok (1.003) |
+| knit_sample_03 | lost (0.055) | lost (0.134) | harmonic_flip (0.494) | ok (1.000) | ok (1.001) | drift (1.018) | drift (1.407) | lost (15.679) | ok (0.998) | ok (1.000) | ok (0.978) | lost (6.796) | ok (1.003) | lost (3.538) |
+| knit_sample_04 | ok (0.995) | ok (0.993) | harmonic_flip (0.514) | ok (1.000) | ok (1.000) | ok (1.002) | ok (1.020) | ok (1.036) | ok (0.988) | ok (1.010) | ok (0.990) | skipped | ok (0.995) | ok (1.008) |
+| knit_sample_05 | ok (1.000) | ok (0.984) | harmonic_flip (1.966) | ok (1.000) | ok (1.000) | ok (1.000) | ok (0.978) | **harmonic_flip (0.513)** | ok (1.001) | ok (0.999) | ok (0.995) | ok (1.016) | ok (1.002) | ok (1.040) |
+| knit_sample_06 | ok (0.994) | drift (1.125) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.015) | drift (1.148) | ok (1.001) | drift (1.081) | ok (0.998) | drift (1.052) | ok (0.996) | drift (1.066) |
+| knit_sample_07 | ok (0.989) | **lost (0.128)** | **lost (0.064)** | ok (1.000) | ok (1.000) | **ok (1.000)** | ok (1.009) | **skipped** | ok (0.999) | **lost (0.131)** | ok (1.001) | **drift (1.185)** | ok (0.995) | **drift (1.463)** |
+| knit_sample_08 | ok (0.989) | drift (0.928) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.000) | ok (0.966) | skipped | ok (1.000) | ok (1.000) | ok (0.993) | drift (0.947) | ok (1.003) | ok (0.953) |
+| knit_sample_09 | ok (1.003) | ok (0.998) | ok (1.000) | ok (1.000) | ok (1.000) | ok (0.990) | ok (1.012) | ok (1.019) | ok (1.000) | ok (0.985) | ok (0.980) | ok (1.040) | ok (0.983) | lost (3.365) |
+| real_jersey_sample | ok (0.998) | ok (1.021) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.019) | skipped | ok (0.994) | ok (1.000) | ok (1.011) | ok (1.007) | ok (1.009) | ok (1.021) |
+| sarahmaker-knitting-gauge | ok (0.997) | ok (1.020) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.019) | ok (0.936) | ok (1.000) | ok (0.986) | ok (1.000) | ok (0.994) | ok (0.977) | ok (0.951) |
+
+(bold = changed from `main`'s 119 / 12 / 4 / 13 / 6; the sweep is `tests/metamorphic.py` on each
+fixture at its default box and does not go through the proposer, so the constants audit above
+cannot move it). The new flip is the one worth naming: knit_05's half-window course reads the
+TRUE pitch (50.4 px) against the full box's doubled 98.3, and the harness, which only knows the
+full box's baseline, calls the correct half a flip.
 
 #### 6. Resolution invariance
 
@@ -3437,7 +3515,12 @@ error · status. The generated block above carries the live table; this is the t
 
 Every fixture gets areas at every resolution (main: 9 MISSING rows). Confident-and-wrong at some
 resolution: knit_08 W at 2× (+10.1%, inherited from the proposer's placement -- the proposer
-commit alone reads the same cell) and teal W at all three.
+commit alone reads the same cell) and teal W at all three. **knit_08's 2× cells are accepted
+(Eva, Oct 23) and pinned as known, labelled *proposer placement at 2×*: the course spread
+(`RESOLUTION_DISAGREE`) and the +10.1% wale (`RESOLUTION_CONFIDENT_AND_WRONG`), both in
+`tests/test_app_path_scorecard.py`.** The constants audit of §1 moved no cell of this table, no
+app-path row, no jitter point and neither confident-and-wrong count (the card is identical to the
+pre-audit tree's on every key).
 
 #### 7. A proposer regression the parked commit carries, found by the original suite and NOT fixed here
 

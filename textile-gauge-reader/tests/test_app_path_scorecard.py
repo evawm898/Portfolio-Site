@@ -391,15 +391,16 @@ RESOLUTION_DISAGREE = {
         "against the ~200 px readings at 0.5x and 1x)."
     ),
     ("knit_08", "course"): (
-        "11.8% spread, all confident (7.33 / 6.74 / 6.56 per inch at 0.5x / 1x / 2x against 6.90), inherited from "
-        "the working-resolution proposer's placement (main read 4 / 4 / 1 areas and a 5.6% spread; the proposer "
-        "commit alone reads this row identically). Every resolution is inside 10% of the truth."
+        "proposer placement at 2x (accepted, Eva Oct 23): 11.8% spread, all confident (7.33 / 6.74 / 6.56 per "
+        "inch at 0.5x / 1x / 2x against 6.90) -- the working-resolution proposer's two 2-inch areas sit elsewhere "
+        "at each resolution (main read 4 / 4 / 1 areas and a 5.6% spread; the proposer commit alone reads this "
+        "row identically). Every resolution is inside 10% of the truth."
     ),
 }
 
 # Confident-and-wrong at some resolution, pinned exactly (fixture, scale, axis).
 RESOLUTION_CONFIDENT_AND_WRONG = [
-    ("knit_08", 2.0, "wale"),   # +10.1% confident at 2x, inherited from the proposer's placement (the proposer commit alone reads it identically)
+    ("knit_08", 2.0, "wale"),   # proposer placement at 2x (accepted, Eva Oct 23): +10.1% confident, the two 2-inch areas the proposer lands at 2x (the proposer commit alone reads it identically)
     ("teal", 0.5, "wale"),      # teal W's accepted -11..-14% (KNOWN_CONFIDENT_AND_WRONG), at every resolution
     ("teal", 1.0, "wale"),
     ("teal", 2.0, "wale"),
