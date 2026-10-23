@@ -175,7 +175,7 @@ const SPECS = [   // the longest first, so four at a time finishes soonest
   { name: 'mf-friction-substep', swatch: 'plain', params: { FRICTION_MODE: 'substep' }, peakHold: 600 },
   { name: 'mf-no-contact-velocity', swatch: 'plain', params: { CONTACT_VELOCITY: false, SUBSTEPS_PER_FRAME: 32 } },
   { name: 'mf-friction-accumulates', swatch: 'plain', mutant: 'friction-cap-accumulates' },
-  { name: 'mf-gauss-seidel-stretch', swatch: 'plain', params: { STRETCH_SOLVER: 'gs' } },
+  { name: 'mf-gauss-seidel-stretch', swatch: 'plain', params: { STRETCH_SOLVER: 'gs', SUBSTEPS_PER_FRAME: 32, CONTACT_VELOCITY: false } },   // the phase-1 solver
   { name: 'mf-compliant-yarn', swatch: 'plain', params: { STRETCH_COMPLIANCE: 2e-6 } },
 ];
 const ONLY = opt('--only', null);
@@ -275,7 +275,8 @@ function monotoneClosed(r) {
 if (has('plain')) {
   console.log('\n== M. μ 0.25: monotonic loading through the jam, a clean closed unloading branch');
   for (const k of PAIRS.flat().filter(k => runs[k])) gate(monotoneClosed(runs[k]), k);
-  if (runs['mf-no-contact-velocity']) mustFail(monotoneClosed(runs['mf-no-contact-velocity']), 'no contact velocity pass, 32 substeps (the solver before this round)');
+  if (runs['mf-friction-substep']) mustFail(monotoneClosed(runs['mf-friction-substep']), 'the phase-2 friction (each substep\'s slip only): it ratchets, the way back runs above the way out');
+  if (runs['mf-no-contact-velocity']) console.log(`  (not gated) the solver before this round, no velocity pass, 32 substeps: ${monotoneClosed(runs['mf-no-contact-velocity']).why}`);
 }
 
 // ---- H: hold ----------------------------------------------------------------------------------
@@ -328,7 +329,7 @@ if (has('plain', 'eyelet', 'mf-compliant-yarn', 'mf-gauss-seidel-stretch', 'mf-t
     gate(endedOnLoad(runs[k]), `${k}: the test, not the strain safety, ends the loading (peak ${fmt(runs[k].pull.peak.load)} at ${pct(runs[k].pull.peak.ext)}; largest strain anywhere ${pct(Math.max(...R[k].rows.map(r => Math.abs(r.strain))), 3)})`);
   }
   mustFail(strainBeforeJam(R['mf-compliant-yarn']), 'a yarn 2,000x more compliant (STRETCH_COMPLIANCE 2e-6)');
-  mustFail(endedOnLoad(runs['mf-gauss-seidel-stretch']), `the one-sweep Gauss-Seidel stretch solve, the first version (${strainBeforeJam(R['mf-gauss-seidel-stretch']).why})`);
+  mustFail(endedOnLoad(runs['mf-gauss-seidel-stretch']), `the one-sweep Gauss-Seidel stretch solve at 32 substeps, the first version (${strainBeforeJam(R['mf-gauss-seidel-stretch']).why})`);
   mustFail(noCollapse(R['mf-tail-untied']), 'the comb fixture with the yarn\'s end left free (it unravels from the tail under load)');
 }
 
