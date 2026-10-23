@@ -257,6 +257,23 @@ main was fast only because it proposed nothing.
 Whole scorecard: main 2 m 14 s, branch 8 m 53 s (mostly the extra analysis on knit_02 / knit_05 at
 every resolution and jitter step).
 
+### 6b. 4000 px photos (criterion 7), measured by the session that wrote `f875431`
+
+The fixture upscaled or downscaled to a 4000 px long edge (INTER_CUBIC / INTER_AREA, JPEG q92),
+calibrated correctly, through the API, local, **nothing else running on the box**:
+
+| photo @4000 | propose main → branch | areas main → branch | whole request main → branch |
+|---|---|---|---|
+| jersey (4000x2674) | 0.80 → 0.42 s | 0 → 2 | 0.80 → 4.96 s |
+| knit_01 (4000x3517) | 1.97 → 0.89 s | 2 → 4 | 3.52 → 8.36 s |
+| knit_02 (4000x2667) | 1.11 → 0.09 s | 0 → 4 | 1.11 → 12.97 s |
+| teal (3200x4000) | 3.31 → 0.25 s | 2 → 4 | 4.91 → 19.75 s |
+
+The proposer is 2–12× faster. The whole request is slower, because areas now exist (or more and
+larger ones get analysed) at full resolution, at ~5 s per 2-inch area at 4000 px. Teal at ~20 s
+locally is a risk against the frontend's 75 s timeout on Render's free tier. Analysis-side
+resolution normalisation, which the knit_02 2× failure needs anyway, would likely fix this too.
+
 ## 7. For the measurement session
 
 - Success criteria the proposer fix alone fails: 2/3/4/7 of the brief (knit_05 course confident
