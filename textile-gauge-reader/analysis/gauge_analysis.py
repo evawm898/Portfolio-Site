@@ -4114,12 +4114,20 @@ def _brightness_score(mean_brightness: float) -> float:
     return float(np.clip((255.0 - mean_brightness) / (255.0 - hi), 0.0, 1.0))
 
 
-def _roi_quality_score(crop_gray: np.ndarray) -> Tuple[float, dict]:
+def _roi_quality_score(crop_gray: np.ndarray, sharpness_ceiling: Optional[float] = None) -> Tuple[float, dict]:
     """
     Generic image-quality score for an automatically-proposed measurement
     area candidate -- NOT the final gauge-detection confidence (that's
     computed per-approved-ROI, later, by analyze_gauge). Used only to
     rank and select candidate regions before the user ever sees them.
+
+    `sharpness_ceiling` is the Laplacian variance at which a window's
+    sharpness term saturates at 1.0. propose_measurement_rois passes the
+    PHOTO'S OWN clean-fabric level (_global_sharpness_baseline) -- see
+    ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING for why a fixed number cannot
+    do this job; the fixed number is the fallback for a caller that has
+    no photo to measure (the unit tests score single crops) and for a
+    photo with too little textured area to establish a baseline.
     """
     if crop_gray.size == 0:
         parts = dict(
@@ -4131,11 +4139,20 @@ def _roi_quality_score(crop_gray: np.ndarray) -> Tuple[float, dict]:
     crop_f = crop_gray.astype(np.float32)
 
     # Sharpness: variance of the Laplacian -- low for blur, high for
-    # crisp edges. Normalized against a generous ceiling (empirically,
-    # very sharp textile close-ups rarely exceed this) so no single
-    # outlier crop dominates relative ranking.
+    # crisp edges -- against a ceiling so no single outlier crop can
+    # dominate the ranking on this term. The ceiling is the photo's own
+    # clean-fabric level wherever the caller could measure one: a window
+    # AT that level is as sharp as this fabric gets (1.0), a window under
+    # it is softer than the fabric around it (defocus, motion, a curled
+    # edge), and a window ABOVE it is sharper than fabric can be -- a
+    # ruler's print, a label -- which is capped, never rewarded.
+    ceiling = (
+        float(sharpness_ceiling)
+        if sharpness_ceiling is not None and sharpness_ceiling > 1e-6
+        else ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING
+    )
     sharpness_raw = float(cv2.Laplacian(crop_gray, cv2.CV_32F).var())
-    sharpness = float(np.clip(sharpness_raw / 500.0, 0.0, 1.0))
+    sharpness = float(np.clip(sharpness_raw / ceiling, 0.0, 1.0))
 
     # Local contrast: plain std-dev of intensity. Flat background or a
     # blown-out region both score low here.
@@ -4169,6 +4186,56 @@ def _roi_quality_score(crop_gray: np.ndarray) -> Tuple[float, dict]:
     return float(np.clip(score, 0.0, 1.0)), parts
 
 
+# The sharpness term's ceiling when no photo baseline is available (a
+# unit test scoring one crop; a photo with under five textured blocks).
+# It is NOT the production ceiling, and the reason is a measurement, not
+# a preference. "Variance of the Laplacian" carries no fixed-pixel
+# meaning across scales: on a textile photo it is dominated by sensor
+# noise, JPEG blocking and in-camera sharpening, which no resampling law
+# predicts. Measured on the eight real fixtures' KNOWN-CLEAN pinned
+# crops, native scale -> the proposer's 180 px/in working copy (INTER_
+# AREA): knit_09 1019 -> 453 at a resample factor of 0.963, knit_05
+# 193 -> 96, knit_01 1445 -> 1099, knit_08 1016 -> 715, knit_06 879 ->
+# 1355 (UP), knit_02 144 -> 608 (up 4.2x at a factor of 0.152) -- against
+# the s^4 a smooth texture would follow (0.001 .. 0.86 over the same
+# rows). Clean fabric at the working scale spans 96 .. 1355, so there is
+# no single value at 180 px/in that is "the level sharp fabric reaches":
+# whichever number is typed here, some clean photo sits well under it,
+# and on THAT photo any window that borrows a strip of a ruler (whose
+# print reads 5,000-7,000 at the working scale, above fabric at every
+# scale) wins the sharpness term outright. This is how the ruler-band
+# regression entered at 180 px/in: the synthetic fabric's 711 at native
+# was pixel noise (sigma 6 white noise through the 3x3 Laplacian is 720
+# by arithmetic) that INTER_AREA averaged down to 265, under this
+# ceiling, while the ruler strip's hard edges stayed over it. So the
+# production ceiling is the photo's OWN clean-fabric level, measured at
+# the scale the proposer runs at (_global_sharpness_baseline -- the same
+# construction as the anomaly gate's _global_local_std_baseline), and
+# this constant is reached only where that cannot be measured.
+ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING = 500.0
+
+# Fixed-PIXEL constants of the proposer, audited at the working scale
+# (ROI_PROPOSAL_WORKING_PX_PER_INCH, 180 px/in, 7.09 px/mm -- the finest
+# image the proposer ever sees; a coarser photo runs at its own scale,
+# as it always did):
+#   * the 16 px fabric / anomaly block is 2.26 mm. The anomaly fraction's
+#     0.5 gate, its 4-MAD multiplier and the 10-grey-level fabric floor
+#     were swept on the two real fixtures at THEIR native scales -- the
+#     jersey at 166 px/in (16 px = 2.45 mm) and the teal at 273 px/in
+#     (1.49 mm) -- so the working scale sits inside the span those
+#     thresholds were set over. Unchanged.
+#   * the minimum sizes: _periodicity_consistency_score's 20 px half-
+#     crop (a 40 px crop, 5.6 mm), _local_anomaly_fraction's four blocks
+#     (64 px, 9.0 mm), MIN_ROI_DIM_PX * 2 (80 px, 11.3 mm) are each well
+#     under the smallest window tried, 0.75 in = 135 px. Unchanged.
+#   * the kernels are the analyser's own primitives, reused: the 3x3
+#     Gaussian and Sobel in _enhance_texture, SMOOTHING_WINDOW_PX = 3 and
+#     MIN_PLAUSIBLE_SPACING_PX = 3 in _project / _autocorrelation_spacing
+#     -- 3 px is 0.42 mm, 60 repeats per inch, finer than any knit; the
+#     CLAHE 8x8 tile grid and the texture-consistency 4x4 grid are counts.
+#     Unchanged.
+#   * the sharpness ceiling: the one constant with no consistent value at
+#     any scale -- replaced by the photo's own baseline, above.
 ROI_PROPOSAL_BACKGROUND_BLOCK_PX = 16       # block size for the coarse fabric-vs-background variance map
 ROI_PROPOSAL_BACKGROUND_STD_THRESHOLD = 10.0  # blocks with local std-dev below this count as "background"
 ROI_PROPOSAL_MIN_FABRIC_FRACTION = 0.97       # a candidate window must be at least this "fabric" to be considered at all
@@ -4287,6 +4354,37 @@ def _global_local_std_baseline(gray_full: np.ndarray, block: int = ROI_PROPOSAL_
     return median, mad
 
 
+def _global_sharpness_baseline(gray_full: np.ndarray, block: int = ROI_PROPOSAL_ANOMALY_BLOCK_PX) -> Optional[float]:
+    """
+    The photo's own clean-fabric sharpness: the MEDIAN per-block variance
+    of the Laplacian across the whole image, over blocks that already
+    read as textured by _fabric_mask's floor, computed ONCE per proposal
+    run and handed to every candidate's _roi_quality_score as its
+    sharpness ceiling (see ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING for
+    why the ceiling has to come from the photo). A median, like the
+    anomaly baseline's: a ruler band that is a sixth of the photo at
+    twenty times fabric's Laplacian variance cannot move it, where a mean
+    would be dragged to a level no fabric window reaches. Returns None
+    where fewer than five textured blocks exist -- callers fall back to
+    the fixed ceiling and the proposal still runs.
+    """
+    gray_f = gray_full.astype(np.float32)
+    k = (block, block)
+    mean = cv2.boxFilter(gray_f, ddepth=-1, ksize=k, normalize=True)
+    mean_sq = cv2.boxFilter(gray_f * gray_f, ddepth=-1, ksize=k, normalize=True)
+    local_std = np.sqrt(np.clip(mean_sq - mean * mean, 0.0, None))
+    lap = cv2.Laplacian(gray_f, cv2.CV_32F)
+    lap_mean = cv2.boxFilter(lap, ddepth=-1, ksize=k, normalize=True)
+    lap_mean_sq = cv2.boxFilter(lap * lap, ddepth=-1, ksize=k, normalize=True)
+    lap_var = np.clip(lap_mean_sq - lap_mean * lap_mean, 0.0, None)
+    sampled_std = local_std[block // 2 :: block, block // 2 :: block]
+    sampled_var = lap_var[block // 2 :: block, block // 2 :: block]
+    textured = sampled_var[sampled_std >= ROI_PROPOSAL_BACKGROUND_STD_THRESHOLD]
+    if textured.size < 5:
+        return None
+    return float(np.median(textured))
+
+
 def _local_anomaly_fraction(
     crop_gray: np.ndarray,
     global_median_std: Optional[float],
@@ -4368,9 +4466,12 @@ def _local_anomaly_fraction(
 # The proposer runs at ONE working resolution, whatever the photo's own.
 # Every gate and score below carries fixed-PIXEL constants that were
 # tuned on ~170-350 px/in photos: _fabric_mask's and the anomaly
-# baseline's 16 px blocks with an absolute std-dev floor, the Laplacian
-# sharpness ceiling, MIN_PLAUSIBLE_SPACING_PX, the quadrant split's 20 px
-# minimum. On a phone-resolution photo (knit_sample_02 is 1187 px/in) a
+# baseline's 16 px blocks with an absolute std-dev floor, MIN_PLAUSIBLE_
+# SPACING_PX, the quadrant split's 20 px minimum (each audited at the
+# working scale beside ROI_PROPOSAL_BACKGROUND_BLOCK_PX), and the
+# Laplacian sharpness ceiling, which turned out to have no consistent
+# value at any scale and now comes from the photo itself
+# (_global_sharpness_baseline). On a phone-resolution photo (knit_sample_02 is 1187 px/in) a
 # 16 px block sits INSIDE a single smooth yarn strand, so its local
 # std-dev falls under the floor and real fabric reads as "background":
 # knit_02's windows scored 31-53% fabric against the 97% gate and every
@@ -4506,6 +4607,7 @@ def _propose_measurement_rois_at_scale(image_bgr: np.ndarray, pixels_per_mm: flo
     gray_full = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     fabric_mask = _fabric_mask(gray_full)
     anomaly_baseline_median, anomaly_baseline_mad = _global_local_std_baseline(gray_full)
+    sharpness_ceiling = _global_sharpness_baseline(gray_full)
 
     best_size_selection: Optional[List[dict]] = None  # best candidate SET seen at any size, as a last-resort fallback
     best_size_window_px: Optional[int] = None
@@ -4550,7 +4652,7 @@ def _propose_measurement_rois_at_scale(image_bgr: np.ndarray, pixels_per_mm: flo
                 anomaly_fraction = _local_anomaly_fraction(crop_gray, anomaly_baseline_median, anomaly_baseline_mad)
                 if anomaly_fraction > ROI_PROPOSAL_MAX_ANOMALY_FRACTION:
                     continue
-                score, parts = _roi_quality_score(crop_gray)
+                score, parts = _roi_quality_score(crop_gray, sharpness_ceiling=sharpness_ceiling)
                 # Third hard gate: periodicity_consistency is only 20% of
                 # the weighted score above, so a window that's mostly
                 # clean but grazes a curled/distorted/wrinkled band (or
