@@ -573,8 +573,8 @@ mirror moved 0.02 mm (OR5).
 1. **Wire style is a control** (`ornWireStyle`, Ornament): CONSTANT (as built) or TAPERED — the
    scroll's profile thickest in the body, thinning toward the volute, MIN_FEATURE_MM applied at
    the thinnest point (the eye), and the gap clamp reading the actual LOCAL thickness.
-   Half-round stays the default cross-section for both. **The default style: asked at the stop
-   (§11.5).**
+   Half-round stays the default cross-section for both. **The default style is TAPERED
+   (Eva, from the sheet, §11.5).**
 2. **Longer body (rocaille).** The volute share is reverted to its step-1 value, 0.5, and is
    never grown to make turns fit; zero dead travel is kept by the second mechanism alone — where
    the asked turns do not fit, the slider's top is the most that prints, told.
@@ -671,4 +671,7 @@ reflection about the axis now. `--only=<id,…>` runs a mutant subset, reported 
 
 ### 11.5 The stop
 
-One question, from the sheet: the default wire style — A) constant, B) tapered.
+One question, from the sheet: the default wire style — A) constant, B) tapered. **Ruled B,
+tapered (Eva, Oct 23).** Also noted by Eva and NOT fixed here: at the default size the lead is
+~23 mm and the tightness slider spans only 0.50–0.56 turns (tapered) — options carried to the
+session report.

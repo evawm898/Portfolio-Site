@@ -441,8 +441,8 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       ['rect crowded (groups must give way)', { skeleton: 'rect', width: 70, height: 120, ...DENSE, ornScale: 6 }],
       ['dense, round wire, tight, thick', { ...DENSE, ornShape: 'round', ornTightness: 1, ornWire: 3.2 }],
     ];
-    // every row again with the TAPERED wire (phase 3b, ruling 1)
-    for (const [nm, q] of OROWS.slice()) OROWS.push([`${nm} · tapered`, { ...q, ornWireStyle: 'tapered' }]);
+    // every row in BOTH wire styles (phase 3b, ruling 1; tapered the default)
+    for (const r of OROWS.splice(0)) { OROWS.push([`${r[0]} · tapered`, { ...r[1], ornWireStyle: 'tapered' }], [`${r[0]} · constant`, { ...r[1], ornWireStyle: 'constant' }]); }
     const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : 'constant');
     const ST = { constant: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, tapered: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 } };
     // the gate's own band footprints, in print mm: an open band is one

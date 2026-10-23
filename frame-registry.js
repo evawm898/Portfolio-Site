@@ -96,7 +96,8 @@ export const PARAM_SPEC = [
   // the wire's style (phase 3b, Eva's ruling 1): CONSTANT along the scroll,
   // or TAPERED — full width through the body, thinning over each volute to
   // half of it at the eye, floored at MIN_FEATURE_MM (the thinnest point)
-  { id: 'ornWireStyle', section: 'ornament', label: 'Wire style', kind: 'choice', default: 'constant', visibleWhen: ornOn,
+  // default TAPERED (Eva, phase 3b, from the sheet)
+  { id: 'ornWireStyle', section: 'ornament', label: 'Wire style', kind: 'choice', default: 'tapered', visibleWhen: ornOn,
     options: [['constant', 'Constant'], ['tapered', 'Tapered — thins toward the volute']] },
   { id: 'ornCrest', section: 'ornament', label: 'Crest (top centre)', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },
   { id: 'ornCorners', section: 'ornament', label: 'Corners / springings', kind: 'choice', default: 'on', visibleWhen: (p) => ornOn(p) && !isOval(p), options: ON_OFF },
