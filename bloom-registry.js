@@ -2655,7 +2655,9 @@ export const CONTROLS = [
   { id: 'textureSize', section: 'texture', kind: 'slider',
     min: TEXTURE_SIZE_RANGE[0], max: TEXTURE_SIZE_RANGE[1], step: TEXTURE_SIZE_STEP, default: TEXTURE_SIZE_DEFAULT,
     label: 'Feature size',
-    fmt: (v) => `${Number(v).toFixed(1)} mm features on a ${TEXTURE_EDGE_MM.toFixed(1)} mm lattice (${(Number(v) / TEXTURE_EDGE_MM).toFixed(1)} edges across one)`,
+    /* the lattice edge is the SHOWN build's (the budget cap may coarsen it,
+       Eva's Oct 23 ruling), the ruled constant where no build is shown */
+    fmt: (v, ui, shown) => { const e = (shown && shown.texture && shown.texture.edgeMm) || TEXTURE_EDGE_MM; return `${Number(v).toFixed(1)} mm features on a ${e.toFixed(2)} mm lattice (${(Number(v) / e).toFixed(1)} edges across one)${e !== TEXTURE_EDGE_MM ? ' — the edge is COARSENED to fit the export budget, see the read-out' : ''}`; },
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'texturePresent' } },
 
   /* THE TUBE — one slider per whorl (Eva's ruling: per layer), stepped over

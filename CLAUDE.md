@@ -1388,15 +1388,42 @@ lattice or relief, `textureContext`, `TEXTURE_*`, `TEXTURE_BAR_XFAIL`, TX0–TX8
   REPORTED WITH RENDERS, not masked and not rows**: the 0.40 mm nib at PEBBLE 1.5 (19 / 0.5011), cup × curl at
   1.5 on both patterns (1,588 / 0.2727, 1,298 / 0.2975). At the 0.4 mm default nothing measured folds but the
   declared row. The default's neighbour clearance is 0.000 textured AND untextured (the accepted crossing).
-- Cost: the default 24,688 → **151,792** at PEBBLE 0.4; **40 × 3 whorls is 1,542,832 (102.9%) and REFUSES**.
-  The cap's three mechanisms are measured and NONE is picked (refuse as today; cap the head count — 38 of
-  40 fit at 3 whorls; coarsen the edge — 0.5 mm is the finest that fits). WAITING ON EVA.
+- Cost: the default 24,688 → **151,792** at PEBBLE 0.4; **40 × 3 whorls is 1,542,832 (102.9%) at the ruled
+  edge** — the cap's three mechanisms were measured and NONE picked on Oct 22; **RULED Oct 23: COARSEN THE
+  EDGE, TOLD — the block below.**
 - Gates: TX0–TX8 in both STL gates, five witnessed apex mutants, panel route (ao) (THIRTY-TWO routes) with
   the section's geometry witness, block 77 (19 rows, 1,525), smoke block 77, E carves relieved parts out BY
   NAME, the texture sliders are `SCOPE_UNSCOPED`. `frozen/phase83` = the 1,506 rows at `56f91f4` (row-for-row `d60e734`'s); 0 frozen
   rows name a texture id. **Its tag was REFUSED on `frame.yml`** (#452 edited it after the base, merged mid-CI; the
   phase65 shape) and is declared in `TAG_PUSH_XFAIL`; the registration is what pins it. Sheet: `node tools/shot-bloom-texture-t3.mjs` → `docs/img/bloom-texture-t3.png`;
   `tools/bloom-texture-bead.mjs` and `tools/bloom-texture-corner.mjs` are the measurements.
+
+**THE TEXTURE'S LATTICE EDGE IS DERIVED FROM THE EXPORT BUDGET: OVER IT AT 0.4 mm THE EDGE COARSENS TO THE
+FINEST 0.01 mm RUNG THAT FITS, NEVER PAST 0.5, TOLD; PAST 0.5 THE EXPORT IS REFUSED, SAID** (Eva's ruling of
+Oct 23 on the worst corner — read §7 of `docs/bloom-surface-texture-t3-outcome.md` before touching THE EDGE CAP
+block beside `textureFor`, `buildBloomInto`'s outer wrapper, `TEXTURE_EDGE_IN_FORCE`, `textureEdgeRung`,
+`texture.edgeCap`, TX9, `TEXTURE_CAP_ROW` or block 79).
+- `buildBloomInto` builds at the ruled 0.4 into the caller's own accumulator first (a build that fits pays
+  nothing — the shipping default is one trial, 151,792, unmoved), and only over `EXPORT_TRI_BUDGET` bisects
+  the rungs `(40 + k) / 100` between 0.4 and `TEXTURE_EDGE_CAP_MM` (0.5) with REAL whole-bloom trial builds —
+  the cap first, then halving — so the finest fitting rung is derived, never typed per state. The 40 × 3 corner
+  lands on **0.41 mm (1,478,672, 98.6%)**, the whole bloom at that count on 0.43; the corner pays five builds.
+- **ONE EDGE FOR THE WHOLE BLOOM**: `TEXTURE_EDGE_IN_FORCE` is read by every organ and every floret through
+  `textureEdgeInForce`; `cap.textureEdgeMm` is a PIN now (every organ, the derivation off) — the corner tool's
+  measuring route, the sheet's refused-0.4 cell, and TX9's rebuild of the next finer rung.
+- Past the cap the build stands at 0.5 and the export is refused as before, with `EVEN 0.50 mm DOES NOT FIT` on
+  the read-out: 40 × 3 + whorled leaves (148% at 0.4), 40 × 2 + 40 sepals + leaves, the 12 × 12 × 1.00 umbel, and
+  40 × 3 at 100 × 46 mm petals (548%) are refused; block 79's declared refusal is 40 × 3 + 40 sepals × 4 tiers +
+  whorled leaves at **1,795,898** on 0.5. **No matrix row of the 1,552 trips the cap** (the byte partition's
+  predeclared movers are exactly block 79's three added rows); the states that do are §7b of the doc.
+- The decision reads the caller's own mode's count; the gates' `tris(live) === tris(export)` is what makes it
+  mode-free (measured on the corner: both modes land on 0.41 with the same five trials).
+- Gates: **TX9** (the edge used = the derived edge: the law, the rung, every blade on it, `fits` against the
+  BUILDER's tally, the next finer rung does not fit through the PIN, the read-out's words); TX0 checks the ASKED
+  edge; three witnessed apex mutants (the cap removed, the edge typed at 0.5 — the default moves —, coarsened
+  past 0.5); block 79 (3 rows, 1,555), smoke block 79, `EXPORT_REFUSED_XFAIL` + XR1 on the refusal; capped rows
+  take the refused rows' 120 s settle. `frozen/phase85` = the 1,552 rows at `908221c`. Sheet §6: the corner at
+  0.4 (pinned, refused) beside the derived edge with relief close-ups and the counts in the captions.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,

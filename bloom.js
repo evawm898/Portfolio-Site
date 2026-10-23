@@ -2697,7 +2697,16 @@ function textureLine(T) {
     return `${k}: ${q.panels} panel${q.panels === 1 ? '' : 's'}, ${q.subRows} sub-rows, columns x${q.cfMax}, skin ${q.skinTris} tris = ${ratio}x its floor (the builder's own estimate — TX4 reads the untextured twin, ~0.1 lower)${q.floorTris && q.skinTris / q.floorTris > TEXTURE_LATTICE_BAR ? ` (PAST THE ${TEXTURE_LATTICE_BAR}x BAR BY THIS ESTIMATE)` : ''}, relief 0..${q.reliefMaxMm.toFixed(3)} mm${ref ? `; ${ref}` : ''}`;
   });
   const clamp = (T.heightClamped ? ' · height CLAMPED to its range' : '') + (T.sizeClamped ? ' · feature size CLAMPED to its range' : '');
-  return `TEXTURE ${word}: ${T.heightMm.toFixed(2)} mm peak to valley, ${T.sizeMm.toFixed(1)} mm features, outward only over the bead, on a ${T.edgeMm.toFixed(1)} mm lattice${clamp} — ${parts.join(' · ')}. The hub, stem, rods and tube ring stay smooth (T5).\n`;
+  /* THE EDGE CAP (Eva, Oct 23): the edge actually used is printed whenever it
+     differs from the ruled 0.4 mm, with the counts the decision was made on;
+     past 0.5 the build stands at 0.5 and the export will be refused — said. */
+  const C = T.edgeCap;
+  const fmtTris = (n) => Number(n).toLocaleString('en-US');
+  const edgeWords = C && C.pinned ? `on a ${T.edgeMm.toFixed(2)} mm lattice (PINNED by a capability hook — the budget cap is off)`
+    : C && C.usedMm !== C.askedMm
+      ? `on a ${C.usedMm.toFixed(2)} mm lattice — COARSENED from the ruled ${C.askedMm.toFixed(2)} mm to fit the ${fmtTris(C.budget)} export budget (${C.trials.map((t) => `${t.edgeMm.toFixed(2)} mm: ${fmtTris(t.tris)}`).join(', ')}; the finest edge that fits, never past ${C.capMm.toFixed(2)})${C.fits ? '' : ` — EVEN ${C.capMm.toFixed(2)} mm DOES NOT FIT (${fmtTris(C.trials[C.trials.length - 1].tris)} tris): the export will be REFUSED`}`
+      : `on a ${T.edgeMm.toFixed(1)} mm lattice`;
+  return `TEXTURE ${word}: ${T.heightMm.toFixed(2)} mm peak to valley, ${T.sizeMm.toFixed(1)} mm features, outward only over the bead, ${edgeWords}${clamp} — ${parts.join(' · ')}. The hub, stem, rods and tube ring stay smooth (T5).\n`;
 }
 function infillLine(petals) {
   const F = petals && petals[0] && petals[0].infill;

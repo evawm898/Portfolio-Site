@@ -13,8 +13,14 @@
        texture control greyed, and with BOTH on (neither greyed, told).
    (5) THE WHOLE BLOOM with sepals and a leaf: the sheets carry the field,
        the hub / stem / rods / tube ring do not (T5).
-   (6) THE CORNER-CAP OPTIONS — the numbers from tools/bloom-texture-corner.mjs,
-       mechanism by mechanism, NONE PICKED (Eva's question).
+   (6) THE WORST CORNER UNDER THE EDGE CAP (Eva's ruling of Oct 23: coarsen
+       the edge, told) — 40 x 3 at the ruled 0.4 mm (PINNED through the
+       capability hook: 1,542,832 tris, the export refused) beside the same
+       head on the DERIVED edge (0.41 mm, 1,478,672, fits), whole and a relief
+       close-up of each, the edge and the counts in every caption, and the
+       state even the 0.5 mm cap cannot hold (refused, told). The mechanism
+       table from tools/bloom-texture-corner.mjs stays beneath as the record
+       the ruling was made on.
 
    EVERY CANVAS CELL: PRINT PREVIEW ON (read back from the app's own
    shownMode), chrome hidden, auto-rotate off through the asserted
@@ -34,7 +40,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { decodePNG } from './pngdec.mjs';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, exportStl, analyzeStl,
+import { serveRepo, launchPage, openBloom, applyConfig, settleMsForRow, fullStateDrift, stillFrame, exportStl, analyzeStl,
          junctionAssertions, textureAssertions, settleBuild, modeTag, shownModeOf } from './bloom-harness.mjs';
 
 const argv = process.argv;
@@ -90,21 +96,28 @@ async function shoot(file, view, frame) {
   await die(`${path.basename(file)}: still inside the model after four widenings`);
 }
 
-async function cell({ label, set: sets = [], views = ['whole'], frame = null, ruling = '' }) {
+async function cell({ label, set: sets = [], views = ['whole'], frame = null, ruling = '', capability = null, refused = false }) {
   await openBloom(page, port);
-  const bad = await applyConfig(page, sets);
+  /* the PIN through the page's own hook (no structural row assertions: this is a sheet cell, not a matrix row) */
+  if (capability) await page.evaluate((c) => window.__bloomCapability(c), { label: 'texture edge pinned', ...capability });
+  const bad = await applyConfig(page, sets, null, { settleMs: settleMsForRow(label) });
   if (bad.length) await die(`${label}: ${bad.join('; ')}`);
   const drift = await fullStateDrift(page, sets);
   if (drift.length) await die(`${label}: state is not DEFAULTS+set: ${drift.join('; ')}`);
-  const row = { label, set: sets };
+  const row = { label, set: sets, capability };
   const jct = await junctionAssertions(page, row);
   if (jct.length) await die(`${label}: junction: ${jct.join('; ')}`);
-  const tx = await textureAssertions(page, row);
+  /* a PINNED or over-budget cell has no declared matrix row, so TX9's refusal
+     clause (declared in EXPORT_REFUSED_XFAIL) is the one it may not meet */
+  const tx = (await textureAssertions(page, row)).filter((t) => !(refused && /EXPORT_REFUSED_XFAIL/.test(t)));
   if (tx.length) await die(`${label}: TX: ${tx.join('; ')}`);
   const buf = await exportStl(page, tmp);
-  if (!buf) await die(`${label}: no STL download`);
-  const stl = analyzeStl(buf);
-  if (stl.boundary !== 0 || stl.degenerate !== 0) await die(`${label}: the export has ${stl.boundary} boundary edges and ${stl.degenerate} degenerate triangles`);
+  if (!buf && !refused) await die(`${label}: no STL download`);
+  if (buf && refused) await die(`${label}: the export was expected to be REFUSED and a file came back`);
+  const stl = buf ? analyzeStl(buf) : null;
+  if (stl && (stl.boundary !== 0 || stl.degenerate !== 0)) await die(`${label}: the export has ${stl.boundary} boundary edges and ${stl.degenerate} degenerate triangles`);
+  const refusal = refused ? await page.evaluate(() => document.getElementById('readout')?.textContent || '') : '';
+  if (refused && !/export refused:/.test(refusal)) await die(`${label}: the read-out carries no budget refusal`);
   const m0 = await page.evaluate(() => window.__bloomMetrics());
   const bad0 = await stillFrame(page);
   if (bad0.length) await die(`${label}: ${bad0.join('; ')}`);
@@ -119,9 +132,9 @@ async function cell({ label, set: sets = [], views = ['whole'], frame = null, ru
   const texLine = readout.split('\n').find((l) => /^TEXTURE/.test(l)) || 'no TEXTURE line (untextured)';
   const T = m.texture;
   const petal = T && T.organs && T.organs.petal;
-  const rec = { label, ruling, shots, own, tag: modeTag(m), sha: sha(buf), bytes: buf.length, tris: stl.tris, shownTris: m.shownTris, texLine,
-    ratio: petal && petal.floorTris ? petal.skinTris / petal.floorTris : null, relief: petal ? petal.reliefMaxMm : null, refused: T ? T.refused : null };
-  console.log(`  ${label.padEnd(62)} ${String(stl.tris).padStart(8)} tris · ${rec.ratio ? rec.ratio.toFixed(3) + 'x floor' : '—'} · ${rec.tag}`);
+  const rec = { label, ruling, shots, own, tag: modeTag(m), sha: buf ? sha(buf) : 'REFUSED', bytes: buf ? buf.length : 0, tris: stl ? stl.tris : m.shownTris, shownTris: m.shownTris, texLine,
+    ratio: petal && petal.floorTris ? petal.skinTris / petal.floorTris : null, relief: petal ? petal.reliefMaxMm : null, refused: T ? T.refused : null, edgeCap: T ? T.edgeCap : null, exportRefused: !buf };
+  console.log(`  ${label.padEnd(62)} ${String(rec.tris).padStart(8)} tris${rec.exportRefused ? ' (export REFUSED)' : ''} · ${rec.ratio ? rec.ratio.toFixed(3) + 'x floor' : '—'} · ${rec.tag}`);
   return rec;
 }
 
@@ -176,12 +189,20 @@ panels.push(await panelCell({ label: 'BOTH on (a loaded design) — neither grey
 /* (5) the whole bloom with sepals and a leaf */
 const whole = await cell({ label: 'PEBBLE 0.4 mm with 8 sepals and a leaf on a 60 mm stem', set: set({ petalTexture: 'PEBBLE', sepalCount: 8, stemLength: 60, leafLength: 60 }), views: ['whole'], ruling: 'petals, sepals and the leaf carry the one field; the hub, stem, petiole and rods stay smooth (T5)' });
 
+/* (6) the corner under the cap: pinned at 0.4 (refused) against the derived edge */
+const CORNER_SET = { petalTexture: 'PEBBLE', petalCount: 40, layerCount: 3 };
+const cornerCells = [];
+cornerCells.push(await cell({ label: 'the worst corner — 40 x 3 at the ruled 0.40 mm edge (PINNED; the export is REFUSED)', set: set(CORNER_SET), views: ['whole', 'bead'], capability: { textureEdgeMm: 0.4 }, refused: true, ruling: 'what the ruled edge alone would build: over the budget, so the page refuses the export (the T3 state, reproduced through the hook that pins the edge)' }));
+cornerCells.push(await cell({ label: 'the worst corner — 40 x 3 on the DERIVED edge (the cap: the finest 0.01 mm rung that fits)', set: set(CORNER_SET), views: ['whole', 'bead'], frame: cornerCells[0].own, ruling: 'Eva\'s ruling (Oct 23): the edge coarsens to the finest rung that fits, never past 0.5, and the read-out says which' }));
+cornerCells.push(await cell({ label: 'past the cap — 40 x 3 + 40 sepals x 4 tiers + whorled leaves on a 120 mm stem (REFUSED at 0.50 mm, told)', set: set({ ...CORNER_SET, sepalCount: 40, sepalTiers: 4, stemLength: 120, leafLength: 60, leafNodes: 8, leafPhyllotaxy: 'whorled' }), views: ['whole'], refused: true, ruling: 'even the 0.5 mm cap does not fit: the build stands at 0.5 and the export is refused with the count — never coarser without a ruling' }));
+
 /* captions */
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const beadOf = (state, type, H) => BEAD && BEAD.find((b) => b.state.startsWith(state) && b.type === type && Math.abs(b.H - H) < 1e-9);
 const num = (c) => `<b>${esc(c.tag)}</b> · ${Number(c.tris).toLocaleString('en-US')} tris in the file${c.ratio ? ` · petal lattice skin <b>${c.ratio.toFixed(3)}x</b> its conforming floor (bar 1.25x)` : ''}${c.relief != null ? ` · relief 0..${c.relief.toFixed(3)} mm` : ''} · STL ${c.sha} (${(c.bytes / 1024).toFixed(0)} KiB)<br><small>${esc(c.texLine)}</small>`;
 const fig = (c, view, extra = '') => `<figure><img src="${c.shots[view]}"><figcaption><b>${esc(c.label)}</b><br><small>${esc(c.ruling)}</small><br>${num(c)}${extra}</figcaption></figure>`;
 const beadNum = (type, H, state = 'the default') => { const b = beadOf(state, type, H); return b ? `<br>bead tool: apex moves out <b>max ${b.apexMax.toFixed(3)} / mean ${b.apexMean.toFixed(3)} mm</b> of H ${H} over ${b.apexN} samples · within-shell pairs ${b.within} (untextured ${b.withinTwin}) worst ${b.worstMm.toFixed(4)} mm · nearest neighbour blade ${b.gapMm.toFixed(3)} mm (untextured ${b.gapTwinMm.toFixed(3)})` : '<br><i>bead tool not run in this invocation (--bead)</i>'; };
+const capNum = (c) => { const E = c.edgeCap; if (!E) return ''; return `<br>edge cap: asked ${E.askedMm.toFixed(2)} mm · <b>used ${E.usedMm.toFixed(2)} mm</b>${E.pinned ? ' (pinned)' : ''} · trials ${E.trials.map((t) => `${t.edgeMm.toFixed(2)} mm → ${Number(t.tris).toLocaleString('en-US')}`).join(', ')} · ${E.fits ? `fits the ${Number(E.budget).toLocaleString('en-US')} budget` : `<b>DOES NOT FIT the ${Number(E.budget).toLocaleString('en-US')} budget — export refused</b>`}${c.exportRefused ? ' · <b>no STL</b> (the page refused)' : ''}`; };
 const cornerHtml = () => {
   if (!CORNER) return '<p class="note"><i>corner tool not run in this invocation (--corner)</i></p>';
   const pct = (t) => `${Number(t).toLocaleString('en-US')} (${(100 * t / CORNER.budget).toFixed(1)}%)`;
@@ -216,7 +237,12 @@ figcaption{margin-top:8px}small{color:#7f948a}table{border-collapse:collapse;mar
 <main>${panels.map(panelFig).join('')}</main>
 <h2>5. The whole bloom — which sheets carry the field</h2>
 <main class="two">${fig(whole, 'whole')}</main>
-<h2>6. The worst corner (40 petals × 3 whorls) — the cap's options, none picked</h2>
+<h2>6. The worst corner (40 petals × 3 whorls) under the EDGE CAP — ruled Oct 23: coarsen the edge, told</h2>
+<main class="two">${cornerCells.slice(0, 2).map((c) => fig(c, 'whole', capNum(c))).join('')}</main>
+<main class="two">${cornerCells.slice(0, 2).map((c) => fig(c, 'bead', '<br>the relief close-up on one margin: the same field, the same height, on the ruled lattice (left) and the derived one (right)')).join('')}</main>
+<main class="two">${fig(cornerCells[2], 'whole', capNum(cornerCells[2]))}</main>
+<p class="note">A textured build over the ${Number(1500000).toLocaleString('en-US')} export budget at the ruled 0.4 mm edge is rebuilt on the finest 0.01 mm rung that fits, never coarser than 0.5 mm; the read-out prints the edge used whenever it differs from 0.4 (TX9 holds the edge used to the derived one, and that the next finer rung does not fit). Past 0.5 the build stands at the cap and the export is refused, said. The edge is derived from the budget on real trial builds, never typed per state.</p>
+<h3>The record the ruling was made on — the three mechanisms, measured (tools/bloom-texture-corner.mjs)</h3>
 ${cornerHtml()}`;
 fs.writeFileSync(path.join(outDir, 'index.html'), html);
 console.log(`\nwrote ${outDir}/index.html`);

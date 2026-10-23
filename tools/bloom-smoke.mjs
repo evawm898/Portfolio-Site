@@ -1871,6 +1871,22 @@ export const SMOKE_BLOCKS = [
         path: "UM0 the head's two statements on a raceme (the head present), ID1 the raceme's nodes untouched by the umbel's count" },
     ],
   },
+  {
+    n: 79, title: 'the texture edge cap (Oct 23)',
+    anchor: 'TEXTURE CAP: PEBBLE x 40 petals x 3 whorls (1,542,832 tris at 0.40 mm — the edge coarsens to the finest rung that fits)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       budget-derived lattice edge (the bisection between the ruled 0.4 and the
+       0.5 cap on real trial builds) and the refusal past the cap. The anchor
+       is the corner the ruling is about (lands on 0.41); the subset adds the
+       state even 0.5 cannot hold (the declared refusal — XR1 and TX9 on it).
+       --conn is REQUIRED for the anchor: a 1.48 M-triangle textured head is
+       the heaviest junction the flood fill reads. */
+    conn: true,
+    rows: [
+      { label: 'TEXTURE CAP: past 0.50 mm — 40 x 3 x 40 sepals x 4 tiers x whorled leaves on a 120 mm stem (REFUSED at the cap, told)',
+        path: "TX9 the build standing at the cap with fits false against the builder's tally, the read-out saying DOES NOT FIT, XR1 the declared refusal at its count" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
