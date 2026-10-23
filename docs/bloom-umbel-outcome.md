@@ -272,3 +272,16 @@ exceeded (the sphere gave several mm). At 35° on six florets it crosses
 1.661 mm (through the rim). Reported, not widened: holding the disc is the
 ruling's law, and a deeper band at 90° would be a typed height.
 
+### 9b. Measured on this tree (local)
+
+* **Export gate, block 78**: PASS — 27 of 27 rows reach the results, watertight,
+  0 within-shell self-intersections, UM0–UM4 silent (1,084 s).
+* **Connectedness, block 78**: PASS — 27 of 27 one connected body at every count
+  (2 / 5 / 6 / 7 / 12) and angle (-60 / 35 / 90), head off and on, sessile, on a
+  3 mm solid and a 12 mm stem (826 s).
+* **Byte partition** (`verify-bloom-surface-bytes --base <8e75e1c> --movers-predicate
+  umbel-boss`): rows 1525–1551 PASS, 25 movers moved and the 2 GATED holders held to
+  the bit in both modes; rows 0–1524 recorded in the PR.
+* **Combination gate, the three umbel pairs**: unchanged — every declared magnitude
+  reproduces, `umbel-head-length-x-angle` still CLEARS at 1.087 mm.
+
