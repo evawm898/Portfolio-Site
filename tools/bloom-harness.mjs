@@ -14223,14 +14223,20 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
     const H = rec.hub, N = GEOMETRY.HUB_SECTORS;
     if (!H.dome) {
       /* a TEXTURED hub (T5) is read for the plate's OUTERMOST faces within
-         half the rebuild's plate plus the relief height: the lattice cuts the
-         rim wall into rows, and relief only ever adds — untextured the window
-         holds exactly the two corners and the reading is the shipped one */
+         half the rebuild's plate plus the relief height, and within the
+         relief height of the line: the lattice cuts the rim wall into rows,
+         and the rim's corners are creases that move OUT as well as up (the
+         summed normal), so the corner leaves the line and only the wall's
+         middle rows stay on it. Relief only ever adds, so the reading can
+         OVER-read a plate by up to 2H and never under-read it — a declared
+         weakening on textured rows (a thin plate under its own relief would
+         read thick); untextured the line holds exactly the two corners and
+         the reading is the shipped one */
       const relH = ui.petalTexture && ui.petalTexture !== 'NONE' ? Number(ui.textureHeight) || 0 : 0;
       const plateT = Math.max(MIN_FEATURE_MM, rec.hubBuilt && typeof rec.hubBuilt.thickness === 'number' ? rec.hubBuilt.thickness : rec.hub.thickness);
       for (let k = 0; k < N && hubT === null; k++) {
         const th = (k * 2 * Math.PI) / N;
-        hubT = relH > 0 ? look([H.radius * Math.cos(th), H.radius * Math.sin(th), 0], [0, 0, 1], plateT / 2 + relH + 0.01, 5e-4, true) : look([H.radius * Math.cos(th), H.radius * Math.sin(th), 0], [0, 0, 1], 8);
+        hubT = relH > 0 ? look([H.radius * Math.cos(th), H.radius * Math.sin(th), 0], [0, 0, 1], plateT / 2 + relH + 0.01, relH + 5e-4, true) : look([H.radius * Math.cos(th), H.radius * Math.sin(th), 0], [0, 0, 1], 8);
       }
     } else if (ui.gynoecium === 'NONE' || ui.gynoecium === undefined) {
       hubT = look([0, 0, H.dome.centreZ + H.dome.Rd], [0, 0, 1], 8);
