@@ -5,7 +5,7 @@
    the page's controls write the state, whether the hand lands where the
    geometry says, and whether its buttons give the files they claim.
 
-     P0  the page loads clean on the defaults: the Folded view, both halves
+     P0  the page loads clean on the defaults: the Lit view (ruling 7; Folded until phase 5), both halves
          drawn (the mesh's triangle count is the geometry's), frames rendering.
      P1  the view toggle: Flat shows one outline, 2N tabs, N mountain scores,
          N valley perfs, the opening and the ring; Folded resumes rendering.
@@ -53,10 +53,23 @@
          test grid and coupon downloads are SVGs; the ZIP then holds the backing
          sheets, the grid, the coupon and INSTRUCTIONS.txt; backing survives a
          reload.
+     P16 LIT (phase 5): the page opens on the Lit view with the lamp on; the
+         wall behind the star carries the pattern (the lamp lights a FRACTION of
+         the frame through the holes — more than none, less than with no
+         shadow); every Light slider moves the lamp's record and the wall
+         distance moves the wall; a changed warmth survives a reload and rides
+         in the design file; the Folded view puts every light back (the lit
+         record is null and the paper reads as phase 1's).
 
    --negative-control re-serves deliberately broken copies of lantern.js and
    requires each to fail the check that names it. Every anchor is checked
-   first. */
+   first. --shard k/n runs the mutants whose index is k mod n (every anchor
+   and every claimed name still checked for ALL of them), so CI spreads the
+   sweep over n parallel jobs: at ~3.7 min a mutant on the runner's software
+   GL the whole sweep passed the 60-minute job timeout (run 39767517254).
+   --only=<ids> runs a named subset and REFUSES an id it does not know (a
+   mis-typed id used to be silently nothing). A shard or a subset reports
+   itself as one, never as the sweep. */
 
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -67,9 +80,10 @@ import * as G from '../lantern-geometry.js';
 const args = process.argv.slice(2);
 const NEG = args.includes('--negative-control');
 const ONLY = (args.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
+const SHARD = (() => { const a = args.find((x) => x.startsWith('--shard=')); if (!a) return null; const [k, n] = a.slice(8).split('/').map(Number); if (!(n >= 1 && k >= 0 && k < n)) { console.log(`bad --shard ${a.slice(8)}: want k/n with 0 <= k < n`); process.exit(1); } return { k, n }; })();
 
-async function download(page, trigger) {
-  const [d] = await Promise.all([page.waitForEvent('download', { timeout: 20000 }), trigger()]);
+async function download(page, trigger, timeout = 20000) {   // a download that RENDERS (the PNG reads the WebGL canvas) gets the sheet's 120 s: 20 s timed out on the runner's software GL (run 39762462046)
+  const [d] = await Promise.all([page.waitForEvent('download', { timeout }), trigger()]);
   const p = await d.path();
   return { name: d.suggestedFilename(), path: p, text: /\.(svg|json|txt)$/.test(d.suggestedFilename()) ? fs.readFileSync(p, 'utf8') : '' };
 }
@@ -86,7 +100,7 @@ async function run(override = null) {
     {
       const m = await T(() => { const m = window.__lantern.model(); return { N: m.N, ok: m.ok, tris: window.__lantern.fold.triangles(), frames: window.__lantern.fold.frames(), view: window.__lantern.view(), running: window.__lantern.fold.running() }; });
       const want = G.foldedMesh(G.solveLantern(G.DEFAULTS), 1).triangles + G.foldedMesh(G.solveLantern(G.DEFAULTS), -1, { opening: true }).triangles;
-      ok(!errors.length && m.N === 5 && m.ok && m.tris === want && m.frames > 0 && m.view === 'folded' && m.running, `P0: loads clean on the Folded view — N ${m.N}, ${m.tris} triangles (geometry says ${want}), ${m.frames} frames, errors: ${errors.join(' | ') || 'none'}`);
+      ok(!errors.length && m.N === 5 && m.ok && m.tris === want && m.frames > 0 && m.view === 'lit' && m.running, `P0: loads clean on the Lit view (phase 5 — ruling 7; the halves are the Folded view's) — N ${m.N}, ${m.tris} triangles (geometry says ${want}), ${m.frames} frames, errors: ${errors.join(' | ') || 'none'}`);
     }
     // P1
     {
@@ -286,13 +300,29 @@ async function run(override = null) {
       const svgs = names.filter((n) => /-sheet-\d+-of-\d+\.svg$/.test(n)),   // the CUT sheets by name; the zip also carries backing sheets, the test grid and the coupon (P15's)
        readme = names.find((n) => /README/.test(n)), json = names.find((n) => /\.json$/.test(n));
       const sheet1 = svgs.length ? await z.file(svgs[0]).async('string') : '';
-      const png = await download(page, () => page.click('#exportPng'));
+      const png = await download(page, () => page.click('#exportPng', { timeout: 120000 }), 120000);   // the click resolves only when the synchronous render has (the bloom gate's own XR1 lesson): 30 s timed out at 4 min on the runner (run 39766275888)
       const pngHead = fs.readFileSync(png.path).subarray(0, 8).toString('hex');
       await T(() => window.__lantern.set('bed', 'k40'));
       const small = await T(() => ({ plan: window.__lantern.plan(), badge: document.getElementById('flagCount').textContent, bed: window.__lantern.flags().find((f) => f.id === 'bed') }));
       await T(() => window.__lantern.set('bed', 'glowforge')); await T(() => window.__lantern.set('material', 'card200'));
       ok(first.validated && first.flags.includes('thin') && r1.bridge > r0.bridge && r1.rimMargin > r0.rimMargin && new RegExp(`bridge ${r1.bridge}`).test(txt) && pat1.validated && pat1.cuts[0] !== pat0.cuts[0] && planG.split && planG.sheets > 2 && !planL.split && planL.sheets === 2 && svgs.length === planL.sheets && readme && json && /id="CUT"/.test(sheet1) && /id="PERF"/.test(sheet1) && pngHead === '89504e470d0a1a0a' && !small.plan.fitsBed && small.bed && /bad/.test(small.bed.kind) && /problem/.test(small.badge),
         `P14: first paint judged (${first.flags.join(', ')}); cover300 → bridge ${r0.bridge} → ${r1.bridge}, rim margin ${r0.rimMargin} → ${r1.rimMargin}, read-out "${txt.slice(0, 40)}…", pattern re-laid on the new rules (${pat0.cuts[0]} → ${pat1.cuts[0]} cuts); Glowforge split=${planG.split} ${planG.sheets} sheets, 900×600 split=${planL.split} ${planL.sheets} sheets; zip holds ${svgs.length} svg + ${readme ? 'README' : 'no README'} + ${json ? 'design' : 'no design'}; png header ${pngHead}; K40: fits=${small.plan.fitsBed}, "${small.bed && small.bed.text.slice(0, 50)}…", badge "${small.badge}"`);
+    }
+    // P16 lit
+    {
+      await page.reload(); await page.waitForTimeout(700); await T(() => window.__lantern.flush());
+      const opens = await T(() => ({ label: document.getElementById('previewLabel').textContent, lit: window.__lantern.lit(), canvas: !document.getElementById('foldCanvas').hidden, on: document.querySelector('#views .is-on').dataset.view }));
+      const shadow = await T(() => window.__lantern.litWallSamples(false)), open = await T(() => window.__lantern.litWallSamples(true));
+      await T(() => window.__lantern.set('litWarmth', 2200)); await T(() => window.__lantern.set('litBrightness', 1.5)); await T(() => window.__lantern.set('litRoom', 0.4)); await T(() => window.__lantern.set('litWall', 2.2));
+      const moved = (await T(() => window.__lantern.lit())) || { none: true };   // null when the page is not lit (the opens-folded mutant) — the clause fails, the detail must still print
+      const json = JSON.parse(await T(() => window.__lantern.designJson())).state;
+      await page.reload(); await page.waitForTimeout(700);
+      const kept = await T(() => ({ st: window.__lantern.state().litWarmth, lit: window.__lantern.lit() }));
+      await T(() => window.__lantern.view('folded')); await page.waitForTimeout(200);
+      const off = await T(() => ({ lit: window.__lantern.lit(), label: document.getElementById('previewLabel').textContent }));
+      await page.click('#resetAll'); await T(() => window.__lantern.view('lit'));
+      ok(opens.label === 'Lit' && opens.on === 'lit' && opens.canvas && opens.lit && opens.lit.lampIntensity > 0 && opens.lit.shadows >= 2 && shadow.lit >= 5 && shadow.lit < open.lit * 0.5 && !moved.none && moved.warmth === 2200 && moved.brightness === 1.5 && moved.room === 0.4 && moved.wallDistance === 2.2 && Math.abs(moved.wallZ) > Math.abs(opens.lit.wallZ) * 1.4 && moved.lampIntensity > opens.lit.lampIntensity && json.litWarmth === 2200 && kept.st === 2200 && kept.lit && kept.lit.warmth === 2200 && off.lit === null && off.label === 'Folded',
+        `P16: opens ${opens.label} (${opens.on}), lamp ${opens.lit && opens.lit.lampIntensity.toFixed(0)}, ${opens.lit && opens.lit.shadows} casters; wall band lit ${shadow.lit} of ${shadow.n} samples through the holes (the star masked out by a lamp-off frame; a solid shadow reads 0) against ${open.lit} unshadowed; sliders → ${moved.warmth} K / ${moved.brightness} / ${moved.room} / wall ${moved.wallDistance} (z ${moved.wallZ && moved.wallZ.toFixed(0)} from ${opens.lit && opens.lit.wallZ.toFixed(0)}); file litWarmth ${json.litWarmth}; after reload ${kept.st} (lit ${kept.lit ? kept.lit.warmth + ' K' : 'null'}); Folded → lit ${off.lit}, "${off.label}"`);
     }
     // P15 backing and build
     {
@@ -337,7 +367,7 @@ const MUTANTS = [
   { id: 'the-clamp-is-not-shown', file: 'lantern.js', from: "li.className = n.kind === 'clamp' ? 'warn' : n.kind;", to: "li.className = 'info';", breaks: ['P5'] },
   { id: 'the-cuts-are-not-drawn-flat', file: 'lantern.js', from: "flatSvg.append(el('path', { class: 'cutpat', d: path(c.poly, true) }));", to: '0;', breaks: ['P10'] },
   { id: 'the-svg-has-no-cuts', file: 'lantern.js', from: "const exportSvg = (which) => G.flatSvg(model, which, { cuts: state.patMode === 'none' ? [] : PAT.placeCuts(model, pattern, state).map((c) => c.poly) });", to: "const exportSvg = (which) => G.flatSvg(model, which);", breaks: ['P10'] },
-  { id: 'the-folded-view-has-no-cuts', file: 'lantern.js', from: "bounds: model.rt, textureOf: texOf, colourOf });", to: "bounds: model.rt, colourOf });", breaks: ['P10', 'P15'] },
+  { id: 'the-folded-view-has-no-cuts', file: 'lantern.js', from: "bounds: model.rt, textureOf: texOf, colourOf });", to: "bounds: model.rt, colourOf });", breaks: ['P10', 'P15', 'P16'] },
   { id: 'an-island-is-not-a-problem', file: 'lantern.js', from: "if (pc.island) cutFindings.push({ kind: 'bad',", to: "if (pc.island) cutFindings.push({ kind: 'info',", breaks: ['P12'] },
   { id: 'a-finding-click-does-not-zoom', file: 'lantern.js', from: "if (n.issue) { li.title = 'show in the Flat view'; li.addEventListener('click', () => focusIssue(n.issue)); }", to: "if (n.issue) { li.title = 'show in the Flat view'; }", breaks: ['P12'] },
   { id: 'the-random-pattern-keeps-islands', file: 'lantern.js', from: "const score = pat.counts.island * 100 + pat.counts.thin + pat.counts.narrow + pat.counts.keepout;", to: "const score = 0;", breaks: ['P13'] },
@@ -346,8 +376,14 @@ const MUTANTS = [
   { id: 'the-zip-drops-the-readme', file: 'lantern.js', from: "zip.file('README.txt', EXP.readme(model, plan, state, rules));", to: '0;', breaks: ['P14'] },
   { id: 'the-backing-is-not-drawn', file: 'lantern.js', from: "const colourOf = backing ? (part) => (part.solid ? null : BLD.colourOfPoint(state, part.j)) : null;", to: "const colourOf = null;", breaks: ['P15'] },
   { id: 'the-zip-drops-the-backing-sheets', file: 'lantern.js', from: "plan.backingSheets.forEach((sh, k) => { sh.machine = plan.machine; zip.file(", to: "[].forEach((sh, k) => { sh.machine = plan.machine; zip.file(", breaks: ['P15'] },
+  { id: 'the-page-opens-folded', file: 'lantern.js', from: "setView('lit');\n\n/* the page's test chrome */", to: "setView('folded');\n\n/* the page's test chrome */", breaks: ['P0', 'P16'] },
+  /* the shadow pass takes the cut-out from the OBJECT material's alphaMap + alphaTest (three copies them onto the distance
+     material), so the defect that ships a solid shadow is alphaTest 0 on the cut material — the one this project hit */
+  { id: 'the-shadow-ignores-the-holes', file: 'lantern-view.js', from: "if (lit) { m.emissive = kelvin(lit.warmth); m.emissiveIntensity = 1.0 * lit.brightness; m.emissiveMap = glowFor(canvas); m.needsUpdate = true; }", to: "if (lit) { m.emissive = kelvin(lit.warmth); m.emissiveIntensity = 1.0 * lit.brightness; m.emissiveMap = glowFor(canvas); m.alphaTest = 0; m.needsUpdate = true; }", breaks: ['P16'] },
+  { id: 'the-lit-settings-are-not-stored', file: 'lantern.js', from: "const LIT_FIELDS = ['litWarmth', 'litBrightness', 'litRoom', 'litWall'];", to: "const LIT_FIELDS = ['litBrightness', 'litRoom', 'litWall'];", breaks: ['P16'] },
+  { id: 'the-lamp-ignores-the-wall-distance', file: 'lantern-view.js', from: "wall.position.set(0, 0, -d); wall.scale", to: "wall.position.set(0, 0, -radius * 1.4); wall.scale", breaks: ['P16'] },
   { id: 'the-build-view-stays-hidden', file: 'lantern.js', from: "$('buildView').toggleAttribute('hidden', name !== 'build');", to: "$('buildView').toggleAttribute('hidden', true);", breaks: ['P15'] },
-  { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7', 'P13', 'P15'] },
+  { id: 'the-design-is-not-stored', file: 'lantern.js', from: "function persist() { try { localStorage.setItem(STORE, snap(state)); }", to: 'function persist() { try { 0; }', breaks: ['P7', 'P13', 'P15', 'P16'] },
 ];
 
 function print(res, label) { let f = 0; for (const [p, m] of res) { console.log(`${p ? 'ok  ' : 'FAIL'} ${m}`); if (!p) f++; } console.log(`\n${label}: ${res.length - f} of ${res.length} passed`); return f; }
@@ -363,9 +399,10 @@ if (!NEG) {
   const clean = await run();
   const names = clean.map(([, msg]) => msg.split(':')[0]);
   for (const m of MUTANTS) for (const b of m.breaks) if (!names.includes(b)) { console.log(`STALE NAME ${m.id} claims ${b}`); bad++; }
-  if (clean.some(([p]) => !p) || bad) { print(clean, 'clean'); console.log('the clean tree does not pass; the control cannot run'); process.exit(1); }
-  for (const m of MUTANTS) {
-    if (ONLY.length && !ONLY.includes(m.id)) continue;
+  for (const id of ONLY) if (!MUTANTS.some((m) => m.id === id)) { console.log(`UNKNOWN MUTANT ${id}`); bad++; }
+  if (clean.some(([p]) => !p) || bad) { print(clean, 'clean'); console.log(bad ? 'a stale anchor, a stale name or an unknown id; the control cannot run' : 'the clean tree does not pass; the control cannot run'); process.exit(1); }
+  const picked = MUTANTS.filter((m, i) => (!ONLY.length || ONLY.includes(m.id)) && (!SHARD || i % SHARD.n === SHARD.k));
+  for (const m of picked) {
     const res = await run({ [`/${m.file}`]: srcs[m.file].replace(m.from, m.to) });
     const red = res.filter(([p]) => !p).map(([, msg]) => msg.split(':')[0]);
     const missed = m.breaks.filter((b) => !red.includes(b)), unclaimed = red.filter((r) => !m.breaks.includes(r));
@@ -373,6 +410,7 @@ if (!NEG) {
     console.log(`${good ? 'ok  ' : 'BAD '} ${m.id}: reddened ${red.join(', ') || 'nothing'}${missed.length ? ` — MISSED ${missed.join(', ')}` : ''}${unclaimed.length ? ` — UNCLAIMED ${unclaimed.join(', ')}` : ''}`);
     if (!good) bad++;
   }
-  console.log(`\nnegative control: ${MUTANTS.length - bad} of ${MUTANTS.length} mutants behave`);
+  const scope = SHARD ? `shard ${SHARD.k}/${SHARD.n}` : ONLY.length ? 'subset' : 'sweep';
+  console.log(`\nnegative control (${scope}): ${picked.length - bad} of ${picked.length} mutants behave${picked.length < MUTANTS.length ? ` — ${MUTANTS.length - picked.length} of ${MUTANTS.length} not run here` : ''}`);
   process.exit(bad ? 1 : 0);
 }

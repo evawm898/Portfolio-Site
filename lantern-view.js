@@ -31,6 +31,53 @@ export function createFoldedView(canvas) {
   group.rotation.x = -Math.PI / 2;
   scene.add(group);
   const paperMat = new THREE.MeshStandardMaterial({ color: PAPER, roughness: 0.92, metalness: 0, side: THREE.DoubleSide, flatShading: false });
+  /* ---- the lit mode (phase 5): a lamp inside the star, the room dark, a wall behind it that the cuts throw their pattern onto.
+     Translucent paper is faked honestly: the paper's own material takes an EMISSIVE glow (a warm colour at a share of the lamp's
+     brightness — paper lit from inside glows, it does not reflect), the cuts are holes in it, and the lamp casts shadows through
+     them onto the wall, with each cut material's alpha map on its DEPTH material so the holes let light through. The tissue skins
+     glow in their own colour. Nothing here decides geometry. */
+  const lamp = new THREE.PointLight(0xffd9a8, 0, 0, 2); lamp.castShadow = true; lamp.shadow.mapSize.set(2048, 2048); lamp.shadow.bias = -0.0002; lamp.shadow.radius = 2;
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3632, roughness: 1, metalness: 0 });
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), wallMat); wall.receiveShadow = true;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), wallMat); floor.receiveShadow = true; floor.rotation.x = -Math.PI / 2;
+  const litGroup = new THREE.Group(); litGroup.add(lamp, wall, floor); litGroup.visible = false; scene.add(litGroup);
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  let lit = null;   // { warmth (K), brightness, room, wallDistance }
+  const kelvin = (K) => { const t = Math.min(4000, Math.max(1800, K)) / 100; const r = 255, g = Math.min(255, Math.max(0, 99.47 * Math.log(t) - 161.12)), b = t <= 19 ? 0 : Math.min(255, Math.max(0, 138.52 * Math.log(t - 10) - 305.04)); return new THREE.Color(r / 255, g / 255, b / 255); };
+  let litWas = null;   // whether the last applyLit was lit: a shader recompile is owed only when that FLIPS (an emissive map comes or goes)
+  function applyLit() {
+    const on = !!lit;
+    const flipped = litWas !== on; litWas = on;
+    litGroup.visible = on;
+    hemi.intensity = on ? 0.05 + 1.4 * (1 - lit.room) : 0.9; key.intensity = on ? 0.9 * (1 - lit.room) : 1.15; fill.intensity = on ? 0.3 * (1 - lit.room) : 0.45;
+    const room = on ? new THREE.Color(0x05050a).lerp(new THREE.Color(0x4a4640), 1 - lit.room) : new THREE.Color(INK);
+    renderer.setClearColor(room, 1);
+    scene.fog = on ? new THREE.Fog(room, radius * (lit.wallDistance + 3.2), radius * (lit.wallDistance + 10)) : null;   // from the camera's own fit distance (~3.3 R) the wall sits at ~3.3 R + d, so the fog starts just past the thrown pattern   // the planes fade into the room instead of ending at an edge
+    // needsUpdate only on a FLIP: every rebuild in one view used to recompile every program, which on the runner's software GL
+    // is seconds a material and took the PNG export past the page gate's download wait (run 39762462046, #445).
+    if (flipped) for (const m of [paperMat, wallMat, ...cutMats.values(), ...tintMats.values()]) m.needsUpdate = true;
+    const glow = on ? kelvin(lit.warmth) : null;
+    /* lit: the paper is lit from INSIDE, so its daylight shading goes (colour near black, the glow is the emissive). The cuts stay
+       HOLES (alphaTest 0.5 on the material — the shadow pass copies the object material's alphaTest onto the distance material,
+       so a material with alphaTest 0 throws a SOLID shadow; measured, 43 of 2,115 wall samples lit against 1,583 unshadowed),
+       and through them the lamp lights the wall with the pattern. Folded: every value back to phase 1's. */
+    paperMat.emissive = on ? glow.clone() : new THREE.Color(0); paperMat.emissiveIntensity = on ? GLOW_PAPER * lit.brightness : 0; paperMat.color.setHex(on ? 0x2a2622 : PAPER); if (flipped) paperMat.needsUpdate = true;
+    for (const [cv, m] of cutMats) { m.emissive = on ? glow.clone() : new THREE.Color(0); m.emissiveIntensity = on ? 1.0 * lit.brightness : 0; m.emissiveMap = on ? glowFor(cv) : null; m.color.setHex(on ? 0x2a2622 : PAPER); if (flipped) m.needsUpdate = true; }
+    for (const m of tintMats.values()) { m.emissive = on ? m.color.clone().multiply(glow) : new THREE.Color(0); m.emissiveIntensity = on ? 1.1 * lit.brightness : 0; m.opacity = on ? 0.55 : 0.82; }
+    if (on) {
+      wallMat.color.setHex(0x3a3632).lerp(new THREE.Color(0x8a8278), (1 - lit.room) * 0.8);
+      const d = radius * lit.wallDistance;
+      // inverse-square light sized so the WALL reads at any star size: irradiance at the wall is I / d², held near a constant
+      lamp.color.copy(glow); lamp.intensity = lit.noLamp ? 0 : 14 * lit.brightness * d * d;   // noLamp: test chrome's mask frame (the star glows, the wall is black)
+      lamp.distance = 0;
+      wall.position.set(0, 0, -d); wall.scale.set(radius * 60, radius * 60, 1);
+      floor.position.set(0, -radius * 2.1, 0);   // low enough that the room's corner stays under the star even with the wall close (0.8 R) floor.scale.set(radius * 60, radius * 60, 1);
+      lamp.shadow.camera.near = radius * 0.05; lamp.shadow.camera.far = radius * 60;   // as far as the planes reach: wall past the shadow camera's far plane is UNSHADOWED and lit up as a hard wedge (measured at 8 R with the wall at 1.0 R) lamp.shadow.camera.updateProjectionMatrix();
+    }
+    for (const m of meshes) if (m.isMesh) { m.castShadow = on && !m.material.transparent; m.receiveShadow = false; }
+    dirty = true;
+  }
+  function setLit(opts) { lit = opts ? { warmth: 2700, brightness: 1, room: 0.85, wallDistance: 1.4, ...opts } : null; if (opts && opts.noShadow !== undefined) lamp.castShadow = !opts.noShadow; applyLit(); }
   const creaseMat = new THREE.LineBasicMaterial({ color: 0x6a6a66, transparent: true, opacity: 0.55 });
   let meshes = [];
   let frames = 0, lastUser = -Infinity, radius = 300, running = false, raf = 0;
@@ -40,15 +87,32 @@ export function createFoldedView(canvas) {
   /* `halves` is [{ positions: Float32Array, creases: [{from, to}] }, …] in the model's own mm, z-up. */
   const texCache = new Map();   // canvas -> THREE.CanvasTexture
   const cutMats = new Map();    // canvas -> material carrying it as an alpha map
+  const glowCache = new Map();  // canvas -> CanvasTexture of the GLOW map: a hole reads white, the paper a dim grey (what a lamp inside makes of a cut sheet)
+  const GLOW_PAPER = 0.42;      // the paper's share of the lamp's glow against a hole's 1 — the one 'translucency' number; doc ruling 22
+  function glowFor(canvas) {
+    let t = glowCache.get(canvas);
+    if (t) { t.needsUpdate = true; return t; }
+    const cv = document.createElement('canvas'); cv.width = canvas.width; cv.height = canvas.height;
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(canvas, 0, 0);
+    const img = ctx.getImageData(0, 0, cv.width, cv.height), d = img.data, paper = Math.round(255 * GLOW_PAPER);
+    for (let i = 0; i < d.length; i += 4) { const v = d[i] > 127 ? paper : 255; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+    ctx.putImageData(img, 0, 0);
+    t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.NoColorSpace; t.flipY = false;
+    glowCache.set(canvas, t);
+    return t;
+  }
   function matFor(canvas) {
     if (!canvas) return paperMat;
     let m = cutMats.get(canvas);
-    if (m) { const t = texCache.get(canvas); t.needsUpdate = true; return m; }
+    if (m) { const t = texCache.get(canvas); t.needsUpdate = true; if (lit) { m.emissiveMap = glowFor(canvas); } return m; }
     const t = new THREE.CanvasTexture(canvas); t.colorSpace = THREE.NoColorSpace; t.flipY = false;
     texCache.set(canvas, t);
     m = new THREE.MeshStandardMaterial({ color: PAPER, roughness: 0.92, metalness: 0, side: THREE.DoubleSide, alphaMap: t, alphaTest: 0.5, transparent: false });
+    m.userData.depth = new THREE.MeshDistanceMaterial({ alphaMap: t, alphaTest: 0.5, side: THREE.DoubleSide });   // the point light's shadow pass reads a DISTANCE material; with the alpha map on it the holes throw light
     cutMats.set(canvas, m);
-    if (cutMats.size > 12) { const [k] = cutMats.keys(); cutMats.get(k).dispose(); texCache.get(k).dispose(); cutMats.delete(k); texCache.delete(k); }
+    if (lit) { m.emissive = kelvin(lit.warmth); m.emissiveIntensity = 1.0 * lit.brightness; m.emissiveMap = glowFor(canvas); m.needsUpdate = true; }
+    if (cutMats.size > 12) { const [k] = cutMats.keys(); cutMats.get(k).dispose(); texCache.get(k).dispose(); cutMats.delete(k); texCache.delete(k); if (glowCache.has(k)) { glowCache.get(k).dispose(); glowCache.delete(k); } }
     return m;
   }
   /* `halves` is [{ positions, creases, parts? }, …]; with `textureOf(part)` returning a canvas (or null) the
@@ -65,7 +129,9 @@ export function createFoldedView(canvas) {
           g.setAttribute('position', new THREE.BufferAttribute(part.positions, 3));
           g.setAttribute('uv', new THREE.BufferAttribute(part.uvs, 2));
           g.computeVertexNormals();
-          const mesh = new THREE.Mesh(g, matFor(textureOf(part)));
+          const mat = matFor(textureOf(part));
+          const mesh = new THREE.Mesh(g, mat);
+          if (mat.userData.depth) mesh.customDistanceMaterial = mat.userData.depth;
           group.add(mesh); meshes.push(mesh);
           const tint = colourOf && colourOf(part);
           if (tint) { const back = new THREE.Mesh(g, tintFor(tint)); back.renderOrder = -1; group.add(back); meshes.push(back); }
@@ -89,6 +155,7 @@ export function createFoldedView(canvas) {
     }
     radius = bounds || maxR;
     if (fit) fitCamera();
+    applyLit();
     dirty = true;
   }
   function fitCamera() {
@@ -119,7 +186,8 @@ export function createFoldedView(canvas) {
   function stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
   function renderOnce() { controls.update(); renderer.render(scene, camera); frames++; }
   return {
-    setModel, resize, start, stop, renderOnce, fitCamera,
+    setModel, resize, start, stop, renderOnce, fitCamera, setLit,
+    lit: () => (lit ? { ...lit, lampIntensity: lamp.intensity, wallZ: wall.position.z, shadows: meshes.filter((m) => m.isMesh && m.castShadow).length, meshes: meshes.filter((m) => m.isMesh).length, withDistance: meshes.filter((m) => m.isMesh && m.customDistanceMaterial).length, emissive: paperMat.emissiveIntensity } : null),
     get frames() { return frames; },
     get triangles() { return meshes.filter((m) => m.isMesh).reduce((n, m) => n + m.geometry.attributes.position.count / 3, 0); },
     camera: () => ({ position: camera.position.toArray(), target: controls.target.toArray() }),

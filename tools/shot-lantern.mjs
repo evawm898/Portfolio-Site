@@ -16,14 +16,15 @@ const SHOT = { timeout: 120000 };   // a WebGL canvas on the runner's software G
 // scroller and the clip is CLAMPED to the viewport first: a clip reaching past the viewport makes Playwright resize the
 // viewport for the shot, which re-renders the turning WebGL canvas on the runner's software GL and hung the export cell
 // for 120 s there (the runner's fonts make the panel taller than this box's, so #secExport ended below the fold).
-const shotOf = async (sel) => {
+const shotOf = async (sel, timeout) => {   // a Lit cell gets LIT_SHOT_MS: a lit frame on the runner's software GL takes 55-120 s, and at 120 s which cell tripped was luck (runs 39777729024, 39780364382, 39785255238)
   const loc = page.locator(sel);
   await loc.evaluate((el) => el.scrollIntoView({ block: 'start' })); await page.waitForTimeout(100);
   const b = await loc.boundingBox(); const v = page.viewportSize();
   const x = Math.max(0, b.x), y = Math.max(0, b.y);
   const clip = { x, y, width: Math.min(b.x + b.width, v.width) - x, height: Math.min(b.y + b.height, v.height) - y };
-  return page.screenshot({ clip, ...SHOT });
+  return page.screenshot({ clip, ...SHOT, ...(timeout ? { timeout } : {}) });
 };
+const LIT_SHOT_MS = 300000;
 const save = (name, buf, caption) => { fs.writeFileSync(path.join(OUT, name), buf); cells.push({ name, caption }); console.log(`${name.padEnd(22)} ${caption}`); };
 
 const s = await openLantern({ storage: '', viewport: { width: 1440, height: 900 }, dsf: 2 });
@@ -73,7 +74,7 @@ save('export.png', await shotOf('#secExport'), 'Export: the plan on the default 
   const svg = (await z.file(first).async('string')).replace(/width="[\d.]+mm" height="[\d.]+mm"/, 'width="1320" height="744" style="background:#f4f2ec"');
   const sheetPage = await s.browser.newPage({ viewport: { width: 1340, height: 764 }, deviceScaleFactor: 2 });
   await sheetPage.setContent(`<body style="margin:10px;background:#333">${svg}</body>`); await sheetPage.waitForTimeout(100);
-  save('sheet-1.png', await sheetPage.screenshot(), `sheet 1 of ${sheets} from the ZIP, rendered: a point module with its rim tabs, the seam tab on the right valley, the pattern's cuts, the labels on the ENGRAVE layer`);
+  save('sheet-1.png', await sheetPage.screenshot(SHOT), `sheet 1 of ${sheets} from the ZIP, rendered: a point module with its rim tabs, the seam tab on the right valley, the pattern's cuts, the labels on the ENGRAVE layer`);
   await sheetPage.close();
 }
 await T(() => window.__lantern.set('backing', true)); await page.waitForTimeout(500);
@@ -82,19 +83,32 @@ await T(() => window.__lantern.set('backingColours', 3)); await T(() => window._
 save('backing-dusk.png', await shotOf('.ln-preview'), 'three colours, the dusk palette');
 await page.locator('#secBacking').evaluate((d) => { d.open = true; }); await page.locator('#secBacking').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
 save('backing-panel.png', await shotOf('#secBacking'), 'the Backing section: on / off, colours, the palette and its swatches');
-await T(() => window.__lantern.view('build')); await page.waitForTimeout(200);
+await T(() => window.__lantern.view('build')); await page.waitForTimeout(400);
 save('build.png', await shotOf('.ln-preview'), 'the Build view: the eleven steps with this star\'s own counts, and the machine settings table (starting values)');
 {
   const grid = await T(() => window.__lantern.testGridSvg());
   const gp = await s.browser.newPage({ viewport: { width: 1220, height: 740 }, deviceScaleFactor: 2 });
   await gp.setContent(`<body style="margin:10px;background:#333">${grid.replace(/width="[\d.]+mm" height="[\d.]+mm"/, 'width="1200" height="720" style="background:#f4f2ec"')}</body>`); await gp.waitForTimeout(100);
-  save('test-grid.png', await gp.screenshot(), 'the test grid for the stock: bridges, holes, strokes and a score beside a cut, the derived value marked ◀ — cut this before the star');
+  save('test-grid.png', await gp.screenshot(SHOT), 'the test grid for the stock: bridges, holes, strokes and a score beside a cut, the derived value marked ◀ — cut this before the star');
   await gp.close();
 }
 await T(() => window.__lantern.set('backing', false)); await T(() => window.__lantern.view('folded'));
+const before = await T(() => window.__lantern.state());   // the clamp cell's infeasible target is undone before the Lit cells
 await T(() => window.__lantern.setState({ ...window.__lantern.state(), points: 5, slender: 0.38, depthFrac: 0.2, edgeMode: 'straight', edge: { mode: 'single', points: [[0, 0], [1, 0]] } }));
 await page.waitForTimeout(300);
 save('clamp.png', await shotOf('.ln-panel'), 'an infeasible target (slender 0.38 at 0.2 × width): Checks says the depth was clamped to the nearest closing depth and why');
+// The Lit cells come LAST in this session, after Build, the grid and the clamp cell: once the Lit view has rendered,
+// every later frame on the runner's software GL costs 55-120 s and a screenshot after it hangs past its budget whatever
+// view is showing (runs 39777729024, 39780364382, 39789531435, 39795357136). Nothing after them touches the canvas.
+await T((snap) => window.__lantern.setState(snap), before); await T(() => window.__lantern.set('backing', true));
+await T(() => window.__lantern.view('lit')); await T(() => window.__lantern.fold.fit()); await page.waitForTimeout(800);
+save('lit.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'the Lit view, the page\'s opening view: a warm LED inside the star, the paper glowing, the cuts bright, the pattern thrown onto the wall and floor behind (the backing\'s tissue tinting the glow)');
+await T(() => window.__lantern.set('backing', false)); await T(() => window.__lantern.set('litRoom', 0.3)); await page.waitForTimeout(600);
+save('lit-day.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'room darkness 30 %: the lamp against daylight, the thrown pattern fading into a lit room');
+await T(() => window.__lantern.set('litRoom', 1)); await T(() => window.__lantern.set('litWarmth', 2000)); await T(() => window.__lantern.set('litWall', 1.2)); await page.waitForTimeout(600);
+save('lit-candle.png', await shotOf('.ln-preview', LIT_SHOT_MS), 'a 2000 K candle-warm lamp, the room black, the wall close behind the star (1.2 radii — the slider\'s floor is 1.1, past the tips) so the thrown pattern is sharp and small');
+await page.locator('#secLit').evaluate((d) => { d.open = true; }); await page.locator('#secLit').scrollIntoViewIfNeeded(); await page.waitForTimeout(100);
+save('lit-panel.png', await shotOf('#secLit', LIT_SHOT_MS), 'the Light section: warmth, brightness, room darkness, wall distance — view settings, saved with the design');
 await s.close();
 const m = await openLantern({ storage: '', viewport: { width: 390, height: 844 }, dsf: 2 });
 await m.page.waitForTimeout(600);

@@ -442,13 +442,47 @@ coupon of the rules themselves: bridges 0.6–2.2, holes 0.8–3.0, strokes
 single-point COUPON (front module F1 alone on the bed). All of it rides in
 the ZIP beside the sheets, as SVGs and `INSTRUCTIONS.txt`.
 
-Phase 1 opened on the FOLDED view with a slow turntable; phase 5 moves the
-default to LIT.
+Phase 1 opened on the FOLDED view with a slow turntable; phase 5 moved the
+default to LIT (ruling 7).
 
-## 10. Lit view (phase 5 — plan)
+## 10. Lit view (phase 5 — built)
 
-A point light inside the star, the paper emissive, the cuts throwing their
-pattern onto a wall behind; the page opens Lit (ruling 7).
+The page opens LIT: a point light inside the star at its centre, the room
+dark, a wall behind the star and a floor under it that the cuts throw their
+pattern onto. All of it lives in `lantern-view.js` and decides nothing
+geometric. Four view settings, in a Light section, saved on the state and in
+the design file (`litWarmth` K, `litBrightness`, `litRoom`, `litWall` in star
+radii, 1.1–3: the star's tips reach 1 R, so a nearer wall meets them — at 1.0 R a
+tip touches the wall and the shadow pass lights a hard wedge of wall past it,
+measured 56 bright samples in the frame's top-right quadrant at 1.0 against 0 at
+1.1), read by nothing that writes a file.
+
+How translucent paper is faked, honestly: three has no subsurface transport,
+so the paper's own material takes an EMISSIVE glow — the lamp's colour (a
+Kelvin → RGB fit, 1800–4000 K) at a share of the brightness — because paper lit
+from inside glows rather than reflects; the cuts stay holes (the alpha map);
+the tissue skins glow in their own colour times the lamp's. The lamp casts
+shadows: every cut material carries a `MeshDistanceMaterial` with the SAME
+alpha map as its `customDistanceMaterial` (a point light's shadow pass is a
+distance pass, not a depth pass), so the holes let light through and the wall
+shows the pattern, scaled and softened by the wall distance. The lamp is
+inverse-square and scaled by the star's own radius, so a 200 mm and a 600 mm
+star read alike. The tissue skins do not cast shadows (they are a tint, not an
+occluder) — a judgment call, ruling 22. Room darkness scales the daylight
+rig (hemisphere + key) and the clear colour between a lit room and black.
+The Folded view is the old rig untouched: `setLit(null)` restores every
+intensity, emissive and clear colour to its phase-1 value.
+
+Why three.js for the 3D views: the folded view needs orbit controls, a
+double-sided lit material and, in phase 5, a point light inside a translucent
+shell with emissive cut regions and a projected shadow on a backdrop — all of
+which three gives for one pinned CDN import (`three@0.161.0`, the version
+every other generator here pins, so the headless tools serve one local copy).
+Hand-rolled WebGL would be a week of shader and camera code for no gain and
+no gate coverage. It is confined to `lantern-view.js`; nothing else imports
+it, and the geometry module hands it plain Float32 triangle data.
+
+---
 
 ## 11. UI
 
@@ -468,8 +502,25 @@ Phone width stacks the preview over the panel.
 2. Pattern system + validity — built (§4).
 3. Material model + modularization + export — built (§5, §6, §8).
 4. Backing + settings + test grid + coupon + instructions + ring — built (§7, §9).
-5. Lit simulation.
-6. Stretch: faceted-curve profile, SVG import, wall band, collapsible lock.
+5. Lit simulation — built (§10).
+6. Stretch — NOT BUILT, each with its reason (the overnight build stopped here
+   on risk, not on budget):
+   - faceted-curve profile: a solver-contract change (bands, per-band cones,
+     closure band by band) that the pattern's facet frames, the UVs, the
+     modules and the validator all rest on; ruling 1 asks whether it should be
+     the default at all, so it waits on that ruling and its own session.
+   - polygon nesting: TRIED AND MEASURED. Pairing point modules head to tail
+     (one turned 180°, slid in on the polygons until 4 mm clear, offset in y by
+     0 / ¼ / ½ of the height) formed NO pair on any bed: a point module is a
+     rhombus (widest at the inner vertices, narrow at the apex and the tip),
+     and two rhombi offset to interlock make a 1.5 × 1.5 box — 2.25 of a single
+     against 2.0 for two singles. Rhombi gain only in a LATTICE of many, which
+     is a bottom-left polygon nester, not a pair pass; the sweep also cost
+     20 s a plan on the page's rebuild. The shelf nest stays (6 sheets on the
+     Glowforge for the default; 3 on 600 × 400).
+   - SVG import: the brief named it and nothing here says what it imports (a
+     point outline? a motif?) — an input contract to rule on first.
+   - collapsible lock: ruling 6, not built.
 
 ## 12a. What the phase-1 build found (beside §2.3)
 
@@ -559,6 +610,21 @@ to the lantern's own files (and `bloom-curve.js`, which it imports).
     machine is its own and the numbers are a place to start a power test.
 21. The instructions say LED only, 5 W or less — the one safety line, kept
     on the page, in the PDF and in the ZIP's text.
+
+22. The lit view's glow is a faked translucency (emissive paper, shadows cast
+    through the alpha map onto a wall); the tissue skins tint the glow and
+    cast no shadow of their own. Defaults 2700 K, brightness 100 %, room 85 %
+    dark, wall at 1.4 star radii — set by eye on the default star, not from
+    any lamp; the Kelvin → RGB fit is the common approximation and reads a
+    little yellow at 2000 K. Confirm against a real LED in a real lantern.
+23. The page opens on the Lit view (ruling 7 said so); Folded and Flat are one
+    click away and the view is not saved with the design — only the four lit
+    settings are.
+
+24. Phase 6 stopped on risk, not budget (§12): the faceted profile changes the
+    contract four shipped phases rest on and waits on ruling 1; pair nesting
+    was measured and gains nothing on rhombic modules (a lattice nester would);
+    SVG import has no stated input. Say which, if any, is wanted next.
 
 ## 15. Out of scope, named
 

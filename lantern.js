@@ -14,18 +14,23 @@ import { curveFunction, proposeEdit, nearestOnCurve, quantise, curveEquals, clon
 import { createFoldedView } from './lantern-view.js';
 
 const STORE = 'lantern-v1';
+/* the lit view's four values are VIEW settings: on the state so they persist and ride in the design file, read by nothing geometric */
+const LIT_FIELDS = ['litWarmth', 'litBrightness', 'litRoom', 'litWall'];
+const LIT_DEFAULTS = Object.freeze({ litWarmth: 2700, litBrightness: 1, litRoom: 0.85, litWall: 1.4 });
+G.registerDesignFields(LIT_FIELDS, (raw) => ({ litWarmth: Math.min(4000, Math.max(1800, +raw.litWarmth || 2700)), litBrightness: Math.min(2, Math.max(0.2, +raw.litBrightness || 1)), litRoom: Math.min(1, Math.max(0, Number.isFinite(+raw.litRoom) ? +raw.litRoom : 0.85)), litWall: Math.min(3, Math.max(1.1, +raw.litWall || 1.4)) }));
 const NS = 'http://www.w3.org/2000/svg';
 const $ = (id) => document.getElementById(id);
 const inch = (mm) => (mm / G.MM_PER_IN).toFixed(1) + '″';
 
 /* ---------------- state and history ---------------- */
-let state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...MAT.EXPORT_STATE_DEFAULTS, ...BLD.BACKING_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) };
+let state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...MAT.EXPORT_STATE_DEFAULTS, ...BLD.BACKING_STATE_DEFAULTS, ...LIT_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) };
+const litOf = (s) => ({ warmth: s.litWarmth, brightness: s.litBrightness, room: s.litRoom, wallDistance: s.litWall });
 let rules = MAT.rulesFor(MAT.stockOf(state), MAT.machineOf(state));   // the material model's derived rules, re-read on every rebuild
 let plan = null;        // the export plan: pieces, sheets, notes (see rebuildNow)
 let pattern = null;      // the pattern laid onto the model's facets, judged (see rebuildNow)
 let flatFocus = null;    // a cut finding the Flat view is zoomed on: { x, y, r } in flat mm
 let model = null;
-let view = 'folded';
+let view = 'lit';   // phase 5: the page opens LIT (doc ruling 7)
 const history = { past: [], future: [], max: 80 };
 const stats = { solves: 0, solveMs: 0, flatDraws: 0, edits: 0, patterns: 0, patternMs: 0, textures: 0 };
 const snap = (s) => JSON.stringify(s);
@@ -67,6 +72,10 @@ const CONTROLS = [
   { id: 'backing', sec: 'backingCtrls', kind: 'check', label: 'Tissue backing', tip: 'Translucent tissue glued behind each point\'s cuts, so the light comes through colour.' },
   { id: 'backingColours', sec: 'backingCtrls', kind: 'range', label: 'Colours', min: 1, max: 3, step: 1, fmt: (v) => `${v}`, when: (s) => s.backing, tip: 'One colour, two alternating around the star, or a triad.' },
   { id: 'palette', sec: 'backingCtrls', kind: 'select', label: 'Palette', options: BLD.PALETTES.map((p) => [p.id, p.name]), when: (s) => s.backing, tip: 'Curated tissue colours; the pieces are labelled by point.' },
+  { id: 'litWarmth', sec: 'litCtrls', kind: 'range', label: 'Lamp warmth', min: 1800, max: 4000, step: 50, fmt: (v) => `${v} K`, tip: 'The bulb\'s colour temperature: 2200 K candle-warm, 2700 K a warm white LED, 4000 K neutral.' },
+  { id: 'litBrightness', sec: 'litCtrls', kind: 'range', label: 'Brightness', min: 0.2, max: 2, step: 0.05, fmt: (v) => `${(v * 100).toFixed(0)}%`, tip: 'How hard the lamp drives the paper\'s glow and the pattern on the wall.' },
+  { id: 'litRoom', sec: 'litCtrls', kind: 'range', label: 'Room darkness', min: 0, max: 1, step: 0.05, fmt: (v) => `${(v * 100).toFixed(0)}%`, tip: 'Daylight at the left, a dark room at the right — the pattern on the wall only reads in the dark.' },
+  { id: 'litWall', sec: 'litCtrls', kind: 'range', label: 'Wall distance', min: 1.1, max: 3, step: 0.1, fmt: (v) => `${v.toFixed(1)} × the star`, tip: 'How far behind the star the wall stands, in star radii; the thrown pattern grows and softens with it.' },
   { id: 'profile', sec: 'profileCtrls', kind: 'select', label: 'Side profile', options: [['straight', 'straight — classic triangle'], ['faceted', 'faceted curve (phase 6, not yet)']], disabledOptions: ['faceted'], tip: 'Straight: the ridge runs straight from centre to tip. Faceted: extra creases round the body (not built yet).' },
 ];
 const SECS = {};
@@ -192,7 +201,7 @@ function rebuildNow({ commit = true } = {}) {
   drawDims();
   drawFlags();
   drawEditor();
-  if (view === 'flat') drawFlat(); else pushMesh();
+  if (view === 'flat') drawFlat(); else if (view === 'build') drawBuild(); else pushMesh();
   if (commit) persist();
 }
 const textureCache = new Map();   // per facet type record: the canvas the alpha map was painted on
@@ -215,6 +224,7 @@ function pushMesh() {
   const front = G.foldedMesh(model, 1, { solidAlternate: solidAlt, perPoint: backing }), back = G.foldedMesh(model, -1, { opening: true, solidAlternate: solidAlt, perPoint: backing });
   const texOf = (part) => (state.patMode === 'none' ? null : textureFor(pattern.types[model.alternate ? (part.type === 'short' ? 1 : 0) : 0], part.solid));
   const colourOf = backing ? (part) => (part.solid ? null : BLD.colourOfPoint(state, part.j)) : null;
+  fold.setLit(view === 'lit' ? litOf(state) : null);
   fold.setModel([front, back], { fit: !meshFitted || Math.abs(lastFitRadius - model.flatSpan) > 1e-6, bounds: model.rt, textureOf: texOf, colourOf });
   meshFitted = true; lastFitRadius = model.flatSpan;
 }
@@ -466,12 +476,13 @@ const fold = createFoldedView($('foldCanvas'));
 function setView(name) {
   view = name;
   for (const b of $('views').children) b.classList.toggle('is-on', b.dataset.view === name);
+  const canvasOn = name === 'folded' || name === 'lit';
   $('flatSvg').toggleAttribute('hidden', name !== 'flat');
-  $('foldCanvas').toggleAttribute('hidden', name !== 'folded');
+  $('foldCanvas').toggleAttribute('hidden', !canvasOn);
   $('buildView').toggleAttribute('hidden', name !== 'build');
-  $('previewLabel').textContent = name === 'flat' ? 'Flat — the cut file' : name === 'build' ? 'Build — the instructions' : 'Folded';
-  $('previewHint').textContent = name === 'flat' ? 'one half, as it is cut: creases as the file carries them' : name === 'build' ? 'the same steps go into the PDF, with the counts of this star' : 'drag to turn · scroll to zoom · it turns on its own when left alone';
-  if (name === 'folded') { fold.start(); pushMesh(); } else if (name === 'flat') { fold.stop(); drawFlat(); } else { fold.stop(); drawBuild(); }
+  $('previewLabel').textContent = name === 'flat' ? 'Flat — the cut file' : name === 'build' ? 'Build — the instructions' : name === 'lit' ? 'Lit' : 'Folded';
+  $('previewHint').textContent = name === 'flat' ? 'one half, as it is cut: creases as the file carries them' : name === 'build' ? 'the same steps go into the PDF, with the counts of this star' : name === 'lit' ? 'the lamp inside, the room dark, the pattern thrown on the wall · drag to turn' : 'drag to turn · scroll to zoom · it turns on its own when left alone';
+  if (canvasOn) { fold.start(); pushMesh(); } else if (name === 'flat') { fold.stop(); drawFlat(); } else { fold.stop(); drawBuild(); }
 }
 for (const b of $('views').children) b.addEventListener('click', () => setView(b.dataset.view));
 flatSvg.addEventListener('click', () => { if (flatFocus) { flatFocus = null; drawFlat(); } });
@@ -565,7 +576,7 @@ $('exportPng').addEventListener('click', exportPng);
 $('randomPattern').addEventListener('click', randomPattern);
 $('patReseed').addEventListener('click', reseedPattern);
 $('undo').addEventListener('click', undo); $('redo').addEventListener('click', redo);
-$('resetAll').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...MAT.EXPORT_STATE_DEFAULTS, ...BLD.BACKING_STATE_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) }; pushHistory(prev); rebuild({ commit: true }); });
+$('resetAll').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; state = { ...G.DEFAULTS, ...PAT.PATTERN_STATE_DEFAULTS, ...MAT.EXPORT_STATE_DEFAULTS, ...BLD.BACKING_STATE_DEFAULTS, ...LIT_DEFAULTS, edge: cloneCurve(G.DEFAULTS.edge) }; pushHistory(prev); rebuild({ commit: true }); });
 $('randomShape').addEventListener('click', () => { const prev = { ...state, edge: cloneCurve(state.edge) }; const seed = (Math.random() * 2 ** 31) >>> 0; const st = G.randomShape(seed); state = { ...state, ...st, width: state.width }; pushHistory(prev); $('presetNote').textContent = `random #${seed.toString(36)}`; rebuild({ commit: true }); });
 document.addEventListener('keydown', (ev) => {
   if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); }
@@ -578,11 +589,11 @@ buildPresets(); buildEdgeModes(); buildPatternPresets();
 try { const saved = localStorage.getItem(STORE); if (saved) { const r = G.readDesign({ format: G.DESIGN_FORMAT, version: G.DESIGN_VERSION, state: JSON.parse(saved) }, state); if (r.ok) state = r.state; } } catch { /* a bad save is ignored */ }
 new ResizeObserver(() => { fold.resize(); if (view === 'flat' && model) drawFlat(); }).observe($('foldCanvas').parentElement);
 rebuildNow({ commit: false });
-setView('folded');
+setView('lit');
 
 /* the page's test chrome */
 window.__lantern = {
-  state: () => JSON.parse(snap(state)), model: () => model, stats,
+  state: () => JSON.parse(snap(state)), model: () => model, stats, designJson: () => G.serializeDesign(state),
   setState: (partial) => { const prev = { ...state, edge: cloneCurve(state.edge) }; state = { ...state, ...partial }; if (partial.edge) state.edge = cloneCurve(partial.edge); pushHistory(prev); rebuildNow({ commit: true }); },
   set: (id, v) => { const el = $(id); if (!el) throw new Error(`no control ${id}`); if (el.type === 'checkbox') { el.checked = !!v; el.dispatchEvent(new Event('change', { bubbles: true })); } else { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); } rebuildNow({ commit: true }); },
   flush: () => { if (pending) { cancelAnimationFrame(pending); pending = 0; rebuildNow({ commit: true }); } return true; },
@@ -594,7 +605,23 @@ window.__lantern = {
   history: () => ({ past: history.past.length, future: history.future.length }), undo, redo,
   flatCounts: () => ({ outline: flatSvg.querySelectorAll('.outline').length, tabs: flatSvg.querySelectorAll('.tab').length, mountain: flatSvg.querySelectorAll('.mountain').length, valley: flatSvg.querySelectorAll('.valley').length, holes: flatSvg.querySelectorAll('.hole').length, ring: flatSvg.querySelectorAll('.ring').length }),
   svgText: (which) => exportSvg(which), design: () => G.serializeDesign(state),
-  fold: { frames: () => fold.frames, triangles: () => fold.triangles, camera: fold.camera, lookAt: fold.lookAt, pixel: fold.pixel, running: fold.isRunning, renderOnce: fold.renderOnce, materials: fold.materials },
+  lit: () => fold.lit(),
+  /* lit probe (test chrome): how much of the frame the lamp lights, with and without its shadow — the wall carries the pattern iff
+     the shadowed count is a FRACTION of the unshadowed one and not 0 */
+  litWallSamples: (noShadow) => {
+    const c = $('foldCanvas'), b = c.getBoundingClientRect();
+    // the WALL band only: the floor, and the opening's own blob of light on it, lie below y 0.7 of the frame
+    const grid = (f) => { const out = []; for (let y = 0.05; y < 0.7; y += 0.025) for (let x = 0.03; x < 0.97; x += 0.03) out.push(f(b.width * x, b.height * y)); return out; };
+    // the MASK: the same frame with the LAMP OFF and the room black — the star still glows (emissive), the wall is black, so a bright sample there is the star
+    fold.setLit({ ...litOf(state), room: 1, noLamp: true }); fold.renderOnce(); const dark = grid((x, y) => fold.pixel(x, y)[0]);
+    fold.setLit({ ...litOf(state), noShadow }); fold.renderOnce(); const bright = grid((x, y) => fold.pixel(x, y)[0]);
+    fold.setLit({ ...litOf(state), noShadow: false }); fold.renderOnce();
+    // the bar is the frame's OWN room level (the median of the masked dark samples) plus 40: a wall the lamp reaches through a hole
+    const wall = bright.filter((v, k) => dark[k] <= 30).sort((a, b) => a - b); const base = wall[wall.length >> 1] || 0;   // the room level: the median wall sample
+    let lit = 0, n = 0; for (let k = 0; k < dark.length; k++) { if (dark[k] > 30) continue; n++; if (bright[k] > base + 40) lit++; }
+    return { n, lit, base };
+  },
+  fold: { frames: () => fold.frames, triangles: () => fold.triangles, camera: fold.camera, lookAt: fold.lookAt, pixel: fold.pixel, running: fold.isRunning, renderOnce: fold.renderOnce, materials: fold.materials, fit: () => { fold.fitCamera(); fold.renderOnce(); } },
   flags: () => [...document.querySelectorAll('#flags li')].map((li) => ({ kind: li.className, id: li.dataset.flag || 'ok', text: li.textContent })),
   dimsText: () => $('dims').textContent,
   random: () => lastRandom && { draws: lastRandom.draws.map((d) => ({ counts: { ...d.counts } })), picked: lastRandom.picked },
