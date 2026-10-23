@@ -41,7 +41,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import crypto from 'node:crypto';
 import { shardOf } from './bloom-export-shards.mjs';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, curlAssertions, stamenAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions, textureAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, settleMsForRow, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, curlAssertions, stamenAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions, textureAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -745,6 +745,22 @@ const SEPC_MUTANTS = /^(a-sepal-curve-read-from-the-petals|a-tier-curve-leaks-to
 const SEPC_ROWS = /^SEPAL CURVES:/;
 const TEX_ROWS = /^surface texture/;
 const TEX_MUTANTS = /^(the-relief-goes-inward|the-bead-is-left-flat|the-field-is-sampled-per-organ|the-lattice-leaves-the-surface|the-exclusivity-is-dropped)$/;
+/* THE EDGE CAP (Eva, Oct 23): its three mutants run on the `texture edge cap`
+   rows (the corner, a state past the cap) plus the shipped PEBBLE row, where
+   a typed edge moves the default. */
+const CAP_ROWS = /^texture edge cap|^TEXTURE CAP: past|^surface texture — PEBBLE at the shipped/;
+const CAP_MUTANTS = /^(the-edge-cap-is-removed|the-edge-is-typed-at-the-cap|the-edge-coarsens-past-the-cap)$/;
+/* the edge-cap facts a witness reads off a MUTATED module's own build */
+function capFacts(G, st) {
+  try {
+    const acc = new G.MeshBuilder({ exportMode: true });
+    const b = G.buildBloomInto(acc, st, {});
+    const T = b.texture; if (!T) return { none: true };
+    return { tris: acc.triangleCount, edge: T.edgeMm, cap: T.edgeCap || null, budget: G.EXPORT_TRI_BUDGET };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const CAP_CORNER = { petalCount: 40, layerCount: 3, petalTexture: 'PEBBLE' };
+const CAP_PAST = { petalCount: 40, layerCount: 3, sepalCount: 40, sepalTiers: 4, stemLength: 120, leafLength: 60, leafNodes: 8, leafPhyllotaxy: 'whorled', petalTexture: 'PEBBLE' };
 /* the texture facts a witness reads off a MUTATED module's own build */
 function texFacts(G, st) {
   try {
@@ -3049,6 +3065,29 @@ const MUTANTS = [
       const sm = subs(m), sc = subs(c);
       let worst = 0; for (let i = 0; i < Math.min(sm.length, sc.length); i++) worst = Math.max(worst, Math.hypot(sm[i].mid[0] - sc[i].mid[0], sm[i].mid[1] - sc[i].mid[1], sm[i].mid[2] - sc[i].mid[2]));
       return (sm.length && worst > 1e-4) ? null : `${sm.length} sub-row samples, the mid-surface moved ${worst} mm at most — the lerp did not leave the surface`; } },
+  /* ===================================================================
+     THE TEXTURE EDGE CAP (Eva's ruling of Oct 23). Three mutants, each
+     witnessed on the MUTATED module's own edge-cap record, scoped to
+     `CAP_ROWS` (the corner builds take the refused rows' settle allowance).
+     =================================================================== */
+  { id: 'the-edge-cap-is-removed', rows: CAP_ROWS, why: "the cap's switch is off: every textured build stays on the ruled 0.4 mm edge, so the 40 x 3 corner builds 1,542,832 triangles, over the export budget, and the export is refused where the ruling says the edge coarsens to the finest rung that fits (0.41 mm, 1,478,672)",
+    find: "    const capOn = true;   // the cap's own switch: the mutant table turns it off",
+    into: "    const capOn = false;   // the cap's own switch: the mutant table turns it off", names: ['TX9'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, ...CAP_CORNER }; const m = capFacts(M, st), c = capFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.edge === 0.4 && m.tris > m.budget && c.edge > 0.4 && c.tris <= c.budget) ? null : `the mutant built the corner at ${m.edge} mm / ${m.tris} tris (clean ${c.edge} mm / ${c.tris})`; } },
+  { id: 'the-edge-is-typed-at-the-cap', rows: CAP_ROWS, why: "the edge in force is TYPED at the 0.5 mm cap on every rung of the ladder, so the shipping PEBBLE default is latticed at 0.5 mm (102,512 triangles where the ruled 0.4 mm edge builds 151,792): the default moves, the record's edge and its derived rung disagree, and the read-out claims the ruled edge",
+    find: "    TEXTURE_EDGE_IN_FORCE = textureEdgeRung(k);",
+    into: "    TEXTURE_EDGE_IN_FORCE = TEXTURE_EDGE_CAP_MM;", names: ['TX9'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE' }; const m = capFacts(M, st), c = capFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.edge === 0.5 && c.edge === 0.4 && m.tris < c.tris) ? null : `the mutant built the default at ${m.edge} mm / ${m.tris} tris (clean ${c.edge} mm / ${c.tris})`; } },
+  { id: 'the-edge-coarsens-past-the-cap', rows: CAP_ROWS, why: "the ladder's top is twice the cap: a build that does not fit at 0.5 mm is coarsened on to 0.6 mm (where it fits) instead of standing at the cap and refusing the export — the ruling says never coarser than 0.5 without a ruling",
+    find: "      const topK = TEXTURE_EDGE_CAP_RUNGS;   // the ladder's top: the cap, never coarser without a ruling",
+    into: "      const topK = 2 * TEXTURE_EDGE_CAP_RUNGS;   // the ladder's top: the cap, never coarser without a ruling", names: ['TX9'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, ...CAP_PAST }; const m = capFacts(M, st), c = capFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.edge > 0.5 && m.cap && m.cap.fits && c.edge === 0.5 && c.cap && !c.cap.fits) ? null : `the mutant built the past-the-cap state at ${m.edge} mm (fits ${m.cap && m.cap.fits}; clean ${c.edge} mm, fits ${c.cap && c.cap.fits})`; } },
   { id: 'the-exclusivity-is-dropped', rows: TEX_ROWS, why: "the refusal is dropped: with the infill on the record reports NOTHING refused and the read-out says nothing (Q9 says told, never silently picked) — measured, the infilled petal's cell panels never reach emitPanel's relief, so the sheet stays flat while the record claims a texture",
     /* (the witness is the RECORD's word, not a displacement: on this tree an
        infilled petal structurally carries no relief, which is exactly why a
@@ -4080,10 +4119,19 @@ const ROWS = [
   /* SURFACE TEXTURE (T3): three rows, scoped to the texture mutants — the
      shipped PEBBLE, the whole bloom (a sepal and a leaf under the one field,
      the per-organ mutant's witness) and BOTH ON (the exclusivity's). */
-  { label: 'surface texture — PEBBLE at the shipped height and size', for: TEX_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }] },
+  { label: 'surface texture — PEBBLE at the shipped height and size', for: /^(the-relief-goes-inward|the-bead-is-left-flat|the-field-is-sampled-per-organ|the-lattice-leaves-the-surface|the-exclusivity-is-dropped|the-edge-cap-is-removed|the-edge-is-typed-at-the-cap|the-edge-coarsens-past-the-cap)$/, set: [{ id: 'petalTexture', value: 'PEBBLE' }] },
   { label: 'surface texture — CELLULAR x 8 sepals x a 60 mm leaf on a 60 mm stem (one field, three organs)', for: TEX_MUTANTS,
     set: [{ id: 'petalTexture', value: 'CELLULAR' }, { id: 'sepalCount', value: '8' }, { id: 'stemLength', value: '60' }, { id: 'leafLength', value: '60' }] },
   { label: 'surface texture — BOTH ON (the infill wins, the texture refused)', for: TEX_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalInfill', value: 'VORONOI' }] },
+  /* THE EDGE CAP (Oct 23): the corner the ruling is about and a state past
+     the cap, scoped to the cap mutants; the shipped PEBBLE row above also
+     runs under them (CAP_ROWS) for the typed-edge mutant. */
+  { label: 'texture edge cap — PEBBLE x 40 petals x 3 whorls (over the budget at 0.4 mm, lands on 0.41)', for: CAP_MUTANTS,
+    set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }] },
+  /* the past-the-cap row carries the MATRIX row's own label: TX9 asks that a
+     build which does not fit at the cap be a DECLARED refusal, by label */
+  { label: 'TEXTURE CAP: past 0.50 mm — 40 x 3 x 40 sepals x 4 tiers x whorled leaves on a 120 mm stem (REFUSED at the cap, told)', for: CAP_MUTANTS,
+    set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }, { id: 'sepalCount', value: '40' }, { id: 'sepalTiers', value: '4' }, { id: 'stemLength', value: '120' }, { id: 'leafLength', value: '60' }, { id: 'leafNodes', value: '8' }, { id: 'leafPhyllotaxy', value: 'whorled' }] },
   { label: 'an asymmetric outline curve — a LOPSIDED blade (the right half narrower)', for: ASYM_MUTANTS,
     set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
   { label: 'an asymmetric outline curve — a PINWHEEL x 5 petals', for: ASYM_MUTANTS,
@@ -4227,7 +4275,7 @@ async function famsOn(rows) {
   for (const row of rows) {
     await openBloom(page, port);
     await stillFrame(page);
-    const bad = await applyConfig(page, row.set);
+    const bad = await applyConfig(page, row.set, null, { settleMs: settleMsForRow(row.label) });
     if (bad.length) { console.log(`    (row "${row.label}" refused: ${bad[0]})`); continue; }
     /* A ROW MAY CARRY SCOPES (F1.1a): the tier offsets reach the page through
        the `__bloomScopes` hook (the scopes gate's own route) and the harness's

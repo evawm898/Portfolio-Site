@@ -17,7 +17,14 @@
                                read-out (the fringe's precedent, XR1); the
                                row stays unbuilt as a matrix row because a
                                refused row produces no STL for the gates.
-   Nothing here picks one. Node only. RUN: node tools/bloom-texture-corner.mjs
+   RULED (Eva, Oct 23): COARSEN THE EDGE, TOLD — mechanism (2), built into
+   `buildBloomInto` as a budget-derived edge on a 0.01 mm grid between 0.4 and
+   the 0.5 cap (past the cap the export is refused). This tool now ALSO prints
+   the shipped derivation's own answer per corner (the edge used and every
+   trial) beside the pinned ladder it measured before the ruling; the pinned
+   ladder reaches EVERY organ now (the hook pins the whole bloom), so its
+   whole-bloom figures are lower than the petals-only ones T3 quoted.
+   Node only. RUN: node tools/bloom-texture-corner.mjs
    =================================================================== */
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -27,7 +34,10 @@ const R = await import(pathToFileURL(path.join(HERE, 'bloom-registry.js')).href)
 const B = G.EXPORT_TRI_BUDGET;
 const JSON_OUT = process.argv.includes('--json') ? process.argv[process.argv.indexOf('--json') + 1] : null;
 const REC = { budget: B, corners: {}, headCount: {}, edges: {} };
-const tris = (o, cap = null) => { const acc = new G.MeshBuilder({ exportMode: true }); G.buildBloomInto(acc, { ...R.DEFAULTS, petalTexture: 'PEBBLE', ...o }, { below: null, capability: cap }); return acc.triangleCount; };
+/* a PINNED build (the hook) — the derivation is off, the edge is the one asked */
+const tris = (o, cap = { textureEdgeMm: 0.4 }) => { const acc = new G.MeshBuilder({ exportMode: true }); G.buildBloomInto(acc, { ...R.DEFAULTS, petalTexture: 'PEBBLE', ...o }, { below: null, capability: cap }); return acc.triangleCount; };
+/* the SHIPPED derivation's own answer */
+const derived = (o) => { const acc = new G.MeshBuilder({ exportMode: true }); const b = G.buildBloomInto(acc, { ...R.DEFAULTS, petalTexture: 'PEBBLE', ...o }, { below: null }); const E = b.texture.edgeCap; return { usedMm: E.usedMm, fits: E.fits, tris: acc.triangleCount, trials: E.trials }; };
 const pct = (n) => `${(100 * n / B).toFixed(1)} %`;
 console.log(`THE CORNER — PEBBLE at the ruled 0.4 mm edge, H 0.4, EXPORT (the budget is ${B.toLocaleString('en-US')}):`);
 const corners = [['40 x 3 whorls', { petalCount: 40, layerCount: 3 }], ['40 x 3 whorls + 8 sepals + a 60 mm leaf on a 60 mm stem (the WHOLE bloom)', { petalCount: 40, layerCount: 3, sepalCount: 8, stemLength: 60, leafLength: 60 }], ['40 x 1 whorl', { petalCount: 40 }], ['the default', {}]];
@@ -47,4 +57,10 @@ for (const e of [0.4, 0.5, 0.6, 0.7, 0.8, 1.0, 1.2]) { const t = tris({ petalCou
 console.log(`  the finest edge in that ladder that fits: ${fits} mm`);
 console.log('\n(3) REFUSAL PAST BUDGET — the page as it stands: the export click builds the mesh, reads the count and refuses above the budget with the count printed; a textured 40 x 3 is refused at ' + got['40 x 3 whorls'].toLocaleString('en-US') + ' tris. No row carries it: a refused row produces no STL for X1 to read (the ALL MAX precedent).');
 REC.finestEdgeThatFits = fits;
+console.log('\nTHE SHIPPED CAP (Eva, Oct 23 — the derivation itself, every organ on one edge):');
+REC.derived = {};
+for (const [n, o] of [...corners, ['past the cap: 40 x 3 + 40 sepals x 4 tiers + whorled leaves on a 120 mm stem', { petalCount: 40, layerCount: 3, sepalCount: 40, sepalTiers: 4, stemLength: 120, leafLength: 60, leafNodes: 8, leafPhyllotaxy: 'whorled' }]]) {
+  const d = derived(o); REC.derived[n] = d;
+  console.log(`  ${n}: edge ${d.usedMm.toFixed(2)} mm, ${d.tris.toLocaleString('en-US')} tris = ${pct(d.tris)}${d.fits ? '' : ' — DOES NOT FIT AT THE CAP, the export is refused'} (trials ${d.trials.map((t) => `${t.edgeMm.toFixed(2)}: ${t.tris.toLocaleString('en-US')}`).join(' · ')})`);
+}
 if (JSON_OUT) (await import('node:fs')).writeFileSync(JSON_OUT, JSON.stringify(REC, null, 1));
