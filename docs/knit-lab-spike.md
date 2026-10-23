@@ -1,4 +1,4 @@
-# Knit Lab — yarn-level knit feasibility spike (Oct 21; phase 2 the same day, phase 3 Oct 21–22)
+# Knit Lab — yarn-level knit feasibility spike (Oct 21; phase 2 the same day, phase 3 Oct 21–22, phase 3b Oct 22–23)
 
 `/knit-lab.html` (noindex, unlinked). Ten wales × ten courses of stockinette knitted flat from one
 yarn — plain, or with one eyelet row across the middle — the yarn a chain of points relaxed with XPBD,
@@ -9,6 +9,236 @@ that stays inextensible under load, a load–unload cycle, yarn overs and k2tog,
 Web Worker. Phase 3 replaced the continuous pull with a stepped, quasi-static test, found why phase 2's
 friction was rate-dependent, added a pull across the courses, and purl, 1×1 rib and ssk. Each phase's
 record is kept below the next; where a later phase overturned an earlier one, it says so.
+
+## Phase 3b — the clamp fixture; what absorbs the work without friction; friction through the jam (Oct 22)
+
+**Outcome: not merged.** The fixture is now a tensile tester's (§1). Without friction the cycle still loses
+9.7% of the work against the 2% bar, and the cause is found (§2): the yarn is a chain of straight
+segments, and a yarn sliding over one rides a bump at every vertex. The bumps act like friction (an
+effective coefficient of about 0.26). A contact between smooth curves removes them: the same excursion
+comes back to within 0.4% instead of 4%. But on that contact the swatch never comes to rest, so it is in
+the code and switched off. Along the wales, μ 0.25 jersey loads monotonically through the jam and unloads on a
+clean closed branch at both step sizes; rib does not, by one step each way (§3). **Across the courses the test does not
+reach equilibrium on this model at all** (§4), so it is out of the gate run (`--course` puts it back) and
+the page says so. Numbers: `node tools/verify-knit-lab.mjs` on this container, unless a section says
+otherwise.
+
+### 1. The fixture: jaws across the full width, free side edges, no plates
+
+- **Bottom jaw:** the cast-on course, as before.
+- **Top jaw** (`FIXTURE: 'clamp'`): every point of the last course across the full width, plus the yarn's
+  end. It is not a comb of pins.
+- **Side edges:** free. The plates are gone (`PLATE_HALF_GAP: Infinity`).
+- **The start-up squeeze stays.** The drawn start is 2.5× deep and is squeezed to ±1.6 d while the yarn
+  reels in to length, then opened over 60 frames. It touches nothing once the swatch starts to settle.
+  Without it the loops shorten while still deep and the swatch crumples.
+- **Out-of-plane spring.** Free curl, frictionless and weightless, did not settle: the swatch crumpled,
+  jaw gap 33 → 21 d. So, as the brief allowed, a weak restoring force acts on interior nodes only
+  (`OUT_OF_PLANE_K`):
+  - each loop not in an edge wale or an edge course feels −K × the z of its own centroid, spread over its
+    points;
+  - it acts along the depth only, so it never enters a jaw's load;
+  - the edge wales and courses are free to curl;
+  - **K = 300 load units per d per loop.** At 100 or below the swatch still crumples; from 150 up it holds;
+  - on the settled swatch interior loop centroids sit within about 1.5 d of the mid-plane. The spring
+    therefore carries at most about 450 per loop, against jaw loads of 10⁴–10⁶.
+- **Width at rest.** jersey's settled wale-centre span is 34.9 d (drawn 37.8), and the jaw gap 31.6 d.
+
+The fixture moved the frictionless loss nowhere: **9.24%** between clamps (K 300), against 9.1%
+between plates. So it was not the plates. The rest of this section is what it was.
+
+### 2. What absorbs the work without friction
+
+**(a) The contacts bounced.** Held still at +12%, frictionless, with damping 15/s, the swatch never came to
+rest:
+
+| held at +12% | RMS point speed |
+|---|---|
+| 32 substeps a frame | 0.14 d/s |
+| 128 substeps | 0.014 d/s |
+| 64 substeps, with the velocity pass below | 0.0000 d/s |
+
+A positional contact pushes the yarns apart by however far the prediction left them overlapping.
+Deriving velocity from positions turns that push into a separating velocity, the next substep carries it,
+and the contact pushes again. That is energy pumped in every substep, which only the damping takes out.
+
+The fix is `CONTACT_VELOCITY`: XPBD's restitution-0 velocity pass. After the velocity update, every contact
+active in that substep, and every pin push, loses its relative normal velocity. At 64 substeps a held
+swatch then comes to rest exactly (RMS 0.0000 d/s after 1,000 frames); at 32 it does not. The defaults are
+now 64 substeps a frame with the pass on.
+
+**This did not change the frictionless loss: 9.66%.** The swatch now rests between steps, and the loss is
+still there.
+
+**(b) The polyline corrugation.** With the swatch truly at rest (RMS < 1e-5 d/s at every hold), an
+excursion at one extension does not come back.
+
+Small excursions at +12%, frictionless; "back" is the load on returning to +12%:
+
+| excursion | start | back after +d | back after −d | back after +d again |
+|---|---|---|---|---|
+| ±0.5% | 45,304 | 43,345 | 43,907 | 43,234 |
+| ±2% | 45,304 | 40,387 | 42,138 | 40,303 |
+
+The loop width is about 9% of the excursion's load swing at both sizes, so it acts like friction.
+
+The two rest states at one extension differ by 0.1–0.3 d all over the swatch. It is not the edges: the
+edge loops' RMS difference is 0.117 d, the interior's 0.151. It survives every solver knob:
+
+| knob changed | result |
+|---|---|
+| iterations 1 / 4 / 8 | down/up 0.91 / 0.93 / 0.92 |
+| 64 substeps | 0.92 |
+| damping 50 (before the velocity pass) | loss 8.9% |
+| spring K 3,000, or on every loop | unchanged |
+| softer contact, skip arc 3 d | unchanged |
+| stiffer or softer bend | unchanged |
+
+**It grows with the segment length.** The ±2% loop is 9% of the swing at 0.5 d segments and 14% at 0.75 d,
+with the bend compliance scaled as seg³ so the yarn is the same. At 0.25 d it did not settle at 64
+substeps.
+
+The mechanism: between two vertices the chord runs inside the curve by the sagitta seg² κ / 8, so the
+contact tube is corrugated. A yarn sliding over a bent one climbs and drops at every vertex, and with hard
+contacts that pins it. The effective friction coefficient is about π · seg · κ / 4, which is 0.26 on the
+knit's ~1.5 d bends at 0.5 d segments — about the real μ.
+
+**Testing the mechanism.** `CONTACT_SMOOTH` takes the contact between the smooth curves the points define,
+at their own closest points (Newton from the chords' answer), as an 8-point constraint. With the
+Catmull-Rom curve, the ±2% excursion at +12% comes back to **34,503 after +d and 34,379 after −d**, from
+34,459. That is 0.4% instead of 4%, so the corrugation is the loss.
+
+**But on the smooth contact the swatch never comes to rest:**
+
+| smooth-contact variant | RMS held still |
+|---|---|
+| Catmull-Rom; uniform quadratic B-spline (C1) | 0.11–0.13 d/s |
+| no velocity pass; a softer contact; 2 iterations | 0.11–0.13 d/s |
+| a softer bend | 0.07 d/s |
+| 128 substeps | 0.02 d/s |
+| normal projected off both tangents | blew up (139 d/s) |
+
+The loads drift 0.3–0.5% per 1,000 frames, so a stepped hold cannot converge. A gate-style run with it
+recorded no test in 50 minutes. **So `CONTACT_SMOOTH` is off.** What it needs is a smooth contact that is
+also a fixed point of the solver; it is the next thing to do.
+
+**Frictionless gate: FAIL — 9.7% lost** along the wales on the chord contact.
+
+### 3. Friction through the jam, along the wales
+
+With the solver at rest between steps, every step of every μ 0.25 wale test converged, at 1% and 0.5%
+steps, for jersey and for rib. **Jersey** loads monotonically through the jam and comes back on a clean
+closed branch at both step sizes (23 / 22 and 44 / 43 steps, none out of order). **Rib does not**, by one
+step each way: at 1% steps its load at 1% is 12.9% below its load at 0% (the teal curve's first two points
+in `docs/img/knit-lab/wale-plot.png`; why is not established), and at 0.5% steps one unloading step rises. Nothing was tuned to make
+rib pass.
+
+**Loss and set across the two step sizes:** rib agrees (loss 46.7 / 49.1%, set 8.34 / 8.67%, spreads 5.0 /
+4.0%). Jersey does not (loss 31.3 / 43.3%), and the reason is not the step size: a replica at the SAME
+settings, the preload moved by one part in 1e9, reads 44.2% / 8.23%. Jersey's cycle is chaotic at the 10%
+level on this model, so a step-size comparison cannot be read to 10% from one run each.
+
+The suspects in the brief, checked against the code:
+
+- **The friction cap** is already this substep's normal multiplier. `lamC` and `lamT` are zeroed every
+  substep, and the budget is μ · λn − λt of that substep. The must-fail is
+  `friction-cap-accumulates`, which still breaks the F gate.
+- **Static/kinetic switching:** not separately instrumented this round.
+
+Phase 3's ratchet past the jam was measured across the courses: held at 56%, the load went 0.91 → 2.03 M.
+That test cannot be run on this model now (§4), so the ratchet there is **untested**, not fixed. Along the
+wales the held peak was already steady with memory friction (gate H). The working hypothesis is that the
+ratchet was the bouncing contacts of §2a — a chattering contact under load lets a little slip through
+every substep — but it is not demonstrated.
+
+### 4. Across the courses: not measurable on this model
+
+**Both top and bottom free, at zero load** (the brief's free edges):
+
+- the frictionless swatch shrinks in height from 29 to 21 d;
+- its cast-on edge flops up to 7 d out of plane;
+- it keeps moving at about 1 d/s whatever the damping. Nothing holds it.
+
+**Pretension instead** (`COURSE_BOTTOM: 'rail'`, `COURSE_EDGE_LOAD: 1500`):
+
+- the cast-on rides a rail (y and z kept, free along x);
+- the live stitches go onto a needle, the pins free along x, force-controlled to 1,500 while the width
+  is released and **held fixed once the side jaws clamp**;
+- this is a small pretension across the pull, as in a biaxial test.
+
+The width at rest comes out of this release (§5). The pull still does not settle. At +3%, held still, the
+two side jaws disagree:
+
+| frames held | left / right jaw |
+|---|---|
+| 0 | −32% |
+| 140 | 0% |
+| 300 onward | +9% to +12%, and stays there |
+
+Every step reached the 900-frame cap unconverged.
+
+The moving points sit next to a jaw: a free yarn pressed on the clamped edge-wale yarn at one of its
+vertices. It flips between two segments' normals at about 1e-4 d a substep, with zero net displacement.
+Against a segment that cannot move, the velocity-pass impulses carry force that no jaw reading counts. It
+is the polyline-corner family of §2b again. The course tests are left out of the gate run (`--course` puts
+them back), and the page says the course test does not settle.
+
+### 5. Rib against jersey across the courses
+
+**Width at rest, released.** One settle and width release each on this fixture (`scratchpad restw`, both
+1× runs):
+
+| | drawn | settled between jaws | released |
+|---|---|---|---|
+| jersey | 37.8 d | 34.9 d | 33.21 d |
+| 1×1 rib | 37.7 d | 37.9 d | 30.13 d |
+
+So rib draws in to **0.907×** jersey's width, from the topology alone; phase 3 measured 0.843× with the
+plates. **The jam across the courses** is not measurable on this fixture (§4). Phase 3's figure, on the
+plates-and-comb fixture with the old solver, was rib at 71% against jersey at 50% (1.42×), from a run past
+that gate's 60% range.
+
+### 6. Gate results (phase 3b)
+
+`node tools/verify-knit-lab.mjs` (wale direction; `--course` not run — §4). **9 checks fail; every
+must-fail is rejected.** Full log: one run on this container, the untied-tail must-fail capped at 60%
+extension (unravelling, it never reaches the load limit and would otherwise walk to 300%).
+
+| gate | check | result | numbers |
+|---|---|---|---|
+| Q | μ 0, wale: cycle loses < 2% | **FAIL** | 9.7% lost, set 1.31% (§2: the chord corrugation) |
+| Q | μ 0, course: cycle loses < 2% | not run | the course test does not settle (§4) |
+| Q | μ 0.25 jersey: loss and set within 10% at 1% / 0.5% steps | **FAIL** | loss 31.3 / 43.3% (spread 38.5%), set 7.15 / 8.24%; a same-settings replica reads 44.2% / 8.23% |
+| Q | μ 0.25 rib: the same | PASS | loss 46.7 / 49.1% (5.0%), set 8.34 / 8.67% (4.0%) |
+| Q | must-fails: the phase-2 test at two speeds; μ 0.25 under the 2% bar | rejected / rejected | spread 50% in set; 31.3% lost |
+| M | jersey, 1% and 0.5% steps: monotone loading through the jam, closed unloading | PASS / PASS | 23 / 22 and 44 / 43 steps, 0 unconverged, 0 out of order |
+| M | rib, 1% steps | **FAIL** | one loading step fell 12.9% (0% → 1%) |
+| M | rib, 0.5% steps | **FAIL** | one unloading step rose |
+| M | must-fail: the phase-2 friction | rejected | the way back above the way out on 21 steps, worst 169.8% |
+| H | held at the peak, the load stays put | PASS | 1,207,967 → 1,203,913 (−0.3%) over 600 frames; phase-2 friction +25.0% |
+| T | every chart's drawn start passes its record (plain, eyelet, eyelet-ssk, rib) | PASS | 3 must-fails rejected |
+| O | k2tog leans right, drawn and settled | PASS | top head in front by 0.14–1.83 d settled |
+| O | k2tog after the test | **FAIL** | loop 51's top head −0.02 d (one of four) |
+| O | ssk settled / after the test | **FAIL / FAIL** | loop 52's top head −0.15 d settled, −0.67 d after |
+| F | μ 0.25's soft region ≤ 2× the frictionless | **FAIL** | 2.46× (18,651 against 7,576 per d), jam at 17% |
+| I | strain < 1% before the jam; no collapse past it; the load limit ends the test | PASS ×12 | worst strain 0.008% (plain), peaks 1.22 M / 0.85 M / 0.69 M / 0.88 M |
+| I | must-fails: compliant yarn; Gauss-Seidel stretch at 32 substeps; comb fixture, untied tail | rejected ×3 | 6.86% strain; the 5% strain stop; load fell to 36% of its peak at 57% |
+| C | friction makes the loop | PASS | loss 31.3% against 9.7% (+21.6 points), set 7.15% against 1.31% |
+| E | the yo-k2tog row opens (≥ 4 holes ≥ 1 d) | PASS | 4 settled, 5 at +20% |
+| E | the ssk-yo row opens | **FAIL** | 2 settled, 4 at +20% |
+| E | the eyelet swatches jam elsewhere | PASS / PASS | 39% and 34% against 17% |
+| S | no pass-through (plain, eyelet, rib) | PASS | 0 deep overlaps; certificate clean on every step; closest 0.736 d |
+
+**Rib against jersey, restated:**
+
+- **Course direction:** not measurable on this fixture (§4). Phase 3's figure, on the plates-and-comb
+  fixture with the old solver, was rib jamming at 71% against jersey's 50% (1.42×). It is not carried
+  forward as a phase 3b result.
+- **Width at rest, released:** rib 30.13 d against jersey 33.21 d, **0.907×** (phase 3: 0.843×).
+- **Along the wales (not gated, read off the same runs):** rib jams at 18% against jersey's 17%, its recorded
+  peak is 0.85 M against 1.22 M, and it loses more of its work (46.7% against 31.3%).
+
+Nothing was tuned to make rib pass.
 
 ## Phase 3 — quasi-static test, the course direction, purl / rib / ssk (Oct 21–22)
 
