@@ -309,7 +309,22 @@ space — three whorls of forty, or heavy sepal and leaf complements — and fro
 
 ### 7d. The byte partition
 
-(filled in below once the four chunks merge — `PARTITION-PLACEHOLDER`)
+`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 908221c> --movers-predicate texture-edge-cap`, six chunks
+merged, both modes:
+
+```
+MERGED 6 chunks over 1555 rows x 2 modes, predicate texture-edge-cap, base <worktree of 908221c>
+partition     : 3 of 3 predeclared movers MOVED (every one must), 1552 holders compared to the bit
+export stream : 1,925,286,768 floats over 213,920,752 triangles
+captured grid : 82,404,596 values over 9,496 panels (live)
+PASS — 0 floats moved on the 1552 holders, positionally, under Object.is; all 3 predeclared movers moved.
+```
+
+The movers are block 79's three added rows (the base tree builds them at the ruled edge, this tree on the
+derived one); **every one of main's 1,552 rows holds to the bit in both modes** — the nineteen textured rows of
+block 77 among them, whose first trial IS the old build. No frozen phase's bytes move (no frozen row trips the
+cap: a frozen textured row is one of block 77's, all under the budget). The first chunked run was stopped at the
+container's two-hour background limit after rows 0–800; the remaining rows were re-run in four smaller chunks.
 
 ### 7e. Clearance with relief over the bead — the numbers (`node tools/bloom-texture-bead.mjs`, re-run on this tree, EXPORT)
 
