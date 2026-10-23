@@ -6169,7 +6169,9 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
       for (let c = 0; c < 3; c++) {
         const k = key(P, b + c * 3), a = facet.get(k);
         if (a) { a[0] += n[0]; a[1] += n[1]; a[2] += n[2]; }
-        else { const f = [...n]; facet.set(k, f); const pp = [P[b + c * 3], P[b + c * 3 + 1], P[b + c * 3 + 2]]; const nk = nearKey(pp[0], pp[1], pp[2]); if (!near.has(nk)) near.set(nk, []); near.get(nk).push({ p: pp, f }); }
+        else { const f = [...n]; facet.set(k, f); const pp = [P[b + c * 3], P[b + c * 3 + 1], P[b + c * 3 + 2]]; const nk = nearKey(pp[0], pp[1], pp[2]); if (!near.has(nk)) near.set(nk, []); near.get(nk).push({ p: pp, f, faces: [] }); }
+        const nkk = nearKey(P[b + c * 3], P[b + c * 3 + 1], P[b + c * 3 + 2]), L = Math.hypot(n[0], n[1], n[2]);
+        if (L > 0) for (const v of near.get(nkk) || []) if (v.p[0] === P[b + c * 3] && v.p[1] === P[b + c * 3 + 1] && v.p[2] === P[b + c * 3 + 2]) { v.faces.push([n[0] / L, n[1] / L, n[2] / L]); break; }
       }
     }
     const unit = (a) => { const L = Math.hypot(a[0], a[1], a[2]); return L > 0 ? [a[0] / L, a[1] / L, a[2] / L] : null; };
@@ -6178,7 +6180,14 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
       nSamp++;
       const hit = findNear(q.p0), f = hit && hit.f;
       if (!f) { bad.push(`TX10: ${name}: a relieved sample at ${q.p0.map((x) => x.toFixed(4)).join(',')} is no vertex of the organ's own undisplaced lattice`); break; }
-      const fn = unit(f), dot = fn ? fn[0] * q.n[0] + fn[1] * q.n[1] + fn[2] * q.n[2] : -1;
+      /* OUTWARD ALONG ITS OWN SURFACE: within 60 degrees of at least one
+         incident face's outward normal. A crease vertex (the ring's edge, a
+         rim) takes a face's own law normal, which the area-weighted average
+         of a right-angle crease tilts by up to 60 degrees — so the bar is
+         read against the faces, one by one; a normal pointed INWARD fails it
+         against every face */
+      let dot = -1;
+      for (const fu of hit.faces) dot = Math.max(dot, fu[0] * q.n[0] + fu[1] * q.n[1] + fu[2] * q.n[2]);
       if (!(dot >= 0.5)) { bad.push(`TX10: ${name}: the relief's normal at ${q.p0.map((x) => x.toFixed(4)).join(',')} is ${Math.acos(Math.max(-1, Math.min(1, dot))) * 180 / Math.PI | 0} degrees off the outward facet normal the undisplaced lattice carries there — the organ is relieved INWARD or off its own surface`); break; }
     }
     if (o.displaced > 0 && !nSamp) bad.push(`TX10: ${name}: displaced vertices and no sample reached the record`);
@@ -13697,6 +13706,7 @@ export const INFLO_APPROACH_XFAIL = Object.freeze({
      pass through each other on every row but the two-floret ones. Measured
      0.0000 mm on each (both engines), declared by value, never clamped. */
   'UMBEL: 5 florets, head OFF': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
+  'TEXTURE T5: PEBBLE x an UMBEL, head ON (the florets\' hubs textured, their pedicels smooth)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — T5\'s textured copy of the default umbel, head ON' },
   'UMBEL: 5 florets, head ON': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
   'UMBEL: 7 florets, head OFF': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
   'UMBEL: 7 florets, head ON': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
@@ -14058,7 +14068,11 @@ function fileVertexIndex(positions) {
   }
   /* the vertices on the line P + s n within `lat` of it, |s| in (1e-3, smax]:
      the nearest one each side of P */
-  return (P, n, smax, lat = 5e-4) => {
+  /* `extreme`: the OUTERMOST vertex each side within smax instead of the
+     nearest — T3's hub plate on a textured build, whose rim wall the organ
+     lattice (T5) cuts into rows: where a sepal foot buries the rim those rows
+     stay on the probe line and the nearest pair reads one row's height */
+  return (P, n, smax, lat = 5e-4, extreme = false) => {
     let top = null, bot = null;
     const r = Math.ceil(smax / cell) + 1;
     const cx = Math.floor(P[0] / cell), cy = Math.floor(P[1] / cell), cz = Math.floor(P[2] / cell);
@@ -14070,8 +14084,8 @@ function fileVertexIndex(positions) {
         if (!(Math.abs(sAlong) > 1e-3 && Math.abs(sAlong) <= smax)) continue;
         const lx = vx - sAlong * n[0], ly = vy - sAlong * n[1], lz = vz - sAlong * n[2];
         if (lx * lx + ly * ly + lz * lz > lat * lat) continue;
-        if (sAlong > 0 && (top === null || sAlong < top)) top = sAlong;
-        if (sAlong < 0 && (bot === null || sAlong > bot)) bot = sAlong;
+        if (sAlong > 0 && (top === null || (extreme ? sAlong > top : sAlong < top))) top = sAlong;
+        if (sAlong < 0 && (bot === null || (extreme ? sAlong < bot : sAlong > bot))) bot = sAlong;
       }
     }
     return top === null || bot === null ? null : top - bot;
@@ -14208,9 +14222,15 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
   {
     const H = rec.hub, N = GEOMETRY.HUB_SECTORS;
     if (!H.dome) {
+      /* a TEXTURED hub (T5) is read for the plate's OUTERMOST faces within
+         half the rebuild's plate plus the relief height: the lattice cuts the
+         rim wall into rows, and relief only ever adds — untextured the window
+         holds exactly the two corners and the reading is the shipped one */
+      const relH = ui.petalTexture && ui.petalTexture !== 'NONE' ? Number(ui.textureHeight) || 0 : 0;
+      const plateT = Math.max(MIN_FEATURE_MM, rec.hubBuilt && typeof rec.hubBuilt.thickness === 'number' ? rec.hubBuilt.thickness : rec.hub.thickness);
       for (let k = 0; k < N && hubT === null; k++) {
         const th = (k * 2 * Math.PI) / N;
-        hubT = look([H.radius * Math.cos(th), H.radius * Math.sin(th), 0], [0, 0, 1], 8);
+        hubT = relH > 0 ? look([H.radius * Math.cos(th), H.radius * Math.sin(th), 0], [0, 0, 1], plateT / 2 + relH + 0.01, 5e-4, true) : look([H.radius * Math.cos(th), H.radius * Math.sin(th), 0], [0, 0, 1], 8);
       }
     } else if (ui.gynoecium === 'NONE' || ui.gynoecium === undefined) {
       hubT = look([0, 0, H.dome.centreZ + H.dome.Rd], [0, 0, 1], 8);
@@ -14377,8 +14397,17 @@ export function stemChannelAssertions(positions, row, m, ui) {
     bad.push(`ST9: the exported file carries ${levels.length} z-level(s) of vertices at the stem's own ${outerR} mm radius; the channel cannot be located in the artefact`);
     return bad;
   }
-  const tipZ = levels[0][0];
-  const rootLevel = levels.find(([z, n]) => n >= 3 && Math.abs(z - (tipZ + lengthMm)) <= 1e-2);
+  /* A TEXTURED STEM (T5) stands up to H outside its own radius and its tip up
+     to H below where it was: the root ring is inside the hub (buried, never
+     relieved), so it is the populated level at the stem's radius between L
+     and L + H above the stem's LOWEST material within outerR + H, and the tip
+     is the control's length below THAT — the same two owners, read through
+     the relief. Untextured, H is 0 and this is the shipped search verbatim. */
+  const relH = ui.petalTexture && ui.petalTexture !== 'NONE' ? Number(ui.textureHeight) || 0 : 0;
+  let tipZ = levels[0][0];
+  if (relH > 0) { for (let i = 0; i < positions.length; i += 3) if (Math.hypot(positions[i], positions[i + 1]) <= outerR + relH + TOL && positions[i + 2] < tipZ) tipZ = positions[i + 2]; }
+  const rootLevel = levels.find(([z, n]) => n >= 3 && (relH > 0 ? z - (tipZ + lengthMm) >= -1e-2 && z - (tipZ + lengthMm) <= relH + 1e-2 : Math.abs(z - (tipZ + lengthMm)) <= 1e-2));
+  if (rootLevel && relH > 0) tipZ = rootLevel[0] - lengthMm;
   if (!rootLevel) {
     bad.push(`ST9: the file's lowest stem vertex stands at z ${tipZ.toFixed(4)} and no populated ring at the stem's radius stands the control's ${lengthMm} mm above it — the free stem cannot be located, so no claim is made about the channel`);
     return bad;
@@ -14532,6 +14561,16 @@ export function stemChannelAssertions(positions, row, m, ui) {
   };
   const Rout = -rootZ;
   if (!(Rout > 0)) { bad.push(`ST9: the free stem's root stands at z ${rootZ}, which is not below the equator — the hub's outer surface cannot be located`); return bad; }
+  /* THE RELIEVED HUB AND STEM ARE THEIR OWN, NAMED BY THE RANGES THEIR EMITTERS
+     REPORT (T5 — the knot's precedent): relief moves them off the sphere and
+     the cylinder this clause locates them by. A DECLARED BLINDNESS: a vertex
+     inside those ranges is never an intruder, so the clause cannot see the
+     stem's own relief pushed into the channel — the stem's relief is TX10's
+     subject, outward along the stem's own normal; untextured the ranges are
+     empty and nothing changes */
+  const organRanges = [];
+  if (relH > 0 && m.texture && m.texture.organs) for (const k of ['hub', 'stem']) { const o = m.texture.organs[k]; if (o && o.organ) for (const rg of (o.organ.triRanges || [o.organ.triRange])) organRanges.push([rg[0] * 9, rg[1] * 9]); }
+  const inAnOrgan = (i) => organRanges.some(([lo, hi]) => i >= lo && i < hi);
   let intruders = 0, excused = 0, florets = 0, worst = Infinity, worstAt = null, floretWorst = Infinity;
   for (let i = 0; i < positions.length; i += 3) {
     const x = positions[i], y = positions[i + 1], z = positions[i + 2];
@@ -14541,6 +14580,7 @@ export function stemChannelAssertions(positions, row, m, ui) {
     if (!(d < clear)) continue;
     if (Math.abs(r - outerR) <= TOL || (boreR > 0 && Math.abs(r - boreR) <= TOL)) continue;   // the stem's own
     if (z >= -Math.sqrt(Math.max(0, Rout * Rout - r * r)) - TOL) continue;                    // the hub's own, or on its surface
+    if (inAnOrgan(i)) continue;                                                                // a relieved hub or stem vertex, named by its own emitted range (T5)
     if (i >= knotLo && i < knotHi) { excused++; continue; }                                    // the umbel's knot, named by its own range
     if (onAPetiole(x, y, z)) { excused++; continue; }                                          // a leaf's or a floret's own rod, rooted through the wall
     if (mine) { florets++; if (d < floretWorst) floretWorst = d; continue; }                   // a floret's own body — reported below, never an intruder
@@ -14976,6 +15016,8 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      BY VALUE, never masked; the remedy (a relief that fades where the sheet
      approaches itself) is a ruling, not a constant. */
   'TEXTURE: CELLULAR x a COMPOUND leaf (every leaflet in the one field)': { pairs: 59, worstMm: 0.1963, note: 'the CELLULAR relief at the leaflets\' free base beads (T3, Oct 22; the lattice alone and the untextured leaf read 0)' },
+  'TEXTURE T5: CELLULAR x the hemisphere (headRise 1) x a stem': { pairs: 352, worstMm: 0.3349, note: 'NOT T5\'s: the CELLULAR relief folding each PETAL on a hemisphere head, 44 pairs a petal, every pair petal-against-the-same-petal (attributed by emitter range); the identical state reads 352 on b3163de, where no organ is relieved (T5, Oct 23)' },
+  'TEXTURE T5: CELLULAR x a 60 mm stem x textureHeight max (1.5 on the organs)': { pairs: 40, worstMm: 0.1286, note: 'T5\'s, at the 1.5 mm MAXIMUM: outward relief into the CONCAVE hub-to-stem join folds where the height passes the join\'s own radius of curvature — every pair hub-against-hub at r 7.1 mm, z -1.7; as a function of height on this state CELLULAR reads 0 / 0 / 3 / 98 / 40 pairs at 0.4 / 0.8 / 1.0 / 1.2 / 1.5 mm and PEBBLE 0 / 0 / 0 / 14 / 0 (b3163de reads 0: no organ relieved). Declared, never clamped — the max-height fold class T3 reported (T5, Oct 23)' },
   'TEXTURE: PEBBLE x cup 1.2 x curl 180 (the field read in world space on a curled blade)': { pairs: 147, worstMm: 0.0918, note: 'the relief closing the cupped crown\'s own self-approach at the tips (T3, Oct 22; the lattice alone and the untextured state read 0; §18a measured 1.031 mm of clearance there, which two 0.4 mm skins close)' },
   /* ===================================================================
      REMOVED BY SPINE-CUP-FOLD (Oct 20), NINETEEN ENTRIES, ALL ONE MECHANISM:
