@@ -11492,9 +11492,27 @@ to a load limit and UNLOADED.
   asserts never fires. `PULL_DAMPING` is 1 (15 made a frictionless swatch lag the jaw: fake hysteresis).
 - **The topology is `through` per loop**; `placeCourse` has a case for 0 (yo), 1 and 2 (k2tog: the
   right parent's head drawn over the left's) parents. The start is drawn `INITIAL_DEPTH` (2.5×) deep and
-  the plates close / the yarn reels to length over the first frames — a decrease needs the room.
+  squeezed while the yarn reels to length over the first frames — a decrease needs the room.
   Linking numbers (`legLinks`) certify the drawn start; the pass-through certificate carries it after.
-- `tools/verify-knit-lab.mjs` (Node + `--browser`, ~5 min): gates T/F/I/C/E/S/W, each with a must-fail.
+- **Phase 3b (Oct 22): the clamp fixture** (`FIXTURE: 'clamp'`). The top jaw clamps every point of the
+  last course plus the tail, the cast-on is the bottom jaw, the side edges are free and there are NO
+  plates. The deep start is squeezed only while it reels in. Interior loops feel a weak mid-plane spring
+  (`OUT_OF_PLANE_K` 300, on each loop's centroid, z only); it crumples at ≤ 100.
+- **`CONTACT_VELOCITY` + 64 substeps:** a restitution-0 velocity pass on every contact and pin push.
+  Without it a held swatch never rests (0.14 d/s at 32 substeps): the contacts bounced. With it, it rests
+  exactly.
+- **THE FRICTIONLESS LOSS (~9.7%) IS THE POLYLINE CORRUGATION, NOT A SOLVER KNOB.** A chord tube has a
+  bump at every vertex (an effective μ ~ π·seg·κ/4 ≈ 0.26). The loss grows with the segment length, and
+  no iteration, substep, damping, spring or contact-softness setting removes it.
+  - `CONTACT_SMOOTH` (B-spline contact, Newton closest points) removes it: the excursion comes back to
+    0.4% instead of 4%.
+  - **But the swatch never comes to rest on it (~0.1 d/s), so it is OFF.** Do not switch it on without
+    fixing that.
+- **The course test does not converge on this model.** Held still, the side jaws disagree ~10%: free
+  yarn chatters on the clamped edge-wale yarn's vertices. It is out of the gate unless `--course`, and the
+  page says so.
+- `tools/verify-knit-lab.mjs` (Node + `--browser`; hours at 64 substeps): gates Q/M/H/T/O/F/I/C/E/S/W
+  (+ D/R with `--course`), each with a must-fail; `KNIT_PROGRESS=1` logs each step of a `--run`.
   `tools/shot-knit-lab.mjs <dir>` takes the screenshots. **No CI covers it.**
 - `textile-knit-loops.js` is imported for the starting curve and must not be forked; the stretch
   simulator is untouched.

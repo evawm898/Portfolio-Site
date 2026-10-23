@@ -33,8 +33,17 @@
 //               The comb is the needle the stitches are still on.
 //               The load is the reaction a jaw feels: the sum over every constraint that touches a
 //               pinned point (or a pin) of λ·∂C/∂y / Δt².
-//   * TEST      load (comb up at PULL_SPEED) until the bottom jaw reads LOAD_LIMIT, unload (comb
-//               back to where it was clamped), hold. advanceTest() is the whole protocol.
+//   * TEST      load until the stationary jaw reads LOAD_LIMIT, unload back to where the jaws were
+//               clamped. QUASI-STATIC by default (PROTOCOL 'stepped'): the driven jaw moves one
+//               STEP_EXT of the gauge, stops, and the swatch is held until its load has stopped
+//               changing (STEP_TOL over two STEP_WINDOWs); that settled load is the point recorded.
+//               'continuous' is the phase-2 test (the jaw at PULL_SPEED throughout), kept for the
+//               rate comparison. advanceTest() is the whole protocol.
+//   * DIRECTION 'wale' (the default): the comb pulls up, the cast-on is the load cell. 'course':
+//               after the wale settle the width is RELEASED (the cast-on slides on a rail, the comb's
+//               pins slide along x, the comb keeps the preload) and the swatch settles again at its
+//               own width; then SIDE JAWS grip the two edge wales (every point of the selvedge loops
+//               and turns), the left one is the load cell and the right one is driven out along x.
 //
 // Units: the yarn diameter is 1 length unit (read it as mm for a ~1 mm yarn), time is seconds
 // of SIMULATED time, mass is 1 per point. Forces come out in those model units and are not
@@ -51,15 +60,32 @@ export const PARAMS = {
   BEND_COMPLIANCE: 4e-6,       // α of a bend. Bigger = softer yarn.
   CONTACT_COMPLIANCE: 0,       // α of a contact. 0 = hard.
   FRICTION: 0.25,              // yarn-on-yarn Coulomb coefficient, a realistic dry value. Position
-                               // based: a contact's tangential slip this substep is cancelled up to
-                               // FRICTION times the normal multiplier THIS SUBSTEP built (both reset
-                               // every substep). The first version read "μ 0.1 locks the loops"; that
-                               // was the free tail unravelling plus the one-sweep stretch solve
-                               // letting the yarn run to 12%, not friction (docs/knit-lab-spike.md).
+                               // based: a contact's tangential slip is cancelled up to FRICTION times
+                               // the normal multiplier THIS SUBSTEP built (both reset every substep).
+  FRICTION_MODE: 'memory',     // 'memory' (phase 3): the slip cancelled is this substep's PLUS what the
+                               // contact let through last substep, measured after the stretch solve —
+                               // see frictionMemory(). 'substep' (phase 2): this substep's slip only. The
+                               // stretch solve runs last and slides the yarn along a stuck contact, so
+                               // under 'substep' no contact ever stays stuck: every one creeps by one
+                               // stretch-slide a substep, at a rate set by the TIME STEP, not the material.
+                               // That creep made phase 2's friction rate-dependent (29.5% of the work lost
+                               // at 1.5 d/s, 9.1% at 0.5) and, held in the jam, ratchets the swatch tighter
+                               // without end (the load climbed 319k -> 3.8M in 50 s at a fixed extension).
+  SETTLE_FRICTION: 0,          // friction while settling (and while the width is released before a
+                               // course test). 0: the rough start relaxes frictionless, the way a knit is
+                               // wet-relaxed, so μ 0 and μ 0.25 tests start from the SAME swatch and
+                               // friction stores no stress from the drawn guess. null = FRICTION.
+  CONTACT_SMOOTH: false,       // contact between the yarns' smooth (B-spline) curves, not their chords —
+                               // contactSmooth(). OFF: it takes the polyline's corrugation out (a frictionless
+                               // ±2% excursion comes back to 0.4% instead of 4%) but the swatch never comes to
+                               // rest under it (~0.1 d/s held still, every variant tried), so no hold converges.
+  CONTACT_VELOCITY: true,      // the contacts' restitution-0 velocity pass (contactVelocity()). Without it a
+                               // swatch held still keeps moving at 0.05-0.35 d/s whatever the damping.
   CONTACT_SKIP_ARC: 2.0,       // in d: segments nearer than this along the yarn never collide.
   CONTACT_MARGIN: 0.15,        // in d: the pair list is built this much wider than contact and
                                // reused until some point has moved half of it (a Verlet list).
-  SUBSTEPS_PER_FRAME: 32,      // XPBD substeps per rendered frame...
+  SUBSTEPS_PER_FRAME: 64,      // XPBD substeps per rendered frame (with the velocity pass, a held swatch comes
+                               // to rest exactly at 64; at 32 it does not)...
   ITERATIONS_PER_SUBSTEP: 1,   // ...each this many Gauss-Seidel sweeps ("small steps": 1).
   STRETCH_SOLVER: 'direct',    // 'direct': all stretch constraints in one tridiagonal solve along
                                // the yarn; 'gs': one Gauss-Seidel sweep (the first version).
@@ -83,7 +109,7 @@ export const PARAMS = {
                                // stops at a set force, then UNLOADS the comb back to where it started.
                                // Past the jam an inextensible yarn cannot extend, so an extension
                                // target there is a request for broken yarn.
-  PULL_MAX_EXTENSION: 0.6,     // ...or at +60%, whichever first.
+  PULL_MAX_EXTENSION: 3.0,     // ...or at +300%, whichever first (the course direction jams far out).
   STRAIN_STOP: 0.05,           // SAFETY: stop loading if any segment is strained 5%. With the direct
                                // stretch solve it never fires (the gate asserts so); in the first
                                // version it was what ended every pull.
@@ -94,12 +120,35 @@ export const PARAMS = {
                                // PLATE_CLOSE_FRAMES. A decrease stacks two heads between a third yarn's
                                // legs; at depth 1 there is not a diameter between them to draw it in.
   PLATE_CLOSE_FRAMES: 90,
-  PLATE_HALF_GAP: 1.6,         // the swatch lies between two frictionless plates: every yarn
+  FIXTURE: 'clamp',            // 'clamp' (phase 3, after review): a tensile fixture — the top jaw CLAMPS every
+                               // point of the last course across the full width (and the yarn's tail), the
+                               // cast-on is the bottom jaw, the side edges are free, and there are NO plates:
+                               // the free edges curl as stockinette does. 'comb': phases 1-3 — a comb of pins
+                               // through the live loops and the swatch between two plates (PLATE_HALF_GAP).
+  PLATE_HALF_GAP: Infinity,    // (the 'comb' fixture's plates; 1.6 there) the swatch lay between two frictionless plates: every yarn
                                // CENTRELINE keeps |z| <= this, in d (the loops' own depth is
                                // ±(LOOP_DEPTH + ½) d). Without them a frictionless, weightless
                                // stockinette swatch rolls its free side edges up indefinitely and
                                // the rolling shortens it (measured: the comb load creeps up by
-                               // ~6,000 over 1,400 frames after "settling"). Infinity = no plates.
+                               // ~6,000 over 1,400 frames after "settling"). Infinity = no plates. The plates
+                               // also made the frictionless cycle lose 9% of its work: the stockinette buckled
+                               // out of plane between them into more than one rest shape.
+  START_HALF_GAP: 1.6,         // the deep drawn start is squeezed to this half-depth over PLATE_CLOSE_FRAMES while
+                               // the yarn reels in to length, and released after: a START-UP device only (with
+                               // no squeeze the loops shorten while still deep and the swatch crumples). It
+                               // touches nothing once the swatch starts to settle.
+  START_RELEASE_FRAMES: 60,    // ...and opens linearly to nothing over this many frames after closing.
+  OUT_OF_PLANE_K: 300,          // a weak spring holding the fabric's MID-SURFACE near z = 0 (no plates): each
+                               // INTERIOR loop (not in an edge wale or an edge course) feels -K x the z of
+                               // its own centroid, in model load units per d, spread evenly over its points —
+                               // so a loop keeps its own depth and the edges are free to curl. Along z only:
+                               // it never reaches a jaw's load (read along x or y). 300: at 100 or below the
+                               // swatch crumples while it settles (jaw gap 33 -> 21 d), from 150 up it holds.
+  COURSE_BOTTOM: 'rail',       // in a course test the cast-on rides a RAIL (its y and z kept, free along x) and
+  COURSE_EDGE_LOAD: 1500,      // the live loops a NEEDLE (the pins, each free along x) force-controlled to this
+                               // load: a small pretension across the pull, the wale test's own preload. 'free' /
+                               // 0: both edges free and unloaded — frictionless, the swatch then collapses
+                               // (height 29 -> 21 d, the edges curling 7 d out of plane) and never comes to rest.
   PIN_RADIUS: 0.5,             // comb pin radius, in d.
   TAIL_TIED: 1.5,              // this much of the yarn's end, in d, is tied to the comb.
   COMB_FOLLOW: 1e-3,           // while settling the comb is FORCE-controlled: it moves at this
@@ -110,6 +159,26 @@ export const PARAMS = {
                                // buckles into a crumple that the contacts then lock (measured).
   COMB_MAX_SPEED: 3,           // ...never faster than this (d/s).
   PIN_HALF_LENGTH: 40,         // comb pins run z = -this..+this, in d (long: a loop must not slide off).
+  // ---- the quasi-static test (phase 3)
+  PROTOCOL: 'stepped',         // 'stepped': move, hold until settled, record, repeat. 'continuous': phase 2.
+  STEP_EXT: 0.01,              // one step of the driven jaw, as a fraction of the gauge (1%).
+  STEP_SPEED: 0.5,             // the jaw's speed DURING a step's move, d/s. At 1.5 the moves still carried
+                               // dynamics: 22% / 19% of the work lost at 1% / 0.5% steps, against 25% / 24%
+                               // at 0.5 d/s (docs/knit-lab-spike.md, phase 3).
+  STEP_DAMPING: 15,            // velocity decay (1/s) through the whole stepped test. It sets how fast a
+                               // hold converges, not where to: the jaws are still while the load is read.
+  STEP_WINDOW: 10,             // frames per averaging window. A hold has CONVERGED when, over the last
+  STEP_TOL: 0.002,             // window, the two jaws read the same load (static equilibrium: nothing else
+                               // pulls along the test axis) AND it is the load of the window before, both
+                               // within this fraction of max(|load|, STEP_LOAD_FLOOR) — a near-zero load
+  STEP_LOAD_FLOOR: 1500,       // has no scale of its own.
+  STEP_HOLD_MIN: 20,           // frames held before convergence is first asked (>= 2 windows),
+  STEP_HOLD_MAX: 900,          // and the most: past this the step is recorded and counted unconverged.
+  LOAD_LIMIT_TOL: 0.03,        // a stepped test's loading ends once a settled load is within 3% of the limit
+                               // (the last steps are shortened to land there — approachStep()).
+  DIRECTION: 'wale',           // 'wale' | 'course' (see TEST above). startTest() reads it.
+  FREE_MAX_FRAMES: 3000,       // the width-release settle before a course test: done when the wale-centre
+                               // span has moved < SETTLE_GAP_DRIFT over SETTLE_WINDOW frames, or after this.
 };
 
 // ---- Initial geometry ------------------------------------------------------------------------
@@ -174,12 +243,19 @@ export function buildYarn(topo, P = PARAMS) {
   const SAMPLES = 64;
   const ramp = (u, a, b) => { const t = Math.min(1, Math.max(0, (Math.min(u, 1 - u) - a) / b)); return t * t * (3 - 2 * t); };
   const K = DECREASE_SHAPE;
+  // PURL: the new loop is pulled through its parent from the FRONT, so every depth of the loop is
+  // mirrored (legs behind, head and feet in front): sign -1. A cast-on loop takes the sign of the
+  // loop knitted into it, so the head it offers lies on the side that loop's legs need. In a
+  // wale that is knit (or purl) all the way up — stockinette, reverse stockinette, 1x1 rib — the
+  // parent's head then always lies opposite the child's legs and its legs opposite the child's feet.
+  const childOf = new Map(); for (const l of topo.loops) for (const p of l.through) if (!childOf.has(p)) childOf.set(p, l.id);
+  const sgn = id => { const l = topo.loops[id]; if (!l) return 1; if (l.kind === 'purl') return -1; if (l.kind === 'cast-on' && childOf.has(id)) return sgn(childOf.get(id)); return 1; };
   // course 0 is the cast-on, pinned where it is drawn: it is always drawn at its own depth
   const draw = depth => {
   const dense = [];            // {x, y, z, course, id, u}
   const pt = (u, id, cx, cy, course) => {
     const p = loopPoint(u, cx, 0, W, L, SHAPE), hd = headDepth.get(id) || 0;
-    let x = p.x, z = -A * Math.cos(4 * Math.PI * u);
+    let x = p.x, z = -sgn(id) * A * Math.cos(4 * Math.PI * u);
     if (hd > 0) {            // the parent that moves: its head slides over (and is a little wider than) the other's,
                              // its inner leg crossing IN FRONT of the new loop's legs, its head between those legs and the other head
       x = cx + (p.x - cx) * (1 + (K.widen - 1) * ramp(u, 0.3, 0.1)) + headShift.get(id) * ramp(u, K.s0, K.s1);
@@ -199,9 +275,9 @@ export function buildYarn(topo, P = PARAMS) {
       if (last && Math.hypot(q.x - last.x, q.y - last.y) < 1e-9) continue;   // shared sinker
       pts.push(q);
     }
-    if (dense.length) {        // the selvedge turn: straight up the edge, behind
-      const a = dense[dense.length - 1], b = pts[0];
-      for (let i = 1; i < 16; i++) { const t = i / 16; dense.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: -A * depth, course: c - 0.5 }); }
+    if (dense.length) {        // the selvedge turn: straight up the edge, on the side the edge loop's feet are (behind for knit)
+      const a = dense[dense.length - 1], b = pts[0], zt = -A * depth * sgn(a.id);
+      for (let i = 1; i < 16; i++) { const t = i / 16; dense.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: zt, course: c - 0.5 }); }
     }
     dense.push(...pts);
   }
@@ -269,6 +345,12 @@ export class KnitSim {
     this.closing = 0; this.subIndex = 0; this.zStart = 0; for (let i = 0; i < y.n; i++) this.zStart = Math.max(this.zStart, Math.abs(y.pos[3 * i + 2]));
     // which loop every point belongs to (-1: a selvedge turn), for the topology check
     this.loopOf = y.loopOf; this.uOf = y.uOf;
+    { const nl = topo.loops.length, last = topo.rows.length - 1, cnt = new Float64Array(nl);
+      this.interior = new Uint8Array(nl);
+      const e = P.OUT_OF_PLANE_EDGES ? 0 : 1;
+      for (let c = e; c <= last - e; c++) { const row = topo.rows[c]; for (let k = e; k < row.length - e; k++) this.interior[row[k]] = 1; }
+      for (let i = 0; i < y.n; i++) if (y.loopOf[i] >= 0) cnt[y.loopOf[i]]++;
+      this.loopCount = cnt; this.loopZ = new Float64Array(nl); }
     this.prev = new Float64Array(n * 3);
     this.v = new Float64Array(n * 3);
     this.w = new Float64Array(n).fill(1);           // inverse mass
@@ -280,8 +362,12 @@ export class KnitSim {
     this.tieBase = new Float64Array(n * 3);
     const tail = Math.ceil(P.TAIL_TIED * P.YARN_DIAMETER / this.seg);
     // (it is drawn deep like the rest and moves to its own depth while the plates close)
-    this.tieStart = new Float64Array(n * 3); this.tieFlat = y.flatPos;
+    this.tieStart = new Float64Array(n * 3); this.tieFlat = y.flatPos; this.tailFrom = n - tail;
     for (let i = n - tail; i < n; i++) { this.grip[i] = 2; this.w[i] = 0; for (let k = 0; k < 3; k++) this.tieBase[3 * i + k] = this.tieStart[3 * i + k] = this.x[3 * i + k]; }
+    // FIXTURE 'clamp': the top jaw clamps every point of the last course, across the full width, where
+    // it is drawn (it moves from the deep drawing to the true one over PLATE_CLOSE_FRAMES like the tail)
+    this.clampTop = P.FIXTURE === 'clamp';
+    if (this.clampTop) { const last = topo.rows.length - 1; for (let i = 0; i < n; i++) if (this.course[i] === last) { this.grip[i] = 2; this.w[i] = 0; for (let k = 0; k < 3; k++) this.tieBase[3 * i + k] = this.tieStart[3 * i + k] = this.x[3 * i + k]; } }
     this.rest = new Float64Array(n - 1);
     for (let i = 0; i < n - 1; i++) this.rest[i] = this.dist(i, i + 1);
     this.restStart = new Float64Array(this.rest);      // reeled in to seg over PLATE_CLOSE_FRAMES
@@ -293,15 +379,18 @@ export class KnitSim {
     this.cellStart = new Int32Array(size + 1); this.cellEnt = new Int32Array(this.nSeg); this.segCell = new Int32Array(this.nSeg);
     this.pairCap = this.nSeg * 16;
     this.pairA = new Int32Array(this.pairCap); this.pairB = new Int32Array(this.pairCap); this.lamC = new Float64Array(this.pairCap); this.lamT = new Float64Array(this.pairCap);
-    this.nPairs = 0;
+    this.cS = new Float64Array(this.pairCap); this.cT = new Float64Array(this.pairCap);
+    this.acc = new Float64Array(this.pairCap * 3); this.capped = new Uint8Array(this.pairCap); this.cIdx = new Int32Array(8); this.cCo = new Float64Array(8); this.cST = new Float64Array(2); this.cN = new Float64Array(3); for (const k of ['sw0', 'sw1', 'sw2', 'sv0', 'sv1', 'sv2']) this[k] = new Float64Array(4);
+    this.nPairs = 0; this.pinHits = 0;
     this.skip = Math.ceil(P.CONTACT_SKIP_ARC * P.YARN_DIAMETER / this.seg);
     this.cs = [0, 0];
     // state
     this.phase = 'settling'; this.frame = 0; this.settleFrames = 0; this.gapHist = []; this.drift = Infinity;
     this.pullOffset = 0; this.combLoad = 0; this.loadSmooth = 0; this.restHeight = 0; this.bottomY = this.meanY(1);
-    this.react = [0, 0, 0];
+    this.react = [0, 0, 0, 0, 0, 0]; this.reactX = [0, 0, 0, 0, 0, 0]; this.reactPin = 0;   // per grip: 0 free 1 bottom jaw 2 tail 3 left jaw 4 right jaw 5 rail
+    this.dir = 'wale'; this.sideOffset = 0; this.pinsFree = false; this.steps = []; this.step = null;
     this.audit = false;                              // per-substep pass-through certificate (costly)
-    this.stats = { maxSpeed: 0, rmsSpeed: 0, minDist: Infinity, deep: 0, certFail: 0, certSteps: 0, worstMargin: Infinity, loadBottom: 0, loadTop: 0, maxStrain: 0 };
+    this.stats = { maxSpeed: 0, rmsSpeed: 0, minDist: Infinity, deep: 0, certFail: 0, certSteps: 0, worstMargin: Infinity, loadBottom: 0, loadTop: 0, loadLeft: 0, loadRight: 0, maxStrain: 0 };
     this.timing = { frameMs: 0, steps: 0, totalMs: 0 };
     this.initialOverlaps = this.countOverlaps(0.999).pairs;
   }
@@ -339,6 +428,9 @@ export class KnitSim {
 
   // candidate pairs (i < j, |i - j| > skip) whose midpoints are within reach of a contact
   findPairs() {
+    // a contact's carried slip (FRICTION_MODE 'memory') survives a rebuild of the list, by segment pair
+    const keep = new Map();
+    if (this.P.FRICTION_MODE === 'memory') for (let p = 0; p < this.nPairs; p++) { const a = this.acc; if (a[3 * p] || a[3 * p + 1] || a[3 * p + 2]) keep.set(this.pairA[p] * this.nSeg + this.pairB[p], [a[3 * p], a[3 * p + 1], a[3 * p + 2]]); }
     this.buildHash();
     if (!this.builtAt) this.builtAt = new Float64Array(this.n * 3);
     this.builtAt.set(this.x); this.builds = (this.builds || 0) + 1;
@@ -359,7 +451,10 @@ export class KnitSim {
           const ex = m[3 * j] - mx, ey = m[3 * j + 1] - my, ez = m[3 * j + 2] - mz;
           if (ex * ex + ey * ey + ez * ez > r2) continue;
           if (np === this.pairCap) this.growPairs();
-          this.pairA[np] = i; this.pairB[np] = j; np++;
+          this.pairA[np] = i; this.pairB[np] = j;
+          const k = keep.size ? keep.get(i * this.nSeg + j) : undefined;
+          if (k) { this.acc[3 * np] = k[0]; this.acc[3 * np + 1] = k[1]; this.acc[3 * np + 2] = k[2]; } else { this.acc[3 * np] = this.acc[3 * np + 1] = this.acc[3 * np + 2] = 0; }
+          np++;
         }
       }
     }
@@ -369,6 +464,8 @@ export class KnitSim {
     this.pairCap *= 2;
     const a = new Int32Array(this.pairCap), b = new Int32Array(this.pairCap); a.set(this.pairA); b.set(this.pairB);
     this.pairA = a; this.pairB = b; this.lamC = new Float64Array(this.pairCap); this.lamT = new Float64Array(this.pairCap);
+    this.cS = new Float64Array(this.pairCap); this.cT = new Float64Array(this.pairCap);
+    const ac = new Float64Array(this.pairCap * 3); ac.set(this.acc); this.acc = ac; this.capped = new Uint8Array(this.pairCap);
   }
 
   // ---- constraint solves. Each returns nothing; reactions on pinned points accumulate in react[]
@@ -384,8 +481,8 @@ export class KnitSim {
       const nx = dx / len, ny = dy / len, nz = dz / len;
       x[3 * i] += wi * nx * dl; x[3 * i + 1] += wi * ny * dl; x[3 * i + 2] += wi * nz * dl;
       x[3 * j] -= wj * nx * dl; x[3 * j + 1] -= wj * ny * dl; x[3 * j + 2] -= wj * nz * dl;
-      if (wi === 0) this.react[g[i]] += dl * ny;
-      if (wj === 0) this.react[g[j]] -= dl * ny;
+      if (wi === 0) { this.react[g[i]] += dl * ny; this.reactX[g[i]] += dl * nx; }
+      if (wj === 0) { this.react[g[j]] -= dl * ny; this.reactX[g[j]] -= dl * nx; }
     }
   }
   // The yarn's length as ONE linear solve along the chain. Every stretch constraint touches only
@@ -423,8 +520,8 @@ export class KnitSim {
       const nx = N[3 * i], ny = N[3 * i + 1], nz = N[3 * i + 2], wi = w[i], wj = w[j];
       x[3 * i] += wi * nx * d; x[3 * i + 1] += wi * ny * d; x[3 * i + 2] += wi * nz * d;
       x[3 * j] -= wj * nx * d; x[3 * j + 1] -= wj * ny * d; x[3 * j + 2] -= wj * nz * d;
-      if (wi === 0) this.react[g[i]] += d * ny;
-      if (wj === 0) this.react[g[j]] -= d * ny;
+      if (wi === 0) { this.react[g[i]] += d * ny; this.reactX[g[i]] += d * nx; }
+      if (wj === 0) { this.react[g[j]] -= d * ny; this.reactX[g[j]] -= d * nx; }
     }
   }
   solveBend(at) {
@@ -441,19 +538,21 @@ export class KnitSim {
       const h = -0.5 * dl;
       x[3 * a] += wa * nx * h; x[3 * a + 1] += wa * ny * h; x[3 * a + 2] += wa * nz * h;
       x[3 * b] += wb * nx * h; x[3 * b + 1] += wb * ny * h; x[3 * b + 2] += wb * nz * h;
-      if (wi === 0) this.react[g[i]] += dl * ny;
-      if (wa === 0) this.react[g[a]] += h * ny;
-      if (wb === 0) this.react[g[b]] += h * ny;
+      if (wi === 0) { this.react[g[i]] += dl * ny; this.reactX[g[i]] += dl * nx; }
+      if (wa === 0) { this.react[g[a]] += h * ny; this.reactX[g[a]] += h * nx; }
+      if (wb === 0) { this.react[g[b]] += h * ny; this.reactX[g[b]] += h * nx; }
     }
   }
   solveContacts(at, first) {
-    const x = this.x, w = this.w, g = this.grip, D = this.P.YARN_DIAMETER, D2 = D * D, cs = this.cs, lam = this.lamC, lamT = this.lamT, mu = this.P.FRICTION;
+    const x = this.x, w = this.w, g = this.grip, D = this.P.YARN_DIAMETER, D2 = D * D, cs = this.cs, lam = this.lamC, lamT = this.lamT, mu = this.relaxing() ? (this.P.SETTLE_FRICTION ?? this.P.FRICTION) : this.P.FRICTION;
     let minD2 = Infinity;
-    const pA = this.pairA, pB = this.pairB;
+    const pA = this.pairA, pB = this.pairB, memory = this.P.FRICTION_MODE === 'memory';
+    const smooth = this.P.CONTACT_SMOOTH, SM2 = (D + 0.2 * D) * (D + 0.2 * D);
     for (let p = 0; p < this.nPairs; p++) {
       const a0 = pA[p], a1 = a0 + 1, b0 = pB[p], b1 = b0 + 1;
       const d2 = closest(x, a0, a1, b0, b1, cs);
       if (first && d2 < minD2) minD2 = d2;
+      if (smooth) { if (d2 >= SM2) continue; if (this.contactSmooth(p, a0, b0, cs[0], cs[1], at, mu, memory)) continue; continue; }
       if (d2 >= D2) continue;
       const s = cs[0], t = cs[1];
       const pax = x[3 * a0] + (x[3 * a1] - x[3 * a0]) * s, pay = x[3 * a0 + 1] + (x[3 * a1 + 1] - x[3 * a0 + 1]) * s, paz = x[3 * a0 + 2] + (x[3 * a1 + 2] - x[3 * a0 + 2]) * s;
@@ -463,6 +562,7 @@ export class KnitSim {
       if (dd < 1e-9) continue;                       // exact touch: no direction to push in
       nx /= dd; ny /= dd; nz /= dd;
       const ca0 = 1 - s, ca1 = s, cb0 = 1 - t, cb1 = t;
+      this.cS[p] = s; this.cT[p] = t;
       const W = ca0 * ca0 * w[a0] + ca1 * ca1 * w[a1] + cb0 * cb0 * w[b0] + cb1 * cb1 * w[b1];
       if (W === 0) continue;
       const C = dd - D;
@@ -474,24 +574,26 @@ export class KnitSim {
       x[3 * a1] += nx * k1; x[3 * a1 + 1] += ny * k1; x[3 * a1 + 2] += nz * k1;
       x[3 * b0] -= nx * k2; x[3 * b0 + 1] -= ny * k2; x[3 * b0 + 2] -= nz * k2;
       x[3 * b1] -= nx * k3; x[3 * b1 + 1] -= ny * k3; x[3 * b1 + 2] -= nz * k3;
-      if (w[a0] === 0) this.react[g[a0]] += ca0 * dl * ny;
-      if (w[a1] === 0) this.react[g[a1]] += ca1 * dl * ny;
-      if (w[b0] === 0) this.react[g[b0]] -= cb0 * dl * ny;
-      if (w[b1] === 0) this.react[g[b1]] -= cb1 * dl * ny;
+      if (w[a0] === 0) { this.react[g[a0]] += ca0 * dl * ny; this.reactX[g[a0]] += ca0 * dl * nx; }
+      if (w[a1] === 0) { this.react[g[a1]] += ca1 * dl * ny; this.reactX[g[a1]] += ca1 * dl * nx; }
+      if (w[b0] === 0) { this.react[g[b0]] -= cb0 * dl * ny; this.reactX[g[b0]] -= cb0 * dl * nx; }
+      if (w[b1] === 0) { this.react[g[b1]] -= cb1 * dl * ny; this.reactX[g[b1]] -= cb1 * dl * nx; }
       if (mu > 0) {
         // relative slip of the two contact points since the start of the substep, tangential part
         const pr = this.prev;
         let rx = (x[3 * a0] - pr[3 * a0]) * ca0 + (x[3 * a1] - pr[3 * a1]) * ca1 - (x[3 * b0] - pr[3 * b0]) * cb0 - (x[3 * b1] - pr[3 * b1]) * cb1;
         let ry = (x[3 * a0 + 1] - pr[3 * a0 + 1]) * ca0 + (x[3 * a1 + 1] - pr[3 * a1 + 1]) * ca1 - (x[3 * b0 + 1] - pr[3 * b0 + 1]) * cb0 - (x[3 * b1 + 1] - pr[3 * b1 + 1]) * cb1;
         let rz = (x[3 * a0 + 2] - pr[3 * a0 + 2]) * ca0 + (x[3 * a1 + 2] - pr[3 * a1 + 2]) * ca1 - (x[3 * b0 + 2] - pr[3 * b0 + 2]) * cb0 - (x[3 * b1 + 2] - pr[3 * b1 + 2]) * cb1;
+        if (memory) { const A3 = this.acc; rx += A3[3 * p]; ry += A3[3 * p + 1]; rz += A3[3 * p + 2]; this.capped[p] = 0; }
         const rn = rx * nx + ry * ny + rz * nz; rx -= rn * nx; ry -= rn * ny; rz -= rn * nz;
         const slip = Math.sqrt(rx * rx + ry * ry + rz * rz);
         if (slip > 1e-12) {
           // tangential multiplier needed to cancel the slip is slip / W; Coulomb caps the
           // tangential multiplier of THIS SUBSTEP at mu x its normal multiplier (lam and lamT are
           // both zeroed every substep): static under the cap, kinetic (partial) above it
-          const budget = mu * lam[p] - lamT[p]; if (budget <= 0) continue;
+          const budget = mu * lam[p] - lamT[p]; if (budget <= 0) { if (memory) this.capped[p] = 1; continue; }
           const f = Math.min(1 / W, budget / slip);
+          if (memory && f < 1 / W) this.capped[p] = 1;
           lamT[p] += f * slip;
           const tx = rx * f, ty = ry * f, tz = rz * f;
           const q0 = w[a0] * ca0, q1 = w[a1] * ca1, q2 = w[b0] * cb0, q3 = w[b1] * cb1;
@@ -499,18 +601,191 @@ export class KnitSim {
           x[3 * a1] -= tx * q1; x[3 * a1 + 1] -= ty * q1; x[3 * a1 + 2] -= tz * q1;
           x[3 * b0] += tx * q2; x[3 * b0 + 1] += ty * q2; x[3 * b0 + 2] += tz * q2;
           x[3 * b1] += tx * q3; x[3 * b1 + 1] += ty * q3; x[3 * b1 + 2] += tz * q3;
-          if (w[a0] === 0) this.react[g[a0]] -= ca0 * ty; if (w[a1] === 0) this.react[g[a1]] -= ca1 * ty;
-          if (w[b0] === 0) this.react[g[b0]] += cb0 * ty; if (w[b1] === 0) this.react[g[b1]] += cb1 * ty;
+          if (w[a0] === 0) { this.react[g[a0]] -= ca0 * ty; this.reactX[g[a0]] -= ca0 * tx; } if (w[a1] === 0) { this.react[g[a1]] -= ca1 * ty; this.reactX[g[a1]] -= ca1 * tx; }
+          if (w[b0] === 0) { this.react[g[b0]] += cb0 * ty; this.reactX[g[b0]] += cb0 * tx; } if (w[b1] === 0) { this.react[g[b1]] += cb1 * ty; this.reactX[g[b1]] += cb1 * tx; }
         }
       }
     }
     return minD2;
   }
 
+  // ---- the smooth contact (CONTACT_SMOOTH). A polyline yarn's tube is CORRUGATED: between two
+  // vertices the chord runs inside the curve the points sample by the sagitta, seg² κ / 8, so a yarn
+  // sliding over a bent one rides over a bump at every vertex. Those bumps pin a frictionless contact
+  // like friction does — an effective coefficient ~ π seg κ / 4, about 0.25 on a knit's ~1.5 d bends at
+  // 0.5 d segments — and that was what lost ~10% of the work in a FRICTIONLESS cycle (measured: the loss
+  // grows with the segment length; the static states it rests in differ by ~0.1-0.3 d all over the
+  // swatch). So the contact is taken between the two smooth CURVES the points define (below), at their
+  // own closest points, not between the chords. The constraint then reads EIGHT points (each segment
+  // and its two neighbours); its weights sum to 1 on each side, so it still pushes the two yarns apart
+  // with equal and opposite impulses.
+  // The yarn's smooth curve is the uniform quadratic B-SPLINE of its points: C1 everywhere (no kink at
+  // a vertex, so a contact sliding along it meets no bump), through every segment's midpoint and inside
+  // every vertex by (x0 - 2 x1 + x2) / 8. On segment (a0, a0+1), at s < ½ it is the piece centred on
+  // a0, at s >= ½ the piece centred on a0+1; splineW() writes the four weights on a0-1 .. a0+2 (value,
+  // first or second derivative in s). At the yarn's two ends it falls back to the chord.
+  splineW(a0, s, order, out) {
+    const n = this.n;
+    if (s < 0.5) {
+      if (a0 < 1) { out[0] = 0; out[1] = order === 0 ? 1 - s : order === 1 ? -1 : 0; out[2] = order === 0 ? s : order === 1 ? 1 : 0; out[3] = 0; return; }
+      if (order === 0) { out[0] = (0.5 - s) * (0.5 - s) / 2; out[1] = 0.75 - s * s; out[2] = (s + 0.5) * (s + 0.5) / 2; }
+      else if (order === 1) { out[0] = -(0.5 - s); out[1] = -2 * s; out[2] = s + 0.5; }
+      else { out[0] = 1; out[1] = -2; out[2] = 1; }
+      out[3] = 0;
+    } else {
+      if (a0 + 2 >= n) { out[0] = 0; out[1] = order === 0 ? 1 - s : order === 1 ? -1 : 0; out[2] = order === 0 ? s : order === 1 ? 1 : 0; out[3] = 0; return; }
+      out[0] = 0;
+      if (order === 0) { out[1] = (1.5 - s) * (1.5 - s) / 2; out[2] = -s * s + 2 * s - 0.25; out[3] = (s - 0.5) * (s - 0.5) / 2; }
+      else if (order === 1) { out[1] = -(1.5 - s); out[2] = 2 - 2 * s; out[3] = s - 0.5; }
+      else { out[1] = 1; out[2] = -2; out[3] = 1; }
+    }
+  }
+  // The closest points of the two smooth segments: Newton on |A(s) - B(t)|² from the chords' answer.
+  // At an interior answer the separation is normal to BOTH curves, so the push is the gradient of the
+  // distance and the contact force is conservative.
+  closestSmooth(a0, b0, s, t) {
+    const x = this.x, o = this.cST, w0 = this.sw0, w1 = this.sw1, w2 = this.sw2, v0 = this.sv0, v1 = this.sv1, v2 = this.sv2;
+    const pt = (j, W, k) => { let r = 0; for (let m = 0; m < 4; m++) if (W[m]) r += W[m] * x[3 * (j - 1 + m) + k]; return r; };
+    for (let it = 0; it < 4; it++) {
+      this.splineW(a0, s, 0, w0); this.splineW(a0, s, 1, w1); this.splineW(a0, s, 2, w2);
+      this.splineW(b0, t, 0, v0); this.splineW(b0, t, 1, v1); this.splineW(b0, t, 2, v2);
+      let raA = 0, rbB = 0, aa = 0, bb = 0, ab = 0, rA2 = 0, rB2 = 0;
+      for (let k = 0; k < 3; k++) {
+        const r = pt(a0, w0, k) - pt(b0, v0, k), Ad = pt(a0, w1, k), Bd = pt(b0, v1, k);
+        raA += r * Ad; rbB += r * Bd; aa += Ad * Ad; bb += Bd * Bd; ab += Ad * Bd; rA2 += r * pt(a0, w2, k); rB2 += r * pt(b0, v2, k);
+      }
+      const gs = raA, gt = -rbB, Hss = aa + rA2, Htt = bb - rB2, Hst = -ab, det = Hss * Htt - Hst * Hst;
+      if (!(Hss > 0 && Htt > 0 && det > 1e-12 * Hss * Htt)) break;
+      let ns = s - (Htt * gs - Hst * gt) / det, nt = t - (Hss * gt - Hst * gs) / det;
+      if (ns < 0 || ns > 1) { ns = ns < 0 ? 0 : 1; nt = t - (gt + Hst * (ns - s)) / Htt; }
+      if (nt < 0 || nt > 1) { nt = nt < 0 ? 0 : 1; ns = s - (gs + Hst * (nt - t)) / Hss; ns = ns < 0 ? 0 : ns > 1 ? 1 : ns; }
+      const done = Math.abs(ns - s) + Math.abs(nt - t) < 1e-10; s = ns; t = nt; if (done) break;
+    }
+    o[0] = s; o[1] = t; return o;
+  }
+  // The eight weights of the contact separation A(s) - B(t) on a0-1 .. a0+2 and b0-1 .. b0+2 (they sum
+  // to +1 on A's side and -1 on B's). A zero weight keeps a valid index.
+  contactCoefs(p, a0, b0, s, t) {
+    const I = this.cIdx, Q = this.cCo, w0 = this.sw0, v0 = this.sv0;
+    this.splineW(a0, s, 0, w0); this.splineW(b0, t, 0, v0);
+    for (let m = 0; m < 4; m++) {
+      I[m] = w0[m] ? a0 - 1 + m : a0; Q[m] = w0[m];
+      I[4 + m] = v0[m] ? b0 - 1 + m : b0; Q[4 + m] = -v0[m];
+    }
+  }
+  contactSmooth(p, a0, b0, s, t, at, mu, memory) {
+    const x = this.x, w = this.w, g = this.grip, D = this.P.YARN_DIAMETER, lam = this.lamC, lamT = this.lamT;
+    const st = this.closestSmooth(a0, b0, s, t); s = st[0]; t = st[1];
+    this.contactCoefs(p, a0, b0, s, t);
+    const I = this.cIdx, Q = this.cCo;
+    let nx = 0, ny = 0, nz = 0, W = 0;
+    for (let k = 0; k < 8; k++) { const i = I[k], q = Q[k]; nx += q * x[3 * i]; ny += q * x[3 * i + 1]; nz += q * x[3 * i + 2]; W += q * q * w[i]; }
+    const dd = Math.hypot(nx, ny, nz);
+    if (dd >= D || dd < 1e-9 || W === 0) return false;
+    nx /= dd; ny /= dd; nz /= dd;
+    this.cS[p] = s; this.cT[p] = t;
+    let dl = (-(dd - D) - at * lam[p]) / (W + at);
+    if (lam[p] + dl < 0) dl = -lam[p];
+    lam[p] += dl;
+    for (let k = 0; k < 8; k++) {
+      const i = I[k], q = Q[k]; if (!q) continue;
+      if (w[i] === 0) { this.react[g[i]] += q * dl * ny; this.reactX[g[i]] += q * dl * nx; continue; }
+      const kk = w[i] * q * dl; x[3 * i] += nx * kk; x[3 * i + 1] += ny * kk; x[3 * i + 2] += nz * kk;
+    }
+    if (mu > 0) {
+      // friction on the smooth contact: the relative slip of the two (bulged) contact points since the
+      // start of the substep, plus the memory, tangential part, cancelled up to mu x this substep's normal
+      const pr = this.prev; let rx = 0, ry = 0, rz = 0;
+      for (let k = 0; k < 8; k++) { const i = I[k], q = Q[k]; rx += q * (x[3 * i] - pr[3 * i]); ry += q * (x[3 * i + 1] - pr[3 * i + 1]); rz += q * (x[3 * i + 2] - pr[3 * i + 2]); }
+      if (memory) { const A3 = this.acc; rx += A3[3 * p]; ry += A3[3 * p + 1]; rz += A3[3 * p + 2]; this.capped[p] = 0; }
+      const rn = rx * nx + ry * ny + rz * nz; rx -= rn * nx; ry -= rn * ny; rz -= rn * nz;
+      const slip = Math.sqrt(rx * rx + ry * ry + rz * rz);
+      if (slip > 1e-12) {
+        const budget = mu * lam[p] - lamT[p]; if (budget <= 0) { if (memory) this.capped[p] = 1; return true; }
+        const f = Math.min(1 / W, budget / slip);
+        if (memory && f < 1 / W) this.capped[p] = 1;
+        lamT[p] += f * slip;
+        const tx = rx * f, ty = ry * f, tz = rz * f;
+        for (let k = 0; k < 8; k++) {
+          const i = I[k], q = Q[k]; if (!q) continue;
+          if (w[i] === 0) { this.react[g[i]] -= q * ty; this.reactX[g[i]] -= q * tx; continue; }
+          const kk = w[i] * q; x[3 * i] -= tx * kk; x[3 * i + 1] -= ty * kk; x[3 * i + 2] -= tz * kk;
+        }
+      }
+    }
+    return true;
+  }
+
+  // ---- the contacts' velocity pass (restitution 0). A position-based contact pushes the two yarns
+  // apart by however far the prediction and the other constraints (the stretch solve, last) left them
+  // overlapping, and deriving velocity from positions turns that push into a SEPARATING velocity the
+  // next substep carries: a contact held against a curved yarn bounces every substep, feeding the
+  // swatch energy that only damping takes out. (Measured, frictionless, held still at +12%: RMS speed
+  // 0.14 d/s at 32 substeps a frame, 0.014 at 128 — a time-step artifact.) So after the velocity update
+  // every contact active this substep has its relative NORMAL velocity removed, the restitution-0 step
+  // of XPBD's velocity solve (Müller et al. 2020): perfectly inelastic along the normal, tangential
+  // velocity untouched (friction stays the position pass's). Positions, and so the jaws' loads, are not
+  // moved by it.
+  contactVelocity() {
+    const x = this.x, v = this.v, w = this.w, lam = this.lamC, pA = this.pairA, pB = this.pairB;
+    for (let p = 0; p < this.nPairs; p++) {
+      if (!(lam[p] > 0)) continue;
+      const a0 = pA[p], a1 = a0 + 1, b0 = pB[p], b1 = b0 + 1, s = this.cS[p], t = this.cT[p], ca0 = 1 - s, ca1 = s, cb0 = 1 - t, cb1 = t;
+      let nx = 0, ny = 0, nz = 0, vn = 0;
+      if (this.P.CONTACT_SMOOTH) {
+        this.contactCoefs(p, a0, b0, s, t); const I = this.cIdx, Q = this.cCo; let W = 0, vx = 0, vy = 0, vz = 0;
+        for (let k = 0; k < 8; k++) { const i = I[k], q = Q[k]; nx += q * x[3 * i]; ny += q * x[3 * i + 1]; nz += q * x[3 * i + 2]; vx += q * v[3 * i]; vy += q * v[3 * i + 1]; vz += q * v[3 * i + 2]; W += q * q * w[i]; }
+        const dd = Math.hypot(nx, ny, nz); if (dd < 1e-9 || W === 0) continue; nx /= dd; ny /= dd; nz /= dd;
+        const j = -(vx * nx + vy * ny + vz * nz) / W;
+        for (let k = 0; k < 8; k++) { const i = I[k], q = Q[k] * j * w[i]; if (!q) continue; v[3 * i] += nx * q; v[3 * i + 1] += ny * q; v[3 * i + 2] += nz * q; }
+        continue;
+      }
+      const pa = [0, 0, 0], pb = [0, 0, 0];
+      for (let k = 0; k < 3; k++) { pa[k] = x[3 * a0 + k] * ca0 + x[3 * a1 + k] * ca1; pb[k] = x[3 * b0 + k] * cb0 + x[3 * b1 + k] * cb1; }
+      nx = pa[0] - pb[0]; ny = pa[1] - pb[1]; nz = pa[2] - pb[2];
+      const dd = Math.hypot(nx, ny, nz); if (dd < 1e-9) continue; nx /= dd; ny /= dd; nz /= dd;
+      const W = ca0 * ca0 * w[a0] + ca1 * ca1 * w[a1] + cb0 * cb0 * w[b0] + cb1 * cb1 * w[b1]; if (W === 0) continue;
+      const rel = k => v[3 * a0 + k] * ca0 + v[3 * a1 + k] * ca1 - v[3 * b0 + k] * cb0 - v[3 * b1 + k] * cb1;
+      vn = rel(0) * nx + rel(1) * ny + rel(2) * nz;
+      const j = -vn / W;
+      const q0 = w[a0] * ca0 * j, q1 = w[a1] * ca1 * j, q2 = w[b0] * cb0 * j, q3 = w[b1] * cb1 * j;
+      v[3 * a0] += nx * q0; v[3 * a0 + 1] += ny * q0; v[3 * a0 + 2] += nz * q0;
+      v[3 * a1] += nx * q1; v[3 * a1 + 1] += ny * q1; v[3 * a1 + 2] += nz * q1;
+      v[3 * b0] -= nx * q2; v[3 * b0 + 1] -= ny * q2; v[3 * b0 + 2] -= nz * q2;
+      v[3 * b1] -= nx * q3; v[3 * b1 + 1] -= ny * q3; v[3 * b1 + 2] -= nz * q3;
+    }
+  }
+
+  // The slip a contact did not stop this substep — measured at the END of it, after the stretch
+  // solve has slid the yarn along the contact to keep its length — is carried into the next
+  // substep's friction, which cancels it together with that substep's own slip. Measured at the
+  // contact's own material points (s, t of this substep), so a contact that ROLLS (both yarns' contact
+  // points moving along together) accumulates nothing. A slipping (capped) contact forgets it.
+  frictionMemory() {
+    const x = this.x, pr = this.prev, A3 = this.acc, lam = this.lamC, pA = this.pairA, pB = this.pairB;
+    for (let p = 0; p < this.nPairs; p++) {
+      if (!(lam[p] > 0) || this.capped[p]) { A3[3 * p] = A3[3 * p + 1] = A3[3 * p + 2] = 0; continue; }
+      const a0 = pA[p], a1 = a0 + 1, b0 = pB[p], b1 = b0 + 1, s = this.cS[p], t = this.cT[p], ca0 = 1 - s, ca1 = s, cb0 = 1 - t, cb1 = t;
+      let nx = 0, ny = 0, nz = 0, rx = 0, ry = 0, rz = 0;
+      if (this.P.CONTACT_SMOOTH) {
+        this.contactCoefs(p, a0, b0, s, t); const I = this.cIdx, Q = this.cCo;
+        for (let k = 0; k < 8; k++) { const i = I[k], q = Q[k]; nx += q * x[3 * i]; ny += q * x[3 * i + 1]; nz += q * x[3 * i + 2]; rx += q * (x[3 * i] - pr[3 * i]); ry += q * (x[3 * i + 1] - pr[3 * i + 1]); rz += q * (x[3 * i + 2] - pr[3 * i + 2]); }
+      } else for (let k = 0; k < 3; k++) {
+        const pa = x[3 * a0 + k] * ca0 + x[3 * a1 + k] * ca1, pb = x[3 * b0 + k] * cb0 + x[3 * b1 + k] * cb1;
+        const r = pa - (pr[3 * a0 + k] * ca0 + pr[3 * a1 + k] * ca1) - pb + (pr[3 * b0 + k] * cb0 + pr[3 * b1 + k] * cb1);
+        if (k === 0) { nx = pa - pb; rx = r; } else if (k === 1) { ny = pa - pb; ry = r; } else { nz = pa - pb; rz = r; }
+      }
+      const nl = Math.hypot(nx, ny, nz); if (nl < 1e-9) continue; nx /= nl; ny /= nl; nz /= nl;
+      const rn = rx * nx + ry * ny + rz * nz;
+      A3[3 * p] += rx - rn * nx; A3[3 * p + 1] += ry - rn * ny; A3[3 * p + 2] += rz - rn * nz;
+    }
+  }
+
   // Comb pins: rods along z at (pin.x, pin.y + pullOffset), |z| <= PIN_HALF_LENGTH. A point closer
   // to a pin's axis than PIN_RADIUS + d/2 is pushed straight out; the pin is kinematic, so all of
   // the correction goes to the yarn and its y component is the comb's reaction.
   solvePins() {
+    if (!this.pinHitI) { this.pinHitI = new Int32Array(4096); this.pinHitN = new Float64Array(8192); }
     const x = this.x, w = this.w, pins = this.pins, R = this.P.PIN_RADIUS + 0.5 * this.P.YARN_DIAMETER, R2 = R * R;
     const zl = this.P.PIN_HALF_LENGTH * this.P.YARN_DIAMETER, off = this.pullOffset;
     const yTop = pins[0].y + off + R, yBot = pins[0].y + off - R;
@@ -522,18 +797,38 @@ export class KnitSim {
         const dx = x[3 * i] - pins[k].x, dy = py - (pins[k].y + off);
         const d2 = dx * dx + dy * dy; if (d2 >= R2) continue;
         const dd = Math.sqrt(d2); if (dd < 1e-9) continue;
-        const push = R - dd;
-        x[3 * i] += dx / dd * push; x[3 * i + 1] += dy / dd * push;
-        this.react[2] += push * dy / dd;              // λ·∂C/∂y on the yarn; the pin feels the opposite
+        const push = R - dd, nx = dx / dd, ny = dy / dd;
+        if (this.pinHits < this.pinHitI.length) { this.pinHitI[this.pinHits] = i; this.pinHitN[2 * this.pinHits] = nx; this.pinHitN[2 * this.pinHits + 1] = ny; this.pinHits++; }
+        if (!this.pinsFree) {
+          x[3 * i] += nx * push; x[3 * i + 1] += ny * push;
+          this.reactPin += push * ny;                 // λ·∂C/∂y on the yarn; the pin feels the opposite
+        } else {                                      // course test: the pin slides freely along x (a needle the
+          const dl = push / (1 + nx * nx);            // loops can move along); mass 1 in x, kinematic in y
+          x[3 * i] += nx * dl; x[3 * i + 1] += ny * dl; pins[k].x -= nx * dl;
+          this.reactPin += dl * ny;
+        }
       }
     }
   }
 
   solvePlates() {
-    let lim = this.P.PLATE_HALF_GAP * this.P.YARN_DIAMETER; if (!Number.isFinite(lim)) return;
-    if (this.frame < this.P.PLATE_CLOSE_FRAMES) lim += (this.zStart - lim) * Math.max(0, 1 - this.closing);
+    let lim = this.P.PLATE_HALF_GAP * this.P.YARN_DIAMETER;
+    if (!Number.isFinite(lim)) {                     // no plates: only the start-up squeeze, then nothing
+      const P = this.P, f = this.frame - P.PLATE_CLOSE_FRAMES;
+      if (!P.START_HALF_GAP || f >= P.START_RELEASE_FRAMES) return;
+      lim = P.START_HALF_GAP * P.YARN_DIAMETER;
+      if (f < 0) lim += (this.zStart - lim) * Math.max(0, 1 - this.closing);
+      else lim += (this.zStart - lim) * (f / P.START_RELEASE_FRAMES);
+    } else if (this.frame < this.P.PLATE_CLOSE_FRAMES) lim += (this.zStart - lim) * Math.max(0, 1 - this.closing);
     const x = this.x, w = this.w;
     for (let i = 0; i < this.n; i++) { if (w[i] === 0) continue; const z = x[3 * i + 2]; if (z > lim) x[3 * i + 2] = lim; else if (z < -lim) x[3 * i + 2] = -lim; }
+  }
+
+  // course test: the cast-on rides a rail — each point keeps its y and z, free along x
+  solveRail() {
+    if (!this.railY) return;
+    const x = this.x, g = this.grip;
+    for (let i = 0; i < this.n; i++) if (g[i] === 5) { x[3 * i + 1] = this.railY[i]; x[3 * i + 2] = this.railZ[i]; }
   }
 
   // ---- one substep
@@ -541,18 +836,27 @@ export class KnitSim {
   // if the swatch between the bottom jaw and the comb were stretching uniformly. A world-frame drag
   // would resist the pull itself, and the bottom jaw would feel less than the comb by the drag on
   // ~3,500 moving points — it did, by about 9,000 load units while settling.
-  substep(dt, damping, combV) {
-    const P = this.P, x = this.x, v = this.v, prev = this.prev, w = this.w, n = this.n;
+  substep(dt, damping, combV, sideV = 0) {
+    const P = this.P, x = this.x, v = this.v, prev = this.prev, w = this.w, n = this.n, g = this.grip;
     prev.set(x);
     const keep = Math.exp(-damping * dt), yB = this.bottomY, span = Math.max(1e-6, this.combY() - yB);
-    for (let i = 0; i < n; i++) if (this.grip[i] === 2) {      // the tied tail rides the comb
+    const xL = this.jawL || 0, wspan = Math.max(1e-6, (this.jawR0 || 1) + this.sideOffset - xL);
+    for (let i = 0; i < n; i++) if (g[i] === 2) {      // the tied tail rides the comb
       x[3 * i] = this.tieBase[3 * i]; x[3 * i + 1] = this.tieBase[3 * i + 1] + this.pullOffset; x[3 * i + 2] = this.tieBase[3 * i + 2];
+    } else if (g[i] === 4) {                             // the right side jaw is driven along x
+      x[3 * i] = this.tieBase[3 * i] + this.sideOffset; x[3 * i + 1] = this.tieBase[3 * i + 1]; x[3 * i + 2] = this.tieBase[3 * i + 2];
     }
+    const K = P.OUT_OF_PLANE_K, lo = this.loopOf, LZ = this.loopZ;
+    if (K) { LZ.fill(0); for (let i = 0; i < n; i++) { const l = lo[i]; if (l >= 0 && this.interior[l]) LZ[l] += x[3 * i + 2]; }
+      for (let l = 0; l < LZ.length; l++) if (this.interior[l]) LZ[l] = -K * (LZ[l] / this.loopCount[l]) / this.loopCount[l] * dt; }   // dv_z per point
     for (let i = 0; i < n; i++) {
       if (w[i] === 0) continue;
+      if (K) { const l = lo[i]; if (l >= 0 && this.interior[l]) v[3 * i + 2] += LZ[l]; }
       let f = (x[3 * i + 1] - yB) / span; f = f < 0 ? 0 : f > 1 ? 1 : f;
       const ref = combV * f;
-      v[3 * i] *= keep; v[3 * i + 1] = ref + (v[3 * i + 1] - ref) * keep; v[3 * i + 2] *= keep;
+      let fx = sideV ? (x[3 * i] - xL) / wspan : 0; fx = fx < 0 ? 0 : fx > 1 ? 1 : fx;
+      const refX = sideV * fx;
+      v[3 * i] = refX + (v[3 * i] - refX) * keep; v[3 * i + 1] = ref + (v[3 * i + 1] - ref) * keep; v[3 * i + 2] *= keep;
       x[3 * i] += v[3 * i] * dt; x[3 * i + 1] += v[3 * i + 1] * dt; x[3 * i + 2] += v[3 * i + 2] * dt;
     }
     if (this.frame <= this.P.PLATE_CLOSE_FRAMES) {      // the deep start closing: plates in, yarn reeled to length
@@ -562,26 +866,39 @@ export class KnitSim {
     }
     if (this.pairsStale()) this.findPairs();
     this.lamS.fill(0); this.lamB.fill(0); this.lamC.fill(0, 0, this.nPairs); this.lamT.fill(0, 0, this.nPairs);
+    this.pinHits = 0;
     const dt2 = dt * dt;
-    const r0 = this.react[1], r2 = this.react[2];
+    const r0 = this.react[1], r2 = this.react[2], rp = this.reactPin, r3 = this.reactX[3], r4 = this.reactX[4];
     for (let it = 0; it < P.ITERATIONS_PER_SUBSTEP; it++) {
       // Contact first, the yarn's own length last: the last constraint in a Gauss-Seidel sweep
       // is the one met exactly, and a knit yarn is inextensible before it is impenetrable.
       const m = this.solveContacts(P.CONTACT_COMPLIANCE / dt2, it === 0);
       if (it === 0) this.lastMinPre = Math.sqrt(m);
-      this.solvePins();
+      if (!this.clampTop || this.pinsFree) this.solvePins();
       this.solvePlates();
+      this.solveRail();
       this.solveBend(P.BEND_COMPLIANCE / dt2);
       if (P.STRETCH_SOLVER === 'gs') this.solveStretch(P.STRETCH_COMPLIANCE / dt2);
       else this.solveStretchDirect(P.STRETCH_COMPLIANCE / dt2);
     }
-    this.subLoadBottom = (this.react[1] - r0) / dt2; this.subLoadTop = (this.react[2] - r2) / dt2;
+    if (P.FRICTION > 0 && P.FRICTION_MODE === 'memory') { if (this.relaxing() && P.SETTLE_FRICTION === 0) this.acc.fill(0); else this.frictionMemory(); }
+    // The comb's load is the pins' push on the yarn PLUS the pull of the tied tail. react[] holds what a
+    // pinned point would have been moved (its own reaction), the pins' push is the yarn's: opposite
+    // conventions, so the tail is subtracted. (Phase 2 added them; the comb read low by twice the tail,
+    // ~6% at the jam. The bottom jaw, the load cell, was never affected.)
+    this.subLoadBottom = (this.react[1] - r0) / dt2; this.subLoadTop = ((this.reactPin - rp) - (this.react[2] - r2)) / dt2;
+    this.subLoadLeft = (this.reactX[3] - r3) / dt2; this.subLoadRight = -(this.reactX[4] - r4) / dt2;   // tension positive on both
     let maxD2 = 0, sum2 = 0;
     for (let i = 0; i < n; i++) {
       const dx = x[3 * i] - prev[3 * i], dy = x[3 * i + 1] - prev[3 * i + 1], dz = x[3 * i + 2] - prev[3 * i + 2];
       const d2 = dx * dx + dy * dy + dz * dz; if (d2 > maxD2) maxD2 = d2; sum2 += d2;
       if (w[i] === 0) continue;
       v[3 * i] = dx / dt; v[3 * i + 1] = dy / dt; v[3 * i + 2] = dz / dt;
+    }
+    if (P.CONTACT_VELOCITY) {
+      this.contactVelocity();
+      // the pins too: a yarn point a pin pushed out keeps no velocity along the push (restitution 0)
+      for (let h = 0; h < this.pinHits; h++) { const i = this.pinHitI[h], nx = this.pinHitN[2 * h], ny = this.pinHitN[2 * h + 1]; const vn = v[3 * i] * nx + v[3 * i + 1] * ny; v[3 * i] -= vn * nx; v[3 * i + 1] -= vn * ny; }
     }
     this.subRms = Math.sqrt(sum2 / n);
     return Math.sqrt(maxD2);
@@ -591,25 +908,32 @@ export class KnitSim {
   stepFrame() {
     const P = this.P, sub = P.SUBSTEPS_PER_FRAME, dt = P.FRAME_DT / sub;
     const t0 = now();
-    const damping = this.phase === 'settling' ? P.DAMPING : P.PULL_DAMPING;
-    let maxDisp = 0, loadB = 0, loadT = 0, rms = 0;
+    const stepped = this.P.PROTOCOL === 'stepped', course = this.dir === 'course';
+    const damping = this.phase === 'settling' || this.phase === 'freeing' ? P.DAMPING : stepped && this.testing ? P.STEP_DAMPING : P.PULL_DAMPING;
+    let maxDisp = 0, loadB = 0, loadT = 0, loadL = 0, loadR = 0, rms = 0;
     for (let s = 0; s < sub; s++) {
-      const offBefore = this.pullOffset;
-      if (this.phase === 'settling') {   // force-controlled comb, speed-limited so a contact spike cannot fling it off the loops
-        const v = Math.max(-P.COMB_MAX_SPEED, Math.min(P.COMB_MAX_SPEED, -P.COMB_FOLLOW * (this.combLoad - P.PRELOAD)));
+      const offBefore = this.pullOffset, sideBefore = this.sideOffset;
+      // force-controlled comb while settling, and through a course test (it holds the preload while the
+      // width changes); speed-limited so a contact spike cannot fling it off the loops
+      if (this.phase === 'settling' || (course && this.phase !== 'held' && !this.combFixed)) {
+        const target = course && this.clampTop ? P.COURSE_EDGE_LOAD : P.PRELOAD;
+        const v = Math.max(-P.COMB_MAX_SPEED, Math.min(P.COMB_MAX_SPEED, -P.COMB_FOLLOW * (this.combLoad - target)));
         this.pullOffset += v * dt;
       }
-      else if (this.phase === 'pulling' && this.pullAuto) this.pullOffset = Math.min(this.pullTarget, this.pullOffset + P.PULL_SPEED * dt);
-      else if (this.phase === 'unloading') this.pullOffset = Math.max(this.restOffset, this.pullOffset - P.PULL_SPEED * dt);
+      if (this.phase === 'pulling' && this.pullAuto) {
+        if (stepped) this.drive = approach(this.drive, this.step.target, P.STEP_SPEED * dt);
+        else this.drive = Math.min(this.pullTarget, this.drive + P.PULL_SPEED * dt);
+      }
+      else if (this.phase === 'unloading') this.drive = stepped ? approach(this.drive, this.step.target, P.STEP_SPEED * dt) : Math.max(this.restOffset, this.drive - P.PULL_SPEED * dt);
       else if (this.phase === 'pulling') this.pullOffset += Math.max(-P.PULL_SPEED * 3 * dt, Math.min(P.PULL_SPEED * 3 * dt, this.pullTarget - this.pullOffset));
-      const combV = (this.pullOffset - offBefore) / dt;
+      const combV = (this.pullOffset - offBefore) / dt, sideV = (this.sideOffset - sideBefore) / dt;
       if (this.audit) this.auditBefore();
       this.subIndex = s;
-      const d = this.substep(dt, damping, combV);
+      const d = this.substep(dt, damping, combV, sideV);
       if (this.audit) this.auditAfter();
       if (d > maxDisp) maxDisp = d;
       rms += this.subRms * this.subRms;
-      loadB += this.subLoadBottom; loadT += this.subLoadTop;
+      loadB += this.subLoadBottom; loadT += this.subLoadTop; loadL += this.subLoadLeft; loadR += this.subLoadRight;
     }
     const ms = now() - t0;
     this.timing.frameMs = ms; this.timing.totalMs += ms; this.timing.steps += sub;
@@ -617,11 +941,22 @@ export class KnitSim {
     this.stats.maxSpeed = maxDisp / dt;
     if (this.phase !== 'settling') { this.stats.maxStrain = this.maxStrain(); if (this.phase === 'pulling' && this.stats.maxStrain > P.STRAIN_STOP) this.strainStopped = true; }
     this.stats.rmsSpeed = Math.sqrt(rms / sub) / dt;
-    this.stats.loadBottom = loadB / sub; this.stats.loadTop = loadT / sub;
+    this.stats.loadBottom = loadB / sub; this.stats.loadTop = loadT / sub; this.stats.loadLeft = loadL / sub; this.stats.loadRight = loadR / sub;
     // pin contact comes and goes substep to substep; the comb follows a smoothed load
     this.combLoad += (this.stats.loadTop - this.combLoad) * 0.2;
-    this.loadSmooth += (this.stats.loadBottom - this.loadSmooth) * P.LOAD_SMOOTH;
+    this.loadSmooth += (this.testLoad() - this.loadSmooth) * P.LOAD_SMOOTH;
     this.advanceTest();
+    if (this.phase === 'freeing') {
+      this.freeFrames++;
+      this.spanHist.push(this.waleSpan());
+      const W = P.SETTLE_WINDOW, h = this.spanHist;
+      this.freeDrift = h.length > W ? Math.abs(h[h.length - 1] - h[h.length - 1 - W]) : Infinity;
+      if (this.freeDrift < P.SETTLE_GAP_DRIFT * P.YARN_DIAMETER || this.freeFrames >= P.FREE_MAX_FRAMES) {
+        this.phase = 'free';
+        this.freeAt = { frames: this.freeFrames, hitCap: !(this.freeDrift < P.SETTLE_GAP_DRIFT * P.YARN_DIAMETER), span: h[h.length - 1] };
+        if (this.pending) { const c = this.pending; this.pending = null; this.clampSides(); this.startPull(true, c.cycle); }
+      }
+    }
     if (this.phase === 'settling') {
       this.settleFrames++;
       this.gapHist.push(this.jawGap());
@@ -637,13 +972,77 @@ export class KnitSim {
   // clamped); then hold there RETURN_HOLD frames; then done. Each frame is tagged with its phase.
   advanceTest() {
     const P = this.P;
+    if (P.PROTOCOL === 'stepped' && this.step && ((this.phase === 'pulling' && this.pullAuto) || this.phase === 'unloading')) return this.advanceStep();
     if (this.phase === 'pulling' && this.pullAuto) {
       const why = this.strainStopped ? 'strain' : this.loadSmooth >= P.LOAD_LIMIT ? 'load' : this.pullOffset >= this.pullTarget - 1e-9 ? 'extension' : null;
       if (why) { this.loadEnd = why; this.peak = { ext: this.extension(), load: this.loadSmooth }; this.phase = this.cycle ? 'unloading' : 'held'; }
     } else if (this.phase === 'unloading' && this.pullOffset <= this.restOffset + 1e-9) { this.phase = 'returned'; this.returnFrames = 0; }
     else if (this.phase === 'returned' && ++this.returnFrames >= P.RETURN_HOLD) this.phase = 'done';
   }
+  relaxing() { return this.phase === 'settling' || this.phase === 'freeing'; }
   get testing() { return ['pulling', 'unloading', 'returned', 'held', 'done'].includes(this.phase); }
+
+  // The driven jaw: the comb in a wale test, the right side jaw in a course test.
+  get drive() { return this.dir === 'course' ? this.sideOffset : this.pullOffset; }
+  set drive(v) { if (this.dir === 'course') this.sideOffset = v; else this.pullOffset = v; }
+  // The load cell: the stationary jaw (the cast-on in a wale test, the left side jaw in a course test).
+  testLoad() { return this.dir === 'course' ? this.stats.loadLeft : this.stats.loadBottom; }
+
+  // Past the jam the load grows about exponentially with extension (roughly doubling every 1-2% here),
+  // so a fixed step overshoots the limit by anything up to that factor and the PEAK — which sets how
+  // much work the cycle can lose — would depend on the step size. The last steps are therefore
+  // shortened: the next one is the extension the last two steps' own exponential growth says reaches
+  // LOAD_LIMIT, never more than a full step nor less than 1/16 of one.
+  approachStep(size) {
+    const ld = this.steps.filter(r => r.phase === 'pulling'); if (ld.length < 2) return size;
+    const q = ld[ld.length - 2], r = ld[ld.length - 1], g = Math.log(r.load / q.load) / ((r.ext - q.ext) * this.restHeight);
+    if (!(g > 0) || !(r.load > 0)) return size;
+    const need = Math.log(this.P.LOAD_LIMIT / r.load) / g;
+    return Math.max(size / 16, Math.min(size, need));
+  }
+
+  // The quasi-static protocol, once a frame. A step is MOVING until the driven jaw reaches its target,
+  // then HELD: the stationary jaw's load is averaged over windows of STEP_WINDOW frames, and the
+  // step is recorded once two consecutive windows agree within STEP_TOL (or after STEP_HOLD_MAX
+  // frames, counted unconverged). Loading stops on LOAD_LIMIT / PULL_MAX_EXTENSION / the strain
+  // safety; unloading steps back to where the jaws were clamped, and the last step is that hold.
+  advanceStep() {
+    const P = this.P, st = this.step, W = P.STEP_WINDOW;
+    if (st.moving) {
+      // A move never carries the load past the limit: at the wall (the jam closing, then the yarn's own
+      // length) the load can triple in a tenth of a percent, faster than the last steps' growth predicts,
+      // so a loading move stops the frame EITHER jaw reads LOAD_LIMIT and that step ends the loading.
+      // Either, not the load cell alone: during a short move the stationary jaw lags (a contact
+      // correction travels a few segments a substep), so the load it reads arrives in the hold, after
+      // the move — the moving jaw feels the wall at once.
+      const moving = this.dir === 'course' ? this.stats.loadRight : this.stats.loadTop;
+      if (this.phase === 'pulling' && Math.max(this.testLoad(), moving) >= P.LOAD_LIMIT) { st.target = this.drive; st.capped = true; }
+      if (Math.abs(this.drive - st.target) < 1e-12) { st.moving = false; st.hold = 0; st.win = []; st.top = []; }
+      return;
+    }
+    st.hold++; st.win.push(this.testLoad()); st.top.push(this.dir === 'course' ? this.stats.loadRight : this.stats.loadTop);
+    if (st.hold < Math.max(P.STEP_HOLD_MIN, 2 * W)) return;
+    const mean = (a, i0, i1) => { let s = 0; for (let i = i0; i < i1; i++) s += a[i]; return s / (i1 - i0); };
+    const L = st.win.length, a = mean(st.win, L - W, L), b = mean(st.win, L - 2 * W, L - W), t = mean(st.top, L - W, L);
+    const scale = Math.max(Math.abs(a), P.STEP_LOAD_FLOOR);
+    const rel = Math.max(Math.abs(a - b), Math.abs(a - t)) / scale;
+    const converged = rel <= P.STEP_TOL;
+    if (!converged && st.hold < P.STEP_HOLD_MAX) return;
+    const loading = this.phase === 'pulling';
+    const rec = { ext: this.extension(), load: a, top: mean(st.top, L - W, L), strain: this.maxStrain(), phase: loading ? 'pulling' : 'unloading', frames: st.hold, converged, rel, step: true };
+    this.steps.push(rec); this.stepCount = (this.stepCount || 0) + 1; if (!converged) this.unconverged = (this.unconverged || 0) + 1;
+    const size = P.STEP_EXT * this.restHeight;
+    if (loading) {
+      if (Math.abs(rec.strain) > P.STRAIN_STOP) this.strainStopped = true;
+      const why = this.strainStopped ? 'strain' : st.capped || a >= P.LOAD_LIMIT * (1 - P.LOAD_LIMIT_TOL) ? 'load' : this.drive >= this.pullTarget - 1e-9 ? 'extension' : null;
+      if (why) { this.loadEnd = why; this.peak = { ext: rec.ext, load: a }; if (!this.cycle) { this.phase = 'held'; return; } this.phase = 'unloading'; st.target = Math.max(this.restOffset, this.drive - size); }
+      else st.target = Math.min(this.pullTarget, this.drive + this.approachStep(size));
+    } else {
+      if (this.drive <= this.restOffset + 1e-9) { this.phase = 'done'; return; }
+      st.target = Math.max(this.restOffset, this.drive - size);
+    }
+    st.moving = true;
+  }
 
   settleProgress() {
     if (this.phase !== 'settling') return 1;
@@ -668,6 +1067,79 @@ export class KnitSim {
     if (!this.restHeight) this.clampJaws();
     this.phase = 'pulling'; this.pullAuto = auto; this.cycle = cycle; this.strainStopped = false; this.loadEnd = null; this.peak = null;
     if (auto) this.pullTarget = this.restOffset + this.P.PULL_MAX_EXTENSION * this.restHeight;
+    this.steps = []; this.stepCount = 0; this.unconverged = 0;
+    // the stepped test starts with a hold at the clamped position: its first point is the rest load
+    this.step = auto && this.P.PROTOCOL === 'stepped' ? { target: this.drive, moving: false, hold: 0, win: [], top: [] } : null;
+  }
+  // The whole automatic test in the given direction. A course test first releases the width and
+  // lets the swatch settle at its own width ('freeing' -> 'free'), then clamps the side jaws.
+  startTest(direction = this.P.DIRECTION, cycle = true) {
+    if (this.phase === 'settling') this.finishSettle();
+    if (direction === 'course') {
+      if (this.dir !== 'course') { this.releaseWidth(); this.pending = { cycle }; return; }
+      if (this.phase === 'freeing') { this.pending = { cycle }; return; }
+      if (!this.sideGrip) this.clampSides();
+      this.startPull(true, cycle); return;
+    }
+    if (this.dir === 'course') throw new Error('knit-lab: a wale test after a course test needs a fresh swatch');
+    this.startPull(true, cycle);
+  }
+  // Course test, part 1: free the width. The cast-on rides a rail (y, z kept, x free), the comb's pins
+  // slide along x, the comb keeps the preload; the swatch settles again at its own width.
+  // FIXTURE 'clamp': the cast-on is let go entirely and the top jaw opens onto a NEEDLE (the pins,
+  // each free along x, the needle force-controlled to COURSE_EDGE_LOAD): top and bottom edges free.
+  releaseWidth() {
+    this.dir = 'course'; this.pinsFree = true;
+    if (this.clampTop) {
+      for (let i = 0; i < this.n; i++) if (this.grip[i] === 2 && i < this.tailFrom) { this.grip[i] = 0; this.w[i] = 1; }
+      if (this.P.COURSE_BOTTOM === 'free') {
+        for (let i = 0; i < this.n; i++) if (this.grip[i] === 1) { this.grip[i] = 0; this.w[i] = 1; }
+        this.v.fill(0); this.builtAt = null;
+        this.phase = 'freeing'; this.freeFrames = 0; this.spanHist = []; this.freeDrift = Infinity;
+        return;
+      }
+    }
+    this.railY = new Float64Array(this.n); this.railZ = new Float64Array(this.n);
+    for (let i = 0; i < this.n; i++) if (this.grip[i] === 1) { this.grip[i] = 5; this.w[i] = 1; this.railY[i] = this.x[3 * i + 1]; this.railZ[i] = this.x[3 * i + 2]; }
+    this.v.fill(0); this.builtAt = null;
+    this.phase = 'freeing'; this.freeFrames = 0; this.spanHist = []; this.freeDrift = Infinity;
+  }
+  // Course test, part 2: grip both edge wales — every point of the first and last loop of every
+  // course and of the selvedge turns — the left jaw fixed, the right one to be driven along x.
+  clampSides() {
+    const edge = new Set(); for (const row of this.topo.rows) { edge.add(row[0]); edge.add(row[row.length - 1]); }
+    const b = this.bounds(), mid = (b.x0 + b.x1) / 2;
+    let sl = 0, nl = 0, sr = 0, nr = 0;
+    for (let i = 0; i < this.n; i++) {
+      const lo = this.loopOf[i];
+      if (this.grip[i] === 2) {                      // the tied tail goes with the jaw on its side, so the
+        const side = this.x[3 * i] < mid ? 3 : 4;      // two side jaws carry every pull along x between them
+        this.grip[i] = side; for (let k = 0; k < 3; k++) this.tieBase[3 * i + k] = this.x[3 * i + k];
+        continue;
+      }
+      if (!(edge.has(lo) || lo < 0)) continue;
+      const side = lo < 0 ? (this.x[3 * i] < mid ? 3 : 4) : (this.topo.loops[lo].slot === 0 ? 3 : 4);
+      this.grip[i] = side; this.w[i] = 0;
+      for (let k = 0; k < 3; k++) this.tieBase[3 * i + k] = this.x[3 * i + k];
+      if (side === 3) { sl += this.x[3 * i]; nl++; } else { sr += this.x[3 * i]; nr++; }
+    }
+    this.jawL = sl / nl; this.jawR0 = sr / nr; this.sideOffset = 0; this.sideGrip = { left: nl, right: nr };
+    if (this.clampTop) this.combFixed = true;      // the needle found its height at the pretension while the width was free; from here it is held (a biaxial grip), so nothing moves but the driven jaw
+    this.restHeight = this.jawGap(); this.restOffset = 0;
+  }
+  // Per loop: the centroid of its points (x, y, z) and how many.
+  loopCentroids() {
+    const m = this.topo.loops.length, c = new Float64Array(m * 4);
+    for (let i = 0; i < this.n; i++) { const l = this.loopOf[i]; if (l < 0) continue; c[4 * l] += this.x[3 * i]; c[4 * l + 1] += this.x[3 * i + 1]; c[4 * l + 2] += this.x[3 * i + 2]; c[4 * l + 3]++; }
+    for (let l = 0; l < m; l++) if (c[4 * l + 3]) { c[4 * l] /= c[4 * l + 3]; c[4 * l + 1] /= c[4 * l + 3]; c[4 * l + 2] /= c[4 * l + 3]; }
+    return c;
+  }
+  // The swatch's width, robust to ragged selvedges: the span between the centres of the first and
+  // last loop of each course, averaged over the middle courses (a quarter in from each jaw).
+  waleSpan(lo = Math.round(this.topo.rows.length * 0.3), hi = Math.round(this.topo.rows.length * 0.7) - 1) {
+    const c = this.loopCentroids(); let s = 0, k = 0;
+    for (let r = lo; r <= hi; r++) { const row = this.topo.rows[r]; s += c[4 * row[row.length - 1]] - c[4 * row[0]]; k++; }
+    return s / k;
   }
   setPullTarget(off) { this.pullTarget = Math.max(this.restOffset - 0.3 * this.restHeight, off); }
   // Copy / restore the dynamic state (positions, velocities, jaws), for comparing runs from one
@@ -677,8 +1149,8 @@ export class KnitSim {
 
   meanY(g) { let y = 0, k = 0; for (let i = 0; i < this.n; i++) if (this.grip[i] === g) { y += this.x[3 * i + 1]; k++; } return y / k; }
   combY() { return this.pins[0].y + this.pullOffset; }
-  // jaw to jaw: the comb's pins against the bottom jaw's mean height
-  jawGap() { return this.combY() - this.bottomY; }
+  // jaw to jaw: the comb's pins against the bottom jaw's mean height (wale), or right jaw against left (course)
+  jawGap() { return this.dir === 'course' && this.jawR0 !== undefined ? this.jawR0 + this.sideOffset - this.jawL : this.combY() - this.bottomY; }
   extension() { return this.restHeight ? this.jawGap() / this.restHeight - 1 : 0; }
 
   // Largest segment strain, signed (positive = stretched), over segments the solver can move.
@@ -759,5 +1231,6 @@ export class KnitSim {
   }
 }
 
+function approach(a, b, step) { return a < b ? Math.min(b, a + step) : Math.max(b, a - step); }
 function hash3(i, j, k) { return Math.imul(i, 73856093) ^ Math.imul(j, 19349663) ^ Math.imul(k, 83492791); }
 const now = typeof performance !== 'undefined' ? () => performance.now() : () => Date.now();
