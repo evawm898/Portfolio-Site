@@ -23097,6 +23097,8 @@ export function floretPitchFloorMm(bodyOf, pairs, gapMm) {
     }
     return [...by.values()];
   })();
+  const decodeJ = (key2) => { const jw = ((key2 % KEY) + KEY) % KEY; return jw > KEY / 2 ? jw - KEY : jw; };
+  const decodeI = (key2) => (key2 - (((key2 % KEY) + KEY) % KEY)) / KEY;
   const decode = (key2) => { const jw = ((key2 % KEY) + KEY) % KEY; const i = (key2 - jw) / KEY; const j = jw > KEY / 2 ? jw - KEY : jw; return [i, j]; };
   /* a map as dense arrays over its own bounding box, and the lower's dilations */
   const denses = new Map();
@@ -23105,12 +23107,20 @@ export function floretPitchFloorMm(bodyOf, pairs, gapMm) {
     const key = Math.round(w * 1e9);
     if (denses.has(key)) return denses.get(key);
     const m = map(w);
+    /* THE BOX IS READ WITH SCALAR DECODES, never by destructuring decode()'s
+       array: in CHROMIUM's V8 the destructured form sometimes handed this
+       loop ANOTHER map's box (measured: the dense grid of azimuth 0 carried
+       azimuth pi's i0, -151 for 3, with its own z arrays intact), so the
+       bound was read at the wrong offset, `whereOf`'s cross-check threw on
+       `TEXTURE: PEBBLE x a RACEME` about one run in four on b3163de — never
+       in Node — and a wrong bound for a pair that does not win would have
+       passed silently. The same integers, as two functions of the key. */
     let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
-    for (const k of m.keys()) { const [i, j] = decode(k); if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+    for (const k of m.keys()) { const i = decodeI(k), j = decodeJ(k); if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
     if (!(i0 <= i1)) { denses.set(key, { empty: true }); return denses.get(key); }
     const W = i1 - i0 + 1, H = j1 - j0 + 1;
     const zmin = new Float64Array(W * H).fill(Infinity), zmax = new Float64Array(W * H).fill(-Infinity);
-    for (const [k, r] of m) { const [i, j] = decode(k); const x = (i - i0) * H + (j - j0); zmin[x] = r[0]; zmax[x] = r[1]; }
+    for (const [k, r] of m) { const x = (decodeI(k) - i0) * H + (decodeJ(k) - j0); zmin[x] = r[0]; zmax[x] = r[1]; }
     /* dilations on a grid padded by SUB on every side, so an upper cell just
        outside the lower's box still reads the lower cells within a gap */
     const Wd = W + 2 * SUB, Hd = H + 2 * SUB;
