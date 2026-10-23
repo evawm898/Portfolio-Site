@@ -158,7 +158,8 @@ const SPECS = [   // the longest first, so four at a time finishes soonest
   { name: 'plain-course-mu0', swatch: 'plain', dir: 'course', params: { FRICTION: 0 } },
   // the clamp fixture holds every point of the last course, so an untied end cannot unravel there: the
   // must-fail is the comb fixture (phases 1-3) with the end left free
-  { name: 'mf-tail-untied', swatch: 'plain', params: { FIXTURE: 'comb', PLATE_HALF_GAP: 1.6, TAIL_TIED: 0 } },
+  // capped at 60%: unravelling, it never reaches the load limit and would otherwise walk to 300% (hours)
+  { name: 'mf-tail-untied', swatch: 'plain', params: { FIXTURE: 'comb', PLATE_HALF_GAP: 1.6, TAIL_TIED: 0, PULL_MAX_EXTENSION: 0.6 } },
   { name: 'plain', swatch: 'plain', audit: true, peakHold: 600 },
   { name: 'plain-step0.5', swatch: 'plain', params: { STEP_EXT: 0.005 } },
   { name: 'rib', swatch: 'rib', audit: true },
