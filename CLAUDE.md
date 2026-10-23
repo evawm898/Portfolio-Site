@@ -1394,7 +1394,8 @@ lattice or relief, `textureContext`, `TEXTURE_*`, `TEXTURE_BAR_XFAIL`, TX0–TX8
 - Gates: TX0–TX8 in both STL gates, five witnessed apex mutants, panel route (ao) (THIRTY-TWO routes) with
   the section's geometry witness, block 77 (19 rows, 1,525), smoke block 77, E carves relieved parts out BY
   NAME, the texture sliders are `SCOPE_UNSCOPED`. `frozen/phase83` = the 1,506 rows at `56f91f4` (row-for-row `d60e734`'s); 0 frozen
-  rows name a texture id. Sheet: `node tools/shot-bloom-texture-t3.mjs` → `docs/img/bloom-texture-t3.png`;
+  rows name a texture id. **Its tag was REFUSED on `frame.yml`** (#452 edited it after the base, merged mid-CI; the
+  phase65 shape) and is declared in `TAG_PUSH_XFAIL`; the registration is what pins it. Sheet: `node tools/shot-bloom-texture-t3.mjs` → `docs/img/bloom-texture-t3.png`;
   `tools/bloom-texture-bead.mjs` and `tools/bloom-texture-corner.mjs` are the measurements.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
