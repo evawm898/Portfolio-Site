@@ -38,6 +38,7 @@
 
 import { offsetCurve, outerEdge, profileSamples, PROFILE_PRESETS } from './frame-geometry.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
+import { textureSpec, refineSpine, refineColumns, displacedTop } from './frame-texture.js';
 
 export { MIN_FEATURE_MM };
 /* The embed is the minimum feature: a length derived from a length. */
@@ -116,17 +117,29 @@ function bandColumns(spine, prof, e) {
   return { ds, zs, lip };
 }
 
-export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embedMm = EMBED_MM }) {
+export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embedMm = EMBED_MM, texture = null }) {
   const ext = embedSpine(spine, embedMm);
-  const S = ext.spine;
-  const { ds, zs, lip } = bandColumns(spine, prof, embedMm);
+  let S = ext.spine;
+  let { ds, zs, lip } = bandColumns(spine, prof, embedMm);
+  // TEXTURE (phase 4, charter §12): the spine and the columns are refined to
+  // the texture's step (rows and columns that LERP their neighbours, so
+  // offsetCurve below is still the one producer), and the top grid is
+  // displaced along the normal at the texture's scale. Absent: the old path,
+  // by branch.
+  let rowOf = null, colOf = null;
+  if (texture) {
+    const r = refineSpine(S, ds[0], ds[ds.length - 1], scale, texture.step); S = r.spine; rowOf = r.rowOf;
+    const c = refineColumns(ds, zs, scale, texture.step); ds = c.ds; zs = c.zs; colOf = c.colOf;
+  }
   const V = S.pts.length, C = ds.length;
   const closed = !!S.closed;
   const j = S.joins && S.joins.length ? S.joins[0] : -1;
   // xy of every grid vertex: offsetCurve per column, nulls → the mitre point
   // (the join whose stretch the vertex is in; an open spine has one)
+  const srcRow = texture ? [] : null;
   const xy = ds.map((d) => {
     const off = offsetCurve(S, d);
+    if (srcRow) srcRow.push(off.map((q, i) => (q ? i : closed ? nearestJoin(S, i) : j)));
     return closed ? off.map((q, i) => q || off[nearestJoin(S, i)]) : off.map((q) => q || off[j]);
   });
   const base = mesh.pos.length / 3;
@@ -134,7 +147,13 @@ export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embed
   // a tapered wire declares depthScale[v]: its crown at vertex v is
   // reliefDepth · depthScale[v] (absent: the old expression, by branch)
   const dz = S.depthScale;
-  if (dz) for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth * dz[v]);
+  let texStats = null;
+  if (texture) {
+    const e0 = lip ? colOf[1] : 0;
+    const d = displacedTop({ S, xy, srcRow, ds, zs, scale, plateT, reliefDepth, spec: texture, edge0: e0, edge1: C - 1 });
+    texStats = d.stats;
+    for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) { const o = 3 * (v * C + c); mesh.vertex(d.top[o], d.top[o + 1], d.top[o + 2]); }
+  } else if (dz) for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth * dz[v]);
   else for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth);
   for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, 0);
   const T = (v, c) => base + v * C + c, B = (v, c) => base + V * C + v * C + c;
@@ -155,7 +174,9 @@ export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embed
     mesh.quad(T(V - 1, c), B(V - 1, c), B(V - 1, c + 1), T(V - 1, c + 1)); // far end
   }
   orientOutward(mesh, t0);
-  mesh.parts.push({ id: spine.id, kind: 'band', closed, base, V, C, t0, t1: mesh.idx.length / 3, rowOffset: ext.start ? 1 : 0, colOffset: lip ? 1 : 0, embedStart: ext.start, embedEnd: ext.end, lip, T: (v, c) => base + v * C + c });
+  const part = { id: spine.id, kind: 'band', closed, base, V, C, t0, t1: mesh.idx.length / 3, rowOffset: ext.start ? 1 : 0, colOffset: lip ? 1 : 0, embedStart: ext.start, embedEnd: ext.end, lip, T: (v, c) => base + v * C + c };
+  if (texture) Object.assign(part, { textured: true, rowOf, colOf, texStats });
+  mesh.parts.push(part);
 }
 
 /* The join whose trimming stretch vertex i lies in on a closed loop: the
@@ -254,7 +275,19 @@ export function buildRelief(model) {
   if (reliefDepth < MIN_FEATURE_MM) underFloor.push(`relief ${reliefDepth.toFixed(2)} mm deep`);
   const prof = model.prof;
   const mesh = new Mesh();
-  for (const s of model.spines) bandSolid(mesh, s, prof, { scale, plateT, reliefDepth });
+  // texture: the MOLDING bands only (Eva's ruling 2, phase 4) — never the
+  // ornament's wires below, never the plate
+  const tex = textureSpec(p);
+  if (tex) told.push(...tex.told);
+  for (const s of model.spines) bandSolid(mesh, s, prof, tex ? { scale, plateT, reliefDepth, texture: tex } : { scale, plateT, reliefDepth });
+  let texture = null;
+  if (tex) {
+    const st = mesh.parts.filter((q) => q.textured).map((q) => q.texStats);
+    const sum = (k) => st.reduce((a, b) => a + b[k], 0), mn = (k) => Math.min(...st.map((b) => b[k])), mx = (k) => Math.max(...st.map((b) => b[k]));
+    texture = { kind: tex.kind, scale: tex.scale, amp: tex.amp, asked: tex.asked, seed: tex.seed, step: tex.step, crackW: tex.kind === 'cracks' ? tex.crackW : null,
+      vertices: sum('vertices'), clamped: sum('clamped'), curveHeld: sum('curveHeld'), leanOut: mx('leanOut'), leanIn: mx('leanIn'), foldHeld: sum('foldHeld'), folds: sum('folds'), edges: sum('edges'), passes: mx('passes'), achieved: mx('hMax') - mn('hMin'), hMin: mn('hMin'), hMax: mx('hMax'), zMin: mn('zMin') };
+    if (texture.clamped) told.push(`texture held off the back at ${texture.clamped} of ${texture.vertices} surface points (the ${FLOOR_NOTE} floor) — achieved ${texture.achieved.toFixed(2)} of ${tex.amp.toFixed(2)} mm peak-to-valley`);
+  }
   // the ornament's wires: built in print mm already (scale 1), each its own
   // closed solid standing on the plate thickness, overlapping its molding by
   // the embed it was seated with (frame-filigree.js)
@@ -275,7 +308,7 @@ export function buildRelief(model) {
   let z1 = 0; for (let i = 2; i < positions.length; i += 3) if (positions[i] > z1) z1 = positions[i];
   return {
     positions, indices, parts: mesh.parts, scale, plateT, reliefDepth, plate, panelT,
-    info: { scale, plateT, reliefDepth, bandW, mullW, told, underFloor, triangles: indices.length / 3, heightMm: p.printHeight, widthMm: (model.box.x1 - model.box.x0) * scale, ornament: model.ornament ? { groups: model.ornament.groups.length, wires: model.ornament.solids.length, told: model.ornament.told } : null, depthMm: z1, floorNote: FLOOR_NOTE },
+    info: { scale, plateT, reliefDepth, bandW, mullW, told, underFloor, triangles: indices.length / 3, heightMm: p.printHeight, widthMm: (model.box.x1 - model.box.x0) * scale, texture, ornament: model.ornament ? { groups: model.ornament.groups.length, wires: model.ornament.solids.length, told: model.ornament.told } : null, depthMm: z1, floorNote: FLOOR_NOTE },
   };
 }
 

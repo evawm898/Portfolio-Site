@@ -175,13 +175,18 @@ function writeReadout() {
     `relief <b>${r.widthMm.toFixed(1)} × ${r.heightMm.toFixed(1)} × ${r.depthMm.toFixed(1)} mm</b> (scale ${r.scale.toFixed(3)}), <b>${r.triangles}</b> triangles · `
     + `band <b>${r.bandW.toFixed(2)} mm</b>${info.kind === 'arch' && p.mullions > 0 ? `, mullion <b>${r.mullW.toFixed(2)} mm</b>` : ''}, plate <b>${r.plateT.toFixed(2)} mm</b>, relief depth <b>${r.reliefDepth.toFixed(2)} mm</b> · interior <b>${p.lights}</b>${r.panelT != null ? ` (${r.panelT.toFixed(2)} mm plate)` : ''}\n`
     + `floor: ${r.floorNote}${floorWarn ? '\n' + floorWarn : ''}`;
+  const T = r.texture;
+  const texLine = T
+    ? `texture <b>${T.kind}</b>, scale <b>${T.scale.toFixed(1)} mm</b>, amplitude <b>${T.amp.toFixed(2)} mm</b> peak to valley${T.asked < T.amp ? ` (asked ${T.asked.toFixed(2)})` : ''}, achieved <b>${T.achieved.toFixed(2)} mm</b> · on the molding only, not mirrored · refined to <b>${T.step.toFixed(2)} mm</b>${T.crackW ? `, cracks <b>${T.crackW.toFixed(2)} mm</b> wide` : ''}\n`
+      + `held: <b>${T.clamped}</b> off the back (the floor), <b>${T.curveHeld}</b> by the profile's curvature, <b>${T.foldHeld}</b> by the fold pass, of ${T.vertices} surface points · folds on the emitted grid <b>${T.folds}</b> · nearest the back <b>${T.zMin.toFixed(2)} mm</b> · walls lean (the footprint unmoved) up to <b>${T.leanOut.toFixed(2)} mm</b> out, <b>${T.leanIn.toFixed(2)} mm</b> in`
+    : 'texture: none';
   const o = model.ornament;
   const ornLine = o
     ? `ornament <b>${o.groups.length}</b> groups (${o.groups.map((g) => g.anchor).join(', ')}, mirrored), <b>${o.curves.length}</b> wires · lead <b>${o.length.toFixed(1)} mm</b>, wire <b>${o.wire.toFixed(2)} mm</b> (${o.shape}, <b>${o.style}</b>${o.style === 'tapered' ? `, thinning to <b>${o.tip.toFixed(2)} mm</b> at the eye` : ''}) — print mm; it may stand past the frame (overall height is the frame's)`
       + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
     : 'ornament: none';
   document.getElementById('readout').innerHTML =
-    `${reliefLine}\n${ornLine}\n`
+    `${reliefLine}\n${texLine}\n${ornLine}\n`
     + `drawing <b>${(box.x1 - box.x0).toFixed(1)} × ${(box.y1 - box.y0).toFixed(1)} mm</b>, <b>${model.strokes}</b> strokes\n`
     + `${skelLines}\n`
     + `shade across the band <b>${tmin.toFixed(2)}–${tmax.toFixed(2)}</b> darkness (${tmax - tmin < 1e-9 ? 'uniform — a flat face' : 'graded — the profile turns'})\n`

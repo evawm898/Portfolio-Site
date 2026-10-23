@@ -642,10 +642,12 @@ async function partTwo(G, R) {
   const CONTEXT = { cornerTreatment: { skeleton: 'rect' }, cornerSize: { skeleton: 'rect', cornerTreatment: 'rounded' }, aspect: { skeleton: 'oval' },
     // the ornament's rows are probed with the filigree on (they are hidden
     // and inert while it is off)
-    ornDensity: ORN, ornScale: ORN, ornTightness: ORN, ornWire: ORN, ornCrest: ORN, ornCorners: ORN, ornSides: ORN, ornBottom: ORN, ornShape: ORN, ornProjection: ORN, ornWireStyle: ORN };
+    ornDensity: ORN, ornScale: ORN, ornTightness: ORN, ornWire: ORN, ornCrest: ORN, ornCorners: ORN, ornSides: ORN, ornBottom: ORN, ornShape: ORN, ornProjection: ORN, ornWireStyle: ORN,
+    // the texture's rows are probed with a texture on (hidden and inert while it is none)
+    textureScale: { texture: 'stone' }, textureAmplitude: { texture: 'stone' }, textureSeed: { texture: 'stone' } };
   const baseOf = {};
   for (const s of R.PARAM_SPEC) {
-    if (s.section === 'print') continue;        // the print rows reach the STL, never the paper: V2 below
+    if (R.STL_ONLY_SECTIONS.includes(s.section)) continue;        // the print and texture rows reach the STL, never the paper: V2 below
     const ctx = CONTEXT[s.id] || {};
     const key = JSON.stringify(ctx);
     if (!baseOf[key]) { await page.evaluate((q) => window.__frame.setParams(q), ctx); baseOf[key] = await decode(await shot()); }
@@ -667,7 +669,7 @@ async function partTwo(G, R) {
   const svg0 = await page.evaluate(() => window.__frame.svg());
   const prows = [];
   const pbase = {};
-  for (const s of R.PARAM_SPEC.filter((q) => q.section === 'print')) {
+  for (const s of R.PARAM_SPEC.filter((q) => R.STL_ONLY_SECTIONS.includes(q.section))) {
     const ctx = CONTEXT[s.id] || {}, key = JSON.stringify(ctx);
     if (!pbase[key]) { await page.evaluate((q) => window.__frame.setParams(q), ctx); pbase[key] = { stl: await page.evaluate(() => window.__frame.stl()), svg: await page.evaluate(() => window.__frame.svg()) }; }
     const states = s.kind === 'range' ? [s.default === s.max ? s.min : s.max] : s.options.map(([v]) => v).filter((v) => v !== s.default);

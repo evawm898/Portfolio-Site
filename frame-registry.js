@@ -10,7 +10,13 @@ export const SECTIONS = [
   { id: 'shading', label: 'Shading', open: true },
   { id: 'ornament', label: 'Ornament — filigree', open: false },
   { id: 'print', label: 'Print (relief STL)', open: true },
+  // phase 4: texture reaches the STL only (the SVG is unchanged), so it
+  // sits inside Print
+  { id: 'texture', label: 'Texture — the molding surface', open: false, parent: 'print' },
 ];
+/* Sections whose controls reach the STL and never the SVG (the 2-D gate's
+   V2 probes these against the STL; V1 skips them). */
+export const STL_ONLY_SECTIONS = ['print', 'texture'];
 
 const R = (id, section, label, min, max, step, def, unit = '', visibleWhen = null, tier = 'standard') =>
   ({ id, section, label, kind: 'range', min, max, step, default: def, unit, visibleWhen, tier });
@@ -21,6 +27,7 @@ const isOval = (p) => p.skeleton === 'oval';
 const hasMullions = (p) => isArch(p) && p.mullions > 0;
 const sizedCorner = (p) => isRect(p) && p.cornerTreatment !== 'mitre';
 const ornOn = (p) => p.filigree === 'scrolls';
+const texOn = (p) => !!p.texture && p.texture !== 'none';
 const ON_OFF = [['on', 'On'], ['off', 'Off']];
 
 export const PARAM_SPEC = [
@@ -124,6 +131,19 @@ export const PARAM_SPEC = [
   { id: 'ornShape', section: 'print', label: 'Ornament wire', kind: 'choice', default: 'half-round', visibleWhen: ornOn,
     options: [['half-round', 'Half-round — flat back'], ['round', 'Round — on a wall']] },
   R('ornProjection', 'print', 'Ornament relief (× wire)', 0.5, 3, 0.05, 1.25, '', ornOn),   // 1.25 (Eva, phase 3b): the default 1.6 mm half-round crown is 1.0 mm, on the floor
+
+  // --- 4b. texture (phase 4, charter §12): real displacement of the
+  //     MOLDING's relief surface along its normal (never the plate, never
+  //     the scrolls), evaluated in 3-D space so seams and mitres show
+  //     nothing, NOT mirrored. Off by default; every row below is hidden AND
+  //     inert while it is off. Scale and amplitude are PRINT mm; the
+  //     amplitude is peak-to-valley, built at MIN_FEATURE_MM when asked
+  //     under it (told), and held off the back locally (told).
+  { id: 'texture', section: 'texture', label: 'Texture', kind: 'choice', default: 'none',
+    options: [['none', 'None'], ['stone', 'Stone grain'], ['weathering', 'Weathering — pits and worn edges'], ['cracks', 'Cracks — incised'], ['hammered', 'Hammered metal — faceted dimples']] },
+  R('textureScale', 'texture', 'Scale (feature size)', 1.5, 16, 0.5, 4, 'mm', texOn),
+  R('textureAmplitude', 'texture', 'Amplitude (peak to valley)', 0.25, 3, 0.05, 1, 'mm', texOn),
+  R('textureSeed', 'texture', 'Seed', 1, 99, 1, 1, '', texOn),
 ];
 
 /* The minimum printable feature, in millimetres. AN ASSUMPTION: the print

@@ -675,3 +675,125 @@ One question, from the sheet: the default wire style — A) constant, B) tapered
 tapered (Eva, Oct 23).** Also noted by Eva and NOT fixed here: at the default size the lead is
 ~23 mm and the tightness slider spans only 0.50–0.56 turns (tapered) — options carried to the
 session report.
+
+## 12. Phase 4 — molding texture (step 1: the vocabulary; step 2 after Eva's pick)
+
+### 12.0 Rulings (Eva, Oct 23, the phase-4 brief)
+
+1. The scroll tightness slider at the default size is **accepted as is** (0.50–0.56 turns at the
+   ~23 mm default lead); the read-out keeps reporting the span. No change.
+2. **Texture applies to the MOLDING ONLY** — never the back plate, never the scrolls.
+3. Which textures ship is **not yet ruled**: stone grain, weathering (pits + worn edges), cracks
+   (incised lines), hammered metal (faceted dimples) are all built for the vocabulary sheet, and
+   step 2 ships only the picked ones.
+
+### 12.1 The texture model (the law, stated before the code)
+
+- **Real displacement, in the STL.** Texture moves the molding's TOP SURFACE — the relief grid
+  `bandSolid` lifts over the back — along the surface's own normal. No painted map, no normal map,
+  nothing in the 3D view that the STL does not carry. The walls and the flat back are not
+  displaced; a wall's top edge follows the displaced top grid, so every band stays one closed
+  shell by construction (the same quads, the same closing strip, the same caps).
+- **Seamless because it is evaluated in 3-D space.** The height `h(P)` is a function of the
+  UNDISPLACED top-grid point `P` in print millimetres (x, y and z) — world-space value noise and
+  cell (Worley) patterns, built from `Math.imul`, `floor`, products and `sqrt` only — never of
+  arc length along the sweep. The oval's closing seam, the rectangle's mitres and the arch's apex
+  mitre therefore show nothing: the two sides of a join are the same points of space. A grid
+  entry that `offsetCurve` trims past a join's bisector is the join's own mitre point and takes
+  the join row's normal, so coincident points move together.
+- **NOT MIRRORED — the stated exception.** Ornament mirrors exactly, to the bit (§10.5); texture
+  does not. It is a function of `x`, not `|x|`: a stone does not weather symmetrically.
+- **The direction is the surface normal at the TEXTURE'S scale.** The normal is `normalAt` (the
+  one place a profile slope becomes a normal) of the relief's own across-slope, read over a
+  window of a quarter of the texture's scale rather than between neighbouring samples — a reed
+  or a step riser turns faster than a texture feature, and displacing along the sample-to-sample
+  normal folds the grid there. The in-plane part of the direction FADES to zero at the band's
+  two walls over twice the amplitude, so a wall stays vertical and the band's footprint — the
+  light's clear width, a mullion's width — does not move.
+- **Floors (`MIN_FEATURE_MM`, an assumption, invariant 10).** The amplitude is PEAK-TO-VALLEY in
+  print mm; asked under the floor it is built AT the floor and TOLD (the plate's rule — the
+  output is capped, the input never narrowed). No displacement may bring the top surface nearer
+  the back than the floor: an inward displacement is clamped LOCALLY to `(z − F) / N_z` and every
+  clamped vertex is counted and told. A crack is incised and so is held off the back by the same
+  clamp — it can never pierce. A crack's width is at least the floor (a groove narrower than the
+  feature fills in).
+- **Resolution is refined only where texture is on, from the texture's scale** (a length derived
+  from a length, invariant 5): the spine is densified by inserting vertices that lerp the
+  neighbouring vertices' points AND normals — so `offsetCurve` of the densified spine is the
+  exact same ruled surface subdivided, and stays the ONE producer of every grid point — until no
+  band edge segment is longer than the step; the profile's columns are subdivided likewise. Off,
+  `bandSolid` takes the old path by branch and every row is byte-identical.
+- **The SVG is unchanged this phase** (byte-identical); options for drawing texture are asked at
+  the end of step 2.
+
+### 12.2 Step 1 as built — the vocabulary (`frame-texture.js`)
+
+**The four candidates** (`textureHeight`, print mm at an undisplaced point; `scale` the feature
+size, `A` the peak-to-valley amplitude):
+- **stone grain** — three octaves of world-space value noise, sharpened toward its extremes,
+  centred: `±A/2`.
+- **weathering** — PITS (one per Worley cell where a hash says so, a smooth dish of a hashed
+  radius) and WORN EDGES (the arris eased down within ~0.45 scale of each wall, the wear varying
+  along the band by a low noise), with a ±0.05 A grain: `[−0.95 A, +0.05 A]`.
+- **cracks** — incised ROUNDED-V grooves along the Worley cell borders, at least the floor wide
+  (`max(F, 0.15 scale)`), where a smooth noise says so (about a quarter of the surface). The
+  border distance is the distance to the nearest cell's WHOLE boundary (`worleyBorder`, min over
+  its neighbours) — the F1/F2 bisector distance alone jumps where the second-nearest feature
+  changes identity, and a per-border on/off hash adds cliffs; both drew "stairs" on the first
+  sheet.
+- **hammered metal** — a paraboloid dish per Worley cell, the dishes meeting at sharp ridges on
+  the borders: faceted, `[−A, 0]`.
+
+**Controls** (registry, a Texture section inside Print; hidden and inert at `none`, the default
+for step 1): type, scale 1.5–16 mm (default 4), amplitude 0.25–3 mm (default 1.0 — the floor),
+seed 1–99. The 2-D gate's V1 skips `STL_ONLY_SECTIONS` and V2 holds every texture row to moving
+the STL and never the SVG.
+
+**The direction, measured three ways before it was settled** (the shipped arch, 2 mm scale and
+amplitude, reversed grid edges before any fold pass): the normal SMOOTHED over the texture's
+scale — 2,190 → 2,762 → 4,058 crack edges as the window grew (the off-normal part of `h'·D` runs
+a steep wall backwards); the in-plane part FADED toward the walls — the fade spans a 5.7 mm
+mullion whole, off-normal everywhere; the wall held to its plane — 454 of 457 reversed edges on
+the cove's outer wall, its neighbour folding over it. So the direction is the TRUE normal
+everywhere, a wall's top included: the wall LEANS (its bottom, the footprint and the light's
+clear width, never moves), measured and on the read-out — **≤ 0.31 mm on the default arch at
+the 1 mm floor, ≤ 0.77 mm on the cove's steep outer arris (1.53 mm at 2 mm amplitude)**.
+
+**The holds, each local, counted and on the read-out:** the CURVATURE hold (toward the
+cross-section's centre of curvature by at most `CURVE_HOLD` 0.8 of the local radius — the ogee's
+convex curl on a mullion is ~2.4 mm); the FLOOR (`z + h·D_z ≥ MIN_FEATURE_MM`: nearest the back
+is exactly 1.00 mm wherever it binds, so nothing pierces); and the FOLD PASS (an edge whose
+displaced vector runs against its undisplaced one has the displacement at both ends halved until
+none does; it fires at the concave plan corners — the inner side of a mitre — and a few points
+elsewhere). **Folds on the emitted grid: 0 on every row measured.**
+
+**Measured (Node, the four textures × arch / cove / rectangle / oval × scale 2 / 8 × amplitude
+1 / 2):** boundary edges 0 on every row; folds 0; the achieved peak-to-valley 1.00 / 2.00 mm
+(weathering 0.94–0.98 of asked where the floor clamps its pits); texture off, **462 rows (every
+skeleton and corner, every preset, every interior, with and without the ornament) byte-identical
+in SVG and STL to `04d4e52`**, and with texture on the SVG unmoved on 44 of 44. Relief gate
+28/28, frame gate 45/45. **Open for step 2's gate:** single-voxel islands at the 0.2 mm re-read
+on two of 32 rows (arch cracks 2 mm × 2 mm, cove weathering 2 mm × 2 mm), gone at 0.1 mm — the
+row sampler's corner grazes, not a gap (a real gap survives a smaller cell); C must learn this
+before textured rows join it.
+
+**Cost at the defaults (scale 4 mm, amplitude 1 mm, print 180 mm; Node triangle count, STL
+size):**
+
+| | none | stone / weathering / hammered | cracks |
+|---|---|---|---|
+| arch | 68,076 · 3.2 MB | 296,668 · 14.1 MB | 712,300 · 34.0 MB |
+| rectangle | 1,568 · 0.1 MB | 167,776 · 8.0 MB | 446,880 · 21.3 MB |
+| oval | 47,040 · 2.2 MB | 175,616 · 8.4 MB | 416,304 · 19.9 MB |
+
+The grid step is `scale / 6` (cracks: a quarter of the crack's width), so cost grows as the
+scale shrinks and the print grows: the arch at 1.5 mm is 711k triangles (34.7 MB), at 600 mm
+print and 4 mm scale 864k (41.2 MB). **A cap is owed in step 2** (proposed: a triangle budget
+that coarsens the step and tells, the bloom's 1.5 M precedent; and the flat back built coarse,
+which is half of every textured band's triangles today). Sheet: `node tools/shot-frame-texture.mjs
+<dir> --png docs/img/frame-texture-vocabulary.png` (`--only <regex>` for a subset).
+
+**Found, not this phase's:** the page's untextured default STL is 68,460 triangles where Node
+builds 68,076 — on `04d4e52` too (same profile, same params): the mitre fan's degenerate drops
+are exact float equalities and the page's V8 and Node's land them differently. The gates count
+Node's.
