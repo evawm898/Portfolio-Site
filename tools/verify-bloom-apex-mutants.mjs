@@ -748,7 +748,7 @@ const TEX_MUTANTS = /^(the-relief-goes-inward|the-bead-is-left-flat|the-field-is
 /* THE EDGE CAP (Eva, Oct 23): its three mutants run on the `texture edge cap`
    rows (the corner, a state past the cap) plus the shipped PEBBLE row, where
    a typed edge moves the default. */
-const CAP_ROWS = /^texture edge cap|^surface texture — PEBBLE at the shipped/;
+const CAP_ROWS = /^texture edge cap|^TEXTURE CAP: past|^surface texture — PEBBLE at the shipped/;
 const CAP_MUTANTS = /^(the-edge-cap-is-removed|the-edge-is-typed-at-the-cap|the-edge-coarsens-past-the-cap)$/;
 /* the edge-cap facts a witness reads off a MUTATED module's own build */
 function capFacts(G, st) {
@@ -4128,7 +4128,9 @@ const ROWS = [
      runs under them (CAP_ROWS) for the typed-edge mutant. */
   { label: 'texture edge cap — PEBBLE x 40 petals x 3 whorls (over the budget at 0.4 mm, lands on 0.41)', for: CAP_MUTANTS,
     set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }] },
-  { label: 'texture edge cap — past 0.50 mm (40 x 3 x 40 sepals x 4 tiers x whorled leaves; refused at the cap)', for: CAP_MUTANTS,
+  /* the past-the-cap row carries the MATRIX row's own label: TX9 asks that a
+     build which does not fit at the cap be a DECLARED refusal, by label */
+  { label: 'TEXTURE CAP: past 0.50 mm — 40 x 3 x 40 sepals x 4 tiers x whorled leaves on a 120 mm stem (REFUSED at the cap, told)', for: CAP_MUTANTS,
     set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }, { id: 'sepalCount', value: '40' }, { id: 'sepalTiers', value: '4' }, { id: 'stemLength', value: '120' }, { id: 'leafLength', value: '60' }, { id: 'leafNodes', value: '8' }, { id: 'leafPhyllotaxy', value: 'whorled' }] },
   { label: 'an asymmetric outline curve — a LOPSIDED blade (the right half narrower)', for: ASYM_MUTANTS,
     set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },

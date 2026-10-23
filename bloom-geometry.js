@@ -23788,7 +23788,8 @@ function buildSepalTierInto(acc, state, fr, sepals, sites, stemPlanned, cap, unc
     blade: (slot) => {
       azimuths[slot.index] = slot.azimuth;
       slots[slot.index] = slot;
-      const p = buildPetalInto(acc, bs, sepals.ring, slot, null, built.length === 0);
+      /* a sepal reads the texture edge PIN and nothing else of the row's capability (the petal hooks are the petals') */
+      const p = buildPetalInto(acc, bs, sepals.ring, slot, cap && cap.textureEdgeMm > 0 ? { textureEdgeMm: cap.textureEdgeMm } : null, built.length === 0);
       /* THE STATE THIS BLADE WAS BUILT FROM, keyed by the petal name the law
          reads — SP6 compares it against the page's own sepal* read-back, an
          owner the builder does not write. */
