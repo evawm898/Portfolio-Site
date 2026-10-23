@@ -1907,7 +1907,7 @@ export const SMOKE_BLOCKS = [
         path: "TX10 the ring's own lattice and its own law's normals, TX11 the ring under the petals buried, TX2 the one field on the ring" },
       { label: 'TEXTURE T5: PEBBLE x sheetThickness 0.60 x a stem (the counts decided on the export twin)',
         path: "TX10 the floor taken on the export twin, TX7 the counts live = export, TX11 visibility on the thin hub" },
-      { label: 'TEXTURE T5: PEBBLE x a noded stem (swelling 0.5, kink 0.5) x 4 leaves',
+      { label: "TEXTURE T5: PEBBLE x a noded stem (the flower's 0.48 on 100 x 6 mm, three leaves)",
         path: "TX10 the noded wall's radial normal from its own axis, TX11 the petiole roots buried, ST9 the petioles excused by name" },
     ],
   },

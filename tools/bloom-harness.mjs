@@ -5910,7 +5910,12 @@ export async function textureAssertions(page, row) {
      can reach (a declared slot the stem took; a sphere). */
   /* (a FUSED whorl's lobe is built under the `tubeLobe` capability the tube
      hands each slot, which this clause does not restate — skipped by name) */
-  if (organs.petal && organs.petal.skinSamples && !(m.tube && m.tube.active)) {
+  /* (and where the sphere's stem channel took slot 0 — the first petal built
+     is then not slot 0, so the helper's representative is a different petal:
+     the comment's own "a declared slot the stem took", made a condition — the
+     first row to reach it is T5's SPHERE x a stem) */
+  const channelTook = !!(m.stemOmission && Array.isArray(m.stemOmission.omitted) && m.stemOmission.omitted.includes(0));
+  if (organs.petal && organs.petal.skinSamples && !(m.tube && m.tube.active) && !channelTook) {
     const reps = organs.petal.skinSamples.filter((q) => q.rep === true && q.mid);
     if (!reps.length && organs.petal.displaced) bad.push('TX8: the petal organ carries no sample from the representative petal — the clause cannot run');
     else if (reps.length) {
@@ -6135,20 +6140,43 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
       return NaN;
     };
     if (pageMesh && !pm) bad.push(`TX11: ${name}: the page reports a ${name} record and hands over none of its triangles`);
-    /* the undisplaced lattice's own facet normals, area-weighted, per vertex */
+    /* the undisplaced lattice's own facet normals, area-weighted, per vertex.
+       The page's samples and mesh come from CHROMIUM's V8 and the lattice
+       below from Node's: they agree to the last few bits and not to the bit
+       (measured 2.0e-15 mm worst on 462 of 65,808 hub floats — X0's own
+       cancellation-residue class), so a sample is matched to a lattice vertex,
+       and a vertex counts as MOVED, against X0's own bar: X0_TOL_ULPS ulp of
+       the build's largest |coordinate|, never an exact key */
+    let scaleMm = 0; for (let i = 0; i < accOff.positions.length; i++) { const a = Math.abs(accOff.positions[i]); if (a > scaleMm) scaleMm = a; }
+    const tolMm = X0_TOL_ULPS * scaleMm * Number.EPSILON;
     const key = (P, i) => `${P[i]}|${P[i + 1]}|${P[i + 2]}`;
+    const cell = (x) => Math.floor(x / (64 * tolMm));
+    const near = new Map();
+    const nearKey = (x, y, z) => `${cell(x)}|${cell(y)}|${cell(z)}`;
+    const findNear = (q) => {
+      const cx = cell(q[0]), cy = cell(q[1]), cz = cell(q[2]);
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+        const L = near.get(`${cx + dx}|${cy + dy}|${cz + dz}`);
+        if (L) for (const v of L) if (Math.abs(v.p[0] - q[0]) <= tolMm && Math.abs(v.p[1] - q[1]) <= tolMm && Math.abs(v.p[2] - q[2]) <= tolMm) return v;
+      }
+      return null;
+    };
     const facet = new Map();
     for (const [x, y] of ranges) for (let t = x; t < y; t++) {
       const b = t * 9, P = accOff.positions;
       const u = [P[b + 3] - P[b], P[b + 4] - P[b + 1], P[b + 5] - P[b + 2]], v = [P[b + 6] - P[b], P[b + 7] - P[b + 1], P[b + 8] - P[b + 2]];
       const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
-      for (let c = 0; c < 3; c++) { const k = key(P, b + c * 3), a = facet.get(k); if (a) { a[0] += n[0]; a[1] += n[1]; a[2] += n[2]; } else facet.set(k, [...n]); }
+      for (let c = 0; c < 3; c++) {
+        const k = key(P, b + c * 3), a = facet.get(k);
+        if (a) { a[0] += n[0]; a[1] += n[1]; a[2] += n[2]; }
+        else { const f = [...n]; facet.set(k, f); const pp = [P[b + c * 3], P[b + c * 3 + 1], P[b + c * 3 + 2]]; const nk = nearKey(pp[0], pp[1], pp[2]); if (!near.has(nk)) near.set(nk, []); near.get(nk).push({ p: pp, f }); }
+      }
     }
     const unit = (a) => { const L = Math.hypot(a[0], a[1], a[2]); return L > 0 ? [a[0] / L, a[1] / L, a[2] / L] : null; };
     let nSamp = 0;
     for (const q of o.skinSamples || []) {
       nSamp++;
-      const f = facet.get(`${q.p0[0]}|${q.p0[1]}|${q.p0[2]}`);
+      const hit = findNear(q.p0), f = hit && hit.f;
       if (!f) { bad.push(`TX10: ${name}: a relieved sample at ${q.p0.map((x) => x.toFixed(4)).join(',')} is no vertex of the organ's own undisplaced lattice`); break; }
       const fn = unit(f), dot = fn ? fn[0] * q.n[0] + fn[1] * q.n[1] + fn[2] * q.n[2] : -1;
       if (!(dot >= 0.5)) { bad.push(`TX10: ${name}: the relief's normal at ${q.p0.map((x) => x.toFixed(4)).join(',')} is ${Math.acos(Math.max(-1, Math.min(1, dot))) * 180 / Math.PI | 0} degrees off the outward facet normal the undisplaced lattice carries there — the organ is relieved INWARD or off its own surface`); break; }
@@ -6168,7 +6196,7 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
       for (let c = 0; c < 3; c++) {
         const b = t * 9 + c * 3, k = key(accOff.positions, b);
         let id = idOf.get(k);
-        if (id === undefined) { id = Pv.length; idOf.set(k, id); Pv.push([accOff.positions[b], accOff.positions[b + 1], accOff.positions[b + 2]]); const kc = c * 3; Mv.push(emittedAt(t, kc) !== accOff.positions[b] || emittedAt(t, kc + 1) !== accOff.positions[b + 1] || emittedAt(t, kc + 2) !== accOff.positions[b + 2]); Fn.push(unit(facet.get(k) || [0, 0, 0])); ring.push(new Set()); }
+        if (id === undefined) { id = Pv.length; idOf.set(k, id); Pv.push([accOff.positions[b], accOff.positions[b + 1], accOff.positions[b + 2]]); const kc = c * 3; Mv.push(!(Math.abs(emittedAt(t, kc) - accOff.positions[b]) <= tolMm && Math.abs(emittedAt(t, kc + 1) - accOff.positions[b + 1]) <= tolMm && Math.abs(emittedAt(t, kc + 2) - accOff.positions[b + 2]) <= tolMm)); Fn.push(unit(facet.get(k) || [0, 0, 0])); ring.push(new Set()); }
         ids.push(id);
       }
       for (let c = 0; c < 3; c++) { ring[ids[c]].add(ids[(c + 1) % 3]); ring[ids[c]].add(ids[(c + 2) % 3]); }
@@ -13235,7 +13263,10 @@ export async function inflorescenceAssertions(page, row) {
       if (unitCache.has(key)) return unitCache.get(key);
       const sub = new GEOMETRY.MeshBuilder({ exportMode });
       const fs = GEOMETRY.floretState({ ...ui }, prePlan, topL, az);
-      const rec = GEOMETRY.buildBloomInto(sub, fs, { below: null });
+      /* `pedicel: true`: a floret's own stem IS its pedicel, a rod, and rods
+         take no relief (Q12 — deferred pending BONE); the unit is built as
+         the plan builds it, so a textured raceme's floor is the same body's */
+      const rec = GEOMETRY.buildBloomInto(sub, fs, { below: null, pedicel: true });
       const stalked = !!(rec.stem && rec.stem.present);
       const hubT = sub.floorThickness(rec.hub.thickness);
       const tipZ = stalked ? rec.stem.tipZ : GEOMETRY.hubAxisTopZ(rec.hub.dome, hubT) - hubT;
@@ -19654,7 +19685,7 @@ export function buildMatrix() {
   t5('PEBBLE x a dome (headRise 0.5) x a stem', { headRise: 0.5, stemLength: 60 });
   t5('CELLULAR x the hemisphere (headRise 1) x a stem', { petalTexture: 'CELLULAR', headRise: 1, stemLength: 60 });
   t5('PEBBLE x the SPHERE head x a stem (its cavity untouched)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 60 });
-  t5('PEBBLE x a noded stem (swelling 0.5, kink 0.5) x 4 leaves', { stemLength: 120, leafLength: 40, leafNodes: 4, stemNodeSwelling: 0.5, stemNodeKink: 0.5 });
+  t5('PEBBLE x a noded stem (the flower\'s 0.48 on 100 x 6 mm, three leaves)', { stemLength: 100, stemDiameter: 6, leafLength: 40, leafNodes: 3, stemNodeSwelling: 0.48, stemNodeKink: 0.48 });
   t5('PEBBLE x the leaf-stem join at leafAngle 70 (the relief on both sides of the join)', { stemLength: 60, leafLength: 60, leafAngle: 70 });
   t5('PEBBLE x a closed tube (6 petals, k 0 — the ring refined in its own coordinates)', { petalCount: 6, tubeLayer1: 0 });
   t5('CELLULAR x a tube on two whorls (k 0 and k 2)', { petalCount: 6, layerCount: 2, tubeLayer1: 0, tubeLayer2: 2 });
