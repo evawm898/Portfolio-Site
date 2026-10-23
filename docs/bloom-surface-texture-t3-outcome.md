@@ -202,6 +202,14 @@ main's path verbatim). `frozen/phase83` is the 1,506 rows at `56f91f4` — main'
 matrix is row-for-row `d60e734`'s, where this branch started — registered in both maps and proved deep-equal
 against worktrees of both commits.
 
+**The tag did not publish and is declared.** `bloom-frozen-tags` was dispatched from `main` at the merge
+(`89bb3bf`, run 39878247322) and read back: 73 published and correct, 8 missing and declared, and
+`frozen/phase83` refused by GitHub naming `.github/workflows/frame.yml` — #452 (/frame phase 3a) edited that
+existing workflow file after `56f91f4` and merged while #451 was in CI, the phase65 shape, so the refusal
+could not be declared before the dispatch. It is declared in `TAG_PUSH_XFAIL` by the follow-up; the baseline is
+pinned by `FROZEN_MATRICES` / `FROZEN_BASE_COMMITS` and proved by `bloom-frozen-matrices` regardless, and
+`56f91f4` is on `main`, so nothing can orphan it.
+
 ## 7. THE WORST CORNER — the cap's options, measured; NONE PICKED (Eva's question)
 
 `node tools/bloom-texture-corner.mjs` (PEBBLE at the 0.4 floor, EXPORT, the 1,500,000 budget):
