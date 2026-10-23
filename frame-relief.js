@@ -58,10 +58,15 @@ export function embedSpine(spine, e = EMBED_MM) {
   if (!start && !end) return { spine, start: false, end: false };
   const pts = spine.pts.slice(), nrm = spine.nrm.slice();
   const unit = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [dx / l, dy / l]; };
-  if (start) { const t = unit(pts[0], pts[1]); pts.unshift([pts[0][0] - t[0] * e, pts[0][1] - t[1] * e]); nrm.unshift(nrm[0]); }
-  if (end) { const n = pts.length - 1, t = unit(pts[n - 1], pts[n]); pts.push([pts[n][0] + t[0] * e, pts[n][1] + t[1] * e]); nrm.push(nrm[n]); }
+  const ws = spine.widthScale ? spine.widthScale.slice() : null, zs = spine.depthScale ? spine.depthScale.slice() : null;
+  const ext = (a, at) => { if (a) { if (at) a.unshift(a[0]); else a.push(a[a.length - 1]); } };
+  if (start) { const t = unit(pts[0], pts[1]); pts.unshift([pts[0][0] - t[0] * e, pts[0][1] - t[1] * e]); nrm.unshift(nrm[0]); ext(ws, true); ext(zs, true); }
+  if (end) { const n = pts.length - 1, t = unit(pts[n - 1], pts[n]); pts.push([pts[n][0] + t[0] * e, pts[n][1] + t[1] * e]); nrm.push(nrm[n]); ext(ws, false); ext(zs, false); }
   const joins = (spine.joins || []).map((j) => j + (start ? 1 : 0));
-  return { spine: { ...spine, pts, nrm, joins }, start, end };
+  const out = { ...spine, pts, nrm, joins };
+  if (ws) out.widthScale = ws;
+  if (zs) out.depthScale = zs;
+  return { spine: out, start, end };
 }
 
 /* ------------------------------------------------------------------ */
@@ -126,7 +131,11 @@ export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embed
   });
   const base = mesh.pos.length / 3;
   const t0 = mesh.idx.length / 3;
-  for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth);
+  // a tapered wire declares depthScale[v]: its crown at vertex v is
+  // reliefDepth · depthScale[v] (absent: the old expression, by branch)
+  const dz = S.depthScale;
+  if (dz) for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth * dz[v]);
+  else for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth);
   for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, 0);
   const T = (v, c) => base + v * C + c, B = (v, c) => base + V * C + v * C + c;
   // a CLOSED loop: row V−1 joins row 0 by the same quads every other pair of
@@ -251,7 +260,7 @@ export function buildRelief(model) {
   // the embed it was seated with (frame-filigree.js)
   if (model.ornament) {
     for (const o of model.ornament.solids) bandSolid(mesh, o.spine, o.prof, { scale: 1, plateT, reliefDepth: o.depth });
-    const crown = Math.min(...model.ornament.solids.map((o) => o.depth));
+    const crown = Math.min(...model.ornament.solids.map((o) => o.depth * (o.spine.depthScale ? Math.min(...o.spine.depthScale) : 1)));
     if (model.ornament.solids.length && crown < MIN_FEATURE_MM) underFloor.push(`ornament crown ${crown.toFixed(2)} mm high`);
   }
   // the interior: open, a plate behind at the plate thickness (backed), or

@@ -642,7 +642,7 @@ async function partTwo(G, R) {
   const CONTEXT = { cornerTreatment: { skeleton: 'rect' }, cornerSize: { skeleton: 'rect', cornerTreatment: 'rounded' }, aspect: { skeleton: 'oval' },
     // the ornament's rows are probed with the filigree on (they are hidden
     // and inert while it is off)
-    ornDensity: ORN, ornScale: ORN, ornTightness: ORN, ornWire: ORN, ornCrest: ORN, ornCorners: ORN, ornSides: ORN, ornBottom: ORN, ornShape: ORN, ornProjection: ORN };
+    ornDensity: ORN, ornScale: ORN, ornTightness: ORN, ornWire: ORN, ornCrest: ORN, ornCorners: ORN, ornSides: ORN, ornBottom: ORN, ornShape: ORN, ornProjection: ORN, ornWireStyle: ORN };
   const baseOf = {};
   for (const s of R.PARAM_SPEC) {
     if (s.section === 'print') continue;        // the print rows reach the STL, never the paper: V2 below
