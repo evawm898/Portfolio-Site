@@ -10,6 +10,28 @@ Web Worker. Phase 3 replaced the continuous pull with a stepped, quasi-static te
 friction was rate-dependent, added a pull across the courses, and purl, 1×1 rib and ssk. Each phase's
 record is kept below the next; where a later phase overturned an earlier one, it says so.
 
+
+## Resume here (parked Oct 23)
+
+**Current state:**
+1. **Works:** I (yarn inextensible to the jam, no collapse past it), H (load steady held at the peak, −0.3%), T (every chart knits to its record), C (friction makes the loop, 31.3% vs 9.7%), S (no pass-through).
+2. **Fails, frictionless and rib:** Q frictionless loses 9.7% (bar 2%); M rib, one loading step falls 12.9% at 1% steps and one unloading step rises at 0.5% steps.
+3. **Fails, decreases and friction:** O decreases, one k2tog after the test, one ssk settled and after; F soft region 2.46× frictionless (bar 2×); E the ssk-yo row opens only 2 holes settled.
+4. **Also fails, Q jersey step sizes:** loss 31.3% vs 43.3%, but a same-settings replica reads 44.2%, so run-to-run chaos dominates.
+5. **Unmeasurable:** every course-direction test on the clamp fixture. Held still, the side jaws disagree by about 10% and never settle, so they are out of the gate unless `--course`.
+
+**Root cause found.** The yarn is a chain of straight segments, so yarn sliding over it rides a bump at every vertex, which acts like friction of μ ≈ 0.26. That is the frictionless loss, and no solver setting moves it. A smooth contact (`CONTACT_SMOOTH`, B-spline with Newton closest points) is in `knit-lab-sim.js` and removes it (an excursion comes back within 0.4% instead of 4%). It is switched off because the swatch never comes to rest with it (about 0.1 d/s).
+
+**The open decision:** build a smooth contact that also settles, or cap all tests at the jam and accept the frictionless loss.
+
+**Re-run:**
+- **Gate:** `node tools/verify-knit-lab.mjs --out <dir>`. About 70–80 min on 4 cores: 266 CPU-minutes over 17 runs, the longest 48 min (`eyelet`).
+  - Add `--reuse <dir>` to re-judge saved runs, which takes seconds.
+  - Add `--course` for the course tests, several hours more and they do not converge.
+  - Add `KNIT_PROGRESS=1` for per-step logging.
+- **Screenshots:** `node tools/shot-knit-lab.mjs <out-dir> --runs <gate-dir>`. About 5 min; `--runs` adds `wale-plot.png` from a gate directory.
+- Needs `playwright-core` and Chromium. No CI covers knit-lab.
+
 ## Phase 3b — the clamp fixture; what absorbs the work without friction; friction through the jam (Oct 22)
 
 **Outcome: not merged.** The fixture is now a tensile tester's (§1). Without friction the cycle still loses
