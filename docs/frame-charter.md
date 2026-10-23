@@ -676,7 +676,15 @@ tapered (Eva, Oct 23).** Also noted by Eva and NOT fixed here: at the default si
 ~23 mm and the tightness slider spans only 0.50–0.56 turns (tapered) — options carried to the
 session report.
 
-## 12. Phase 4 — molding texture (step 1: the vocabulary; step 2 after Eva's pick)
+## 12. Phase 4 — molding texture: the vocabulary was built and rendered, and NONE ships
+
+**Outcome (Eva, Oct 23, from the sheet): no texture ships, and none is on by default.** Per the
+brief ("remove the rest from the UI; keep the code only if it costs nothing"), the controls AND
+the code came out (§12.3). What stays is this section and the sheet
+(`docs/img/frame-texture-vocabulary.png`) as the record; the implementation is commit `0882706`
+on branch `claude/laughing-sagan-i2xbof` (never deleted without approval), and restoring it is a
+cherry-pick plus the step-2 work §12.2 lists as owed (a triangle cap, the C gate's island rule).
+**Every frame file is byte-identical to `04d4e52`.** §12.1–12.2 describe the tree at `0882706`.
 
 ### 12.0 Rulings (Eva, Oct 23, the phase-4 brief)
 
@@ -703,13 +711,11 @@ session report.
   the join row's normal, so coincident points move together.
 - **NOT MIRRORED — the stated exception.** Ornament mirrors exactly, to the bit (§10.5); texture
   does not. It is a function of `x`, not `|x|`: a stone does not weather symmetrically.
-- **The direction is the surface normal at the TEXTURE'S scale.** The normal is `normalAt` (the
-  one place a profile slope becomes a normal) of the relief's own across-slope, read over a
-  window of a quarter of the texture's scale rather than between neighbouring samples — a reed
-  or a step riser turns faster than a texture feature, and displacing along the sample-to-sample
-  normal folds the grid there. The in-plane part of the direction FADES to zero at the band's
-  two walls over twice the amplitude, so a wall stays vertical and the band's footprint — the
-  light's clear width, a mullion's width — does not move.
+- ~~**The direction is the surface normal at the TEXTURE'S scale**, smoothed over a quarter of
+  the scale, its in-plane part FADED to zero at the walls so a wall stays vertical.~~
+  **SUPERSEDED BY MEASUREMENT (§12.2):** both the smoothing and the fade fold the grid; the
+  direction is the TRUE normal everywhere and a wall LEANS (its bottom, the footprint, never
+  moves). Kept struck through so the reversal is legible.
 - **Floors (`MIN_FEATURE_MM`, an assumption, invariant 10).** The amplitude is PEAK-TO-VALLEY in
   print mm; asked under the floor it is built AT the floor and TOLD (the plate's rule — the
   output is capped, the input never narrowed). No displacement may bring the top surface nearer
@@ -797,3 +803,15 @@ which is half of every textured band's triangles today). Sheet: `node tools/shot
 builds 68,076 — on `04d4e52` too (same profile, same params): the mitre fan's degenerate drops
 are exact float equalities and the page's V8 and Node's land them differently. The gates count
 Node's.
+
+### 12.3 Step 2 — the ruling, and what came out
+
+Eva's pick from the sheet: **none** — no texture ships and none is on by default. Keeping the code
+parked would not have cost nothing: an unreachable branch in `bandSolid`, a 352-line module, a
+sheet tool that needs both, and a 2-D gate carrying an STL-only section exception for a section no
+user can open. So all of it came out — `frame-texture.js`, the Texture section and its four
+controls, the read-out line, `bandSolid`'s `texture` option, `STL_ONLY_SECTIONS`' texture entry,
+V1/V2's texture rows and `tools/shot-frame-texture.mjs` — by restoring each file to `04d4e52`, so
+the identity is the files themselves rather than a measurement. The SVG options for texture that
+step 2 was to ask about are moot. Re-opening texture is a new ruling, not a re-run of step 2.
+

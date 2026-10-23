@@ -11641,11 +11641,11 @@ sides), seats each in the molding by the embed (no graze), mirrors to the bit, a
 bands to the SVG and wire solids to the STL; filigree off returns the model itself (77 of 77
 rows byte-identical to `e4ce6eb`). The FRAME's box sets the print scale (`frameBox`). Read §10 of
 the charter.
-**Phase 4 step 1 (Oct 23): TEXTURE** (`frame-texture.js`, charter §12) — stone grain, weathering, cracks,
-hammered metal as real displacement of the MOLDING's relief along its TRUE normal (smoothed or wall-held
-directions fold, measured), world-space so seams show nothing, not mirrored; curvature, floor and fold-pass
-holds, all told; off is byte-identical (462 rows vs `04d4e52`). The vocabulary sheet is
-`tools/shot-frame-texture.mjs`; step 2 ships only Eva's pick and owes a triangle cap and the gate rows. Sheets: `node tools/shot-frame-scrolls.mjs <dir>`, `node
+**Phase 4 (Oct 23): TEXTURE WAS BUILT, RENDERED AND NOT SHIPPED** (charter §12) — stone grain,
+weathering, cracks and hammered metal as real displacement of the molding along its TRUE normal (smoothed or
+wall-held directions fold, measured). Eva picked **none** from `docs/img/frame-texture-vocabulary.png`, so the
+controls and the code came out and every frame file is `04d4e52`'s; the implementation is commit `0882706` on
+`claude/laughing-sagan-i2xbof`. Re-opening it is a new ruling. Sheets: `node tools/shot-frame-scrolls.mjs <dir>`, `node
 tools/shot-frame-filigree.mjs <dir>`; gates SC1–SC7, OR1–OR6 and K5.
 
 ## `/marble` — the paper-marbling simulator (pointer only)
