@@ -44,6 +44,14 @@ labelled known confident-and-wrong, the target of the next PR (the count's
 precision on small windows). Three calibration-(b) wale rows that used to
 return no number or a coincidentally right one now carry the ruler's own
 error, confident; each is explained in KNOWN_BEYOND_BAR.
+
+RE-PINNED 2026-10-22 for the calibration guardrail (README: "Calibration guardrail"):
+/detect-ruler now offers a pre-fill only when justify_ruler_calibration can show the
+span is one unit of the ruler's own tick comb, and mode (b) is "accept the pre-fill if
+one is offered, else calibrate by hand, correctly". (b)'s confident-and-wrong axes go
+13 -> 1 (teal W, the same row as (a)); jersey and knit_01 keep their pre-fill; the three
+'ruler-detector error' strict xfails from #441 are regular tests. The old as-is numbers
+are in the PR report; mode (a), the jitter table and every census above are unchanged.
 """
 from __future__ import annotations
 
@@ -81,28 +89,28 @@ BASELINE = {
     ("truth", "synth_garter", "course"): 0.1,
     ("truth", "synth_rib", "wale"): 0.0,
     ("truth", "synth_rib", "course"): 0.1,
-    # (b) the ruler detector's pre-fill accepted as-is
+    # (b) the pre-fill accepted if offered, else a correct manual calibration
     ("ruler", "jersey", "wale"): -6.2,
     ("ruler", "jersey", "course"): -6.7,
-    ("ruler", "teal", "wale"): 69.6,
-    ("ruler", "teal", "course"): 99.1,
+    ("ruler", "teal", "wale"): -11.0,
+    ("ruler", "teal", "course"): 0.5,
     ("ruler", "knit_01", "wale"): 6.3,
     ("ruler", "knit_01", "course"): 2.0,
     ("ruler", "knit_02", "wale"): None,
-    ("ruler", "knit_05", "wale"): -15.5,
-    ("ruler", "knit_05", "course"): -1.2,
-    ("ruler", "knit_06", "wale"): 72.4,
-    ("ruler", "knit_06", "course"): 93.1,
-    ("ruler", "knit_08", "wale"): None,
-    ("ruler", "knit_08", "course"): None,
-    ("ruler", "knit_09", "wale"): 15.2,
-    ("ruler", "knit_09", "course"): 17.1,
-    ("ruler", "synth_jersey", "wale"): 154.0,
-    ("ruler", "synth_jersey", "course"): 153.9,
-    ("ruler", "synth_garter", "wale"): 154.0,
-    ("ruler", "synth_garter", "course"): 155.0,
-    ("ruler", "synth_rib", "wale"): 103.2,
-    ("ruler", "synth_rib", "course"): 306.5,
+    ("ruler", "knit_05", "wale"): None,
+    ("ruler", "knit_05", "course"): None,
+    ("ruler", "knit_06", "wale"): -4.3,
+    ("ruler", "knit_06", "course"): 0.4,
+    ("ruler", "knit_08", "wale"): -1.4,
+    ("ruler", "knit_08", "course"): 2.3,
+    ("ruler", "knit_09", "wale"): -0.9,
+    ("ruler", "knit_09", "course"): -0.0,
+    ("ruler", "synth_jersey", "wale"): 0.2,
+    ("ruler", "synth_jersey", "course"): 0.1,
+    ("ruler", "synth_garter", "wale"): 0.0,
+    ("ruler", "synth_garter", "course"): 0.1,
+    ("ruler", "synth_rib", "wale"): 0.0,
+    ("ruler", "synth_rib", "course"): 0.1,
 }
 
 _LEG_GATE = (
@@ -114,38 +122,16 @@ _LEG_GATE = (
 _NO_PROPOSALS = "/propose-rois returns no areas ('Could not evaluate any candidate measurement areas.')"
 
 
-def _ruler_reason(fixture: str, detail: str) -> str:
-    return f"ruler pre-fill {detail}, so every number the user sees on {fixture} is off by that scale"
-
-
 # Why every beyond-bar row is beyond it.
 KNOWN_BEYOND_BAR = {
     ("truth", "knit_02", "wale"): _NO_PROPOSALS,
     ("truth", "knit_05", "wale"): _NO_PROPOSALS,
     ("truth", "knit_05", "course"): _NO_PROPOSALS,
-    ("ruler", "teal", "wale"): _ruler_reason("teal", "is +94.6% (labelled 1 cm)") + " (+258.7% before the leg gate; " + _LEG_GATE + ")",
-    ("ruler", "teal", "course"): _ruler_reason("teal", "is +94.6% (labelled 1 cm)"),
-    ("ruler", "knit_02", "wale"): _NO_PROPOSALS + " at the pre-filled (-88.3%) scale too",
-    ("ruler", "knit_06", "wale"): _ruler_reason("knit_06", "is +75.2% (labelled 1 cm)"),
-    ("ruler", "knit_06", "course"): _ruler_reason("knit_06", "is +75.2% (labelled 1 cm)"),
-    ("ruler", "knit_08", "wale"): _NO_PROPOSALS + " at the pre-filled (+486.5%) scale",
-    ("ruler", "knit_08", "course"): _NO_PROPOSALS + " at the pre-filled (+486.5%) scale",
-    ("ruler", "synth_jersey", "wale"): (
-        "RULER-DETECTOR ERROR, TARGET OF THE CALIBRATION PR: " + _ruler_reason("synth_jersey", "is spurious (+154.0%)")
-        + "; the wale consensus is the areas' own 36 px reading (right in pixels) at a 2.54x wrong scale -- "
-        "before the leg gate every area's leg-lattice count was excluded as implausibly dense at that scale and "
-        "the axis returned no number (see KNOWN_CONFIDENT_AND_WRONG)"
-    ),
-    ("ruler", "synth_jersey", "course"): _ruler_reason("synth_jersey", "is spurious (+154.0%)"),
-    ("ruler", "synth_garter", "wale"): (
-        "RULER-DETECTOR ERROR, TARGET OF THE CALIBRATION PR: " + _ruler_reason("synth_garter", "is spurious (+154.0%)")
-        + "; the wale consensus is the areas' own 36 px reading (right in pixels) at a 2.54x wrong scale -- "
-        "before the leg gate every area's leg-lattice count was excluded as implausibly dense at that scale and "
-        "the axis returned no number (see KNOWN_CONFIDENT_AND_WRONG)"
-    ),
-    ("ruler", "synth_garter", "course"): _ruler_reason("synth_garter", "is spurious (+154.0%)"),
-    ("ruler", "synth_rib", "wale"): _ruler_reason("synth_rib", "is spurious (+306.4%)"),
-    ("ruler", "synth_rib", "course"): _ruler_reason("synth_rib", "is spurious (+306.4%)"),
+    # Calibration (b) now falls back to a correct manual calibration where no pre-fill
+    # is offered, so these three are the same no-proposal fixtures as under (a).
+    ("ruler", "knit_02", "wale"): _NO_PROPOSALS + " (calibrated by hand: no pre-fill is offered)",
+    ("ruler", "knit_05", "wale"): _NO_PROPOSALS + " (calibrated by hand: no pre-fill is offered)",
+    ("ruler", "knit_05", "course"): _NO_PROPOSALS + " (calibrated by hand: no pre-fill is offered)",
 }
 
 # Rows pinned as KNOWN CONFIDENT-AND-WRONG by ruling: still "confident"
@@ -158,27 +144,6 @@ KNOWN_BEYOND_BAR = {
 # the entry has to come off on purpose, together with its line in
 # CONFIDENT_AND_WRONG below.
 KNOWN_CONFIDENT_AND_WRONG = {
-    # The three calibration-(b) rows the loop-count gate made VISIBLE (Eva's
-    # ruling, 2026-10-22: they do not count against the gate's "no new row"
-    # condition -- each is a ruler-detector error now reported on a correct
-    # wale reading, not an error the fix created).
-    ("ruler", "knit_05", "wale"): (
-        "RULER-DETECTOR ERROR, TARGET OF THE CALIBRATION PR: the pre-fill is -56.6% ('1 in' across ~0.43 in), "
-        "so the proposer builds one 122 px window (1.8 true wales) whose 35 px reading is a sub-feature of a "
-        "68 px wale; -15.5% confident. The old +7.6% was that scale error cancelling against a 27.5 px count."
-    ),
-    ("ruler", "synth_jersey", "wale"): (
-        "RULER-DETECTOR ERROR, TARGET OF THE CALIBRATION PR: a spurious '1 cm' ruler (+154.0%) on an image drawn "
-        "with no ruler; the wale consensus is the areas' correct 36 px reading at that wrong scale, +154.0% "
-        "confident (its course twin reads the same). Before the gate the axis returned no number while claiming "
-        "confident."
-    ),
-    ("ruler", "synth_garter", "wale"): (
-        "RULER-DETECTOR ERROR, TARGET OF THE CALIBRATION PR: a spurious '1 cm' ruler (+154.0%) on an image drawn "
-        "with no ruler; the wale consensus is the areas' correct 36 px reading at that wrong scale, +154.0% "
-        "confident (its course twin reads the same). Before the gate the axis returned no number while claiming "
-        "confident."
-    ),
     ("truth", "teal", "wale"): (
         "-11.0% CONFIDENT -- KNOWN CONFIDENT-AND-WRONG, ACCEPTED BY EVA'S RULING on the loop-count gate "
         "(variant B) and the target of the next PR: teal's own wale periodicity reads 75-80 px against a "
@@ -186,24 +151,41 @@ KNOWN_CONFIDENT_AND_WRONG = {
         "only a count's VALUE ever put it inside 10%; under the ruling a corroborating count supplies "
         "confidence, never the value. Within 15% at all seven scales (ruling condition 2)."
     ),
+    ("ruler", "teal", "wale"): (
+        "the same row as (a): no ruler pre-fill is offered on teal, so the user calibrates by hand and reads "
+        "exactly (a)'s -11.0% confident. Calibration adds nothing to it (test_calibration_adds_no_confident_and_wrong_rows)."
+    ),
 }
+
+# Rows that were pinned here as KNOWN CONFIDENT-AND-WRONG "ruler-detector errors, target of the calibration PR"
+# and are now REGULAR tests (test_ruler_error_rows_are_no_longer_confident_and_wrong): the pre-fill that put
+# them there is no longer offered.
+RULER_DETECTOR_ERROR_ROWS = [
+    ("ruler", "knit_05", "wale"),
+    ("ruler", "synth_jersey", "wale"),
+    ("ruler", "synth_garter", "wale"),
+]
 
 # Fixtures that get no proposed areas on calibration (a).
 NO_PROPOSALS = {"knit_02": _NO_PROPOSALS, "knit_05": _NO_PROPOSALS}
 
-# Ruler pre-fills further than RULER_SCALE_TOL_PCT from the true scale.
-# On a ruler-less (synthetic) image the right answer is "no ruler".
-WRONG_RULER = {
-    "teal": "WRONG: '1 cm' pre-filled across points spanning ~1.95 cm (+94.6% scale)",
-    "knit_02": "WRONG: '1 in' pre-filled across points spanning ~0.12 in (-88.3% scale)",
-    "knit_05": "WRONG: '1 in' pre-filled across points spanning ~0.43 in (-56.6% scale)",
-    "knit_06": "WRONG: '1 cm' pre-filled across points spanning ~1.75 cm (+75.2% vs the cm ruler)",
-    "knit_08": "WRONG: '1 cm' pre-filled across points spanning ~5.9 cm (+486.5% scale)",
-    "knit_09": "OFF: the '1 cm' label is right but the points span ~1.15 cm (+15.5% scale)",
-    "synth_jersey": "SPURIOUS: a '1 cm' ruler pre-filled on an image drawn with no ruler",
-    "synth_garter": "SPURIOUS: a '1 cm' ruler pre-filled on an image drawn with no ruler",
-    "synth_rib": "SPURIOUS: a '1 cm' ruler pre-filled on an image drawn with no ruler",
+# Photos WITH a ruler that are offered NO pre-fill (calibration guardrail,
+# analysis.gauge_analysis.justify_ruler_calibration). Withholding is safe -- the user
+# calibrates by hand -- but it is a miss, so each is a strict xfail on "a photo with a
+# ruler gets a correct pre-fill": the day the detector reads one of these rulers
+# correctly it XPASSes and the entry has to come off on purpose. Before the guardrail
+# every one of these was pre-filled WRONG, and the three synthetics (no ruler drawn)
+# were pre-filled with a ruler.
+WITHHELD_RULER = {
+    "teal": "was '1 cm' across ~1.95 cm (+94.6% scale): the detector read the needle-size gauge's numerals, not a ruler",
+    "knit_02": "was '1 in' across ~0.12 in (-88.3% scale): real tape, but both points one tick apart",
+    "knit_05": "was '1 in' across ~0.43 in (-56.6% scale): the detector read stitch peaks on the fabric's top edge",
+    "knit_06": "was '1 cm' across ~1.75 cm (+75.2% scale): the detector read stitches, not either printed border ruler",
+    "knit_08": "was '1 cm' across ~5.9 cm (+486.5% scale): an inch ruler, read at its half-inch ticks and labelled cm",
+    "knit_09": "was '1 cm' across ~1.15 cm (+15.5% scale): the detector read the fabric's lower edge, not the vertical tape",
 }
+# Photos whose correct pre-fill the guardrail must KEEP.
+KEPT_PREFILL = ("jersey", "knit_01")
 
 # (fixture, axis) whose app-path result jumps > 25% or flips status under
 # +-0.5/1/2% scale jitter around the correct scale.
@@ -216,7 +198,7 @@ JITTER_UNSTABLE = {
 # The headline: confident-and-wrong rows per calibration mode.
 CONFIDENT_AND_WRONG = {
     "truth": [("teal", "wale")],
-    "ruler": [("knit_05", "wale"), ("knit_06", "course"), ("knit_06", "wale"), ("knit_09", "course"), ("knit_09", "wale"), ("synth_garter", "course"), ("synth_garter", "wale"), ("synth_jersey", "course"), ("synth_jersey", "wale"), ("synth_rib", "course"), ("synth_rib", "wale"), ("teal", "course"), ("teal", "wale")],
+    "ruler": [("teal", "wale")],
 }
 
 @pytest.fixture(scope="module")
@@ -287,10 +269,12 @@ def test_app_path_proposes_areas(card, name):
 
 
 @pytest.mark.parametrize("name", [
-    pytest.param(f.name, marks=_strict(WRONG_RULER[f.name]) if f.name in WRONG_RULER else [])
+    pytest.param(f.name, marks=_strict(WITHHELD_RULER[f.name]) if f.name in WITHHELD_RULER else [])
     for f in ap.FIXTURES
 ])
 def test_ruler_prefill_is_right(card, name):
+    """A photo with a ruler is offered a pre-fill within 5% of the true scale; a photo
+    without one is offered nothing. (Withheld rulers are strict xfails, see WITHHELD_RULER.)"""
     fx = ap.FIXTURES_BY_NAME[name]
     r = card["rulers"][name]
     if not fx.has_ruler:
@@ -299,11 +283,52 @@ def test_ruler_prefill_is_right(card, name):
             f"{r['suggested_unit']} ({r['scale_error_pct']:+.1f}% scale)"
         )
         return
-    assert r["success"], f"{name}: the photo has a ruler and none was detected -- {r['message']}"
+    assert r["success"], f"{name}: the photo has a ruler and no pre-fill was offered -- {r.get('declined_reason') or r['message']}"
     assert abs(r["scale_error_pct"]) <= ap.RULER_SCALE_TOL_PCT, (
         f"{name}: pre-filled {r['suggested_distance']} {r['suggested_unit']} implies "
         f"{r['implied_ppi']:.2f} px/in against {r['true_ppi']:.2f} ({r['scale_error_pct']:+.1f}%)"
     )
+
+
+@pytest.mark.parametrize("name", [f.name for f in ap.FIXTURES])
+def test_no_wrong_prefill_is_ever_offered(card, name):
+    """The guardrail's one promise: whatever is offered is right. A refusal is allowed
+    (the user calibrates by hand); a pre-fill beyond the tolerance, or on a photo drawn
+    without a ruler, is not."""
+    fx = ap.FIXTURES_BY_NAME[name]
+    r = card["rulers"][name]
+    if not r["success"]:
+        return
+    assert fx.has_ruler, f"{name}: a ruler was pre-filled on a photo that has none"
+    assert abs(r["scale_error_pct"]) <= ap.RULER_SCALE_TOL_PCT, (
+        f"{name}: pre-fill {r['suggested_distance']} {r['suggested_unit']} is {r['scale_error_pct']:+.1f}% off"
+    )
+
+
+@pytest.mark.parametrize("name", KEPT_PREFILL)
+def test_correct_prefill_is_kept(card, name):
+    """The guardrail must not take a correct pre-fill away (jersey and knit_01 are the two
+    the detector gets right), and must say in plain words what it assumed."""
+    r = card["rulers"][name]
+    assert r["success"], f"{name}: the guardrail removed a correct pre-fill -- {r.get('declined_reason') or r['message']}"
+    assert abs(r["scale_error_pct"]) <= ap.RULER_SCALE_TOL_PCT
+    assert r["assumption"].startswith(f"Read as 1 {'inch' if r['suggested_unit'] == 'in' else r['suggested_unit']} between")
+
+
+@pytest.mark.parametrize("key", RULER_DETECTOR_ERROR_ROWS, ids=lambda k: "-".join(k))
+def test_ruler_error_rows_are_no_longer_confident_and_wrong(card, key):
+    """The three calibration-(b) rows #441 pinned as strict xfails ('ruler-detector error'):
+    a spurious or wrong pre-fill put a confident wrong number on them. With the pre-fill
+    withheld they are ordinary rows."""
+    row = card["rows"][key]
+    assert not ap.confident_and_wrong(row), f"{key}: {row['error']} (status {row['status']}) -- still confident-and-wrong"
+
+
+def test_calibration_adds_no_confident_and_wrong_rows(card):
+    """Every confident-and-wrong axis under (b) is also confident-and-wrong under (a): the
+    pre-fill never puts one there."""
+    added = sorted(set(card["cw"]["ruler"]) - set(card["cw"]["truth"]))
+    assert not added, f"calibration added confident-and-wrong rows: {added}"
 
 
 @pytest.mark.parametrize("key", [

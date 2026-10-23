@@ -154,6 +154,10 @@ body {
   background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--bl-accent) 30%, transparent) 0 2px, transparent 2px 6px);
   opacity: .55;
 }
+/* GREYED, NOT HIDDEN (T3, Q9): a control whose `enabledWhen` is false. The
+   value stays on screen and is still read; only the hand is kept off it. */
+.bl-ctrl--disabled { opacity: .45; }
+.bl-ctrl--disabled input, .bl-ctrl--disabled select { cursor: not-allowed; }
 .bl-ctrl label {
   display: flex; justify-content: space-between; align-items: baseline;
   /* The gap is what keeps a long read-out off its label. space-between

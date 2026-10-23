@@ -192,6 +192,9 @@ const MATRIX = harness.buildMatrix();
    past the base's length are the declared ADDED count. Keyed on THIS tree's
    label. */
 const ROW_DEF_MOVED_BY_PRED = {
+  /* SURFACE TEXTURE (T3, Oct 22): block 77's nineteen rows; no base row is
+     redefined — the choice guard keeps every slider sweep where it was. */
+  'texture': { added: 19, rows: {} },
   'root-support': {
     added: 21,
     rows: {
@@ -280,6 +283,13 @@ function foldMoverOnBase(st, row) {
   return false;
 }
 const PREDICATE_MOVERS = {
+  /* SURFACE TEXTURE (T3, Oct 22). A row moves iff its texture choice is not
+     NONE and the infill is NONE (with the infill on the texture is REFUSED
+     and nothing moves — Q9); written from the CONTROLS, the choice guard's own
+     sentence, never from either tree's `textureIsAbsent`. The GATED row (the
+     sliders moved under NONE) and BOTH ON must HOLD. A textured row whose
+     only sheets are LOBED leaves would hold too; no such row exists. */
+  'texture': (st) => String(st.petalTexture ?? 'NONE') !== 'NONE' && String(st.petalInfill ?? 'NONE') === 'NONE',
   /* RULING 6 — NODES DECOUPLED FROM LEAVES (stem session 2). A row moves iff
      it asks for nodes on a BARE stem: a stem, a prominence away from 0, no
      raceme, and no leaves. Written from the CONTROLS — the ruling's own

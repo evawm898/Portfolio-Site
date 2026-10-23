@@ -125,7 +125,7 @@ pinned:
 * **Four mutants** in the apex table, each with a witness on the mutated
   module: the pedicel rooted off the junction, the head built while toggled off,
   a typed knot, the umbel on the cut end.
-* **Panel route (ao)** (THIRTY-TWO routes): the umbel controls appear and the
+* **Panel route (ap)** (THIRTY-THREE routes): the umbel controls appear and the
   raceme's hide under UMBEL, the head-off label, two registry mutants.
 
 ## 6b. A pre-existing defect found on the way — the inflorescence read-outs
@@ -136,34 +136,38 @@ and **on `main` that record never carried the inflorescence plan**. So the
 is built"* on EVERY raceme with a stem, the pedicel read-outs never quoted
 their plan's numbers, and **the gradient cap's hatch on `pedicelGradient`
 (build 3's ruling 2, "hatched on the control") was never drawn** — its `cap`
-reads `shown.inflorescence.gradientMax`. Panel route (ao) found it (its
+reads `shown.inflorescence.gradientMax`. Panel route (ap) found it (its
 "the read-out says there is no head" clause read the stem line). Fixed by
 adding `inflorescence` / `inflorescenceBuilt` to `shown`; read-out only, no
 byte moves.
 
 ## 6c. What was measured (local, this tree)
 
-* **Export gate, block 77**: PASS, 27 of 27 rows watertight, 0 degenerate,
+* **Export gate, block 78**: PASS, 27 of 27 rows watertight, 0 degenerate,
   live and export counts equal.
-* **Connectedness, block 77**: PASS, 27 of 27 one connected body — every
+* **Connectedness, block 78**: PASS, 27 of 27 one connected body — every
   pedicel reaches the knot at 2 / 5 / 6 / 7 / 12 florets and at -60 / 35 / 90
   deg (UM2 asserts the root disc inside the knot on every row).
 * **Apex mutants**: the four umbel mutants each fire what they name (with the
   ID collateral their mutation genuinely causes), the clean tree silent; the
   raceme's `the-pedicel-roots-on-the-axis` was RE-ANCHORED (its line gained the
   umbel arm — the anchor scan said so before anything ran) and still fires ID2.
-* **Panel gate**: PASS; `--negative-control` — all THIRTY-TWO routes observed
-  their failure, route (ao)'s two mutants among them.
+* **Panel gate**: PASS; `--negative-control` — all THIRTY-THREE routes observed
+  their failure, route (ap)'s two mutants among them.
 * **Byte partition** (`verify-bloom-surface-bytes --base <56f91f4> --movers-predicate
   umbel`, both modes, three ranges merged): **25 movers / 1,508 holders, 0
   floats moved on any holder** over 1,803,869,496 export floats and 82,156,516
-  captured-grid values; every predeclared mover moved (block 77 less its two
+  captured-grid values; every predeclared mover moved (block 78 less its two
   GATED rows); `--control` fires both clauses. Every existing row holds by
   branch.
 * **Combination gate**: three umbel pairs; `umbel-florets-x-angle` and
   `umbel-length-x-angle` SINGLE-REACHES (12 cells declared by value),
   `umbel-head-length-x-angle` CLEARS (nearest 1.087 mm, a 5 mm pedicel at 35).
-* **`frozen/phase83`** = the 1,506 rows at `e4ce6eb`, `--verify-frozen` PASS.
+* **`frozen/phase84`** = the 1,525 rows at `89bb3bf`, `--verify-frozen` PASS.
+  Surface texture T3 (#451) merged while this was in CI and took block 77,
+  `phase83` and panel route (ao); its `phase83` is the same 1,506 rows this
+  session had frozen at `e4ce6eb` (deep-equal), so that copy was dropped in
+  the merge and the umbel moved to block 78, route (ap) and `phase84`.
 
 The sheet's measured approaches (EXPORT, emitted vertices against triangles):
 

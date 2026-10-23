@@ -1645,9 +1645,14 @@ automatic detection, see [Verify by counting a repeat](
 — this runs BEFORE any calibration exists). Returns `success`,
 `point1_px`/`point2_px` (suggested calibration points), `suggested_
 distance`/`suggested_unit`, `minor_tick_spacing_px`, `major_tick_count`,
-and `confidence` — a suggestion to pre-fill the Calibrate Scale step,
-never applied without the user's own confirm/override. See [Automatic
-ruler calibration detection](#automatic-ruler-calibration-detection).
+`confidence`, `assumption` (what the detector assumed, in plain words) and
+`declined_reason` — a suggestion to pre-fill the Calibrate Scale step,
+never applied without the user's own confirm/override, and **offered only
+when the span between the two points can be justified from the ruler's own
+tick pattern**; otherwise `success` is false, nothing is pre-filled and the
+user calibrates by hand. See [Automatic ruler calibration
+detection](#automatic-ruler-calibration-detection) and [Calibration
+guardrail](#calibration-guardrail-a-ruler-pre-fill-is-offered-only-when-it-can-be-justified-2026-10-22).
 
 `GET /health` — liveness check (used as Render's health check path).
 `GET /api/health` — same thing, kept for the local-dev frontend.
@@ -2013,8 +2018,11 @@ and on (a) each axis is scored against its own ruler. Per-area status is
 confident-and-wrong (status `confident`, |error| > 10%), the headline
 number for every PR. Pinned with the pinned-crop scorecard's contract: a
 row within 20% may not worsen by more than 2 points; a row beyond 20%, a
-fixture with no proposals, a wrong ruler pre-fill and a jitter-unstable
-result are strict xfails; the confident-and-wrong lists are pinned exactly.
+fixture with no proposals, a photo with a ruler that is offered no pre-fill
+(`WITHHELD_RULER`) and a jitter-unstable result are strict xfails; the
+confident-and-wrong lists are pinned exactly. Calibration (b) is "accept the
+ruler pre-fill if one is offered, otherwise calibrate by hand, correctly" (see
+[Calibration guardrail](#calibration-guardrail-a-ruler-pre-fill-is-offered-only-when-it-can-be-justified-2026-10-22)).
 This block is generated — `python tests/app_path_scorecard.py
 --write-readme` — and the suite fails if it is stale.
 
@@ -2022,7 +2030,7 @@ This block is generated — `python tests/app_path_scorecard.py
 **Confident-and-wrong** (status `confident`, |error| > 10%):
 
 - **truth** calibration: **1** confident-and-wrong of 21 scored axes (teal W)
-- **ruler** calibration: **13** confident-and-wrong of 21 scored axes (knit_05 W, knit_06 C, knit_06 W, knit_09 C, knit_09 W, synth_garter C, synth_garter W, synth_jersey C, synth_jersey W, synth_rib C, synth_rib W, teal C, teal W)
+- **ruler** calibration: **1** confident-and-wrong of 21 scored axes (teal W)
 
 **(a) Correct scale from ground truth**
 
@@ -2040,35 +2048,35 @@ This block is generated — `python tests/app_path_scorecard.py
 | synth_garter | 3 | 5.00 | 5.00 | +0.0% | confident | u u u | 7.00 | 7.01 | +0.1% | confident | C C C |
 | synth_rib | 3 | 5.00 | 2.50 | +0.0% (alt) | confident | u C C | 7.00 | 7.00 | +0.1% | confident | C C C |
 
-**(b) Ruler detector's pre-fill accepted as-is** (verdict: ok within 5%; OFF 5-20%, the points misplaced; WRONG beyond 20%, a wrong distance label or unit; SPURIOUS, a ruler found in a photo drawn without one)
+**(b) The ruler pre-fill accepted if one is offered; otherwise the user calibrates by hand, correctly** (the pre-fill is ok within 5%; OFF 5-20%, the points misplaced; WRONG beyond 20%, a wrong distance label or unit; SPURIOUS, offered in a photo drawn without a ruler; withheld, a photo that has a ruler and was offered none; none (correct), no ruler and none offered)
 
-| fixture | pre-filled distance | implied px/in | true px/in | scale error | verdict |
+| fixture | pre-fill offered | implied px/in | true px/in | scale error | verdict |
 |---|---|---|---|---|---|
 | jersey | 1 in | 165.00 | 166.25 | -0.8% | ok |
-| teal | 1 cm | 530.86 | 272.80 | +94.6% | WRONG |
+| teal | none | — | — | — | withheld |
 | knit_01 | 1 cm | 337.82 | 333.00 | +1.4% | ok |
-| knit_02 | 1 in | 139.00 | 1187.00 | -88.3% | WRONG |
-| knit_05 | 1 in | 139.00 | 320.00 | -56.6% | WRONG |
-| knit_06 | 1 cm | 820.42 | 468.38 | +75.2% | WRONG |
-| knit_08 | 1 cm | 2029.46 | 346.00 | +486.5% | WRONG |
-| knit_09 | 1 cm | 215.90 | 187.00 | +15.5% | OFF |
-| synth_jersey | 1 cm | 457.20 | 180.00 | +154.0% | SPURIOUS |
-| synth_garter | 1 cm | 457.20 | 180.00 | +154.0% | SPURIOUS |
-| synth_rib | 1 cm | 731.52 | 180.00 | +306.4% | SPURIOUS |
+| knit_02 | none | — | — | — | withheld |
+| knit_05 | none | — | — | — | withheld |
+| knit_06 | none | — | — | — | withheld |
+| knit_08 | none | — | — | — | withheld |
+| knit_09 | none | — | — | — | withheld |
+| synth_jersey | none | — | — | — | none (correct) |
+| synth_garter | none | — | — | — | none (correct) |
+| synth_rib | none | — | — | — | none (correct) |
 
 | fixture | areas | WPI true | WPI app | W err | W status | W per-area | CPI true | CPI app | C err | C status | C per-area |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | jersey | 2 | 5.00 | 4.69 | -6.2% | confident | u u | 7.20 | 6.72 | -6.7% | confident | C C |
-| teal | 3 | 4.00 | 6.78 | **+69.6%** | confident | u u u | 5.00 | 9.95 | **+99.1%** | confident | C C C |
+| teal | 3 (manual) | 4.00 | 3.56 | **-11.0%** | confident | u u u | 5.00 | 5.03 | +0.5% | confident | C C C |
 | knit_01 | 3 | 3.80 | 4.04 | +6.3% | confident | u u u | 5.70 | 5.81 | +2.0% | uncertain | C u C |
-| knit_02 | 0 (no proposals) | 4.00 | — | — | — | — | — | — | no truth | — | — |
-| knit_05 | 1 | 4.70 | 3.97 | **-15.5%** | confident | u | 6.70 | 6.62 | -1.2% | confident | C |
-| knit_06 | 2 | 3.80 | 6.55 | **+72.4%** | confident | u u | 5.20 | 10.04 | **+93.1%** | confident | C C |
-| knit_08 | 0 (no proposals) | 4.50 | — | — | — | — | 6.90 | — | — | — | — |
-| knit_09 | 3 | 5.10 | 5.88 | **+15.2%** | confident | C u C | 7.60 | 8.90 | **+17.1%** | confident | C C C |
-| synth_jersey | 2 | 5.00 | 12.70 | **+154.0%** | confident | C C | 7.00 | 17.78 | **+153.9%** | confident | C C |
-| synth_garter | 2 | 5.00 | 12.70 | **+154.0%** | confident | u u | 7.00 | 17.85 | **+155.0%** | confident | C C |
-| synth_rib | 2 | 5.00 | 10.16 | **+103.2%** | confident | C C | 7.00 | 28.45 | **+306.5%** | confident | C C |
+| knit_02 | 0 (no proposals) (manual) | 4.00 | — | — | — | — | — | — | no truth | — | — |
+| knit_05 | 0 (no proposals) (manual) | 4.70 | — | — | — | — | 6.70 | — | — | — | — |
+| knit_06 | 3 (manual) | 3.80 | 3.64 | -4.3% | confident | u u u | 5.20 | 5.22 | +0.4% | confident | C C C |
+| knit_08 | 4 (manual) | 4.50 | 4.44 | -1.4% | confident | u u u u | 6.90 | 7.06 | +2.3% | uncertain | C C C C |
+| knit_09 | 4 (manual) | 5.10 | 5.05 | -0.9% | confident | u C u C | 7.60 | 7.60 | -0.0% | confident | C C C C |
+| synth_jersey | 3 (manual) | 5.00 | 5.01 | +0.2% | confident | u C C | 7.00 | 7.00 | +0.1% | confident | C C C |
+| synth_garter | 3 (manual) | 5.00 | 5.00 | +0.0% | confident | u u u | 7.00 | 7.01 | +0.1% | confident | C C C |
+| synth_rib | 3 (manual) | 5.00 | 2.50 | +0.0% (alt) | confident | u C C | 7.00 | 7.00 | +0.1% | confident | C C C |
 
 **Scale jitter around the correct scale** (per-inch result as the user sees it; change vs the unjittered run; flagged beyond ±25% or on a status flip)
 
@@ -3059,6 +3067,135 @@ mechanism, in its own PR: the one that should take teal W inside 10%), or
 if a fixture arrives whose periodicity reads a harmonic of the truth while
 its count reads the loop pitch: the census above found none, and that case
 is the one the override was written for.
+
+### Calibration guardrail: a ruler pre-fill is offered only when it can be justified (2026-10-22)
+
+**The failure.** A user confirms whatever the Calibrate step pre-fills, so a wrong
+pre-fill is a confidently wrong scale. On the app-path scorecard at `main` c887a2d,
+accepting `/detect-ruler`'s pre-fill as-is (calibration (b)) left **13**
+confident-and-wrong axes against **1** with the correct scale (a). What the
+pre-fill actually was, photo by photo (checked by overlaying the detected band,
+ticks and points on each image):
+
+| photo | pre-fill | what it was |
+|---|---|---|
+| jersey, knit_01 | 1 in / 1 cm | **correct** (−0.8%, +1.4%) |
+| teal | 1 cm across ~1.95 cm | **no real ruler read**: the needle-size gauge's numerals and circles (+94.6%) |
+| knit_02 | 1 in across ~0.12 in | **wrong label**: a real tape, both points one tick apart (−88.3%) |
+| knit_05 | 1 in across ~0.43 in | **no real ruler read**: stitch peaks along the fabric's top edge (−56.6%) |
+| knit_06 | 1 cm across ~1.75 cm | **no real ruler read**: stitches, not either printed border ruler (+75.2%) |
+| knit_08 | 1 cm across ~5.9 cm | **wrong unit**: an inch ruler read at its half-inch ticks and labelled cm (+486.5%) |
+| knit_09 | 1 cm across ~1.15 cm | **no real ruler read**: the fabric's lower edge, not the vertical tape (+15.5%) |
+| synth_jersey / garter / rib | 1 cm | **no real ruler** (none is drawn): +154%, +154%, +306% |
+
+Over every image elsewhere in the repo (178: screenshots, renders, photos; a root-level
+copy of the teal photo is left out) plus five rendered printed-text pages (183 images, a
+stand-in: the audit's own non-knit images are not in the repository) the detector,
+ungated, reported a ruler on **150**, at confidence up to 0.94.
+
+**The confidence does not separate them, so it was not used.** The two correct
+pre-fills read 0.73 (knit_01) and 0.85 (jersey); the wrong ones read 0.61, 0.75, 0.77,
+0.78, 0.80, 0.91, 0.95, 0.97 and 0.98. No cut keeps both correct ones and drops the
+rest. What does separate them is structure.
+
+**The mechanism: the span must be one period of the ruler's own tick comb**
+(`justify_ruler_calibration` in `analysis/gauge_analysis.py`, read by
+`/detect-ruler`; the detector itself is unchanged and still decides where the ticks
+are). A real ruler repeats a unit mark at one pitch, the same number of smaller ticks
+sits between neighbouring unit marks, and a unit mark is longer than anything between
+two unit marks. The gate checks the span the detector picked against exactly that,
+using only the ticks the detector already found. Five checks, each of which let a
+wrong span through on real tick evidence when removed:
+
+1. **A tick hierarchy was found.** The detector's fallback (five minor ticks labelled
+   "1 unit") never knows how long its span is; its own docstring says so.
+2. **The span holds a whole, standard number of minor ticks** (4/5/8/10/16, the
+   detector's own unit vocabulary, now one owner), to within pixel quantisation
+   (±1 px plus ½ px per interval): the tick intervals agree with the claimed spacing.
+3. **That number names the unit the detector suggested** (10 → cm, 8 or 16 → in).
+4. **The two end marks are one tick class and longer than everything between them**,
+   by a rule with no number in it (`|reach₁ − reach₂| < min(reach) − max(interior reach)`):
+   a half-inch mark and an inch mark, or two neighbouring half-inch marks, are not a unit.
+5. **No tick as long as the end marks sits half-way along the span**: if one does, the
+   real unit is half the span (two inches read as one).
+
+When all five hold the pre-fill is offered with a plain-words statement of what was
+assumed (`assumption`: *"Read as 1 cm between these two marks. The detector counted 10
+small ticks between them, which is how 1 cm looks on a metric ruler. It cannot read the
+ruler's numbers, so check that both points sit on marks exactly 1 cm apart."*) and the
+detector's confidence is no longer shown, since it does not mean what it appeared to.
+When any fails, nothing is pre-filled, `declined_reason` records which and why (for
+logs and tests, not display), and the Calibrate step says: *"No ruler scale could be
+verified in this photo, so nothing was pre-filled. Click two marks on your ruler, then
+type the distance between them."* Both copies of the frontend (the production copy at
+the repo root and `frontend/`) carry the same change.
+
+**What each check earns, measured.** On every pair of ticks the detector found on the
+four photos whose detected ticks lie on a real ruler (jersey, knit_01, knit_02, knit_08;
+114 / 495 / 102 / 12 pairs whose span is a standard subdivision), with the label the strongest a wrong pair could
+carry (the unit its own subdivision implies):
+
+| gate | jersey right / wrong | knit_01 right / wrong | knit_02 right / wrong |
+|---|---|---|---|
+| checks 1–3 | 21 / **39** | 97 / **96** | 0 / **8** |
+| checks 1–3 and 5 (no 4) | 4 / **8** | 7 / **5** | 0 / **1** |
+| checks 1–3 and 4 (no 5) | 4 / **1** | 9 / 0 | 0 / 0 |
+| all five | 4 / 0 | 6 / 0 | 0 / 0 |
+
+(knit_08: 12 candidate pairs, none accepted.) The shipped gate is pinned against this
+in `test_no_pair_of_real_ticks_is_wrongly_accepted`. A sixth check, "the unit marks
+recur at least three times", was tried and dropped: it added nothing on any of these
+and refused four correct synthetic pre-fills where only two units fit in the frame.
+The two soft constants (the half-way window of 0.25 pitch, the 1 px quantisation) are
+insensitive: 0.5–2 px and 0.1–0.4 pitch give identical outcomes everywhere; only
+deliberately loose values (≥2 px with 0.5 pitch, or ≥3 px with 0.4 pitch) start to
+refuse a correct pre-fill, and never to accept a wrong one.
+
+**Result (scorecard, `tests/app_path_scorecard.py`).**
+
+| | before (c887a2d) | after |
+|---|---|---|
+| (b) confident-and-wrong axes | 13 | **1** (teal W, the same row as (a)) |
+| (a) confident-and-wrong axes | 1 (teal W) | 1 (unchanged) |
+| pre-fill offered on a drawn fabric | 3 of 3 | **0 of 3** |
+| pre-fill offered on 183 non-ruler images | 150 | **0** |
+| jersey, knit_01 | correct pre-fill | **correct pre-fill kept**, same points |
+| photos with a ruler and a pre-fill that was wrong | 6 of 8 | **0 of 8** |
+| photos with a ruler and no pre-fill (calibrate by hand) | 0 of 8 | 6 of 8 |
+
+Mode (a), the jitter table, the pinned-crop scorecard and the metamorphic sweep (ok
+119 / drift 12 / harmonic_flip 4 / lost 13 / skipped 6) are identical to `main` cell
+for cell; the three strict xfails #441 pinned as "ruler-detector error" (knit_05 W,
+synth_jersey W, synth_garter W on (b)) are regular tests now.
+
+**What it costs, and what it does not cover.**
+
+* **Recall is 2 of 8.** Six photos with a real ruler (teal, knit_02, 05, 06, 08, 09) are
+  offered no pre-fill and the user calibrates by hand. That is the safe direction, and
+  each is a strict xfail (`WITHHELD_RULER`): the day the detector reads one of those
+  rulers correctly, it XPASSes and the entry has to come off. Reading the right ruler
+  is the detector's job and is not done here.
+* **The evidence for acceptance is thin by construction**: two real photos. The 40
+  correct synthetic pre-fills (120 drawn rulers: metric and imperial, 5 scales each,
+  horizontal and vertical, plain and fabric ground; the ungated detector was wrong on
+  80 of them and the gate refused all 80) were drawn by the author of the gate and
+  confirm the accept/refuse logic, not the gate's behaviour on photographs.
+* Checks 1, 2 and 4 are exercised by real photos and by real-tick pairs. Check 3 has a
+  unit test and one non-ruler image behind it; check 5 has a unit test and the real-pair
+  table above. knit_05 is refused by two checks independently (check 2's quantisation,
+  7 px off against 3 px allowed, and check 5).
+* A span that is one unit of a ruler whose finest ticks were missed *and* whose
+  half-way tick was also missed is not detectable from the evidence the detector keeps.
+* Dev-copy quirk found and not touched: `frontend/textile-gauge-reader.js` has
+  `API_BASE_URL: ""` and every API call is guarded by `if (!CONFIG.API_BASE_URL) return`,
+  so the dev copy never auto-detects; the root copy is the one tested end to end here.
+
+**Files.** `analysis/gauge_analysis.py` (the gate; `RulerTickEvidence` recorded on the
+detector's result; the unit vocabulary lifted to constants, behaviour unchanged),
+`backend/main.py` + `backend/schemas.py` (`/detect-ruler`), both frontends, the
+scorecard harness and its pins, and `tests/test_ruler_prefill_gate.py` (each check
+fires alone — six mutants of the gate, one per check, each turn exactly the matching
+tests red).
 
 ## Deploying the backend to Render
 

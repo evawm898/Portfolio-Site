@@ -1,6 +1,8 @@
 # Bloom surface texture — discovery and standalone prototype
 
 **Status: DISCOVERY, RULED (§0). Merged as reference — the prototype page, this doc and the sheet. Nothing shipped.**
+
+**[Oct 22, T3: SHIPPED into `bloom-geometry.js` behind a choice guard — `docs/bloom-surface-texture-t3-outcome.md`. §12.8's items: 18 is RULED (1.25×) and one row is declared over it; 19 is moot (texture and infill are exclusive, Q9); 20 stays (the tube ring is out, T5); 21's foot and seam gap are gated on `g > 0` by measurement, buckled petals and tube-lobe rows are refined through the organ's own `rowAt`, florets in their own frame; 22 is discharged by the port.]**
 **T1 DONE (Oct 22, §11): the prototype's split is fixed and the prototype re-measured, outward only. Every
 stem figure in §4, §5 and §7 before §11 was the red-green split's and is replaced there; prototype files only,
 still nothing shipped.**

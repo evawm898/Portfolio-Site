@@ -8,6 +8,7 @@ import { PARAM_SPEC, SECTIONS, DEFAULTS, PROFILE_PRESETS, HATCH_WEIGHT_RANGE, MI
 import { buildFrame, exportSvg, toneAcross, profileFor } from './frame-geometry.js';
 import { buildRelief, exportStl } from './frame-relief.js';
 import { ProfileEditor } from './frame-profile-editor.js';
+import { withOrnament } from './frame-filigree.js';
 
 /* ---------------- state ---------------- */
 let params = { ...DEFAULTS };
@@ -101,7 +102,7 @@ const stats = { buildMs: 0 };
 function scheduleBuild() { if (!pending) pending = requestAnimationFrame(() => { pending = 0; buildNow(); }); }
 function buildNow() {
   const t = performance.now();
-  model = buildFrame(params, profile);
+  model = withOrnament(buildFrame(params, profile));
   stats.buildMs = performance.now() - t;
   const t2 = performance.now();
   relief = buildRelief(model);
@@ -174,8 +175,13 @@ function writeReadout() {
     `relief <b>${r.widthMm.toFixed(1)} × ${r.heightMm.toFixed(1)} × ${r.depthMm.toFixed(1)} mm</b> (scale ${r.scale.toFixed(3)}), <b>${r.triangles}</b> triangles · `
     + `band <b>${r.bandW.toFixed(2)} mm</b>${info.kind === 'arch' && p.mullions > 0 ? `, mullion <b>${r.mullW.toFixed(2)} mm</b>` : ''}, plate <b>${r.plateT.toFixed(2)} mm</b>, relief depth <b>${r.reliefDepth.toFixed(2)} mm</b> · interior <b>${p.lights}</b>${r.panelT != null ? ` (${r.panelT.toFixed(2)} mm plate)` : ''}\n`
     + `floor: ${r.floorNote}${floorWarn ? '\n' + floorWarn : ''}`;
+  const o = model.ornament;
+  const ornLine = o
+    ? `ornament <b>${o.groups.length}</b> groups (${o.groups.map((g) => g.anchor).join(', ')}, mirrored), <b>${o.curves.length}</b> wires · lead <b>${o.length.toFixed(1)} mm</b>, wire <b>${o.wire.toFixed(2)} mm</b> (${o.shape}) — print mm; it may stand past the frame (overall height is the frame's)`
+      + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
+    : 'ornament: none';
   document.getElementById('readout').innerHTML =
-    `${reliefLine}\n`
+    `${reliefLine}\n${ornLine}\n`
     + `drawing <b>${(box.x1 - box.x0).toFixed(1)} × ${(box.y1 - box.y0).toFixed(1)} mm</b>, <b>${model.strokes}</b> strokes\n`
     + `${skelLines}\n`
     + `shade across the band <b>${tmin.toFixed(2)}–${tmax.toFixed(2)}</b> darkness (${tmax - tmin < 1e-9 ? 'uniform — a flat face' : 'graded — the profile turns'})\n`
@@ -208,6 +214,7 @@ window.__frame = {
   setView: (name) => setView(name),
   view3dInk: () => (viewer ? viewer.ink() : null),
   pinCamera: (v) => { pinnedCamera = !!v; if (viewer && v) { viewer.frame(v); viewer.render(); } },
+  ornament: () => (model.ornament ? { groups: model.ornament.groups.map((g) => ({ group: g.group, anchor: g.anchor, push: g.push, wires: g.curves.length * 2 })), wires: model.ornament.curves.length, told: model.ornament.told } : null),
   model: () => ({ info: { ...model.info, anchors: Object.fromEntries(Object.entries(model.info.anchors).map(([k, a]) => [k, { spine: a.spine, index: a.index, pt: a.pt }])) }, box: model.box, strokes: model.strokes, bands: model.bands.map((b) => ({ id: b.id, hatch: b.hatch.length, cross: b.cross.length, creases: b.creases.length, tone: b.tone, weights: b.hatch.map((h) => h.weight) })) }),
   setAdvanced: (on) => setAdvanced(on),
   readout: () => document.getElementById('readout').textContent,

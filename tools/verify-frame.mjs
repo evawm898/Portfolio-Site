@@ -357,6 +357,49 @@ async function partOne(G, R, label = 'shipped') {
   ].map(([nm, q]) => { const m = G.buildFrame(q); const sp = m.spines[0]; return { nm, told: m.info.clamped.length, x: selfCrossings(G.innerEdge(sp, sp.bandWidth)) + selfCrossings(G.outerEdge(sp, sp.bandWidth)), msg: m.info.clamped[0] || '' }; });
   rec('K4 a corner or aspect the band cannot carry is clamped AND told, and the clamped edges do not cross', k4.every((r) => r.told >= 1 && r.x === 0), k4.map((r) => `${r.nm}: ${r.told ? '"' + r.msg + '"' : 'NOT TOLD'}${r.x ? ` ${r.x} CROSSINGS` : ''}`).join(' · '));
 
+  // K5 (ruling 5, phase 3a): the clamps sit where the fold is MEASURED. At the
+  // floor itself (asked exactly at the clamp) nothing is told, nothing folds
+  // on either edge, and the least feature on the inner edge — read off the
+  // EMITTED polyline, a triple's circumradius on a curve, a segment's length
+  // on a step — is exactly what the clamp promises (F/2 of inner radius; F of
+  // ear step; F of notch jog). Just past it the corner is told and built AT
+  // the floor (the same SVG string as the boundary row). The floors are
+  // restated here from MIN_FEATURE_MM and the band, never read from the
+  // builder; tools/frame-fold-boundary.mjs is the measurement that put them there.
+  const Fm = R.MIN_FEATURE_MM;
+  const foldsOn = (sp, w) => { let r = 0; const n = sp.pts.length; for (const d of [-w / 2, w / 2]) { const off = G.offsetCurve(sp, d); const keep = []; for (let i = 0; i < n; i++) if (off[i]) keep.push(i); for (let k = 0; k < keep.length; k++) { const i = keep[k], j = keep[(k + 1) % keep.length]; const a = sp.pts[i], b = sp.pts[j], P0 = off[i], P1 = off[j]; if ((b[0] - a[0]) * (P1[0] - P0[0]) + (b[1] - a[1]) * (P1[1] - P0[1]) < 0) r++; } } return r; };
+  const circR = (a, b, c) => { const A = Math.hypot(b[0] - c[0], b[1] - c[1]), B = Math.hypot(a[0] - c[0], a[1] - c[1]), C = Math.hypot(a[0] - b[0], a[1] - b[1]); const ar = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2; return ar > 1e-12 ? A * B * C / (4 * ar) : Infinity; };
+  const leastRadius = (poly) => { let m = Infinity; for (let i = 1; i < poly.length - 1; i++) m = Math.min(m, circR(poly[i - 1], poly[i], poly[i + 1])); return m; };
+  const leastSeg = (poly) => { let m = Infinity; for (let i = 0; i < poly.length - 1; i++) { const l = Math.hypot(poly[i + 1][0] - poly[i][0], poly[i + 1][1] - poly[i][1]); if (l > 1e-9) m = Math.min(m, l); } return m; };
+  const segDist = (a, b, c, d) => Math.min(G.distToPoly(a, [c, d]), G.distToPoly(b, [c, d]), G.distToPoly(c, [a, b]), G.distToPoly(d, [a, b]));
+  const k5Rows = [];
+  for (const w of [18, 30]) {
+    const B80 = (80 - w) / 2;
+    const cases = [
+      ['rounded', (v) => ({ skeleton: 'rect', cornerTreatment: 'rounded', cornerSize: v, moldingWidth: w }), (w + Fm) / 2, -0.5, (sp) => leastRadius(G.innerEdge(sp, w)), Fm / 2, 'inner radius'],
+      // the ear: at w + F the inner edge's loop has opened — its last offset
+      // face ends F short of its first, both ways, so the least distance
+      // between non-adjacent inner segments is the F × F diagonal, √2·F
+      ['eared', (v) => ({ skeleton: 'rect', cornerTreatment: 'eared', cornerSize: v, moldingWidth: w }), w + Fm, -0.5, (sp) => { const inn = G.innerEdge(sp, w); let m = Infinity; for (let i = 0; i < inn.length - 1; i++) for (let j = i + 2; j < inn.length - 1; j++) { if (i === 0 && j === inn.length - 2) continue; m = Math.min(m, segDist(inn[i], inn[i + 1], inn[j], inn[j + 1])); } return m; }, Math.SQRT2 * Fm, 'inner ear clearance'],
+      ['notched', (v) => ({ skeleton: 'rect', cornerTreatment: 'notched', cornerSize: Math.max(2, v), moldingWidth: w }), 2, 0, (sp) => leastSeg(G.innerEdge(sp, w)), 2, 'notch jog (range floor 2 mm ≥ F)'],
+      ['oval narrow', (v) => ({ skeleton: 'oval', aspect: v, moldingWidth: w, height: 80 }), Math.sqrt(((w + Fm) / 2) / B80), -0.02, (sp) => leastRadius(G.innerEdge(sp, w)), Fm / 2, 'inner radius'],
+    ];
+    if (B80 / ((w + Fm) / 2) <= 2.5) cases.push(['oval wide', (v) => ({ skeleton: 'oval', aspect: v, moldingWidth: w, height: 80 }), B80 / ((w + Fm) / 2), +0.05, (sp) => leastRadius(G.innerEdge(sp, w)), Fm / 2, 'inner radius']);
+    for (const [nm, mk, lo, past, feat, want, unit] of cases) {
+      const mA = G.buildFrame(mk(lo)), spA = mA.spines[0];
+      const got = feat(spA);
+      const atOk = mA.info.clamped.length === 0 && foldsOn(spA, w) === 0 && got >= want * (1 - 1e-6) && got <= want * 1.01;
+      let pastOk = true, pastMsg = '—';
+      if (past) {
+        const mP = G.buildFrame(mk(lo + past));
+        pastOk = mP.info.clamped.length >= 1 && G.exportSvg(mP).svg === G.exportSvg(mA).svg && foldsOn(mP.spines[0], w) === 0;
+        pastMsg = mP.info.clamped[0] || 'NOT TOLD';
+      }
+      k5Rows.push({ ok: atOk && pastOk, d: `${nm} w${w}: floor ${lo.toFixed(4)} → ${unit} ${got.toFixed(4)} (want ${want})${atOk ? '' : ` BOUNDARY BAD (told ${mA.info.clamped.length}, folds ${foldsOn(spA, w)})`}; past → ${pastOk ? 'held at it, told' : 'NOT HELD: ' + pastMsg}` });
+    }
+  }
+  rec('K5 every clamp sits on the MEASURED fold: at the floor nothing is told or folds and the inner edge\'s least feature is the promised one; just past it the corner is told and built AT the floor', k5Rows.every((r) => r.ok), k5Rows.map((r) => r.d).join(' · '));
+
   // Q the seam, in the plane: the loop's first vertex IS the restated bottom
   // centre (0, w/2) with the normal (0, 1) — the gap and the normal
   // discontinuity at the loop start, measured; the turn across the seam
@@ -436,7 +479,7 @@ async function partOne(G, R, label = 'shipped') {
 
 /* ================= NEGATIVE CONTROL ================= */
 const MUTANTS = [
-  { id: 'no-mitre', from: 'return cosHalf > 1e-9 ? [sx / l / cosHalf, sy / l / cosHalf] : n1;', to: 'return n1;', breaks: ['M1', 'K1', 'K2', 'Q1', 'W3'] },   // mitreNormal has two owners since 2b: the arch apex AND every rectangle corner, so the corners fold (K1/K2) and the seam vertex is trimmed (Q1)
+  { id: 'no-mitre', from: 'return cosHalf > 1e-9 ? [sx / l / cosHalf, sy / l / cosHalf] : n1;', to: 'return n1;', breaks: ['M1', 'K1', 'K2', 'Q1', 'W3', 'K5'] },   // mitreNormal has two owners since 2b: the arch apex AND every rectangle corner, so the corners fold (K1/K2) and the seam vertex is trimmed (Q1)
   { id: 'shading-ignores-the-profile', from: 'return p.shadeIntensity * (1 - lambert(normalAt(dzds, nrm)));', to: 'return p.shadeIntensity * 0.3;', breaks: ['T2', 'T3', 'W1', 'H2', 'W3'] },   // one darkness everywhere: one weight, and no band reaches the cross-hatch threshold (H2's vacuity guard)
   { id: 'sill-top-restated-as-a-constant', from: 'floorY = innerEdge(sill, w)[0][1];', to: 'floorY = w * 0.9;', breaks: ['O1'] },
   { id: 'lights-measured-from-the-centreline', from: "const xInL = innerEdge(spines.find((s) => s.id === 'jambL'), w)[0][0];", to: 'const xInL = -a;', breaks: ['O2', 'O3'] },   // the outer light springs on that same xInL since ruling 4, so O3 reads it too
@@ -449,16 +492,21 @@ const MUTANTS = [
   { id: 'cross-hatch-ignores-the-threshold', from: 'const thr = p.crossHatchThreshold;', to: 'const thr = 0;', breaks: ['H1'] },
   { id: 'cross-hatch-never-drawn', from: 'const cross = crossHatch(spine, prof, p);', to: 'const cross = [];', breaks: ['H1', 'H2', 'W3'] },
   // phase 2b: the closed skeletons
-  { id: 'the-oval-seam-offset-0.1mm', from: "const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", to: "pts[0] = [pts[0][0] + 0.1, pts[0][1]]; const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", breaks: ['K2', 'Q1', 'AN'] },
+  { id: 'the-oval-seam-offset-0.1mm', from: "const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", to: "pts[0] = [pts[0][0] + 0.1, pts[0][1]]; const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", breaks: ['K2', 'Q1', 'AN', 'K5'] },
   // a 0.1 mm shift ALONG the bottom side stays on the restated rectangle, so K2 is right to stay silent; the seam clause and the anchor's mirror see it
   { id: 'the-rect-seam-offset-0.1mm', from: 'push(0, yb, 0, 1, false); anchorIdx.bottom = 0;', to: 'push(0.1, yb, 0, 1, false); anchorIdx.bottom = 0;', breaks: ['Q1', 'AN'] },
   { id: 'a-hatch-line-cut-at-the-seam', from: 'const order = spine.closed ? closedOrder(run, (v) => weightLevel(darknessAt(prof, i, p, spine.nrm[v]))) : null;', to: 'const order = spine.closed ? run.map((_, v) => v) : null;', breaks: ['Q1'] },
   { id: 'a-rect-corner-not-mitred', from: "if (treat === 'mitre') Q.push([0, 0, ...mitreNormal([0, 1], [-1, 0]), true]);", to: "if (treat === 'mitre') Q.push([0, 0, 0, 1, true]);", breaks: ['K2', 'Q1', 'W3'] },   // the wrong corner normal also trims the seam vertex away (the bottom-left corner's stretch reaches it)
-  { id: 'the-oval-sampled-by-parameter', from: 'pts.push([A * A * c / den, cy + B * B * s / den]);', to: 'pts.push([A * c, cy + B * s]);', breaks: ['K2'] },
-  { id: 'the-aspect-not-read', from: 'let k = p.aspect;', to: 'let k = 1;', breaks: ['K2', 'K3', 'K4'] },   // an unread aspect cannot be clamped, so K4's folding-aspect row is never told
+  { id: 'the-oval-sampled-by-parameter', from: 'pts.push([A * A * c / den, cy + B * B * s / den]);', to: 'pts.push([A * c, cy + B * s]);', breaks: ['K2', 'K5'] },
+  { id: 'the-aspect-not-read', from: 'let k = p.aspect;', to: 'let k = 1;', breaks: ['K2', 'K3', 'K4', 'K5'] },   // an unread aspect cannot be clamped, so K4's folding-aspect row is never told
   { id: 'an-arch-control-leaks-into-the-rect', from: 'const a = p.width / 2;\n  let b = (p.height - w) / 2;', to: 'const a = p.width / 2 + (p.mullions - 2);\n  let b = (p.height - w) / 2;', breaks: ['K3'] },
   { id: 'an-anchor-off-its-spine', from: 'topCentre: anchorAt(loop, anchorIdx.top),', to: 'topCentre: { ...anchorAt(loop, anchorIdx.top), pt: [0, 1] },', breaks: ['AN'] },
-  { id: 'a-corner-clamp-not-told', from: 'if (sz < lo) { info.clamped.push(`corner radius', to: 'if (sz < lo) { void (`corner radius', breaks: ['K4'] },
+  // ruling 5: a clamp removed; the notch's floor back at phase 2b's guess (w + F, not a fold); the ear held only where a segment REVERSES ((w + F)/2 — its inner edge still loops through itself)
+  { id: 'the-rounded-clamp-removed', from: 'if (sz < lo) { info.clamped.push(`corner radius', to: 'if (false) { info.clamped.push(`corner radius', breaks: ['K4', 'K5'] },
+  { id: 'the-oval-clamp-removed', from: 'if (k < kLo) {', to: 'if (false) {', breaks: ['K4', 'K5'] },
+  { id: 'the-notch-floor-at-the-old-guess', from: "const lo = treat === 'eared' ? w + F : F,", to: "const lo = w + F,", breaks: ['K5'] },
+  { id: 'the-ear-held-only-to-its-reversal', from: "const lo = treat === 'eared' ? w + F : F,", to: "const lo = treat === 'eared' ? (w + F) / 2 : F,", breaks: ['K4', 'K5'] },
+  { id: 'a-corner-clamp-not-told', from: 'if (sz < lo) { info.clamped.push(`corner radius', to: 'if (sz < lo) { void (`corner radius', breaks: ['K4', 'K5'] },
 ];
 
 async function negativeControl() {
@@ -590,7 +638,11 @@ async function partTwo(G, R) {
   const vrows = [];
   // a control that belongs to one skeleton type is probed IN that type,
   // against that type's own baseline (phase 2b) — never against the arch
-  const CONTEXT = { cornerTreatment: { skeleton: 'rect' }, cornerSize: { skeleton: 'rect', cornerTreatment: 'rounded' }, aspect: { skeleton: 'oval' } };
+  const ORN = { filigree: 'scrolls' };
+  const CONTEXT = { cornerTreatment: { skeleton: 'rect' }, cornerSize: { skeleton: 'rect', cornerTreatment: 'rounded' }, aspect: { skeleton: 'oval' },
+    // the ornament's rows are probed with the filigree on (they are hidden
+    // and inert while it is off)
+    ornDensity: ORN, ornScale: ORN, ornTightness: ORN, ornWire: ORN, ornCrest: ORN, ornCorners: ORN, ornSides: ORN, ornBottom: ORN, ornShape: ORN, ornProjection: ORN };
   const baseOf = {};
   for (const s of R.PARAM_SPEC) {
     if (s.section === 'print') continue;        // the print rows reach the STL, never the paper: V2 below
@@ -614,13 +666,16 @@ async function partTwo(G, R) {
   const stl0 = await page.evaluate(() => window.__frame.stl());
   const svg0 = await page.evaluate(() => window.__frame.svg());
   const prows = [];
+  const pbase = {};
   for (const s of R.PARAM_SPEC.filter((q) => q.section === 'print')) {
+    const ctx = CONTEXT[s.id] || {}, key = JSON.stringify(ctx);
+    if (!pbase[key]) { await page.evaluate((q) => window.__frame.setParams(q), ctx); pbase[key] = { stl: await page.evaluate(() => window.__frame.stl()), svg: await page.evaluate(() => window.__frame.svg()) }; }
     const states = s.kind === 'range' ? [s.default === s.max ? s.min : s.max] : s.options.map(([v]) => v).filter((v) => v !== s.default);
     for (const v of states) {
-      await page.evaluate((q) => window.__frame.setParams(q), { [s.id]: v });
+      await page.evaluate((q) => window.__frame.setParams(q), { ...ctx, [s.id]: v });
       const stl = await page.evaluate(() => window.__frame.stl());
       const svg = await page.evaluate(() => window.__frame.svg());
-      prows.push({ id: s.id, v, moved: stl.hash !== stl0.hash, paper: svg === svg0, tris: stl.triangles });
+      prows.push({ id: s.id, v, moved: stl.hash !== pbase[key].stl.hash, paper: svg === pbase[key].svg, tris: stl.triangles });
     }
   }
   await page.evaluate(() => window.__frame.setParams({}));

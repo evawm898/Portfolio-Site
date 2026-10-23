@@ -68,7 +68,7 @@ export function embedSpine(spine, e = EMBED_MM) {
 /* Mesh accumulator                                                    */
 /* ------------------------------------------------------------------ */
 
-class Mesh {
+export class Mesh {
   constructor() { this.pos = []; this.idx = []; this.parts = []; }
   vertex(x, y, z) { this.pos.push(x, y, z); return this.pos.length / 3 - 1; }
   tri(a, b, c) {
@@ -229,7 +229,9 @@ export const FLOOR_NOTE = `${MIN_FEATURE_MM.toFixed(1)} mm assumed minimum featu
 
 export function buildRelief(model) {
   const p = model.params;
-  const scale = p.printHeight / (model.box.y1 - model.box.y0);
+  // the FRAME's box sets the scale (an ornament may stand past it)
+  const fb = model.frameBox || model.box;
+  const scale = p.printHeight / (fb.y1 - fb.y0);
   const told = [];
   let plateT = p.plateThickness;
   if (plateT < MIN_FEATURE_MM) { told.push(`back plate ${plateT.toFixed(2)} mm built at the ${FLOOR_NOTE} floor`); plateT = MIN_FEATURE_MM; }
@@ -244,6 +246,14 @@ export function buildRelief(model) {
   const prof = model.prof;
   const mesh = new Mesh();
   for (const s of model.spines) bandSolid(mesh, s, prof, { scale, plateT, reliefDepth });
+  // the ornament's wires: built in print mm already (scale 1), each its own
+  // closed solid standing on the plate thickness, overlapping its molding by
+  // the embed it was seated with (frame-filigree.js)
+  if (model.ornament) {
+    for (const o of model.ornament.solids) bandSolid(mesh, o.spine, o.prof, { scale: 1, plateT, reliefDepth: o.depth });
+    const crown = Math.min(...model.ornament.solids.map((o) => o.depth));
+    if (model.ornament.solids.length && crown < MIN_FEATURE_MM) underFloor.push(`ornament crown ${crown.toFixed(2)} mm high`);
+  }
   // the interior: open, a plate behind at the plate thickness (backed), or
   // the same plate at the floor so the opening reads deeper (recessed)
   let plate = null, panelT = null;
@@ -256,7 +266,7 @@ export function buildRelief(model) {
   let z1 = 0; for (let i = 2; i < positions.length; i += 3) if (positions[i] > z1) z1 = positions[i];
   return {
     positions, indices, parts: mesh.parts, scale, plateT, reliefDepth, plate, panelT,
-    info: { scale, plateT, reliefDepth, bandW, mullW, told, underFloor, triangles: indices.length / 3, heightMm: p.printHeight, widthMm: (model.box.x1 - model.box.x0) * scale, depthMm: z1, floorNote: FLOOR_NOTE },
+    info: { scale, plateT, reliefDepth, bandW, mullW, told, underFloor, triangles: indices.length / 3, heightMm: p.printHeight, widthMm: (model.box.x1 - model.box.x0) * scale, ornament: model.ornament ? { groups: model.ornament.groups.length, wires: model.ornament.solids.length, told: model.ornament.told } : null, depthMm: z1, floorNote: FLOOR_NOTE },
   };
 }
 

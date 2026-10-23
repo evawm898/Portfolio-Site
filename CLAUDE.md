@@ -1363,6 +1363,40 @@ texture work). The prototype is `bloom-texture-lab.html` / `bloom-texture-lab-co
   outward relief on sheets → T4 Voronoi walls (the midline ridge) → T5 hub/stem/rod fallback → T6 sheet.
   Gate family **TX**.
 
+**SURFACE TEXTURE T3 SHIPS: ONE WORLD FIELD OVER THE SHEETS, OUTWARD, OVER THE BEAD, ON A 0.4 mm LATTICE,
+BEHIND A CHOICE GUARD THAT SHIPS OFF — AND THE WORST-CORNER CAP IS EVA'S OPEN QUESTION** (Oct 22 — read
+`docs/bloom-surface-texture-t3-outcome.md` before touching `textureField`, `textureFor`, `emitPanel`'s
+lattice or relief, `textureContext`, `TEXTURE_*`, `TEXTURE_BAR_XFAIL`, TX0–TX8, panel route (ao) or block 77).
+- `petalTexture` (NONE / PEBBLE / CELLULAR, a CHOICE — out of the blanket sweep, `ALL MAX` untextured),
+  `textureHeight` (0.4–1.5 mm PEAK-TO-VALLEY, default the 0.4 floor — Eva's Q13, UNVALIDATED), `textureSize`
+  (1.6–12 mm; four lattice edges is the floor). The field is built from floor / imul / products / sqrt ONLY
+  (engine-agreed; TX2 restates it at 2.8e-17). No ribbing (Q6).
+- **THE LATTICE REACHES ONLY WHERE `g > 0`.** The first cut refined the foot rows, put a sub-column at `v = 0`
+  on the hub's rim vertex and WELDED every petal to the hub (5,808 within-shell pairs on every textured row).
+- **Texture and the Voronoi infill are EXCLUSIVE (Q9): greyed, never switched; BOTH ON (a loaded design) greys
+  neither, the texture is REFUSED with the word `infill` and TOLD** — an ON control is never greyed, which is
+  what keeps both-on reachable to undo. `bloom-file.js` reports the conflict; F2 expects it exactly there.
+- The relief runs OVER the bead (Q4/Q5): a textured petal's outline moves out by up to H (apex measured
+  0.36–1.5 mm), an untextured one is byte-identical. The hub, stem, rods and tube ring stay out (T5). A
+  LOBED leaf is out (no row law), told. Sepals, leaves, leaflets and florets (each in its own frame) are in.
+- **TX4's bar is 1.25× the untextured twin's conforming floor per organ; the default petal reads 1.033× (TX4's owner: skin + rim against the twin); the read-out's `x its floor` is the BUILDER's own estimate, 1.147× there, a different owner ~0.1–0.2 above the gate's.**
+  `TEXTURE: PEBBLE x cup 1.2 x curl 180` reads **1.577×** and is declared in `TEXTURE_BAR_XFAIL` (±0.005 both
+  ways): the column factor is ROW-UNIFORM and a curled, cupped row's columns differ 2–3× in length. A
+  per-span count is a lengths decision, not built.
+- **Two relief folds declared by value** (0 untextured, 0 lattice-only): the compound CELLULAR leaflets' free
+  bases (59 / 0.1963) and the cup × curl tips (147 / 0.0918). **Three more fold at the 1.5 mm MAXIMUM and are
+  REPORTED WITH RENDERS, not masked and not rows**: the 0.40 mm nib at PEBBLE 1.5 (19 / 0.5011), cup × curl at
+  1.5 on both patterns (1,588 / 0.2727, 1,298 / 0.2975). At the 0.4 mm default nothing measured folds but the
+  declared row. The default's neighbour clearance is 0.000 textured AND untextured (the accepted crossing).
+- Cost: the default 24,688 → **151,792** at PEBBLE 0.4; **40 × 3 whorls is 1,542,832 (102.9%) and REFUSES**.
+  The cap's three mechanisms are measured and NONE is picked (refuse as today; cap the head count — 38 of
+  40 fit at 3 whorls; coarsen the edge — 0.5 mm is the finest that fits). WAITING ON EVA.
+- Gates: TX0–TX8 in both STL gates, five witnessed apex mutants, panel route (ao) (THIRTY-TWO routes) with
+  the section's geometry witness, block 77 (19 rows, 1,525), smoke block 77, E carves relieved parts out BY
+  NAME, the texture sliders are `SCOPE_UNSCOPED`. `frozen/phase83` = the 1,506 rows at `56f91f4` (row-for-row `d60e734`'s); 0 frozen
+  rows name a texture id. Sheet: `node tools/shot-bloom-texture-t3.mjs` → `docs/img/bloom-texture-t3.png`;
+  `tools/bloom-texture-bead.mjs` and `tools/bloom-texture-corner.mjs` are the measurements.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
@@ -6613,7 +6647,7 @@ Sheet: `node tools/shot-bloom-node-laws.mjs <png>`.
 SHIPS OFF** (the umbel session, Oct 22 — Eva's rulings of Oct 21–22, the spider lily; read
 `docs/bloom-umbel-outcome.md` before touching `umbelKnot`, `umbelIsAbsent` / `umbelHeadIsAbsent`, `HUB_ABSENT`,
 `inflorescencePlan`'s umbel arm, the knot in `buildInflorescenceInto`, `headPresent` / `racemePresent`,
-`umbelClauses` (UM0–UM4) or block 77).
+`umbelClauses` (UM0–UM4) or block 78).
 - **The raceme was probed first and cannot do it**: `floretNodes 1` whorled is exactly three florets, 66 mm
   down (`LEAF_NODE_SOLO`), rooted in the wall, the head always on. UMBEL is a third TYPE of the one
   inflorescence plan — the floret build, the memo, the placement, the area rule and the reach inset are the
@@ -6631,13 +6665,14 @@ SHIPS OFF** (the umbel session, Oct 22 — Eva's rulings of Oct 21–22, the spi
   controls both ways. The PETAL controls stay visible and the Petal section's label says they shape the FLORETS.
 - **Found on main and fixed**: the `shown` record `fmt` reads never carried the inflorescence plan, so the Type
   read-out said "no stem to carry it" on every raceme and the gradient cap's hatch was never drawn.
-- `frozen/phase83` is the 1,506 rows at `e4ce6eb` (56f91f4 bloom-wise; its workflow files are main HEAD's).
+- `frozen/phase84` is the 1,525 rows at `89bb3bf` (T3 took block 77 and phase83 while this was in CI — phase83 is the same
+  1,506 rows the umbel first froze, so its copy was dropped and block, route and phase each moved up one).
 - **The florets of one umbel overlap by construction** (no internode): every row but the two-floret ones reads
   0.0000 mm floret-to-floret — declared by value in `INFLO_APPROACH_XFAIL` and in the combination gate's
   `umbel-florets-x-angle`, never clamped. ST9 names the knot by its own `triRange`.
 - Budget corner (12 x 12 petals x 1.00, head ON): 1,381,266 export tris, 92.1%, measured before building.
 - Gates: UM0–UM4 in both STL gates; four witnessed mutants in the apex table (`/^an umbel/` rows); panel route
-  (ao) (THIRTY-TWO routes); three combination pairs; block 77 (27 rows, 1,533), smoke block 77 (8, `--conn`).
+  (ap) (THIRTY-THREE routes); three combination pairs; block 78 (27 rows, 1,552), smoke block 78 (8, `--conn`).
   Sheet: `node tools/shot-bloom-umbel.mjs <dir> --png docs/img/umbel.png`.
 
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
@@ -11595,6 +11630,17 @@ trims between neighbouring joins and wraps through the seam; named ANCHORS are d
 registry; the interior is open / backed / recessed. Every arch row's SVG and STL is
 byte-identical to `e759041` (CI's `--base`). Read §7b of the charter before touching a closed
 skeleton. Sheet: `node tools/shot-frame-skeletons.mjs <dir>`.
+**Phase 3a (Oct 22): the SCROLL primitive (`frame-filigree.js`) — C and S scrolls by a
+curvature law, log-spiral volutes, groups of 2–5, swept by `bandSolid` — with the tightness range
+FITTED to each scroll (Eva's ruling: no dead travel; the volute's share rises to 0.8, then the
+range's top is the most that prints, told) and a half-round wire by default; ruling 5's clamps
+MEASURED (`tools/frame-fold-boundary.mjs`). Step 2 ATTACHES it: `withOrnament(model)` builds the
+groups in PRINT mm at the skeleton's right-hand anchors (crest, bottom, corners/springings,
+sides), seats each in the molding by the embed (no graze), mirrors to the bit, and adds wire
+bands to the SVG and wire solids to the STL; filigree off returns the model itself (77 of 77
+rows byte-identical to `e4ce6eb`). The FRAME's box sets the print scale (`frameBox`). Read §10 of
+the charter. Sheets: `node tools/shot-frame-scrolls.mjs <dir>`, `node
+tools/shot-frame-filigree.mjs <dir>`; gates SC1–SC7, OR1–OR6 and K5.
 
 ## `/marble` — the paper-marbling simulator (pointer only)
 

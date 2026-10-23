@@ -8,6 +8,7 @@ export const SECTIONS = [
   { id: 'skeleton', label: 'Skeleton', open: true },
   { id: 'molding', label: 'Molding', open: true },
   { id: 'shading', label: 'Shading', open: true },
+  { id: 'ornament', label: 'Ornament — filigree', open: false },
   { id: 'print', label: 'Print (relief STL)', open: true },
 ];
 
@@ -19,6 +20,8 @@ const isRect = (p) => p.skeleton === 'rect';
 const isOval = (p) => p.skeleton === 'oval';
 const hasMullions = (p) => isArch(p) && p.mullions > 0;
 const sizedCorner = (p) => isRect(p) && p.cornerTreatment !== 'mitre';
+const ornOn = (p) => p.filigree === 'scrolls';
+const ON_OFF = [['on', 'On'], ['off', 'Off']];
 
 export const PARAM_SPEC = [
   // --- 1. skeleton — three types feeding ONE sweep, ONE relief, ONE SVG
@@ -75,6 +78,26 @@ export const PARAM_SPEC = [
   // until the panel's Advanced toggle is on, and never a Standard control.
   R('crossHatchThreshold', 'shading', 'Cross-hatch above', 0, 1, 0.01, 0.7, '', null, 'advanced'),
 
+  // --- 3b. ornament — FILIGREE (phase 3a, step 2): scroll groups grown
+  //     from the skeleton's named anchors (ANCHORS below), built in PRINT
+  //     millimetres so the wire, every gap and every root embed meet the
+  //     MIN_FEATURE_MM floor. Off by default; every row below is hidden AND
+  //     inert while it is off. Read docs/frame-charter.md §10.
+  { id: 'filigree', section: 'ornament', label: 'Filigree', kind: 'choice', default: 'none',
+    options: [['none', 'None'], ['scrolls', 'Scrolls']] },
+  // scrolls in each group: a lead C and its children (1 = the lead alone)
+  R('ornDensity', 'ornament', 'Density (scrolls per group)', 1, 5, 1, 2, '', ornOn),
+  // the lead scroll's length, as a multiple of the molding width (the
+  // ornament keeps its proportion to the frame at any print size)
+  R('ornScale', 'ornament', 'Scale (× molding width)', 1, 6, 0.05, 2.5, '', ornOn),
+  R('ornTightness', 'ornament', 'Tightness', 0, 1, 0.01, 0.5, '', ornOn),
+  // the wire, in PRINT mm (a print feature: floored at MIN_FEATURE_MM)
+  R('ornWire', 'ornament', 'Wire (print)', 1, 3.2, 0.05, 1.6, 'mm', ornOn),
+  { id: 'ornCrest', section: 'ornament', label: 'Crest (top centre)', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },
+  { id: 'ornCorners', section: 'ornament', label: 'Corners / springings', kind: 'choice', default: 'on', visibleWhen: (p) => ornOn(p) && !isOval(p), options: ON_OFF },
+  { id: 'ornSides', section: 'ornament', label: 'Sides', kind: 'choice', default: 'off', visibleWhen: ornOn, options: ON_OFF },
+  { id: 'ornBottom', section: 'ornament', label: 'Bottom centre', kind: 'choice', default: 'off', visibleWhen: (p) => ornOn(p) && !(isArch(p) && p.sill === 'none'), options: ON_OFF },
+
   // --- 4. print — the relief STL, the PRIMARY output (phase 2, ruling 1).
   //     These reach the STL and the 3D view and never the SVG; the 2-D gate's
   //     pixel sweep skips this section and asserts the STL moves instead.
@@ -90,6 +113,11 @@ export const PARAM_SPEC = [
   // reads deeper by the difference (told when there is none).
   { id: 'lights', section: 'print', label: 'Interior', kind: 'choice', default: 'pierced',
     options: [['pierced', 'Open — pierced'], ['backed', 'Backed — a plate behind'], ['recessed', 'Recessed — a thin plate, set deep']] },
+  // the ornament's relief: reach the STL and never the SVG (the drawing
+  // shows a half-round wire's true section whatever is printed)
+  { id: 'ornShape', section: 'print', label: 'Ornament wire', kind: 'choice', default: 'half-round', visibleWhen: ornOn,
+    options: [['half-round', 'Half-round — flat back'], ['round', 'Round — on a wall']] },
+  R('ornProjection', 'print', 'Ornament relief (× wire)', 0.5, 3, 0.05, 1, '', ornOn),
 ];
 
 /* The minimum printable feature, in millimetres. AN ASSUMPTION: the print

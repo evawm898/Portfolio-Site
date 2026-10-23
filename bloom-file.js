@@ -372,7 +372,7 @@ const scopeable = new Set(SCOPEABLE_IDS);
 export function scopeOffsetRefusal(id, container) {
   const c = controlOf.get(id);
   if (!c) return 'not a control this page knows';
-  if (SCOPE_UNSCOPED.includes(id)) return 'never scoped — it is the material (Q3.6)';
+  if (SCOPE_UNSCOPED.includes(id)) return id === 'sheetThickness' ? 'never scoped — it is the material (Q3.6)' : 'never scoped — the texture is one field over the whole bloom (T3)';
   if (container === 'strands') return SCOPE_STRAND_IDS.includes(id) ? null : `only a strand's length, coil radius and turns are its own (${SCOPE_STRAND_IDS.join(' / ')}) — every other value is the bundle's`;
   if (container === 'tiers' ? scopeableTier.has(id) : scopeable.has(id)) return null;
   if (c.kind !== 'slider') return `a ${c.kind} has no offset`;
@@ -482,6 +482,12 @@ export function readDoc(obj) {
   const notes = [];
   const doc = { format: FORMAT, version: v, app: obj.app ?? null, savedAt: obj.savedAt ?? null };
   doc.controls = readControls(obj.controls, notes);
+  /* BOTH THE INFILL AND THE TEXTURE ON (T3, Q9): the page builds the infill and
+     REFUSES the texture, told on the read-out — this reader REPORTS it and picks
+     nothing: both values are applied as the file holds them. */
+  if (String(doc.controls.petalInfill) === 'VORONOI' && doc.controls.petalTexture !== undefined && String(doc.controls.petalTexture) !== 'NONE') {
+    notes.push(note('conflict', `controls: petalInfill is VORONOI AND petalTexture is ${JSON.stringify(doc.controls.petalTexture)} — the two are exclusive (Q9); both are applied as saved, the page builds the infill and leaves the texture unbuilt and says so. Set one of them to None.`));
+  }
   doc.overrides = readContainer(obj.overrides, 'overrides', SCOPE_CONTAINERS, notes);
   migrateRetiredRoles(doc, notes);
   doc.curves = readContainer(obj.curves, 'curves', CURVE_CONTAINERS, notes);

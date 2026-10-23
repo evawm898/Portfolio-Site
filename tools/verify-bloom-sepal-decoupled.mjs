@@ -50,7 +50,9 @@ const G = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href)
 const { DEFAULTS, CONTROLS } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
 const CONTROL = process.argv.includes('--control');
 
-const SHARED = new Set([...CONTROLS.filter((c) => c.section === 'thickness').map((c) => c.id), 'petalLength', 'petalWidth']);
+/* …and the SURFACE TEXTURE's three controls (T3): one world field over every sheet
+   by ruling, so a sepal carries the petals' relief by design (TX2 holds it). */
+const SHARED = new Set([...CONTROLS.filter((c) => c.section === 'thickness').map((c) => c.id), 'petalLength', 'petalWidth', 'petalTexture', 'textureHeight', 'textureSize']);
 const isPetalSide = (c) => !c.id.startsWith('sepal') && !SHARED.has(c.id);
 
 /* A whorl with sepals on it — so the base state's own ring exists to pin. */
@@ -104,7 +106,7 @@ for (const c of CONTROLS.filter(isPetalSide)) {
   }
 }
 console.log(`\nsepal decoupling — ${swept} non-sepal control values x 2 modes, ${ref.live.length.toLocaleString('en-US')} sepal floats a build (live), ring and slot pinned, angle ${ANGLE}, Object.is`);
-console.log(`  shared by declaration: ${[...SHARED].join(', ')} (the Part thickness section, read off the registry, and the size the sepal is a ruled fraction of)`);
+console.log(`  shared by declaration: ${[...SHARED].join(', ')} (the Part thickness section, read off the registry, the size the sepal is a ruled fraction of, and the one surface-texture field — T3)`);
 console.log(`  values that moved a sepal float: ${moved}`);
 for (const f of findings.slice(0, 14)) console.log(`    - ${f}`);
 if (findings.length > 14) console.log(`    … and ${findings.length - 14} more`);

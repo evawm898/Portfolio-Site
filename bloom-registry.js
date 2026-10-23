@@ -44,6 +44,7 @@ import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WA
   INFILL_RELAX_RANGE, INFILL_RELAX_DEFAULT, INFILL_LAW_RANGE, INFILL_LAW_STEP, INFILL_LAW_DEFAULT,
   INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT,
   INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
+import { TEXTURE_TYPES, TEXTURE_HEIGHT_RANGE, TEXTURE_HEIGHT_STEP, TEXTURE_HEIGHT_DEFAULT, TEXTURE_SIZE_RANGE, TEXTURE_SIZE_STEP, TEXTURE_SIZE_DEFAULT, TEXTURE_EDGE_MM, TEXTURE_LATTICE_BAR } from './bloom-geometry.js';
 import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE, STAMEN_COIL_RADIUS_RANGE, STAMEN_COIL_TURNS_RANGE, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_TURNS_DEFAULT } from './bloom-geometry.js';
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, sepalOutlineWidthScale, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE, SEPAL_TIER_RANGE, SEPAL_TIER_DEFAULT } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
@@ -839,6 +840,12 @@ export const PREDICATES = {
      so a choice is out of the blanket sweep BY CONSTRUCTION. */
   infillPresent: { all: [{ id: 'petalInfill', oneOf: ['VORONOI'] }] },
 
+  /* THE SURFACE TEXTURE'S ONE STATEMENT (T3) — the twin of the geometry's
+     `textureIsAbsent`, checked against it at harness load (the infill's
+     relation). ONE TERM: the guard is a CHOICE whose off value is NONE, so
+     the blanket sweep never reaches it and `ALL MAX` stays untextured. */
+  texturePresent: { all: [{ id: 'petalTexture', oneOf: ['PEBBLE', 'CELLULAR'] }] },
+
   /* THE STEM'S ONE STATEMENT (session 43, narrowed by the sphere-stem session).
      This is the twin of the geometry's `stemIsAbsent`: the registry HIDES the
      diameter on this condition and the geometry makes it INERT, and ST0
@@ -1357,6 +1364,11 @@ export const SECTIONS = [
      `parent` field to move. Both sections SAY why they are hidden. */
   { id: 'tube', label: 'Tube', open: false, parent: 'petal', hiddenReason: TUBE_UNAVAILABLE },
   { id: 'tubeFusion', label: 'Fusion', open: false, parent: 'tube', hiddenReason: TUBE_ALL_FREE },
+  /* THE SURFACE TEXTURE (T3) — a drop-down inside Petal, after the Tube and
+     its child (a nested section goes after its elder sibling's LAST
+     descendant). A PLACEMENT MADE WITHOUT A RULING: one `parent` field to
+     move. */
+  { id: 'texture', label: 'Texture', open: false, parent: 'petal' },
   /* HEAD (session 18, Eva Sep 5) — the shape of the junction the feet sit
      on: a CAP (flat at Head rise 0, a hemisphere at 1) or a full SPHERE.
      A NEW SECTION rather than a slider bolted onto Arrangement or a fifth
@@ -1663,6 +1675,12 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
   const used = new Set();
   for (const c of controls) {
     if (!c.section) bad.push(`control "${c.id}" declares no section`);
+    /* `enabledWhen` (T3) is the SECOND gating field, and a greyed control
+       says WHY on its read-out: a row that declares one owes a reason. */
+    if (c.enabledWhen !== undefined) {
+      if (typeof c.disabledReason !== 'function') bad.push(`control "${c.id}" declares \`enabledWhen\` with no \`disabledReason\` function — a greyed control says why`);
+      try { evalPredicate(c.enabledWhen, defaultsOf(controls)); } catch (e) { bad.push(`control "${c.id}"'s \`enabledWhen\` does not evaluate: ${e.message}`); }
+    }
     else if (!ids.has(c.section)) bad.push(`control "${c.id}" names section "${c.section}", which is not in SECTIONS`);
     else used.add(c.section);
     /* EVERY CONTROL CARRIES A `visibleWhen`, and "never gated" is the explicit
@@ -2403,6 +2421,18 @@ export const CONTROLS = [
       { value: 'VORONOI', label: 'Voronoi cells' },
     ],
     label: 'Infill',
+    /* TEXTURE AND INFILL ARE EXCLUSIVE (Q9, Oct 22): while the petals carry a
+       texture this control is GREYED OUT — disabled, still shown, its value
+       still read and saved — and never auto-switched. `enabledWhen` is the
+       registry's second gating field (beside `visibleWhen`), evaluated by
+       applyVisibility() and by nothing else; the reason is printed on the
+       read-out while it holds. */
+    /* A CONTROL ALREADY ON IS NEVER GREYED: a design saved with BOTH on
+       (reported on load, never silently picked) must leave each control
+       reachable so that one can be turned off — greying both would lock the
+       state in. So the infill greys only while it is NONE under a texture. */
+    enabledWhen: { any: [{ not: { ref: 'texturePresent' } }, { ref: 'infillPresent' }] },
+    disabledReason: () => 'greyed out: the petals carry a surface texture, and the two are exclusive (Q9) — set Texture to None to cut cells',
     fmt: (v, ui, shown) => {
       if (String(v) === 'NONE') return 'a solid blade — the sheet, with nothing cut out of it';
       const f = shown && shown.infill;
@@ -2572,6 +2602,61 @@ export const CONTROLS = [
        parking rather than deleting. */
     hiddenReason: 'parked — at 0 the cells start on the derived floor; the solid base comes from INFILL_BASE_NARROW and the basal V, neither a control',
     tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'infillPresent' }, { any: [] }] } },
+
+  /* ===================================================================
+     THE SURFACE TEXTURE — T3 (docs/bloom-surface-texture-t3-outcome.md).
+     THE GUARD IS A CHOICE (the infill's precedent, derived here from it):
+     `SWEEPABLE` filters `SLIDERS()`, so the blanket sweep cannot reach it
+     and `ALL MAX` stays untextured; the two sliders below are hidden at the
+     guard and out of the sweep through the harness's derived `TEXTURE_SUBS`.
+     EVERY RANGE IS IMPORTED (Q6's discipline): the geometry owns what a
+     texture can be. Non-directional patterns only (Q6 of the texture doc —
+     no ribbing in T3). The relief runs over the rim bead (Q4/Q5), and the
+     height is PEAK-TO-VALLEY (Q2). The infill greys this control out while it
+     is on (Q9), and this one greys the infill out.
+     =================================================================== */
+  { id: 'petalTexture', section: 'texture', kind: 'choice', default: 'NONE',
+    options: [
+      { value: 'NONE', label: 'None (a smooth sheet)' },
+      { value: 'PEBBLE', label: 'Pebble' },
+      { value: 'CELLULAR', label: 'Cellular' },
+    ],
+    label: 'Texture',
+    enabledWhen: { any: [{ not: { ref: 'infillPresent' } }, { ref: 'texturePresent' }] },   // never greyed while ON (see petalInfill)
+    disabledReason: () => 'greyed out: the petals are infilled, and the two are exclusive (Q9) — set Infill to None to texture the sheet',
+    fmt: (v, ui, shown) => {
+      if (String(v) === 'NONE') return 'a smooth sheet — no relief';
+      const T = shown && shown.texture;
+      const word = String(v) === 'PEBBLE' ? 'pebble' : 'cellular';
+      if (!T) return `${word} relief over the petals, sepals and leaves — not built on this blade`;
+      if (T.refused === 'infill') return `${word} — NOT BUILT: the petals are infilled, and texture and infill are exclusive (Q9); told, not picked`;
+      const o = T.organs || {};
+      const parts = Object.entries(o).map(([k, q]) => `${k}${q.refused && Object.keys(q.refused).length ? ` (${Object.entries(q.refused).map(([w, n]) => `${n} refused: ${w}`).join(', ')})` : ''}`);
+      const skin = Object.values(o).reduce((a, q) => a + q.skinTris, 0), floor = Object.values(o).reduce((a, q) => a + q.floorTris, 0);
+      return `${word} relief over ${parts.join(', ') || 'no sheet'} — outward only, ${T.heightMm.toFixed(2)} mm peak to valley on a ${T.edgeMm.toFixed(1)} mm lattice (skin ${skin} tris, ${floor ? (skin / floor).toFixed(2) : '—'}x its floor; the hub, stem, rods and tube ring stay smooth)`;
+    },
+    tier: 'standard', role: 'petal', visibleWhen: { all: [] } },
+  /* THE HEIGHT: PEAK-TO-VALLEY (Q2), its MINIMUM Eva's 0.4 mm floor (Q13),
+     UNVALIDATED — nothing has been printed. The default is the floor (ruling
+     3: never a default that assumes it prints). */
+  { id: 'textureHeight', section: 'texture', kind: 'slider',
+    min: TEXTURE_HEIGHT_RANGE[0], max: TEXTURE_HEIGHT_RANGE[1], step: TEXTURE_HEIGHT_STEP, default: TEXTURE_HEIGHT_DEFAULT,
+    label: 'Relief height',
+    fmt: (v, ui, shown) => {
+      const h = Number(v);
+      const T = shown && shown.texture;
+      const floor = h <= TEXTURE_HEIGHT_RANGE[0] + 1e-9 ? ' — the floor, an unvalidated guess at what SLS resolves' : '';
+      if (!T || T.refused) return `${h.toFixed(2)} mm peak to valley${floor}`;
+      const mx = Math.max(0, ...Object.values(T.organs || {}).map((q) => q.reliefMaxMm));
+      return `${h.toFixed(2)} mm peak to valley${floor} · the sheet stands up to ${mx.toFixed(3)} mm proud, never thinner`;
+    },
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'texturePresent' } },
+  /* THE FEATURE SIZE: its floor is four lattice edges (λ >= 4e, §10 T3). */
+  { id: 'textureSize', section: 'texture', kind: 'slider',
+    min: TEXTURE_SIZE_RANGE[0], max: TEXTURE_SIZE_RANGE[1], step: TEXTURE_SIZE_STEP, default: TEXTURE_SIZE_DEFAULT,
+    label: 'Feature size',
+    fmt: (v) => `${Number(v).toFixed(1)} mm features on a ${TEXTURE_EDGE_MM.toFixed(1)} mm lattice (${(Number(v) / TEXTURE_EDGE_MM).toFixed(1)} edges across one)`,
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'texturePresent' } },
 
   /* THE TUBE — one slider per whorl (Eva's ruling: per layer), stepped over
      0 (the full TUBE), the divisors of the petal count, and the count itself
