@@ -2037,13 +2037,13 @@ This block is generated — `python tests/app_path_scorecard.py
 | fixture | areas | WPI true | WPI app | W err | W status | W per-area | CPI true | CPI app | C err | C status | C per-area |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | jersey | 2 | 5.00 | 4.72 | -5.5% | confident | u u | 7.20 | 6.74 | -6.4% | confident | C C |
-| teal | 3 | 4.00 | 3.56 | **-11.0%** | confident | u u u | 5.00 | 5.03 | +0.5% | confident | C C C |
-| knit_01 | 2 | 3.80 | 3.93 | +3.4% | confident | u u | 5.70 | 5.95 | +4.3% | confident | C C |
-| knit_02 | 0 (no proposals) | 4.00 | — | — | — | — | — | — | no truth | — | — |
-| knit_05 | 0 (no proposals) | 4.70 | — | — | — | — | 6.70 | — | — | — | — |
-| knit_06 | 3 | 3.80 | 3.64 | -4.3% | confident | u u u | 5.20 | 5.22 | +0.4% | confident | C C C |
-| knit_08 | 4 | 4.50 | 4.44 | -1.4% | confident | u u u u | 6.90 | 7.06 | +2.3% | uncertain | C C C C |
-| knit_09 | 4 | 5.10 | 5.05 | -0.9% | confident | u C u C | 7.60 | 7.60 | -0.0% | confident | C C C C |
+| teal | 4 | 4.00 | 3.48 | **-13.0%** | confident | u u u u | 5.00 | 4.97 | -0.6% | confident | C C C C |
+| knit_01 | 3 | 3.80 | 3.73 | -1.9% | confident | u u u | 5.70 | 3.98 | -30.2% | uncertain | C u C |
+| knit_02 | 4 | 4.00 | 3.90 | -2.4% | confident | u u u u | — | — | no truth | — | — |
+| knit_05 | 4 | 4.70 | 4.81 | +2.4% | confident | u u u u | 6.70 | 6.31 | -5.8% | confident | C C C C |
+| knit_06 | 4 | 3.80 | 3.64 | -4.3% | confident | C u u u | 5.20 | 5.30 | +2.0% | confident | C C C C |
+| knit_08 | 2 | 4.50 | 4.70 | +4.5% | confident | u u | 6.90 | 6.74 | -2.3% | confident | C C |
+| knit_09 | 3 | 5.10 | 4.97 | -2.5% | confident | u C C | 7.60 | 7.53 | -0.9% | confident | C C C |
 | synth_jersey | 3 | 5.00 | 5.01 | +0.2% | confident | u C C | 7.00 | 7.00 | +0.1% | confident | C C C |
 | synth_garter | 3 | 5.00 | 5.00 | +0.0% | confident | u u u | 7.00 | 7.01 | +0.1% | confident | C C C |
 | synth_rib | 3 | 5.00 | 2.50 | +0.0% (alt) | confident | u C C | 7.00 | 7.00 | +0.1% | confident | C C C |
@@ -2067,13 +2067,13 @@ This block is generated — `python tests/app_path_scorecard.py
 | fixture | areas | WPI true | WPI app | W err | W status | W per-area | CPI true | CPI app | C err | C status | C per-area |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | jersey | 2 | 5.00 | 4.69 | -6.2% | confident | u u | 7.20 | 6.72 | -6.7% | confident | C C |
-| teal | 3 (manual) | 4.00 | 3.56 | **-11.0%** | confident | u u u | 5.00 | 5.03 | +0.5% | confident | C C C |
-| knit_01 | 3 | 3.80 | 4.04 | +6.3% | confident | u u u | 5.70 | 5.81 | +2.0% | uncertain | C u C |
-| knit_02 | 0 (no proposals) (manual) | 4.00 | — | — | — | — | — | — | no truth | — | — |
-| knit_05 | 0 (no proposals) (manual) | 4.70 | — | — | — | — | 6.70 | — | — | — | — |
-| knit_06 | 3 (manual) | 3.80 | 3.64 | -4.3% | confident | u u u | 5.20 | 5.22 | +0.4% | confident | C C C |
-| knit_08 | 4 (manual) | 4.50 | 4.44 | -1.4% | confident | u u u u | 6.90 | 7.06 | +2.3% | uncertain | C C C C |
-| knit_09 | 4 (manual) | 5.10 | 5.05 | -0.9% | confident | u C u C | 7.60 | 7.60 | -0.0% | confident | C C C C |
+| teal | 4 (manual) | 4.00 | 3.48 | **-13.0%** | confident | u u u u | 5.00 | 4.97 | -0.6% | confident | C C C C |
+| knit_01 | 4 | 3.80 | 3.90 | +2.8% | confident | u u u u | 5.70 | 5.97 | +4.7% | confident | C u C C |
+| knit_02 | 4 (manual) | 4.00 | 3.90 | -2.4% | confident | u u u u | — | — | no truth | — | — |
+| knit_05 | 4 (manual) | 4.70 | 4.81 | +2.4% | confident | u u u u | 6.70 | 6.31 | -5.8% | confident | C C C C |
+| knit_06 | 4 (manual) | 3.80 | 3.64 | -4.3% | confident | C u u u | 5.20 | 5.30 | +2.0% | confident | C C C C |
+| knit_08 | 2 (manual) | 4.50 | 4.70 | +4.5% | confident | u u | 6.90 | 6.74 | -2.3% | confident | C C |
+| knit_09 | 3 (manual) | 5.10 | 4.97 | -2.5% | confident | u C C | 7.60 | 7.53 | -0.9% | confident | C C C |
 | synth_jersey | 3 (manual) | 5.00 | 5.01 | +0.2% | confident | u C C | 7.00 | 7.00 | +0.1% | confident | C C C |
 | synth_garter | 3 (manual) | 5.00 | 5.00 | +0.0% | confident | u u u | 7.00 | 7.01 | +0.1% | confident | C C C |
 | synth_rib | 3 (manual) | 5.00 | 2.50 | +0.0% (alt) | confident | u C C | 7.00 | 7.00 | +0.1% | confident | C C C |
@@ -2084,26 +2084,53 @@ This block is generated — `python tests/app_path_scorecard.py
 |---|---|---|---|---|---|---|---|---|---|---|
 | jersey | wale | 4.72 | confident | 4.66 (-1%) | 4.66 (-1%) | 4.70 (-1%) | 4.82 (+2%) | 4.83 (+2%) | 4.71 (-0%) | stable |
 | jersey | course | 6.74 | confident | 6.49 (-4%) | 6.49 (-4%) | 6.74 (-0%) | 6.87 (+2%) | 6.84 (+1%) | 6.88 (+2%) | stable |
-| teal | wale | 3.56 | confident | 3.42 (-4%) | 3.47 (-2%) | 3.62 (+2%) | 3.58 (+1%) | 3.50 (-1%) | 3.62 (+2%) | stable |
-| teal | course | 5.03 | confident | 5.01 (-0%) | 5.07 (+1%) | 4.87 (-3%) | 5.14 (+2%) | 5.26 (+5%) | 5.33 (+6%) | stable |
-| knit_01 | wale | 3.93 | confident | 3.88 (-1%) | 4.10 (+4%) | 3.91 (-0%) | 3.82 (-3%) | 3.94 (+0%) | 4.09 (+4%) | stable |
-| knit_01 | course | 5.95 | confident | 3.88 (**-35%**) | 3.95 (**-34%**) **uncertain** | 5.66 (-5%) | 4.01 (**-33%**) **uncertain** | 5.70 (-4%) | 5.83 (-2%) | UNSTABLE |
-| knit_02 | wale | no result | — | no result | no result | no result | no result | no result | no result | stable |
-| knit_02 | course | no result | — | no result | no result | no result | no result | no result | no result | stable |
-| knit_05 | wale | no result | — | no result | no result | no result | no result | no result | no result | stable |
-| knit_05 | course | no result | — | no result | no result | no result | no result | no result | no result | stable |
-| knit_06 | wale | 3.64 | confident | 3.56 (-2%) | 3.60 (-1%) | 3.71 (+2%) | 3.53 (-3%) | 3.62 (-0%) | 3.70 (+2%) | stable |
-| knit_06 | course | 5.64 | confident | 5.44 (-4%) | 5.51 (-2%) | 5.44 (-4%) | 5.65 (+0%) | 5.68 (+1%) | 5.73 (+2%) | stable |
-| knit_08 | wale | 4.44 | confident | 4.82 (+9%) | 4.54 (+2%) | 4.62 (+4%) | 4.24 (-4%) **uncertain** | 4.85 (+9%) | 4.80 (+8%) **uncertain** | UNSTABLE |
-| knit_08 | course | 7.06 | uncertain | 6.73 (-5%) | 6.90 (-2%) **confident** | 7.13 (+1%) | 6.50 (-8%) | 6.87 (-3%) **confident** | 6.71 (-5%) **confident** | UNSTABLE |
-| knit_09 | wale | 5.05 | confident | 4.95 (-2%) | 5.00 (-1%) | 5.03 (-0%) | 5.00 (-1%) | 5.11 (+1%) | 5.16 (+2%) | stable |
-| knit_09 | course | 7.60 | confident | 7.43 (-2%) | 7.52 (-1%) | 7.57 (-0%) | 7.64 (+1%) | 7.67 (+1%) | 7.75 (+2%) | stable |
+| teal | wale | 3.48 | confident | 3.46 (-1%) | 3.46 (-1%) | 3.46 (-1%) | 3.58 (+3%) | 3.50 (+1%) | 3.55 (+2%) | stable |
+| teal | course | 4.97 | confident | 5.01 (+1%) | 5.07 (+2%) | 4.97 (-0%) | 5.13 (+3%) | 5.26 (+6%) | 5.19 (+4%) | stable |
+| knit_01 | wale | 3.73 | confident | 3.98 (+7%) | 3.97 (+7%) | 3.86 (+4%) | 3.92 (+5%) | 4.12 (+10%) | 4.33 (+16%) | stable |
+| knit_01 | course | 3.98 | uncertain | 3.91 (-2%) | 5.60 (**+41%**) **confident** | 2.77 (**-30%**) **confident** | 5.21 (**+31%**) **confident** | 5.63 (**+42%**) **confident** | 4.07 (+2%) | UNSTABLE |
+| knit_02 | wale | 3.90 | confident | 3.88 (-1%) | 4.14 (+6%) | 3.74 (-4%) | 3.77 (-3%) | 3.79 (-3%) | 4.13 (+6%) | stable |
+| knit_02 | course | 6.05 | confident | 5.92 (-2%) | 5.93 (-2%) | 6.02 (-0%) | 6.20 (+3%) | 6.10 (+1%) | 5.86 (-3%) | stable |
+| knit_05 | wale | 4.81 | confident | 4.74 (-1%) | 4.69 (-3%) | 4.79 (-0%) | 4.84 (+1%) | 4.90 (+2%) | 5.04 (+5%) | stable |
+| knit_05 | course | 6.31 | confident | 6.15 (-3%) | 6.41 (+2%) | 6.38 (+1%) | 6.39 (+1%) | 6.46 (+2%) | 6.53 (+3%) | stable |
+| knit_06 | wale | 3.64 | confident | 3.66 (+1%) | 3.69 (+2%) | 3.62 (-0%) | 3.69 (+1%) | 3.76 (+3%) | 3.80 (+4%) | stable |
+| knit_06 | course | 5.73 | confident | 5.60 (-2%) | 5.54 (-3%) | 5.54 (-3%) | 5.52 (-4%) | 5.77 (+1%) | 5.73 (+0%) | stable |
+| knit_08 | wale | 4.70 | confident | 4.59 (-2%) | 4.69 (-0%) | 4.69 (-0%) | 4.72 (+1%) | 4.75 (+1%) | 5.02 (+7%) | stable |
+| knit_08 | course | 6.74 | confident | 6.56 (-3%) | 6.67 (-1%) | 6.71 (-0%) | 6.77 (+1%) | 6.92 (+3%) | 7.61 (+13%) | stable |
+| knit_09 | wale | 4.97 | confident | 4.95 (-0%) | 5.00 (+1%) | 5.03 (+1%) | 5.01 (+1%) | 5.11 (+3%) | 5.16 (+4%) | stable |
+| knit_09 | course | 7.53 | confident | 7.43 (-1%) | 7.49 (-1%) | 7.53 (-0%) | 7.64 (+1%) | 7.57 (+1%) | 7.83 (+4%) | stable |
 | synth_jersey | wale | 5.01 | confident | 4.90 (-2%) | 4.95 (-1%) | 4.97 (-1%) | 5.03 (+0%) | 5.05 (+1%) | 5.10 (+2%) | stable |
 | synth_jersey | course | 7.00 | confident | 6.85 (-2%) | 6.92 (-1%) | 6.97 (-0%) | 7.04 (+0%) | 7.07 (+1%) | 7.14 (+2%) | stable |
 | synth_garter | wale | 5.00 | confident | 4.90 (-2%) | 4.95 (-1%) | 4.97 (-1%) | 5.03 (+1%) | 5.05 (+1%) | 5.10 (+2%) | stable |
 | synth_garter | course | 7.00 | confident | 6.88 (-2%) | 6.95 (-1%) | 6.97 (-0%) | 7.04 (+0%) | 7.07 (+1%) | 7.17 (+2%) | stable |
 | synth_rib | wale | 2.50 | confident | 2.45 (-2%) | 2.48 (-1%) | 2.49 (-1%) | 2.51 (+0%) | 2.52 (+1%) | 2.55 (+2%) | stable |
 | synth_rib | course | 7.00 | confident | 6.85 (-2%) | 6.93 (-1%) | 6.97 (-0%) | 7.04 (+0%) | 7.07 (+1%) | 7.14 (+2%) | stable |
+
+**Resolution invariance** (each photo resampled to 0.5×, 1× and 2× of its own resolution -- INTER_AREA down, INTER_CUBIC up -- and calibrated correctly for that resolution; each cell is areas · per-inch · error · status; spread is the largest disagreement between two resolutions' readings, which must be within 10% or carry an `uncertain` status)
+
+| fixture | axis | 0.5× | 1× | 2× | spread | verdict |
+|---|---|---|---|---|---|---|
+| jersey | wale | 4 · 4.71 -5.9% C | 2 · 4.72 -5.5% C | 2 · 4.72 -5.5% C | 0.4% | agree |
+| jersey | course | 4 · 6.80 -5.5% C | 2 · 6.74 -6.4% C | 2 · 6.76 -6.2% C | 0.9% | agree |
+| teal | wale | 2 · 3.50 **-12.6%** C | 4 · 3.48 **-13.0%** C | 4 · 3.43 **-14.2%** C | 1.9% | agree |
+| teal | course | 2 · 5.18 +3.7% C | 4 · 4.97 -0.6% C | 4 · 5.27 +5.4% C | 6.0% | agree |
+| knit_01 | wale | 4 · 3.96 +4.3% C | 3 · 3.73 -1.9% C | 4 · 3.92 +3.1% C | 6.3% | agree |
+| knit_01 | course | 4 · 5.70 +0.0% C | 3 · 3.98 -30.2% u | 4 · 5.91 +3.7% C | 48.5% | flagged |
+| knit_02 | wale | 4 · 3.80 -4.9% C | 4 · 3.90 -2.4% C | 4 areas, no measurement | — | MISSING |
+| knit_02 | course | 4 areas, no truth | 4 areas, no truth | 4 areas, no truth | 4985.3% | **DISAGREE** |
+| knit_05 | wale | 4 · 4.78 +1.6% C | 4 · 4.81 +2.4% C | 4 · 4.85 +3.3% C | 1.6% | agree |
+| knit_05 | course | 4 · 6.43 -4.1% C | 4 · 6.31 -5.8% C | 4 · 6.36 -5.0% C | 1.9% | agree |
+| knit_06 | wale | 4 · 3.66 -3.7% C | 4 · 3.64 -4.3% C | 4 · 3.64 -4.3% C | 0.6% | agree |
+| knit_06 | course | 4 · 5.20 -0.1% C | 4 · 5.30 +2.0% C | 4 · 5.26 +1.2% C | 2.1% | agree |
+| knit_08 | wale | 4 · 4.87 +8.3% C | 2 · 4.70 +4.5% C | 2 · 4.95 **+10.1%** C | 5.4% | agree |
+| knit_08 | course | 4 · 7.33 +6.2% C | 2 · 6.74 -2.3% C | 2 · 6.56 -4.9% C | 11.8% | **DISAGREE** |
+| knit_09 | wale | 3 · 4.92 -3.5% C | 3 · 4.97 -2.5% C | 3 · 5.01 -1.7% C | 1.9% | agree |
+| knit_09 | course | 3 · 7.46 -1.8% C | 3 · 7.53 -0.9% C | 3 · 7.64 +0.6% C | 2.4% | agree |
+| synth_jersey | wale | 3 · 5.00 +0.0% C | 3 · 5.01 +0.2% C | 3 · 5.05 +0.9% C | 0.9% | agree |
+| synth_jersey | course | 3 · 7.00 +0.1% C | 3 · 7.00 +0.1% C | 3 · 7.00 +0.1% C | 0.0% | agree |
+| synth_garter | wale | 3 · 5.00 +0.0% C | 3 · 5.00 +0.0% C | 3 · 5.00 +0.0% C | 0.0% | agree |
+| synth_garter | course | 3 · 7.00 +0.1% C | 3 · 7.01 +0.1% C | 3 · 7.00 +0.1% C | 0.0% | agree |
+| synth_rib | wale | 3 · 2.50 +0.0% (alt) C | 3 · 2.50 +0.0% (alt) C | 3 · 2.50 +0.0% (alt) C | 0.0% | agree |
+| synth_rib | course | 3 · 7.00 +0.1% C | 3 · 7.00 +0.1% C | 3 · 7.00 +0.1% C | 0.0% | agree |
 <!-- app-path-scorecard:end -->
 
 **Metamorphic invariants, every real fixture** — the CLI's default ROI
@@ -3196,6 +3223,322 @@ detector's result; the unit vocabulary lifted to constants, behaviour unchanged)
 scorecard harness and its pins, and `tests/test_ruler_prefill_gate.py` (each check
 fires alone — six mutants of the gate, one per check, each turn exactly the matching
 tests red).
+
+### Phone-resolution photos: the ROI proposer at one working resolution, and the course loop-center pitch may corroborate, never override by a harmonic (2026-10-23)
+
+Two mechanisms landed together (Eva's ruling of Oct 22: park the proposer fix, build the
+measurement fix on top, land both). Both are measured on `tests/app_path_scorecard.py`'s
+app path -- `/propose-rois`, every area accepted, `/analyze-multi` -- at the correct scale,
+under ±0.5/1/2% scale jitter, and at 0.5× / 1× / 2× of each photo's own resolution.
+
+#### 1. The proposer: a 16 px fabric filter and its 97% requirement (PARKED, now shipped)
+
+`_fabric_mask` marks a pixel "fabric" when the local std-dev over a **16 px** box
+(`ROI_PROPOSAL_BACKGROUND_BLOCK_PX`) is at least 10 grey levels, and a candidate window had to
+be **≥ 97%** fabric (`ROI_PROPOSAL_MIN_FABRIC_FRACTION`) before it was even scored -- fixed
+PIXEL quantities tuned on ~170-350 px/in photos. On a fine photo a 16 px block sits inside one
+smooth yarn strand, its std-dev falls under the floor, real fabric reads as background, and
+every window at every size is rejected before scoring: the app proposed NOTHING. Measured at
+native resolution, 1-inch windows on the proposer's own grid: knit_02 (1187 px/in) **0 of 28**
+windows pass, knit_05 (320 px/in) **0 of 210** (fabric fraction median 0.40 and 0.78); the
+same windows at 180 px/in pass 5 of 28 and 95 of 210. The anomaly baseline's 16 px block, the
+Laplacian sharpness ceiling, `MIN_PLAUSIBLE_SPACING_PX` and the quadrant split's 20 px minimum
+are the same class of constant, which is why the fix normalises the IMAGE rather than retuning
+one number.
+
+`propose_measurement_rois` is now a resolution-normalising front door onto
+`_propose_measurement_rois_at_scale`: a photo finer than
+`ROI_PROPOSAL_WORKING_PX_PER_INCH = 180` is downsampled (INTER_AREA) **for proposal only**, the
+windows are chosen there and mapped back to the full-resolution image, which is what analysis
+reads, untouched. A coarser photo is never upsampled (there is nothing finer to recover, and an
+upscale re-creates the smooth-strand problem). **Why 180:** it is the synthetic fixtures' own
+scale (their 1× rows take the untouched path), it is the coarsest value at which every
+ground-truth fixture is proposed at 0.5×, 1× and 2×, and at 200 the 2×-upscaled synthetic
+garter loses its proposals again (3 → 0 areas). **Why not 160:** at 160 one resolution table
+cell reads better -- knit_05 course at 1× becomes −2.0% uncertain instead of +87.3% confident --
+and that cell is a trap: the same fixture still read +91.0% confident at 0.5× and at 2×, so the
+"improvement" was the proposer landing its windows a few pixels elsewhere on a photo where a
+one-pixel move of the area flipped the course reading between the pitch and its half (§2).
+Choosing the working scale for a lucky placement on a ground-truth fixture is tuning the
+instrument to the test set; 180 is chosen on a property and left the knit_05 defect visible,
+which is what §2 fixes. **Do not move `ROI_PROPOSAL_WORKING_PX_PER_INCH` to rescue a reading.**
+
+**The proposer's fixed-pixel constants, audited at the working scale** (Eva's ruling on the
+first cut, which had re-run `tests/test_roi_proposal.py::test_proposed_regions_avoid_a_ruler_like_block`
+red: the proposer's own ruler-avoidance test, a 203 px/in synthetic that the front door now
+downsamples to 180, chose a 3-inch window dipping 18 px into the ruler band). Each constant
+below is reasoned from the scale (7.09 px/mm at 180 px/in) and the span it was tuned over, never
+from the test; the test then passes unmodified.
+
+| constant | at 180 px/in | why it stands or moves |
+|---|---|---|
+| `ROI_PROPOSAL_BACKGROUND_BLOCK_PX` / `ROI_PROPOSAL_ANOMALY_BLOCK_PX` = 16 px | 2.26 mm | the anomaly gate's 0.5 fraction, 4-MAD multiplier and 10-grey-level fabric floor were swept on the jersey at 166 px/in (16 px = 2.45 mm) and the teal at 273 (1.49 mm); 2.26 mm is inside that span. **Unchanged.** |
+| minimum sizes: 20 px half-crop in `_periodicity_consistency_score`, 4 blocks in `_local_anomaly_fraction`, `MIN_ROI_DIM_PX * 2` | 5.6 / 9.0 / 11.3 mm | all well under the smallest window tried (0.75 in = 135 px). **Unchanged.** |
+| kernels: 3×3 Gaussian and Sobel (`_enhance_texture`), `SMOOTHING_WINDOW_PX` 3, `MIN_PLAUSIBLE_SPACING_PX` 3; CLAHE 8×8 and the 4×4 texture grid | 0.42 mm (60 repeats/in); counts | the analyser's own primitives, finer than any knit; the grids are counts, not pixels. **Unchanged.** |
+| the sharpness ceiling, Laplacian variance / 500 | — | **no value is consistent at any scale; replaced by the photo's own baseline** (below). |
+
+The ceiling is the one that broke, and the reason is a measurement rather than a retune. The
+variance of the Laplacian has no fixed-pixel meaning across scales: on a textile photo it is
+dominated by sensor noise, JPEG blocking and in-camera sharpening, which no resampling law
+predicts. On the eight real fixtures' KNOWN-CLEAN pinned crops, native → the 180 px/in working
+copy (INTER_AREA), it reads knit_09 1019 → 453 at a resample factor of 0.963, knit_05 193 → 96,
+knit_01 1445 → 1099, knit_08 1016 → 715, knit_06 879 → **1355 (up)**, knit_02 144 → **608 (up
+4.2× at a factor of 0.152)**, against the s⁴ a smooth texture would follow (0.001 .. 0.86 over
+the same rows). Clean fabric at the working scale therefore spans **96 .. 1355**, so no number
+typed at 180 px/in is "the level sharp fabric reaches": whichever it is, some clean photo sits
+under it, and on that photo any window borrowing a strip of ruler -- whose print reads
+5,000-7,000 at the working scale, above fabric at every scale -- wins the sharpness term
+outright. That is exactly how the regression entered: the synthetic's 711 at native was pixel
+noise (σ 6 white noise through the 3×3 Laplacian is 720 by arithmetic), INTER_AREA averaged it
+to 265, under the 500 ceiling (sharpness 0.53), while the ruler strip's hard edges kept the
+dipping window at 1.0, and 0.47 × the 0.15 weight outranked the clean windows' better texture
+consistency. At native scale both saturated at 1.0 and the term never decided anything.
+
+So the production ceiling is now **the photo's own clean-fabric level**, `_global_sharpness_
+baseline`: the median per-16-px-block Laplacian variance over the blocks `_fabric_mask` already
+calls textured, computed once per proposal run at the scale the proposer runs at -- the same
+construction as the anomaly gate's `_global_local_std_baseline`, and a median for the same
+reason (a ruler band a sixth of the photo at twenty times fabric's variance cannot move it; a
+mean would be dragged to a level no fabric window reaches). A window at that level is as sharp
+as this fabric gets (1.0); under it is softer than the fabric around it (defocus, a curled edge);
+above it is sharper than fabric can be -- a ruler, a label -- and is capped, never rewarded. The
+old 500 survives as `ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING`, reached only by a caller with no
+photo to measure (the unit tests score single crops) or a photo with under five textured blocks.
+Measured on the real fixtures at the working scale, the proposer's chosen windows read 0.96-1.55
+of their photo's baseline (every one saturates but knit_08's first area at 0.96); on the ruler
+synthetic the clean windows read 265 against a baseline of 267 (1.0) and the dipping window 796
+(capped at 1.0), so the ranking falls to texture consistency, 0.998 against 0.888, and the four
+proposals end at or above y 628, 1055 and 841 against the ruler's 1250. `ProposedRoi.sharpness`
+is relative to the photo from here on.
+
+The proposer is 2-12× faster on large photos (it scans a ≤180 px/in copy). The whole request
+is SLOWER wherever areas now exist that did not before, because every area is analysed at full
+resolution (§4).
+
+#### 2. The course axis: a loop-center pitch that matches no candidate is not evidence (THE MEASUREMENT FIX)
+
+**The failure, measured through the API on knit_05 once the proposer offered it areas** (320
+px/in, true course pitch 320 / 6.7 = 47.8 px): the course consensus read **+87.3% confident**
+at 1× (+91.0% at 0.5×, −5.0% uncertain at 2×). Two of its four 2-inch areas read a 25.5 px
+sub-feature and two the ~50 px row pitch, and the same 640 px window moved ONE pixel right and
+down flipped 25.5 ↔ 50.6, both confident.
+
+**The diagnosis, per window.** The course SEED was right on every window: `_autocorrelation_
+spacing` lands on 50-51 px (on window A it lands on 101 and the sub-repeat test descends it to
+51, as designed). What halved it is the loop-center reconciliation. `_detect_loop_centers` runs
+at a minimum separation of `0.3 × min(p0_wale, p0_course)` -- on knit_05 **9.9 px**, because the
+raw wale seed is the 33 px leg lattice -- and finds **~1,250 "centers" in a window that holds
+~125 loops**. Their nearest-neighbour pitch along the course axis is **15.0 px** on every window
+(≈1.5× the detector's own floor: the detector reading its own minimum separation, not a loop
+pitch), and its consistency is **0.496-0.512** against `MIN_CENTER_CONSISTENCY = 0.5` -- so
+whether that pitch was TRUSTED at all is decided by the last bit of a one-pixel window move.
+Where it was trusted, `_reconcile_period` took "the candidate nearest the loop-center pitch on a
+log scale" from {25.5, 51, 102} with no agreement tolerance: 25.5 is 1.70× away from 15.0, 51
+is 3.4×, so 25.5 "wins" and the correct seed is "corrected down to match loop-center spacing".
+Where the pitch was not trusted, the seed stood and read right.
+
+This is NOT the course-axis twin of the wale leg / half-period ambiguity (#338, #441): there the
+SEED lands on a genuine periodic structure at T/2 (the leg lattice) and the fix is a second
+discriminator (the leg-slant signal, the sub-repeat walk). Here the seed is right, the sub-repeat
+test already did its job, and what overrode it is a structural cross-check reading a quantity
+with no loop information in it. It IS the course-axis twin of #441 in shape: an independent
+"structural" estimate replaced the periodicity reading across a harmonic. The course path had
+no equivalent of #441's corroboration rule -- the v3 scorer the WALE axis uses applies
+`HARMONIC_MATCH_LOG_TOLERANCE` (~1.4×) in `_center_pitch_agreement`; the course path's
+`_reconcile_period` applied none. The template walk cannot stand in for it: at 25.5 px it reads
+0.64 (positive) on knit_05, so a walk-gated descent would still halve it.
+
+**The fix (one mechanism, `_reconcile_period`'s `center_log_tolerance`, passed by
+`_analyze_direction` as `HARMONIC_MATCH_LOG_TOLERANCE`, the one owner the wale axis already
+uses):** the loop-center pitch may CORROBORATE a member of the 0.5×/1×/2× family -- pick the one
+it agrees with within ~1.4× -- and a pitch further than that from EVERY candidate is set aside,
+for the period AND for the overlay positions, exactly as if none had been offered; the decision
+says so (`center_pitch_used = False`, a reason naming the pitch, the nearest candidate and the
+ratio). An agreeing pitch corrects a doubled or halved seed exactly as before. `_reconcile_
+period` called with no tolerance keeps its original contract (nearest candidate whatever the
+distance), which `tests/test_loop_center_reconciliation.py` pins; every production call goes
+through `_analyze_direction` and carries the tolerance. `tests/test_course_center_pitch_gate.py`
+(13 tests) pins the gate, the must-fail (tolerance off takes the half), that a rejected pitch is
+withheld from the positions too, and knit_05's windows A / B / B+1px / C through `analyze_gauge`
+(all within 10%, confident, B and B+1px within 2% of each other).
+
+After the fix every one of knit_05's eight probed windows (the four proposals and their 1 px
+shifts) reads **48.75-52.0 px**, confident.
+
+**Rejected on the way:** gating the descent on the sub-repeat walk (the half-lag walks at 0.64
+on knit_05 -- backwards); a saturation test on the detector (`median_nn ≈ 1.5 × min_separation`
+on both affected photos -- the same root cause, the same outcome on every fixture measured, but
+a second number without an owner where the agreement tolerance already has one; revisit if a
+real loop pitch ever lands outside the family's 1.4× band); moving the detector's minimum
+separation (changes loop-center evidence for the wale scorer and the density gate on every row);
+tuning the tolerance between knit_01's 1.61× and knit_05's 1.70× (a test-set tune).
+
+#### 3. knit_02 at 2× (2374 px/in): an image-wide 4 px grid, NOT this mechanism -- pinned, "high px/in, deferred"
+
+At 2× every one of knit_02's areas reads an **8 px** period on BOTH axes at autocorrelation
+strength 0.76-0.82 (the wale result is then empty; course has no truth). It is not the re-encode:
+the 2× image encoded as PNG, as JPEG q95 and as JPEG q75, and not re-encoded at all, all read 8
+px to the third decimal. It is a **4 px periodicity at native scale, present in every window of
+the photo -- fabric and non-fabric alike (lag-4 autocorrelation of the raw gradient projection
+0.60-0.83 on all six windows probed, both axes)** -- a sensor / ISP grid (the shape of a quad-
+Bayer remosaic), not fibre texture or ply twist. At 1× the fixed 3 px `SMOOTHING_WINDOW_PX`
+suppresses it (after smoothing the lags 2-4 read 0.86 / 0.83 / 0.84, no local peak), the same
+accidental suppressor `_prefer_fundamental_seed`'s docstring records for the jersey's fine legs.
+The 2× upscale moves it to 8 px, where it passes the smoother and becomes the crop's strongest
+periodicity. The metamorphic sweep already reads it at native scale: knit_02's 70% box baseline
+course is **4.0 px**.
+
+Analysing each area at a working resolution (the proposer's own 180 px/in) would remove it (8 px
+becomes 0.6 px and INTER_AREA integrates it away) and would also fix the timing (§4). It would
+NOT fix §2, which fires at 320 px/in native and at 0.5× (160 px/in, below any working scale) --
+so (a) and (b)+timing are two mechanisms, and only (a) is fixed here. knit_02 at 2× is pinned
+as a strict xfail labelled "high px/in, deferred" in `tests/test_app_path_scorecard.py`.
+Analysis-side resolution normalisation is its own decision with its own resolution-invariance
+obligation.
+
+#### 4. Timing
+
+Whole-request time (one `/propose-rois`, every proposal accepted, one `/analyze-multi`, through
+the test client) on each photo resampled to a 4000 px long edge (INTER_CUBIC / INTER_AREA, JPEG
+q92) and calibrated correctly, local, nothing else running on the box. Compare within a row.
+
+| photo @4000 | propose main → here | areas main → here | analyze main → here | whole request main → here |
+|---|---|---|---|---|
+| jersey (4000x2674) | 1.61 → 0.50 s | 0 → 2 | 0.00 → 4.84 s | 1.61 → **5.33 s** |
+| knit_01 (4000x3517) | 2.16 → 1.08 s | 2 → 4 | 1.46 → 9.41 s | 3.62 → **10.49 s** |
+| knit_02 (4000x2667) | 1.34 → 0.15 s | 0 → 4 | 0.00 → 14.71 s | 1.34 → **14.86 s** |
+| teal (3200x4000) | 3.58 → 0.24 s | 2 → 4 | 1.73 → 23.00 s | 5.31 → **23.24 s** (over 15 s) |
+
+(Re-run after the constants audit of §1, alone on the box; the pre-audit tree read 5.10 / 10.24 /
+15.42 / 22.13 s, so the photo-own sharpness baseline -- one Laplacian and three box filters over
+the ≤180 px/in copy, once per request -- costs nothing measurable, and knit_02 crossing back
+under 15 s is run-to-run variance, not a saving. **Accepted for this PR (Eva, Oct 23); analysis
+at a working resolution is the next PR.**)
+
+The proposer is 2-15× faster (it scans a ≤180 px/in copy). The whole request is slower because
+areas now exist, or more and larger ones, and each is analysed at full resolution: ~4-5 s per
+2-inch area at 4000 px. teal at ~22 s locally is a risk against the frontend's 75 s timeout on
+Render's free tier, which is slower than this box. The reconciliation gate (§2) costs nothing
+measurable (knit_02 and teal read within a second of the parked commit's own table). Analysis-
+side resolution normalisation -- the same 180 px/in working copy for the per-area analysis --
+would address this and §3 together; it is a separate decision with its own resolution-
+invariance obligation and is not taken here.
+
+#### 5. What moved, main → this tree
+
+Calibration (a), the correct scale; every row that moved, with the proposer-only tree between
+(`f875431`), so each move has an owner. Confident-and-wrong: main **1** (teal W) → proposer
+alone **2** (teal W, knit_05 C) → here **1** (teal W), on (a) and on (b) alike. No axis that was
+confident and correct on main is confident and wrong here.
+
+| row | main | proposer only | proposer + gate | why |
+|---|---|---|---|---|
+| knit_02 W | no areas | −2.4% C | −2.4% C | the proposer offers four 1-inch areas (was none) |
+| knit_05 W | no areas | +1.4% C | +2.4% C | areas (was none); one area's wale moves 1.0 pt with the gate through the per-region aspect-ratio exclusion |
+| knit_05 C | no areas | **+87.3% C** | **−5.8% C** | §2: the 15 px loop-center pitch is set aside and the 51 px seed stands on every area |
+| knit_01 C | +4.3% C | −30.2% u | −30.2% u | the proposer's third area (B) reads the two-row seed 235 px; its 39 px pitch is set aside here (it pulled B to 117.5 px on the proposer alone, also doubled); the consensus of 54.5 / 241 / 83.7 px is flagged uncertain. ±0.5-1% of scale moves the windows and reads 5.6-5.9/in confident |
+| knit_01 W | +3.4% C | +3.7% C | −1.9% C | area B's course at 241 px fails the wale:course plausibility gate, B leaves both consensuses, the wale consensus re-forms from A and C (84.5 / 89.3 px) |
+| knit_06 C | +0.4% C | +2.0% C | +2.0% C | the proposer's fourth area |
+| knit_08 W | −1.4% C | +4.5% C | +4.5% C | the proposer's two 2-inch areas (were four 1-inch) |
+| knit_08 C | +2.3% u | −2.3% C | −2.3% C | same |
+| knit_09 W | −0.9% C | −2.5% C | −2.5% C | the proposer's three areas (were four) |
+| knit_09 C | −0.0% C | −0.9% C | −0.9% C | same |
+| teal W | **−11.0% C** | **−13.0% C** | **−13.0% C** | the proposer's fourth area; teal's own periodicity reads −12% on every area (#441's accepted row). Jitter −10.4 .. −13.5% at every scale (main −9.4 .. −14.6%) |
+| teal C | +0.5% C | −0.6% C | −0.6% C | same |
+
+Under (b) the same rows move by the same amounts (knit_01 C there is +4.7% confident on the
+ruler's own −0.8% scale, from +2.0% uncertain). Jitter-unstable axes **3 → 1**: knit_08 W and
+knit_08 C are stable under the proposer's placement, knit_05 C was UNSTABLE on the proposer alone
+(±1% of scale flipped 12.55 ↔ 6.2-6.4/in) and is stable here; knit_01 C stays flagged (above).
+
+**The gate's own partition, by instrument.** The app-path scorecard: knit_05 C fixed at every
+resolution, knit_01 W −1.9%, nothing else. The **pinned-crop scorecard** (`python
+tests/test_ground_truth_scorecard.py`): ONE row moves -- **knit_01 course −1.8% → −46.9%,
+confident** (110 px against 58.4 on ROI (550, 431, 862, 862)). On that crop the course seed is
+119 px, the signal is ANTI-correlated at one row (autocorrelation −0.15 at 59 px, no peak, so the
+sub-repeat test cannot descend), the v3 diagnostics score 119 over 59.5 (0.425 vs 0.383) and the
+template walk at 59.5 reads 0.0: nothing in the crop supports one row except the loop-center
+pitch of 37.0 px -- 1.45× the detector's 25.5 px floor, 1.61× from the nearest candidate -- which
+the old rule rounded to 59.5. The pinned −1.8% was the same coin that gives knit_05 +87%, landing
+the other way. **The metamorphic sweep** (11 fixtures, the CLI's 70% box): 119 / 12 / 4 / 13 / 6
+→ **118 / 12 / 5 / 12 / 7** (ok / drift / flip / lost / skipped); nine cells move. knit_05
+half_roi course goes lost (25.5 px) → harmonic_flip (**50.4 px, the true pitch**, counted as a
+flip because the full box's baseline is the doubled 98.3); knit_01 half_roi course stays lost
+(58.5 → 116 px against an 8.9 px baseline that is a sub-feature either way); knit_07 (no course
+truth, its wale truth excluded by the ground-truth file) moves its baseline 64 → 108 px and six
+cells with it, one ok → drift. These two instruments are the cost of the fix and are stated here
+rather than tuned around. **Both accepted (Eva, Oct 23):** `tests/test_ground_truth_scorecard.py`'s
+knit_01 course row is re-pinned at **−46.9%** as a strict xfail in `KNOWN_BEYOND_BAR` (that
+file's known-and-wrong list), labelled *doubled course seed, exposed by #456, future target*,
+with the mechanism above in its reason -- main's −1.8% on that crop came from the same coin as
+knit_05's +87%, a loop-center pitch 1.6-1.7× from every candidate deciding the period, and
+landed the other way. And the sweep's **118 / 12 / 5 / 12 / 7** is recorded as the baseline:
+
+| fixture | resize/wale | resize/course | rotate90/wale | rotate90/course | mirror/wale | mirror/course | half_roi/wale | half_roi/course | jpeg60/wale | jpeg60/course | downsample2x/wale | downsample2x/course | crop_shift/wale | crop_shift/course |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| knit_sample_01 | ok (1.000) | drift (1.040) | harmonic_flip (0.501) | ok (1.000) | ok (1.000) | ok (0.998) | ok (0.982) | **lost (12.983)** | ok (1.000) | ok (0.994) | ok (0.997) | skipped | ok (1.000) | ok (1.012) |
+| knit_sample_02 | lost (0.014) | ok (1.008) | ok (0.998) | ok (1.001) | ok (1.001) | ok (1.000) | skipped | lost (80.806) | ok (1.001) | ok (1.002) | ok (1.018) | skipped | ok (0.960) | ok (1.003) |
+| knit_sample_03 | lost (0.055) | lost (0.134) | harmonic_flip (0.494) | ok (1.000) | ok (1.001) | drift (1.018) | drift (1.407) | lost (15.679) | ok (0.998) | ok (1.000) | ok (0.978) | lost (6.796) | ok (1.003) | lost (3.538) |
+| knit_sample_04 | ok (0.995) | ok (0.993) | harmonic_flip (0.514) | ok (1.000) | ok (1.000) | ok (1.002) | ok (1.020) | ok (1.036) | ok (0.988) | ok (1.010) | ok (0.990) | skipped | ok (0.995) | ok (1.008) |
+| knit_sample_05 | ok (1.000) | ok (0.984) | harmonic_flip (1.966) | ok (1.000) | ok (1.000) | ok (1.000) | ok (0.978) | **harmonic_flip (0.513)** | ok (1.001) | ok (0.999) | ok (0.995) | ok (1.016) | ok (1.002) | ok (1.040) |
+| knit_sample_06 | ok (0.994) | drift (1.125) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.015) | drift (1.148) | ok (1.001) | drift (1.081) | ok (0.998) | drift (1.052) | ok (0.996) | drift (1.066) |
+| knit_sample_07 | ok (0.989) | **lost (0.128)** | **lost (0.064)** | ok (1.000) | ok (1.000) | **ok (1.000)** | ok (1.009) | **skipped** | ok (0.999) | **lost (0.131)** | ok (1.001) | **drift (1.185)** | ok (0.995) | **drift (1.463)** |
+| knit_sample_08 | ok (0.989) | drift (0.928) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.000) | ok (0.966) | skipped | ok (1.000) | ok (1.000) | ok (0.993) | drift (0.947) | ok (1.003) | ok (0.953) |
+| knit_sample_09 | ok (1.003) | ok (0.998) | ok (1.000) | ok (1.000) | ok (1.000) | ok (0.990) | ok (1.012) | ok (1.019) | ok (1.000) | ok (0.985) | ok (0.980) | ok (1.040) | ok (0.983) | lost (3.365) |
+| real_jersey_sample | ok (0.998) | ok (1.021) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.019) | skipped | ok (0.994) | ok (1.000) | ok (1.011) | ok (1.007) | ok (1.009) | ok (1.021) |
+| sarahmaker-knitting-gauge | ok (0.997) | ok (1.020) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.000) | ok (1.019) | ok (0.936) | ok (1.000) | ok (0.986) | ok (1.000) | ok (0.994) | ok (0.977) | ok (0.951) |
+
+(bold = changed from `main`'s 119 / 12 / 4 / 13 / 6; the sweep is `tests/metamorphic.py` on each
+fixture at its default box and does not go through the proposer, so the constants audit above
+cannot move it). The new flip is the one worth naming: knit_05's half-window course reads the
+TRUE pitch (50.4 px) against the full box's doubled 98.3, and the harness, which only knows the
+full box's baseline, calls the correct half a flip.
+
+#### 6. Resolution invariance
+
+Each photo resampled to 0.5× / 1× / 2× of its own resolution (INTER_AREA down, INTER_CUBIC up),
+calibrated correctly for that resolution, every proposal accepted; a cell is areas · per-inch ·
+error · status. The generated block above carries the live table; this is the tree at this note.
+
+| fixture | axis | 0.5× | 1× | 2× | spread | verdict |
+|---|---|---|---|---|---|---|
+| knit_05 | wale | 4 · 4.78 +1.6% C | 4 · 4.81 +2.4% C | 4 · 4.85 +3.3% C | 1.6% | agree |
+| knit_05 | course | 4 · 6.43 −4.1% C | 4 · 6.31 −5.8% C | 4 · 6.36 −5.0% C | 1.9% | agree (was 12.80 / 12.55 / 6.36 u: +91% / +87% / −5%) |
+| knit_02 | wale | 4 · 3.80 −4.9% C | 4 · 3.90 −2.4% C | 4 areas, no measurement | — | MISSING (§3, deferred) |
+| knit_02 | course | 4 areas, no truth | 4 areas, no truth | 4 areas, no truth | 4985% | DISAGREE (§3, deferred) |
+| knit_01 | wale | 4 · 3.96 +4.3% C | 3 · 3.73 −1.9% C | 4 · 3.92 +3.1% C | 6.3% | agree |
+| knit_01 | course | 4 · 5.70 +0.0% C | 3 · 3.98 −30.2% u | 4 · 5.91 +3.7% C | 48.5% | flagged |
+| knit_08 | wale | 4 · 4.87 +8.3% C | 2 · 4.70 +4.5% C | 2 · 4.95 **+10.1%** C | 5.4% | agree |
+| knit_08 | course | 4 · 7.33 +6.2% C | 2 · 6.74 −2.3% C | 2 · 6.56 −4.9% C | 11.8% | DISAGREE (the proposer's placement; identical on the proposer commit alone) |
+| teal | wale | 2 · 3.50 −12.6% C | 4 · 3.48 −13.0% C | 4 · 3.43 −14.2% C | 1.9% | agree (the accepted row) |
+| every other row | | | | | ≤ 6.0% | agree |
+
+Every fixture gets areas at every resolution (main: 9 MISSING rows). Confident-and-wrong at some
+resolution: knit_08 W at 2× (+10.1%, inherited from the proposer's placement -- the proposer
+commit alone reads the same cell) and teal W at all three. **knit_08's 2× cells are accepted
+(Eva, Oct 23) and pinned as known, labelled *proposer placement at 2×*: the course spread
+(`RESOLUTION_DISAGREE`) and the +10.1% wale (`RESOLUTION_CONFIDENT_AND_WRONG`), both in
+`tests/test_app_path_scorecard.py`.** The constants audit of §1 moved no cell of this table, no
+app-path row, no jitter point and neither confident-and-wrong count (the card is identical to the
+pre-audit tree's on every key).
+
+#### 7. A proposer regression the parked commit carries, found by the original suite and NOT fixed here
+
+`tests/test_roi_proposal.py::test_proposed_regions_avoid_a_ruler_like_block` passes on main
+and fails on the parked proposer commit: on its synthetic (900×1500 at 8.0 px/mm = 203 px/in,
+a bright ruler band from y 1250) the proposer now puts region A at y 658..1268, 18 px into the
+band. It is not the map-back: at the working scale the chosen window spans 583..1123 against a
+band edge at 1107.3, the same one-block dip. The cause is the quality RANKING at the working
+scale. `_roi_quality_score`'s sharpness is `Laplacian variance / 500`, a fixed-pixel ceiling:
+the INTER_AREA downsample (factor 0.886) softens the synthetic fabric so every clean window's
+sharpness falls from 1.0 to **0.53-0.55** (quality 0.981 → 0.907-0.910), while the window that
+dips one block into the ruler keeps **sharpness 1.0 from the ruler's own edge** (quality 0.961)
+and outranks them. The anomaly gate reads that window at 0.059 against a 0.5 ceiling and is not
+meant to catch a one-block dip ("ranking, not gating", by the test's own text); on main the
+ranking did the job because all four windows were equally sharp and texture consistency (0.998
+vs 0.862) decided. A proposer-side change (a sharpness ceiling that follows the working scale,
+or re-ranking at native resolution) is the fix and belongs to the proposer's owner; it is
+recorded here rather than widened into this PR.
 
 ## Deploying the backend to Render
 
