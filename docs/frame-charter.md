@@ -565,3 +565,110 @@ mirror moved 0.02 mm (OR5).
     group. *Undo:* `ORNAMENT_GROUPS.oval`.
 28. **Groups that would crowd give way whole, in a fixed priority**, rather than shrinking. *Undo:*
     the clearance block in `ornamentFor`.
+
+## 11. Phase 3b — scroll rulings: the tapered wire, the longer body, the defaults
+
+### 11.0 Rulings (Eva, Oct 23, the phase-3b brief)
+
+1. **Wire style is a control** (`ornWireStyle`, Ornament): CONSTANT (as built) or TAPERED — the
+   scroll's profile thickest in the body, thinning toward the volute, MIN_FEATURE_MM applied at
+   the thinnest point (the eye), and the gap clamp reading the actual LOCAL thickness.
+   Half-round stays the default cross-section for both. **The default style: asked at the stop
+   (§11.5).**
+2. **Longer body (rocaille).** The volute share is reverted to its step-1 value, 0.5, and is
+   never grown to make turns fit; zero dead travel is kept by the second mechanism alone — where
+   the asked turns do not fit, the slider's top is the most that prints, told.
+3. Rectangle and oval interior default stays OPEN (`lights: pierced`) — unchanged.
+4. Default ornament relief (`ornProjection`) **1.25** — the default 1.6 mm half-round lead
+   wire's crown is **1.000 mm**, on the floor (it was 0.80, told).
+5. Kept: all four corner styles; scale 2.5, density 2, crest + corners on, sides + bottom off.
+
+### 11.1 The tapered wire
+
+**The law** (`scrollCurve`, `taperTip`): the wire is its full width `t` through the root and the
+body and thins LINEARLY in arc length over each volute (its last 0.5 of the half) to
+`max(F, TAPER_TIP · t)` at the eye, `TAPER_TIP` 0.5 — so the default 1.6 mm wire ends at
+1.00 mm, a 2.4 mm one at 1.20, and a 1.0 mm wire has no room to taper (built constant, told).
+The eye's floor reads the LOCAL width there: `(tip + F)/2`. The curve carries `w[i]`, its local
+width per station.
+
+**One producer, extended, not a second one.** A tapered spine declares `widthScale[i]`, and
+`offsetCurve` is the place it is read: the offset at vertex i is `d · widthScale[i]`, so the
+wire's two edges, its crease and hatch lines, the relief grid and the walls narrow together;
+`bandSolid` reads `depthScale[i]` for the crown. Both are absent on every other spine and the
+old expressions run by branch — **462 rows (all skeletons × presets × interiors × corner /
+aspect / sill variants, with and without every ornament control set) are byte-identical in SVG
+and STL to `1c797ea` with the filigree off.** The crown thins with the width but never under
+`min(F, the body's crown)` (`crownScale`): at the default 1.25 relief the lead's crown is 1.000
+everywhere, tapered or not.
+
+**Every clamp reads the local width.** `selfGap` (the coil clamp) subtracts the two stations'
+local half widths; `pairGap`, `joinsCleanly`, `wireClear`, the band contacts and the seat read
+`wAt(c, i)`, taking a segment's WIDER end (the stricter reading). The crest's axis slide is
+followed by a clearance pass on that measure: a tapered edge between two stations can stand
+nearer the axis than its vertices (measured: 0.998 mm until the pass). A constant wire computes
+exactly what it did.
+
+### 11.2 The share held, and what the slider spans
+
+`tightnessFit` returns `{ share: 0.5, turnsMax: the most that prints }`; `VOLUTE_SHARE_MAX` and
+its bisection are gone. **Dead travel 0 of 100 steps everywhere** (SC7). The slider's top, in
+turns (balance 0.6; C and S agree to 0.01):
+
+| length | 1.0 mm wire | 1.6 mm | 2.4 mm | 1.6 tapered | 2.4 tapered |
+|---|---|---|---|---|---|
+| 30 mm | 0.67 | 0.59 | 0.51 | 0.65 | 0.60 |
+| 60 mm | 0.97 | 0.84 | 0.73 | 0.94 | 0.86 |
+| 120 mm | 1.42 | 1.24 | 1.07 | 1.39 | 1.30 |
+
+(1.0 mm tapered = 1.0 mm constant: no room to taper.) **The cost, said plainly:** at the
+DEFAULT frame the lead scroll is ~23 mm, so the slider spans only **0.50–0.51 turns constant,
+0.50–0.56 tapered** — not dead (every step builds more), but nearly flat; the read-out says so.
+The taper buys turns because the coils are thinner where they crowd.
+
+### 11.3 Measured (relief gate, both wire styles)
+
+SC on 108 scrolls (54 per style) and 16 groups; OR on 26 rows (every phase-3a row, again
+tapered). Boundary 0 and one voxel region on every row. Off the emitted mesh:
+
+| | thinnest wire | smallest gap | root embeds |
+|---|---|---|---|
+| constant | 1.0000 mm | 1.0000 mm | 1.000–3.112 mm |
+| tapered | 1.0000 mm (the tip) | 1.0000 mm | 1.000–2.179 mm |
+
+SC8 (new) reads the wire's width off the EMITTED walls against the taper law RESTATED in the
+gate from the ruling's numbers (law error ≤ 1e-14 mm), never under F, crown never under
+min(F, body crown). SC7 now runs both styles, asserts the share is the ruled 0.5, and probes the
+top with the gate's OWN gap (the emitted turning less the restated local widths) — the module's
+`selfGap` is no longer its reference. SC6's overlap bar is F restated, never `RL.EMBED_MM` (the
+embed mutant moved both sides together). Triangles at the defaults: arch 113,548 constant /
+115,420 tapered; rectangle 70,640 / 68,912; oval 70,064 / 69,488. The children's crowns
+(wire 1.24 mm) stay under the floor at 0.77 mm, told, as before.
+
+**Density 5 at 60 mm now builds four scrolls**, the fifth told dropped (it crosses another
+wire at every station) — a cost of the longer body; SC6 asserts every asked child is built or
+told, and that no group loses all its children (the floating-child mutant had made every child
+fail its own join and vanish, leaving SC6 nothing to examine).
+
+**Gates: relief 28 checks (30 with `--base`), 18 mutants; frame 45 checks, 24 mutants.**
+Mutants (new): `the-taper-tip-under-the-floor` (SC8, OR2, and SC2 / SC7, which restate the
+floored tip), `the-gap-clamp-reads-the-nominal-wire` (SC7 — a nominal clamp is conservative, so
+only the top probe sees it), `the-volute-share-grows` (SC7). Three gate defects the sweep found,
+all fixed: SC6 read its overlap bar from `RL.EMBED_MM` (the embed mutant moved both sides); SC6
+could examine an empty set (above); and the crest's new axis pass measured the pair through
+`mirrorCurve` and so pushed the halves apart to hide a broken mirror — it measures against the
+reflection about the axis now. `--only=<id,…>` runs a mutant subset, reported as one. Sheet: `node tools/shot-frame-taper.mjs <dir>` → `docs/img/frame-taper-sheet.png`.
+
+### 11.4 Decisions made without a ruling
+
+29. **`TAPER_TIP` 0.5** — the tip is half the wire, floored at F. *Undo:* the constant.
+30. **The taper runs over the volute only** (the body and root at full width), linear in arc
+    length. *Undo:* the `w` map in `scrollCurve`.
+31. **The crown thins with the width, floored at min(F, body crown)** — the section stays a
+    semicircle where it can. *Undo:* `crownScale`.
+32. **The SVG draws the taper** (the spine's `widthScale` reaches the drawing through
+    `offsetCurve`), so the engraving and the print agree.
+
+### 11.5 The stop
+
+One question, from the sheet: the default wire style — A) constant, B) tapered.

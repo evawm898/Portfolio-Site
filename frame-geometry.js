@@ -121,7 +121,13 @@ function joinSpines(id, a, b, extra = {}) {
    vertex itself is where the two offset arcs meet. offsetPoly() is the
    null-free form every drawn edge uses; the hatch keeps the indices. */
 export function offsetCurve(spine, d) {
-  const out = spine.pts.map((p, i) => [p[0] + d * spine.nrm[i][0], p[1] + d * spine.nrm[i][1]]);
+  // a TAPERED spine (phase 3b: a scroll wire thinning toward its volute)
+  // declares widthScale[i] — the offset at vertex i is d · widthScale[i], so
+  // every column of the band (its edges, creases, hatch, relief grid) narrows
+  // together. Absent, the offset is d itself: the old expression, by branch.
+  const k = spine.widthScale;
+  const out = k ? spine.pts.map((p, i) => [p[0] + d * k[i] * spine.nrm[i][0], p[1] + d * k[i] * spine.nrm[i][1]])
+    : spine.pts.map((p, i) => [p[0] + d * spine.nrm[i][0], p[1] + d * spine.nrm[i][1]]);
   const joins = spine.joins || [], n = out.length;
   for (let k = 0; k < joins.length; k++) {
     const j = joins[k], P = out[j], b = spine.nrm[j];

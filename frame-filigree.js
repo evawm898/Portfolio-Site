@@ -57,6 +57,13 @@ export const VOLUTE_SHARE = 0.5;
 export const VOLUTE_TURNS = [0.5, 1.75];
 /* the body's radius of curvature, as a fraction of the scroll's length */
 export const SCROLL_BODY = { C: 0.42, S: 0.6 };
+/* THE TAPERED WIRE (phase 3b, Eva's ruling 1): the wire is its full width
+   through the root and the body and thins LINEARLY in arc length over each
+   volute to TAPER_TIP of it at the eye, floored at the feature — the floor
+   applies at the thinnest point, the tip. A wire already at the floor has
+   no room to taper (told). Every gap and clamp reads the LOCAL width. */
+export const TAPER_TIP = 0.5;
+export const taperTip = (t) => Math.max(MIN_FEATURE_MM, TAPER_TIP * t);
 /* the wire's profile samples across its width */
 export const WIRE_SAMPLES = 8;
 
@@ -126,7 +133,9 @@ export function scrollCurve(spec) {
   const h2 = L / (1 + beta), h1 = L - h2;
   const ramp = kind === 'S' ? 0.2 * Math.min(h1, h2) : 0;
   const rMid = SCROLL_BODY[kind] * L;
-  const re = (t + MIN_FEATURE_MM) / 2;
+  // the eye is the floor on the wire's LOCAL width there: the tip, tapered
+  const tEye = spec.taper ? taperTip(t) : t;
+  const re = (tEye + MIN_FEATURE_MM) / 2;
   const share = spec.share ?? VOLUTE_SHARE;
   const rv = [h1, h2].map((h) => voluteStart(h * share, re, turns, rMid));
   const B = halfCurve(h2, rMid, rv[1], re, +1, ramp, 0, share);
@@ -136,7 +145,11 @@ export function scrollCurve(spec) {
   for (let i = 0; i < B.pts.length; i++) { pts.push(B.pts[i]); tan.push(B.phi[i]); u.push(B.u[i]); kap.push(B.kap[i]); }
   const nrm = tan.map((f) => [-Math.sin(f), Math.cos(f)]);
   const built = [h1, h2].map((h, i) => linTurn(h * share, rv[i], re) / (2 * Math.PI));
-  return { kind, pts, nrm, tan, u, kap, root: A.pts.length - 1, info: { L, t, rMid, rv, eye: re, h1, h2, turnsAsked: turns, turnsBuilt: built } };
+  const out = { kind, pts, nrm, tan, u, kap, root: A.pts.length - 1, info: { L, t, rMid, rv, eye: re, h1, h2, turnsAsked: turns, turnsBuilt: built, share, taper: !!spec.taper, tip: tEye } };
+  // the local width at every station: t through the body, linear in arc
+  // length over the volute down to the tip at the eye
+  if (spec.taper) out.w = u.map((s) => { const h = s < 0 ? h1 : h2, a = Math.abs(s), sv = h * (1 - share); return a <= sv ? t : t + (tEye - t) * Math.min(1, (a - sv) / (h - sv)); });
+  return out;
 }
 
 /* The least gap ACROSS a wire's own coils: centreline distance between two
@@ -148,7 +161,8 @@ export function selfGap(curve, t) {
   let best = Infinity, at = null;
   for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
     if (Math.abs(T[j] - T[i]) < Math.PI) continue;
-    const d = Math.hypot(P[j][0] - P[i][0], P[j][1] - P[i][1]) - t;
+    // the gap is the centreline distance less the two LOCAL half widths
+    const d = Math.hypot(P[j][0] - P[i][0], P[j][1] - P[i][1]) - (curve.w ? (curve.w[i] + curve.w[j]) / 2 : t);
     if (d < best) { best = d; at = [i, j]; }
   }
   return { gap: best, at };
@@ -180,11 +194,15 @@ function printableTurns(base, t, asked) {
         step of the slider changes the scroll, and tightness 1 means "as
         tight as this wire and length print" (told, with the number).
    Below half a turn nothing is left to span: the slider is inert, told. */
-export const VOLUTE_SHARE_MAX = 0.8;
+/* PHASE 3b (Eva's ruling 2): move 1 is WITHDRAWN. Growing the volute's
+   share bought turns by spending the body — the scroll read as all spiral —
+   so the share is held at VOLUTE_SHARE (a long sweeping body ending in a
+   smaller curl, rocaille) and ONLY move 2 remains: where the asked turns do
+   not fit, the slider's top is the most that prints, told. */
 const fitMemo = new Map();
 export function tightnessFit(spec) {
   const t = Math.max(spec.wire, MIN_FEATURE_MM);
-  const key = [spec.kind, spec.length, t, spec.balance, spec.share].join('|');
+  const key = [spec.kind, spec.length, t, spec.balance, spec.share, !!spec.taper].join('|');
   if (!fitMemo.has(key)) fitMemo.set(key, fitUncached({ ...spec, wire: t }, t));   // pure: tightness does not enter it
   return fitMemo.get(key);
 }
@@ -193,12 +211,7 @@ function fitUncached(base, t) {
   const top = VOLUTE_TURNS[1];
   const at = (share) => printableTurns({ ...base, share }, t, top).turns;
   if (spec.share != null) return { share: spec.share, turnsMax: at(spec.share) };
-  if (at(VOLUTE_SHARE) >= top) return { share: VOLUTE_SHARE, turnsMax: top };
-  const capT = at(VOLUTE_SHARE_MAX);
-  if (capT < top) return { share: VOLUTE_SHARE_MAX, turnsMax: capT };
-  let lo = VOLUTE_SHARE, hi = VOLUTE_SHARE_MAX;
-  for (let i = 0; i < 30 && hi - lo > 1e-4; i++) { const m = (lo + hi) / 2; if (at(m) >= top) hi = m; else lo = m; }
-  return { share: hi, turnsMax: top };
+  return { share: VOLUTE_SHARE, turnsMax: at(VOLUTE_SHARE) };
 }
 
 /* The scroll as built: the wire floored at F (told); the tightness mapped
@@ -219,6 +232,7 @@ export function buildScroll(spec) {
     const tau = Math.min(1, Math.max(0, spec.tightness ?? 0.5));
     const lo = Math.min(VOLUTE_TURNS[0], fit.turnsMax);
     asked = lo + (fit.turnsMax - lo) * tau;
+    if (spec.taper && taperTip(t) >= t) told.push(`tapered wire: a ${t.toFixed(2)} mm wire is already at the ${MIN_FEATURE_MM.toFixed(1)} mm floor — no room to taper, built constant`);
     if (fit.turnsMax < VOLUTE_TURNS[1]) told.push(fit.turnsMax <= VOLUTE_TURNS[0]
       ? `tightness inert — a ${(spec.length).toFixed(0)} mm scroll on a ${t.toFixed(1)} mm wire prints at most ${fit.turnsMax.toFixed(2)} turns`
       : `tightness spans ${lo.toFixed(2)}–${fit.turnsMax.toFixed(2)} turns — the most a ${(spec.length).toFixed(0)} mm scroll on a ${t.toFixed(1)} mm wire prints (volute ${(fit.share * 100).toFixed(0)}% of each half)`);
@@ -254,20 +268,20 @@ export function placeCurve(c, { at = [0, 0], angle = 0, flip = false, mirror = f
    sides of its root. The child's root sits (t_lead + t_child)/2 − EMBED_MM
    off the lead's centreline, so the two closed shells OVERLAP by the embed
    at the contact (never a graze). */
-export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ratio = 0.6, balance = 0.6, kind = 'C' } = {}) {
-  const lead = buildScroll({ kind, length, tightness, wire, balance });
+export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ratio = 0.6, balance = 0.6, kind = 'C', taper = false } = {}) {
+  const lead = buildScroll({ kind, length, tightness, wire, balance, taper });
   const out = [{ curve: lead, role: 'lead', parent: null, station: null }];
   const stations = [];
   for (let i = 1; i < n; i++) stations.push((i % 2 ? -1 : 1) * (0.18 + 0.14 * Math.floor((i - 1) / 2)));
   const placeChild = (frac, i, tau) => {
     const order = Math.floor(i / 2) + 1;
     const len = length * ratio ** order, tw = Math.max(MIN_FEATURE_MM, wire * Math.sqrt(ratio) ** order);
-    const child = buildScroll({ kind: i % 2 ? 'S' : 'C', length: len, tightness: tau, wire: tw, balance });
+    const child = buildScroll({ kind: i % 2 ? 'S' : 'C', length: len, tightness: tau, wire: tw, balance, taper });
     // the lead's station at arc length frac · L from its root, on its BACK
     // (the side opposite its normal)
     const target = frac * lead.info.L;
     let j = lead.root; while (j > 0 && j < lead.u.length - 1 && Math.abs(lead.u[j] - target) > Math.abs(lead.u[j + Math.sign(target)] - target)) j += Math.sign(target);
-    const off = (wire + tw) / 2 - EMBED_MM;
+    const off = (wAt(lead, j) + tw) / 2 - EMBED_MM;   // the local widths at the contact
     const at = [lead.pts[j][0] - off * lead.nrm[j][0], lead.pts[j][1] - off * lead.nrm[j][1]];
     // the child's back faces the lead: its own normal points AWAY from the
     // lead, so it is laid along the lead's tangent and flipped
@@ -322,15 +336,25 @@ export function wireProfile(shape = 'half-round') {
 }
 export const wireHeight = (t, shape) => (shape === 'half-round' ? t / 2 : t);
 
+/* The LOCAL wire width at station i (a constant wire: its one width). */
+export const wAt = (c, i) => (c.w ? c.w[i] : c.info.wire);
+
 /* A spine for bandSolid from a placed curve. */
-export const scrollSpine = (c, id) => ({ id, pts: c.pts, nrm: c.nrm, bandWidth: c.info.wire });
+export const scrollSpine = (c, id) => { const sp = { id, pts: c.pts, nrm: c.nrm, bandWidth: c.info.wire }; if (c.w) sp.widthScale = c.w.map((x) => x / c.info.wire); return sp; };
+/* A tapered wire's crown thins with its width but never under the floor
+   (nor above the body's crown): depthScale[i] = max(min(F, D)/D, w_i/t). */
+export const crownScale = (c, depth) => { if (!c.w) return null; const fl = Math.min(MIN_FEATURE_MM, depth) / depth; return c.w.map((x) => Math.max(fl, x / c.info.wire)); };
 
 /* Lay a list of placed curves into a mesh as closed wire solids standing on
    a base of `baseZ` (print mm; the vocabulary sheet stands them on a plate of
    that thickness). scale maps the curve's mm to print mm (1 on the sheet). */
 export function scrollsIntoMesh(mesh, curves, { scale = 1, baseZ = 1, shape = 'half-round' } = {}) {
   const prof = wireProfile(shape);
-  curves.forEach((c, i) => bandSolid(mesh, scrollSpine(c, `scroll${i}`), prof, { scale, plateT: baseZ, reliefDepth: wireHeight(c.info.wire, shape) * scale }));
+  curves.forEach((c, i) => {
+    const sp = scrollSpine(c, `scroll${i}`), depth = wireHeight(c.info.wire, shape) * scale, k = crownScale(c, depth);
+    if (k) sp.depthScale = k;
+    bandSolid(mesh, sp, prof, { scale, plateT: baseZ, reliefDepth: depth });
+  });
   return mesh;
 }
 
@@ -346,11 +370,13 @@ export function scrollRelief(curves, opts = {}) {
    come within a feature without joining (a graze prints as a web). */
 export function joinsCleanly(a, b) { return joinsFrom(a, b) && joinsFrom(b, a); }   // read from both wires
 function joinsFrom(a, b) {
-  const half = (a.info.wire + b.info.wire) / 2;
+  const half = (a.info.wire + b.info.wire) / 2, local = !!(a.w || b.w);
   let run = null;
-  for (const q of a.pts) {
-    let d = Infinity; for (let k = 0; k < b.pts.length - 1; k++) d = Math.min(d, segDist(q, b.pts[k], b.pts[k + 1]));
-    d -= half;
+  for (let i = 0; i < a.pts.length; i++) {
+    const q = a.pts[i];
+    let d = Infinity;
+    if (local) for (let k = 0; k < b.pts.length - 1; k++) d = Math.min(d, segDist(q, b.pts[k], b.pts[k + 1]) - (wAt(a, i) + Math.max(wAt(b, k), wAt(b, k + 1))) / 2);
+    else { for (let k = 0; k < b.pts.length - 1; k++) d = Math.min(d, segDist(q, b.pts[k], b.pts[k + 1])); d -= half; }
     if (d < MIN_FEATURE_MM) run = Math.min(run ?? Infinity, d);
     else if (run !== null) { if (run > -EMBED_MM + 1e-9) return false; run = null; }
   }
@@ -370,8 +396,9 @@ export function pairGap(a, b) {
   return x.gap <= y.gap ? x : y;
 }
 function pairGapFrom(a, b) {
-  const ta = a.info.wire, tb = b.info.wire, need = (ta + tb) / 2 + MIN_FEATURE_MM;
-  const near = (i) => { let m = Infinity, jm = -1; for (let j = 0; j < b.pts.length; j++) { const d = Math.hypot(a.pts[i][0] - b.pts[j][0], a.pts[i][1] - b.pts[j][1]); if (d < m) { m = d; jm = j; } } return [m, jm]; };
+  // local widths: d is the centreline distance LESS the two local half widths
+  const near = (i) => { let m = Infinity, jm = -1; for (let j = 0; j < b.pts.length; j++) { const d = Math.hypot(a.pts[i][0] - b.pts[j][0], a.pts[i][1] - b.pts[j][1]) - (wAt(a, i) + wAt(b, j)) / 2; if (d < m) { m = d; jm = j; } } return [m, jm]; };
+  const need = MIN_FEATURE_MM;
   const d = a.pts.map((_, i) => near(i));
   // the junction: the run of a's stations under `need` that contains a's
   // nearest approach
@@ -380,9 +407,9 @@ function pairGapFrom(a, b) {
   if (d[i0][0] < need) { while (lo > 0 && d[lo - 1][0] < need) lo--; while (hi < d.length - 1 && d[hi + 1][0] < need) hi++; }
   else { lo = i0 + 1; hi = i0; }   // no junction
   let gap = Infinity;
-  for (let i = 0; i < d.length; i++) if (i < lo || i > hi) gap = Math.min(gap, d[i][0] - (ta + tb) / 2);
+  for (let i = 0; i < d.length; i++) if (i < lo || i > hi) gap = Math.min(gap, d[i][0]);
   const web = hi >= lo ? Math.abs(a.u[hi] - a.u[lo]) : 0;
-  return { gap, web, contact: d[i0][0] - (ta + tb) / 2 };
+  return { gap, web, contact: d[i0][0] };
 }
 
 export { offsetCurve, EMBED_MM };
@@ -479,6 +506,10 @@ export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [-x, y]), 
    distance less the half wires, with no junction excused. */
 export function wireClear(a, b) {
   let m = Infinity;
+  if (a.w || b.w) {
+    for (let i = 0; i < a.pts.length; i++) for (let k = 0; k < b.pts.length - 1; k++) m = Math.min(m, segDist(a.pts[i], b.pts[k], b.pts[k + 1]) - (wAt(a, i) + Math.max(wAt(b, k), wAt(b, k + 1))) / 2);
+    return m;
+  }
   for (const p of a.pts) for (let k = 0; k < b.pts.length - 1; k++) m = Math.min(m, segDist(p, b.pts[k], b.pts[k + 1]));
   return m - (a.info.wire + b.info.wire) / 2;
 }
@@ -490,8 +521,7 @@ export function wireClear(a, b) {
 export function bandContacts(curves, region) {
   const runs = [];
   curves.forEach((c, ci) => {
-    const t = c.info.wire;
-    const cl = c.pts.map((p) => -region.depth(p) - t / 2);
+    const cl = c.pts.map((p, i) => -region.depth(p) - wAt(c, i) / 2);
     let run = null;
     cl.forEach((v, i) => {
       if (v < MIN_FEATURE_MM) { if (!run) run = { curve: ci, from: i, to: i, min: v }; run.to = i; run.min = Math.min(run.min, v); }
@@ -506,7 +536,7 @@ export function bandContacts(curves, region) {
    the band, then on until no contact run is a graze. Returns the moved curves
    and the push (mm). */
 function seat(curves, inward, region, bracket) {
-  const deepest = (cs) => Math.min(...cs.map((c) => Math.min(...c.pts.map((p) => -region.depth(p) - c.info.wire / 2))));
+  const deepest = (cs) => Math.min(...cs.map((c) => Math.min(...c.pts.map((p, i) => -region.depth(p) - wAt(c, i) / 2))));
   const at = (d) => curves.map((c) => shift(c, [inward[0] * d, inward[1] * d]));
   // the push at which the deepest wire edge is exactly EMBED_MM in. The
   // clearance is NOT monotone in the push (pushed through the band a wire
@@ -567,14 +597,26 @@ export function ornamentFor(model) {
       let mirrorX = false;
       if (onAxis) mirrorX = dir[0] < 0;
       else { const upper = Po[1] >= yMid - 1e-9; mirrorX = upper ? dir[1] < 0 : dir[1] > 0; }
-      const local = buildGroup({ n: p.ornDensity, length, tightness: p.ornTightness, wire: p.ornWire, balance: 0.6 });
+      const local = buildGroup({ n: p.ornDensity, length, tightness: p.ornTightness, wire: p.ornWire, balance: 0.6, taper: p.ornWireStyle === 'tapered' });
       let curves = local.map((x) => rigid(x.curve, { at: Po, angle: theta, mirrorX }));
       const childTold = local.flatMap((x) => x.curve.info.told.filter((m) => /^child/.test(m)));
       if (onAxis) {
         // slide along the edge's tangent (here: x) until the nearest wire
         // edge stands F/2 off the axis — the mirrored pair a feature apart
-        const minX = Math.min(...curves.map((c) => Math.min(...c.pts.map(([x]) => x - c.info.wire / 2))));
+        const minX = Math.min(...curves.map((c) => Math.min(...c.pts.map(([x], i) => x - wAt(c, i) / 2))));
         curves = curves.map((c) => shift(c, [MIN_FEATURE_MM / 2 - minX, 0]));
+        // a TAPERED wire's edge between two stations can stand nearer the axis
+        // than its vertices do: clear the pair on the local-width measure
+        // wireClear owns (constant wires already clear it by construction)
+        for (let k = 0; k < 20; k++) {
+          // measured against the reflection ABOUT THE AXIS itself, never
+          // through mirrorCurve: a clearance read through the producer of the
+          // left halves would push the pair apart to hide a broken mirror
+          const mir = curves.map((c) => ({ ...c, pts: c.pts.map(([x, y]) => [-x, y]) }));
+          let m = Infinity; for (const a of curves) for (const b of mir) m = Math.min(m, wireClear(a, b));
+          if (m >= MIN_FEATURE_MM - 1e-9) break;
+          curves = curves.map((c) => shift(c, [(MIN_FEATURE_MM - m) / 2 + 1e-9, 0]));
+        }
       }
       const reach = 3 * length + 20;
       const seated = seat(curves, [-out[0], -out[1]], region.near(Po, 2 * reach), reach);
@@ -596,7 +638,8 @@ export function ornamentFor(model) {
   if (p.ornWire < MIN_FEATURE_MM) told.push(`wire ${p.ornWire.toFixed(2)} mm built at the ${MIN_FEATURE_MM.toFixed(1)} mm assumed minimum feature`);
   const fit = all.length ? groups[0].curves[0].info : null;
   if (fit) for (const m of fit.told.filter((q) => /^tightness/.test(q))) told.push(`lead scroll: ${m}`);
-  return { scale, length, wire, groups, curves: all, region, told };
+  const tip = all.length ? Math.min(...all.map((c) => c.info.tip ?? c.info.wire)) : wire;
+  return { scale, length, wire, style: p.ornWireStyle === 'tapered' ? 'tapered' : 'constant', tip, groups, curves: all, region, told };
 }
 
 /* The model with its ornament: the frame's bands unchanged and first, the
@@ -610,7 +653,10 @@ export function withOrnament(model) {
   const orn = ornamentFor(model);
   const s = orn.scale;
   const shape = p.ornShape === 'round' ? 'round' : 'half-round';
-  const spines = orn.curves.map((c, i) => ({ id: `orn${i}`, pts: c.pts.map(([x, y]) => [x / s, y / s]), nrm: c.nrm, bandWidth: c.info.wire / s }));
+  // a tapered wire's local width rides on the spine as widthScale (the one
+  // offsetCurve reads); its crown thins with it but never under the floor
+  const wScale = (c) => (c.w ? c.w.map((x) => x / c.info.wire) : null);
+  const spines = orn.curves.map((c, i) => { const sp = { id: `orn${i}`, pts: c.pts.map(([x, y]) => [x / s, y / s]), nrm: c.nrm, bandWidth: c.info.wire / s }; const k = wScale(c); if (k) sp.widthScale = k; return sp; });
   const drawProf = wireProfile('half-round');
   const bands = spines.map((sp, i) => sweepSpine(sp, drawProf, { ...p, moldingWidth: orn.curves[i].info.wire / s, moldingDepth: orn.curves[i].info.wire / 2 / s }));
   let { x0, y0, x1, y1 } = model.box, strokes = model.strokes;
@@ -619,6 +665,12 @@ export function withOrnament(model) {
     for (const [x, y] of poly) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   }
   const prof = wireProfile(shape);
-  const solids = orn.curves.map((c, i) => ({ spine: { id: `orn${i}`, pts: c.pts, nrm: c.nrm, bandWidth: c.info.wire }, prof, depth: wireHeight(c.info.wire, shape) * p.ornProjection }));
+  const solids = orn.curves.map((c, i) => {
+    const depth = wireHeight(c.info.wire, shape) * p.ornProjection;
+    const spine = { id: `orn${i}`, pts: c.pts, nrm: c.nrm, bandWidth: c.info.wire };
+    const k = wScale(c);
+    if (k) { spine.widthScale = k; spine.depthScale = crownScale(c, depth); }
+    return { spine, prof, depth };
+  });
   return { ...model, bands: [...model.bands, ...bands], frameBox: model.box, box: { x0, y0, x1, y1 }, strokes, ornament: { ...orn, spines, solids, shape } };
 }

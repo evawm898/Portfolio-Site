@@ -93,6 +93,11 @@ export const PARAM_SPEC = [
   R('ornTightness', 'ornament', 'Tightness', 0, 1, 0.01, 0.5, '', ornOn),
   // the wire, in PRINT mm (a print feature: floored at MIN_FEATURE_MM)
   R('ornWire', 'ornament', 'Wire (print)', 1, 3.2, 0.05, 1.6, 'mm', ornOn),
+  // the wire's style (phase 3b, Eva's ruling 1): CONSTANT along the scroll,
+  // or TAPERED — full width through the body, thinning over each volute to
+  // half of it at the eye, floored at MIN_FEATURE_MM (the thinnest point)
+  { id: 'ornWireStyle', section: 'ornament', label: 'Wire style', kind: 'choice', default: 'constant', visibleWhen: ornOn,
+    options: [['constant', 'Constant'], ['tapered', 'Tapered — thins toward the volute']] },
   { id: 'ornCrest', section: 'ornament', label: 'Crest (top centre)', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },
   { id: 'ornCorners', section: 'ornament', label: 'Corners / springings', kind: 'choice', default: 'on', visibleWhen: (p) => ornOn(p) && !isOval(p), options: ON_OFF },
   { id: 'ornSides', section: 'ornament', label: 'Sides', kind: 'choice', default: 'off', visibleWhen: ornOn, options: ON_OFF },
@@ -117,7 +122,7 @@ export const PARAM_SPEC = [
   // shows a half-round wire's true section whatever is printed)
   { id: 'ornShape', section: 'print', label: 'Ornament wire', kind: 'choice', default: 'half-round', visibleWhen: ornOn,
     options: [['half-round', 'Half-round — flat back'], ['round', 'Round — on a wall']] },
-  R('ornProjection', 'print', 'Ornament relief (× wire)', 0.5, 3, 0.05, 1, '', ornOn),
+  R('ornProjection', 'print', 'Ornament relief (× wire)', 0.5, 3, 0.05, 1.25, '', ornOn),   // 1.25 (Eva, phase 3b): the default 1.6 mm half-round crown is 1.0 mm, on the floor
 ];
 
 /* The minimum printable feature, in millimetres. AN ASSUMPTION: the print

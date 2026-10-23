@@ -274,20 +274,38 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
   if (FL) {
     const F = R.MIN_FEATURE_MM;
     const grid = [];
-    for (const kind of ['C', 'S']) for (const tightness of [0, 0.5, 1]) for (const length of [30, 60, 120]) for (const wire of [1, 1.6, 3.2]) grid.push({ kind, tightness, length, wire, balance: kind === 'C' ? 0.6 : 1 });
+    for (const taper of [false, true]) for (const kind of ['C', 'S']) for (const tightness of [0, 0.5, 1]) for (const length of [30, 60, 120]) for (const wire of [1, 1.6, 3.2]) grid.push({ kind, tightness, length, wire, balance: kind === 'C' ? 0.6 : 1, taper });
     const scs = grid.map((q) => ({ q, c: FL.buildScroll(q) }));
     // turning between consecutive chords (atan2: never acos)
     const turnAt = (P, i) => { const ax = P[i][0] - P[i - 1][0], ay = P[i][1] - P[i - 1][1], bx = P[i + 1][0] - P[i][0], by = P[i + 1][1] - P[i][1]; return Math.atan2(ax * by - ay * bx, ax * bx + ay * by); };
     const circR = (a, b, c) => { const A = Math.hypot(b[0] - c[0], b[1] - c[1]), B = Math.hypot(a[0] - c[0], a[1] - c[1]), C = Math.hypot(a[0] - b[0], a[1] - b[1]); const ar = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2; return ar > 1e-15 ? A * B * C / (4 * ar) : Infinity; };
-    let sc1 = [], sc2 = [], sc3 = [], worstEye = 0, worstTurn = 0, worstGap = Infinity;
+    // THE TAPER LAW RESTATED (phase 3b, Eva's ruling 1): full width t through
+    // the body, linear in arc length over each volute (its last `share` of the
+    // half) down to the tip max(F, ½ t) at the eye — written here from the
+    // ruling's numbers and the module's declared share, never from c.w
+    const TIP = (t) => Math.max(F, 0.5 * t);
+    const lawW = (q, c, s) => { const t = Math.max(F, q.wire); if (!q.taper) return t; const beta = Math.min(1, Math.max(0.3, q.balance)), h2 = q.length / (1 + beta), h1 = q.length - h2, h = s < 0 ? h1 : h2, a = Math.abs(s), sv = h * (1 - c.info.share); return a <= sv ? t : t + (TIP(t) - t) * Math.min(1, (a - sv) / (h - sv)); };
+    // the emitted wall widths of a one-wire relief: per row, first to last column
+    const wallW = (rel) => { const pt = rel.parts[0], P = rel.positions, w = []; for (let v = 0; v < pt.V; v++) { const i0 = 3 * pt.T(v, 0), i1 = 3 * pt.T(v, pt.C - 1); w.push(Math.hypot(P[i0] - P[i1], P[i0 + 1] - P[i1 + 1])); } return w; };
+    const crownZ = (rel) => { const pt = rel.parts[0], P = rel.positions, z = []; for (let v = 0; v < pt.V; v++) { let m = -Infinity; for (let k = 0; k < pt.C; k++) m = Math.max(m, P[3 * pt.T(v, k) + 2]); z.push(m - 1); } return z; };
+    let sc1 = [], sc2 = [], sc3 = [], sc8 = [], worstEye = 0, worstTurn = 0, worstGap = Infinity;
+    const thinnest = { false: Infinity, true: Infinity }, lawErr = { false: 0, true: 0 }, leastCrown = { false: Infinity, true: Infinity };
     for (const { q, c } of scs) {
       const rel = FL.scrollRelief([c], { baseZ: 1 });
       const a = RL.analyzeStl(RL.exportStl(rel)), cc = RL.connected(rel);
-      if (a.boundary !== 0 || cc.comps !== 1) sc1.push(`${q.kind} τ${q.tightness} L${q.length} t${q.wire}: boundary ${a.boundary}, ${cc.comps} regions`);
+      if (a.boundary !== 0 || cc.comps !== 1) sc1.push(`${q.kind} τ${q.tightness} L${q.length} t${q.wire}${q.taper ? ' tapered' : ''}: boundary ${a.boundary}, ${cc.comps} regions`);
       const P = c.pts, n = P.length, t = Math.max(F, q.wire);
+      // SC8: the emitted widths ARE the restated law, the thinnest ≥ F, and a
+      // tapered crown is never under min(F, its body crown)
+      const ww = wallW(rel), cz = crownZ(rel), D = t / 2;
+      if (ww.length !== n) sc8.push(`${q.kind} L${q.length}: ${ww.length} rows for ${n} stations`);
+      for (let i = 0; i < Math.min(n, ww.length); i++) { const e = Math.abs(ww[i] - lawW(q, c, c.u[i])); lawErr[q.taper] = Math.max(lawErr[q.taper], e); thinnest[q.taper] = Math.min(thinnest[q.taper], ww[i]); leastCrown[q.taper] = Math.min(leastCrown[q.taper], cz[i]); }
+      if (Math.min(...ww) < F - 1e-9) sc8.push(`${q.kind} L${q.length} t${q.wire}${q.taper ? ' tapered' : ''}: wire ${Math.min(...ww).toFixed(4)} mm under the floor`);
+      if (Math.min(...cz) < Math.min(F, D) - 1e-9) sc8.push(`${q.kind} L${q.length} t${q.wire}${q.taper ? ' tapered' : ''}: crown ${Math.min(...cz).toFixed(4)} mm under min(F, ${D})`);
       // the eye: the radius at each END, read off the last three vertices, is
-      // the restated floor (t + F)/2 — the wire's inner edge keeps F/2 of radius
-      const eyeWant = (t + F) / 2;
+      // the restated floor (t_eye + F)/2 — the wire's inner edge keeps F/2 of
+      // radius on the wire's LOCAL width at the eye (the tip, tapered)
+      const eyeWant = ((q.taper ? TIP(t) : t) + F) / 2;
       // the radius of curvature is LINEAR in arc length through the volute (a
       // log spiral), so it is extrapolated to the end vertex from the two last
       // triples' circumradii (each the radius at its middle vertex)
@@ -320,14 +338,16 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       // at least π between, centreline distance less the wire
       let cum = [0]; for (let i = 1; i < n - 1; i++) cum.push(cum[i - 1] + turnAt(P, i)); cum.push(cum[n - 2]);
       let g = Infinity;
-      for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) if (Math.abs(cum[j] - cum[i]) >= Math.PI) g = Math.min(g, Math.hypot(P[j][0] - P[i][0], P[j][1] - P[i][1]) - t);
+      // less the two LOCAL half widths, read off the emitted walls
+      for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) if (Math.abs(cum[j] - cum[i]) >= Math.PI) g = Math.min(g, Math.hypot(P[j][0] - P[i][0], P[j][1] - P[i][1]) - (ww[i] + ww[j]) / 2);
       worstGap = Math.min(worstGap, g);
       // within the chord's own turning step of the curve's π
       if (g < F - 1e-6) sc3.push(`${q.kind} τ${q.tightness} L${q.length} t${q.wire}: self-gap ${g.toFixed(4)} mm`);
     }
     rec('SC1 every scroll on the vocabulary grid is a closed solid: boundary 0 and one voxel region', sc1.length === 0, `${scs.length} scrolls${sc1.length ? ': ' + sc1.slice(0, 3).join('; ') : ''}`);
     rec('SC2 the drawn scroll is the law: each eye (the end vertices\' radius, extrapolated) is the restated floor (t + F)/2 within two steps of the spiral\'s own slope, each volute\'s drawn turns are the reported ones, never above the asked', sc2.length === 0, `worst eye ${(100 * worstEye).toFixed(3)}%, worst turns ${worstTurn.toFixed(4)}${sc2.length ? ' — ' + sc2.slice(0, 3).join('; ') : ''}`);
-    rec('SC3 no wire comes within a feature of its own coil, eye or mouth (restated off the emitted chords)', sc3.length === 0, `least self-gap ${worstGap.toFixed(4)} mm against ${F}${sc3.length ? ' — ' + sc3.slice(0, 3).join('; ') : ''}`);
+    rec('SC3 no wire comes within a feature of its own coil, eye or mouth (restated off the emitted chords, less the LOCAL widths off the emitted walls)', sc3.length === 0, `least self-gap ${worstGap.toFixed(4)} mm against ${F}${sc3.length ? ' — ' + sc3.slice(0, 3).join('; ') : ''}`);
+    rec('SC8 the wire\'s width is the restated law off the emitted walls: constant at t, or tapered — t through the body, linear over each volute to max(F, ½ t) at the eye; never under F, and a tapered crown never under min(F, its body crown)', sc8.length === 0 && lawErr.false < 1e-9 && lawErr.true < 1e-9, `constant: thinnest ${thinnest.false.toFixed(4)} mm, law error ${lawErr.false.toExponential(1)}, least crown ${leastCrown.false.toFixed(4)} · tapered: thinnest ${thinnest.true.toFixed(4)} mm, law error ${lawErr.true.toExponential(1)}, least crown ${leastCrown.true.toFixed(4)}${sc8.length ? ' — ' + sc8.slice(0, 3).join('; ') : ''}`);
     const thin = FL.buildScroll({ kind: 'C', length: 60, tightness: 0.5, wire: 0.6 });
     rec('SC4 a wire under the floor is built AT it and told', thin.info.wire === F && thin.info.told.some((x) => /wire 0\.60/.test(x)), thin.info.told.join('; '));
     // SC5 mirror: x -> -x to the bit, and the group's junctions
@@ -335,22 +355,31 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
     const mirOk = m0.pts.every((p, i) => Object.is(p[0], -c0.pts[i][0]) && Object.is(p[1], c0.pts[i][1]));
     rec('SC5 a mirrored scroll is its source with x negated, to the bit', mirOk, `${m0.pts.length} vertices`);
     const sc6 = [];
-    let leastPair = Infinity, longestWeb = 0;
-    for (const n of [2, 3, 4, 5]) for (const tightness of [0, 1]) {
-      const g = FL.buildGroup({ n, length: 60, tightness, wire: 1.6 });
+    let leastPair = Infinity, longestWeb = 0, dropped = 0;
+    for (const taper of [false, true]) for (const n of [2, 3, 4, 5]) for (const tightness of [0, 1]) {
+      const g = FL.buildGroup({ n, length: 60, tightness, wire: 1.6, taper });
       const cs = g.map((x) => x.curve);
+      // every asked child is BUILT: a child that cannot join is dropped (told),
+      // and a clause over the children that exist would then examine nothing
+      const dropTold = g[0].curve.info.told.filter((m) => /not built/.test(m)).length;
+      if (g.length + dropTold !== n || g.length < 2) sc6.push(`group ${n}${taper ? ' tapered' : ''} τ${tightness}: ${g.length} of ${n} scrolls built, ${dropTold} told dropped`);
+      dropped += n - g.length;
       const rel = FL.scrollRelief(cs, { baseZ: 1 });
       if (RL.analyzeStl(RL.exportStl(rel)).boundary !== 0 || RL.connected(rel).comps !== 1) sc6.push(`group ${n}: not one closed region`);
       // each child OVERLAPS its parent by at least the embed at the contact:
       // least centreline distance ≤ (t_p + t_c)/2 − EMBED, restated
       for (const x of g.filter((y) => y.role === 'child')) {
-        const p = cs[x.parent], tp = p.info.wire, tc = x.curve.info.wire;
-        let d = Infinity; for (const a of x.curve.pts) for (const b of p.pts) d = Math.min(d, Math.hypot(a[0] - b[0], a[1] - b[1]));
-        if (d > (tp + tc) / 2 - RL.EMBED_MM + 1e-6) sc6.push(`group ${n}: a child stands ${(d - (tp + tc) / 2).toFixed(3)} mm off its parent (wants an overlap of ${RL.EMBED_MM})`);
+        const p = cs[x.parent], wl = (c, i) => (c.w ? c.w[i] : c.info.wire);
+        // the overlap at the contact, on the LOCAL widths there
+        let d = Infinity; x.curve.pts.forEach((a, i) => p.pts.forEach((b, j) => { d = Math.min(d, Math.hypot(a[0] - b[0], a[1] - b[1]) - (wl(x.curve, i) + wl(p, j)) / 2); }));
+        // the bar is the embed RESTATED as the feature (charter §3: the embed is
+        // MIN_FEATURE_MM, a length from a length) — never RL.EMBED_MM, which is
+        // the quantity a broken embed would move with
+        if (d > -F + 1e-6) sc6.push(`group ${n}${taper ? ' tapered' : ''}: a child stands ${d.toFixed(3)} mm off its parent (wants an overlap of ${F})`);
       }
       for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) { const pg = FL.pairGap(cs[i], cs[j]); leastPair = Math.min(leastPair, pg.gap); longestWeb = Math.max(longestWeb, pg.web); if (pg.gap < F - 1e-9) sc6.push(`group ${n} τ${tightness}: wires ${i}-${j} ${pg.gap.toFixed(3)} mm apart outside their junction`); }
     }
-    rec('SC6 a group is one closed region; each child overlaps its parent by the embed; outside each junction no two wires come within a feature', sc6.length === 0, `least pair gap ${leastPair.toFixed(4)} mm, longest junction web ${longestWeb.toFixed(1)} mm${sc6.length ? ' — ' + sc6.slice(0, 3).join('; ') : ''}`);
+    rec('SC6 a group is one closed region; every asked child is built or told dropped, never all; each child overlaps its parent by the embed; outside each junction no two wires come within a feature', sc6.length === 0, `least pair gap ${leastPair.toFixed(4)} mm, longest junction web ${longestWeb.toFixed(1)} mm, ${dropped} children dropped (told)${sc6.length ? ' — ' + sc6.slice(0, 3).join('; ') : ''}`);
   }
 
   // (it costs ~1,800 builds, so a mutant of another file does not pay it)
@@ -363,20 +392,35 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
     // gap ≥ F and a hundredth of a turn more closes it (unless the top is the
     // 1¾ ceiling), and a share raised above the base was needed (the base
     // share could not hold 1¾ turns).
-    const sc7 = []; let rows = 0;
-    for (const kind of ['C', 'S']) for (const length of [30, 60, 120]) for (const wire of [1.0, 1.6, 2.4]) {
+    // phase 3b (Eva's ruling 2): the volute's share is HELD at its step-1
+    // value, 0.5 — restated here as the ruled number — and the slider's top
+    // is the most that prints. The gap is the gate's OWN: the emitted
+    // centreline's turning, less the two local half widths of the RESTATED
+    // taper law — never frame-filigree's selfGap.
+    const RULED_SHARE = 0.5;
+    const sc7 = []; let rows = 0; const tops = [];
+    for (const taper of [false, true]) for (const kind of ['C', 'S']) for (const length of [30, 60, 120]) for (const wire of [1.0, 1.6, 2.4]) {
       rows++;
       let prev = -Infinity, dead = 0, last = null;
-      for (let i = 0; i <= 100; i++) { const c = FL.buildScroll({ kind, length, tightness: i / 100, wire, balance: 0.6 }); if (!(c.info.turnsHeld > prev + 1e-6)) dead++; prev = c.info.turnsHeld; last = c; }
-      if (dead) sc7.push(`${kind} L${length} t${wire}: ${dead} dead steps`);
-      const sh = last.info.share, top = last.info.turnsHeld, spec = { kind, length, wire, balance: 0.6, share: sh };
-      const gapAt = (turns, share = sh) => FL.selfGap(FL.scrollCurve({ ...spec, share, turns }), wire).gap;
-      if (gapAt(top) < F) sc7.push(`${kind} L${length} t${wire}: the top ${top.toFixed(3)} turns does not print`);
-      if (top < FL.VOLUTE_TURNS[1] - 1e-9 && gapAt(top + 0.01) >= F) sc7.push(`${kind} L${length} t${wire}: ${(top + 0.01).toFixed(3)} turns still prints — the range stops short`);
-      if (sh < FL.VOLUTE_SHARE || sh > FL.VOLUTE_SHARE_MAX) sc7.push(`${kind} L${length} t${wire}: share ${sh} outside the declared range`);
-      if (sh > FL.VOLUTE_SHARE + 1e-9 && gapAt(FL.VOLUTE_TURNS[1], FL.VOLUTE_SHARE) >= F) sc7.push(`${kind} L${length} t${wire}: the share was raised though the base share holds 1¾ turns`);
+      for (let i = 0; i <= 100; i++) { const c = FL.buildScroll({ kind, length, tightness: i / 100, wire, balance: 0.6, taper }); if (!(c.info.turnsHeld > prev + 1e-6)) dead++; prev = c.info.turnsHeld; last = c; }
+      const tag = `${kind} L${length} t${wire}${taper ? ' tapered' : ''}`;
+      if (dead) sc7.push(`${tag}: ${dead} dead steps`);
+      const sh = last.info.share, top = last.info.turnsHeld, t = Math.max(F, wire);
+      tops.push(`${tag} ${top.toFixed(2)}`);
+      const tip = taper ? Math.max(F, 0.5 * t) : t, h2 = length / 1.6, h1 = length - h2;
+      const wl = (s) => { if (!taper) return t; const h = s < 0 ? h1 : h2, a = Math.abs(s), sv = h * (1 - RULED_SHARE); return a <= sv ? t : t + (tip - t) * Math.min(1, (a - sv) / (h - sv)); };
+      const gapAt = (turns) => {
+        const c = FL.scrollCurve({ kind, length, wire: t, balance: 0.6, share: RULED_SHARE, turns, taper }), P = c.pts, n = P.length;
+        const cum = [0]; for (let i = 1; i < n - 1; i++) { const ax = P[i][0] - P[i - 1][0], ay = P[i][1] - P[i - 1][1], bx = P[i + 1][0] - P[i][0], by = P[i + 1][1] - P[i][1]; cum.push(cum[i - 1] + Math.atan2(ax * by - ay * bx, ax * bx + ay * by)); }
+        cum.push(cum[n - 2]);
+        let g = Infinity; for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) if (Math.abs(cum[j] - cum[i]) >= Math.PI) g = Math.min(g, Math.hypot(P[j][0] - P[i][0], P[j][1] - P[i][1]) - (wl(c.u[i]) + wl(c.u[j])) / 2);
+        return g;
+      };
+      if (Math.abs(sh - RULED_SHARE) > 1e-12) sc7.push(`${tag}: share ${sh} — the volute grew past the ruled ${RULED_SHARE}`);
+      if (gapAt(top) < F - 2e-3) sc7.push(`${tag}: the top ${top.toFixed(3)} turns does not print (gap ${gapAt(top).toFixed(4)})`);
+      if (top < FL.VOLUTE_TURNS[1] - 1e-9 && gapAt(top + 0.01) >= F) sc7.push(`${tag}: ${(top + 0.01).toFixed(3)} turns still prints — the range stops short`);
     }
-    rec('SC7 the tightness slider has no dead travel: every 0.01 step builds more turns, at 30/60/120 mm on 1.0/1.6/2.4 mm wire, and its top is exactly the most that prints', sc7.length === 0, `${rows} scrolls × 101 steps${sc7.length ? ' — ' + sc7.slice(0, 3).join('; ') : ''}`);
+    rec('SC7 the tightness slider has no dead travel: every 0.01 step builds more turns, at 30/60/120 mm on 1.0/1.6/2.4 mm wire, constant and tapered, the volute share held at the ruled 0.5, and the top exactly the most that prints (the gate\'s own gap on local widths)', sc7.length === 0, `${rows} scrolls × 101 steps; tops (turns): ${tops.join(', ')}${sc7.length ? ' — ' + sc7.slice(0, 3).join('; ') : ''}`);
   }
 
   // OR — the ORNAMENT attached (phase 3a, step 2), on every skeleton at the
@@ -397,6 +441,10 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       ['rect crowded (groups must give way)', { skeleton: 'rect', width: 70, height: 120, ...DENSE, ornScale: 6 }],
       ['dense, round wire, tight, thick', { ...DENSE, ornShape: 'round', ornTightness: 1, ornWire: 3.2 }],
     ];
+    // every row again with the TAPERED wire (phase 3b, ruling 1)
+    for (const [nm, q] of OROWS.slice()) OROWS.push([`${nm} · tapered`, { ...q, ornWireStyle: 'tapered' }]);
+    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : 'constant');
+    const ST = { constant: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, tapered: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 } };
     // the gate's own band footprints, in print mm: an open band is one
     // polygon, a closed loop two (outer, inner) — never bridged
     const pip = (pt, poly) => { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) ins = !ins; } return ins; };
@@ -404,6 +452,10 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
     const depthIn = (fs_, q) => { const ins = fs_.some((f) => f.inside(q)); let d = Infinity; for (const f of fs_) for (const l of f.loops) d = Math.min(d, G.distToPoly(q, l)); return ins ? d : -d; };
     const dseg = (q, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy; let t = l2 ? ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy); };
     const minD = (A, B) => { let m = Infinity; for (const q of A) for (let k = 0; k < B.length - 1; k++) m = Math.min(m, dseg(q, B[k], B[k + 1])); return m; };
+    // the least wall-to-wall clearance on LOCAL widths: per station of A and
+    // segment of B, centreline distance less the two local half widths (the
+    // wider end of B's segment — the stricter reading)
+    const minDL = (A, tA, B, tB) => { let m = Infinity; for (let i = 0; i < A.length; i++) for (let k = 0; k < B.length - 1; k++) m = Math.min(m, dseg(A[i], B[k], B[k + 1]) - (tA[i] + Math.max(tB[k], tB[k + 1])) / 2); return m; };
     const or1 = [], or2 = [], or3 = [], or4 = [], or5 = [], or6 = [];
     let leastWire = Infinity, leastGap = Infinity, leastEmbed = Infinity, deepest = 0, built = 0, notBuilt = 0;
     for (const [name, q] of OROWS) {
@@ -420,7 +472,8 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
         for (let v = 0; v < pt.V; v++) { const i0 = 3 * pt.T(v, 0), i1 = 3 * pt.T(v, pt.C - 1); const A = [P[i0], P[i0 + 1]], B = [P[i1], P[i1 + 1]]; c.push([(A[0] + B[0]) / 2, (A[1] + B[1]) / 2]); t.push(Math.hypot(A[0] - B[0], A[1] - B[1])); }
         return { c, t, wire: Math.min(...t), part: pt };
       });
-      for (const w of W) { leastWire = Math.min(leastWire, w.wire); if (w.wire < F - 1e-9) or2.push(`${name}: a wire ${w.wire.toFixed(4)} mm wide`); }
+      const st = ST[styleOf(name)];
+      for (const w of W) { leastWire = Math.min(leastWire, w.wire); st.wire = Math.min(st.wire, w.wire); if (w.wire < F - 1e-9) or2.push(`${name}: a wire ${w.wire.toFixed(4)} mm wide`); }
       // which wire is in which group, and which side: groups.flatMap(curves, mirrored)
       const owner = []; let k = 0;
       orn.groups.forEach((g, gi) => { for (const side of ['R', 'L']) for (let i = 0; i < g.curves.length; i++) owner[k++] = { gi, side, i }; });
@@ -434,21 +487,20 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
         const C = W[x].c, n = C.length; let cum = [0];
         for (let i = 1; i < n - 1; i++) { const ax = C[i][0] - C[i - 1][0], ay = C[i][1] - C[i - 1][1], bx = C[i + 1][0] - C[i][0], by = C[i + 1][1] - C[i][1]; cum.push(cum[i - 1] + Math.atan2(ax * by - ay * bx, ax * bx + ay * by)); }
         cum.push(cum[n - 2]);
-        for (let i = 0; i < n; i += 2) for (let j = i + 2; j < n; j += 2) if (Math.abs(cum[j] - cum[i]) >= Math.PI) { const g = Math.hypot(C[j][0] - C[i][0], C[j][1] - C[i][1]) - W[x].wire; leastGap = Math.min(leastGap, g); if (g < F - 2e-3) { or3.push(`${name}: wire ${x} comes ${g.toFixed(3)} mm from its own coil`); i = n; break; } }
+        for (let i = 0; i < n; i += 2) for (let j = i + 2; j < n; j += 2) if (Math.abs(cum[j] - cum[i]) >= Math.PI) { const g = Math.hypot(C[j][0] - C[i][0], C[j][1] - C[i][1]) - (W[x].t[i] + W[x].t[j]) / 2; leastGap = Math.min(leastGap, g); st.gap = Math.min(st.gap, g); if (g < F - 2e-3) { or3.push(`${name}: wire ${x} comes ${g.toFixed(3)} mm from its own coil`); i = n; break; } }
         for (let y = x + 1; y < W.length; y++) {
           const same = owner[x].gi === owner[y].gi && owner[x].side === owner[y].side;
-          const half = (W[x].wire + W[y].wire) / 2;
-          if (!same) { const d = minD(W[x].c, W[y].c) - half; leastGap = Math.min(leastGap, d); if (d < F - 1e-6) or3.push(`${name}: wires ${x} and ${y} (different groups or sides) ${d.toFixed(3)} mm apart`); continue; }
+          if (!same) { const d = minDL(W[x].c, W[x].t, W[y].c, W[y].t); leastGap = Math.min(leastGap, d); st.gap = Math.min(st.gap, d); if (d < F - 1e-6) or3.push(`${name}: wires ${x} and ${y} (different groups or sides) ${d.toFixed(3)} mm apart`); continue; }
           // runs of either wire's stations within a feature of the other; each
           // must reach an overlap ≥ E (read from both wires)
           const runs = [];
-          for (const [A, B] of [[W[x].c, W[y].c], [W[y].c, W[x].c]]) {
+          for (const [A, B] of [[W[x], W[y]], [W[y], W[x]]]) {
             let run = null;
-            A.forEach((qq) => { const d = minD([qq], B) - half; if (d < F) { if (!run) run = { min: d }; run.min = Math.min(run.min, d); } else if (run) { runs.push(run); run = null; } });
+            A.c.forEach((qq, i) => { const d = minDL([qq], [A.t[i]], B.c, B.t); if (d < F) { if (!run) run = { min: d }; run.min = Math.min(run.min, d); } else if (run) { runs.push(run); run = null; } });
             if (run) runs.push(run);
           }
           for (const r of runs) { if (r.min > -E + 1e-6) { or3.push(`${name}: wires ${x} and ${y} graze at ${r.min.toFixed(3)} mm (neither a feature apart nor joined)`); break; } }
-          const outside = runs.length ? null : minD(W[x].c, W[y].c) - half; if (outside != null) leastGap = Math.min(leastGap, outside);
+          const outside = runs.length ? null : minDL(W[x].c, W[x].t, W[y].c, W[y].t); if (outside != null) { leastGap = Math.min(leastGap, outside); st.gap = Math.min(st.gap, outside); }
         }
       }
       // OR4 every half-group is ROOTED: each of its contacts with the band is
@@ -462,7 +514,7 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
           let run = null; const runs = [];
           w.c.forEach((qq, i) => { const cl = -depthIn(fs_, qq) - w.t[i] / 2; if (cl < F) { if (!run) run = { min: cl }; run.min = Math.min(run.min, cl); } else if (run) { runs.push(run); run = null; } });
           if (run) runs.push(run);
-          for (const r of runs) { if (r.min <= -E + 1e-6) { rooted = true; leastEmbed = Math.min(leastEmbed, -r.min); deepest = Math.max(deepest, -r.min); } else or4.push(`${name} group ${key}: a wire grazes the band at ${r.min.toFixed(3)} mm`); }
+          for (const r of runs) { if (r.min <= -E + 1e-6) { rooted = true; leastEmbed = Math.min(leastEmbed, -r.min); deepest = Math.max(deepest, -r.min); st.e0 = Math.min(st.e0, -r.min); st.e1 = Math.max(st.e1, -r.min); } else or4.push(`${name} group ${key}: a wire grazes the band at ${r.min.toFixed(3)} mm`); }
         }
         if (!rooted) or4.push(`${name} group ${key}: not rooted in the band (no contact reaches the ${E} mm embed)`);
       }
@@ -486,6 +538,7 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
     rec('OR4 every scroll group is rooted: each half has a contact with the band (the gate\'s own footprints) at least EMBED_MM deep, and no contact is a graze', or4.length === 0, `${built} groups built, ${notBuilt} given way (told); embeds ${leastEmbed.toFixed(3)}–${deepest.toFixed(3)} mm${or4.length ? ' — ' + or4.slice(0, 3).join('; ') : ''}`);
     rec('OR5 the ornament is mirror-symmetric to the bit: every left wire\'s emitted vertices are the right\'s with x negated', or5.length === 0, or5.slice(0, 2).join('; '));
     rec('OR6 the filigree off is the frame itself (no ornament field, the same SVG string)', or6.length === 0, or6.slice(0, 2).join('; '));
+    console.log(`     per wire style (off the emitted mesh): ${['constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
   }
 
   // base-tree byte identity, when a worktree is given
@@ -512,7 +565,7 @@ const MUTANTS = [
   { id: 'an-open-edge', file: 'relief', from: 'mesh.quad(T(V - 1, c), B(V - 1, c), B(V - 1, c + 1), T(V - 1, c + 1)); // far end', to: '', breaks: ['W', 'SC1', 'SC6'] },   // the scroll wires close on the same far-end cap
   // floats at BOTH ends: a mullion lifted off the sill alone still hangs from its light's springing, one region
   { id: 'a-detached-mullion', file: 'geometry', from: 'const m = lineSpine(`mullion${i}`, [info.mullionX[i - 1], floorY], [info.mullionX[i - 1], subSpring], [1, 0], 2);', to: 'const m = lineSpine(`mullion${i}`, [info.mullionX[i - 1], floorY + 2], [info.mullionX[i - 1], subSpring - 3], [1, 0], 2);', breaks: ['C', 'B'] },
-  { id: 'the-mesh-offsets-by-itself', file: 'relief', from: 'const off = offsetCurve(S, d);', to: 'const off = S.pts.map((q, i) => [q[0] + d * S.nrm[i][0], q[1] + d * S.nrm[i][1]]);', breaks: ['R'] },
+  { id: 'the-mesh-offsets-by-itself', file: 'relief', from: 'const off = offsetCurve(S, d);', to: 'const off = S.pts.map((q, i) => [q[0] + d * S.nrm[i][0], q[1] + d * S.nrm[i][1]]);', breaks: ['R', 'SC3', 'SC8'] },   // it also drops a tapered wire's widthScale: the walls come out constant
   { id: 'the-embed-removed', file: 'relief', from: 'export const EMBED_MM = MIN_FEATURE_MM;', to: 'export const EMBED_MM = 0;', breaks: ['B', 'F0', 'SC6'] },   // a child scroll then only TOUCHES its parent
   // phase 2b: a closed loop left OPEN at its seam, and the seam moved 0.1 mm
   { id: 'the-closing-strip-dropped', file: 'relief', from: 'const strips = closed ? V : V - 1, nx = (v) => (v + 1) % V;', to: 'const strips = V - 1, nx = (v) => (v + 1) % V;', breaks: ['W', 'Q'] },
@@ -521,8 +574,12 @@ const MUTANTS = [
   // child laid off its parent's back
   { id: 'the-scroll-gap-clamp-removed', file: 'filigree', from: 'if (selfGap(scrollCurve({ ...base, turns: asked }), t).gap >= MIN_FEATURE_MM) return', to: 'if (true) return', breaks: ['SC3', 'SC6', 'SC7', 'OR3'] },
   { id: 'the-tightness-range-not-fitted', file: 'filigree', from: 'fitMemo.set(key, fitUncached({ ...spec, wire: t }, t))', to: 'fitMemo.set(key, { share: VOLUTE_SHARE, turnsMax: VOLUTE_TURNS[1] })', breaks: ['SC7'] },
-  { id: 'the-eye-under-the-floor', file: 'filigree', from: 'const re = (t + MIN_FEATURE_MM) / 2;', to: 'const re = t / 2 + 0.1;', breaks: ['SC2', 'SC3'] },   // the eye itself is then a gap of 0.2 mm
-  { id: 'a-child-floats-off-its-parent', file: 'filigree', from: 'const off = (wire + tw) / 2 - EMBED_MM;', to: 'const off = (wire + tw) / 2 + 0.5;', breaks: ['SC6'] },
+  { id: 'the-eye-under-the-floor', file: 'filigree', from: 'const re = (tEye + MIN_FEATURE_MM) / 2;', to: 'const re = tEye / 2 + 0.1;', breaks: ['SC2', 'SC3', 'SC7'] },   // the eye itself is then a gap of 0.2 mm, so no turn count prints and the slider's top probe fails
+  // phase 3b: the tapered wire and the held share
+  { id: 'the-taper-tip-under-the-floor', file: 'filigree', from: 'export const taperTip = (t) => Math.max(MIN_FEATURE_MM, TAPER_TIP * t);', to: 'export const taperTip = (t) => TAPER_TIP * t;', breaks: ['SC8', 'OR2', 'SC2', 'SC7'] },   // the eye law and the top probe restate the floored tip too
+  { id: 'the-gap-clamp-reads-the-nominal-wire', file: 'filigree', from: '(curve.w ? (curve.w[i] + curve.w[j]) / 2 : t)', to: 't', breaks: ['SC7'] },
+  { id: 'the-volute-share-grows', file: 'filigree', from: 'return { share: VOLUTE_SHARE, turnsMax: at(VOLUTE_SHARE) };', to: 'if (at(VOLUTE_SHARE) >= VOLUTE_TURNS[1]) return { share: VOLUTE_SHARE, turnsMax: VOLUTE_TURNS[1] }; return { share: 0.8, turnsMax: at(0.8) };', breaks: ['SC7'] },
+  { id: 'a-child-floats-off-its-parent', file: 'filigree', from: 'const off = (wAt(lead, j) + tw) / 2 - EMBED_MM;', to: 'const off = (wAt(lead, j) + tw) / 2 + 0.5;', breaks: ['SC6'] },
   // phase 3a, step 2 — the ornament: a scroll left off its molding, the
   // graze rule removed (a gap under the floor between wire and band), the
   // group-clearance check removed (groups crowd under the floor), the mirror
@@ -544,7 +601,12 @@ async function negativeControl() {
     if (n !== 1) { console.log(`FAIL anchor ${m.id}: matches ${n} times`); process.exit(1); }
   }
   let bad = 0;
-  for (const m of MUTANTS) {
+  // --only=<id>[,...] re-verifies a subset (reported as one; every anchor
+  // above was still checked)
+  const only = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
+  const RUN = only.length ? MUTANTS.filter((m) => only.includes(m.id)) : MUTANTS;
+  if (only.length && RUN.length !== only.length) { console.log(`FAIL --only names a mutant that does not exist: ${only.filter((id) => !MUTANTS.some((m) => m.id === id)).join(', ')}`); process.exit(1); }
+  for (const m of RUN) {
     const gPath = path.join(ROOT, `_frame-geometry-mutant-${m.id}.js`), rPath = path.join(ROOT, `_frame-relief-mutant-${m.id}.js`);
     fs.writeFileSync(gPath, m.file === 'geometry' ? srcG.replace(m.from, m.to) : srcG);
     fs.writeFileSync(rPath, (m.file === 'relief' ? srcR.replace(m.from, m.to) : srcR).replace("from './frame-geometry.js'", `from './${path.basename(gPath)}'`));
@@ -561,7 +623,7 @@ async function negativeControl() {
     if (!ok) bad++;
     console.log(`${ok ? ' ok ' : 'FAIL'} mutant ${m.id}: fired ${red.join(',') || 'nothing'}${missed.length ? ' MISSED ' + missed.join(',') : ''}${unclaimed.length ? ' UNCLAIMED ' + unclaimed.join(',') : ''}`);
   }
-  console.log(`\n${MUTANTS.length - bad} of ${MUTANTS.length} mutants behave.`);
+  console.log(`\n${RUN.length - bad} of ${RUN.length} mutants behave${only.length ? ` (a SUBSET — ${MUTANTS.length - RUN.length} of ${MUTANTS.length} not run)` : ''}.`);
   process.exit(bad ? 1 : 0);
 }
 
