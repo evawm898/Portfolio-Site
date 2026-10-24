@@ -183,7 +183,7 @@ emitter's NAME rather than left to the visibility test.
   relabelled (the whole bloom, the tube) — declared in the byte tool's `ROW_DEF_MOVED_BY_PRED`.
 - **Coverage R1** (both instruments) counts the organs' lattice delta; **ST1** reads the stem's SHIPPED
   count, the lattice reported beside it (`latticeTris`).
-- **The mutants**: four in `tools/verify-bloom-apex-mutants.mjs`, scoped to two T5 rows, each witnessed on
+- **The mutants**: five in `tools/verify-bloom-apex-mutants.mjs`, scoped to two T5 rows, each witnessed on
   the mutated module's own organ record. Result in §9.
 
 ## 7. Bytes
@@ -254,4 +254,26 @@ no infill AND the base build carries a hub, a stem, a tube ring or an infloresce
 
 ## 9. Results of the gates, the mutants and the partition
 
-(filled in below at the close)
+- **Export gate, every textured row** (`--only '^TEXTURE( T5| CAP)?: '`, 35 rows, Chromium): 34 export
+  watertight and pass every clause, 1 is the declared refusal (XR1 at 1,873,730). Reached in three runs, each
+  failure diagnosed and fixed or declared (§7b, §7c) — the last seven rows passed together after the fixes.
+- **Connectedness**, the same rows: every one ONE connected piece (27 + the 7 re-run).
+- **The Node preflight** (`bloom-export-watertight.yml`'s): defaults bar and its control, edge profile (E0–E7,
+  the block-80 smoke rows among its draws), the grid (915 checks), the combination gate (270 cells, all
+  declared), the tube (TU0–TU6), the wall instrument (V1–V5), the stem channel, nodes and cut, off-station,
+  rim arc — all PASS. `bloom-smoke --check`: 330 rows over 76 blocks, 216 families both ways (TX10, TX11 in).
+- **The five mutants** (`--rows=surface texture T5`, a SUBSET, the clean control silent):
+  `a-buried-face-is-textured` fires TX11 (and TX7); `the-hub-is-skipped` fires TX10;
+  `the-stem-normal-points-inward` fires TX11 (and TX7) — **its claim was TX10 and the table said otherwise**:
+  negating the normal also turns the escape rays inward, the wall reads buried and is left smooth, so what
+  breaks is the visible wall going unrelieved; `the-stem-relief-is-applied-inward` (added for TX10's normal
+  clause) fires TX10 (and TX1), once TX10 read the DISPLACEMENT each vertex took rather than its recorded
+  normal; `the-tube-ring-has-its-own-field` fires TX2. The full sweep is CI's.
+- **The byte partition** (`verify-bloom-surface-bytes --movers-predicate t5-organs`, both modes, the whole
+  1,568-row matrix in 14 chunks against a worktree of `b3163de`): **PASS — 33 of 33 predeclared movers moved
+  (20 base rows: the textured rows of blocks 77 and 79, each carrying a hub; and block 80's 13 added rows),
+  0 floats moved on the 1,535 holders**, positionally under `Object.is`, over 1,871,004,996 export floats and
+  82,569,640 captured-grid values. The shipping default is a holder. The `floretPitchFloorMm` change landed
+  mid-partition; it is Node-identical by construction (the same integers) and the inflorescence rows were
+  re-run on the final tree to say so.
+- **`frozen/phase86`** is the 1,555 rows at `b3163de`, registered in both maps.
