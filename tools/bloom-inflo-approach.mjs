@@ -222,12 +222,21 @@ export function measureInfloApproachMm(G, state, measure) {
   const P = acc.positions;
   const rachis = m.stem;
   /* inside the rachis's own solid: the joins' region (see the header) */
-  /* AN UMBEL's pedicels meet at the KNOT (the umbel session): the knot is the
-     junction every pedicel roots in, so a vertex inside the knot's own emitted
-     solid is the umbel's join and is excluded exactly as the rachis's is — a
-     REGION, named, the one place the design puts every pedicel into one solid. */
+  /* AN UMBEL's pedicels meet at the KNOT (the umbel session), built as a squat
+     BOSS since Eva's Oct 23 ruling: the junction every pedicel roots in, so a
+     vertex inside the boss's own emitted solid is the umbel's join and is
+     excluded exactly as the rachis's is — a REGION, named, the one place the
+     design puts every pedicel into one solid. The region is read off the
+     boss's EMITTED faces: the flat band, and below it the 45 deg underside
+     closing at its own emitted radius. */
   const K = B.knot || null;
-  const insideKnot = (p) => !!K && Math.hypot(p[0] - K.centre[0], p[1] - K.centre[1], p[2] - K.centre[2]) < K.radiusMinMm;
+  const insideKnot = (p) => {
+    if (!K) return false;
+    const r = Math.hypot(p[0] - K.centre[0], p[1] - K.centre[1]), z = p[2];
+    if (z >= K.topZ || z <= K.bottomZ) return false;
+    if (z >= K.rimBottomZ) return r < K.radiusMinMm;
+    return K.flareRMm !== null && r < K.flareRMm + (z - K.bottomZ);
+  };
   const outsideRachis = (p) => G.freeStemDistanceMm(rachis, p[0], p[1], p[2]) > 0 && !insideKnot(p);
   const blocks = B.placed.map((q, k) => ({ lo: q.at, hi: q.at + q.tris * 9, owner: `floret${k}`, q }));
   const capped = (d) => (d >= SEARCH_CAP_MM ? SEARCH_CAP_MM : d);

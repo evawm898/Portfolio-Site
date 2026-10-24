@@ -6722,7 +6722,7 @@ Sheet: `node tools/shot-bloom-node-laws.mjs <png>`.
 
 **A BLOOM CAN BE AN UMBEL: FLORETS ON PEDICELS FROM ONE KNOT AT THE STEM'S TOP, THE HEAD A TOGGLE THAT
 SHIPS OFF** (the umbel session, Oct 22 — Eva's rulings of Oct 21–22, the spider lily; read
-`docs/bloom-umbel-outcome.md` before touching `umbelKnot`, `umbelIsAbsent` / `umbelHeadIsAbsent`, `HUB_ABSENT`,
+`docs/bloom-umbel-outcome.md` before touching `umbelBoss`, `umbelRootDiscReachMm`, `umbelIsAbsent` / `umbelHeadIsAbsent`, `HUB_ABSENT`,
 `inflorescencePlan`'s umbel arm, the knot in `buildInflorescenceInto`, `headPresent` / `racemePresent`,
 `umbelClauses` (UM0–UM4) or block 78).
 - **The raceme was probed first and cannot do it**: `floretNodes 1` whorled is exactly three florets, 66 mm
@@ -6731,11 +6731,19 @@ SHIPS OFF** (the umbel session, Oct 22 — Eva's rulings of Oct 21–22, the spi
   raceme's own on ONE node; never a second law.
 - `inflorescence` UMBEL with `umbelFlorets` (2–12, default 6) and `umbelHead` (OFF / ON, default OFF). The
   raceme's node count, phyllotaxy, corymb and gradient hide and are inert under UMBEL (`racemePresent`).
-- **The knot is derived**: the root ring `rho = max((rP + gap/2)/sin(pi/n), head ON ? outerR + rP + gap : 0)`
-  (one printable gap between neighbours — the 90-deg parallel case — and, with the head ON, off the stem that
-  runs on past the knot); the knot is the sphere `rho + rP + gap/2` (the least one is an exact tangency that
-  WELDS — 749 within-shell pairs at 90 deg head ON). Head OFF: centred on the stem's top end, which ends
-  there; the florist's cut stays on the free end (UM4). Head ON: on the stem at the reach-inset depth.
+- **RULED Oct 23: 6 florets, head OFF is the default.**
+- **RULED Oct 23: the floret-stem contact at -60° is accepted as declared.**
+- **RULED Oct 23: the knot becomes a flatter boss (this session).** §9 of the outcome doc.
+- **The ring is derived**: `rho = max((rP + gap/2)/sin(pi/n), head ON ? outerR + rP + gap : 0)` (one printable gap
+  between neighbours — the 90-deg parallel case — and, with the head ON, off the stem that runs on past it).
+- **The junction is a BOSS, not a sphere** (`umbelBoss`; the sphere read as a ball, 12 mm at 6 florets, 19.45 at
+  12): a flat-topped band of radius `R` = the root disc's farthest reach from the axis (`umbelRootDiscReachMm`, closed
+  form) + gap/2, half-height `h` = `rP |cos pedicelAngle|` + gap/2 (the one angle IS the steepest pedicel's), and a
+  45° underside — the unsupported-overhang law — in to `outerR - gap/2` inside the stem's wall, closed flat there.
+  Half a gap on every face so no root-disc edge lies ON the boss (the sphere's exact tangency welded: 749 pairs).
+  288 triangles against the sphere's 2,208; 10.72 x 6.32 mm at 6 florets / 35°. A vertical pedicel crosses exactly
+  0.500 mm of it — ID2's half-feature floor, met (reported). Head OFF: centred on the stem's top end, which ends
+  inside the band; the florist's cut stays on the free end (UM4). Head ON: on the stem at the reach-inset depth.
 - **Head OFF builds no head at all**: `buildBloomBody` emits no petal, hub, stamen, style or sepal and reports
   `HUB_ABSENT` (`absent: true`) in place of the hub record; every head-only family (form, J, ST4+, JS, JG, SP, Z,
   VS5, coverage, crowding, ST9's sphere channel) stands down on that record, and UM0 holds it true against the
@@ -6746,11 +6754,14 @@ SHIPS OFF** (the umbel session, Oct 22 — Eva's rulings of Oct 21–22, the spi
   1,506 rows the umbel first froze, so its copy was dropped and block, route and phase each moved up one).
 - **The florets of one umbel overlap by construction** (no internode): every row but the two-floret ones reads
   0.0000 mm floret-to-floret — declared by value in `INFLO_APPROACH_XFAIL` and in the combination gate's
-  `umbel-florets-x-angle`, never clamped. ST9 names the knot by its own `triRange`.
+  `umbel-florets-x-angle`, never clamped. ST9 names the boss by its own `triRange`.
 - Budget corner (12 x 12 petals x 1.00, head ON): 1,381,266 export tris, 92.1%, measured before building.
-- Gates: UM0–UM4 in both STL gates; four witnessed mutants in the apex table (`/^an umbel/` rows); panel route
+- Gates: UM0–UM4 in both STL gates (UM1/UM2 restated for the boss — UM1 rebuilds `R`, `h` and the underside from the
+  controls by a brute disc-rim maximisation, never the geometry's closed form); five witnessed mutants in the apex table
+  (`/^an umbel/` rows; `the-boss-radius-is-typed`, `the-boss-height-is-typed`); panel route
   (ap) (THIRTY-THREE routes); three combination pairs; block 78 (27 rows, 1,552), smoke block 78 (8, `--conn`).
-  Sheet: `node tools/shot-bloom-umbel.mjs <dir> --png docs/img/umbel.png`.
+  Sheet: `node tools/shot-bloom-umbel.mjs <dir> --png docs/img/umbel.png`; the boss's before/after junction sheet
+  `node tools/shot-bloom-umbel-boss.mjs docs/img/umbel-boss.png --base <worktree>` (side-on and from below).
 
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of

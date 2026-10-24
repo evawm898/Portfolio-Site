@@ -1516,7 +1516,7 @@ const MUTANTS = [
     witness: (M, C) => {
       const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); const q = b.inflorescenceBuilt.placed[0]; const K = b.inflorescenceBuilt.knot; return Math.hypot(q.root[0] - K.centre[0], q.root[1] - K.centre[1]) - K.radiusMm; };
       const m = f(M), c = f(C);
-      return (m > 0 && c < 0) ? null : `the root stands ${m.toFixed(3)} mm past the knot's surface on the mutant and ${c.toFixed(3)} on the clean tree`;
+      return (m > 0 && c < 0) ? null : `the root stands ${m.toFixed(3)} mm past the boss's rim on the mutant and ${c.toFixed(3)} on the clean tree`;
     } },
   { id: 'the-head-is-built-while-toggled-off', rows: /^an umbel/,
     why: "the head toggle is read and ignored: a spider lily asked with no head builds the whole head at the stem's top anyway — a perfectly good closed solid, watertight, one piece",
@@ -1527,14 +1527,25 @@ const MUTANTS = [
       const m = f(M), c = f(C);
       return (m > 0 && c === 0) ? null : `the head built ${m} petals on the mutant and ${c} on the clean tree with the head OFF`;
     } },
-  { id: 'the-knot-is-typed', rows: /^an umbel/,
-    why: "the junction knot is a typed 6 mm sphere instead of the size the count and the pedicel radius derive — at twelve florets the pedicels then root on a ring wider than the knot",
-    find: '  const radiusMm = rho + rP + MIN_FEATURE_MM / 2;',
+  /* RE-ANCHORED by the boss session (Eva's ruling, Oct 23): the junction is a
+     squat BOSS now, and the typed size is the boss's RIM radius. */
+  { id: 'the-boss-radius-is-typed', rows: /^an umbel/,
+    why: "the junction boss's rim is a typed 6 mm radius instead of the reach the count, the pedicel radius and the angle derive — at twelve florets the pedicels then root on a ring wider than the boss, every root disc out past its rim",
+    find: '  const radiusMm = umbelRootDiscReachMm(rho, rP, angleDeg) + gap / 2;',
     into: '  const radiusMm = 6;', names: ['UM1', 'UM2'],
     witness: (M, C) => {
       const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE({ umbelFlorets: 12 })).inflorescenceBuilt.knot.radiusMm;
       const m = f(M), c = f(C);
-      return (Math.abs(m - 6) < 1e-9 && Math.abs(c - 6) > 1e-6) ? null : `the knot is ${m} mm on the mutant and ${c} on the clean tree`;
+      return (Math.abs(m - 6) < 1e-9 && Math.abs(c - 6) > 1e-6) ? null : `the boss's rim is ${m} mm on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-boss-height-is-typed', rows: /^an umbel/,
+    why: "the junction boss's band is a typed one-feature half-height instead of the root disc's own reach at the pedicel's angle — at the shipped 35 deg a 1.5 mm pedicel's root disc reaches 1.23 mm above and below its ring, so its edge stands out through both faces of a 1 mm band: watertight, one piece, and the disc no longer rooted inside solid",
+    find: '  const halfHeightMm = rP * Math.abs(Math.cos((angleDeg * Math.PI) / 180)) + gap / 2;',
+    into: '  const halfHeightMm = MIN_FEATURE_MM;', names: ['UM1', 'UM2'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescenceBuilt.knot.halfHeightMm;
+      const m = f(M), c = f(C);
+      return (Math.abs(m - 1) < 1e-9 && c > 1.2) ? null : `the boss's half-height is ${m} mm on the mutant and ${c} on the clean tree`;
     } },
   { id: 'the-umbel-sits-on-the-cut-end', rows: /^an umbel/,
     why: "the head-off umbel's node is put at the stem's TIP — the end the florist's cut is on — so the knot swallows the cut and the umbel hangs from the free end: watertight, one piece",
@@ -4052,9 +4063,9 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'pedicelLength', value: '250' }] },
   /* THE UMBEL (the umbel session): six florets with the head OFF, and twelve
      with the head ON — scoped to the four umbel mutants and they to these. */
-  { label: 'an umbel: six florets, the head OFF (the spider lily\'s default)', for: /umbel|head-is-built|knot-is-typed/,
+  { label: 'an umbel: six florets, the head OFF (the spider lily\'s default)', for: /umbel|head-is-built|boss-/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }] },
-  { label: 'an umbel: twelve florets, the head ON', for: /umbel|head-is-built|knot-is-typed/,
+  { label: 'an umbel: twelve florets, the head ON', for: /umbel|head-is-built|boss-/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '12' }, { id: 'umbelHead', value: 'ON' }] },
   /* (iv) A RACEME ASKED FOR WITH NO RACHIS, and it is the ONLY state ID0 can
      speak on — measured, not reasoned. ID0 compares the geometry's guard
