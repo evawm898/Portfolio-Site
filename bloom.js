@@ -975,7 +975,8 @@ const STRAND_IDS = new Set(SCOPE_STRAND_IDS);
 const idsFor = (v) => (v && v.kind === 'tier' ? TIER_IDS : v && v.kind === 'strand' ? STRAND_IDS : SCOPE_IDS);
 let scopeView = null;              // { kind: 'layer' | 'petal' | 'tier' | 'strand', layer, slot } — the picked scope; null = the whole bloom
 const scopeGlobals = new Map();    // id -> the GLOBAL value's string, while a scope is picked
-let lastShown = null;              // the `shown` record regenerate() last built — a pick relabels from it without a rebuild
+let lastShown = null;
+let lastOrganMesh = null;           // T5: the organs' own emitted triangles, for TX11 (window.__bloomOrganMesh)              // the `shown` record regenerate() last built — a pick relabels from it without a rebuild
 const scopeBar = document.getElementById('scopeBar');
 const scopePick = document.getElementById('scopePick');
 const scopeStatus = document.getElementById('scopeStatus');
@@ -1913,6 +1914,15 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastInfillAbsent = infillIsAbsent(uiForBuild);
     lastTexture = built.texture || null;
     lastTextureAbsent = textureIsAbsent(uiForBuild);
+    /* THE ORGANS' EMITTED TRIANGLES (T5) — the hub's, the stem's and each tube
+       ring's, as this build emitted them, so TX11 can read what the PAGE moved
+       rather than what a Node rebuild moves. Null on every untextured build. */
+    lastOrganMesh = null;
+    if (built.texture && built.texture.organs) for (const [k, r] of Object.entries(built.texture.organs)) {
+      if (!r.organ) continue;
+      lastOrganMesh = lastOrganMesh || {};
+      lastOrganMesh[k] = r.organ.triRanges.map(([a, b]) => ({ from: a, to: b, positions: acc.positions.slice(a * 9, b * 9) }));
+    }
     lastPetalsAll = built.petalsAll || [];
     builtPetalWidth = Number(uiForBuild.petalWidth);   // what a refused width drag goes back to (F6-sym-2)
     builtCup = { petalCup: Number(uiForBuild.petalCup), petalCupGradient: Number(uiForBuild.petalCupGradient) };   // what a refused cup goes back to (spine-cup-fold)
@@ -2692,6 +2702,12 @@ function textureLine(T) {
   const organs = Object.entries(T.organs || {});
   if (!organs.length) return `TEXTURE ${word} ${T.heightMm.toFixed(2)} mm — no sheet carries it on this build\n`;
   const parts = organs.map(([k, q]) => {
+    /* THE ORGANS (T5): the hub, the stem and the tube ring, each refined on its
+       own shipped lattice; VISIBLE faces only (Q7), the rest named */
+    if (q.organ) {
+      const O = q.organ;
+      return `${k}${q.blades > 1 ? ` (${q.blades} rings)` : ''}: ${Number(O.shippedTris).toLocaleString('en-US')} shipped -> ${Number(O.refinedTris).toLocaleString('en-US')} lattice tris, ${O.visible} of ${O.relievable} vertices visible (${O.buried} buried, smooth; the relief fades in over ${O.fadeMm.toFixed(2)} mm from them)${O.cavityTris ? `, ${O.cavityTris} cavity tris left as shipped` : ''}${O.normalFallback ? `, ${O.normalFallback} vertices with no normal from the ${k}'s own law left smooth` : ''}, relief 0..${q.reliefMaxMm.toFixed(3)} mm`;
+    }
     const ref = Object.entries(q.refused || {}).map(([w, n]) => `${n} ${k}${n === 1 ? '' : 's'} refused (${w})`).join(', ');
     const ratio = q.floorTris ? (q.skinTris / q.floorTris).toFixed(2) : '—';
     return `${k}: ${q.panels} panel${q.panels === 1 ? '' : 's'}, ${q.subRows} sub-rows, columns x${q.cfMax}, skin ${q.skinTris} tris = ${ratio}x its floor (the builder's own estimate — TX4 reads the untextured twin, ~0.1 lower)${q.floorTris && q.skinTris / q.floorTris > TEXTURE_LATTICE_BAR ? ` (PAST THE ${TEXTURE_LATTICE_BAR}x BAR BY THIS ESTIMATE)` : ''}, relief 0..${q.reliefMaxMm.toFixed(3)} mm${ref ? `; ${ref}` : ''}`;
@@ -2706,7 +2722,7 @@ function textureLine(T) {
     : C && C.usedMm !== C.askedMm
       ? `on a ${C.usedMm.toFixed(2)} mm lattice — COARSENED from the ruled ${C.askedMm.toFixed(2)} mm to fit the ${fmtTris(C.budget)} export budget (${C.trials.map((t) => `${t.edgeMm.toFixed(2)} mm: ${fmtTris(t.tris)}`).join(', ')}; the finest edge that fits, never past ${C.capMm.toFixed(2)})${C.fits ? '' : ` — EVEN ${C.capMm.toFixed(2)} mm DOES NOT FIT (${fmtTris(C.trials[C.trials.length - 1].tris)} tris): the export will be REFUSED`}`
       : `on a ${T.edgeMm.toFixed(1)} mm lattice`;
-  return `TEXTURE ${word}: ${T.heightMm.toFixed(2)} mm peak to valley, ${T.sizeMm.toFixed(1)} mm features, outward only over the bead, ${edgeWords}${clamp} — ${parts.join(' · ')}. The hub, stem, rods and tube ring stay smooth (T5).\n`;
+  return `TEXTURE ${word}: ${T.heightMm.toFixed(2)} mm peak to valley, ${T.sizeMm.toFixed(1)} mm features, outward only over the bead, ${edgeWords}${clamp} — ${parts.join(' · ')}. Buried faces stay smooth (Q7); the rods (filaments, the style, anthers, pedicels, petioles) stay smooth, pending the BONE sheet (Q12).\n`;
 }
 function infillLine(petals) {
   const F = petals && petals[0] && petals[0].infill;
@@ -4087,6 +4103,7 @@ window.addEventListener('blur', endDrag);
 document.addEventListener('change', (e) => { if (isSlider(e.target)) endDrag(); }, true);
 /* For the drag-preview gate: whether a slider is held, and whether the build
    on screen is the light one. */
+window.__bloomOrganMesh = () => lastOrganMesh;
 window.__bloomDragState = () => ({ dragging: dragActive, lightOnScreen, lightBuilds: lightBuildCount });
 /* What is ON SCREEN, as a digest of the viewport mesh's own positions — the
    drag-preview gate compares it with the exported STL's. Negative zeros are

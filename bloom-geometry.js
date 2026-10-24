@@ -1415,6 +1415,19 @@ export class MeshBuilder {
        is a different quantity for a different job and stays where it is. */
     this.lo = [Infinity, Infinity, Infinity];
     this.hi = [-Infinity, -Infinity, -Infinity];
+    /* THE ORGAN RELIEF'S TWO SIDE CHANNELS (surface texture T5) — both OFF
+       (null) on every build that is not textured, and OFF outside the one
+       emitter call the relief is about, so no shipped path pays for either
+       and neither decides anything that is BUILT. `faceTags`, while an array,
+       takes the emitter's current `faceTag` per triangle (which face of the
+       hub, the stem or the tube ring the triangle is), so the organ's own
+       analytic normal can be asked of the face it lies on; `normalSink`,
+       while a function, is handed each tube-ring vertex with the normal the
+       ring's own law gave it. Setting `faceTag` on an untagged build is a
+       property write and moves no byte. */
+    this.faceTags = null;
+    this.faceTag = null;
+    this.normalSink = null;
   }
   /* Extent along each axis, and the max bounding dimension in mm — the number
      that decides whether a design fits a given process. SLS nests in any
@@ -1449,6 +1462,7 @@ export class MeshBuilder {
   noteSheet(t) { if (this.exportMode && t < this.minThickness) this.minThickness = t; }
   tri(a, b, c) {
     this.positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+    if (this.faceTags) this.faceTags.push(this.faceTag);
     for (const p of [a, b, c]) {
       for (let k = 0; k < 3; k++) { if (p[k] < this.lo[k]) this.lo[k] = p[k]; if (p[k] > this.hi[k]) this.hi[k] = p[k]; }
     }
@@ -11635,7 +11649,7 @@ function rimProfile(acc, K, C, n, b, apex, topP, botP, sOf = null, TR = null, gR
      exactly 0 there and sOf is null. `TR` is the panel's relief record. */
   const APEX = K / 2;
   const pts = new Array(K + 1);
-  const ns = acc.captureNormals ? new Array(K + 1) : null;
+  const ns = (acc.captureNormals || acc.normalSink) ? new Array(K + 1) : null;
   pts[0] = topP; pts[K] = botP;
   const wx = apex[0] - C[0], wy = apex[1] - C[1], wz = apex[2] - C[2];
   /* A PROFILE THE TREATMENT DID NOT REACH IS A STEP, NOT A SUBDIVISION, AND
@@ -11761,8 +11775,10 @@ function rimProfile(acc, K, C, n, b, apex, topP, botP, sOf = null, TR = null, gR
     ns[0] = [n[0], n[1], n[2]];
     ns[K] = [-n[0], -n[1], -n[2]];
     ns[APEX] = [wx / aLen, wy / aLen, wz / aLen];
+    /* the bead's closed-form normals, handed to the organ relief (T5) */
+    if (acc.normalSink) for (let m = 0; m <= K; m++) acc.normalSink(pts[m], ns[m]);
   }
-  return { pts, ns };
+  return { pts, ns: acc.captureNormals ? ns : null };
 }
   /* A profile pair that shares its skin point — the two corners, where the
      margin run hands over to the tip run — collapses its end quads to
@@ -12158,6 +12174,9 @@ function emitPanel(acc, rows, panel, tAt, rim, tex = null) {
       if (sOf === null) {
         ht.push([P[0] + n[0] * b, P[1] + n[1] * b, P[2] + n[2] * b]);
         hb.push([P[0] - n[0] * b, P[1] - n[1] * b, P[2] - n[2] * b]);
+        /* THE RING'S OWN NORMAL AT EACH SKIN VERTEX, handed to the organ relief
+           (T5) when it asks — null on every other build, so nothing is pushed */
+        if (acc.normalSink) { acc.normalSink(ht[ht.length - 1], n); acc.normalSink(hb[hb.length - 1], [-n[0], -n[1], -n[2]]); }
       } else {
         /* OUTWARD, ON EACH SKIN'S OWN SIDE: the field at the undisplaced skin
            point, the displacement added to the offset — never subtracted */
@@ -12874,6 +12893,588 @@ function textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, cap = null) 
   for (const o of Object.values(organs)) if (!Number.isFinite(o.reliefMinMm)) o.reliefMinMm = 0;
   return { type: T.type, heightMm: T.heightMm, sizeMm: T.sizeMm, edgeMm: T.edgeMm, bar: TEXTURE_LATTICE_BAR, refused: T.refused || null, heightClamped: T.heightClamped, sizeClamped: T.sizeClamped, organs };
 }
+
+/* ===================================================================
+   THE ORGANS' RELIEF — surface texture T5 (docs/bloom-surface-texture-t5-
+   outcome.md; Eva's rulings of Oct 23). The HUB, the STEM and the TUBE RING
+   take the one world field the sheets take (attachment B), OUTWARD ONLY, at
+   the same PEAK-TO-VALLEY height, on the same 0.4 mm lattice edge the budget
+   cap derives for the whole bloom. RODS (filaments, the style, anthers,
+   PEDICELS, petioles, the rachis) are DEFERRED to the BONE sheet (Q12) and
+   take nothing here: a floret's own stem is its pedicel, so a floret build
+   relieves its hub and never its stem.
+
+   WHY A SECOND CONSTRUCTION AND NOT emitPanel's. The sheets have a row law
+   (`rowAt(u)`) and their lattice is refined in the surface's own (u, v); the
+   hub, the stem and the tube ring have none (the discovery's T5, §12.8 item
+   20). So each is REFINED ON ITS OWN SHIPPED LATTICE — every edge of the
+   organ's shipped triangles into ceil(L / e) equal segments (L snapped to
+   2^-20 mm, Q16), a coplanar strip quad cut as one unit, a closed centre fan
+   re-meshed as concentric rings, anything else by rows (T1's 'rows' split,
+   ported; its zip is the emitter's integer rule with a slack, so no last bit
+   decides a triangle) — and every new point lies ON a shipped facet. The
+   tube ring is therefore refined in its own (row, column) coordinates,
+   linearly, between the rows and columns its own law placed (`tubePanelRows`)
+   — the ring's normal at a new point is its own law's normals at the facet's
+   corners interpolated, never a second law.
+
+   EVERY COUNT IS MODE-FREE. A count is decided on the organ's shipped mesh IN
+   EXPORT MODE: on an export build that is the organ itself; on a live build
+   whose sheet the export floor raises (the only case the two differ — the hub
+   radius follows the floored sheet through the area rule, the rim band IS the
+   sheet), on an untextured export TWIN of the same state, built for the
+   purpose, whose organ meshes have the same topology triangle for triangle. So
+   tris(live) === tris(export) holds by construction, as both STL gates require.
+
+   THE NORMAL IS THE ORGAN'S OWN, PER FACE (TX10 restates it from the part's
+   axis or surface, never from the mesh): the emitter names the face each
+   triangle lies on (`faceTag`) and supplies the face's analytic normal —
+   the hub's +-z, its rim's radial, the dome's and the sphere's from their
+   centre, the join's profile normal, the stem wall's horizontal radial from
+   its own axis at its own depth, the end faces' +-z and the cut plane's; the
+   tube ring's own `sect` normals, handed over as it emits them. A vertex on
+   a CREASE (a hub's rim edge, the stem's end edge) takes the normalised sum of
+   its faces' normals, so ONE displacement per position: the relief runs over
+   the crease (the bead's own Q4/Q5 ruling) and nothing cracks.
+
+   VISIBLE (Q7) IS DERIVED FROM THE GEOMETRY, PER VERTEX: a vertex is visible
+   iff some ray from just outside it (q + delta n) escapes the whole bloom's
+   emitted triangles, tried along n and along each of a fixed set of world
+   directions in its outward hemisphere. A point inside another part (the
+   stem's top inside the hub, the hub's underside inside the stem, the rim
+   under a petal's root, the ring under a petal, the wall under a petiole's
+   root) is enclosed by that part's closed shell and no ray escapes; a face
+   COINCIDENT with another part's face (the hub's top under the feet, which sit
+   ON it) is on the outside of the union and is visible, so the hub textures
+   over the buried feet. A buried vertex takes no relief, and the relief fades
+   in from the nearest buried vertex over `TEXTURE_CONTACT_FADE_K x H` — K = 2
+   keeps the steepest ramp the fade itself adds under 45 degrees (the ease's
+   peak slope is 15/8). The organ's own CAVITY faces (the stem's bore and the
+   void's caps, the sphere hub's inner sphere) are named by the emitter,
+   never refined and never relieved (Q15); `tools/bloom-texture-t5.mjs`
+   confirms by the same escape test that no ray leaves them.
+
+   THE RELIEF IS DEFERRED TO THE END OF THE BUILD because visibility needs
+   every part: the lattice is cut right after the organ is emitted (so every
+   later triangle range is where it was), the displacement is written in place
+   once everything else exists, positions only, no count moves. An untextured
+   build takes none of this: `organsT5` is null and every expression is the
+   shipped one, by branch.
+   =================================================================== */
+export const TEXTURE_RELIEF_ORGANS = Object.freeze(['hub', 'stem', 'tube']);
+export const TEXTURE_CONTACT_FADE_K = 2;
+export const TEXTURE_VISIBILITY_OFFSET_MM = 1e-4;
+/* the escape directions — the six axes and the eight cube diagonals, turned
+   once by a fixed rotation so no one of them lies along a symmetry axis of
+   any organ (a ray down an edge of the hub's 48 sectors would ask its
+   question of a knife edge) */
+export const TEXTURE_VISIBILITY_DIRS = (() => {
+  const raw = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  for (const a of [1, -1]) for (const b of [1, -1]) for (const c of [1, -1]) raw.push([a, b, c]);
+  /* a rotation by 0.3 rad about (0.31, 0.53, 0.79), written as its matrix
+     once with products only (the directions are constants of the law) */
+  const ax = [0.31, 0.53, 0.79], L = Math.sqrt(ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]);
+  const k = [ax[0] / L, ax[1] / L, ax[2] / L], c = 0.955336489125606, s = 0.29552020666133955, v = 1 - c;
+  const M = [[c + k[0] * k[0] * v, k[0] * k[1] * v - k[2] * s, k[0] * k[2] * v + k[1] * s], [k[1] * k[0] * v + k[2] * s, c + k[1] * k[1] * v, k[1] * k[2] * v - k[0] * s], [k[2] * k[0] * v - k[1] * s, k[2] * k[1] * v + k[0] * s, c + k[2] * k[2] * v]];
+  return Object.freeze(raw.map((d) => { const n = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]); const e = [d[0] / n, d[1] / n, d[2] / n]; return Object.freeze([M[0][0] * e[0] + M[0][1] * e[1] + M[0][2] * e[2], M[1][0] * e[0] + M[1][1] * e[1] + M[1][2] * e[2], M[2][0] * e[0] + M[2][1] * e[1] + M[2][2] * e[2]]); }));
+})();
+const T5_HEMISPHERE_DOT = 0.3;
+const T5_RAY_EDGE = 1e-9;               // the barycentric slack a ray along a shared edge is caught by
+/* the first ray is the normal turned by a fixed small angle off it: a radial
+   normal lies in the plane of the hub's own sector edges, and a ray down an
+   edge asks its question of a knife edge */
+const T5_NORMAL_TILT = Object.freeze([0.031, 0.053, 0.079]);          // a direction is tried where it leaves the surface at more than ~17 degrees
+const T5_PAIR_PLANE_MM = 1e-9;          // a strip quad's fourth point within this of the others' plane
+const T5_ZIP_SLACK_MM = 1e-6;           // emitPanel's own ZIP_SLACK_MM: within it the integer rule decides
+const T5_FAN_MIN_SPOKES = 8;            // a closed fan of at least this many spokes is a centre (the hub's 48, a pole's)
+const T5_FAN_SPOKE_RATIO = 1.5;         // ... with every spoke within this factor of the shortest
+const T5_FAN_RING_MIN = 6;              // the innermost ring of a re-meshed centre is a hexagon, never the fan's own 48 slivers
+/* the emitter's own normal function for the organ it is emitting, recorded
+   only while a capture is open (a textured build) */
+function organNormalOf(acc, fn) { if (acc.faceTags) acc.organNormal = fn; }
+const t5IsCavity = (tag) => tag === 'hub.cavity' || tag === 'stem.cavity';
+/* run one emitter with the face channel open; returns the tags of the
+   triangles it emitted and the normal function it declared */
+function organCapture(acc, fn) {
+  acc.faceTags = []; acc.faceTag = null; acc.organNormal = null;
+  try { const out = fn(); return { out, tags: acc.faceTags, normalOf: acc.organNormal }; }
+  finally { acc.faceTags = null; acc.faceTag = null; acc.organNormal = null; }
+}
+/* weld a triangle soup by exact position — the organ's own vertices are the
+   same doubles wherever two of its faces meet (they are made by one call) */
+function t5Weld(pos, from, to) {
+  const map = new Map(), P = [], tri = new Int32Array((to - from) * 3);
+  for (let t = from; t < to; t++) for (let c = 0; c < 3; c++) {
+    const o = t * 9 + c * 3, x = pos[o], y = pos[o + 1], z = pos[o + 2];
+    const key = `${x}|${y}|${z}`;
+    let id = map.get(key);
+    if (id === undefined) { id = P.length / 3; map.set(key, id); P.push(x, y, z); }
+    tri[(t - from) * 3 + c] = id;
+  }
+  return { P, tri, nT: to - from, map };
+}
+/* THE ORGAN'S LATTICE, cut in place right after the organ is emitted.
+   `decide` (null on every build where this mode IS the export mode, or the
+   export floor does not bind) is the organ's shipped mesh in export mode,
+   triangle for triangle the same topology: every count, pair, fan and zip
+   decision is taken on it, the geometry on this mesh. */
+function organLatticeInto(acc, from, cap, { organ, edgeMm, decide = null, sink = null }) {
+  const to = acc.triangleCount;
+  const tags = cap.tags || [];
+  const W = t5Weld(acc.positions, from, to);
+  const nT = W.nT, P = W.P;
+  let D = null, twinMismatch = false;
+  if (decide) {
+    const Wd = t5Weld(decide.positions, decide.from, decide.to);
+    if (Wd.nT === nT && Wd.P.length === P.length && Wd.tri.every((v, i) => v === W.tri[i])) D = Wd.P;
+    else twinMismatch = true;
+  }
+  if (!D) D = P;
+  const twoMeshes = D !== P;
+  const e = edgeMm, snap = (L) => Math.round(L * 1048576) / 1048576;
+  const dist = (A, i, j) => { const dx = A[j * 3] - A[i * 3], dy = A[j * 3 + 1] - A[i * 3 + 1], dz = A[j * 3 + 2] - A[i * 3 + 2]; return Math.sqrt(dx * dx + dy * dy + dz * dz); };
+  const tri = W.tri;
+  const kept = new Uint8Array(nT);
+  for (let t = 0; t < nT; t++) if (t5IsCavity(tags[t])) kept[t] = 1;
+  const ek = (i, j) => (i < j ? i * 4294967296 + j : j * 4294967296 + i);
+  const frozen = new Set();
+  for (let t = 0; t < nT; t++) if (kept[t]) for (let k = 0; k < 3; k++) frozen.add(ek(tri[t * 3 + k], tri[t * 3 + (k + 1) % 3]));
+  /* every count from the DECISION mesh, snapped (Q16) */
+  const segs = (i, j) => { if (frozen.has(ek(i, j))) return 1; const L = snap(dist(D, i, j)); return L <= e ? 1 : Math.ceil(L / e); };
+  /* the normals the tube ring handed over, per shipped vertex */
+  const NA = sink ? [] : null;
+  if (sink) for (let id = 0; id < P.length / 3; id++) { const n = sink.get(`${P[id * 3]}|${P[id * 3 + 1]}|${P[id * 3 + 2]}`); NA.push(n ? n[0] : 0, n ? n[1] : 0, n ? n[2] : 0); }
+  const addPoint = (i, j, f) => {
+    const id = P.length / 3;
+    P.push(P[i * 3] + (P[j * 3] - P[i * 3]) * f, P[i * 3 + 1] + (P[j * 3 + 1] - P[i * 3 + 1]) * f, P[i * 3 + 2] + (P[j * 3 + 2] - P[i * 3 + 2]) * f);
+    if (twoMeshes) D.push(D[i * 3] + (D[j * 3] - D[i * 3]) * f, D[i * 3 + 1] + (D[j * 3 + 1] - D[i * 3 + 1]) * f, D[i * 3 + 2] + (D[j * 3 + 2] - D[i * 3 + 2]) * f);
+    if (NA) NA.push(NA[i * 3] + (NA[j * 3] - NA[i * 3]) * f, NA[i * 3 + 1] + (NA[j * 3 + 1] - NA[i * 3 + 1]) * f, NA[i * 3 + 2] + (NA[j * 3 + 2] - NA[i * 3 + 2]) * f);
+    return id;
+  };
+  const edgeCache = new Map();
+  const edgePts = (i, j) => {
+    const lo = i < j ? i : j, hi = i < j ? j : i, k = ek(lo, hi);
+    let pts = edgeCache.get(k);
+    if (!pts) {
+      const n = segs(lo, hi);
+      pts = [lo];
+      for (let q = 1; q < n; q++) pts.push(addPoint(lo, hi, q / n));
+      pts.push(hi);
+      edgeCache.set(k, pts);
+    }
+    return i === lo ? pts : pts.slice().reverse();
+  };
+  const faceN = (A, a, b, c) => {
+    const ux = A[b * 3] - A[a * 3], uy = A[b * 3 + 1] - A[a * 3 + 1], uz = A[b * 3 + 2] - A[a * 3 + 2];
+    const vx = A[c * 3] - A[a * 3], vy = A[c * 3 + 1] - A[a * 3 + 1], vz = A[c * 3 + 2] - A[a * 3 + 2];
+    return [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+  };
+  const out = [], src = [];
+  /* the strip between two chains, zipped by the INTEGER rule (advance the
+     chain whose next fraction is smaller) unless one diagonal is shorter by
+     more than the slack — decided on the decision mesh — and wound with the
+     parent face */
+  const zip = (Lc, Rc, n0, s) => {
+    const a = Lc.length - 1, b = Rc.length - 1;
+    let i = 0, j = 0;
+    const emit = (x, y, z) => {
+      if (x === y || y === z || x === z) return;
+      const f = faceN(D, x, y, z);
+      if (f[0] * n0[0] + f[1] * n0[1] + f[2] * n0[2] < 0) out.push(x, z, y); else out.push(x, y, z);
+      src.push(s);
+    };
+    while (i < a || j < b) {
+      let advL = j === b || (i < a && (i + 1) * b <= (j + 1) * a);
+      if (i < a && j < b) {
+        const diff = dist(D, Lc[i + 1], Rc[j]) - dist(D, Lc[i], Rc[j + 1]);
+        if (diff < -T5_ZIP_SLACK_MM) advL = true; else if (diff > T5_ZIP_SLACK_MM) advL = false;
+      }
+      if (advL) { emit(Lc[i], Lc[i + 1], Rc[j]); i++; } else { emit(Lc[i], Rc[j + 1], Rc[j]); j++; }
+    }
+  };
+  const rowBetween = (Lp, Rp) => {
+    const m = segs(Lp, Rp), row = [Lp];
+    for (let q = 1; q < m; q++) row.push(addPoint(Lp, Rp, q / m));
+    row.push(Rp);
+    return row;
+  };
+  /* ---- the edge use, for the strip quads and the centre fans ---- */
+  const use = new Map();
+  for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) { const key = ek(tri[t * 3 + k], tri[t * 3 + (k + 1) % 3]); const l = use.get(key); if (l) l.push(t); else use.set(key, [t]); }
+  /* ---- CLOSED CENTRE FANS (the hub's apexes and poles): re-meshed as rings ---- */
+  const fanOf = new Int32Array(nT).fill(-1), fans = [];
+  {
+    const inc = new Map();
+    for (let t = 0; t < nT; t++) if (!kept[t]) for (let k = 0; k < 3; k++) { const v = tri[t * 3 + k]; const l = inc.get(v); if (l) l.push(t); else inc.set(v, [t]); }
+    for (const [v, ts] of inc) {
+      if (ts.length < T5_FAN_MIN_SPOKES) continue;
+      const tag = tags[ts[0]];
+      if (!ts.every((t) => tags[t] === tag && fanOf[t] < 0)) continue;
+      /* every spoke shared by exactly two of these triangles, and the opposite
+         edges form ONE closed loop */
+      const opp = new Map(); let ok = true;
+      for (const t of ts) {
+        const k = [0, 1, 2].find((q) => tri[t * 3 + q] === v);
+        const a = tri[t * 3 + (k + 1) % 3], b = tri[t * 3 + (k + 2) % 3];
+        if (opp.has(a)) { ok = false; break; }
+        opp.set(a, { b, t });
+      }
+      if (!ok || opp.size !== ts.length) continue;
+      for (const t of ts) for (let k = 0; k < 3; k++) { const a = tri[t * 3 + k], b = tri[t * 3 + (k + 1) % 3]; if (a === v || b === v) { const u = use.get(ek(a, b)); if (!u || u.length !== 2 || !u.every((x) => ts.includes(x))) ok = false; } }
+      if (!ok) continue;
+      const start = opp.keys().next().value;
+      const loop = []; let cur = start, guard = 0;
+      do { const o = opp.get(cur); if (!o) { ok = false; break; } loop.push({ a: cur, b: o.b, t: o.t }); cur = o.b; } while (cur !== start && ++guard <= ts.length);
+      if (!ok || loop.length !== ts.length || cur !== start) continue;
+      /* a CENTRE: every spoke the same length to within the factor (a
+         lattice's interior vertex is not one) */
+      let sMin = Infinity, sMax = 0;
+      for (const L of loop) { const d = dist(D, v, L.a); if (d < sMin) sMin = d; if (d > sMax) sMax = d; }
+      if (!(sMax <= T5_FAN_SPOKE_RATIO * sMin)) continue;
+      for (const t of ts) fanOf[t] = fans.length;
+      fans.push({ v, loop, tag });
+    }
+  }
+  /* ---- STRIP QUADS: two triangles across their mutual longest edge, coplanar
+          and convex, rails at least as long as the ends (T1's rule) ---- */
+  const pairOf = new Int32Array(nT).fill(-1);
+  const longest = (t) => { let best = -1, bk = 0; for (let k = 0; k < 3; k++) { const i = tri[t * 3 + k], j = tri[t * 3 + (k + 1) % 3], d = dist(D, i, j); if (d > best) { best = d; bk = ek(i, j); } } return bk; };
+  const railLoop = (Lq) => { const a = Math.min(segs(Lq[0], Lq[1]), segs(Lq[3], Lq[2])), b = Math.min(segs(Lq[1], Lq[2]), segs(Lq[0], Lq[3])); return b > a ? [Lq[1], Lq[2], Lq[3], Lq[0]] : Lq; };
+  for (let t = 0; t < nT; t++) {
+    if (pairOf[t] >= 0 || kept[t] || fanOf[t] >= 0) continue;
+    const kt = longest(t), bi = Math.floor(kt / 4294967296), bj = kt % 4294967296;
+    if (segs(bi, bj) === 1) continue;
+    const users = use.get(kt);
+    if (!users || users.length !== 2) continue;
+    const u = users[0] === t ? users[1] : users[0];
+    if (pairOf[u] >= 0 || kept[u] || fanOf[u] >= 0 || tags[u] !== tags[t] || longest(u) !== kt) continue;
+    const T = [tri[t * 3], tri[t * 3 + 1], tri[t * 3 + 2]], U = [tri[u * 3], tri[u * 3 + 1], tri[u * 3 + 2]];
+    const q = U.find((x) => !T.includes(x));
+    if (q === undefined) continue;
+    let r = 0; while (U.includes(T[(r + 2) % 3])) r++;
+    const i = T[r], j = T[(r + 1) % 3], p = T[(r + 2) % 3];
+    const nn = faceN(D, i, j, p), nl = Math.sqrt(nn[0] * nn[0] + nn[1] * nn[1] + nn[2] * nn[2]);
+    if (!(nl > 0)) continue;
+    const off = ((D[q * 3] - D[i * 3]) * nn[0] + (D[q * 3 + 1] - D[i * 3 + 1]) * nn[1] + (D[q * 3 + 2] - D[i * 3 + 2]) * nn[2]) / nl;
+    if (Math.abs(off) > T5_PAIR_PLANE_MM) continue;
+    const Lq = [j, p, i, q];
+    let convex = true;
+    for (let k = 0; k < 4 && convex; k++) { const A = Lq[k], B = Lq[(k + 1) % 4], C = Lq[(k + 2) % 4]; const f = [D[B * 3] - D[A * 3], D[B * 3 + 1] - D[A * 3 + 1], D[B * 3 + 2] - D[A * 3 + 2]], g = [D[C * 3] - D[B * 3], D[C * 3 + 1] - D[B * 3 + 1], D[C * 3 + 2] - D[B * 3 + 2]]; if ((f[1] * g[2] - f[2] * g[1]) * nn[0] + (f[2] * g[0] - f[0] * g[2]) * nn[1] + (f[0] * g[1] - f[1] * g[0]) * nn[2] <= 0) convex = false; }
+    if (!convex) continue;
+    const [w0, w1, w2, w3] = railLoop(Lq);
+    if (Math.min(segs(w0, w1), segs(w3, w2)) < Math.max(segs(w0, w3), segs(w1, w2))) continue;
+    pairOf[t] = u; pairOf[u] = t;
+  }
+  /* ---- emit ---- */
+  const doneFan = new Uint8Array(fans.length);
+  for (let t = 0; t < nT; t++) {
+    const a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2];
+    if (kept[t]) { out.push(a, b, c); src.push(t); continue; }
+    if (fanOf[t] >= 0) {
+      const fi = fanOf[t];
+      if (doneFan[fi]) continue;
+      doneFan[fi] = 1;
+      const F = fans[fi], v = F.v;
+      /* the outer chain, the fan's own loop edges at their split points */
+      const chain = [];
+      for (const L of F.loop) { const pts = edgePts(L.a, L.b); for (let q = 0; q < pts.length - 1; q++) chain.push(pts[q]); }
+      const nOut = chain.length;
+      let M = 1; for (const L of F.loop) M = Math.max(M, segs(v, L.a));
+      /* the ring's own length, read on the decision mesh: ring m carries as
+         many points as its circumference needs at the edge, never more than
+         the chain it is drawn from */
+      let perim = 0; for (let q = 0; q < nOut; q++) perim += dist(D, chain[q], chain[(q + 1) % nOut]);
+      const n0 = faceN(D, v, F.loop[0].a, F.loop[0].b);
+      /* ring m (1..M-1) is the chain scaled toward the apex by m / M, its point
+         count the chain's scaled likewise (at least the loop's own count);
+         every ring point is on one shipped facet (a point between two chain
+         points of one loop edge, drawn toward the apex) */
+      const ringAt = (m) => {
+        const cnt = Math.min(nOut, Math.max(T5_FAN_RING_MIN, Math.ceil(snap((perim * m) / M) / e)));
+        const pts = [];
+        for (let q = 0; q < cnt; q++) {
+          const pos = (q * nOut) / cnt, i0 = Math.floor(pos), fr = pos - i0;
+          const A = chain[i0 % nOut], B = chain[(i0 + 1) % nOut];
+          const on = fr === 0 ? A : addPoint(A, B, fr);
+          pts.push(addPoint(v, on, m / M));
+        }
+        return pts;
+      };
+      let prev = [v];
+      for (let m = 1; m <= M; m++) {
+        const ring = m === M ? chain : ringAt(m);
+        if (prev.length === 1) {
+          for (let q = 0; q < ring.length; q++) { const x = v, y = ring[q], z = ring[(q + 1) % ring.length]; const f = faceN(D, x, y, z); if (f[0] * n0[0] + f[1] * n0[1] + f[2] * n0[2] < 0) out.push(x, z, y); else out.push(x, y, z); src.push(F.loop[0].t); }
+        } else zip([...prev, prev[0]], [...ring, ring[0]], n0, F.loop[0].t);
+        prev = ring;
+      }
+      continue;
+    }
+    if (pairOf[t] >= 0) {
+      const u = pairOf[t];
+      if (u < t) continue;
+      const T = [a, b, c], U = [tri[u * 3], tri[u * 3 + 1], tri[u * 3 + 2]];
+      let r = 0; while (U.includes(T[(r + 2) % 3])) r++;
+      const i = T[r], j = T[(r + 1) % 3], p = T[(r + 2) % 3], q = U.find((x) => x !== i && x !== j);
+      const n0 = faceN(D, i, j, p);
+      const [v0, v1, v2, v3] = railLoop([j, p, i, q]);
+      const rA = edgePts(v0, v1), rB = edgePts(v3, v2);
+      const n1 = rA.length - 1, n2 = rB.length - 1, K = Math.max(n1, n2);
+      let prev = edgePts(v0, v3);
+      for (let k = 1; k <= K; k++) {
+        const row = k === K ? edgePts(v1, v2) : rowBetween(rA[Math.round((k * n1) / K)], rB[Math.round((k * n2) / K)]);
+        zip(prev, row, n0, t);
+        prev = row;
+      }
+      continue;
+    }
+    const ab = edgePts(a, b), bc = edgePts(b, c), ca = edgePts(c, a);
+    if (ab.length === 2 && bc.length === 2 && ca.length === 2) { out.push(a, b, c); src.push(t); continue; }
+    const n0 = faceN(D, a, b, c);
+    /* the apex is opposite the edge with the fewest segments (ties: the
+       shorter edge on the decision mesh, then the triangle's own order) */
+    const cand = [[bc, a, b, c, dist(D, b, c), 0], [ca, b, c, a, dist(D, c, a), 1], [ab, c, a, b, dist(D, a, b), 2]];
+    cand.sort((x, y) => (x[0].length - y[0].length) || (snap(x[4]) - snap(y[4])) || (x[5] - y[5]));
+    const [base, A, B, Cc] = cand[0];
+    const sB = edgePts(A, B), sC = edgePts(A, Cc);
+    const n1 = sB.length - 1, n2 = sC.length - 1, K = Math.max(n1, n2);
+    let prev = [A];
+    for (let k = 1; k <= K; k++) {
+      const row = k === K ? base : rowBetween(sB[Math.round((k * n1) / K)], sC[Math.round((k * n2) / K)]);
+      zip(prev, row, n0, t);
+      prev = row;
+    }
+  }
+  /* ---- the organ's vertices: their faces, their normal, relievable or not ---- */
+  const nV = P.length / 3;
+  const vTags = Array.from({ length: nV }, () => null);
+  for (let k = 0; k < out.length; k++) {
+    const v = out[k], tg = tags[src[(k / 3) | 0]];
+    const l = vTags[v];
+    if (!l) vTags[v] = [tg]; else if (!l.includes(tg)) l.push(tg);
+  }
+  const N = new Float64Array(nV * 3), relievable = new Uint8Array(nV);
+  let normalFallback = 0;
+  for (let v = 0; v < nV; v++) {
+    const l = vTags[v];
+    if (!l || l.some(t5IsCavity)) continue;
+    let nx = 0, ny = 0, nz = 0, got = 0;
+    const p = [P[v * 3], P[v * 3 + 1], P[v * 3 + 2]];
+    for (const tg of l) {
+      let n = null;
+      if (NA) { const a = [NA[v * 3], NA[v * 3 + 1], NA[v * 3 + 2]], L = Math.hypot(a[0], a[1], a[2]); n = L > 0 ? [a[0] / L, a[1] / L, a[2] / L] : null; }
+      else if (cap.normalOf) n = cap.normalOf(tg, p);
+      if (!n) continue;
+      nx += n[0]; ny += n[1]; nz += n[2]; got++;
+      if (NA) break;
+    }
+    const L = Math.hypot(nx, ny, nz);
+    if (!got || !(L > 0)) { normalFallback++; continue; }
+    N[v * 3] = nx / L; N[v * 3 + 1] = ny / L; N[v * 3 + 2] = nz / L;
+    relievable[v] = 1;
+  }
+  /* ---- write the lattice in place of the shipped triangles ---- */
+  const nOutT = out.length / 3;
+  acc.positions.length = from * 9;
+  if (acc.normals) acc.normals.length = from * 9;
+  for (let k = 0; k < nOutT; k++) {
+    const a = out[k * 3], b = out[k * 3 + 1], c = out[k * 3 + 2];
+    acc.positions.push(P[a * 3], P[a * 3 + 1], P[a * 3 + 2], P[b * 3], P[b * 3 + 1], P[b * 3 + 2], P[c * 3], P[c * 3 + 1], P[c * 3 + 2]);
+    if (acc.normals) { const f = faceN(P, a, b, c), L = Math.hypot(f[0], f[1], f[2]) || 1; acc.normals.push(f[0] / L, f[1] / L, f[2] / L, f[0] / L, f[1] / L, f[2] / L, f[0] / L, f[1] / L, f[2] / L); }
+  }
+  let cavityTris = 0; for (let t = 0; t < nT; t++) if (kept[t]) cavityTris++;
+  return { organ, from, to: from + nOutT, shippedTris: nT, refinedTris: nOutT, cavityTris, edgeMm: e, tri: Int32Array.from(out), P, N, relievable, fans: fans.length, pairs: pairOf.reduce((n, x) => n + (x >= 0 ? 1 : 0), 0) / 2, normalFallback, twin: twoMeshes, twinMismatch, vTags };
+}
+
+/* THE VISIBILITY GRID — every triangle the build emitted, in a dense CSR
+   uniform grid, for the escape rays */
+function t5Grid(pos) {
+  const nT = pos.length / 9;
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { const x = pos[i + k]; if (x < lo[k]) lo[k] = x; if (x > hi[k]) hi[k] = x; }
+  for (let k = 0; k < 3; k++) { lo[k] -= 1; hi[k] += 1; }
+  const ext = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+  const h = Math.max(0.5, Math.cbrt((ext[0] * ext[1] * ext[2]) / 400000));
+  const nx = Math.max(1, Math.ceil(ext[0] / h)), ny = Math.max(1, Math.ceil(ext[1] / h)), nz = Math.max(1, Math.ceil(ext[2] / h));
+  const cellOf = (x, k, n) => { const c = Math.floor((x - lo[k]) / h); return c < 0 ? 0 : c >= n ? n - 1 : c; };
+  const count = new Int32Array(nx * ny * nz + 1);
+  const span = (t) => {
+    const o = t * 9;
+    const x0 = Math.min(pos[o], pos[o + 3], pos[o + 6]), x1 = Math.max(pos[o], pos[o + 3], pos[o + 6]);
+    const y0 = Math.min(pos[o + 1], pos[o + 4], pos[o + 7]), y1 = Math.max(pos[o + 1], pos[o + 4], pos[o + 7]);
+    const z0 = Math.min(pos[o + 2], pos[o + 5], pos[o + 8]), z1 = Math.max(pos[o + 2], pos[o + 5], pos[o + 8]);
+    return [cellOf(x0, 0, nx), cellOf(x1, 0, nx), cellOf(y0, 1, ny), cellOf(y1, 1, ny), cellOf(z0, 2, nz), cellOf(z1, 2, nz)];
+  };
+  for (let t = 0; t < nT; t++) { const [a0, a1, b0, b1, c0, c1] = span(t); for (let i = a0; i <= a1; i++) for (let j = b0; j <= b1; j++) for (let k = c0; k <= c1; k++) count[(k * ny + j) * nx + i + 1]++; }
+  for (let i = 1; i < count.length; i++) count[i] += count[i - 1];
+  const fill = count.slice(), items = new Int32Array(count[count.length - 1]);
+  for (let t = 0; t < nT; t++) { const [a0, a1, b0, b1, c0, c1] = span(t); for (let i = a0; i <= a1; i++) for (let j = b0; j <= b1; j++) for (let k = c0; k <= c1; k++) items[fill[(k * ny + j) * nx + i]++] = t; }
+  return { pos, lo, h, nx, ny, nz, start: count, items, stamp: new Int32Array(nT), ray: 0 };
+}
+/* does a ray from `o` along unit `d` reach the grid's edge without meeting a
+   triangle? (Moller-Trumbore, products and quotients only) */
+function t5Escapes(G, o, d) {
+  const { pos, lo, h, nx, ny, nz, start, items, stamp } = G;
+  const id = ++G.ray;
+  let ix = Math.floor((o[0] - lo[0]) / h), iy = Math.floor((o[1] - lo[1]) / h), iz = Math.floor((o[2] - lo[2]) / h);
+  if (ix < 0 || iy < 0 || iz < 0 || ix >= nx || iy >= ny || iz >= nz) return true;
+  const st = [d[0] > 0 ? 1 : -1, d[1] > 0 ? 1 : -1, d[2] > 0 ? 1 : -1];
+  const tMax = [0, 0, 0], tDel = [0, 0, 0], idx = [ix, iy, iz];
+  for (let k = 0; k < 3; k++) {
+    if (d[k] === 0) { tMax[k] = Infinity; tDel[k] = Infinity; continue; }
+    const edge = lo[k] + (idx[k] + (d[k] > 0 ? 1 : 0)) * h;
+    tMax[k] = (edge - o[k]) / d[k]; tDel[k] = h / Math.abs(d[k]);
+  }
+  for (;;) {
+    const c = (idx[2] * ny + idx[1]) * nx + idx[0];
+    for (let q = start[c]; q < start[c + 1]; q++) {
+      const t = items[q];
+      if (stamp[t] === id) continue;
+      stamp[t] = id;
+      const b = t * 9;
+      const e1x = pos[b + 3] - pos[b], e1y = pos[b + 4] - pos[b + 1], e1z = pos[b + 5] - pos[b + 2];
+      const e2x = pos[b + 6] - pos[b], e2y = pos[b + 7] - pos[b + 1], e2z = pos[b + 8] - pos[b + 2];
+      const px = d[1] * e2z - d[2] * e2y, py = d[2] * e2x - d[0] * e2z, pz = d[0] * e2y - d[1] * e2x;
+      const det = e1x * px + e1y * py + e1z * pz;
+      if (det === 0) continue;
+      const inv = 1 / det;
+      const sx = o[0] - pos[b], sy = o[1] - pos[b + 1], sz = o[2] - pos[b + 2];
+      /* the acceptance is CLOSED and a hair wide: a ray that runs exactly along
+         a shared edge (an organ's sector edge lies in the same plane as the
+         hub's) must meet one of the two triangles, never slip between them —
+         blocked is the conservative answer */
+      const u = (sx * px + sy * py + sz * pz) * inv;
+      if (u < -T5_RAY_EDGE || u > 1 + T5_RAY_EDGE) continue;
+      const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+      const v = (d[0] * qx + d[1] * qy + d[2] * qz) * inv;
+      if (v < -T5_RAY_EDGE || u + v > 1 + T5_RAY_EDGE) continue;
+      const tt = (e2x * qx + e2y * qy + e2z * qz) * inv;
+      if (tt > 1e-9) return false;
+    }
+    const k = tMax[0] < tMax[1] ? (tMax[0] < tMax[2] ? 0 : 2) : (tMax[1] < tMax[2] ? 1 : 2);
+    idx[k] += st[k];
+    if (idx[k] < 0 || idx[k] >= (k === 0 ? nx : k === 1 ? ny : nz)) return true;
+    tMax[k] += tDel[k];
+  }
+}
+/* VISIBLE: some ray from just outside the vertex escapes — along its own
+   normal first, then along each fixed direction in its outward hemisphere */
+export function textureVertexVisible(G, q, n, delta = TEXTURE_VISIBILITY_OFFSET_MM) {
+  const o = [q[0] + n[0] * delta, q[1] + n[1] * delta, q[2] + n[2] * delta];
+  const t = [n[0] + T5_NORMAL_TILT[0], n[1] + T5_NORMAL_TILT[1], n[2] + T5_NORMAL_TILT[2]], tl = Math.sqrt(t[0] * t[0] + t[1] * t[1] + t[2] * t[2]);
+  if (t5Escapes(G, o, [t[0] / tl, t[1] / tl, t[2] / tl])) return true;
+  for (const d of TEXTURE_VISIBILITY_DIRS) if (d[0] * n[0] + d[1] * n[1] + d[2] * n[2] > T5_HEMISPHERE_DOT && t5Escapes(G, o, d)) return true;
+  return false;
+}
+export function textureVisibilityGrid(positions) { return t5Grid(positions); }
+/* THE RELIEF PASS, once every part exists: visibility, the fade, the field,
+   the displacement written in place. Returns one record per organ. */
+function organReliefPass(acc, T, organs, capability = null) {
+  /* a gate-only lever, reached by no control: the lattice cut and every record
+     kept, the displacement not written — TX11 reads visibility off this mesh */
+  const off = !!(capability && capability.organReliefOff);
+  if (!organs.length) return {};
+  const G = t5Grid(acc.positions);
+  const H = T.heightMm, Lam = TEXTURE_CONTACT_FADE_K * H;
+  const recs = {};
+  const SAMPLE_EVERY = 97;
+  /* every organ's visibility first, against the undisplaced organs */
+  const vis = organs.map((O) => {
+    const nV = O.P.length / 3, v = new Uint8Array(nV);
+    for (let i = 0; i < nV; i++) if (O.relievable[i]) v[i] = textureVertexVisible(G, [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]], [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]]) ? 1 : 0;
+    return v;
+  });
+  organs.forEach((O, oi) => {
+    const nV = O.P.length / 3, V = vis[oi];
+    /* THE FADE IS GEODESIC: the distance ALONG THE ORGAN'S OWN MESH from the
+       nearest vertex that stays where it is (buried, a cavity's, or one with
+       no normal), by a multi-source Dijkstra over the lattice's edges cut off
+       at the fade length — never a straight line through the material, which
+       would let the hub's buried underside fade its own top face */
+    let buried = 0, visible = 0;
+    const dist = new Float64Array(nV).fill(Infinity);
+    const heap = [];
+    const push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+    for (let i = 0; i < nV; i++) {
+      if (!O.vTags[i]) continue;
+      if (O.relievable[i] && V[i]) { visible++; continue; }
+      if (O.relievable[i]) buried++;
+      dist[i] = 0; push(0, i);
+    }
+    const adj = Array.from({ length: nV }, () => []);
+    for (let t = 0; t < O.tri.length; t += 3) for (let k = 0; k < 3; k++) { const a = O.tri[t + k], b = O.tri[t + (k + 1) % 3]; adj[a].push(b); adj[b].push(a); }
+    while (heap.length) {
+      const [d, i] = pop();
+      if (d > dist[i] || d >= Lam) continue;
+      for (const j of adj[i]) {
+        const dx = O.P[j * 3] - O.P[i * 3], dy = O.P[j * 3 + 1] - O.P[i * 3 + 1], dz = O.P[j * 3 + 2] - O.P[i * 3 + 2];
+        const nd = d + Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (nd < dist[j]) { dist[j] = nd; push(nd, j); }
+      }
+    }
+    const rec = { blades: 1, refused: {}, panels: 0, subRows: 0, cfMax: 1, skinTris: O.refinedTris - O.cavityTris, floorTris: 0, rimTris: 0, reliefMaxMm: 0, reliefMinMm: Infinity, displaced: 0, skinSamples: [], apexSamples: [], edgeMismatch: O.edgeMm === T.edgeMm ? 0 : 1,
+      organ: { shippedTris: O.shippedTris, refinedTris: O.refinedTris, cavityTris: O.cavityTris, vertices: nV, relievable: O.relievable.reduce((n, x) => n + x, 0), visible, buried, fadeMm: Lam, fans: O.fans, pairs: O.pairs, normalFallback: O.normalFallback, twin: O.twin, twinMismatch: O.twinMismatch, triRange: [O.from, O.to] } };
+    const disp = new Float64Array(nV * 3);
+    let tick = 0;
+    for (let i = 0; i < nV; i++) {
+      const q = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]];
+      disp[i * 3] = q[0]; disp[i * 3 + 1] = q[1]; disp[i * 3 + 2] = q[2];
+      if (!O.relievable[i] || !V[i]) continue;
+      const dmin = dist[i];
+      const w = dmin >= Lam ? 1 : rimEase(dmin / Lam);
+      if (!(w > 0)) continue;
+      const n = [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]];
+      const s = w * (H * T.f(q));
+      const p1 = [q[0] + n[0] * s, q[1] + n[1] * s, q[2] + n[2] * s];
+      disp[i * 3] = p1[0]; disp[i * 3 + 1] = p1[1]; disp[i * 3 + 2] = p1[2];
+      rec.displaced++;
+      if (s > rec.reliefMaxMm) rec.reliefMaxMm = s;
+      if (s < rec.reliefMinMm) rec.reliefMinMm = s;
+      if (tick++ % SAMPLE_EVERY === 0 && rec.skinSamples.length < 64) rec.skinSamples.push({ p0: q, p1, mid: q, n, s, g: w, u: 0, v: 0, sIdx: -1, side: 'outward', rep: null, organ: O.organ, tags: O.vTags[i].slice(), fadeDistMm: dmin });
+    }
+    if (!Number.isFinite(rec.reliefMinMm)) rec.reliefMinMm = 0;
+    /* a bounded set of the BURIED vertices too, for the visibility clause */
+    rec.organ.buriedSamples = [];
+    for (let i = 0, k = 0; i < nV && rec.organ.buriedSamples.length < 32; i++) if (O.relievable[i] && !V[i] && (k++ % 13 === 0)) rec.organ.buriedSamples.push({ p: [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]], n: [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]] });
+    /* the displacement, in place: positions only */
+    const pos = acc.positions;
+    if (off) { rec.organ.reliefOff = true; }
+    else
+    for (let t = 0; t < O.tri.length / 3; t++) for (let c = 0; c < 3; c++) {
+      const v = O.tri[t * 3 + c], o = (O.from + t) * 9 + c * 3;
+      pos[o] = disp[v * 3]; pos[o + 1] = disp[v * 3 + 1]; pos[o + 2] = disp[v * 3 + 2];
+      for (let k = 0; k < 3; k++) { const x = pos[o + k]; if (x < acc.lo[k]) acc.lo[k] = x; if (x > acc.hi[k]) acc.hi[k] = x; }
+    }
+    if (acc.normals) for (let t = O.from; t < O.to; t++) {
+      const b = t * 9;
+      const ux = pos[b + 3] - pos[b], uy = pos[b + 4] - pos[b + 1], uz = pos[b + 5] - pos[b + 2], vx = pos[b + 6] - pos[b], vy = pos[b + 7] - pos[b + 1], vz = pos[b + 8] - pos[b + 2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
+      for (let c = 0; c < 3; c++) { acc.normals[b + c * 3] = nx; acc.normals[b + c * 3 + 1] = ny; acc.normals[b + c * 3 + 2] = nz; }
+    }
+    const key = O.organ;
+    if (!recs[key]) recs[key] = rec;
+    else {
+      /* a second ring of the same organ (a tube on two whorls) folds in */
+      const r = recs[key];
+      r.blades++; r.skinTris += rec.skinTris; r.displaced += rec.displaced; r.reliefMaxMm = Math.max(r.reliefMaxMm, rec.reliefMaxMm); r.reliefMinMm = Math.min(r.reliefMinMm, rec.reliefMinMm); r.edgeMismatch += rec.edgeMismatch;
+      for (const q of rec.skinSamples) if (r.skinSamples.length < 96) r.skinSamples.push(q);
+      for (const k of ['shippedTris', 'refinedTris', 'cavityTris', 'vertices', 'relievable', 'visible', 'buried', 'fans', 'pairs', 'normalFallback']) r.organ[k] += rec.organ[k];
+      r.organ.twinMismatch = r.organ.twinMismatch || rec.organ.twinMismatch;
+      r.organ.triRanges = [...(r.organ.triRanges || [r.organ.triRange]), rec.organ.triRange];
+      for (const q of rec.organ.buriedSamples) if (r.organ.buriedSamples.length < 48) r.organ.buriedSamples.push(q);
+    }
+  });
+  for (const r of Object.values(recs)) if (!r.organ.triRanges) r.organ.triRanges = [r.organ.triRange];
+  return recs;
+}
+/* WHETHER THIS BUILD RELIEVES ITS ORGANS, and on what edge: the texture on and
+   not refused, the build not a collect pass */
+function organT5For(state, capability) {
+  const T = textureFor(state, capability || null);
+  return T && !T.refused ? T : null;
+}
+
 
 /* ---------------- plan geometry: convex polygons in (x, y) ---------------- */
 /* Ported from `tools/bloom-voronoi-proto.mjs` term for term. The prototype
@@ -16679,6 +17280,25 @@ export function buildStemInto(acc, plan) {
   }
   const outer = nodeOuter || (CUT ? zs.slice(0, zs.length - 1) : zs).map((z) => ringAt(R, z));
   if (!nodeOuter) measure(outer);
+  /* THE STEM'S FACES, NAMED FOR THE ORGAN RELIEF (T5) — a property write on
+     an untextured build, no byte moved — and its own normals: the wall's
+     horizontal radial from the axis AT ITS OWN DEPTH (the node law's centre on a
+     noded stem: the swelling's tilt is left out, so the direction is outward
+     and never the surface normal exactly — said in the outcome doc), the end
+     faces' +-z, the cut plane's own. The BORE and the void's caps are the
+     enclosed cavity: never refined, never relieved (Q15). */
+  acc.faceTag = 'stem.outer';
+  organNormalOf(acc, (tag, P) => {
+    if (tag === 'stem.outer') {
+      const c = plan.nodeLaw ? stemNodeAxisMm(plan.nodeLaw, plan.rootZ - P[2]) : [0, 0];
+      const dx = P[0] - c[0], dy = P[1] - c[1], L = Math.hypot(dx, dy);
+      return L > 0 ? [dx / L, dy / L, 0] : null;
+    }
+    if (tag === 'stem.top') return [0, 0, 1];
+    if (tag === 'stem.bottom' || tag === 'stem.land') return [0, 0, -1];
+    if (tag === 'stem.cutPlane') { const sl = CUT.slope, L = Math.hypot(sl, 1); return [-sl / L, 0, -1 / L]; }
+    return null;
+  });
   for (let i = 0; i < outer.length - 1; i++) {
     const up = outer[i], dn = outer[i + 1];
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k], dn[k], dn[k2], up[k2]); }
@@ -16758,6 +17378,8 @@ export function buildStemInto(acc, plan) {
      root band, and the last two shared everything but which end was shut. What
      is left is the VOID or the absence of one. */
   const endFace = (face, cap, closed, up) => {
+    const endTag = up ? 'stem.top' : 'stem.bottom';
+    acc.faceTag = endTag;
     if (closed) {
       /* BOTH DISCS ARE RIM FANS, never centre fans — the solid arm's own
          measured defect, one branch down: a vertex at exactly [0, 0, z] is a
@@ -16766,9 +17388,12 @@ export function buildStemInto(acc, plan) {
          self-intersection (528 pairs, measured). A rim fan shares no axis
          vertex with anything. */
       for (let k = 1; k < N - 1; k++) {
-        if (up) { acc.tri(face[0], face[k], face[k + 1]); acc.tri(cap[0], cap[k + 1], cap[k]); }
-        else { acc.tri(face[0], face[k + 1], face[k]); acc.tri(cap[0], cap[k], cap[k + 1]); }
+        acc.faceTag = endTag;
+        if (up) acc.tri(face[0], face[k], face[k + 1]); else acc.tri(face[0], face[k + 1], face[k]);
+        acc.faceTag = 'stem.cavity';
+        if (up) acc.tri(cap[0], cap[k + 1], cap[k]); else acc.tri(cap[0], cap[k], cap[k + 1]);
       }
+      acc.faceTag = null;
     } else {
       /* AND THE OPEN ARM'S WINDING IS THE OTHER WAY ROUND FROM THE ONE THIS
          FILE SHIPPED, WHICH IS A MEASUREMENT AND NOT A TIDY-UP. Both annuli of
@@ -16820,15 +17445,18 @@ export function buildStemInto(acc, plan) {
     const land = [];
     for (let i = iB; i < M; i++) land.push(cr[i]);
     for (let i = 0; i <= iA; i++) land.push(cr[i]);
+    acc.faceTag = 'stem.land';
     for (let j = 1; j < land.length - 1; j++) tri(land[0], land[j + 1], land[j]);
     const plane = [];
     for (let i = iA; i <= iB; i++) plane.push(cr[i % M]);
+    acc.faceTag = 'stem.cutPlane';
     for (let j = 1; j < plane.length - 1; j++) tri(plane[0], plane[j + 1], plane[j]);
+    acc.faceTag = null;
     cutFaceTo = acc.triangleCount;
   };
   /* The void's own floor under a cut: a rim fan facing UP into the bore —
      `endFace`'s closed cap, term for term, on the one ring. */
-  const voidCapInto = (cap) => { for (let k = 1; k < N - 1; k++) acc.tri(cap[0], cap[k], cap[k + 1]); };
+  const voidCapInto = (cap) => { acc.faceTag = 'stem.cavity'; for (let k = 1; k < N - 1; k++) acc.tri(cap[0], cap[k], cap[k + 1]); acc.faceTag = null; };
   let emittedVoid = false, emittedVoidTopZ, emittedVoidBottomZ;
   if (plan.voidMm > 0) {
     /* THE VOID GETS ITS OWN LADDER FROM THE ONE PLACER, over its own length,
@@ -16856,10 +17484,12 @@ export function buildStemInto(acc, plan) {
       ? nodeVoidLadder(plan.voidMm).map((mm) => nodeInner(mm))
       : stemStations(plan.voidMm).map((mm) => ringAt(b, plan.voidTopZ - mm));
     if (nodeMeasureInner) nodeMeasureInner(inner); else measure(inner);
+    acc.faceTag = 'stem.cavity';
     for (let i = 0; i < inner.length - 1; i++) {
       const up = inner[i], dn = inner[i + 1];
       for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k2], dn[k2], dn[k], up[k]); }
     }
+    acc.faceTag = null;
     /* THE EMITTED VOID — ST10's measured side, and it is here rather than read
        off the plan for ST2's and ST3's own reason: a builder that put the plug
        at the wrong end, or at five times its length, emits the SAME triangle
@@ -16874,7 +17504,9 @@ export function buildStemInto(acc, plan) {
   } else if (CUT) {
     /* NO BORE under a CUT: the top cap as the solid arm emits it, the cut
        face below. */
+    acc.faceTag = 'stem.top';
     for (let k = 1; k < N - 1; k++) acc.tri(tOut[0], tOut[k], tOut[k + 1]);
+    acc.faceTag = null;
     cutFaceInto();
   } else {
     /* NO BORE LEFT TO SEE — either the stem never had one (at or under the 3 mm
@@ -16892,9 +17524,12 @@ export function buildStemInto(acc, plan) {
        pairs on the 3 mm row, worst span 0.1962 mm, against 0 on every hollow
        one (a bore leaves no axis vertex to share). */
     for (let k = 1; k < N - 1; k++) {
+      acc.faceTag = 'stem.top';
       acc.tri(tOut[0], tOut[k], tOut[k + 1]);           // top cap, facing up
+      acc.faceTag = 'stem.bottom';
       acc.tri(bOut[0], bOut[k + 1], bOut[k]);           // bottom cap, facing down
     }
+    acc.faceTag = null;
   }
   /* THE STEM'S OWN DIRECTED-EDGE CENSUS — ST10's witness for which way these
      faces point, and the only one available.
@@ -20918,8 +21553,13 @@ export function buildHubInto(acc, state, ring) {
       for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; if (outward) acc.tri(upper[k2], upper[k], apexS); else acc.tri(upper[k], upper[k2], apexS); }
     };
     const before = acc.triangleCount;
+    acc.faceTag = 'hub.sphereOuter';
     sphereInto(Rd + t / 2, true);
+    /* the inner sphere faces the HOLLOW — an enclosed cavity, never relieved (T5) */
+    acc.faceTag = 'hub.cavity';
     sphereInto(Rd - t / 2, false);
+    acc.faceTag = null;
+    organNormalOf(acc, (tag, P) => { const d = [P[0], P[1], P[2] - cz], L = Math.hypot(d[0], d[1], d[2]); return tag === 'hub.sphereOuter' && L > 0 ? [d[0] / L, d[1] / L, d[2] / L] : null; });
     /* A SPHERE'S WALL IS t EVERYWHERE and the hub-to-stem join is INERT here
        by declaration, not by arithmetic: `stemPlan` returns joinT = hubT on a
        closed shell (see its own note — a plate's section modulus does not
@@ -20966,11 +21606,33 @@ export function buildHubInto(acc, state, ring) {
        own expression term for term with no branch to keep in step. */
     const innerRad = (phi) => (Rd - t / 2) - (joinAt(Rd * Math.sin(phi)) - t);
     joinReport.undersideMagnitude = outerRad;
+    acc.faceTag = 'hub.domeOuter';
     cap(() => outerRad, true);
     for (let i = 0; i <= K; i++) { const phi = phiRim * (1 - i / K); underside.push([Rd * Math.sin(phi), outerRad - innerRad(phi)]); }   // the EMITTED difference, round-trip and all
+    acc.faceTag = 'hub.domeInner';
     cap(innerRad, false);
     const top = ringAt(outerRad, phiRim), bot = ringAt(innerRad(phiRim), phiRim);
+    acc.faceTag = 'hub.domeRim';
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(top[k], bot[k], bot[k2], top[k2]); }
+    acc.faceTag = null;
+    /* THE CAP'S OWN NORMALS (T5): the outer cap's from the sphere's centre;
+       the inner cap's from its own profile rho(phi) (the join reshapes it, so
+       the slope term rho' is the profile's, central-differenced); the rim band's
+       the meridian direction e_phi at the rim. */
+    organNormalOf(acc, (tag, P) => {
+      const x = P[0], y = P[1], z = P[2] - cz, rr = Math.hypot(x, y), phi = Math.atan2(rr, z);
+      const cth = rr > 0 ? x / rr : 1, sth = rr > 0 ? y / rr : 0;
+      const eR = [Math.sin(phi) * cth, Math.sin(phi) * sth, Math.cos(phi)], eP = [Math.cos(phi) * cth, Math.cos(phi) * sth, -Math.sin(phi)];
+      if (tag === 'hub.domeOuter') return eR;
+      if (tag === 'hub.domeRim') return eP;
+      if (tag === 'hub.domeInner') {
+        if (!(rr > 0)) return [0, 0, -1];
+        const h = 1e-5, a = Math.max(0, phi - h), b = phi + h, rho = innerRad(phi), d = (innerRad(b) - innerRad(a)) / (b - a);
+        const v = [-(rho * eR[0] - d * eP[0]), -(rho * eR[1] - d * eP[1]), -(rho * eR[2] - d * eP[2])], L = Math.hypot(v[0], v[1], v[2]);
+        return [v[0] / L, v[1] / L, v[2] / L];
+      }
+      return null;
+    });
     return { dome: { Rd, centreZ: cz, H: dome.H, closed: false, rimPhi: phiRim, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before, topFaceZ: cz + outerRad, ...joinReport };
   }
   const r = ring.radius;
@@ -20984,10 +21646,30 @@ export function buildHubInto(acc, state, ring) {
      only. ST6 is what asserts it, against a stemless build of the same state. */
   for (let k = 0; k < N; k++) {
     const k2 = (k + 1) % N;
+    acc.faceTag = 'hub.top';
     acc.tri(cTop, pt(k, zTop), pt(k2, zTop));                      // top fan (up)
+    acc.faceTag = 'hub.bottom';
     if (!joinActive) acc.tri(cBot, pt(k2, zBot), pt(k, zBot));     // bottom fan (down)
+    acc.faceTag = 'hub.rim';
     acc.quad(pt(k, zTop), pt(k, zBot), pt(k2, zBot), pt(k2, zTop)); // rim
   }
+  acc.faceTag = null;
+  /* THE SLAB'S OWN NORMALS (T5): the faces' +-z, the rim's radial, and the
+     join's underside z = zTop - J(r) its own profile normal (-J'(r) r^, -1),
+     J' central-differenced on the one owner of the profile. */
+  organNormalOf(acc, (tag, P) => {
+    const rr = Math.hypot(P[0], P[1]);
+    if (tag === 'hub.top') return [0, 0, 1];
+    if (tag === 'hub.bottom') return [0, 0, -1];
+    if (tag === 'hub.rim') return rr > 0 ? [P[0] / rr, P[1] / rr, 0] : null;
+    if (tag === 'hub.join') {
+      if (!(rr > 0)) return [0, 0, -1];
+      const h = 1e-5, a = Math.max(0, rr - h), b = rr + h, dJ = (joinAt(b) - joinAt(a)) / (b - a);
+      const v = [-dJ * P[0] / rr, -dJ * P[1] / rr, -1], L = Math.hypot(v[0], v[1], v[2]);
+      return [v[0] / L, v[1] / L, v[2] / L];
+    }
+    return null;
+  });
   if (!joinActive) {
     underside.push([r, t], [0, t]);                                  // one flat face, the hub's own thickness everywhere
     return { dome: null, tris: N * 4, topFaceZ: zTop, ...joinReport };   // N*4 is the shipped literal, kept
@@ -20999,6 +21681,7 @@ export function buildHubInto(acc, state, ring) {
      own thickness there by construction), so the rim quad above still closes. */
   const K = HUB_DOME_RINGS;
   const botRing = (rad) => { const z = zTop - joinAt(rad); return Array.from({ length: N }, (_, k) => { const th = (k * TAU) / N; return [rad * Math.cos(th), rad * Math.sin(th), z]; }); };
+  acc.faceTag = 'hub.join';
   let O = botRing(r); underside.push([r, joinAt(r)]);
   for (let i = 1; i < K; i++) {
     const rr = r * (1 - i / K);
@@ -21009,6 +21692,7 @@ export function buildHubInto(acc, state, ring) {
   underside.push([0, joinAt(0)]);
   const apexB = [0, 0, zTop - joinAt(0)];
   for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.tri(apexB, O[k2], O[k]); }
+  acc.faceTag = null;
   /* MEASURED, NEVER COMPUTED. The first version of this line carried the
      arithmetic and was WRONG BY 48 — it reported 1872 against an emitted 1824,
      because the top fan is N triangles and it had been written 2N. Both other
@@ -22486,6 +23170,8 @@ export function floretPitchFloorMm(bodyOf, pairs, gapMm) {
     }
     return [...by.values()];
   })();
+  const decodeJ = (key2) => { const jw = ((key2 % KEY) + KEY) % KEY; return jw > KEY / 2 ? jw - KEY : jw; };
+  const decodeI = (key2) => (key2 - (((key2 % KEY) + KEY) % KEY)) / KEY;
   const decode = (key2) => { const jw = ((key2 % KEY) + KEY) % KEY; const i = (key2 - jw) / KEY; const j = jw > KEY / 2 ? jw - KEY : jw; return [i, j]; };
   /* a map as dense arrays over its own bounding box, and the lower's dilations */
   const denses = new Map();
@@ -22494,12 +23180,20 @@ export function floretPitchFloorMm(bodyOf, pairs, gapMm) {
     const key = Math.round(w * 1e9);
     if (denses.has(key)) return denses.get(key);
     const m = map(w);
+    /* THE BOX IS READ WITH SCALAR DECODES, never by destructuring decode()'s
+       array: in CHROMIUM's V8 the destructured form sometimes handed this
+       loop ANOTHER map's box (measured: the dense grid of azimuth 0 carried
+       azimuth pi's i0, -151 for 3, with its own z arrays intact), so the
+       bound was read at the wrong offset, `whereOf`'s cross-check threw on
+       `TEXTURE: PEBBLE x a RACEME` about one run in four on b3163de — never
+       in Node — and a wrong bound for a pair that does not win would have
+       passed silently. The same integers, as two functions of the key. */
     let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
-    for (const k of m.keys()) { const [i, j] = decode(k); if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+    for (const k of m.keys()) { const i = decodeI(k), j = decodeJ(k); if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
     if (!(i0 <= i1)) { denses.set(key, { empty: true }); return denses.get(key); }
     const W = i1 - i0 + 1, H = j1 - j0 + 1;
     const zmin = new Float64Array(W * H).fill(Infinity), zmax = new Float64Array(W * H).fill(-Infinity);
-    for (const [k, r] of m) { const [i, j] = decode(k); const x = (i - i0) * H + (j - j0); zmin[x] = r[0]; zmax[x] = r[1]; }
+    for (const [k, r] of m) { const x = (decodeI(k) - i0) * H + (decodeJ(k) - j0); zmin[x] = r[0]; zmax[x] = r[1]; }
     /* dilations on a grid padded by SUB on every side, so an upper cell just
        outside the lower's box still reads the lower cells within a gap */
     const Wd = W + 2 * SUB, Hd = H + 2 * SUB;
@@ -23199,7 +23893,7 @@ export function floretUnitMemo(state, plan) {
       if (cache.has(key)) return cache.get(key);
       const sub = new MeshBuilder({ exportMode });
       const fs = floretState(state, plan, L, az);
-      const rec = buildBloomInto(sub, fs, { below: null });
+      const rec = buildBloomInto(sub, fs, { below: null, pedicel: true });
       const stalked = !!(rec.stem && rec.stem.present);
       const hubT = sub.floorThickness(rec.hub.thickness);
       const tipZ = stalked ? rec.stem.tipZ : hubAxisTopZ(rec.hub.dome, hubT) - hubT;
@@ -24458,6 +25152,15 @@ function emitTubeRings(acc, geo, n, capability = null) {
 /* THE CORE WITH A TUBE. Every layer FREE (the default) is today's single pass,
    by branch. */
 function buildBloomCore(acc, state, opts = {}) {
+  /* T5's DECISION TWIN: a live build whose sheet the export floor raises
+     decides every organ count on the same organs built in export (untextured,
+     so the twin cuts nothing itself) — mode-free by construction */
+  if (!opts.t5Decide && !acc.exportMode && Number(state.sheetThickness) < MIN_FEATURE_MM && organT5For(state, opts.capability || null)) {
+    const tw = new MeshBuilder({ exportMode: true });
+    const tb = buildBloomCore(tw, { ...state, petalTexture: 'NONE' }, { ...opts, t5Decide: 'twin' });
+    const dec = { positions: tw.positions, hub: [tb.petalTriEnd, tb.hubTriEnd], stem: [tb.hubTriEnd, tb.stemTriEnd], tube: (tb.tube && tb.tube.rings || []).map((r) => [r.triFrom, r.triTo]) };
+    return buildBloomCore(acc, state, { ...opts, t5Decide: dec });
+  }
   const layerCount = Math.round(Number(state.layerCount) || 1);
   const n = Math.round(Number(state.petalCount));
   let plan = tubePlan(state, layerCount, n);
@@ -24468,22 +25171,49 @@ function buildBloomCore(acc, state, opts = {}) {
   if (!plan.active) {
     const built = buildBloomBody(acc, state, opts, null);
     built.tube = { ...plan, rings: [] };
-    return built;
+    return t5Finish(acc, built, [], opts.capability || null);
   }
   /* pass 1: every fused petal's rows, no blade emitted */
   const collectHooks = plan.layers.map((lay) => (lay.free ? null : () => () => -1));
-  const collected = buildBloomBody(new MeshBuilder({ exportMode: acc.exportMode }), state, opts, { hookFor: (L) => collectHooks[L] });
+  const collected = buildBloomBody(new MeshBuilder({ exportMode: acc.exportMode }), state, opts, { hookFor: (L) => collectHooks[L], collect: true });
   if (collected.foot.slotCount !== n || collected.foot.layerCount !== layerCount) throw new Error(`TUBE: the plan read ${layerCount} x ${n}, the whorl built ${collected.foot.layerCount} x ${collected.foot.slotCount}`);
   /* the same whorls in the OTHER mode, for the mode-free decisions only */
-  const collectedOther = buildBloomBody(new MeshBuilder({ exportMode: !acc.exportMode }), state, opts, { hookFor: (L) => collectHooks[L] });
+  const collectedOther = buildBloomBody(new MeshBuilder({ exportMode: !acc.exportMode }), state, opts, { hookFor: (L) => collectHooks[L], collect: true });
   const geoOther = tubeGeometry(plan, collectedOther);
   const geo = tubeGeometry(plan, collected, geoOther);
   for (const g of geo) if (g && geoOther[g.L].R1 !== g.R1) throw new Error(`TUBE: the ring's top row differs between the modes (${g.R1} against ${geoOther[g.L].R1}) — the ladder is not mode-free`);
   /* pass 2: each fused petal reduced to what stands above the ring */
   const built = buildBloomBody(acc, state, opts, { hookFor: (L) => (geo[L] ? (p) => tubeLobeHook(geo[L], n, p) : null) });
-  /* pass 3: the rings, last */
-  const rings = emitTubeRings(acc, geo, n, opts.capability || null);
+  /* pass 3: the rings, last — under T5 one ring at a time, each refined on its
+     own shipped lattice with its own law's normals */
+  let rings, tubeOrgans = [];
+  if (built.t5) {
+    rings = [];
+    let ri = 0;
+    for (const gg of geo) {
+      if (!gg) continue;
+      const sink = new Map();
+      acc.normalSink = (P, nn) => { const k = `${P[0]}|${P[1]}|${P[2]}`; if (nn && !sink.has(k)) sink.set(k, nn); };
+      const from = acc.triangleCount;
+      let rep;
+      try { const c = organCapture(acc, () => emitTubeRings(acc, [gg], n, opts.capability || null)); rep = c.out; const dd = opts.t5Decide && opts.t5Decide !== 'twin' && opts.t5Decide.tube[ri] ? { positions: opts.t5Decide.positions, from: opts.t5Decide.tube[ri][0], to: opts.t5Decide.tube[ri][1] } : null; tubeOrgans.push(organLatticeInto(acc, from, c, { organ: 'tube', edgeMm: built.t5.edgeMm, decide: dd, sink })); }
+      finally { acc.normalSink = null; }
+      for (const r of rep) { r.shippedTris = r.ringTris; r.triTo = acc.triangleCount; r.ringTris = r.triTo - r.triFrom; rings.push(r); }
+      ri++;
+    }
+  } else rings = emitTubeRings(acc, geo, n, opts.capability || null);
   built.tube = { ...plan, rings };
+  return t5Finish(acc, built, tubeOrgans, opts.capability || null);
+}
+/* the relief pass once every part of this build exists, and its records into
+   the texture summary (the organs' own beside the sheets') */
+function t5Finish(acc, built, extra, capability = null) {
+  if (!built.t5) return built;
+  const organs = [...(built.t5Organs || []), ...extra];
+  const recs = organReliefPass(acc, built.t5, organs, capability);
+  if (built.texture) for (const [k, r] of Object.entries(recs)) built.texture.organs[k] = r;
+  delete built.t5Organs;
+  built.t5 = { organs: organs.map((O) => O.organ) };
   return built;
 }
 
@@ -24626,7 +25356,7 @@ function buildBloomRamped(acc, state, opts = {}) {
   }
 }
 
-function buildBloomBody(acc, state, { below = null, capability = null, scopes = null } = {}, tube = null) {
+function buildBloomBody(acc, state, { below = null, capability = null, scopes = null, pedicel = false, t5Decide = null } = {}, tube = null) {
   if (below !== null && below !== 'stem' && below !== 'branch') {
     throw new Error(`below must be 'stem' | 'branch' | null, got ${JSON.stringify(below)}`);
   }
@@ -24892,7 +25622,16 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   acc.captureLamina = laminaWas;
   /* every triangle before this index is a petal's (the TU family's probe set) */
   const petalTriEnd = acc.positions.length / 9;
-  const hubBuilt = headOff ? HUB_ABSENT : buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
+  /* THE ORGANS' RELIEF (T5): a textured build cuts the hub's and the stem's
+     lattice right after each is emitted; a tube's collect passes and every
+     untextured build take the shipped expressions, by branch */
+  const T5 = tube && tube.collect ? null : organT5For(state, capability);
+  const t5Organs = T5 ? [] : null;
+  const t5Cut = (organ, from, cap) => { const d = t5Decide && t5Decide !== 'twin' && t5Decide[organ] ? { positions: t5Decide.positions, from: t5Decide[organ][0], to: t5Decide[organ][1] } : null; t5Organs.push(organLatticeInto(acc, from, cap, { organ, edgeMm: T5.edgeMm, decide: d })); };
+  let hubBuilt;
+  if (headOff) hubBuilt = HUB_ABSENT;
+  else if (T5) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); }
+  else hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
   const hubTriEnd = acc.positions.length / 9;
   /* THE STEM (session 43) — ONE closed solid on the axis, rooted THROUGH the
      hub wall, overlapping it exactly as every stamen and the style already do.
@@ -24900,7 +25639,11 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      one owner above, the same object buildHubInto shaped the join from, so the
      stem and the hollow it leaves in the hub cannot disagree about where the
      underside is; it is emitted HERE, after the hub, where it always was. */
-  const stemBuilt = buildStemInto(acc, stemPlanned);
+  /* a floret's stem is its PEDICEL, a rod: deferred to BONE (Q12) */
+  let stemBuilt;
+  if (T5 && !pedicel && stemPlanned.present) { const c = organCapture(acc, () => buildStemInto(acc, stemPlanned)); stemBuilt = c.out; t5Cut('stem', hubTriEnd, c); stemBuilt = { ...stemBuilt, latticeTris: acc.positions.length / 9 - hubTriEnd }; }
+  else stemBuilt = buildStemInto(acc, stemPlanned);
+  const stemTriEnd = acc.positions.length / 9;
   /* LEAVES ON THE STEM. Built AFTER the stem because they read its plan for
      the three lengths they need (`boreR`, `outerR`, `rootZ`) and compute none
      of them — the petiole roots in the WALL, which is the one thing Phase A's
@@ -25089,7 +25832,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      organ's lattice count against its conforming floor, the relief's extremes
      and the refusals — what the TX family and the read-out read. */
   const texture = textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, capability);
-  return { petalTriEnd, hubTriEnd, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt, texture,
+  return { petalTriEnd, hubTriEnd, stemTriEnd, t5Organs, t5: T5, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt, texture,
     /* THE SIZE FIELD'S OWN RECORD (organic variance, build 1) — null at amount
        0, which is the guard every consumer of it branches on. The closure is
        left off (a function does not survive the metrics hook's clone); what a

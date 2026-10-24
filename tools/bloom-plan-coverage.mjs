@@ -370,8 +370,12 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     if (fr.sepals) mod.buildSepalsInto(accST, ui, fr, petalSites, stPlan, capParts);
 
     const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
-    if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) {
-      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
+    /* THE ORGANS' LATTICE (texture T5): the hub and the stem re-emitted here
+       are the SHIPPED parts; the whole build refined each on its own lattice,
+       and the record says by how many triangles — counted in, never hidden */
+    const t5Extra = Object.values((builtFull.texture && builtFull.texture.organs) || {}).reduce((n, r) => n + (r.organ ? r.organ.refinedTris - r.organ.shippedTris : 0), 0);
+    if (petalTris + accHC.triangleCount + accST.triangleCount + t5Extra !== accFull.triangleCount) {
+      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) + the organs' lattice (${t5Extra}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount + t5Extra}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
     }
     /* R2 */
     if (petalsBuilt !== builtFull.petalsBuilt) {
