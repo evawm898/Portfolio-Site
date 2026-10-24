@@ -6720,6 +6720,23 @@ SHIPS OFF** (the umbel session, Oct 22 — Eva's rulings of Oct 21–22, the spi
   Sheet: `node tools/shot-bloom-umbel.mjs <dir> --png docs/img/umbel.png`; the boss's before/after junction sheet
   `node tools/shot-bloom-umbel-boss.mjs docs/img/umbel-boss.png --base <worktree>` (side-on and from below).
 
+**THE MOPHEAD HYDRANGEA IS DISCOVERED, NOT BUILT — ~100–120 FLORETS FIT TODAY, THE FLOOD FILL CANNOT SEE
+ROOTING, AND THE STRUCTURE IS EVA'S** (Oct 24 — read `docs/bloom-hydrangea-discovery.md` before any mophead work).
+- **Floret cost (EXPORT = LIVE):** 4 petals x 3,062 + a 192 flat hub = **12,440 (120 fit 1.5 M)**; any pedicel
+  +1,916 (104 fit). Petal tip shape >= 2.50 ramps rows (18,264 at 2.5). The root law is inert at 20 mm petals.
+- **Reduced floret (patched copies, none chosen):** NV 6 + K 2 at NU 56 = 6,664 at the shipped outline chords
+  (~225 fit); NU 28 NV 6 K 2 = 3,528 (~425 fit) at a 0.62 mm round apex. A floret-only row count must also pin
+  the apex ramp's absolute 112 and `CURL_START_MIN`. A 12-sector pedicel is 476 against 1,916.
+- **Three prototypes, all watertight, 0 within-shell pairs, one flood-fill region:** (A) 113 sessile florets on a
+  ball (94.1 %) — the capitulum reading ruling 1 refused; (B) a compound umbel 9 x 11 = 99 (95.1 %) via ONE
+  patched line (`floretState`'s inflorescence pin lifted one level) — a dome, open below; (C) 97 florets on stubs
+  from an inner sphere (93.2 %). **Florets alone read ONE region in all three**, so a ball owes a per-floret root
+  clause (UM2's shape).
+- The 20 mm petal floor makes a round floret 52 mm (a real one is 25–38 mm). The SPHERE hub and every plugged
+  stem bore are sealed cavities (trapped powder, pre-existing). #231 need not land first: the count is exact after
+  one floret build. Tools: `tools/bloom-hydrangea-lib.mjs`, `tools/bloom-hydrangea-measure.mjs`,
+  `tools/shot-bloom-hydrangea-discovery.mjs` -> `docs/img/hydrangea-discovery.png`. None in CI.
+
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of
 `docs/bloom-organic-variance-discovery.md`; read `docs/bloom-organic-variance-size-outcome.md`
