@@ -382,7 +382,7 @@ across 12–19 mm — a vertical pedicel's root disc lies flat in it, half a gap
 plus the margin from each face.
 
 **Triangles: the boss is 192 against the cone's 288**, on every umbel row:
-the spider lily 136,026 → 135,930 (−96), the bloom totals in the table's own
+the spider lily 134,106 → 134,010 (−96, the export gate's own reading), the bloom totals in the table's own
 rows 36,078 → 35,982, 105,366 → 105,270, 209,874 → 209,778, 62,398 → 62,302,
 131,686 → 131,590, 236,194 → 236,098. Nothing else moves.
 
