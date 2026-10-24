@@ -227,15 +227,14 @@ export function measureInfloApproachMm(G, state, measure) {
      vertex inside the boss's own emitted solid is the umbel's join and is
      excluded exactly as the rachis's is — a REGION, named, the one place the
      design puts every pedicel into one solid. The region is read off the
-     boss's EMITTED faces: the flat band, and below it the 45 deg underside
-     closing at its own emitted radius. */
+     boss's EMITTED faces: the flat band (its underside flat since Eva's Oct 24
+     ruling — no cone below it). */
   const K = B.knot || null;
   const insideKnot = (p) => {
     if (!K) return false;
     const r = Math.hypot(p[0] - K.centre[0], p[1] - K.centre[1]), z = p[2];
     if (z >= K.topZ || z <= K.bottomZ) return false;
-    if (z >= K.rimBottomZ) return r < K.radiusMinMm;
-    return K.flareRMm !== null && r < K.flareRMm + (z - K.bottomZ);
+    return r < K.radiusMinMm;
   };
   const outsideRachis = (p) => G.freeStemDistanceMm(rachis, p[0], p[1], p[2]) > 0 && !insideKnot(p);
   const blocks = B.placed.map((q, k) => ({ lo: q.at, hi: q.at + q.tris * 9, owner: `floret${k}`, q }));

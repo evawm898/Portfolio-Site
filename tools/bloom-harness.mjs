@@ -12425,7 +12425,9 @@ export function pedicelPinClauses(F, U) {
        one-gap ring, the root disc's reach at the pedicel angle (a brute
        maximisation over the disc's rim — a second route to the geometry's
        closed form) plus half a gap for the rim, the disc's own height plus
-       half a gap for the band, and the 45 deg underside into the stem's wall
+       half a gap for the band, each grown where a pedicel's crossing would
+       fall short of half a feature plus eight float32 steps (Eva, Oct 24 —
+       the 90 deg knife edge), and a FLAT underside (Oct 24, SLS: no cone)
        — against the EMITTED boss (its axis, rim, band and underside read back
        off its own vertices), never against the plan's own record alone.
    UM2 EVERY PEDICEL ROOTS AT THE BOSS: each placement's emitted pedicel END
@@ -12488,22 +12490,37 @@ export function umbelClauses(m, ui) {
     for (let k = 0; k < 80; k++) { const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3; if (f(m1) < f(m2)) lo = m1; else hi = m2; }
     return Math.max(best, f((lo + hi) / 2));
   };
-  const R = discReach(rho, rP, aRad) + gap / 2;          // the root discs half a gap inside, never on the rim
-  const h = rP * Math.abs(Math.cos(aRad)) + gap / 2;     // and half a gap under the top and over the band's foot
-  const rF = S.outerR - gap / 2;                          // the 45 deg underside runs in to the stem's wall
-  const flare = R > rF ? R - rF : 0;
   const K = B.knot;
+  const R0 = discReach(rho, rP, aRad) + gap / 2;         // the root discs half a gap inside, never on the rim
+  const h0 = rP * Math.abs(Math.cos(aRad)) + gap / 2;    // and half a gap under the top and over the bottom
+  /* THE CROSSING'S MARGIN (Eva, Oct 24) — restated here: eight float32 steps
+     (2^-23 relative each) of the boss's coordinate magnitude, the magnitude
+     read off the EMITTED centre, never off the plan's margin. The band grows
+     only where the crossing through it would be shorter than half a printable
+     feature plus that margin: the top/bottom faces at `h / |sin a|`, the rim
+     at `(R - rho) / cos a`. The underside is FLAT (Eva, Oct 24 — SLS needs no
+     overhang cone). */
+  const M = Math.max(R0, Math.abs(K.centre[2]) + h0) + gap;
+  const crossMin = gap / 2 + 8 * 2 ** -23 * M;
+  const h = Math.max(h0, crossMin * Math.abs(Math.sin(aRad)));
+  const R = Math.max(R0, rho + crossMin * Math.cos(aRad));
   /* the vertices are on the boss to its own few ulp: bounded in ULP of the
      build's coordinate scale, never typed; the reach's search agrees with the
      closed form to 1e-12 */
   const tolR = 64 * Number.EPSILON * Math.max(1, Math.abs(K.centre[2]) + R) + 1e-9;
   if (!(Number.isFinite(K.halfHeightMm) && Number.isFinite(K.bottomZ))) bad.push('UM1: the emitted junction reports no half-height or bottom — it is not the boss (a sphere carries neither)');
   else {
-    if (Math.abs(K.radiusMm - R) > tolR || Math.abs(K.radiusMinMm - R) > tolR) bad.push(`UM1: the boss's rim was emitted at radius ${K.radiusMinMm.toFixed(6)}..${K.radiusMm.toFixed(6)} mm; restated from ${n} pedicels of ${rP.toFixed(4)} mm at ${aDeg} deg off a ${(2 * S.outerR).toFixed(3)} mm stem it is ${R.toFixed(6)} mm (a ring ${rho.toFixed(4)} mm holding them one ${gap} mm gap apart, the root disc's reach, and half a gap — the root discs never on the rim)`);
-    if (Math.abs(K.halfHeightMm - h) > tolR) bad.push(`UM1: the boss's band was emitted ${(2 * K.halfHeightMm).toFixed(6)} mm tall; the root disc at ${aDeg} deg reaches ${(rP * Math.abs(Math.cos(aRad))).toFixed(4)} mm above and below its ring, so with half a gap each way it is ${(2 * h).toFixed(6)} mm`);
-    const wantBot = K.centre[2] - h - flare;
-    if (Math.abs(K.bottomZ - wantBot) > tolR) bad.push(`UM1: the boss's underside reaches z ${K.bottomZ.toFixed(6)} mm; the 45 deg cone from its rim (r ${R.toFixed(4)}) in to the stem's wall (r ${rF.toFixed(4)}) ends at ${wantBot.toFixed(6)} mm`);
-    if (flare > 0 && !(Math.abs(K.flareRMm - rF) <= tolR)) bad.push(`UM1: the boss's underside closes at r ${K.flareRMm} mm; it must close inside the stem's wall at r ${rF.toFixed(4)} mm (half a gap in from the stem's surface, never on it)`);
+    if (Math.abs(K.radiusMm - R) > tolR || Math.abs(K.radiusMinMm - R) > tolR) bad.push(`UM1: the boss's rim was emitted at radius ${K.radiusMinMm.toFixed(6)}..${K.radiusMm.toFixed(6)} mm; restated from ${n} pedicels of ${rP.toFixed(4)} mm at ${aDeg} deg off a ${(2 * S.outerR).toFixed(3)} mm stem it is ${R.toFixed(6)} mm (a ring ${rho.toFixed(4)} mm holding them one ${gap} mm gap apart, the root disc's reach and half a gap, or the crossing's ${crossMin.toFixed(9)} mm through the rim, whichever is larger)`);
+    if (Math.abs(K.halfHeightMm - h) > tolR) bad.push(`UM1: the boss's band was emitted ${(2 * K.halfHeightMm).toFixed(9)} mm tall; the root disc at ${aDeg} deg reaches ${(rP * Math.abs(Math.cos(aRad))).toFixed(4)} mm above and below its ring (half a gap more each way), and a pedicel must cross ${crossMin.toFixed(9)} mm of it — so it is ${(2 * h).toFixed(9)} mm`);
+    const wantBot = K.centre[2] - h;
+    if (Math.abs(K.bottomZ - wantBot) > tolR || Math.abs(K.rimBottomZ - wantBot) > tolR) bad.push(`UM1: the boss's underside reaches z ${K.bottomZ.toFixed(6)} mm (its rim's foot ${K.rimBottomZ.toFixed(6)}); it is FLAT at the band's own foot, ${wantBot.toFixed(6)} mm — no cone below it (SLS, Eva's Oct 24 ruling)`);
+    /* the crossing itself, through the EMITTED boss along the pedicel's own
+       direction from the restated ring: it clears half a feature by the margin */
+    const sn = Math.sin(aRad), cs = Math.cos(aRad);
+    let cross = Infinity;
+    if (Math.abs(sn) > 0) cross = Math.min(cross, K.halfHeightMm / Math.abs(sn));
+    if (cs > 0) cross = Math.min(cross, (K.radiusMinMm - rho) / cs);
+    if (!(cross + tolR >= crossMin)) bad.push(`UM1: a pedicel at ${aDeg} deg crosses ${cross.toFixed(9)} mm of the emitted boss; half a printable feature plus eight float32 steps of the boss's own scale is ${crossMin.toFixed(9)} mm`);
   }
   if (Math.hypot(K.centre[0], K.centre[1]) > tolR) bad.push(`UM1: the boss's emitted axis stands ${Math.hypot(K.centre[0], K.centre[1]).toExponential(3)} mm off the stem's axis`);
   if (Math.abs(P.pedicelR - rP) > 1e-9) bad.push(`UM1: the plan's pedicel is ${(2 * P.pedicelR).toFixed(4)} mm; the area rule from the ${n} ASKED gives ${(2 * rP).toFixed(4)} mm`);

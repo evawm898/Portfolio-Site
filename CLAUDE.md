@@ -6689,12 +6689,17 @@ SHIPS OFF** (the umbel session, Oct 22 — Eva's rulings of Oct 21–22, the spi
   between neighbours — the 90-deg parallel case — and, with the head ON, off the stem that runs on past it).
 - **The junction is a BOSS, not a sphere** (`umbelBoss`; the sphere read as a ball, 12 mm at 6 florets, 19.45 at
   12): a flat-topped band of radius `R` = the root disc's farthest reach from the axis (`umbelRootDiscReachMm`, closed
-  form) + gap/2, half-height `h` = `rP |cos pedicelAngle|` + gap/2 (the one angle IS the steepest pedicel's), and a
-  45° underside — the unsupported-overhang law — in to `outerR - gap/2` inside the stem's wall, closed flat there.
+  form) + gap/2, half-height `h` = `rP |cos pedicelAngle|` + gap/2 (the one angle IS the steepest pedicel's).
   Half a gap on every face so no root-disc edge lies ON the boss (the sphere's exact tangency welded: 749 pairs).
-  288 triangles against the sphere's 2,208; 10.72 x 6.32 mm at 6 florets / 35°. A vertical pedicel crosses exactly
-  0.500 mm of it — ID2's half-feature floor, met (reported). Head OFF: centred on the stem's top end, which ends
-  inside the band; the florist's cut stays on the free end (UM4). Head ON: on the stem at the reach-inset depth.
+  Head OFF: centred on the stem's top end, which ends inside the band; the florist's cut stays on the free end (UM4).
+  Head ON: on the stem at the reach-inset depth.
+- **RULED Oct 24: the underside is FLAT** (the 45° cone was FDM's overhang rule; the first print is SLS PA12) — the
+  boss is a disc, 192 triangles (the cone's boss 288), 10.72 x 3.46 mm at 6 florets / 35°. The cone held no root disc
+  (UM2 holds every disc in the band alone). **And the crossing clears its floor by a DERIVED margin**: the band grows
+  only where a pedicel's crossing (`h/|sin a|`, `(R-rho)/cos a`) would fall under `gap/2 + margin`, the margin EIGHT
+  float32 steps of the boss's own coordinate magnitude (`UMBEL_CROSSING_MARGIN_REL = 2^-20`, X0's and the foot
+  clearance's 8 — the check's conditioning carried to the STL), so a vertical pedicel crosses 0.500006–0.500033 mm,
+  never exactly 0.500. Binds only at 90°. Read §10 of the outcome doc.
 - **Head OFF builds no head at all**: `buildBloomBody` emits no petal, hub, stamen, style or sepal and reports
   `HUB_ABSENT` (`absent: true`) in place of the hub record; every head-only family (form, J, ST4+, JS, JG, SP, Z,
   VS5, coverage, crowding, ST9's sphere channel) stands down on that record, and UM0 holds it true against the
@@ -6708,8 +6713,9 @@ SHIPS OFF** (the umbel session, Oct 22 — Eva's rulings of Oct 21–22, the spi
   `umbel-florets-x-angle`, never clamped. ST9 names the boss by its own `triRange`.
 - Budget corner (12 x 12 petals x 1.00, head ON): 1,381,266 export tris, 92.1%, measured before building.
 - Gates: UM0–UM4 in both STL gates (UM1/UM2 restated for the boss — UM1 rebuilds `R`, `h` and the underside from the
-  controls by a brute disc-rim maximisation, never the geometry's closed form); five witnessed mutants in the apex table
-  (`/^an umbel/` rows; `the-boss-radius-is-typed`, `the-boss-height-is-typed`); panel route
+  controls by a brute disc-rim maximisation, never the geometry's closed form, plus the margin and the crossing); seven witnessed mutants in the apex table
+  (`/^an umbel/` rows; `the-boss-radius-is-typed`, `the-boss-height-is-typed`, `the-boss-underside-cones-again`,
+  `the-boss-crossing-margin-is-dropped`); panel route
   (ap) (THIRTY-THREE routes); three combination pairs; block 78 (27 rows, 1,552), smoke block 78 (8, `--conn`).
   Sheet: `node tools/shot-bloom-umbel.mjs <dir> --png docs/img/umbel.png`; the boss's before/after junction sheet
   `node tools/shot-bloom-umbel-boss.mjs docs/img/umbel-boss.png --base <worktree>` (side-on and from below).

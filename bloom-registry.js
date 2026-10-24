@@ -4824,7 +4824,7 @@ export const CONTROLS = [
       const p = shown && shown.inflorescence;
       if (!p || !p.present) return 'a raceme — but there is no stem to carry it, so nothing is built';
       const per = p.perNode;
-      if (p.umbel) return `an umbel · ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'} from one boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm + p.knot.flareMm).toFixed(2)} mm tall, ${p.headOff ? 'with NO head — the stem ends in the boss' : `${p.nodeDepthsMm[0].toFixed(1)} mm below the head`}`
+      if (p.umbel) return `an umbel · ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'} from one boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm).toFixed(2)} mm tall, flat beneath, ${p.headOff ? 'with NO head — the stem ends in the boss' : `${p.nodeDepthsMm[0].toFixed(1)} mm below the head`}`
         + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris a floret, ${b.tris.toLocaleString('en-US')} in all` : '');
       return `a raceme · ${p.nodes} node${p.nodes === 1 ? '' : 's'} x ${per} = ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'}`
         + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris ${b.units && b.units.length > 1 ? `at the top node (${b.units.length} floret builds, one per distinct pedicel length)` : 'each'}, ${b.tris.toLocaleString('en-US')} in all` : '');
