@@ -5502,13 +5502,22 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
   if (report) report.blend = lo;
   return mix(lo);
 }
-const NV = 10;   // columns across one span
+/* THE COLUMNS ACROSS ONE SPAN — 10, EVEN, so no column lies on the midrib.
+   A `let` since the mophead (Oct 24): a FLORET OF A DEPTH-2 UMBEL is built on
+   the REDUCED LATTICE (`withReducedFloretLattice`, below) and only there, by
+   branch; every other build reads `NV_FULL`, the same 10 it always read. */
+const NV_FULL = 10;
+let NV = NV_FULL;
 /* ONE FROZEN ROW OF `true`, shared by every plain captured row — the mask is
    per (row, column) and a plain panel's is constant, so this allocates once
    for the whole build rather than NV booleans per row per petal. Frozen
    because it is shared: a consumer that wrote through it would write through
    every row of every petal. */
 const GRID_ALL_MATERIAL = Object.freeze(new Array(NV).fill(true));
+/* the reduced floret's twin (the mophead): one more frozen row, of its own
+   length — a captured row's mask is as long as its columns */
+const gridAllMaterialOf = (n) => (n === GRID_ALL_MATERIAL.length ? GRID_ALL_MATERIAL : (GRID_ALL_MATERIAL_BY_N.get(n) || GRID_ALL_MATERIAL_BY_N.set(n, Object.freeze(new Array(n).fill(true))).get(n)));
+const GRID_ALL_MATERIAL_BY_N = new Map();
 /* How many rows adjacent panels share. ONE gives a real overlapping VOLUME:
    both panels occupy the slab between these rows, so the slicer unions
    solid material rather than being asked to join two shells that merely
@@ -11336,6 +11345,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        and varies with the petal's length and the tip law), and every row
        where the narrow-span clamp took the rim below RIM_FLOOR_MM. */
     rim,
+    /* THE LATTICE THIS PETAL WAS BUILT ON (the mophead) — the columns across a
+       span and the bead's segment cap in force while it was emitted: 10 / 4
+       on every petal but a depth-2 floret's (6 / 2). UM6 holds the floret's
+       against its EMITTED rim and every other petal's against the full
+       lattice. */
+    lattice: { columns: NV, beadCap: RIM_BEAD_SEGMENTS_IN_FORCE },
   };
 }
 
@@ -11430,6 +11445,58 @@ export const RIM_BEAD_RADIUS_MM = 0.5;
 export const RIM_TAPER_MM = 3.0;
 export const RIM_BEAD_SEGMENTS = 4;
 export const RIM_BEAD_SEGMENTS_MIN = 3;
+/* ===================================================================
+   THE REDUCED FLORET LATTICE (the mophead, Oct 24 — Eva's ruling 3 on
+   docs/bloom-hydrangea-discovery.md; read docs/bloom-mophead-outcome.md).
+   A FLORET OF A DEPTH-2 UMBEL, and nothing else, is built with SIX columns
+   across a span (still EVEN, so no column lands on the midrib) and a
+   TWO-segment rim bead. The rows stay at NU 56 (`NU_BASE`): the row count is
+   the one knob that costs shape (the discovery's §2c — 0.62 mm at a round
+   apex at NU 28), and the columns and the bead are nearly free.
+
+   A DECLARED EXCEPTION, TWICE OVER, and said so here rather than left to be
+   rediscovered: (i) to the edge-profile ruling (FOUR bead segments, ruled
+   from eight because eight put facets at ~0.2 mm, under Nylon 12's ~0.35-0.4
+   mm resolvable detail), and (ii) to the fixed lattice (`NV` 10 everywhere).
+   WHY IT IS ACCEPTABLE ON A FLORET, measured on the half-round the bead draws
+   (`RIM_BEAD_RADIUS_MM` 0.5 mm, the radius every reachable floret's bead takes
+   — the room arm clamps it smaller only on the narrow last millimetre before
+   the nib):
+     * a facet of a K-segment half round is the chord `2 r sin(pi / 2K)`:
+       0.383 mm at K 4, **0.707 mm at K 2** — LARGER than the resolvable
+       detail, so a printed two-facet bead may read as a chamfer (two flats
+       meeting at the apex) rather than a round. That is the cost, stated.
+     * its departure from the true round is the sagitta `r (1 - cos(pi / 2K))`:
+       0.038 mm at K 4, **0.146 mm at K 2** — under the resolvable detail, so
+       the print cannot tell the drawn edge from the round one by how far it
+       strays from it.
+     * across the blade the cup's own facet error is `c hb / (NV - 1)^2`: on the
+       floor floret (half-width 3.0 mm) at cup 0.35, 0.042 mm at NV 6 against
+       0.013 at NV 10.
+   A floret is ~1/100 of a mophead and the eye reads the dome, not a floret's
+   edge; the same floret at the full lattice costs 1.9x (12,440 against 6,664
+   sessile, 4 petals), which is the difference between ~120 and ~225 florets
+   in the 1,500,000 budget.
+
+   BY BRANCH: `withReducedFloretLattice` is called from ONE place, the
+   depth-2 floret's own unit build in `floretUnitMemo`, and restores both
+   values in a `finally`. Everywhere else `NV` is `NV_FULL` and the bead cap is
+   `RIM_BEAD_SEGMENTS`, so every row that builds no depth-2 umbel forms the
+   expressions it always did. Module-scoped like `NU` and the texture edge, and
+   for their reason: every reader of a lattice constant is deep inside the
+   emitter, and a value threaded through every call would be a second
+   producer of it. `the-reduced-lattice-reaches-a-non-floret` is the standing
+   mutant. =================================================================== */
+export const FLORET_REDUCED_NV = 6;
+export const FLORET_REDUCED_BEAD_SEGMENTS = 2;
+let RIM_BEAD_SEGMENTS_IN_FORCE = RIM_BEAD_SEGMENTS;
+export function latticeInForce() { return { nv: NV, beadSegments: RIM_BEAD_SEGMENTS_IN_FORCE }; }
+export function withReducedFloretLattice(fn) {
+  const nv = NV, k = RIM_BEAD_SEGMENTS_IN_FORCE;
+  NV = FLORET_REDUCED_NV;
+  RIM_BEAD_SEGMENTS_IN_FORCE = FLORET_REDUCED_BEAD_SEGMENTS;
+  try { return fn(); } finally { NV = nv; RIM_BEAD_SEGMENTS_IN_FORCE = k; }
+}
 export const RIM_ROOM_FRACTION = 0.45;
 /* How many steps the profile pivots through at an apex corner. Three takes the
    default's worst corner turn from 65.63 degrees to under the bar; it is a
@@ -11564,8 +11631,9 @@ const rimDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
    bead is made of. Measured cost of leaving it out: the ten-tooth fringe. */
 const rimSegments = (sheetMm) => {
   const r = Math.min(RIM_BEAD_RADIUS_MM, Math.max(sheetMm, MIN_FEATURE_MM) / 2);
-  const raw = Math.round(RIM_BEAD_SEGMENTS * (r / RIM_BEAD_RADIUS_MM));
-  const k = Math.min(RIM_BEAD_SEGMENTS, Math.max(RIM_BEAD_SEGMENTS_MIN, raw));
+  const cap = RIM_BEAD_SEGMENTS_IN_FORCE;
+  const raw = Math.round(cap * (r / RIM_BEAD_RADIUS_MM));
+  const k = Math.min(cap, Math.max(RIM_BEAD_SEGMENTS_MIN, raw));
   return k % 2 === 0 ? k : k + 1;
 };
 
@@ -12234,7 +12302,7 @@ function emitPanel(acc, rows, panel, tAt, rim, tex = null) {
       /* ONE literal, so the row's capture has one site (verify-bloom-grid's
          mutant table anchors on it); readers take the field by name */
       const twoSidedRow = rows[i].h === null;
-      const gridRow = { row: i, u: rows[i].u, halfWidth: twoSidedRow ? rows[i].hL : rows[i].h, thickness: X[k].t, v: b.vs, mid: b.Ps, normal: b.Ns, material: GRID_ALL_MATERIAL };
+      const gridRow = { row: i, u: rows[i].u, halfWidth: twoSidedRow ? rows[i].hL : rows[i].h, thickness: X[k].t, v: b.vs, mid: b.Ps, normal: b.Ns, material: gridAllMaterialOf(b.vs.length) };
       if (twoSidedRow) gridRow.halfWidthRight = rows[i].hR;
       grid.push(gridRow);
     }
@@ -22789,6 +22857,62 @@ export function umbelIsAbsent(state) { return inflorescenceIsAbsent(state) || St
    twin is `PREDICATES.headPresent`, checked per row by UM0 and at harness
    load. The head is absent exactly on an umbel whose head toggle is OFF. */
 export function umbelHeadIsAbsent(state) { return !umbelIsAbsent(state) && String(state.umbelHead ?? UMBEL_HEAD_VALUES[0]) !== 'ON'; }
+/* ===================================================================
+   THE COMPOUND UMBEL — DEPTH 2 (the mophead, Oct 24 — Eva's rulings on
+   docs/bloom-hydrangea-discovery.md; read docs/bloom-mophead-outcome.md
+   before touching any of it). The umbel's rays each end in a SUB-UMBEL of
+   florets, and every join is a shipped boss.
+
+   A LEVEL CONTROL, NOT A FOURTH TYPE (`umbelDepth`, a CHOICE of '1' and '2'
+   under UMBEL — default '1', the shipped umbel by branch). Every control the
+   shipped umbel reads keeps EXACTLY its meaning at depth 2, because a
+   sub-umbel IS the shipped umbel, headless, at the end of a ray:
+   `umbelFlorets` its florets, `pedicelLength` / `pedicelAngle` their stalks
+   (a pedicel carries one flower, botanically and here), `floretPetals` /
+   `floretScale` / `nodeVariance` the florets. What is NEW is only the level
+   that is new — the RAYS from the main junction: `umbelRays` (how many),
+   `umbelRayLength`, `umbelRayAngle` (a rod's angle from horizontal at the
+   junction, `PEDICEL_ANGLE_RANGE` — the same quantity, the same range).
+   A fourth `inflorescence` value would have had to restate every one of the
+   umbel's `type === 'UMBEL'` branches and its eight hidden-and-inert
+   predicates for a type that is the umbel; a level of the umbel is what it
+   is.
+
+   ONE LEVEL OF THE PIN IS LIFTED, AND ONLY ONE (ruling 1). `floretState`
+   pins `inflorescence: 'NONE'` (`PEDICEL_PINS`); at depth 2 the OUTER
+   umbel's "floret" is a sub-umbel state (`subUmbelState`) — headless, depth
+   '1', `umbelLevel` 2 — and THAT state's own florets go through the pin
+   unchanged. DEPTH 3 STAYS REFUSED, BY NAME: `umbelDepthRefusal` throws on any
+   depth outside `UMBEL_DEPTH_VALUES` and on a level-2 state asking depth 2,
+   and the registry offers the two values only (UM5 holds the two statements).
+
+   ONE FLORET BUILD SERVES EVERY FLORET, ONE SUB-UMBEL BUILD EVERY RAY (ruling
+   5's instancing one level up): the outer plan's unit memo builds the
+   sub-umbel ONCE per mode and appends it per ray; inside it the sub-umbel's
+   own memo builds the floret ONCE and appends it per pedicel. Build time does
+   not scale with the floret count.
+   =================================================================== */
+export const UMBEL_DEPTH_VALUES = Object.freeze(['1', '2']);
+export const UMBEL_DEPTH_MAX = 2;
+export const UMBEL_RAY_RANGE = Object.freeze([2, 12]);
+export const UMBEL_RAY_LENGTH_RANGE = Object.freeze([5, 120]);
+/* THE LEVEL a state is built at: 1 for every head, 2 for a sub-umbel at the
+   end of a ray. Internal — set by `subUmbelState` alone, never a control. */
+export function umbelLevelOf(state) { return Number(state.umbelLevel) === 2 ? 2 : 1; }
+/* THE REFUSAL, BY NAME — null where the asked depth is built, else why not.
+   The depth a state reaches is its level plus its own asked depth less one:
+   a head asking '2' reaches 2; a sub-umbel (level 2) asking '2' would reach 3. */
+export function umbelDepthRefusal(state) {
+  const d = String(state.umbelDepth ?? UMBEL_DEPTH_VALUES[0]);
+  if (!UMBEL_DEPTH_VALUES.includes(d)) return `an umbel of depth ${d} is refused: the floret pin is lifted for exactly ONE level (Eva's ruling 1, the mophead) — depth ${UMBEL_DEPTH_VALUES.join(' or ')} only`;
+  const reach = umbelLevelOf(state) + Number(d) - 1;
+  if (reach > UMBEL_DEPTH_MAX) return `an umbel of depth ${reach} is refused: the floret pin is lifted for exactly ONE level (Eva's ruling 1, the mophead) — a sub-umbel's florets are flowers, never umbels`;
+  return null;
+}
+/* THE COMPOUND UMBEL'S OUTER LEVEL: an umbel asking depth 2, at level 1. */
+export function umbelIsCompound(state) {
+  return !umbelIsAbsent(state) && String(state.umbelDepth ?? UMBEL_DEPTH_VALUES[0]) === '2' && umbelLevelOf(state) === 1;
+}
 /* THE JUNCTION KNOT — derived from the count `n`, the pedicel radius `rP`,
    the pedicel angle and the stem's own radius, and nothing else typed but the
    project's one printable gap. Built as a squat BOSS about the stem's axis
@@ -23310,22 +23434,32 @@ export function umbelPairClasses(azimuths) {
    and the phyllotaxis rather than restating either, because there are already
    exactly two owners of "azimuth of the i-th organ" in this file and a third
    would be the registration rule's own failure. */
-export function inflorescencePlan(state, stem, acc) {
+export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {}) {
   if (inflorescenceIsAbsent(state) || !stem || !stem.present) {
     return { present: false, type: String(state.inflorescence ?? 'NONE'), nodes: 0, azimuths: [], nodeDepthsMm: [], built: 0 };
   }
   const type = String(state.inflorescence);
   const umbel = type === 'UMBEL';
+  /* DEPTH (the mophead): refused by name past two levels; the compound
+     umbel's OUTER level reads the RAYS where the shipped umbel reads its
+     florets, and a sub-umbel (level 2) builds its florets on the reduced
+     lattice and down to the derived floret floor. Every other umbel forms
+     the expressions it always did, by branch. */
+  const depthRefusal = umbel ? umbelDepthRefusal(state) : null;
+  if (depthRefusal) throw new Error(depthRefusal);
+  const compound = umbel && umbelIsCompound(state);
+  const level = umbel ? umbelLevelOf(state) : 1;
+  const reducedFlorets = umbel && level === 2;
   const headOff = umbel && umbelHeadIsAbsent(state);
-  const umbelCount = umbel ? Math.round(Number(state.umbelFlorets)) : 0;
+  const umbelCount = umbel ? Math.round(Number(compound ? state.umbelRays : state.umbelFlorets)) : 0;
   /* THE UMBEL'S AZIMUTHS ARE THE WHORL PRIMITIVE'S OWN RADIAL LAW, collected
      from its blade callback rather than restated (phase 0). */
   const umbelAz = [];
   if (umbel) buildWhorlInto({ count: umbelCount, radius: 0, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0, placement: 'RADIAL', blade: (sl) => { umbelAz.push(sl.azimuth); } });
   const nodesAsked = umbel ? 1 : Math.round(Number(state.floretNodes));
-  const angleDeg = Number(state.pedicelAngle);
+  const angleDeg = Number(compound ? state.umbelRayAngle : state.pedicelAngle);
   const phyllo = umbel ? 'umbel' : String(state.floretPhyllotaxy);
-  const pedicelLenMm = Number(state.pedicelLength);
+  const pedicelLenMm = Number(compound ? state.umbelRayLength : state.pedicelLength);
   const perNode = umbel ? umbelCount : phyllo === 'opposite' ? 2 : phyllo === 'whorled' ? 3 : 1;
 
   /* THE PEDICEL'S RADIUS IS DERIVED BY THE AREA RULE AND IS NOT A CONTROL.
@@ -23380,8 +23514,16 @@ export function inflorescencePlan(state, stem, acc) {
      of new constants here would be a second owner of the petal's range in the
      file that states the registration rule. */
   const LB = OVERRIDE_BOUNDS.get('petalLength'), WB = OVERRIDE_BOUNDS.get('petalWidth');
-  const petalLength = clamp(lengthAsked, LB.min, LB.max);
-  const petalWidth = clamp(widthAsked, WB.min, WB.max);
+  /* A SUB-UMBEL'S FLORETS (level 2) take the DERIVED FLORET FLOOR in place of
+     the petal sliders' own two floors (Eva's ruling 3, the mophead): the
+     scale is held at or above the least scale at which the floret's petal
+     still carries its full sheet BODY (`floretBodyFloor`), and the head's
+     own proportion is kept. The head's 20 mm floor does not move — it is
+     still the clamp on every head and every depth-1 floret, by branch. */
+  const bodyFloor = reducedFlorets ? floretBodyFloor(state) : null;
+  const scaleBuilt = bodyFloor ? Math.min(1, Math.max(scale, bodyFloor.scale)) : scale;
+  const petalLength = bodyFloor ? Math.min(LB.max, Number(state.petalLength) * scaleBuilt) : clamp(lengthAsked, LB.min, LB.max);
+  const petalWidth = bodyFloor ? Math.min(WB.max, Number(state.petalWidth) * scaleBuilt) : clamp(widthAsked, WB.min, WB.max);
   const sizeClamped = petalLength !== lengthAsked || petalWidth !== widthAsked;
   /* THE DEAD TRAVEL IS A NUMBER THE READ-OUT PRINTS, AND THE RANGE IS NOT
      NARROWED — `stamenSpread`'s ruling, and the floor binds on a HEAD-SIZED
@@ -23396,7 +23538,7 @@ export function inflorescencePlan(state, stem, acc) {
      bind: the scale is capped at 1.00 and the head's own two values are
      already inside their ranges, so the ceiling is unreachable by
      construction. ID4 asserts the biconditional in both directions. */
-  const sizeDeadBelow = Math.max(
+  const sizeDeadBelow = bodyFloor ? bodyFloor.scale : Math.max(
     Number(state.petalLength) > 0 ? LB.min / Number(state.petalLength) : 0,
     Number(state.petalWidth) > 0 ? WB.min / Number(state.petalWidth) : 0);
 
@@ -23441,8 +23583,12 @@ export function inflorescencePlan(state, stem, acc) {
      it — ONE extra floret build per raceme build (the other mode's unit),
      nothing rebuilt. The plan's own inputs to the unit are all above this
      line, which is why the size block moved up. */
+  /* A COMPOUND UMBEL'S RAYS carry the sub-umbel's floret count — the asked
+     one, or the budget clamp's (`umbelBudgetClamp`, which re-plans with it). */
+  const perRay = compound ? (floretsPerRay === null ? Math.round(Number(state.umbelFlorets)) : floretsPerRay) : null;
   const pre = { floretPetals: Math.round(Number(state.floretPetals)), petalLength, petalWidth,
-    pedicelR, pedicelLenMm, angleDeg, rootR, embedMm, rootZ: 0, nodeDepthsMm: [0] };
+    pedicelR, pedicelLenMm, angleDeg, rootR, embedMm, rootZ: 0, nodeDepthsMm: [0],
+    compound, floretsPerRay: perRay, reducedFlorets };
   const unitMemo = floretUnitMemo(state, pre);
   const sessileTop = pedicelLenMm === 0;
   /* OVER EVERY AZIMUTH THE PHYLLOTAXY PRODUCES ON ANY ASKED NODE — found by
@@ -23515,10 +23661,15 @@ export function inflorescencePlan(state, stem, acc) {
   const extentMm = Math.max(unitExtentMm(false), unitExtentMm(true));
   const dMax = Math.max(1, Math.ceil((extentMm + MIN_FEATURE_MM) / pitchFloorRodMm));
   const pairClasses = umbel ? umbelPairClasses(umbelAz) : floretPairClasses(phyllo, Math.max(1, nodesAsked), dMax);
-  const pitchOf = (exportMode) => floretPitchFloorMm((az) => {
+  /* A COMPOUND UMBEL HAS ONE NODE AND NO PITCH TO FLOOR — nor has its
+     sub-umbel — and the compound's unit is a whole sub-umbel, whose column
+     map is the dominant cost of a build (measured, 3.4 of 6 s). Not computed
+     on either level, BY BRANCH; the florets' approach to each other is the
+     combination gate's measure (`mophead-*`). */
+  const pitchOf = (exportMode) => (compound || reducedFlorets ? { floorMm: 0, at: null, sameNodeMayTouch: true } : floretPitchFloorMm((az) => {
     const U = unitMemo.get(pedicelLenMm, exportMode, az);
     return { positions: U.sub.positions, M: pedicelPlacement(pre, 0, az, U.tipZLocal, sessileTop).M };
-  }, pairClasses, MIN_FEATURE_MM);
+  }, pairClasses, MIN_FEATURE_MM));
   const pitchLive = pitchOf(false), pitchExport = pitchOf(true);
   const pitchFloretRawMm = Math.max(pitchLive.floorMm, pitchExport.floorMm);
   const pitchFloretMm = Math.ceil(pitchFloretRawMm / INFLO_REACH_GRID_MM) * INFLO_REACH_GRID_MM;
@@ -23632,6 +23783,12 @@ export function inflorescencePlan(state, stem, acc) {
     gapMm: knot.gapMm, marginMm: knot.marginMm, crossMinMm: knot.crossMinMm, heightGrown: knot.heightGrown, radiusGrown: knot.radiusGrown, centre: [0, 0, stem.rootZ - umbelDepthMm], crossMm: knotCrossMm } : null;
   return {
     present: true, type, umbel, headOff, umbelCount: umbel ? umbelCount : null, knot: knotRec, phyllotaxy: phyllo, perNode,
+    /* DEPTH (the mophead): `compound` on the OUTER level of a depth-2 umbel,
+       whose units are sub-umbels; `level` 2 on a sub-umbel, whose florets are
+       built on the reduced lattice down to the derived floor. */
+    depth: umbel ? Number(String(state.umbelDepth ?? UMBEL_DEPTH_VALUES[0])) : null, level, compound, reducedFlorets,
+    floretsPerRay: perRay, floretsPerRayAsked: compound ? Math.round(Number(state.umbelFlorets)) : null, budgetClamp: null,
+    bodyFloor, scaleBuilt,
     nodes: nodeDepthsMm.length, nodesAsked, nodesBuilt: nodeDepthsMm.length, nodesClamped,
     nodeDepthsMm, azimuths, angleDeg, pedicelLenMm, pedicelR, pedicelRClamped, areaRuleR, pedicelRFloor,
     rootR, embedMm, crossesSolidMm, crossings,
@@ -23770,7 +23927,33 @@ export const PEDICEL_PINS = Object.freeze({
   stemNodeKink: 0,
   stemCut: 'FLAT',            // no florist's cut on a pedicel (ruling 7): its free end is the one rooted THROUGH the rachis wall
 });
+/* THE SUB-UMBEL'S OWN STATE (the mophead) — what a ray of a compound umbel
+   carries, and the ONE place the floret pin is lifted, for exactly one level.
+   It is the head's state with the PEDICEL'S pins (no leaves, no nodes, a FLAT
+   free end — a ray is rooted in the main boss, so its far end is a stalk's,
+   never the florist's cut), the tube free like a floret's, and then the
+   umbel's own: an UMBEL, HEADLESS (the ray ends in its sub-boss), depth '1'
+   at LEVEL 2 — so `umbelDepthRefusal` refuses it a level of its own — with
+   the plan's (possibly clamped) floret count. Its stem IS the ray: the ray's
+   length and the area rule's diameter. Its petal controls are the HEAD's,
+   untouched, because the sub-umbel's own plan scales them into florets. No
+   per-node term at this level: the florets inside take their own. */
+export function subUmbelState(state, plan, lengthMm) {
+  return {
+    ...state,
+    ...Object.fromEntries(Array.from({ length: MAX_LAYERS }, (_, i) => [`tubeLayer${i + 1}`, TUBE_K_MAX])),
+    ...PEDICEL_PINS,
+    inflorescence: 'UMBEL',
+    umbelHead: 'OFF',
+    umbelDepth: '1',
+    umbelLevel: 2,
+    umbelFlorets: plan.floretsPerRay,
+    stemLength: lengthMm,
+    stemDiameter: 2 * plan.pedicelR,
+  };
+}
 export function floretState(state, plan, lengthMm = plan.pedicelLenMm, az = null) {
+  if (plan.compound) return subUmbelState(state, plan, lengthMm);
   const nodeOverrides = floretNodeOverrides(state, plan, az);
   return {
     ...state,
@@ -23784,6 +23967,166 @@ export function floretState(state, plan, lengthMm = plan.pedicelLenMm, az = null
     petalWidth: plan.petalWidth,
     stemLength: lengthMm,
     stemDiameter: 2 * plan.pedicelR,
+  };
+}
+
+/* ===================================================================
+   THE FLORET FLOOR (the mophead, Eva's ruling 3: "florets — and only florets
+   on a depth-2 umbel — may go down to the petal length where the floret
+   still prints ... DERIVE the floor from the nib, the rim bead and the root
+   at that scale, and report it"). The head's 20 mm floor does not move.
+
+   THE CRITERION: A FLORET'S PETAL STILL CARRIES ITS BODY. The rim treatment
+   eases the sheet from its body thickness toward `RIM_FLOOR_MM` over
+   `RIM_TAPER_MM` of surface distance from every free edge and closes it on
+   the bead; the nib closes the tip; the root blend holds the base on the
+   foot. A petal PRINTS AS A PETAL while somewhere on it the sheet is at the
+   thickness the sheet control asks for — a point that is
+     * past the ROOT: on the law's own stretch, `u >= ROOT_BLEND_END`, where
+       the outline is the blade's and not the foot's floor;
+     * `RIM_TAPER_MM` in from BOTH MARGINS — the RIM BEAD's own taper (the
+       plan half-width is used, which never exceeds the surface distance on a
+       cupped section, so the reading is conservative);
+     * `RIM_TAPER_MM` back from the DRAWN TIP — the NIB and the tip's own
+       bead (the drawn length, which carries the nib's closing).
+   Below the floor no point of the petal is body: the whole petal is rim
+   taper, thinner everywhere than the sheet it was asked for.
+
+   IT IS A SCALE, AND IT IS EXACT IN THE SCALE. A floret's petal is the head's
+   petal times `floretScale`; in the region the criterion reads (past the
+   root blend, `RIM_TAPER_MM` clear of the tip) every half-width and every
+   length scales linearly with it, so the row at `u` first holds a body at
+       s(u) = max(RIM_TAPER_MM / h1(u), RIM_TAPER_MM / (L1 (1 - u)))
+   with `h1`, `L1` the head-size petal's own, and the floor is the least
+   `s(u)`. READ OFF ONE PROBE FLORET'S EMITTED PROFILE at the head's own size
+   (sessile, EXPORT — a constant mode, so the floor is mode-free by
+   construction — on the reduced lattice, whose rows are the full lattice's),
+   at its own ladder rows; a minimum over sampled rows is never under the
+   continuous one, so the floor errs toward the larger petal. An asymmetric
+   outline holds a body where the two halves together span two tapers, so
+   its `h` is the mean of the halves. At the shipping 35 x 16 mm petal the
+   floor is 0.375x, a 13.1 x 6.0 mm floret petal — the discovery's 12-14 mm,
+   reached from the rim's own constants rather than from a reference photo.
+   `the-floret-floor-is-typed` is its mutant. =================================================================== */
+const FLORET_FLOOR_MEMO = new Map();
+export function floretBodyFloor(state) {
+  const probePlan = { floretPetals: Math.round(Number(state.floretPetals)), petalLength: Number(state.petalLength), petalWidth: Number(state.petalWidth), pedicelR: STEM_DIAMETER_RANGE[0] / 2 };
+  const fs = floretState(state, probePlan, 0, null);
+  const key = JSON.stringify(fs);
+  if (FLORET_FLOOR_MEMO.has(key)) return FLORET_FLOOR_MEMO.get(key);
+  const acc = new MeshBuilder({ exportMode: true });
+  const rec = withReducedFloretLattice(() => buildBloomInto(acc, fs, { below: null, pedicel: true }));
+  const p = (rec.petalsAll || []).find(Boolean);
+  const T = RIM_TAPER_MM;
+  let best = Infinity, atU = null, rows = 0;
+  if (p) {
+    const L1 = p.length;
+    for (let i = 0; i < p.profileU.length; i++) {
+      const u = p.profileU[i];
+      if (!(u >= ROOT_BLEND_END) || !(u < 1)) continue;
+      const h = p.profileL && p.profileR ? (p.profileL[i] + p.profileR[i]) / 2 : p.profile[i];
+      if (!(h > 0)) continue;
+      rows++;
+      const sc = Math.max(T / h, T / (L1 * (1 - u)));
+      if (sc < best) { best = sc; atU = u; }
+    }
+  }
+  /* the head-size petal itself keeps no body (an exotic outline): the floret
+     is held at the head's own size, and the plan says so */
+  const out = { scale: Number.isFinite(best) ? best : 1, atU, rows, taperMm: T, probeLengthMm: p ? p.length : null,
+    headLengthMm: Number(state.petalLength), headWidthMm: Number(state.petalWidth),
+    lengthMm: (Number.isFinite(best) ? best : 1) * Number(state.petalLength), widthMm: (Number.isFinite(best) ? best : 1) * Number(state.petalWidth),
+    noBodyAtHeadSize: !(best <= 1) };
+  if (FLORET_FLOOR_MEMO.size > 32) FLORET_FLOOR_MEMO.clear();
+  FLORET_FLOOR_MEMO.set(key, out);
+  return out;
+}
+
+/* ===================================================================
+   THE MOPHEAD'S BUDGET CLAMP (Eva's ruling 4: "when the asked florets exceed
+   1.5 M triangles, the count is clamped before building, from one floret
+   build's exact cost. The read-out says asked vs built. The export never
+   refuses for this reason").
+
+   EXACT, NOT ESTIMATED, and from MEASURED builds, never from a row count. The
+   compound umbel's triangles are
+       boss + rays x (S + k x F(k))
+   where `F(k)` is ONE FLORET's emitted count (its unit, pedicel included —
+   the sub-umbel's own `unitTris`), `S` the sub-umbel's own fixed part (its
+   ray and its boss: the sub-umbel unit's count less its florets), and the
+   boss the main junction's (`umbelBossTris`, the revolve's own two rings and
+   two poles). The rest of the bloom is the accumulator's own count, read
+   after every other part is emitted. All of it is measured in BOTH modes and
+   the larger taken, so which florets exist is mode-free (topology).
+
+   WHAT GIVES IS THE FLORETS A RAY (`umbelFlorets`), down to the umbel's own
+   floor of two; the rays and the dome's shape do not move. `F(k)` depends on
+   `k` only through the sub-pedicel's area-rule radius — the same floret
+   state otherwise — so a count whose pedicel is the asked one's reuses the
+   asked floret's cost, and a count whose pedicel differs is MEASURED on a
+   sub-umbel built at it. The re-plan builds the clamped sub-umbel once per
+   mode, as any plan does. Recorded on the plan (`budgetClamp`) in full on
+   every compound build, clamped or not, so UM7 asserts the prediction
+   against the built count both ways. `the-clamp-reads-a-row-count` is its
+   mutant. =================================================================== */
+export function umbelBossTris() { return 4 * UMBEL_BOSS_SECTORS; }
+export function umbelBudgetClamp(state, stem, acc, plan, restTris) {
+  if (!plan || !plan.compound) return plan;
+  const rays = plan.umbelCount, kAsked = plan.floretsPerRayAsked, L = plan.pedicelLenMm;
+  const az0 = plan.azimuths[0][0];
+  const unitOf = (memo) => {
+    const Ul = memo.get(L, false, az0), Ue = memo.get(L, true, az0);
+    const fOf = (U) => U.rec.inflorescenceBuilt ? U.rec.inflorescenceBuilt.unitTris : 0;
+    return { F: Math.max(fOf(Ul), fOf(Ue)), U: Math.max(Ul.tris, Ue.tris), Fl: fOf(Ul), Fe: fOf(Ue) };
+  };
+  const asked = unitOf(plan.unitMemo);
+  const S = asked.U - kAsked * asked.F;
+  const bossTris = umbelBossTris();
+  const rP = (k) => Math.max(STEM_DIAMETER_RANGE[0] / 2, plan.pedicelR / Math.sqrt(k));
+  const fCache = new Map([[rP(kAsked), asked.F]]);
+  const F = (k) => {
+    const r = rP(k);
+    if (!fCache.has(r)) fCache.set(r, unitOf(floretUnitMemo(state, { ...plan, floretsPerRay: k })).F);
+    return fCache.get(r);
+  };
+  const total = (k) => restTris + bossTris + rays * (S + k * F(k));
+  let k = kAsked;
+  while (k > UMBEL_FLORET_RANGE[0] && total(k) > EXPORT_TRI_BUDGET) k--;
+  const rec = { budget: EXPORT_TRI_BUDGET, rays, floretsPerRayAsked: kAsked, floretsPerRay: k, askedFlorets: rays * kAsked, builtFlorets: rays * k,
+    clamped: k !== kAsked, floretTris: F(k), floretTrisAsked: asked.F, floretTrisLive: asked.Fl, floretTrisExport: asked.Fe, subFixedTris: S, bossTris, restTris,
+    askedTotal: total(kAsked), predictedTotal: total(k), fits: total(k) <= EXPORT_TRI_BUDGET };
+  const out = k === kAsked ? plan : inflorescencePlan(state, stem, acc, { floretsPerRay: k });
+  out.budgetClamp = rec;
+  return out;
+}
+
+function floretLatticeProbe(rec) {
+  return (rec.petalsAll || []).filter(Boolean).map((p) => {
+    const ap = p.rim && Array.isArray(p.rim.apex) ? p.rim.apex : [];
+    const rowsOf = [...new Set(ap.filter((a) => a.panel === ap[0]?.panel).map((a) => a.row))].sort((a, b) => a - b);
+    /* the mid-blade row both of whose side profiles were treated */
+    let mid = null;
+    for (const r of rowsOf.slice(Math.floor(rowsOf.length / 3))) {
+      const side = ap.filter((a) => a.row === r && (a.col === 0 || a.col > 0) && a.panel === ap[0].panel);
+      const cols = [...new Set(side.map((a) => a.col))];
+      if (cols.length >= 2) { const lo = side.find((a) => a.col === Math.min(...cols)), hi = side.find((a) => a.col === Math.max(...cols)); mid = { row: r, lo: { apex: lo.apex, top: lo.top, bot: lo.bot }, hi: { apex: hi.apex, top: hi.top, bot: hi.bot } }; break; }
+    }
+    return { triRange: p.triRange ? p.triRange.slice() : null, lattice: p.lattice ? { ...p.lattice } : null, beadSegments: p.rim ? p.rim.segments : null, mid };
+  });
+}
+function subUmbelSummary(rec) {
+  const B = rec.inflorescenceBuilt, P = rec.inflorescence;
+  if (!B || !P) return null;
+  return {
+    count: B.count, knot: B.knot, unitTris: B.unitTris, tris: B.tris,
+    placed: B.placed.map((q) => ({ az: q.az, root: q.root, headAt: q.headAt, pedicelAxis: q.pedicelAxis, M: q.M, at: q.at, tris: q.tris })),
+    plan: { umbelCount: P.umbelCount, pedicelR: P.pedicelR, pedicelLenMm: P.pedicelLenMm, angleDeg: P.angleDeg, rho: P.knot && P.knot.rho, level: P.level, depth: P.depth,
+      reducedFlorets: P.reducedFlorets, petalLength: P.petalLength, petalWidth: P.petalWidth, lengthAsked: P.lengthAsked, widthAsked: P.widthAsked, scale: P.scale, scaleBuilt: P.scaleBuilt,
+      sizeClamped: P.sizeClamped, bodyFloor: P.bodyFloor, floretPetals: P.floretPetals, outerR: P.outerR, rootZ: P.rootZ },
+    stem: rec.stem ? { outerR: rec.stem.outerR, tipZ: rec.stem.tipZ, rootZ: rec.stem.rootZ, topZ: rec.stem.topZ } : null,
+    stemBuilt: rec.stemBuilt ? { emittedTopZ: rec.stemBuilt.emittedTopZ, emittedTipZ: rec.stemBuilt.emittedTipZ, emittedMaxR: rec.stemBuilt.emittedMaxR } : null,
+    floretState: B.floretState, floretUnit: B.units && B.units[0] ? { tris: B.units[0].tris, lattice: B.units[0].lattice, positions: B.units[0].positions, petalsBuilt: B.units[0].petalsBuilt } : null,
+    headAbsent: rec.hub && rec.hub.absent === true,
   };
 }
 
@@ -23885,19 +24228,26 @@ export function floretUnitMemo(state, plan) {
        node's azimuth adds through `floretNodeOverrides` — nothing at amount 0
        with no field, so every azimuth then shares ONE unit, as shipped. */
     keyOf(L, exportMode, az = null) {
-      const o = floretNodeOverrides(state, plan, az);
+      /* a compound umbel's unit is ONE sub-umbel for every ray (no per-ray
+         term at that level) — ruling 5's one build, one level up */
+      const o = plan.compound ? null : floretNodeOverrides(state, plan, az);
       return `${exportMode ? 'E' : 'L'}|${L}|${o ? JSON.stringify(o) : ''}`;
     },
     get(L, exportMode, az = null) {
       const key = this.keyOf(L, exportMode, az);
       if (cache.has(key)) return cache.get(key);
-      const sub = new MeshBuilder({ exportMode });
+      /* A SUB-UMBEL'S FLORET (level 2) is built on the REDUCED LATTICE, its rim
+         captured (a capture moves no byte) so UM6 can read the columns and the
+         bead off the emitted rim; every other unit is built as it was. */
+      const sub = new MeshBuilder({ exportMode, captureRim: !!plan.reducedFlorets });
       const fs = floretState(state, plan, L, az);
-      const rec = buildBloomInto(sub, fs, { below: null, pedicel: true });
+      const rec = plan.reducedFlorets
+        ? withReducedFloretLattice(() => buildBloomInto(sub, fs, { below: null, pedicel: true }))
+        : buildBloomInto(sub, fs, { below: null, pedicel: true });
       const stalked = !!(rec.stem && rec.stem.present);
       const hubT = sub.floorThickness(rec.hub.thickness);
       const tipZ = stalked ? rec.stem.tipZ : hubAxisTopZ(rec.hub.dome, hubT) - hubT;
-      const U = { lengthMm: L, az, nodeOverrides: floretNodeOverrides(state, plan, az), sub, fs, rec, stalked, tipZLocal: tipZ, tris: sub.triangleCount };
+      const U = { lengthMm: L, az, nodeOverrides: plan.compound ? null : floretNodeOverrides(state, plan, az), sub, fs, rec, stalked, tipZLocal: tipZ, tris: sub.triangleCount };
       cache.set(key, U);
       return U;
     },
@@ -24161,7 +24511,19 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
       floretState: { ...U.fs },
       az: U.az, nodeOverrides: U.nodeOverrides ? { ...U.nodeOverrides } : null,
       positions: U.sub.positions,
+      /* A SUB-UMBEL'S FLORET (the mophead): each petal's own block and lattice
+         record, and the two side profiles of its MID-BLADE row (apex, top and
+         bottom skin edge — emitted vertices, captured), from which UM6 reads
+         the columns and the bead's segments off the emitted rim. */
+      lattice: plan.reducedFlorets ? floretLatticeProbe(U.rec) : null,
     })),
+    /* THE COMPOUND UMBEL'S SUB-UMBEL (the mophead) — the unit every ray
+       carries, summarised in ITS OWN frame (every placed ray applies its own
+       matrix to these, exactly as to the unit's stream — ID5's identity): its
+       boss as emitted, its florets' pedicel ends and axes, its own plan's
+       numbers, and its floret unit with the lattice probe. */
+    sub: plan.compound ? subUmbelSummary(units[0].rec) : null,
+    budgetClamp: plan.budgetClamp || null,
     tris: acc.triangleCount - tris0, placementResidual: residual, placementCompared: compared,
     /* THE FLAG: how near any floret's own body (never its pedicel rod) comes
        to the free rachis. Infinity where nothing was appended. */
@@ -25361,6 +25723,9 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
     throw new Error(`below must be 'stem' | 'branch' | null, got ${JSON.stringify(below)}`);
   }
   if (below !== null) throw new Error(`below='${below}' is phase-2+ work; only null is built today`);
+  /* where this bloom's own triangles start in the accumulator — the mophead's
+     budget clamp reads the rest of the bloom as an exact count */
+  const bodyTris0 = acc.triangleCount;
 
   const fr = footRing(state, acc, { scopes });
   /* ONE WHORL PER LAYER — layers are instances of the arrangement primitive,
@@ -25461,7 +25826,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      here — `buildInflorescenceInto` runs after the sepals, last — so no byte
      moves by asking early, and the read-out can name the florets even on a
      row whose geometry is absent. */
-  const infloPlanned = inflorescencePlan(state, stemPlanned, acc);
+  let infloPlanned = inflorescencePlan(state, stemPlanned, acc);
   /* THE SIZE FIELD (organic variance, build 1): null at amount 0, the guard
      every consumer branches on. Asked once, before the omission mask, because
      the mask probes each slot's petal at the size this field gives it. */
@@ -25714,7 +26079,12 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      sepals, so the stream of a bloom without an inflorescence is a PREFIX of
      the stream with one. Null by branch at type NONE and where there is no
      rachis to hang it on. */
-  const inflorescenceBuilt = buildInflorescenceInto(acc, state, infloPlanned, floretUnits);
+  /* THE MOPHEAD'S BUDGET CLAMP (Eva's ruling 4): decided HERE, after every
+     other part of the bloom is emitted and before a single floret is
+     appended, so the rest of the bloom is an exact count rather than an
+     estimate. A re-plan only where it binds; null-op on every other build. */
+  if (infloPlanned && infloPlanned.compound) infloPlanned = umbelBudgetClamp(state, stemPlanned, acc, infloPlanned, acc.triangleCount - bodyTris0);
+  const inflorescenceBuilt = buildInflorescenceInto(acc, state, infloPlanned, infloPlanned && infloPlanned.compound ? infloPlanned.unitMemo : floretUnits);
   /* THE FILAMENT-AGAINST-STYLE FLAG (session 23; B2b's family, built on
      Eva's ruling of Sep 6 on the ±180 curl range: the crossing is not a
      property of the range's ends, so what closes the question is an

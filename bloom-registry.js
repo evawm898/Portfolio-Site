@@ -37,7 +37,7 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
-import { UMBEL_FLORET_RANGE, UMBEL_HEAD_VALUES } from './bloom-geometry.js';
+import { UMBEL_FLORET_RANGE, UMBEL_HEAD_VALUES, UMBEL_DEPTH_VALUES, UMBEL_RAY_RANGE, UMBEL_RAY_LENGTH_RANGE } from './bloom-geometry.js';
 import { INFLORESCENCE_TYPES, FLORET_NODE_RANGE, FLORET_PETAL_RANGE, FLORET_SCALE_RANGE,
   PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE, PEDICEL_GRADIENT_RANGE, PEDICEL_CORYMB_VALUES } from './bloom-geometry.js';
 import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WALL_MM, INFILL_DENSITY_SWEEP,
@@ -824,6 +824,10 @@ export const PREDICATES = {
      UMBEL, whose one node carries `umbelFlorets` evenly spread pedicels. */
   racemePresent: { all: [{ ref: 'inflorescencePresent' }, { id: 'inflorescence', oneOf: ['RACEME'] }] },
   umbelPresent: { all: [{ ref: 'inflorescencePresent' }, { id: 'inflorescence', oneOf: ['UMBEL'] }] },
+  /* THE COMPOUND UMBEL (the mophead): an umbel asking depth 2. The rays'
+     three controls show here and nowhere else; the geometry's twin is
+     `umbelIsCompound`. */
+  umbelCompound: { all: [{ ref: 'umbelPresent' }, { id: 'umbelDepth', oneOf: ['2'] }] },
   /* THE HEAD'S ONE STATEMENT — the twin of the geometry's
      `umbelHeadIsAbsent` (UM0 checks the two per row, the harness at load).
      The head is absent exactly on an umbel with `umbelHead` OFF; there the
@@ -4824,6 +4828,12 @@ export const CONTROLS = [
       const p = shown && shown.inflorescence;
       if (!p || !p.present) return 'a raceme — but there is no stem to carry it, so nothing is built';
       const per = p.perNode;
+      if (p.compound) {
+        const sb = b && b.sub, cl = p.budgetClamp;
+        return `a COMPOUND umbel (depth 2) · ${p.umbelCount} rays from one boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across, each ending in a sub-umbel of ${p.floretsPerRay} floret${p.floretsPerRay === 1 ? '' : 's'} = ${p.umbelCount * p.floretsPerRay} florets`
+          + (cl && cl.clamped ? ` — CLAMPED from ${cl.askedFlorets} asked (${cl.askedTotal.toLocaleString('en-US')} tris) to fit the ${cl.budget.toLocaleString('en-US')}-triangle export budget` : '')
+          + (sb ? ` · ${sb.floretUnit.tris.toLocaleString('en-US')} tris a floret (the reduced lattice), ${b.unitTris.toLocaleString('en-US')} a sub-umbel, ${b.tris.toLocaleString('en-US')} in all` : '');
+      }
       if (p.umbel) return `an umbel · ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'} from one boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm).toFixed(2)} mm tall, flat beneath, ${p.headOff ? 'with NO head — the stem ends in the boss' : `${p.nodeDepthsMm[0].toFixed(1)} mm below the head`}`
         + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris a floret, ${b.tris.toLocaleString('en-US')} in all` : '');
       return `a raceme · ${p.nodes} node${p.nodes === 1 ? '' : 's'} x ${per} = ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'}`
@@ -4845,9 +4855,16 @@ export const CONTROLS = [
     fmt: (v, ui, shown) => {
       const n = Math.round(Number(v));
       const p = shown && shown.inflorescence;
+      if (p && p.present && p.compound) {
+        const cl = p.budgetClamp, sb = shown.inflorescenceBuilt && shown.inflorescenceBuilt.sub;
+        const k = p.floretsPerRay;
+        return `${n} florets a sub-umbel, on pedicels from its own boss at the end of each ray`
+          + (cl && cl.clamped ? ` — CLAMPED to ${k} a ray: ${cl.askedFlorets} florets asked, ${cl.builtFlorets} built — one floret is ${cl.floretTris.toLocaleString('en-US')} tris (measured), so ${cl.askedFlorets} would be ${cl.askedTotal.toLocaleString('en-US')} against the ${cl.budget.toLocaleString('en-US')} budget; the export never refuses for this` : ` · ${cl ? cl.builtFlorets : n * p.umbelCount} florets in all, ${cl ? cl.predictedTotal.toLocaleString('en-US') : '?'} tris against the ${cl ? cl.budget.toLocaleString('en-US') : ''} budget`)
+          + (sb && sb.knot ? ` · each sub-boss ${(2 * sb.knot.radiusMm).toFixed(2)} mm across` : '');
+      }
       const base = `${n} pedicels from one point, ${(360 / n).toFixed(1)} deg apart`;
       if (!p || !p.present || !p.knot) return base;
-      return `${base} · rooted on a ring ${(2 * p.knot.rho).toFixed(2)} mm across that holds them one ${p.knot.gapMm.toFixed(2)} mm gap apart, inside a boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across with a ${(2 * p.knot.halfHeightMm).toFixed(2)} mm band (derived from the count, the ${(2 * p.pedicelR).toFixed(2)} mm pedicel and its angle) and a 45 deg underside into the stem`
+      return `${base} · rooted on a ring ${(2 * p.knot.rho).toFixed(2)} mm across that holds them one ${p.knot.gapMm.toFixed(2)} mm gap apart, inside a boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across with a ${(2 * p.knot.halfHeightMm).toFixed(2)} mm band (derived from the count, the ${(2 * p.pedicelR).toFixed(2)} mm pedicel and its angle), flat above and beneath`
         + (p.sameNodeMayTouch ? ' · neighbouring florets may touch (measured, declared — two florets fusing is over-connection, never clamped)' : '');
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelPresent' } },
@@ -4865,6 +4882,56 @@ export const CONTROLS = [
         + (p.insetNeededMm > p.nodeDepthsMm[0] ? ' — CLAMPED: the florets reach further than the stem is long, so they stand among the head\'s petals (told, never refused)' : '');
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelPresent' } },
+
+  /* THE COMPOUND UMBEL'S LEVEL AND ITS RAYS (the mophead, Oct 24 — Eva's
+     rulings on docs/bloom-hydrangea-discovery.md; read
+     docs/bloom-mophead-outcome.md). A LEVEL CONTROL, not a fourth type: at
+     depth 2 the umbel's own controls keep their meaning on every sub-umbel
+     (its florets, their pedicels, the florets' petals and size), and only the
+     level that is new gets controls — the rays. The values are the
+     geometry's (`UMBEL_DEPTH_VALUES`, imported); DEPTH 3 IS REFUSED BY NAME
+     there and is not offered here (UM5 holds the two statements). */
+  { id: 'umbelDepth', section: 'inflorescence', kind: 'choice', default: UMBEL_DEPTH_VALUES[0],
+    options: [
+      { value: UMBEL_DEPTH_VALUES[0], label: '1 — florets on pedicels from one boss' },
+      { value: UMBEL_DEPTH_VALUES[1], label: '2 — rays from one boss, each ending in a sub-umbel of florets (a mophead)' },
+    ],
+    label: 'Depth',
+    fmt: (v, ui, shown) => {
+      if (String(v) !== '2') return 'one level — the florets on pedicels from the boss';
+      const p = shown && shown.inflorescence, sb = shown && shown.inflorescenceBuilt && shown.inflorescenceBuilt.sub;
+      const base = 'two levels — rays from the boss, a sub-umbel of florets on each (a dome, open below)';
+      if (!p || !p.present || !sb) return base;
+      const F = sb.plan, bf = F.bodyFloor;
+      return `${base} · the florets are built on the REDUCED lattice (${sb.floretUnit.lattice && sb.floretUnit.lattice[0] && sb.floretUnit.lattice[0].lattice ? `${sb.floretUnit.lattice[0].lattice.columns} columns, a ${sb.floretUnit.lattice[0].lattice.beadCap}-segment bead` : 'reduced'}) and may be as small as the FLORET FLOOR, ${bf ? `${bf.lengthMm.toFixed(2)} x ${bf.widthMm.toFixed(2)} mm (${bf.scale.toFixed(3)}x the head's petal — where a petal last keeps its full sheet body ${bf.taperMm.toFixed(1)} mm in from every rim)` : 'derived'}`;
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelPresent' } },
+  { id: 'umbelRays', section: 'inflorescence', kind: 'slider',
+    min: UMBEL_RAY_RANGE[0], max: UMBEL_RAY_RANGE[1], step: 1, default: 12,
+    label: 'Rays',
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      const p = shown && shown.inflorescence;
+      const base = `${n} rays from one boss, ${(360 / n).toFixed(1)} deg apart`;
+      if (!p || !p.present || !p.compound || !p.knot) return base;
+      return `${base} · each ${(2 * p.pedicelR).toFixed(2)} mm across (the area rule off the ${(2 * p.outerR).toFixed(2)} mm stem${p.pedicelRClamped ? ', FLOORED' : ''}), rooted in a boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm).toFixed(2)} mm tall`;
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelCompound' } },
+  { id: 'umbelRayLength', section: 'inflorescence', kind: 'slider',
+    min: UMBEL_RAY_LENGTH_RANGE[0], max: UMBEL_RAY_LENGTH_RANGE[1], step: 1, default: 40,
+    label: 'Ray length',
+    fmt: (v, ui, shown) => {
+      const p = shown && shown.inflorescence;
+      const base = `${Number(v).toFixed(0)} mm from the boss to each sub-umbel`;
+      if (!p || !p.present || !p.compound || p.crossesSolidMm === null) return base;
+      return `${base} · crosses ${p.crossesSolidMm.toFixed(2)} mm of the boss`;
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelCompound' } },
+  { id: 'umbelRayAngle', section: 'inflorescence', kind: 'slider',
+    min: PEDICEL_ANGLE_RANGE[0], max: PEDICEL_ANGLE_RANGE[1], step: 1, default: 50,
+    label: 'Ray angle',
+    fmt: (v) => { const a = Number(v); return `${a.toFixed(0)} deg from horizontal · every ray leaves the boss at this angle (it also sets the boss's band height)`; },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelCompound' } },
 
   { id: 'floretNodes', section: 'inflorescence', kind: 'slider',
     min: FLORET_NODE_RANGE[0], max: FLORET_NODE_RANGE[1], step: 1, default: 5,
@@ -4915,6 +4982,8 @@ export const CONTROLS = [
         ? 'SESSILE at the top — the floret\'s own hub is rooted into the stem\'s wall, one wall deep'
         : `${Number(v).toFixed(0)} mm from the stem to the topmost floret`;
       if (!p || !p.present) return base;
+      const sb = p.compound && shown.inflorescenceBuilt && shown.inflorescenceBuilt.sub;
+      if (p.compound) return `${Number(v).toFixed(0)} mm from each sub-umbel's boss to its florets` + (sb ? ` · ${(2 * sb.plan.pedicelR).toFixed(2)} mm across (the area rule off the ${(2 * sb.plan.outerR).toFixed(2)} mm ray)` : '');
       if (p.crossesSolidMm === null) return base;
       return `${base} · ${(2 * p.pedicelR).toFixed(2)} mm across`
         + (p.pedicelRClamped ? ` — FLOORED: the area rule asks ${(2 * p.areaRuleR).toFixed(2)} mm for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem, and no rod here prints thinner than ${(2 * p.pedicelRFloor).toFixed(2)} mm`
@@ -4989,6 +5058,7 @@ export const CONTROLS = [
       const p = shown && shown.inflorescence;
       const base = `${a.toFixed(0)} deg from horizontal · ${a > 0 ? 'ascending' : a < 0 ? 'descending' : 'level'}`;
       if (!p || !p.present) return base;
+      if (p.compound) return `${base} · every floret's pedicel leaves its sub-umbel's boss at this angle, measured from the plane square to its RAY`;
       if (p.umbel) return `${base} · every pedicel leaves the boss at this angle (the angle also sets the boss's band height)`;
       return `${base} · the top node sits ${p.insetMm.toFixed(1)} mm below the head`
         + (p.insetClamped ? ` — PUSHED DOWN from ${p.insetAskedMm.toFixed(1)} mm so the top floret's own petals (reaching ${p.reachMm.toFixed(1)} mm above its node) clear it by ${p.insetGapMm.toFixed(2)} mm` : '')
@@ -5020,6 +5090,14 @@ export const CONTROLS = [
       const p = shown && shown.inflorescence;
       const base = `${k.toFixed(2)}x the head's own petal`;
       if (!p || !p.present) return base;
+      /* A COMPOUND UMBEL'S FLORETS are its sub-umbels' (the mophead): their
+         floor is the DERIVED floret floor, not the petal sliders' own */
+      const sb = p.compound && shown.inflorescenceBuilt && shown.inflorescenceBuilt.sub;
+      if (sb) {
+        const F = sb.plan, bf = F.bodyFloor;
+        return `${base} · ${F.petalLength.toFixed(2)} x ${F.petalWidth.toFixed(2)} mm`
+          + (bf && k < bf.scale ? ` — FLOORED at ${bf.scale.toFixed(3)}x: the florets of a depth-2 umbel go down to the FLORET FLOOR, ${bf.lengthMm.toFixed(2)} x ${bf.widthMm.toFixed(2)} mm, where a petal last keeps its full sheet body ${bf.taperMm.toFixed(1)} mm in from every rim (derived from the rim taper, the nib and the root blend; the head's own 20 mm floor does not apply here)` : '');
+      }
       /* THE DEAD TRAVEL IS TOLD WITH ITS NUMBER AND THE RANGE IS NOT
          NARROWED (`stamenSpread`'s ruling); no hatch is drawn because the
          dead stretch is at the BOTTOM of the track (the carnation terminal's
