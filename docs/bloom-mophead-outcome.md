@@ -108,6 +108,23 @@ price to the EMITTED floret, and that no larger count a ray would have fit.
 The clamp corner (12 × 12 florets × 12 petals at 0.60x) asks 3,105,930 triangles and builds 5 a ray,
 1,297,914 — the prediction exact.
 
+**Re-measured on the built tree, by the sheet** (`tools/shot-bloom-mophead.mjs`, off the EXPORTED
+file: the extent and the summed shell volume × 1.01e-3 g/mm³, the stem included, so the mass is
+still an upper bound):
+
+| | tris | across | mass, upper bound |
+|---|---|---|---|
+| the mophead row | 1,241,994 | **123.6 mm** | **≤ 77.7 g** |
+| a 15 cm head (the same dome on 55 mm rays at 45°) | — | **149.7 mm** | **≤ 79.0 g** |
+| the clamp corner: 144 florets asked, **60 built** (12 × 5) | 1,297,914 | — | — |
+| a floret at the floor, 13.13 × 6.00 mm, with its pedicel | 8,580 | | |
+| a 20 mm floret (20 × 8 mm) | 10,198 | | |
+| a floret of the clamp corner, 21.00 × 9.60 mm, 12 petals | 21,524 | | |
+
+The pre-build 126 mm / ~69 g for the mophead row were taken before the floor criterion was
+settled and with the stem's volume left out; the sheet's 123.6 mm / ≤ 77.7 g are the built
+figures and include the 120 mm stem. The triangle counts are unchanged to the integer.
+
 ## 7. The roots — and why the flood fill cannot witness them here
 
 The discovery showed florets fused to each other read as ONE region with the receptacle deleted, so

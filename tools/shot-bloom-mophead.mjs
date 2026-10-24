@@ -131,7 +131,7 @@ async function cell({ label, set: sets, views, ruling = '', frameOf }) {
   const rec = { label, ruling, shots, tag: modeTag(m), sha: sha(buf), bytes: buf.length, tris: stl.tris, shownTris: m.shownTris, facts,
     compound: !!(P && P.compound), rays: B ? B.count : 0, perRay: sub ? sub.count : (B ? B.count : 0), clamp: P && P.budgetClamp,
     floret: sub ? { L: sub.plan.petalLength, W: sub.plan.petalWidth, floor: sub.plan.bodyFloor, lattice: sub.floretUnit && sub.floretUnit.lattice && sub.floretUnit.lattice[0] && sub.floretUnit.lattice[0].lattice, tris: sub.floretUnit && sub.floretUnit.tris }
-      : P ? { L: P.petalLength, W: P.petalWidth, lattice: (m0.headPetalLattices || [])[0] || null } : null };
+      : P ? { L: P.petalLength, W: P.petalWidth, lattice: null, depth1: true } : null };
   const across = Math.max(facts.hi[0] - facts.lo[0], facts.hi[1] - facts.lo[1]);
   console.log(`  ${label.padEnd(64)} tris ${stl.tris} · ${rec.rays} x ${rec.perRay} · ${across.toFixed(1)} mm across · <= ${facts.massG.toFixed(1)} g PA12`);
   return rec;
@@ -148,10 +148,17 @@ const subFrame = (reach) => (m) => {
   return { at: mApply(M, S.knot.centre), r: reach };
 };
 /* one floret petal: ray 0, floret 0, its head */
+/* looking DOWN the floret's own axis (its placement's third column, through
+   the ray's matrix at depth 2), a little off it so the petals' rims show, so
+   the pedicels below stay behind the floret */
+const mDir = (M, d) => [M[0] * d[0] + M[1] * d[1] + M[2] * d[2], M[4] * d[0] + M[5] * d[1] + M[6] * d[2], M[8] * d[0] + M[9] * d[1] + M[10] * d[2]];
 const floretFrame = (reach) => (m) => {
   const B = m.inflorescenceBuilt;
-  if (B.sub) { const M = B.placed[0].M, q = B.sub.placed[0]; return { at: mApply(M, q.headAt), r: reach, dir: [0.1, -0.25, 0.96] }; }
-  return { at: B.placed[0].headAt, r: reach, dir: [0.1, -0.25, 0.96] };
+  const [head, ax] = B.sub
+    ? [mApply(B.placed[0].M, B.sub.placed[0].headAt), mDir(B.placed[0].M, [B.sub.placed[0].M[2], B.sub.placed[0].M[6], B.sub.placed[0].M[10]])]
+    : [B.placed[0].headAt, [B.placed[0].M[2], B.placed[0].M[6], B.placed[0].M[10]]];
+  const tilt = [ax[0] + 0.25, ax[1] - 0.25, ax[2]], n = Math.hypot(...tilt);
+  return { at: [head[0] + ax[0] * 2, head[1] + ax[1] * 2, head[2] + ax[2] * 2], r: reach, dir: tilt.map((x) => x / n) };
 };
 
 const MOP = { stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2' };
@@ -163,15 +170,15 @@ const dome = await cell({ label: 'THE MOPHEAD — 12 rays x 12 round four-petal 
 const big = await cell({ label: 'A 15 cm HEAD — the same dome on 55 mm rays at 45 deg', set: set({ ...DOME, umbelRayLength: 55, umbelRayAngle: 45 }), views: ['side'], frameOf: domeFrame });
 const floorCell = await cell({ label: 'the FLORET FLOOR (floretScale 0.20 asked) — one sub-umbel', set: set({ ...MOP, umbelRays: 6, umbelFlorets: 6, floretScale: 0.2 }), views: ['close'], frameOf: subFrame(48) });
 const twenty = await cell({ label: 'a 20 mm floret (a 40 mm head petal at 0.50x) — one sub-umbel', set: set({ ...MOP, umbelRays: 6, umbelFlorets: 6, petalLength: 40, floretScale: 0.5 }), views: ['close'], frameOf: subFrame(48) });
-const reduced = await cell({ label: 'the REDUCED lattice — a 20 mm floret on a depth-2 umbel', set: set({ ...MOP, umbelRays: 6, umbelFlorets: 6, petalLength: 40, floretScale: 0.5 }), views: ['close'], frameOf: floretFrame(16) });
-const full = await cell({ label: 'the FULL lattice — the same floret on a depth-1 umbel', set: set({ stemLength: 120, inflorescence: 'UMBEL', umbelFlorets: 6, petalLength: 40, floretScale: 0.5 }), views: ['close'], frameOf: floretFrame(16) });
+const reduced = await cell({ label: 'the REDUCED lattice — a 20 mm floret on a depth-2 umbel', set: set({ ...MOP, umbelRays: 6, umbelFlorets: 6, petalLength: 40, floretScale: 0.5 }), views: ['close'], frameOf: floretFrame(13) });
+const full = await cell({ label: 'the FULL lattice — the same floret on a depth-1 umbel', set: set({ stemLength: 120, inflorescence: 'UMBEL', umbelFlorets: 6, petalLength: 40, floretScale: 0.5 }), views: ['close'], frameOf: floretFrame(13) });
 const corner = await cell({ label: 'THE CLAMP CORNER — 12 x 12 florets x 12 petals at 0.60x', set: set({ ...MOP, umbelFlorets: 12, floretPetals: 12, floretScale: 0.6, pedicelLength: 12, pedicelAngle: 20 }), views: ['side'], frameOf: domeFrame });
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const latt = (L) => (L ? `${L.columns} columns, a ${L.beadCap}-segment bead` : '—');
 const num = (c) => {
   const f = c.facts, across = Math.max(f.hi[0] - f.lo[0], f.hi[1] - f.lo[1]);
-  const fl = c.floret ? ` · florets ${c.floret.L.toFixed(2)} x ${c.floret.W.toFixed(2)} mm, ${latt(c.floret.lattice)}${c.floret.tris ? `, ${c.floret.tris.toLocaleString('en-US')} tris a floret` : ''}` : '';
+  const fl = c.floret ? ` · florets ${c.floret.L.toFixed(2)} x ${c.floret.W.toFixed(2)} mm, ${c.floret.depth1 ? 'the FULL lattice (a depth-1 floret is never reduced — by branch, UM6\'s non-floret half)' : latt(c.floret.lattice)}${c.floret.tris ? `, ${c.floret.tris.toLocaleString('en-US')} tris a floret` : ''}` : '';
   const cl = c.clamp ? (c.clamp.clamped ? `<br><b>BUDGET CLAMPED: ${c.clamp.askedFlorets} florets asked, ${c.clamp.builtFlorets} built</b> (one floret ${c.clamp.floretTris.toLocaleString('en-US')} tris, measured; asked ${c.clamp.askedTotal.toLocaleString('en-US')} tris, built ${c.clamp.predictedTotal.toLocaleString('en-US')} against ${c.clamp.budget.toLocaleString('en-US')})` : ` · ${c.clamp.builtFlorets} florets, ${c.clamp.predictedTotal.toLocaleString('en-US')} tris of the ${c.clamp.budget.toLocaleString('en-US')} budget`) : '';
   return `<b>${esc(c.tag)}</b> · ${Number(c.shownTris).toLocaleString('en-US')} tris (print preview) · STL ${c.sha} (${(c.bytes / 1048576).toFixed(1)} MiB, ${c.tris.toLocaleString('en-US')} tris export)<br>${c.compound ? `${c.rays} rays x ${c.perRay} florets · ` : ''}${across.toFixed(1)} mm across, ${(f.hi[2] - f.lo[2]).toFixed(1)} mm tall (stem included) · at most ${f.massG.toFixed(1)} g of PA12 (the shells' summed volume, overlaps counted twice)${fl}${cl}`;
 };
