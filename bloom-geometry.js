@@ -22084,8 +22084,8 @@ export const INFLORESCENCE_TYPES = Object.freeze(['NONE', 'RACEME', 'UMBEL']);
       whorl primitive's own RADIAL law (`buildWhorlInto`, phase 0) — never a
       third owner of "azimuth of the i-th organ".
    2. THE PEDICELS ROOT ON A JUNCTION KNOT, not in the stem's wall: a solid
-      sphere about the stem's axis whose size is DERIVED from the count and
-      the pedicel radius (`umbelKnot`, below), never typed.
+      squat boss about the stem's axis whose size is DERIVED from the count and
+      the pedicel radius and the angle (`umbelBoss`, below), never typed.
    3. THE HEAD IS OPTIONAL (`umbelHead`, OFF by default — the spider lily).
       OFF: no head is built and the stem ENDS at the knot, centred on the
       stem's own top end (`topZ`). ON: the head stands at the stem top as
@@ -22105,52 +22105,94 @@ export function umbelIsAbsent(state) { return inflorescenceIsAbsent(state) || St
    twin is `PREDICATES.headPresent`, checked per row by UM0 and at harness
    load. The head is absent exactly on an umbel whose head toggle is OFF. */
 export function umbelHeadIsAbsent(state) { return !umbelIsAbsent(state) && String(state.umbelHead ?? UMBEL_HEAD_VALUES[0]) !== 'ON'; }
-/* THE JUNCTION KNOT — derived from the count `n` and the pedicel radius
-   `rP`, and nothing else typed but the project's one printable gap.
+/* THE JUNCTION KNOT — derived from the count `n`, the pedicel radius `rP`,
+   the pedicel angle and the stem's own radius, and nothing else typed but the
+   project's one printable gap. Built as a squat BOSS about the stem's axis
+   (Eva's ruling, Oct 23 — the least SPHERE that shipped first read as a ball:
+   12 mm across at six florets and 19.5 mm at twelve on a 6 mm stem).
 
    THE ROOT RING. The pedicels root on a horizontal ring of radius `rho`
-   about the knot's centre, at their own evenly spread azimuths. `rho` is the
+   about the boss's centre, at their own evenly spread azimuths. `rho` is the
    least radius on which `n` rods of radius `rP` stand ONE PRINTABLE GAP
    apart: adjacent roots are `2 rho sin(pi/n)` apart, so
        rho = (rP + MIN_FEATURE_MM / 2) / sin(pi / n).
    That is the case the gap is for: at `pedicelAngle` 90 every pedicel is
-   VERTICAL and parallel to its neighbours along its whole length, and two
-   rods exactly tangent there share a line of vertices (measured on paper
-   first: at n = 2 a ring of exactly `rP` puts rod A's vertex at angle pi and
-   rod B's at angle 0 on the SAME double, an edge of four triangles). At any
-   lower angle the rods diverge from the ring, so the gap only grows.
+   VERTICAL and parallel to its neighbours along its whole length (measured on
+   paper first: at n = 2 a ring of exactly `rP` puts rod A's vertex at angle
+   pi and rod B's at angle 0 on the SAME double, an edge of four triangles).
+   At any lower angle the rods diverge from the ring, so the gap only grows.
 
-   THE KNOT is the sphere of radius `rho + rP + gap/2` about the ring's centre:
-   half a gap past the least sphere that holds every pedicel's ROOT DISC (each
-   disc's points are at most `rho + rP` from the centre) — so every pedicel is
-   rooted INSIDE solid by construction — and, by the area rule, it is always
-   wider than the stem it crowns (`rho + rP >= 1.2 outerR` at every count), so
-   the stem's top end sits inside it too. One expression, read by the plan,
-   the builder and UM1's restatement's owner-independent twin in the harness. */
-export function umbelKnot(n, rP, stemR = 0) {
-  const ringRho = (rP + MIN_FEATURE_MM / 2) / Math.sin(Math.PI / n);
-  /* WITH THE HEAD ON the stem runs ON past the knot to the head, so a pedicel
-     at 90 deg rises PARALLEL TO THE STEM: its ring must stand one printable
-     gap off the stem's own surface too, `stemR + rP + gap` (measured before it
-     was derived: 623 within-shell pairs, the six pedicels inside the stem wall
-     above a 6 mm stem's knot, on `UMBEL: 6 florets at 90 deg, head ON`). With
-     the head OFF the stem ENDS at the knot and `stemR` is 0 — nothing runs
-     beside the pedicels to clear. A floor taken by `max`, so the ring is the
-     count's own wherever that already clears the stem. */
-  const stemRho = stemR > 0 ? stemR + rP + MIN_FEATURE_MM : 0;
-  const rho = Math.max(ringRho, stemRho);
-  /* THE ROOT DISCS SIT HALF A PRINTABLE GAP INSIDE THE KNOT, never ON it: the
-     least sphere holding them is an exact TANGENCY at a disc's outermost point,
-     where the two emitted surfaces can land on one double and weld into one
-     shell — measured, 749 within-shell pairs on `UMBEL: 6 florets at 90 deg,
-     head ON`, every one at that point. Half the gap, the same half the ring's
-     own spacing gives each rod. */
-  const radiusMm = rho + rP + MIN_FEATURE_MM / 2;
-  return { rho, radiusMm, gapMm: MIN_FEATURE_MM, ringRho, stemRho, stemBound: stemRho > ringRho };
+   THE BOSS is a solid of revolution whose profile, in (r, z) about the
+   centre, is
+       (0, +h) — (R, +h) — (R, -h) — (rF, -h - (R - rF)) — (0, -h - (R - rF))
+   — a flat-topped band of radius `R` and half-height `h`, its underside a
+   cone running down at 45 degrees into the stem. Each length is DERIVED:
+     * `h` holds the ROOT DISC at its own angle: a pedicel at `a` from
+       horizontal has a root disc of radius `rP` normal to it, whose points
+       reach `rP |cos a|` above and below the ring's plane — and every pedicel
+       of an umbel stands at the one `pedicelAngle`, so that one disc IS the
+       steepest. Plus half a gap.
+     * `R` holds the same disc across: its farthest point from the axis is
+       `max over phi of sqrt((rho - rP sin(phi) sin a)^2 + rP^2 cos^2(phi))`,
+       in closed form (`umbelRootDiscReachMm`). Plus half a gap.
+     * HALF A GAP, NEVER ZERO, on both: a disc whose rim lies ON the boss's
+       surface is an exact tangency where the two emitted surfaces can share a
+       double and weld into one shell — measured on the sphere this replaces,
+       749 within-shell pairs on `UMBEL: 6 florets at 90 deg, head ON`, every
+       one at that point; half a gap in, 0.
+     * THE UNDERSIDE is the overhang law: a 45 degree cone is the steepest
+       overhang that prints without support, so the band never hangs a flat
+       ledge `R - outerR` wide over the stem. It runs in to `rF = outerR -
+       gap/2` — inside the stem's WALL (Eva's wall is 1.5 mm, so half a gap
+       in is always material) and never ON the stem's cylinder — and closes
+       there on a flat disc across the stem. It reads as the boss flaring into
+       the stem's top. (Where `R <= rF` there is nothing to flare: the band
+       closes flat, a branch.)
+   With the head OFF the boss's centre is the stem's own top end, and the
+   stem's top face lies inside the band (`R > rho > outerR`). With the head
+   ON the stem runs on through the boss to the head. One expression, read by
+   the plan, the builder and UM1's restatement's owner-independent twin in the
+   harness. */
+export function umbelRootDiscReachMm(rho, rP, angleDeg) {
+  const th = (angleDeg * Math.PI) / 180, sa = Math.abs(Math.sin(th)), ca = Math.cos(th);
+  /* f(s) = (rho + rP s sa)^2 + rP^2 (1 - s^2), s = -sin(phi) in [-1, 1]: a
+     downward parabola in s whose vertex is at s = rho sa / (rP ca^2) — inside
+     the interval only when that is at most 1, else the maximum is at s = 1. */
+  return rho * sa <= rP * ca * ca
+    ? Math.sqrt(rho * rho + rP * rP + (rho * sa) * (rho * sa) / (ca * ca))
+    : rho + rP * sa;
 }
-/* THE KNOT'S LATTICE — the stem's own sector count round, half of it from
-   pole to pole. Constants of the knot's DRAWING, not of its size. */
-export const UMBEL_KNOT_BANDS = HUB_SECTORS / 2;
+export function umbelBoss(n, rP, angleDeg, outerR, headOn = false) {
+  const gap = MIN_FEATURE_MM;
+  const ringRho = (rP + gap / 2) / Math.sin(Math.PI / n);
+  /* WITH THE HEAD ON the stem runs ON past the boss to the head, so a pedicel
+     at 90 deg rises PARALLEL TO THE STEM: its ring must stand one printable
+     gap off the stem's own surface too, `outerR + rP + gap` (measured before
+     it was derived: 623 within-shell pairs, the six pedicels inside the stem
+     wall above a 6 mm stem's junction, on `UMBEL: 6 florets at 90 deg, head
+     ON`). With the head OFF the stem ENDS at the boss — nothing runs beside
+     the pedicels to clear. A floor taken by `max`, so the ring is the count's
+     own wherever that already clears the stem. */
+  const stemRho = headOn ? outerR + rP + gap : 0;
+  const rho = Math.max(ringRho, stemRho);
+  const halfHeightMm = rP * Math.abs(Math.cos((angleDeg * Math.PI) / 180)) + gap / 2;
+  const radiusMm = umbelRootDiscReachMm(rho, rP, angleDeg) + gap / 2;
+  const flareRMm = outerR - gap / 2;
+  const flareMm = radiusMm > flareRMm ? radiusMm - flareRMm : 0;
+  return { rho, radiusMm, halfHeightMm, flareRMm, flareMm, gapMm: gap, ringRho, stemRho, stemBound: stemRho > ringRho };
+}
+/* THE BOSS'S LATTICE — the stem's own sector count round. A constant of the
+   boss's DRAWING, not of its size. */
+export const UMBEL_BOSS_SECTORS = HUB_SECTORS;
+export function umbelBossCrossingMm(B, angleDeg) {
+  const th = (angleDeg * Math.PI) / 180, c = Math.cos(th), sn = Math.sin(th);
+  let best = Infinity;
+  if (sn > 0) best = Math.min(best, B.halfHeightMm / sn);                       // the top
+  if (c > 0) best = Math.min(best, (B.radiusMm - B.rho) / c);                   // the rim
+  if (B.flareMm > 0 && c - sn > 0) best = Math.min(best, (B.radiusMm + B.halfHeightMm - B.rho) / (c - sn));   // the underside cone, z - r = -h - R
+  if (sn < 0) best = Math.min(best, (B.halfHeightMm + B.flareMm) / -sn);      // the flat bottom (a convex profile: the exit is the least crossing of an edge it leaves through)
+  return best;
+}
 /* THE ABSENT HUB'S RECORD — what `buildBloomBody` reports in place of
    `buildHubInto`'s record when an umbel's head is OFF. Every field says
    NOTHING WAS BUILT (`absent`, zero triangles, no join, no faces) rather than
@@ -22595,7 +22637,7 @@ export function inflorescencePlan(state, stem, acc) {
   /* UNDER AN UMBEL the pedicels root on the KNOT's ring, not in the wall: the
      root point IS the ring point (the root disc lies inside the knot by the
      knot's own construction, so no embed along the pedicel is needed — 0). */
-  const knot = umbel ? umbelKnot(umbelCount, pedicelR, headOff ? 0 : stem.outerR) : null;
+  const knot = umbel ? umbelBoss(umbelCount, pedicelR, angleDeg, stem.outerR, !headOff) : null;
   const rootR = umbel ? knot.rho : rodWallRootMm(stem);
   const embedMm = umbel ? 0 : rodWallEmbedMm(stem);
   /* THE FLORET'S OWN PETAL SIZE — a MULTIPLIER on the head's two, clamped into
@@ -22847,16 +22889,21 @@ export function inflorescencePlan(state, stem, acc) {
      wall, which `buildInflorescenceInto` measures off the emitted floret
      (`wallReachR`) — so it is not in this minimum; `null` where every node is
      sessile. At one length the minimum is the one value, the same double. */
-  /* UNDER AN UMBEL the solid a pedicel crosses is the KNOT: from its root on
-     the ring out along its direction to the knot's surface, in closed form. */
-  const knotCrossMm = umbel ? (() => { const c = Math.cos((angleDeg * Math.PI) / 180); return -knot.rho * c + Math.sqrt(knot.rho * knot.rho * c * c - knot.rho * knot.rho + knot.radiusMm * knot.radiusMm); })() : null;
+  /* UNDER AN UMBEL the solid a pedicel crosses is the BOSS: from its root on
+     the ring out along its direction to the boss's surface. The pedicel lies
+     in the plane through the axis at its own azimuth, where the boss is a
+     CONVEX polygon (`umbelBoss`'s profile), so the exit is the least distance
+     to an edge the direction leaves through — the top (z = +h) going up, the
+     rim (r = R) going out, the 45 degree underside going down-and-out. */
+  const knotCrossMm = umbel ? umbelBossCrossingMm(knot, angleDeg) : null;
   const crossings = pedicelLensMm.map((L) => (L > 0
     ? (umbel ? Math.min(knotCrossMm, L) : rodWallCrossingMm({ boreR: stem.boreR, outerR: stem.outerR, rootR }, (angleDeg * Math.PI) / 180, L, embedMm))
     : null));
   const stalked = crossings.filter((c) => c !== null);
   const crossesSolidMm = stalked.length ? Math.min(...stalked) : null;
 
-  const knotRec = umbel ? { rho: knot.rho, radiusMm: knot.radiusMm, gapMm: knot.gapMm, centre: [0, 0, stem.rootZ - umbelDepthMm], crossMm: knotCrossMm } : null;
+  const knotRec = umbel ? { rho: knot.rho, radiusMm: knot.radiusMm, halfHeightMm: knot.halfHeightMm, flareRMm: knot.flareRMm, flareMm: knot.flareMm,
+    gapMm: knot.gapMm, centre: [0, 0, stem.rootZ - umbelDepthMm], crossMm: knotCrossMm } : null;
   return {
     present: true, type, umbel, headOff, umbelCount: umbel ? umbelCount : null, knot: knotRec, phyllotaxy: phyllo, perNode,
     nodes: nodeDepthsMm.length, nodesAsked, nodesBuilt: nodeDepthsMm.length, nodesClamped,
@@ -23168,28 +23215,35 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
     return units.length - 1;
   };
   for (let i = 0; i < plan.nodes; i++) for (const az of plan.azimuths[i]) unitFor(plan.pedicelLensMm[i], az);
-  /* THE UMBEL'S JUNCTION KNOT — emitted FIRST, one closed sphere about the
-     plan's own centre at the plan's own derived radius (`umbelKnot`), through
-     the pill's emitter (`revolveInto`, explicit apex fans at both poles). Its
-     MEASURED side — the centre and the radius read back off the vertices it
-     emitted — is what UM1 holds every pedicel's root against, so a knot
-     emitted somewhere other than where the plan says is visible. */
+  /* THE UMBEL'S JUNCTION — emitted FIRST, one closed BOSS about the plan's
+     own centre at the plan's own derived radius, half-height and underside
+     (`umbelBoss`), through the pill's emitter (`revolveInto`, explicit apex
+     fans at both poles — here the flat bottom across the stem and the flat
+     top): three rings, `UMBEL_BOSS_SECTORS` round, 4 x 48 = 192 triangles
+     plus 96 for the underside cone where there is one (the sphere it replaces
+     was 2,208). Its MEASURED side — the axis, the rim's radius and the band's
+     two faces read back off the vertices it emitted — is what UM1 holds
+     against the controls and UM2 holds every pedicel's root disc against, so
+     a boss emitted somewhere other than where the plan says is visible. */
   let knotBuilt = null;
   if (plan.umbel && plan.knot) {
-    const K = plan.knot, c = K.centre, R = K.radiusMm, NB = UMBEL_KNOT_BANDS;
+    const K = plan.knot, c = K.centre, R = K.radiusMm, h = K.halfHeightMm;
     const t0 = acc.triangleCount;
-    const rings = [];
-    for (let k = 1; k < NB; k++) {
-      const ph = (k * Math.PI) / NB;
-      rings.push({ C: [c[0], c[1], c[2] - R * Math.cos(ph)], e1: [1, 0, 0], e2: [0, 1, 0], r: R * Math.sin(ph) });
-    }
-    const pts = revolveInto(acc, rings, [c[0], c[1], c[2] - R], [c[0], c[1], c[2] + R], new Array(HUB_SECTORS).fill(1));
-    let sx = 0, sy = 0, sz = 0, n = 0;
-    for (const ring of pts) for (const q of ring) { sx += q[0]; sy += q[1]; sz += q[2]; n++; }
-    const cen = [sx / n, sy / n, sz / n];
-    let rMax = 0, rMin = Infinity;
-    for (const ring of pts) for (const q of ring) { const d = Math.hypot(q[0] - cen[0], q[1] - cen[1], q[2] - cen[2]); if (d > rMax) rMax = d; if (d < rMin) rMin = d; }
-    knotBuilt = { centre: cen, radiusMm: rMax, radiusMinMm: rMin, tris: acc.triangleCount - t0, triRange: [t0, acc.triangleCount] };
+    const ringAt = (z, r) => ({ C: [c[0], c[1], z], e1: [1, 0, 0], e2: [0, 1, 0], r });
+    const zBot = c[2] - h - K.flareMm;
+    const rings = [ringAt(c[2] - h, R), ringAt(c[2] + h, R)];
+    if (K.flareMm > 0) rings.unshift(ringAt(zBot, K.flareRMm));
+    const pts = revolveInto(acc, rings, [c[0], c[1], zBot], [c[0], c[1], c[2] + h], new Array(UMBEL_BOSS_SECTORS).fill(1));
+    const rim = pts.slice(pts.length - 2);
+    let ax = 0, ay = 0, n = 0, rMax = 0, rMin = Infinity, zTop = -Infinity, zRimLo = Infinity, zLo = Infinity;
+    for (const ring of rim) for (const q of ring) { ax += q[0]; ay += q[1]; n++; const r = Math.hypot(q[0] - c[0], q[1] - c[1]); if (r > rMax) rMax = r; if (r < rMin) rMin = r; }
+    for (const q of rim[1]) if (q[2] > zTop) zTop = q[2];
+    for (const q of rim[0]) if (q[2] < zRimLo) zRimLo = q[2];
+    for (const ring of pts) for (const q of ring) if (q[2] < zLo) zLo = q[2];
+    const flareR = K.flareMm > 0 ? Math.max(...pts[0].map((q) => Math.hypot(q[0] - c[0], q[1] - c[1]))) : null;
+    knotBuilt = { centre: [ax / n, ay / n, (zTop + zRimLo) / 2], radiusMm: rMax, radiusMinMm: rMin, halfHeightMm: (zTop - zRimLo) / 2,
+      topZ: zTop, rimBottomZ: zRimLo, bottomZ: zLo, flareRMm: flareR, rings: pts.length,
+      tris: acc.triangleCount - t0, triRange: [t0, acc.triangleCount] };
   }
   const sub = units[0].sub, fs = units[0].fs, unit = units[0].rec;
   const unitTris = units[0].tris;

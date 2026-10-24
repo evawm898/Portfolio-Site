@@ -4824,7 +4824,7 @@ export const CONTROLS = [
       const p = shown && shown.inflorescence;
       if (!p || !p.present) return 'a raceme — but there is no stem to carry it, so nothing is built';
       const per = p.perNode;
-      if (p.umbel) return `an umbel · ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'} from one knot ${(2 * p.knot.radiusMm).toFixed(2)} mm across, ${p.headOff ? 'with NO head — the stem ends at the knot' : `${p.nodeDepthsMm[0].toFixed(1)} mm below the head`}`
+      if (p.umbel) return `an umbel · ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'} from one boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm + p.knot.flareMm).toFixed(2)} mm tall, ${p.headOff ? 'with NO head — the stem ends in the boss' : `${p.nodeDepthsMm[0].toFixed(1)} mm below the head`}`
         + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris a floret, ${b.tris.toLocaleString('en-US')} in all` : '');
       return `a raceme · ${p.nodes} node${p.nodes === 1 ? '' : 's'} x ${per} = ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'}`
         + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris ${b.units && b.units.length > 1 ? `at the top node (${b.units.length} floret builds, one per distinct pedicel length)` : 'each'}, ${b.tris.toLocaleString('en-US')} in all` : '');
@@ -4847,7 +4847,7 @@ export const CONTROLS = [
       const p = shown && shown.inflorescence;
       const base = `${n} pedicels from one point, ${(360 / n).toFixed(1)} deg apart`;
       if (!p || !p.present || !p.knot) return base;
-      return `${base} · rooted on a ring ${(2 * p.knot.rho).toFixed(2)} mm across that holds them one ${p.knot.gapMm.toFixed(2)} mm gap apart, inside a knot ${(2 * p.knot.radiusMm).toFixed(2)} mm across (derived from the count and the ${(2 * p.pedicelR).toFixed(2)} mm pedicel)`
+      return `${base} · rooted on a ring ${(2 * p.knot.rho).toFixed(2)} mm across that holds them one ${p.knot.gapMm.toFixed(2)} mm gap apart, inside a boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across with a ${(2 * p.knot.halfHeightMm).toFixed(2)} mm band (derived from the count, the ${(2 * p.pedicelR).toFixed(2)} mm pedicel and its angle) and a 45 deg underside into the stem`
         + (p.sameNodeMayTouch ? ' · neighbouring florets may touch (measured, declared — two florets fusing is over-connection, never clamped)' : '');
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelPresent' } },
@@ -4919,7 +4919,7 @@ export const CONTROLS = [
       return `${base} · ${(2 * p.pedicelR).toFixed(2)} mm across`
         + (p.pedicelRClamped ? ` — FLOORED: the area rule asks ${(2 * p.areaRuleR).toFixed(2)} mm for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem, and no rod here prints thinner than ${(2 * p.pedicelRFloor).toFixed(2)} mm`
           : ` — the area rule's own answer for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem`)
-        + (p.umbel ? ` · crosses ${p.crossesSolidMm.toFixed(2)} mm of the umbel's knot` : ` · crosses ${p.crossesSolidMm.toFixed(2)} mm of the stem's wall`);
+        + (p.umbel ? ` · crosses ${p.crossesSolidMm.toFixed(2)} mm of the umbel's boss` : ` · crosses ${p.crossesSolidMm.toFixed(2)} mm of the stem's wall`);
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 
@@ -4989,7 +4989,7 @@ export const CONTROLS = [
       const p = shown && shown.inflorescence;
       const base = `${a.toFixed(0)} deg from horizontal · ${a > 0 ? 'ascending' : a < 0 ? 'descending' : 'level'}`;
       if (!p || !p.present) return base;
-      if (p.umbel) return `${base} · every pedicel leaves the knot at this angle`;
+      if (p.umbel) return `${base} · every pedicel leaves the boss at this angle (the angle also sets the boss's band height)`;
       return `${base} · the top node sits ${p.insetMm.toFixed(1)} mm below the head`
         + (p.insetClamped ? ` — PUSHED DOWN from ${p.insetAskedMm.toFixed(1)} mm so the top floret's own petals (reaching ${p.reachMm.toFixed(1)} mm above its node) clear it by ${p.insetGapMm.toFixed(2)} mm` : '')
         + (p.insetSatisfied ? '' : ' — and it still does not clear the head: the florets reach further than the stem is long, so they stand among the petals (told, never refused)');

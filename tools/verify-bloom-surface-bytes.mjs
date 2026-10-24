@@ -478,6 +478,22 @@ const PREDICATE_MOVERS = {
     const fr = base.footRing(bs, acc);
     return !!(fr.hub && base.stemPlan(bs, fr.hub, acc).present);
   },
+  /* THE UMBEL BOSS (Eva's ruling, Oct 23 — the junction knot becomes a
+     flatter boss). A row moves iff the BASE tree BUILDS AN UMBEL on it: its
+     own `inflorescencePlan` record says umbel, on a stem its own `stemPlan`
+     builds. Read off the base's record, never the label; every other row —
+     every NONE, every RACEME, the GATED umbel rows with no stem — must hold to
+     the bit in both modes, because only the junction's emitter changed. */
+  'umbel-boss': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    if (base.umbelIsAbsent(bs)) return false;
+    const fr = base.footRing(bs, acc);
+    const sp = fr.hub && base.stemPlan(bs, fr.hub, acc);
+    if (!(sp && sp.present)) return false;
+    const P = base.inflorescencePlan(bs, sp, acc);
+    return !!(P && P.present && P.umbel);
+  },
   'stamen-braid': (st) => {
     if (String(st.stamenCoil) !== 'BRAIDED' || !(Number(st.stamenCoilRadius) > 0)) return false;
     const fr = base.footRing(baseState(st), new base.MeshBuilder({ exportMode: true }));
