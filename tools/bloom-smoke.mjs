@@ -1821,9 +1821,9 @@ export const SMOKE_BLOCKS = [
     rows: [
       { label: 'TEXTURE: CELLULAR x textureHeight max (1.5)',
         path: 'TX1 the relief at the height ceiling outward on both skins, TX2 the Worley field restated at the builder\'s samples, TX5 the bead relieved along its own w, TX4 the petal lattice under the 1.25x bar, T1/T2 the file in [w, w + 2H]' },
-      { label: 'TEXTURE: the WHOLE BLOOM — 8 sepals, a stem, a simple leaf (the hub, stem and rods stay out)',
+      { label: 'TEXTURE: the WHOLE BLOOM — 8 sepals, a stem, a simple leaf (the hub and stem textured since T5, the rods smooth)',
         path: 'TX2 one world field on petal, sepal and leaf samples, TX4 per organ against its own untextured twin, TX7 the three organs\' lattice counts engine-agreed, T4/T5 the sepal and leaf files in the band, ST9 the stem untextured' },
-      { label: 'TEXTURE: PEBBLE x the TUBE (6 of 8 fused — the ring stays out, the lobes textured)',
+      { label: 'TEXTURE: PEBBLE x the TUBE (6 of 8 fused — the lobes and, since T5, the ring textured)',
         path: 'TX4 the textured lobes against the twin, TU0/TU1 the ring built untextured beside them, TX8 the representative lobe on its surface' },
       { label: 'TEXTURE: BOTH ON — the VORONOI infill wins, the texture is REFUSED and told (Q9)',
         path: 'TX6 refused with the word infill, nothing displaced, the read-out NOT BUILT; I0-I13 the infill built as before' },
@@ -1885,6 +1885,30 @@ export const SMOKE_BLOCKS = [
     rows: [
       { label: 'TEXTURE CAP: past 0.50 mm — 40 x 3 x 40 sepals x 4 tiers x whorled leaves on a 120 mm stem (REFUSED at the cap, told)',
         path: "TX9 the build standing at the cap with fits false against the builder's tally, the read-out saying DOES NOT FIT, XR1 the declared refusal at its count" },
+    ],
+  },
+  {
+    n: 80, title: 'surface texture T5 — the hub, the stem and the tube ring (Oct 23)',
+    anchor: 'TEXTURE T5: PEBBLE x a 60 mm stem (the hub top, the stem wall, the florist\'s cut)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       organ lattice (strip quads, re-meshed centre fans, rows), the export
+       decision twin (a thin sheet live), the tube ring refined in its own
+       coordinates, and the escape-ray visibility with its geodesic fade. The
+       anchor is the shipped stem under the shipped hub; the subset adds the
+       sphere (its cavity), the closed tube, the thin sheet and the noded stem.
+       --conn is REQUIRED: the relief must not open a gap where the hub meets
+       the stem (the buried faces stay put — TX11 — and the voxel fill is the
+       witness that the union still reads one piece). */
+    conn: true,
+    rows: [
+      { label: 'TEXTURE T5: PEBBLE x the SPHERE head x a stem (its cavity untouched)',
+        path: "TX10 the sphere hub's lattice with its inner sphere left as shipped, TX11 the cavity and the stem's root enclosed and unmoved" },
+      { label: 'TEXTURE T5: PEBBLE x a closed tube (6 petals, k 0 — the ring refined in its own coordinates)',
+        path: "TX10 the ring's own lattice and its own law's normals, TX11 the ring under the petals buried, TX2 the one field on the ring" },
+      { label: 'TEXTURE T5: PEBBLE x sheetThickness 0.60 x a stem (the counts decided on the export twin)',
+        path: "TX10 the floor taken on the export twin, TX7 the counts live = export, TX11 visibility on the thin hub" },
+      { label: "TEXTURE T5: PEBBLE x a noded stem (the flower's 0.48 on 100 x 6 mm, three leaves)",
+        path: "TX10 the noded wall's radial normal from its own axis, TX11 the petiole roots buried, ST9 the petioles excused by name" },
     ],
   },
 ];

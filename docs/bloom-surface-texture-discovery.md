@@ -476,7 +476,9 @@ ruled ones keep their text so the ruling can be read against what it answered.
    Voronoi wall a 0.6 mm fade from both rims leaves only the wall's MIDLINE at full relief, so masked
    relief becomes a sharp ridge along every wall (sheet §2, the masked hole cell). With the rims
    textured, outward relief narrows the 1.50 mm hole bar (§4: 286 hole-rim samples, 1.2 %, through A;
-   B was not measured with the rims unmasked). T4 costs both remedies (§10). **Blocks T4.**
+   B was not measured with the rims unmasked). T4 costs both remedies (§10). **Blocks T4.** **[Oct 23: the
+   Voronoi half is MOOT (T4 struck — texture and infill are exclusive); the TUBE RING takes the relief since
+   T5, visible faces only.]**
 6. **OPEN — "directional ribbing": directional relative to what?** Built as radial spokes about the
    bloom axis (one world field; it converges to a moiré at the hub centre and becomes vertical fluting
    on the stem). The alternatives: a fixed world direction (parallel corrugation across the whole
@@ -487,7 +489,10 @@ ruled ones keep their text so the ruling can be read against what it answered.
    export contract relies on. A bump on a buried face within H of the visible surface would poke
    through it (reasoned, NOT measured — no instrument here counts it; T5 owes the instrument). On the
    flat default the feet's skins are COPLANAR with the hub's faces, take the same field value along the
-   same normal and stay coplanar. Texture buried faces, or not? **Blocks T5's hub half.**
+   same normal and stay coplanar. Texture buried faces, or not? **Blocks T5's hub half.** **[RULED Oct 23:
+   VISIBLE surfaces only — buried faces stay smooth, "visible" derived from the geometry and never a typed
+   per-organ list. T5 derives it by escape rays off each organ's own emitted lattice and gates it as TX11
+   (`docs/bloom-surface-texture-t5-outcome.md` §2).]**
 8. **RULED — a light preview while dragging, the full relief on release and in the export (§0 ruling
    4),** the always-on print preview's pattern. *The question was:* live view or print only? Drawing
    the subdivided mesh costs the default 24,688 → 403,616 triangles at 0.4 mm through the prototype's
@@ -511,7 +516,9 @@ ruled ones keep their text so the ruling can be read against what it answered.
     nothing thins them, but relief thickens a filament the slenderness line already reports and closes
     the gaps between them (904 of the whole bloom's 1,101 newly-closed gaps were rods on the red-green
     split, §7.1; **T1: 220 of 328 at 0.6 mm and 244 of 428 at 0.4 mm, B, §11.3**). Texture the
-    rods, or exempt them? **Blocks T5's rod half.**
+    rods, or exempt them? **Blocks T5's rod half.** **[RULED Oct 23: textured, but DEFERRED out of T5 —
+    the filaments, the style, anthers, pedicels and petioles stay smooth PENDING THE BONE SHEET (BONE
+    replaces PEBBLE and CELLULAR and may leave 1.2 mm rods smooth by its own curvature logic).]**
 13. **OPEN, NEW (from ruling 3) — the height control's FLOOR: what value, and in what units?** Ruling 3
     says the height ships with a floor and never a default that assumes it prints, and names no number.
     The candidates this repo can cite are all guesses: ~0.35–0.4 mm (the edge-profile ruling's SLS
@@ -640,7 +647,7 @@ fields, D family, defaults-bar row for the ruled default; byte partition (0 at t
 (rows added); smoke block. **TX4:** the field restated in the harness (a second statement, on purpose —
 JS8's precedent) against the emitted displacement.
 
-**T4 · VORONOI WALLS — THE MIDLINE RIDGE.** *Gated on T3. Blocked by Q5.* The sheet's §2 masked-hole cell and Q5's finding: a fade
+**[Oct 23: STRUCK — texture and the Voronoi infill are EXCLUSIVE (Q9, ruled at T3): a textured petal has no holes, so there are no walls for a ridge to form on. Nothing below is built, and nothing is owed.]** ~~**T4 · VORONOI WALLS — THE MIDLINE RIDGE.** *Gated on T3. Blocked by Q5.~~* The sheet's §2 masked-hole cell and Q5's finding: a fade
 from both rims on a 1.0 mm wall leaves only the midline at full relief, which draws as a sharp ridge
 along every wall. Outward-only rules out cutting into the wall, so the two remedies are costed here for
 the ruling and one is built: **(a) the wall's own WIDTH sets the relief** — the amplitude scales by
@@ -654,7 +661,7 @@ over). **Gates moved:** the I family (I1's hole bar read on the RELIEVED loops; 
 the infill byte partition, the infill budget B family. **TX5:** no relief ridge — the relief's own
 second difference across a wall is bounded, measured on emitted vertices.
 
-**T5 · HUB, STEM AND RODS — THE NO-MID-SURFACE FALLBACK.** *Gated on T3. The hub half blocked by Q7; the
+**[Oct 23: DONE for the hub, the stem and the tube ring — `docs/bloom-surface-texture-t5-outcome.md`. Q7 RULED: visible faces only, "visible" derived from the emitted geometry (escape rays, §2 of that doc), buried faces smooth. Q12 RULED: rods are textured but DEFERRED — the filaments, the style, anthers, pedicels and petioles stay smooth PENDING THE BONE SHEET (BONE may leave 1.2 mm rods smooth by its own curvature logic); no rod texture is built. Q15: the bore stays unrefined and is buried anyway, confirmed with one measured qualification (§5 of the outcome doc).]** **T5 · HUB, STEM AND RODS — THE NO-MID-SURFACE FALLBACK.** *Gated on T3. The hub half blocked by Q7; the
 rod half by Q12.* The prototype had no captured mid-surface for these and fell back to A's mesh normal
 (§3); a real B gives each emitter its own analytic normal: the hub's slab faces ±z and its rim radial,
 the dome and sphere arms their sphere's normal, the join its own profile normal, the stem's outer wall
@@ -671,7 +678,7 @@ hub surface), the combination gate's `leaf-stem` and the floret measures (gaps c
 outward-only cost, §7.1). **TX6:** each fallback's direction restated from the part's own axis or
 surface, not from the mesh.
 
-**T6 · THE SHEET AND THE REMAINING RULINGS.** *Gated on T5.* `tools/shot-bloom-texture-lab.mjs`
+**[Oct 23: FOLDED INTO T5 — the sheet on the shipped generator is `docs/img/bloom-texture-t5.png` (`tools/shot-bloom-texture-t5.mjs`), the organs against untextured at the floor and the maximum, numbers in every caption; the Voronoi-walls cell is moot (T4 struck).]** **T6 · THE SHEET AND THE REMAINING RULINGS.** *Gated on T5.* `tools/shot-bloom-texture-lab.mjs`
 rebuilt on the shipped generator: the type square, a height sweep starting AT the floor with the
 floor's status in every caption, seams between every organ pair, the Voronoi walls under T4's remedy,
 the budget corners with their triangle counts and refusals. Rendering may start on the prototype
@@ -934,7 +941,9 @@ the red-green split's density, which the stem's fans had inflated. Q9 stands, at
     bring the 0.014 mm sliver-apex crossing back. T5 refining the stem in its own (s, θ) — the way T2 refines
     a panel in its own (u, v) — would not have it. **Shapes T5's stem half and the budget (Q9).** **[T2 (§12.4):
     the stem stays on T1's split, 20,242 / 30,580 at 0.6 / 0.4 mm, the bore 44 % of it; the bore was not
-    refined for T2. Still open.]**
+    refined for T2. Still open.]** **[Oct 23, T5: RULED — the bore stays unrefined (Q7 buries it anyway).
+    It is kept exactly as shipped, tagged a cavity, and costs nothing; confirmed and qualified in §5 of
+    `docs/bloom-surface-texture-t5-outcome.md`.]**
 16. **OPEN — the split's discrete decisions are not cross-engine.** The page (Chromium) and Node build the
     same whole-bloom soup (59,012 triangles both) and subdivide it to **204,432 vs 204,440** ('rows', 0.6
     mm) and **723,686 vs 723,690** (red-green); the default agrees exactly (183,168). Not diagnosed further:
