@@ -747,7 +747,7 @@ const TEX_ROWS = /^surface texture/;
 const TEX_MUTANTS = /^(the-relief-goes-inward|the-bead-is-left-flat|the-field-is-sampled-per-organ|the-lattice-leaves-the-surface|the-exclusivity-is-dropped)$/;
 /* T5 (Oct 23): the organs' four mutants and the two rows they run over */
 const T5_ROWS = /^surface texture T5/;
-const T5_MUTANTS = /^(a-buried-face-is-textured|the-hub-is-skipped|the-stem-normal-points-inward|the-tube-ring-has-its-own-field)$/;
+const T5_MUTANTS = /^(a-buried-face-is-textured|the-hub-is-skipped|the-stem-normal-points-inward|the-stem-relief-is-applied-inward|the-tube-ring-has-its-own-field)$/;
 /* the organs' records as the MUTATED module builds them */
 function organFacts(G, st) {
   try {
@@ -3093,9 +3093,16 @@ const MUTANTS = [
     witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (!m.hub && c.hub && c.hub.displaced > 0 && m.stem && m.stem.displaced > 0) ? null : `the mutant's hub record ${m.hub ? 'exists' : 'is absent'} (clean ${c.hub ? `${c.hub.displaced} displaced` : 'absent'})`; } },
-  { id: 'the-stem-normal-points-inward', rows: T5_ROWS, why: "the stem wall's normal is its own axis's radial NEGATED: the wall is relieved into the stem, thinning it by up to H (ruling 2 forbids it) — every scalar record still reads 0 <= s <= H and the displacement lies along the recorded normal, so TX1 and TX2 cannot see it",
+  { id: 'the-stem-normal-points-inward', rows: T5_ROWS, why: "the stem wall's normal is its own axis's radial NEGATED — and the visibility test reads the same normal, so every escape ray now starts INSIDE the stem and the wall reads BURIED almost everywhere: the stem is left nearly smooth on an exposed wall and the few vertices still relieved go INTO it, while every scalar record reads 0 <= s <= H along the recorded normal (TX1/TX2 blind). Measured: it fires TX11 (the clearly exposed wall stops being relieved), not TX10, which reads too few relieved samples to meet one — the claim is what it does; TX10's normal clause has its own mutant below",
     find: "      return L > 0 ? [dx / L, dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') return [0, 0, 1];",
-    into: "      return L > 0 ? [-dx / L, -dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') return [0, 0, 1];", names: ['TX10'],
+    into: "      return L > 0 ? [-dx / L, -dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') return [0, 0, 1];", names: ['TX11'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const inward = (F) => F.stem.skin.filter((q) => { const r = Math.hypot(q.p0[0], q.p0[1]); return r > 2.9 && (q.p1[0] * q.p0[0] + q.p1[1] * q.p0[1]) / r < r - 0.01; }).length;
+      return (inward(m) > 0 && inward(c) === 0) ? null : `${inward(m)} of the mutant's wall samples moved toward the axis (clean ${inward(c)})`; } },
+  { id: 'the-stem-relief-is-applied-inward', rows: T5_ROWS, why: "the stem's relief is applied AGAINST its own recorded normal: the wall is pushed into the stem by up to H (ruling 2 forbids thinning) while the record still says outward along n with 0 <= s <= H, so TX1/TX2 read a correct relief — only the displacement the vertex took says otherwise",
+    find: "      const p1 = [q[0] + n[0] * s, q[1] + n[1] * s, q[2] + n[2] * s];",
+    into: "      const sg = O.organ === 'stem' ? -1 : 1; const p1 = [q[0] + sg * n[0] * s, q[1] + sg * n[1] * s, q[2] + sg * n[2] * s];", names: ['TX10'],
     witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const inward = (F) => F.stem.skin.filter((q) => { const r = Math.hypot(q.p0[0], q.p0[1]); return r > 2.9 && (q.p1[0] * q.p0[0] + q.p1[1] * q.p0[1]) / r < r - 0.01; }).length;

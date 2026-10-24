@@ -6186,8 +6186,13 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
          of a right-angle crease tilts by up to 60 degrees — so the bar is
          read against the faces, one by one; a normal pointed INWARD fails it
          against every face */
+      /* the DISPLACEMENT the vertex took (p1 - p0), the artefact, never the
+         recorded normal alone: a relief applied against its own record is
+         what TX2's scalar checks cannot see */
+      const dv = [q.p1[0] - q.p0[0], q.p1[1] - q.p0[1], q.p1[2] - q.p0[2]], dl = Math.hypot(dv[0], dv[1], dv[2]);
+      const dir = dl > 1e-9 ? [dv[0] / dl, dv[1] / dl, dv[2] / dl] : q.n;
       let dot = -1;
-      for (const fu of hit.faces) dot = Math.max(dot, fu[0] * q.n[0] + fu[1] * q.n[1] + fu[2] * q.n[2]);
+      for (const fu of hit.faces) dot = Math.max(dot, fu[0] * dir[0] + fu[1] * dir[1] + fu[2] * dir[2]);
       if (!(dot >= 0.5)) { bad.push(`TX10: ${name}: the relief's normal at ${q.p0.map((x) => x.toFixed(4)).join(',')} is ${Math.acos(Math.max(-1, Math.min(1, dot))) * 180 / Math.PI | 0} degrees off the outward facet normal the undisplaced lattice carries there — the organ is relieved INWARD or off its own surface`); break; }
     }
     if (o.displaced > 0 && !nSamp) bad.push(`TX10: ${name}: displaced vertices and no sample reached the record`);
