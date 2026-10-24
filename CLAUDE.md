@@ -6786,6 +6786,33 @@ ROOTING, AND THE STRUCTURE IS EVA'S** (Oct 24 — read `docs/bloom-hydrangea-dis
   one floret build. Tools: `tools/bloom-hydrangea-lib.mjs`, `tools/bloom-hydrangea-measure.mjs`,
   `tools/shot-bloom-hydrangea-discovery.mjs` -> `docs/img/hydrangea-discovery.png`. None in CI.
 
+**THE MOPHEAD SHIPS: A COMPOUND UMBEL OF DEPTH 2 — RAYS FROM ONE BOSS, A HEADLESS SUB-UMBEL ON EACH, THE
+FLORETS ON A REDUCED LATTICE DOWN TO A DERIVED FLOOR, THEIR COUNT CLAMPED TO THE BUDGET AND TOLD** (Oct 24 — Eva's
+rulings on the hydrangea discovery; read `docs/bloom-mophead-outcome.md` before touching `umbelDepth`,
+`umbelDepthRefusal`, `subUmbelState`, `floretBodyFloor`, `withReducedFloretLattice`, `NV` / `NV_FULL`,
+`RIM_BEAD_SEGMENTS_IN_FORCE`, `umbelBudgetClamp`, `mopheadClauses` (UM5–UM9) or block 81).
+- `umbelDepth` (`1` / `2`, default `1`) is a LEVEL control on the umbel, not a fourth type: at depth 2 the umbel's own
+  controls keep their meaning on each sub-umbel and only the rays are new (`umbelRays` 2–12 / 12, `umbelRayLength`
+  5–120 / 40 mm, `umbelRayAngle` / 50°). `subUmbelState` is the ONE place the floret pin is lifted; depth 3 (a head
+  asking `3`, a sub-umbel asking `2`) is refused BY NAME. One floret build serves every floret, one sub-umbel build is
+  appended per ray.
+- **The floor is derived**: the least scale at which a petal keeps its full sheet body `RIM_TAPER_MM` in from both
+  margins and the drawn tip past the root blend, read off a real reduced-lattice probe build — **13.13 × 6.00 mm** on
+  the 35 × 16 petal (0.75x / 26 mm on a narrow 35 × 8 one). The head's 20 mm floor does not move.
+- **The reduced lattice** (6 columns, a 2-segment bead, rows at NU 56) is a DECLARED EXCEPTION to the edge-profile
+  ruling and the fixed lattice, by branch from ONE call site: a 0.707 mm bead facet against PA12's ~0.35–0.4 mm (it
+  may print as a chamfer), sagitta 0.146 mm. 6,664 tris a sessile floret at the floor (225 fit), 8,580 on a pedicel.
+- **The clamp** prices a floret from the EMITTED unit and is exact: the clamp corner asks 3,105,930 and builds
+  1,297,914 (5 a ray). The export never refuses for it.
+- **UM5–UM9**: depth's two statements; the lattice read off the EMITTED rim (and every head petal on 10 / 4); the clamp
+  exact against the bloom's own count; **every floret's root disc inside its sub-boss and every sub-boss on its ray, in
+  the world frame — the flood fill cannot witness rooting here** (fused florets read one region); the floor restated.
+  ID family reads the rays as the outer pedicels at depth 2. Five witnessed mutants; panel route (aq) (THIRTY-FOUR
+  routes); combination measure `subumbel-floret`, two pairs, 14 cells at 0.000 declared by value (the dome's florets
+  interleave — never clamped); defaults bar row on `floret-stem`.
+- Block 81 (20 rows, 1,588), smoke block 81 (5, `--conn`); `frozen/phase87` = the 1,568 rows at `2000b1b`. Sheet:
+  `node tools/shot-bloom-mophead.mjs <dir> --png docs/img/mophead.png`.
+
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of
 `docs/bloom-organic-variance-discovery.md`; read `docs/bloom-organic-variance-size-outcome.md`

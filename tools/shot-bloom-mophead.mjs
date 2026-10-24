@@ -162,9 +162,9 @@ const dome = await cell({ label: 'THE MOPHEAD — 12 rays x 12 round four-petal 
   ruling: 'rays of 40 mm at 50 deg (the registry\'s defaults), sub-umbels on 12 mm pedicels at 20 deg' });
 const big = await cell({ label: 'A 15 cm HEAD — the same dome on 55 mm rays at 45 deg', set: set({ ...DOME, umbelRayLength: 55, umbelRayAngle: 45 }), views: ['side'], frameOf: domeFrame });
 const floorCell = await cell({ label: 'the FLORET FLOOR (floretScale 0.20 asked) — one sub-umbel', set: set({ ...MOP, umbelRays: 6, umbelFlorets: 6, floretScale: 0.2 }), views: ['close'], frameOf: subFrame(48) });
-const twenty = await cell({ label: 'a 20 mm floret (floretScale 0.57) — one sub-umbel', set: set({ ...MOP, umbelRays: 6, umbelFlorets: 6, floretScale: 0.57 }), views: ['close'], frameOf: subFrame(48) });
-const reduced = await cell({ label: 'the REDUCED lattice — a 20 mm floret on a depth-2 umbel', set: set({ ...MOP, umbelRays: 6, umbelFlorets: 6, floretScale: 0.57 }), views: ['close'], frameOf: floretFrame(16) });
-const full = await cell({ label: 'the FULL lattice — the same floret on a depth-1 umbel', set: set({ stemLength: 120, inflorescence: 'UMBEL', umbelFlorets: 6, floretScale: 0.57 }), views: ['close'], frameOf: floretFrame(16) });
+const twenty = await cell({ label: 'a 20 mm floret (a 40 mm head petal at 0.50x) — one sub-umbel', set: set({ ...MOP, umbelRays: 6, umbelFlorets: 6, petalLength: 40, floretScale: 0.5 }), views: ['close'], frameOf: subFrame(48) });
+const reduced = await cell({ label: 'the REDUCED lattice — a 20 mm floret on a depth-2 umbel', set: set({ ...MOP, umbelRays: 6, umbelFlorets: 6, petalLength: 40, floretScale: 0.5 }), views: ['close'], frameOf: floretFrame(16) });
+const full = await cell({ label: 'the FULL lattice — the same floret on a depth-1 umbel', set: set({ stemLength: 120, inflorescence: 'UMBEL', umbelFlorets: 6, petalLength: 40, floretScale: 0.5 }), views: ['close'], frameOf: floretFrame(16) });
 const corner = await cell({ label: 'THE CLAMP CORNER — 12 x 12 florets x 12 petals at 0.60x', set: set({ ...MOP, umbelFlorets: 12, floretPetals: 12, floretScale: 0.6, pedicelLength: 12, pedicelAngle: 20 }), views: ['side'], frameOf: domeFrame });
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');

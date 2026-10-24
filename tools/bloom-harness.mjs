@@ -13328,7 +13328,7 @@ export async function inflorescenceAssertions(page, row) {
          a floret that HAS a stem and a sphere head (a sessile floret has no
          stem to clear a channel for), and the petals built are the asked less
          that unit's own channel's tally. */
-      for (const u of (Array.isArray(UFs) ? UFs : []).slice(1)) {
+      for (const u of (Array.isArray(B.units) ? B.units : []).slice(1)) {
         const omU = u.omissionAsked !== null && u.omissionAsked !== undefined;
         if (omU !== (sphereFloret && u.stemPresent)) { bad.push(`ID4: the ${u.lengthMm} mm floret unit ${omU ? 'declares' : 'declares NO'} stem channel on a ${sphereFloret ? 'sphere' : 'non-sphere'} head ${u.stemPresent ? 'with' : 'without'} a stem`); break; }
         const want = omU ? u.omissionBuilt : askedPetals;
@@ -20097,7 +20097,7 @@ export function buildMatrix() {
   mo('THE MOPHEAD — 12 rays x 12 round four-petal florets at the FLORET FLOOR, 12 mm pedicels at 20 deg', { ...ROUND, umbelFlorets: 12, pedicelLength: 12, pedicelAngle: 20, floretScale: 0.2 });
   mo('THE CLAMP CORNER — 12 x 12 florets x 12 petals at 0.60x (asked 3.1 M tris, clamped to the budget, told)', { umbelFlorets: 12, floretPetals: 12, floretScale: 0.6, pedicelLength: 12, pedicelAngle: 20 });
   mo('THE FLORET FLOOR — floretScale 0.20 asked on the 35 x 16 petal (floored at the derived 13.13 x 6.00 mm)', { umbelFlorets: 6, floretScale: 0.2 });
-  mo('a 20 mm floret beside it — floretScale 0.57 on the 35 x 16 petal', { umbelFlorets: 6, floretScale: 0.57 });
+  mo('a 20 mm floret beside it — floretScale 0.50 on a 40 x 16 head petal (20 x 8 mm, the head\'s own floor length)', { umbelFlorets: 6, petalLength: 40, floretScale: 0.5 });
   mo('a NARROW head petal (35 x 8): the floor binds above the head\'s own 20 mm', { umbelFlorets: 6, petalWidth: 8, floretScale: 0.2 });
   mo('A 15 cm DOME — 12 x 12 at the floor, 55 mm rays at 45 deg', { ...ROUND, umbelFlorets: 12, pedicelLength: 12, pedicelAngle: 20, floretScale: 0.2, umbelRayLength: 55, umbelRayAngle: 45 });
   mo('x the head ON (the boss on the stem below it, the reach inset)', { umbelHead: 'ON', umbelRays: 6 });
