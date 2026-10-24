@@ -386,6 +386,14 @@ the spider lily 134,106 → 134,010 (−96, the export gate's own reading), the 
 rows 36,078 → 35,982, 105,366 → 105,270, 209,874 → 209,778, 62,398 → 62,302,
 131,686 → 131,590, 236,194 → 236,098. Nothing else moves.
 
+**Byte partition, the whole 1,555-row matrix in both modes** (`verify-bloom-surface-bytes
+--base <worktree of 2621100> --movers-predicate umbel-boss`, four shards by `--from/--rows`):
+**25 movers moved, 1,530 holders held — 0 floats moved on any holder**, positionally under
+`Object.is`, over 1,945,703,052 export floats and 82,404,596 captured-grid values. A row moves
+iff the base tree builds an umbel on it (the 25 `UMBEL:` rows that build one; the two GATED
+rows hold). Shards 0–2 hold no umbel row and so report the tool's VACUOUS guard (no mover in
+range) beside a clean holder comparison; shard 3 reads PASS.
+
 **Gates.** UM1 restates the margin from the emitted centre and asserts the band,
 the rim, the FLAT underside (its emitted bottom — now including the south pole —
 at the band's own foot) and the crossing itself through the emitted boss; UM2 is
