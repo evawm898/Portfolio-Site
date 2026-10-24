@@ -15349,6 +15349,13 @@ export const SELF_INTERSECTION_XFAIL_HAS = (label) => Object.prototype.hasOwnPro
      phase that pins it (frozen/phase70) and in
      docs/bloom-role-retirement-outcome.md. */
 export const SELF_INTERSECTION_XFAIL = Object.freeze({
+  /* THE MOPHEAD (Oct 24) — a WELD, not a fold, attributed by EMITTER (the ray blocks and, inside each, the
+     sub-umbel's own floret / sub-boss / ray-stem ranges): all 208 pairs are ray 0's floret 2 against ray 1's ROD,
+     two different parts, joined into one census shell by a coincident vertex. Only at exactly 90 deg — the rays
+     PARALLEL, their frames rotated about z alone — and the overlap itself is the dome's declared fusion (ID10 (d),
+     the combination gate's `mophead-*` cells). 0 pairs within one part. Reproduces to the pair on the builder's
+     doubles in Node and in the browser. Declared by value, never nudged. */
+  'MOPHEAD: rays at 90 deg': { pairs: 208, worstMm: 0.5896, note: 'the mophead\'s parallel rays at 90 deg: ray 0\'s floret 2 welded to ray 1\'s rod at one coincident vertex where the rod passes through it — two parts, the census\'s vertex-weld shell definition, the dome\'s declared fusion (docs/bloom-mophead-outcome.md §8)' },
   /* THE FOOT CLEARANCE (Oct 22, docs/bloom-foot-clearance-outcome.md) REMOVED SEVEN ENTRIES — root support's
      tube ALIGNED WELD (`TUBE: 12 petals x k 1 / 2 / 3 / 4 / 6`, the SNAP row, the thin sheet), declared there at
      263 / 768 / 986 / 1,457 / 2,236 / 1,457 / 530 pairs. Every pair on all seven was a WELD, none a fold

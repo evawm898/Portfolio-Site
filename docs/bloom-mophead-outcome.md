@@ -123,8 +123,17 @@ Inside one sub-umbel the florets stand on one node (the umbel's own declared ove
 sub-umbels the dome's neighbours meet: from six rays up the florets of neighbouring sub-umbels pass
 through each other. Measured and declared in the combination gate
 (`mophead-subumbel-florets-x-angle`, `mophead-rays-x-florets`, 14 cells at 0.000 mm) and in
-`INFLO_APPROACH_XFAIL` for the matrix rows ID10 (d) reads. The look is not clamped: a mophead's
-florets interleave.
+`INFLO_APPROACH_XFAIL` for the matrix rows ID10 (d) reads (16 rows, 0.0000 mm). The look is not
+clamped: a mophead's florets interleave.
+
+**One row carries a WELD in the self-intersection census, and it is declared, not a fold.** At
+exactly 90° (`MOPHEAD: rays at 90 deg`) the rays stand parallel and ray 0's floret 2 shares one
+exact vertex with ray 1's rod where the rod passes through it, so the census's vertex-weld shell
+definition reads the two as one shell: **208 pairs, worst span 0.5896 mm**, identical in Node on the
+builder's doubles and in the browser. Attributed by EMITTER (the ray blocks and, inside each, the
+sub-umbel's floret / sub-boss / ray-stem ranges): every pair is two different parts, 0 within one
+part. Declared in `SELF_INTERSECTION_XFAIL` by value; at every other angle in the matrix the
+census reads 0.
 
 ## 9. Gates
 
