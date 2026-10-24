@@ -285,3 +285,121 @@ ruling's law, and a deeper band at 90° would be a typed height.
 * **Combination gate, the three umbel pairs**: unchanged — every declared magnitude
   reproduces, `umbel-head-length-x-angle` still CLEARS at 1.087 mm.
 
+
+## 10. The flat underside and the crossing's margin (Oct 24, Eva's two rulings)
+
+**RULED Oct 24: flat underside; the overhang rule was FDM's and the target
+process is SLS.** The first print is SLS PA12, which needs no supports, so the
+45° underside cone goes. The profile is now
+
+    (0, +h) — (R, +h) — (R, -h) — (0, -h)
+
+— a flat-topped, flat-bottomed band: the boss reads as a disc.
+
+**The height, re-derived from what holds the discs.** The cone held no root
+disc. Each pedicel's root disc (radius `rP`, normal to the pedicel, centred on
+the ring) reaches `rP |cos a|` above and below the ring's plane and
+`umbelRootDiscReachMm` out from the axis; the band alone already holds that
+whole disc half a gap inside all four faces (UM2, unchanged, now on a
+flat-bottomed boss). So `h = rP |cos a| + gap/2` and `R = reach + gap/2` stand,
+and the cone below them was material holding nothing. With the head OFF the
+stem's top end sits at the boss's centre, so the stem crosses `h` of the boss
+— the same crossing a vertical pedicel makes, and the margin below covers it.
+
+**RULED Oct 24: the 90° knife edge clears by a derived margin.** A pedicel
+crosses the boss from its root on the ring out along its own direction — through
+the top or bottom face after `h / |sin a|`, through the rim after
+`(R - rho) / cos a`. At 90° the disc lies flat, `h` was exactly `gap/2`, and a
+vertical pedicel crossed **0.500 mm — ON ID2's half-feature minimum**. The band
+now grows where the crossing is shortest, and only there:
+
+    h = max(rP |cos a| + gap/2, Cmin |sin a|)
+    R = max(reach + gap/2,      rho + Cmin cos a)
+    Cmin = gap/2 + margin
+
+**Where the margin comes from: the check's own conditioning, carried to the
+artefact.** The band's faces and the pedicel's root are written to the STL as
+float32; each coordinate there is rounded by at most one float32 step, and the
+float32 step at magnitude `M` is at most `M · 2^-23`. The margin is **eight such
+steps** of the boss's own coordinate magnitude — the same 8 as X0's
+`X0_TOL_ULPS` and the foot clearance (`FOOT_CAP_CLEARANCE_RAD`), which Eva ruled
+on Oct 22:
+
+    margin = M · 2^-20,   M = max(R0, |cz| + h0) + gap
+
+(`UMBEL_CROSSING_MARGIN_REL`; `R0`, `h0` the disc-holding values, `cz` the
+boss's centre height; `M` is an upper bound on every coordinate the boss emits,
+since the growth is less than a gap). It is CONTINUOUS in `M` — never rounded to
+a power of two — so UM1's restatement, which reads `M` off the EMITTED centre,
+agrees with the geometry to the ulp. Not typed: every factor is a float32 step,
+the project's 8, or a length the boss already owns.
+
+Measured: the margin is **6.0e-6 to 3.3e-5 mm** (it scales with how far the boss
+stands from the origin — head ON puts it further down the stem), so a vertical
+pedicel crosses 0.500006–0.500033 mm, never exactly 0.500. It binds on the
+height only at 90°, and on the rim nowhere: the rim crossing is
+`(R0 - rho)/cos a`, and `R0 - rho` already exceeds `gap/2` by at least the
+disc's own excess (`~rP^2/(2 rho)` at 0°, 0.07 mm at twelve florets, more at
+any other angle) — four orders over the margin.
+
+**The print-floor alternative, costed and not built.** Requiring the crossing to
+be a whole printable feature (`Cmin = MIN_FEATURE_MM`) would make the 90° boss
+2.00 mm tall instead of 1.00 and grow the rim at 0° by ~0.4 mm; it is one
+constant (`crossMinMm`) and is Eva's to ask for. The conditioning margin fixes
+the knife edge the ruling named — a crossing the float32 file can fall either
+side of — without changing what the boss looks like.
+
+### 10a. §9's table re-measured (6 mm stem, EXPORT)
+
+across = `2R`; tall = the boss's emitted top to its emitted bottom (both poles
+included). Before = main at `2621100` (the coned boss); after = this tree.
+
+| | sphere across = tall | across (before = after) | tall before | **tall after** |
+|---|---|---|---|---|
+| OFF, 2 florets, -60° | 10.49 | 9.92 | 5.58 | **3.12** |
+| OFF, 2 florets, 35° | 10.49 | 8.68 | 6.31 | **4.48** |
+| OFF, 2 florets, 90° | 10.49 | 10.49 | 3.74 | **1.000012** |
+| OFF, 6 florets, -60° | 12.00 | 11.60 | 5.80 | **2.50** |
+| OFF, 6 florets, 35° | 12.00 | 10.72 | 6.32 | **3.46** |
+| OFF, 6 florets, 90° | 12.00 | 12.00 | 4.50 | **1.000013** |
+| OFF, 12 florets, -60° | 19.45 | 19.05 | 9.53 | **2.50** |
+| OFF, 12 florets, 35° | 19.45 | 18.18 | 10.05 | **3.46** |
+| OFF, 12 florets, 90° | 19.45 | 19.45 | 8.23 | **1.000020** |
+| ON, 2 florets, -60° | — | 16.92 | 9.08 | **3.12** |
+| ON, 2 florets, 35° | — | 15.68 | 9.81 | **4.48** |
+| ON, 2 florets, 90° | — | 17.49 | 7.24 | **1.000066** |
+| ON, 6 florets, -60° | — | 14.60 | 7.30 | **2.50** |
+| ON, 6 florets, 35° | 15.00 | 13.72 | 7.82 | **3.46** |
+| ON, 6 florets, 90° | — | 15.00 | 6.00 | **1.000065** |
+| ON, 12 florets, -60° | — | 19.05 | 9.53 | **2.50** |
+| ON, 12 florets, 35° | — | 18.18 | 10.05 | **3.46** |
+| ON, 12 florets, 90° | — | 19.45 | 8.23 | **1.000065** |
+
+The across never moves (the rim margin binds on no row). The boss is now
+**0.05–0.52 as tall as it is wide** where the cone's was 0.36–0.59 and the
+sphere's 1.00; at twelve florets 0.05–0.19. At 90° the disc is 1 mm thick
+across 12–19 mm — a vertical pedicel's root disc lies flat in it, half a gap
+plus the margin from each face.
+
+**Triangles: the boss is 192 against the cone's 288**, on every umbel row:
+the spider lily 134,106 → 134,010 (−96, the export gate's own reading), the bloom totals in the table's own
+rows 36,078 → 35,982, 105,366 → 105,270, 209,874 → 209,778, 62,398 → 62,302,
+131,686 → 131,590, 236,194 → 236,098. Nothing else moves.
+
+**Byte partition, the whole 1,555-row matrix in both modes** (`verify-bloom-surface-bytes
+--base <worktree of 2621100> --movers-predicate umbel-boss`, four shards by `--from/--rows`):
+**25 movers moved, 1,530 holders held — 0 floats moved on any holder**, positionally under
+`Object.is`, over 1,945,703,052 export floats and 82,404,596 captured-grid values. A row moves
+iff the base tree builds an umbel on it (the 25 `UMBEL:` rows that build one; the two GATED
+rows hold). Shards 0–2 hold no umbel row and so report the tool's VACUOUS guard (no mover in
+range) beside a clean holder comparison; shard 3 reads PASS.
+
+**Gates.** UM1 restates the margin from the emitted centre and asserts the band,
+the rim, the FLAT underside (its emitted bottom — now including the south pole —
+at the band's own foot) and the crossing itself through the emitted boss; UM2 is
+unchanged. Two new witnessed mutants (`the-boss-underside-cones-again`,
+`the-boss-crossing-margin-is-dropped`) and a 90° row in the apex table for the
+second to fire on; `the-boss-radius-is-typed` and `the-boss-height-is-typed`
+re-anchored onto the grown `max`; the two `rootR` mutants re-anchored onto
+`ring.rho` (the ring is computed before the boss now, which is placed once its
+centre depth is known).

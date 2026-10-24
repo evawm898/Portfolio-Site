@@ -1486,8 +1486,8 @@ const MUTANTS = [
        ONE OWNER (`rodWallRootMm`) rather than by narrowing the string. */
     /* RE-ANCHORED by the umbel session: the line gained the umbel's arm (its
        root is the KNOT's ring); the mutation still lands on the RACEME arm. */
-    find: '  const rootR = umbel ? knot.rho : rodWallRootMm(stem);\n  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);',
-    into: '  const rootR = umbel ? knot.rho : 0;\n  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);', names: ['ID2'],
+    find: '  const rootR = umbel ? ring.rho : rodWallRootMm(stem);\n  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);',
+    into: '  const rootR = umbel ? ring.rho : 0;\n  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);', names: ['ID2'],
     witness: (M, C) => {
       const [m, c] = infloPair(M, C);
       const t = bothBuilt(m, c); if (t) return t;
@@ -1499,9 +1499,9 @@ const MUTANTS = [
      on the MUTATED module's own build of an umbel, scoped to the two umbel
      rows (`rows`), the rows scoped back to them (`for`). ---- */
   { id: 'the-umbel-pedicel-roots-off-the-junction', rows: /^an umbel/,
-    why: "the umbel's pedicels root on a ring TWICE the knot's radius out — every root disc OUTSIDE the junction, held to the knot by nothing but overlapping florets: watertight, and one piece wherever the florets touch",
-    find: '  const rootR = umbel ? knot.rho : rodWallRootMm(stem);',
-    into: '  const rootR = umbel ? 2 * knot.radiusMm : rodWallRootMm(stem);', names: ['UM2'],
+    why: "the umbel's pedicels root on a ring twice the knot's own ring out and 6 mm more — every root disc OUTSIDE the junction, held to the knot by nothing but overlapping florets: watertight, and one piece wherever the florets touch",
+    find: '  const rootR = umbel ? ring.rho : rodWallRootMm(stem);',
+    into: '  const rootR = umbel ? 2 * ring.rho + 6 : rodWallRootMm(stem);', names: ['UM2'],
     witness: (M, C) => {
       const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); const q = b.inflorescenceBuilt.placed[0]; const K = b.inflorescenceBuilt.knot; return Math.hypot(q.root[0] - K.centre[0], q.root[1] - K.centre[1]) - K.radiusMm; };
       const m = f(M), c = f(C);
@@ -1520,7 +1520,7 @@ const MUTANTS = [
      squat BOSS now, and the typed size is the boss's RIM radius. */
   { id: 'the-boss-radius-is-typed', rows: /^an umbel/,
     why: "the junction boss's rim is a typed 6 mm radius instead of the reach the count, the pedicel radius and the angle derive — at twelve florets the pedicels then root on a ring wider than the boss, every root disc out past its rim",
-    find: '  const radiusMm = umbelRootDiscReachMm(rho, rP, angleDeg) + gap / 2;',
+    find: '  const radiusMm = Math.max(R0, rho + crossMinMm * ca);',
     into: '  const radiusMm = 6;', names: ['UM1', 'UM2'],
     witness: (M, C) => {
       const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE({ umbelFlorets: 12 })).inflorescenceBuilt.knot.radiusMm;
@@ -1529,12 +1529,31 @@ const MUTANTS = [
     } },
   { id: 'the-boss-height-is-typed', rows: /^an umbel/,
     why: "the junction boss's band is a typed one-feature half-height instead of the root disc's own reach at the pedicel's angle — at the shipped 35 deg a 1.5 mm pedicel's root disc reaches 1.23 mm above and below its ring, so its edge stands out through both faces of a 1 mm band: watertight, one piece, and the disc no longer rooted inside solid",
-    find: '  const halfHeightMm = rP * Math.abs(Math.cos((angleDeg * Math.PI) / 180)) + gap / 2;',
+    find: '  const halfHeightMm = Math.max(h0, crossMinMm * sa);',
     into: '  const halfHeightMm = MIN_FEATURE_MM;', names: ['UM1', 'UM2'],
     witness: (M, C) => {
       const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescenceBuilt.knot.halfHeightMm;
       const m = f(M), c = f(C);
       return (Math.abs(m - 1) < 1e-9 && c > 1.2) ? null : `the boss's half-height is ${m} mm on the mutant and ${c} on the clean tree`;
+    } },
+  /* THE FLAT UNDERSIDE AND THE CROSSING'S MARGIN (Eva's rulings, Oct 24). */
+  { id: 'the-boss-underside-cones-again', rows: /^an umbel/,
+    why: "the boss's flat underside is replaced by a cone down to a point on the axis — the FDM overhang the SLS ruling removed: watertight, one piece, every root disc still held",
+    find: '    const zBot = c[2] - h;',
+    into: '    const zBot = c[2] - h - R;', names: ['UM1'],
+    witness: (M, C) => {
+      const f = (X) => { const k = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescenceBuilt.knot; return k.bottomZ - k.rimBottomZ; };
+      const m = f(M), c = f(C);
+      return (m < -1 && Math.abs(c) < 1e-9) ? null : `the boss's bottom stands ${m} mm below its rim's foot on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-boss-crossing-margin-is-dropped', rows: /^an umbel/,
+    why: "the crossing's derived margin is dropped, so a vertical pedicel crosses EXACTLY half a printable feature of boss again — ON the join check's minimum, a knife edge the float32 file can fall either side of",
+    find: '  const crossMinMm = gap / 2 + marginMm;',
+    into: '  const crossMinMm = gap / 2;', names: ['UM1'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE({ pedicelAngle: 90 })).inflorescenceBuilt.knot.halfHeightMm;
+      const m = f(M), c = f(C);
+      return (m === 0.5 && c > 0.5) ? null : `the boss's half-height at 90 deg is ${m} mm on the mutant and ${c} on the clean tree`;
     } },
   { id: 'the-umbel-sits-on-the-cut-end', rows: /^an umbel/,
     why: "the head-off umbel's node is put at the stem's TIP — the end the florist's cut is on — so the knot swallows the cut and the umbel hangs from the free end: watertight, one piece",
@@ -4016,6 +4035,10 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }] },
   { label: 'an umbel: twelve florets, the head ON', for: /umbel|head-is-built|boss-/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '12' }, { id: 'umbelHead', value: 'ON' }] },
+  /* the 90 deg knife edge (Eva, Oct 24): the only angle at which the crossing's
+     margin binds on the band's height, so the margin mutant has a row to fire on */
+  { label: 'an umbel: six florets at 90 deg, the head OFF', for: /umbel|head-is-built|boss-/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }, { id: 'pedicelAngle', value: '90' }] },
   /* (iv) A RACEME ASKED FOR WITH NO RACHIS, and it is the ONLY state ID0 can
      speak on — measured, not reasoned. ID0 compares the geometry's guard
      against the registry's predicate, and the two agree on every state where
