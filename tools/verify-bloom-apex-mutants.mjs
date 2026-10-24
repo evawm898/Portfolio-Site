@@ -217,6 +217,10 @@ const INFLO_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 120, inf
 /* THE UMBEL'S WITNESS STATE (the umbel session): six florets, the head OFF —
    the spider lily's own default — on the shipping 6 mm stem. */
 const UMBEL_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 120, inflorescence: 'UMBEL', umbelFlorets: 6, umbelHead: 'OFF', ...over });
+/* THE MOPHEAD (Oct 24): a small compound umbel — two rays of three florets —
+   so every mophead mutant's witness is a build of seconds */
+const MOPHEAD_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2', umbelRays: 2, umbelFlorets: 3, umbelHead: 'OFF', ...over });
+const mopheadBuild = (X, over = {}) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), MOPHEAD_STATE(over));
 function infloFacts(M, over = {}) {
   try {
     const st = INFLO_STATE(over);
@@ -1574,6 +1578,55 @@ const MUTANTS = [
       const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); return b.inflorescenceBuilt.knot.centre[2] - b.stem.tipZ; };
       const m = f(M), c = f(C);
       return (Math.abs(m) < 1e-6 && c > 100) ? null : `the knot stands ${m.toFixed(3)} mm above the stem's tip on the mutant and ${c.toFixed(3)} on the clean tree`;
+    } },
+
+  /* ---- THE MOPHEAD (Oct 24, Eva's rulings on the hydrangea discovery) —
+     five mutants, each witnessed on the MUTATED module's own build of a small
+     compound umbel, scoped to the mophead rows (`rows`), the rows back to
+     them (`for`). Both STL gates and the flood fill are blind to all five. */
+  { id: 'a-sub-umbel-is-rooted-off-its-ray', rows: /^a mophead/,
+    why: "every sub-umbel's boss is put 5 mm past the end of its ray — its florets rooted in a boss joined to nothing, held to the dome only where neighbouring florets touch: watertight, and one piece wherever the florets fuse (the discovery's own finding)",
+    find: '  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.topZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;',
+    into: '  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.topZ - (umbelLevelOf(state) === 2 ? 5 : 0) : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;', names: ['UM8'],
+    witness: (M, C) => {
+      const f = (X) => { const s = mopheadBuild(X).inflorescenceBuilt.sub; return s.knot.centre[2] - s.stem.topZ; };
+      const m = f(M), c = f(C);
+      return (Math.abs(m - 5) < 1e-6 && Math.abs(c) < 1e-6) ? null : `the sub-boss stands ${m} mm above its ray's top on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'depth-3-is-allowed', rows: /^a mophead/,
+    why: "the depth cap is raised to 3, so a sub-umbel may ask a level of its own — the floret pin lifted for TWO levels where the ruling lifts it for one, refused by nothing",
+    find: 'export const UMBEL_DEPTH_MAX = 2;',
+    into: 'export const UMBEL_DEPTH_MAX = 3;', names: ['UM5'],
+    witness: (M, C) => {
+      const m = M.umbelDepthRefusal({ umbelDepth: '2', umbelLevel: 2 }), c = C.umbelDepthRefusal({ umbelDepth: '2', umbelLevel: 2 });
+      return (m === null && typeof c === 'string') ? null : `a sub-umbel asking depth 2 is ${m === null ? 'ACCEPTED' : 'refused'} on the mutant and ${c === null ? 'ACCEPTED' : 'refused'} on the clean tree`;
+    } },
+  { id: 'the-reduced-lattice-reaches-a-non-floret', rows: /^a mophead/,
+    why: "the reduced lattice's six columns become the module's own, so the HEAD petals beside the florets are built on it too — a coarser head, watertight, one piece, at a lower triangle count nobody asked for",
+    find: 'let NV = NV_FULL;',
+    into: 'let NV = 6;', names: ['UM6'],
+    witness: (M, C) => {
+      const f = (X) => { const b = mopheadBuild(X, { umbelHead: 'ON' }); const p = (b.petalsAll || []).find(Boolean); return p && p.lattice ? p.lattice.columns : null; };
+      const m = f(M), c = f(C);
+      return (m === 6 && c === 10) ? null : `a head petal is built on ${m} columns on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-clamp-counts-rows', rows: /^a mophead/,
+    why: "the budget clamp prices a floret from a ROW COUNT (petals x rows x columns x two skins x two triangles) instead of the floret it builds — the decision then sits on a number no build produced, and the bloom it predicts is not the bloom it emits",
+    find: '    const fOf = (U) => U.rec.inflorescenceBuilt ? U.rec.inflorescenceBuilt.unitTris : 0;',
+    into: '    const fOf = (U) => U.rec.inflorescenceBuilt ? plan.floretPetals * NU_BASE * NV * 4 : 0;', names: ['UM7'],
+    witness: (M, C) => {
+      const f = (X) => { const b = mopheadBuild(X); return b.inflorescence.budgetClamp.floretTris - b.inflorescenceBuilt.sub.floretUnit.tris; };
+      const m = f(M), c = f(C);
+      return (m !== 0 && c === 0) ? null : `the clamp's floret price is ${m} triangles off the emitted floret on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-floret-floor-is-typed', rows: /^a mophead/,
+    why: "the floret floor is a typed 12 mm petal instead of the body criterion's derivation — a floret floor that holds whatever the outline, the sheet or the rim bead does",
+    find: '  const out = { scale: Number.isFinite(best) ? best : 1, atU, rows, taperMm: T, probeLengthMm: p ? p.length : null,',
+    into: '  const out = { scale: 12 / Number(state.petalLength), atU, rows, taperMm: T, probeLengthMm: p ? p.length : null,', names: ['UM9'],
+    witness: (M, C) => {
+      const f = (X) => mopheadBuild(X, { floretScale: 0.2 }).inflorescenceBuilt.sub.plan.petalLength;
+      const m = f(M), c = f(C);
+      return (Math.abs(m - 12) < 1e-9 && Math.abs(c - 12) > 0.5) ? null : `the floor's floret petal is ${m} mm on the mutant and ${c} on the clean tree`;
     } },
 
   /* ---- THE REACH INSET (inflorescence build 3, Phase A — #355) ---- */
@@ -4086,6 +4139,13 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }] },
   { label: 'an umbel: twelve florets, the head ON', for: /umbel|head-is-built|boss-/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '12' }, { id: 'umbelHead', value: 'ON' }] },
+  /* THE MOPHEAD (Oct 24): two rays of three florets with the head OFF, and the
+     same with the head ON (the head's petals beside the reduced florets) —
+     scoped to the five mophead mutants and they to these. */
+  { label: 'a mophead: two rays of three florets, the head OFF, at the floor', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'floretScale', value: '0.2' }] },
+  { label: 'a mophead: two rays of three florets, the head ON', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'umbelHead', value: 'ON' }] },
   /* the 90 deg knife edge (Eva, Oct 24): the only angle at which the crossing's
      margin binds on the band's height, so the margin mutant has a row to fire on */
   { label: 'an umbel: six florets at 90 deg, the head OFF', for: /umbel|head-is-built|boss-/,

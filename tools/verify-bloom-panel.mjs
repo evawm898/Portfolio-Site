@@ -547,6 +547,19 @@
          (both bloom-registry.js): the label never derived, and the head's
          petal count left visible with the head off. Three edits: this entry,
          the block, the negative control's flags and banner.
+     (aq) THE MOPHEAD'S DEPTH ON THE PANEL (the mophead session — docs/
+         bloom-mophead-outcome.md; Eva's rulings 1 and 4). On a 120 mm stem:
+         under a RACEME the depth control hides; under an UMBEL at depth 1 the
+         depth shows and the three ray controls HIDE; at depth 2 they show, the
+         depth's read-out names the REDUCED lattice and the FLORET FLOOR, and
+         the count's read-out says how many florets were built — read against
+         the builder's own record; at the CLAMP CORNER (12 x 12 x 12 petals at
+         0.60x) the count's read-out says CLAMPED with the asked and the built
+         counts the builder's budget record holds, and the bloom exports (it
+         never refuses for this). Two mutants under --negative-control (both
+         bloom-registry.js): the rays shown at depth 1, and the clamp never
+         told. Three edits: this entry, the block, the negative control's
+         flags and banner.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -4887,6 +4900,69 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (aq) THE MOPHEAD'S DEPTH ON THE PANEL (the mophead session) -----
+   See the header. Visibility off the wrappers the page hid, the words off the
+   read-outs the page wrote, the numbers against `__bloomMetrics()`. */
+{
+  const tag = '[mophead]';
+  const snap = (pg) => pg.evaluate(() => {
+    const vis = (id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return !!(w && !w.hidden); };
+    const txt = (id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return w ? w.textContent : ''; };
+    const m = window.__bloomMetrics();
+    const cl = m.inflorescence && m.inflorescence.budgetClamp;
+    return { depth: vis('umbelDepth'), rays: vis('umbelRays'), rayLength: vis('umbelRayLength'), rayAngle: vis('umbelRayAngle'),
+      depthText: txt('umbelDepth'), countText: txt('umbelFlorets'), compound: m.umbelCompound,
+      clamp: cl ? { asked: cl.askedFlorets, built: cl.builtFlorets, clamped: cl.clamped } : null };
+  });
+  const run = async (pg, label, { corner = true } = {}) => {
+    const p = [];
+    let bad = await applyConfig(pg, [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    let r = await snap(pg);
+    if (r.depth || r.rays) p.push(`under a RACEME the depth is ${r.depth ? 'SHOWN' : 'hidden'} and the rays ${r.rays ? 'SHOWN' : 'hidden'}`);
+    bad = await applyConfig(pg, [{ id: 'inflorescence', value: 'UMBEL' }]);
+    r = await snap(pg);
+    if (bad.length || !r.depth || r.rays || r.rayLength || r.rayAngle) p.push(`under an UMBEL at depth 1 the depth is ${r.depth ? 'shown' : 'HIDDEN'} and the ray controls are ${r.rays || r.rayLength || r.rayAngle ? 'SHOWN' : 'hidden'} (${bad.join('; ')})`);
+    bad = await applyConfig(pg, [{ id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }]);
+    r = await snap(pg);
+    if (bad.length || r.compound !== true) p.push(`depth 2 did not build a compound umbel (${bad.join('; ')})`);
+    if (!r.rays || !r.rayLength || !r.rayAngle) p.push(`at depth 2 the ray controls are not all shown (rays ${r.rays}, length ${r.rayLength}, angle ${r.rayAngle})`);
+    if (!/REDUCED lattice/.test(r.depthText) || !/FLORET FLOOR/.test(r.depthText)) p.push(`at depth 2 the depth's read-out does not name the REDUCED lattice and the FLORET FLOOR: "${r.depthText.slice(0, 160)}"`);
+    if (!r.clamp || !new RegExp(`\\b${r.clamp.built} florets in all`).test(r.countText)) p.push(`at depth 2 the count's read-out does not say the ${r.clamp ? r.clamp.built : '?'} florets built: "${r.countText.slice(0, 200)}"`);
+    if (corner) {
+      bad = await applyConfig(pg, [{ id: 'umbelRays', value: '12' }, { id: 'umbelFlorets', value: '12' }, { id: 'floretPetals', value: '12' }, { id: 'floretScale', value: '0.6' }, { id: 'pedicelLength', value: '12' }, { id: 'pedicelAngle', value: '20' }]);
+      r = await snap(pg);
+      if (bad.length || !r.clamp || !r.clamp.clamped) p.push(`the clamp corner did not clamp (${bad.join('; ')}; record ${JSON.stringify(r.clamp)})`);
+      else {
+        const want = new RegExp(`CLAMPED to \\d+ a ray: ${r.clamp.asked} florets asked, ${r.clamp.built} built`);
+        if (!want.test(r.countText)) p.push(`at the clamp corner the count's read-out does not say ${r.clamp.asked} asked and ${r.clamp.built} built: "${r.countText.slice(0, 220)}"`);
+      }
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: a RACEME hides the depth; an UMBEL at depth 1 hides the rays; depth 2 shows them and names the REDUCED lattice and the FLORET FLOOR and the florets built${corner ? `; the clamp corner says CLAMPED with ${r.clamp.asked} asked and ${r.clamp.built} built` : ''}`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'mophead depth');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const regSrc = fs.readFileSync(new URL('../bloom-registry.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the rays are shown at depth 1', from: "      return `${base} · each ${(2 * p.pedicelR).toFixed(2)} mm across (the area rule off the ${(2 * p.outerR).toFixed(2)} mm stem${p.pedicelRClamped ? ', FLOORED' : ''}), rooted in a boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm).toFixed(2)} mm tall`;\n    },\n    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelCompound' } },", to: "      return `${base} · each ${(2 * p.pedicelR).toFixed(2)} mm across (the area rule off the ${(2 * p.outerR).toFixed(2)} mm stem${p.pedicelRClamped ? ', FLOORED' : ''}), rooted in a boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm).toFixed(2)} mm tall`;\n    },\n    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelPresent' } },", corner: false },
+      { name: 'the clamp is never told', from: '          + (cl && cl.clamped ? ` — CLAMPED to ${k} a ray:', to: '          + (false ? ` — CLAMPED to ${k} a ray:', corner: true },
+    ];
+    for (const m of MUTANTS) if (regSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom-registry.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (regSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom-registry.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: regSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`, { corner: m.corner });
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -5020,18 +5096,21 @@ if (NEGATIVE_CONTROL) {
     /* ROUTE (an), THE BRAID'S STRANDS UNDER THE PICKER — one flag per mutant */
     const sawStrandList = fail.some((f) => /^\[strand picker\] MUTANT \(the picker lists no strands\).*the picker lists 0 strand/.test(f));
     const sawStrandBind = fail.some((f) => /^\[strand picker\] MUTANT \(every pick binds strand 1\).*picking strand 4 bound/.test(f));
+    /* ROUTE (aq), THE MOPHEAD'S DEPTH — one flag per mutant */
+    const sawMopheadRays = fail.some((f) => /^\[mophead\] MUTANT \(the rays are shown at depth 1\).*ray controls are SHOWN/.test(f));
+    const sawMopheadClamp = fail.some((f) => /^\[mophead\] MUTANT \(the clamp is never told\).*does not say .* asked and .* built/.test(f));
     /* ROUTE (ap), THE UMBEL'S HEAD TOGGLE — one flag per mutant */
     const sawUmbelLabel = fail.some((f) => /^\[umbel head\] MUTANT \(the label is never derived\).*it must say its controls shape the florets/.test(f));
     const sawUmbelCount = fail.some((f) => /^\[umbel head\] MUTANT \(the head petal count shows with the head off\).*the head-only controls show/.test(f));
-    if (sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    if (sawMopheadRays && sawMopheadClamp && sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
         && sawTextureGrey && sawTextureLine
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-THREE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}, umbel head — the label never derived: ${sawUmbelLabel}, the petal count shown: ${sawUmbelCount}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-FOUR ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}, umbel head — the label never derived: ${sawUmbelLabel}, the petal count shown: ${sawUmbelCount}, mophead — the rays at depth 1: ${sawMopheadRays}, the clamp untold: ${sawMopheadClamp}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');
