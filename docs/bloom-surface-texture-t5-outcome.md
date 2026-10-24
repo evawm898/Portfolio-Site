@@ -91,7 +91,7 @@ fade's own steepest ramp under 45° (the ease's peak slope is 15/8). A typed con
 | dome (rise 0.5) × stem | 3,456 → 15,768 | 4,792 / 3,094 | 570 → 16,830 | 8,030 / 291 | — | — | 184,198 |
 | hemisphere × stem | 3,456 → 21,834 | 7,474 / 3,445 | 570 → 16,830 | 7,754 / 567 | — | — | 190,264 |
 | SPHERE × stem (cavity untouched) | 6,720 → 19,036 | 7,000 / 840 | 570 → 16,446 | 7,845 / 284 | — | — | 116,042 |
-| noded stem × 4 leaves | 1,824 → 10,772 | 4,581 / 807 | 11,898 → 69,310 | 31,365 / 364 | — | — | 318,738 |
+| noded stem (the flower's 0.48 on 100 × 6 mm, three leaves) | 1,824 → 10,772 | 4,581 / 807 | 9,018 → 57,538 | 26,216 / 347 | — | — | 285,202 |
 | the TUBE (6 of 8 fused) | 192 → 7,312 | 3,302 / 356 | — | — | 4,304 → 31,768 | 950 / 14,778 | 147,448 |
 | a closed tube (6 petals, k 0) | 192 → 5,788 | 2,464 / 432 | — | — | 7,920 → 43,008 | 13,586 / 7,918 | 123,652 |
 | tube on two whorls | 192 → 9,476 | 3,532 / 1,208 | — | — | 14,296 → 74,944 | 13,537 / 23,871 | 207,996 |
@@ -192,6 +192,45 @@ emitter's NAME rather than left to the visibility test.
 both modes, the whole matrix, predeclared from the BASE tree's record (a row moves iff it is textured with
 no infill AND the base build carries a hub, a stem, a tube ring or an inflorescence). Result in §9.
 
+## 7b. Gate clauses re-derived for the organs (each seen red first, none loosened in what it asserts untextured)
+
+- **TX10 / TX11 match within X0's own bar.** The page's samples and mesh come from Chromium's V8 and the
+  Node rebuild from Node's; they agree to the last few bits (2.0e-15 mm worst on 462 of 65,808 hub floats).
+  The first cut keyed on exact doubles and dropped 23 of 32 textured rows. A sample is matched to a lattice
+  vertex, and a vertex counts as moved, against `X0_TOL_ULPS` ulp of the build's largest coordinate.
+- **TX10 reads the normal per incident face**, not against the area-weighted average: a crease vertex takes
+  one face's own normal, which a right-angle crease's average tilts by up to 60 degrees (the two-whorl tube).
+  A normal pointed inward still fails against every face.
+- **T3 (the hub plate under its roots) reads a textured plate's OUTERMOST faces within the relief height of
+  the rim line.** The lattice cuts the rim wall into rows and the rim's corners are creases that move out as
+  well as up, so the nearest pair on the line read one wall row (0.4 mm) wherever a sepal foot buries the
+  rim. The reading can now OVER-read a textured plate by up to 2H and never under-read it — a declared
+  weakening on textured rows only; untextured it is the shipped reading.
+- **ST9 names the relieved hub and stem by their emitted triangle ranges** (the umbel knot's precedent) and
+  finds the root ring within H; a declared blindness — it cannot see the stem's own relief pushed into the
+  channel, which is TX10's subject.
+- **TX8 skips a sphere whose stem channel took slot 0** — its comment already named that case; the T5
+  sphere-with-a-stem row is the first to reach it.
+- **ID10 builds its floret unit as the plan does** (`pedicel: true`): the plan's unit has a smooth pedicel
+  (a rod, Q12), the restatement's had a relieved one, and the two floors read 17.97 against 16.92 mm.
+
+## 7c. Found, not T5's
+
+1. **`floretPitchFloorMm` read another azimuth's box in Chromium** — the textured raceme threw its own
+   cross-check about one run in four ON `b3163de` (six in eight with T5's floret hubs), never in Node.
+   Measured by recomputing both forms at the mismatch: the first dense grid of azimuth 0 carried azimuth
+   π's bounding box (i0 −151 for 3) with its own z arrays intact, so the dilated bound was read at the
+   wrong offset. The box loop destructured `decode()`'s returned array; reading it through two scalar
+   functions (the same integers) is clean on 8 of 8 Chromium runs. Consistent with a JIT miscompile, not
+   proven one. A wrong bound on a pair that does not WIN would have passed silently, so this was
+   potentially moving raceme node spacing in the browser before T5 existed. A rewrite of the dilation loop
+   was tried first, changed nothing (6 of 8 still threw) and was reverted.
+2. **ST12 fails untextured on a 120 mm stem with 4 leaves at swelling 0.5 / kink 0.5** — the bend of nodes
+   2 and 3 peaks a station gap above the node. The stem's emitted rings are bit-identical with and without
+   texture, so it is the node law's (or ST12's) and not T5's; the T5 row moved onto block 41's passing
+   0.48 / 100 × 6 mm state. Recorded, not fixed.
+3. **CELLULAR × the hemisphere folds each petal (352 pairs)** on `b3163de` too — declared by value.
+
 ## 8. Ambiguities settled without a ruling — flagged, each Eva's to overrule
 
 1. **The hub top under the petal feet is TEXTURED** (§2): coincident faces are outside the union, so the
@@ -205,8 +244,12 @@ no infill AND the base build carries a hub, a stem, a tube ring or an infloresce
 5. **Floret hubs are relieved in the floret's own frame**; their stems are pedicels (rods, deferred).
    The umbel's KNOT is untextured (a rod junction).
 6. **164 tube-ring vertices with no law normal are left smooth** rather than given the mesh normal.
-7. **Leaf-stem contact at 70° from H 0.8** (§3a) is not seen by the combination gate's analytic measure.
-8. **Q15's "buried anyway"** is true of the bore's wall; the bore's top ring reads exposed by the escape
+7. **The hub-to-stem join folds under relief from 1.0 mm (CELLULAR) / 1.2 mm (PEBBLE)** on a 6 mm stem —
+   outward relief into a concave corner (0 / 0 / 3 / 98 / 40 pairs CELLULAR at 0.4 / 0.8 / 1.0 / 1.2 / 1.5;
+   PEBBLE 0 / 0 / 0 / 14 / 0). Declared on the 1.5 mm row, never clamped; a derived cap (relief no deeper
+   than the join's own concave radius, the fold limit's argument) is available and not built.
+8. **Leaf-stem contact at 70° from H 0.8** (§3a) is not seen by the combination gate's analytic measure.
+9. **Q15's "buried anyway"** is true of the bore's wall; the bore's top ring reads exposed by the escape
    test on the coplanar top plane (§5). Harmless by construction (cavity faces are never relieved).
 
 ## 9. Results of the gates, the mutants and the partition

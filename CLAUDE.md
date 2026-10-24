@@ -1461,6 +1461,12 @@ decision twin in `buildBloomCore`, TX10 / TX11 or block 80).
   witnessed mutants (`a-buried-face-is-textured`, `the-hub-is-skipped`, `the-stem-normal-points-inward`,
   `the-tube-ring-has-its-own-field`), block 80 (13 rows, 1,568), smoke block 80; coverage R1 counts the
   organ lattice delta; ST1 reads the SHIPPED stem count. `frozen/phase86` = the 1,555 rows at `b3163de`.
+- **Found, pre-existing, fixed: `floretPitchFloorMm`'s dense grid read ANOTHER azimuth's box in Chromium**
+  (azimuth 0 carried pi's i0) when the box loop destructured `decode()`'s array — the textured raceme threw
+  its own cross-check 1 run in 4 on `b3163de`, never in Node, and a wrong bound on a non-winning pair would
+  have passed silently. Scalar decodes (the same integers): 8 of 8 clean. **A cross-check that throws in the
+  browser and never in Node is evidence about the browser's JIT, not about the arithmetic — recompute both
+  forms at the mismatch before believing either.**
   T4 is STRUCK (texture and infill are exclusive), T6 folded into `docs/img/bloom-texture-t5.png`
   (`tools/shot-bloom-texture-t5.mjs`); measurements `node tools/bloom-texture-t5.mjs`.
 
