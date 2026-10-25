@@ -171,7 +171,24 @@ census reads 0.
 
 ## 10. Bytes and frozen tags
 
-*Filled in at close — see the PR.*
+**Byte partition: 17 movers / 1,571 holders, 0 floats on any holder**, both modes, positionally
+under `Object.is` — `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 2000b1b>
+--movers-predicate mophead`, run in eight `--range` chunks and closed with `--merge`:
+2,068,236,360 export floats over 229,804,040 triangles and 82,596,220 captured-grid values. The
+predicate is the BASE tree's own record (its `inflorescencePlan` builds an umbel on a stem its
+`stemPlan` builds) plus the row asking `umbelDepth 2`, so every depth-1 umbel, every raceme, every
+NONE and the GATED rows carrying the depth controls at their extremes under depth 1 hold to the
+bit. All 17 predeclared movers moved; they are block 81's rows that build a depth-2 umbel (the
+three GATED rows of the block are holders).
+
+**Frozen sweep: 0 of 86 baselines carry a mover, 0 of 80,543 frozen rows** (1,998 distinct
+states, `--frozen-sweep --movers-predicate mophead`): no frozen matrix names `umbelDepth`, so every
+tag's bytes still reproduce.
+
+**A frozen phase IS owed** because the row set changed (block 81 adds 20 rows, 1,568 → 1,588):
+`frozen/phase87` is the 1,568 rows at `2000b1b`, registered in both maps and proved deep-equal
+(`--verify-frozen`). No workflow file is edited, so by the narrowed rule it is expected to publish
+when `bloom-frozen-tags` is dispatched after the merge.
 
 ## 11. For Eva to rule
 
