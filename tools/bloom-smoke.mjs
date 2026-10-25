@@ -1911,6 +1911,36 @@ export const SMOKE_BLOCKS = [
         path: "TX10 the noded wall's radial normal from its own axis, TX11 the petiole roots buried, ST9 the petioles excused by name" },
     ],
   },
+  {
+    n: 81, title: 'the mophead — a compound umbel, depth 2 (Oct 24)',
+    anchor: 'MOPHEAD: 2 rays x the registry\'s 6 florets a ray',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       compound arm of the inflorescence plan (rays rooted on the main boss,
+       each ending in a headless SUB-UMBEL built once and appended per ray),
+       the depth-2 floret's FLOOR (derived from the body criterion), the
+       REDUCED LATTICE (6 columns, a 2-segment bead) by branch on those florets
+       alone, and the BUDGET CLAMP (florets a ray reduced from one floret's
+       exact cost). The anchor is two rays (the count's low end); the subset adds the
+       dome at the floor, the clamp corner (asked past the budget, built under it), the head ON (the head on the full lattice beside the
+       reduced florets) and the GATED depth control under a depth-1 umbel.
+       --conn is REQUIRED: every floret roots on a sub-boss on a ray on the
+       main boss, and the voxel fill reads all of it — though UM8 is the
+       rooting's own witness (the flood fill cannot see a floret rooted in
+       nothing when the florets touch each other). */
+    conn: true,
+    rows: [
+      { label: 'MOPHEAD: THE CLAMP CORNER — 12 x 12 florets x 12 petals at 0.60x (asked 3.1 M tris, clamped to the budget, told)',
+        path: "UM7 asked 144 florets against the clamp's built count, the bloom's own triangles the record's exact prediction under the budget, the floret priced off the emitted unit, no larger count a ray would have fit; UM6 the reduced lattice on twelve-petal florets; UM8 every built floret rooted in its sub-boss" },
+      { label: 'MOPHEAD: THE MOPHEAD — 12 rays x 12 round four-petal florets at the FLORET FLOOR, 12 mm pedicels at 20 deg',
+        path: "UM6 the reduced lattice read off the emitted rim of a round four-petal floret at the floor, UM8 144 floret roots each inside its own sub-boss and twelve sub-bosses on their rays, UM9 the floored size restated, UM7 the build under the budget unclamped" },
+      { label: 'MOPHEAD: 2 rays x the registry\'s 6 florets a ray',
+        path: "UM1 the main boss restated on two rays at their own angle, UM5 the depth's two statements and the ray's headless depth-1 sub-umbel, UM8 two sub-bosses on their rays and twelve roots, UM9 the floor restated from a probe floret's emitted rows, ID1/ID6/ID7 the rays read as the outer pedicels, ID4 the second level's floret identity" },
+      { label: 'MOPHEAD: x the head ON (the boss on the stem below it, the reach inset)',
+        path: "UM6 the head's petals on the full 10-column, 4-segment lattice while the florets carry 6 / 2, UM0 the head built, UM3 the main boss under the head" },
+      { label: 'MOPHEAD: GATED — the depth and the rays at their extremes under depth 1 (hidden AND inert)',
+        path: "UM5 the registry and the geometry agree the umbel is NOT compound, and the head petals on the full lattice" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

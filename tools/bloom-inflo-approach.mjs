@@ -281,6 +281,40 @@ export function measureInfloApproachMm(G, state, measure) {
     return { mm: capped(best), at, verts, crossing, capped: best >= SEARCH_CAP_MM };
   }
 
+  /* THE MOPHEAD (Oct 24): FLORET against every OTHER floret of ITS OWN
+     sub-umbel. At depth 2 `floret-floret` reads whole sub-umbels against each
+     other (the rays are the outer pedicels); this reads inside one. Every ray
+     carries the same sub-umbel under a rigid matrix (ID5 holds the stream to
+     those matrices), so ray 0's florets are every ray's. The sub-umbel's own
+     boss is its join and is excluded as the main boss is, read in the ray's
+     local frame (the matrix inverted — rigid, so its transpose). */
+  if (measure === 'subumbel-floret') {
+    const S = B.sub;
+    if (!S || !Array.isArray(S.placed) || S.placed.length < 2) return { mm: Infinity, why: S ? 'one floret a sub-umbel — there is no other floret to approach' : 'no sub-umbel is built (the umbel is not compound)' };
+    const ray = B.placed[0], M = ray.M, SK = S.knot;
+    const local = (p) => { const d = [p[0] - M[3], p[1] - M[7], p[2] - M[11]]; return [M[0] * d[0] + M[4] * d[1] + M[8] * d[2], M[1] * d[0] + M[5] * d[1] + M[9] * d[2], M[2] * d[0] + M[6] * d[1] + M[10] * d[2]]; };
+    const insideSub = (p) => { if (!SK) return false; const q = local(p); if (q[2] >= SK.topZ || q[2] <= SK.bottomZ) return false; return Math.hypot(q[0] - SK.centre[0], q[1] - SK.centre[1]) < SK.radiusMinMm; };
+    const fb = S.placed.map((f, k) => ({ lo: ray.at + f.at, hi: ray.at + f.at + f.tris * 9, owner: `f${k}`, f }));
+    const grid = triGrid(P, fb.map(({ lo, hi, owner }) => ({ lo, hi, owner })));
+    const keep = (p) => !insideSub(p);
+    let best = SEARCH_CAP_MM, at = null, verts = 0, crossing = false;
+    for (const b of fb) {
+      const seen = new Set();
+      for (let j = b.lo; j < b.hi; j += 3) {
+        const sk = `${P[j]},${P[j + 1]},${P[j + 2]}`;
+        if (seen.has(sk)) continue;
+        seen.add(sk);
+        const p = [P[j], P[j + 1], P[j + 2]];
+        if (!keep(p)) continue;
+        verts++;
+        const d = nearest(grid, p, b.owner, best);
+        if (d < best) { best = d; at = { floret: b.owner, azDeg: (b.f.az * 180) / Math.PI }; }
+      }
+      if (best > 0 && crosses(grid, P, b.lo, b.hi, b.owner, keep)) { best = 0; crossing = true; at = { floret: b.owner, azDeg: (b.f.az * 180) / Math.PI, crossing: true }; }
+    }
+    return { mm: capped(best), at, verts, crossing, capped: best >= SEARCH_CAP_MM };
+  }
+
   if (measure === 'leaf-floret') {
     if (!m.leaf || !m.leaf.present || !m.leaf.shared) return { mm: Infinity, why: 'no subtending leaf is built (the shared node needs a raceme and a leaf length)' };
     const grid = triGrid(P, blocks.map(({ lo, hi, owner }) => ({ lo, hi, owner })));

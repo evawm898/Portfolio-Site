@@ -103,6 +103,15 @@ export const SHIPPED_STATES = Object.freeze([
      from the sheet; when she rules them this row follows. */
   { id: 'the lobed leaf at its shipped defaults', matrixRow: 'LOBED: the shipped lobed defaults (a 46 mm blade, 34 mm envelope, 3 alternate nodes)', set: { stemLength: 90, stemDiameter: 6, leafLength: 46, leafNodes: 3, leafType: 'LOBED' }, measures: ['self', 'leaf-stem'] },
   { id: 'the infill at its ruled defaults', matrixRow: 'INFILL: the ruled defaults (20 cells, 5 Lloyd passes, law 0.30, stretch 1.65, a 1.00 mm wall, a 1.50 mm hole bar)', set: { petalInfill: 'VORONOI' }, measures: ['self', 'infill-wall'] },
+  /* THE MOPHEAD (Oct 24) — the depth-2 umbel is a guarded feature, so its
+     shipped defaults join the table the day it lands: the defaults are the
+     session's, put to Eva from the sheet. ONE measure, `floret-stem` (every
+     sub-umbel against the free stem, its own ray named): the florets of a
+     dome FUSE by construction, inside a sub-umbel and between sub-umbels —
+     declared by value in the combination gate (`mophead-*`), never clamped —
+     so `floret-floret` is not a bar this state can be held to, and the head
+     is OFF, so there is no representative petal for `self` to read. */
+  { id: 'the mophead at its shipped defaults', matrixRow: "MOPHEAD: 12 rays x the registry's 6 florets a ray", set: { stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2', umbelRays: 12 }, measures: ['floret-stem'] },
   { id: 'the raceme at its defaults', matrixRow: 'INFLO: the raceme (5 nodes x 1, 5-petal florets on 20 mm pedicels)', set: { stemLength: 120, inflorescence: 'RACEME' }, measures: ['self', 'floret-floret', 'floret-head', 'floret-stem'] },
   { id: 'the shared node — a leaf under every pedicel', matrixRow: 'NODE LAWS: SHARED NODE — a raceme with a leaf under every pedicel', set: { stemLength: 120, inflorescence: 'RACEME', leafLength: 40 }, measures: ['leaf-floret', 'leaf-pedicel', 'floret-floret', 'floret-head', 'leaf-stem'] },
 ]);

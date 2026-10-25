@@ -516,6 +516,26 @@ const PREDICATE_MOVERS = {
     const P = base.inflorescencePlan(bs, sp, acc);
     return !!(P && P.present && P.umbel);
   },
+  /* THE MOPHEAD (Oct 24 — the compound umbel, depth 2). A row moves iff the
+     BASE tree BUILDS AN UMBEL on it (its own `inflorescencePlan` record says
+     umbel, on a stem its own `stemPlan` builds) AND the row asks umbelDepth 2.
+     The base tree has no depth control (`baseState` hands it the default), so
+     the depth half is read off the CONTROLS. Every other row — every depth-1
+     umbel, every RACEME, every NONE, the GATED rows carrying the depth and the
+     rays at their extremes under depth 1, a RACEME and NONE — must hold to the
+     bit in both modes: "the reduced lattice and the compound arm apply BY
+     BRANCH only to a depth-2 umbel", measured. */
+  'mophead': (st) => {
+    if (String(st.umbelDepth ?? '1') !== '2') return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    if (base.umbelIsAbsent(bs)) return false;
+    const fr = base.footRing(bs, acc);
+    const sp = fr.hub && base.stemPlan(bs, fr.hub, acc);
+    if (!(sp && sp.present)) return false;
+    const P = base.inflorescencePlan(bs, sp, acc);
+    return !!(P && P.present && P.umbel);
+  },
   'stamen-braid': (st) => {
     if (String(st.stamenCoil) !== 'BRAIDED' || !(Number(st.stamenCoilRadius) > 0)) return false;
     const fr = base.footRing(baseState(st), new base.MeshBuilder({ exportMode: true }));

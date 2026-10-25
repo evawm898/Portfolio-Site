@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, umbelHeadIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, umbelHeadIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, umbelDepthRefusal, umbelIsCompound, UMBEL_DEPTH_VALUES, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -1721,7 +1721,7 @@ let lastSepals = null, lastSepalsBuilt = null, lastSepalsAbsent = true, lastSepa
    is written down: the claim it would serve is already a MEASURED zero the
    builder reports as `placementResidual`, by a second expression beside the
    method under test. */
-let lastInflo = null, lastInfloBuilt = null, lastInfloAbsent = true, lastInfloTris = 0, lastUmbelHeadAbsent = false;
+let lastInflo = null, lastInfloBuilt = null, lastInfloAbsent = true, lastInfloTris = 0, lastUmbelHeadAbsent = false, lastUmbelCompound = false, lastHeadLattices = null;
 let lastNodeVarianceAbsent = true;
 /* THE SPHERE'S STEM CHANNEL (the sphere-stem session) — which slots were NOT
    built, and how near the stem every one of them came. Null wherever the
@@ -1960,6 +1960,9 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastInfloTris = built.inflorescenceBuilt ? built.inflorescenceBuilt.tris : 0;
     lastInfloAbsent = inflorescenceIsAbsent(uiForBuild);
     lastUmbelHeadAbsent = umbelHeadIsAbsent(uiForBuild);
+    lastUmbelCompound = umbelIsCompound(uiForBuild);
+    /* every HEAD petal's lattice record (the mophead's UM6, its non-floret half) */
+    lastHeadLattices = (built.petalsAll || []).filter(Boolean).map((p) => (p.lattice ? { ...p.lattice } : null));
     lastNodeVarianceAbsent = nodeVarianceIsAbsent(uiForBuild);
     lastFootDigest = footFramesDigest(built);
     lastFootBySlot = footFramesBySlot(built);
@@ -3048,6 +3051,20 @@ function overtopLine(plan, builtInflo) {
 }
 
 function infloLine(plan, builtInflo) {
+  /* THE COMPOUND UMBEL (the mophead): rays, sub-umbels, the floret floor, the
+     reduced lattice and the budget clamp — asked against built, always. */
+  if (plan.compound) {
+    const sb = builtInflo && builtInflo.sub, cl = plan.budgetClamp, F = sb && sb.plan, bf = F && F.bodyFloor;
+    const lat = sb && sb.floretUnit && sb.floretUnit.lattice && sb.floretUnit.lattice[0];
+    return `\n     INFLORESCENCE a COMPOUND UMBEL (depth 2) · ${plan.umbelCount} rays of ${plan.pedicelLenMm.toFixed(0)} mm at ${plan.angleDeg} deg, ${(2 * plan.pedicelR).toFixed(2)} mm across, from a boss ${(2 * plan.knot.radiusMm).toFixed(2)} mm across`
+      + `\n     FLORETS ${cl ? `${cl.builtFlorets} built of ${cl.askedFlorets} asked (${cl.floretsPerRay} a ray of ${cl.floretsPerRayAsked})` : `${plan.umbelCount * plan.floretsPerRay}`}`
+      + (cl && cl.clamped ? ` — BUDGET CLAMPED: one floret is ${cl.floretTris.toLocaleString('en-US')} tris (measured), so the asked ${cl.askedFlorets} would be ${cl.askedTotal.toLocaleString('en-US')}; ${cl.predictedTotal.toLocaleString('en-US')} built against the ${cl.budget.toLocaleString('en-US')} budget (the export never refuses for this)` : cl ? ` · ${cl.predictedTotal.toLocaleString('en-US')} tris predicted against the ${cl.budget.toLocaleString('en-US')} budget` : '')
+      + (F ? `\n     FLORET ${F.floretPetals} petals at ${F.petalLength.toFixed(2)} x ${F.petalWidth.toFixed(2)} mm (${F.scaleBuilt.toFixed(3)}x the head's own)` : '')
+      + (bf ? ` · FLORET FLOOR ${bf.lengthMm.toFixed(2)} x ${bf.widthMm.toFixed(2)} mm (${bf.scale.toFixed(3)}x — the least scale at which a petal still keeps its full sheet body ${bf.taperMm.toFixed(1)} mm in from both margins and the drawn tip, past the root blend)${F.sizeClamped ? ' — FLOORED' : ''}` : '')
+      + (lat && lat.lattice ? ` · the REDUCED lattice: ${lat.lattice.columns} columns, a ${lat.lattice.beadCap}-segment bead (a declared exception to the edge profile's four, florets of a depth-2 umbel only)` : '')
+      + (sb ? ` · ${sb.floretUnit.tris.toLocaleString('en-US')} tris a floret, ${builtInflo.unitTris.toLocaleString('en-US')} a sub-umbel, ${builtInflo.tris.toLocaleString('en-US')} in all` : '')
+      + (F ? `\n     SUB-UMBEL ${sb.count} florets on ${F.pedicelLenMm.toFixed(0)} mm pedicels at ${F.angleDeg} deg off each ray, ${(2 * F.pedicelR).toFixed(2)} mm across, rooted in a boss ${(2 * sb.knot.radiusMm).toFixed(2)} mm across at the ray's end` : '');
+  }
   const per = plan.perNode;
   const n = builtInflo ? builtInflo.count : plan.built;
   return `\n     INFLORESCENCE ${plan.type} · ${n} floret${n === 1 ? '' : 's'} on ${plan.nodes} node${plan.nodes === 1 ? '' : 's'} · ${plan.phyllotaxy} (${per} a node)`
@@ -4752,6 +4769,11 @@ window.__bloomMetrics = () => ({
        read it, the count and the DECLARED knot — UM1 restates the knot from
        the controls and holds the EMITTED one (below) to it. */
     type: lastInflo.type, umbel: !!lastInflo.umbel, headOff: !!lastInflo.headOff, umbelCount: lastInflo.umbelCount ?? null,
+    /* THE COMPOUND UMBEL (the mophead): the level, the floret count a ray as
+       asked and as built, and the budget clamp's whole record */
+    depth: lastInflo.depth ?? null, level: lastInflo.level ?? null, compound: !!lastInflo.compound,
+    floretsPerRay: lastInflo.floretsPerRay ?? null, floretsPerRayAsked: lastInflo.floretsPerRayAsked ?? null,
+    budgetClamp: lastInflo.budgetClamp ? { ...lastInflo.budgetClamp } : null,
     knot: lastInflo.knot ? { ...lastInflo.knot, centre: lastInflo.knot.centre.slice() } : null,
   } : null,
   /* WHAT THE BUILDER EMITTED. `unitPositions` is deliberately NOT here — the
@@ -4772,6 +4794,12 @@ window.__bloomMetrics = () => ({
        excusal names it by that range). */
     knot: lastInfloBuilt.knot ? { ...lastInfloBuilt.knot, centre: lastInfloBuilt.knot.centre.slice(), triRange: lastInfloBuilt.knot.triRange.slice() } : null,
     floretState: { ...lastInfloBuilt.floretState },
+    /* THE COMPOUND UMBEL'S SUB-UMBEL, in its own frame (the mophead) — its
+       boss as emitted, its pedicels' emitted ends, its plan's numbers and its
+       ONE floret unit's stream with the lattice probe (~80k floats: UM6 reads
+       the columns and the bead off it, which no other record can say). */
+    sub: lastInfloBuilt.sub ? JSON.parse(JSON.stringify({ ...lastInfloBuilt.sub, floretUnit: lastInfloBuilt.sub.floretUnit ? { ...lastInfloBuilt.sub.floretUnit, positions: Array.from(lastInfloBuilt.sub.floretUnit.positions) } : null })) : null,
+    budgetClamp: lastInfloBuilt.budgetClamp ? { ...lastInfloBuilt.budgetClamp } : null,
     unit: {
       petalsBuilt: lastInfloBuilt.unit.petalsBuilt,
       hubRadius: lastInfloBuilt.unit.hub.radius, hubThickness: lastInfloBuilt.unit.hub.thickness,
@@ -4853,6 +4881,14 @@ window.__bloomMetrics = () => ({
   inflorescenceAbsent: lastInfloAbsent,
   /* THE GEOMETRY'S OWN HEAD STATEMENT, from the running module (UM0's half). */
   umbelHeadAbsent: lastUmbelHeadAbsent,
+  /* THE COMPOUND UMBEL'S TWO STATEMENTS AND THE DEPTH REFUSAL, from the
+     running module (UM5): the geometry's values and its answer to a depth of
+     three, which the registry's two options must match */
+  umbelCompound: lastUmbelCompound,
+  umbelDepthValues: UMBEL_DEPTH_VALUES.slice(),
+  umbelDepth3Refusal: umbelDepthRefusal({ umbelDepth: '3' }),
+  umbelDepth2AtLevel2Refusal: umbelDepthRefusal({ umbelDepth: '2', umbelLevel: 2 }),
+  headPetalLattices: lastHeadLattices,
   nodeVarianceAbsent: lastNodeVarianceAbsent,
   /* ORGANIC VARIANCE (build 1, size): the builder's own field record — null
      at amount 0, which VS0 reads as the guard's own answer — with one factor
