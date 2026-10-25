@@ -1452,7 +1452,10 @@ decision twin in `buildBloomCore`, TX10 / TX11 or block 80).
   bore's top ring on the hub's top plane does (a coplanar knife edge), which is why it is the name and not the ray.
 - **Rods take nothing (Q12)**; a floret build passes `pedicel: true` so its stem (a pedicel) stays smooth.
 - **Measured (EXPORT):** leaf-stem at leafAngle 70 untextured 0.544 emitted / 0.540 gate → **0.252 at H 0.4,
-  touching (0.001–0.010) from H 0.8** — the gate's analytic cylinder cannot see it (flagged); at 35° 3.847 →
+  touching (0.001–0.010) from H 0.8** — the gate's analytic cylinder cannot see it (flagged) **[Oct 25: ANSWERED —
+  the gate's `leaf-stem` reads the EMITTED stem now (vertices + crossings on one export build), the plant (a leaf pushed
+  1 mm in) is RED there and invisible on the old measure, `leafangle-x-textureheight` declares 0.252 / a crossing from
+  H 0.8; `docs/bloom-leaf-stem-instrument-outcome.md`]**; at 35° 3.847 →
   2.532 at H 1.5. Feet / sepals to hub: 0 gaps closed, narrowest gaps WIDEN (the fade). Budget: five §7b
   states coarsen one or two rungs (40 × 3 0.41 → 0.42), none newly refused; block 79's refusal re-recorded
   1,795,898 → 1,873,730. PEBBLE default 151,792 → 158,912 (hub 192 → 7,312).
