@@ -334,7 +334,7 @@ registry's `DEFAULTS` are deep-equal; the overlay is read only by a hand switch 
 block 81's live rows. A frozen row is data, so no frozen row's state or code moved.
 
 **`frozen/phase88` IS owed**, because the row set changed: block 81's 17 rows are redefined in place,
-14 of them relabelled.
+5 of them relabelled (the ray and floret sweeps).
 - It is the 1,588 rows at `6697558`, registered in both maps and proved deep-equal
   (`--verify-frozen --phase88`).
 - No workflow file is edited, so it is expected to publish when `bloom-frozen-tags` is dispatched
