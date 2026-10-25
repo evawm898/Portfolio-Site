@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
+import { CONTROLS, SECTIONS, DEFAULTS, UMBEL_DEPTH2_DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
 import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, umbelHeadIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, umbelDepthRefusal, umbelIsCompound, UMBEL_DEPTH_VALUES, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
@@ -4081,6 +4081,46 @@ function onSeedSwitch(e) {
   seedNotes[M.curve] = `SEEDED from ${M.leaf && M.kind === 'spine' ? 'the Arch slider\'s spine' : M.leaf ? 'the leaf\'s law outline' : seed.from} on the switch — ${seed.points} points, ${seed.met ? 'within' : 'NOT within'} the ${seed.tolMm.toFixed(2)} mm tolerance: it departs from it by ${seed.errorMm.toFixed(3)} mm${split}${!seed.met && seed.constraint ? ` — stopped by ${seed.constraint}` : ''}${seed.rotationDeg ? ` (drawn turned ${seed.rotationDeg.toFixed(0)}° so it stays in front of its root; the law lays it back along the blade)` : ''}${seed.clipped ? ' (wider than the box allows — clipped at half the length)' : ''}; a fit, not the slider build to the bit`;
 }
 window.addEventListener('change', onSeedSwitch, true);
+/* ===================================================================
+   DEPTH 2'S DEFAULTS ON THE SWITCH (Eva's ruling, Oct 25 — the floor-floret
+   mophead is depth 2's default; read §12 of docs/bloom-mophead-outcome.md).
+   The overlay is the registry's (`UMBEL_DEPTH2_DEFAULTS`, one owner); this is
+   where a HAND switch of `umbelDepth` writes it. Placements made without a
+   ruling, told on the depth's read-out:
+     - to depth 2, a control still at its REGISTRY default takes the overlay;
+       one the visitor set is KEPT (a default is all "untouched" can mean on a
+       page that records no history);
+     - back to depth 1, a control still reading the OVERLAY returns to its
+       registry default, one changed since is kept — so a switch there and
+       back with no edit between is the page it was, to the slider value;
+     - a picked scope ends first (it writes nothing), because two of the
+       overlay's controls are scopeable and the panel would otherwise be
+       writing the picked scope's view.
+   Only an `isTrusted` change does any of it: a design file, Reset, a matrix
+   row and `applyConfig` are LOADED states that carry their own values (the
+   seed precedent's split), and a load clears the note. */
+const sameSlider = (a, b) => Math.abs(Number(a) - Number(b)) < 1e-9;
+const labelOf = (id) => (CONTROLS.find((c) => c.id === id) || { label: id }).label;
+function onDepthSwitch(e) {
+  const t = e.target;
+  if (!t || t !== inputs.umbelDepth) return;
+  if (!e.isTrusted) { delete seedNotes.umbelDepth; return; }
+  const toTwo = t.value === '2';
+  if (scopeView) selectScope(null);
+  const wrote = [], kept = [];
+  for (const [id, v] of Object.entries(UMBEL_DEPTH2_DEFAULTS)) {
+    const from = toTwo ? DEFAULTS[id] : v, to = toTwo ? v : DEFAULTS[id];
+    if (sameSlider(inputs[id].value, from)) { inputs[id].value = String(to); wrote.push(`${labelOf(id)} ${to}`); }
+    else if (!sameSlider(inputs[id].value, to)) kept.push(`${labelOf(id)} ${inputs[id].value}`);
+  }
+  seedNotes.umbelDepth = (toTwo
+    ? `DEPTH 2'S DEFAULTS written on the switch (the floor-floret mophead, Eva's ruling of Oct 25)${wrote.length ? `: ${wrote.join(', ')}` : ': nothing to write'}`
+    : `back to depth 1: ${wrote.length ? `the registry defaults restored where depth 2's still stood — ${wrote.join(', ')}` : 'nothing still read depth 2\'s defaults'}`)
+    + (kept.length ? ` · KEPT as you set them: ${kept.join(', ')}` : '');
+  applyVisibility();
+  scheduleRegen();
+}
+window.addEventListener('change', onDepthSwitch, true);
 /* the seed's sentence is told until the curve is next edited */
 for (const M of Object.values(SEED_MODES)) inputs[M.curve].addEventListener('input', () => { delete seedNotes[M.curve]; });
 for (const c of CONTROLS) {

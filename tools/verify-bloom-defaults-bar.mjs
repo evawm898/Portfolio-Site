@@ -69,7 +69,7 @@ import { measureInfloApproachMm } from './bloom-inflo-approach.mjs';
 import { measureLeafStemApproachMm } from './bloom-combination-gate.mjs';
 import { measureInfillWallMm } from './bloom-infill-wall.mjs';
 import { measureWall } from './bloom-wall-thickness.mjs';
-import { buildMatrix } from './bloom-harness.mjs';
+import { buildMatrix, UMBEL_DEPTH2_DEFAULTS } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTROL = process.argv.includes('--control');
@@ -111,7 +111,11 @@ export const SHIPPED_STATES = Object.freeze([
      declared by value in the combination gate (`mophead-*`), never clamped —
      so `floret-floret` is not a bar this state can be held to, and the head
      is OFF, so there is no representative petal for `self` to read. */
-  { id: 'the mophead at its shipped defaults', matrixRow: "MOPHEAD: 12 rays x the registry's 6 florets a ray", set: { stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2', umbelRays: 12 }, measures: ['floret-stem'] },
+  /* RE-PINNED (Eva's ruling, Oct 25 — ruling 3's standing rule): the
+     floor-floret mophead IS depth 2's default now, so the row is the
+     registry's `UMBEL_DEPTH2_DEFAULTS` overlay on a 120 mm stem and nothing
+     else — read from the registry's one owner, never restated here. */
+  { id: 'the mophead at its ruled defaults', matrixRow: 'MOPHEAD: THE MOPHEAD — 12 rays x 12 round four-petal florets at the FLORET FLOOR, 12 mm pedicels at 20 deg', set: { stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2', ...UMBEL_DEPTH2_DEFAULTS }, measures: ['floret-stem'] },
   { id: 'the raceme at its defaults', matrixRow: 'INFLO: the raceme (5 nodes x 1, 5-petal florets on 20 mm pedicels)', set: { stemLength: 120, inflorescence: 'RACEME' }, measures: ['self', 'floret-floret', 'floret-head', 'floret-stem'] },
   { id: 'the shared node — a leaf under every pedicel', matrixRow: 'NODE LAWS: SHARED NODE — a raceme with a leaf under every pedicel', set: { stemLength: 120, inflorescence: 'RACEME', leafLength: 40 }, measures: ['leaf-floret', 'leaf-pedicel', 'floret-floret', 'floret-head', 'leaf-stem'] },
 ]);
