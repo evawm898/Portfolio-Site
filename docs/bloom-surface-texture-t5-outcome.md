@@ -248,7 +248,7 @@ no infill AND the base build carries a hub, a stem, a tube ring or an infloresce
    outward relief into a concave corner (0 / 0 / 3 / 98 / 40 pairs CELLULAR at 0.4 / 0.8 / 1.0 / 1.2 / 1.5;
    PEBBLE 0 / 0 / 0 / 14 / 0). Declared on the 1.5 mm row, never clamped; a derived cap (relief no deeper
    than the join's own concave radius, the fold limit's argument) is available and not built.
-8. **Leaf-stem contact at 70° from H 0.8** (§3a) is not seen by the combination gate's analytic measure.
+8. **Leaf-stem contact at 70° from H 0.8** (§3a) is not seen by the combination gate's analytic measure. **[Oct 25: answered by the instrument PR — the gate reads the emitted stem, and the 70° column is declared by value: `docs/bloom-leaf-stem-instrument-outcome.md`.]**
 9. **Q15's "buried anyway"** is true of the bore's wall; the bore's top ring reads exposed by the escape
    test on the coplanar top plane (§5). Harmless by construction (cavity faces are never relieved).
 

@@ -45,13 +45,19 @@
                 of roots is the ROOTS FUSE flag's and is excluded by
                 starting at the outer root. Overlapping closed rods export
                 watertight, so both STL gates are blind to it.
-     leaf-stem  every LEAF BLADE vertex against the free stem solid,
-                through the geometry's own `freeStemDistanceMm`. The
-                PETIOLE is excluded by the leaf builder's OWN reported
-                `petioleAxis` — it is rooted THROUGH the wall by design
-                and reads exactly 0, and a clearance criterion means
-                nothing between two solids that are fused (ST9's scope,
-                and its remedy: name the rod, never widen the region).
+     leaf-stem  every emitted LEAF BLADE vertex against the stem's own
+                EMITTED triangles (so the stem's T5 relief is in it), 0 if
+                the vertex is inside the free stem's solid, and 0 if any
+                blade edge crosses a stem triangle — on ONE export build's
+                own stream (the leaf-stem instrument session, Oct 25; until
+                then it read a leaf REBUILT outside the bloom against the
+                plan's ANALYTIC cylinder and could not see a contact at
+                70 deg — `measureLeafStemApproachMm`'s header). The RODS
+                are excluded by the leaf builder's OWN reported `rodAxes`
+                — the petiole is rooted THROUGH the wall by design, and a
+                clearance criterion means nothing between two solids that
+                are fused (ST9's scope, and its remedy: name the rod, never
+                widen the region).
 
    THREE TIERS, AND THE TIER IS A FIELD THE GATE READS (CG6). TIER 1 is
    a defect measured and CITED on this pair; TIER 2 is a SHARED
@@ -165,7 +171,7 @@
    =================================================================== */
 
 import { measureInfillWallMm } from './bloom-infill-wall.mjs';
-import { measureInfloApproachMm, SEARCH_CAP_MM as INFLO_SEARCH_CAP_MM } from './bloom-inflo-approach.mjs';
+import { measureInfloApproachMm, SEARCH_CAP_MM as INFLO_SEARCH_CAP_MM, triGrid, nearest, crosses } from './bloom-inflo-approach.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -335,6 +341,27 @@ export const PAIRS = [
     verdict: 'single-reaches',
     cite: 'docs/bloom-leaves-outcome.md — 1.853 / 4.356 / 5.492 / 4.910 / 4.019 / 2.804 / 1.853 / 0.824 / 0.289 / 0.000 mm at leafAngle -60..90, reproduced here exactly through an instrument that shares no code with the one that produced it',
     why: "the escape length is `outerR / cos(theta)`, so a steeper angle lays the blade back along the stem; Eva's ruled 35 deg reads 4.019 mm, four times the gap",
+  },
+  {
+    id: 'leafangle-x-textureheight',
+    tier: 1,
+    label: 'leafAngle x textureHeight — the blade against the RELIEVED stem it hangs off',
+    measure: 'leaf-stem',
+    base: { stemLength: 70, leafLength: 52, leafWidth: 17, leafNodes: 3, petalTexture: 'PEBBLE' },
+    a: { id: 'leafAngle', values: [35, 50, 70, 85] },
+    b: { id: 'textureHeight', values: [0.4, 0.8, 1.2, 1.5] },
+    /* THE PAIR THE INSTRUMENT SESSION WAS FOR (Eva's ruling 7, Oct 25; T5's
+       ambiguity 8). T5's own measurement: at leafAngle 70 the blade and the
+       RELIEVED stem wall touch from H 0.8 up, and the old `leaf-stem` measure
+       — the analytic cylinder — read 0.540 at every height. On the emitted
+       measure the 70-deg column reads 0.252 at the floor and a CROSSING from
+       0.8 (the stem's relief passing through the blade); the 35-deg row falls
+       ~0.88 mm per mm of height and never reaches the bar. `single-reaches`
+       because the angle reaches the bar at the floor height alone (0.252 at
+       70, 0 at 85) — the height deepens a contact the angle already makes. */
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-surface-texture-t5-outcome.md §3a and §8 item 8 — 0.544 untextured, 0.252 at H 0.4, touching from H 0.8 at leafAngle 70; the analytic measure read 0.540 at every height',
+    why: "the stem's relief stands up to `textureHeight` proud of the cylinder the blade's clearance was measured against, so every millimetre of height comes off a gap the angle has already narrowed",
   },
 
   /* ------------------------------------------------------------ TIER 2
@@ -1293,12 +1320,24 @@ export const COMBINATION_XFAIL = Object.freeze({
 
   /* THE LEAF CELLS — `leafAngle`'s hazard, at every stem diameter, which
      is what CG4's `single-reaches` arm asserts about this pair. */
-  'leafangle-x-stem @ leafAngle=70 x stemDiameter=6': { mm: 0.540, note: "docs/bloom-leaves-outcome.md's own figure (0.824), reproduced exactly through an instrument that shares no code with the one that produced it. RE-RECORDED 0.824 -> 0.821 by leaf/stem build S2: the leaf's margin closes on the bead now, and the near point to the stem is at the blade's base margin, where the bead's profile replaces the flat wall's corner. RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade's base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6." },
-  'leafangle-x-stem @ leafAngle=70 x stemDiameter=3': { mm: 0.541, note: 'measured 2026-09-19 on 937263a. RE-RECORDED 0.826 -> 0.822 by S2 (the bead at the base margin). RE-RECORDED 0.822 -> 0.541 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade\'s base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6.' },
-  'leafangle-x-stem @ leafAngle=70 x stemDiameter=12': { mm: 0.540, note: "measured 2026-09-19 on 937263a — 0.002 mm from the 6 mm stem's reading, which is the whole of what the second control contributes. RE-RECORDED 0.822 -> 0.821 by S2 (the bead at the base margin). RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade's base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6." },
+  'leafangle-x-stem @ leafAngle=70 x stemDiameter=6': { mm: 0.544, note: "docs/bloom-leaves-outcome.md's own figure (0.824), reproduced exactly through an instrument that shares no code with the one that produced it. RE-RECORDED 0.824 -> 0.821 by leaf/stem build S2: the leaf's margin closes on the bead now, and the near point to the stem is at the blade's base margin, where the bead's profile replaces the flat wall's corner. RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade's base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.540 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
+  'leafangle-x-stem @ leafAngle=70 x stemDiameter=3': { mm: 0.544, note: 'measured 2026-09-19 on 937263a. RE-RECORDED 0.826 -> 0.822 by S2 (the bead at the base margin). RE-RECORDED 0.822 -> 0.541 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade\'s base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.541 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf\'s azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md.' },
+  'leafangle-x-stem @ leafAngle=70 x stemDiameter=12': { mm: 0.544, note: "measured 2026-09-19 on 937263a — 0.002 mm from the 6 mm stem's reading, which is the whole of what the second control contributes. RE-RECORDED 0.822 -> 0.821 by S2 (the bead at the base margin). RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade's base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.540 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
   'leafangle-x-stem @ leafAngle=85 x stemDiameter=6': { mm: 0, note: "docs/bloom-leaves-outcome.md's 80-90 deg cell: the blade reaches the stem's own surface. `LEAVES: the STEEP angle (85 deg)` is a shipped MATRIX ROW, so this hazard was reachable, built and exported on every full gate run — nothing measured it." },
   'leafangle-x-stem @ leafAngle=85 x stemDiameter=3': { mm: 0, note: 'measured 2026-09-19 on 937263a.' },
   'leafangle-x-stem @ leafAngle=85 x stemDiameter=12': { mm: 0, note: 'measured 2026-09-19 on 937263a.' },
+  /* THE RELIEVED STEM (the leaf-stem instrument session, Oct 25) — every cell
+     the emitted measure reads under the bar on `leafangle-x-textureheight`.
+     The analytic measure read 0.540 / 0.000 at every height here: it could
+     not see the stem's relief at all. */
+  'leafangle-x-textureheight @ leafAngle=70 x textureHeight=0.4': { mm: 0.252, note: 'a SINGLE-axis cell (the floor height): T5 §3a\'s 0.252, reproduced through the gate. The stem\'s relief stands proud of the cylinder the old measure read (0.540 here). Measured 2026-10-25, Node 22, EXPORT.' },
+  'leafangle-x-textureheight @ leafAngle=70 x textureHeight=0.8': { mm: 0, note: 'a CROSSING: an edge of the blade passes through the relieved stem wall (T5 §3a read the nearest vertex at 0.001 mm; the crossing is what makes it 0). Measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=70 x textureHeight=1.2': { mm: 0, note: 'a CROSSING (T5 §3a: 0.010 nearest vertex). Measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=70 x textureHeight=1.5': { mm: 0, note: 'a CROSSING (T5 §3a: 0.003 nearest vertex). Measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=85 x textureHeight=0.4': { mm: 0, note: 'the blade inside the stem at 85 deg whatever the height — `leafangle-x-stem @ leafAngle=85` textured. Measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=85 x textureHeight=0.8': { mm: 0, note: 'measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=85 x textureHeight=1.2': { mm: 0, note: 'measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=85 x textureHeight=1.5': { mm: 0, note: 'measured 2026-10-25.' },
   /* leafarch-x-angle (leaf/stem build S2): the arch's own grid. Four cells are
      the 85 deg column, which the angle reaches alone; ONE is the product. */
   'leafarch-x-angle @ leafArch=0 x leafAngle=85': { mm: 0, note: 'a SINGLE-axis cell — the 85 deg blade reaches the stem with no arch at all (`leafangle-x-stem @ leafAngle=85` declares the same state). Measured on the S2 tree.' },
@@ -1419,9 +1458,9 @@ export const COMBINATION_XFAIL = Object.freeze({
      own two failing angles re-read three times each. They are declared
      because CG2 declares every cell under the bar and an undeclared one
      is a red; what they are worth is the inertness record above them. */
-  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.26': { mm: 0.540, note: "a SINGLE-axis cell, and the same state `leafangle-x-stem @ leafAngle=70 x stemDiameter=6` declares at the same figure. Measured 2026-09-19 on c29a8b5 at 0.824; RE-RECORDED 0.821 by S2 (the bead at the base margin). RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade's base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6." },
-  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.6': { mm: 0.540, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the cell above it; the teeth do not reach this measure. RE-RECORDED 0.824 -> 0.821 by S2. RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade\'s base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6.' },
-  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=1': { mm: 0.540, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the two cells above it. RE-RECORDED 0.824 -> 0.821 by S2. RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade\'s base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6.' },
+  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.26': { mm: 0.544, note: "a SINGLE-axis cell, and the same state `leafangle-x-stem @ leafAngle=70 x stemDiameter=6` declares at the same figure. Measured 2026-09-19 on c29a8b5 at 0.824; RE-RECORDED 0.821 by S2 (the bead at the base margin). RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade's base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.540 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
+  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.6': { mm: 0.544, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the cell above it; the teeth do not reach this measure. RE-RECORDED 0.824 -> 0.821 by S2. RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade\'s base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.540 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf\'s azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md.' },
+  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=1': { mm: 0.544, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the two cells above it. RE-RECORDED 0.824 -> 0.821 by S2. RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade\'s base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.540 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf\'s azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md.' },
   'leafangle-x-tooth @ leafAngle=85 x leafToothDepth=0.26': { mm: 0, note: 'a SINGLE-axis cell: the blade reaches the stem surface at 85 deg whatever the teeth do. Measured 2026-09-19 on c29a8b5.' },
   'leafangle-x-tooth @ leafAngle=85 x leafToothDepth=0.6': { mm: 0, note: 'measured 2026-09-19 on c29a8b5.' },
   'leafangle-x-tooth @ leafAngle=85 x leafToothDepth=1': { mm: 0, note: 'measured 2026-09-19 on c29a8b5.' },
@@ -1610,9 +1649,9 @@ export const COMBINATION_XFAIL = Object.freeze({
   "gradient-x-curl @ petalCupGradient=0.6 x petalSpineCurl=360": { mm: 0.691, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.123 mm (clear) while `measureWall` dropped the foot rows, now 0.691 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "gradient-x-curl @ petalCupGradient=0.9 x petalSpineCurl=360": { mm: 0.695, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.058 mm (clear) while `measureWall` dropped the foot rows, now 0.695 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "curl-x-twist @ petalSpineCurl=360 x petalTwist=0": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT. TRUE CAUSE (Eva's ruling, Oct 6): petalSpineCurl 360 ALONE reaches this — every other axis of this cell is at its default, so it is not this pair's or triple's hazard. The single-control guard is SELF_XFAIL['curl-max'] in tools/bloom-wall-thickness.mjs; this entry stays because the number appears here and removing it would redden CG2." },
-  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=34": { mm: 0.4071, note: "S4c re-record, WORSE by 0.0447 mm: the shipped sinus roundness 0.12 widens the first sinus, which sits near the blade base the stem approaches (S4b: 0.6991 at roundness 0, which still reads 0.699 — `lobedround-x-sinus`'s own grid at 70 degrees). leafAngle 70 ALONE reaches this class (the SIMPLE leaf's own `leafangle-x-stem`). Measured on this tree, Node 22, EXPORT. RE-RECORDED 0.6544 -> 0.4071 by ROOT SUPPORT (Oct 21): the 46 mm lobed leaf takes the root law at its own length (x1.318, a 1.58 mm root), and the near point to the stem moves to the thickened base, where no lobed control reaches (lobedWidth is now bit-identically inert here, declared in COMBINATION_INERT). docs/bloom-root-support-outcome.md §6." },
-  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=10": { mm: 0.4071, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT. RE-RECORDED 0.5865 -> 0.4071 by ROOT SUPPORT (Oct 21): the 46 mm lobed leaf takes the root law at its own length (x1.318, a 1.58 mm root), and the near point to the stem moves to the thickened base, where no lobed control reaches (lobedWidth is now bit-identically inert here, declared in COMBINATION_INERT). docs/bloom-root-support-outcome.md §6." },
-  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=40": { mm: 0.4071, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT. RE-RECORDED 0.6991 -> 0.4071 by ROOT SUPPORT (Oct 21): the 46 mm lobed leaf takes the root law at its own length (x1.318, a 1.58 mm root), and the near point to the stem moves to the thickened base, where no lobed control reaches (lobedWidth is now bit-identically inert here, declared in COMBINATION_INERT). docs/bloom-root-support-outcome.md §6." },
+  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=34": { mm: 0.411, note: "S4c re-record, WORSE by 0.0447 mm: the shipped sinus roundness 0.12 widens the first sinus, which sits near the blade base the stem approaches (S4b: 0.6991 at roundness 0, which still reads 0.699 — `lobedround-x-sinus`'s own grid at 70 degrees). leafAngle 70 ALONE reaches this class (the SIMPLE leaf's own `leafangle-x-stem`). Measured on this tree, Node 22, EXPORT. RE-RECORDED 0.6544 -> 0.4071 by ROOT SUPPORT (Oct 21): the 46 mm lobed leaf takes the root law at its own length (x1.318, a 1.58 mm root), and the near point to the stem moves to the thickened base, where no lobed control reaches (lobedWidth is now bit-identically inert here, declared in COMBINATION_INERT). docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.4071 -> 0.411 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
+  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=10": { mm: 0.411, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT. RE-RECORDED 0.5865 -> 0.4071 by ROOT SUPPORT (Oct 21): the 46 mm lobed leaf takes the root law at its own length (x1.318, a 1.58 mm root), and the near point to the stem moves to the thickened base, where no lobed control reaches (lobedWidth is now bit-identically inert here, declared in COMBINATION_INERT). docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.4071 -> 0.411 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
+  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=40": { mm: 0.411, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT. RE-RECORDED 0.6991 -> 0.4071 by ROOT SUPPORT (Oct 21): the 46 mm lobed leaf takes the root law at its own length (x1.318, a 1.58 mm root), and the near point to the stem moves to the thickened base, where no lobed control reaches (lobedWidth is now bit-identically inert here, declared in COMBINATION_INERT). docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.4071 -> 0.411 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
   "lobedwidth-x-leafangle @ leafAngle=85 x lobedWidth=34": { mm: 0.0, note: "leafAngle 85 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
   "lobedwidth-x-leafangle @ leafAngle=85 x lobedWidth=10": { mm: 0.0, note: "leafAngle 85 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
   "lobedwidth-x-leafangle @ leafAngle=85 x lobedWidth=40": { mm: 0.0, note: "leafAngle 85 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
@@ -1736,6 +1775,19 @@ export const COMBINATION_INERT = Object.freeze({
     maxMoveMm: 0,
     note: "the florets' own internode floor (17.97 mm on this raceme) caps the count at five on the span the reach inset leaves, so 5 and 12 asked build one layout and the measure moves by exactly 0.000e+0 mm — measured by build 3 (ruling 1), Node 22, EXPORT.",
   },
+  /* THE LEAF-STEM INSTRUMENT (Oct 25) — on the EMITTED stem the second control
+     of the tier-1 leaf pair is inert, and that is the artefact speaking: the
+     stem is an inscribed 48-gon with a VERTEX at the leaf's azimuth 0, so the
+     blade's nearest point is to that vertical edge, and a line's distance is
+     unchanged when the stem's radius and the leaf move out together. The
+     analytic cylinder curved away under the blade and moved by 0.0013 mm across
+     3 / 6 / 12 mm — the cylinder's curvature, not the stem's. Declared with the
+     number, never dropped: a stem polygon that rotates, or a leaf that stops
+     standing a fixed distance off the wall, fails CG7. */
+  'leafangle-x-stem @ stemDiameter': {
+    maxMoveMm: 0,
+    note: 'measured 2026-10-25: 3.847 / 2.574 / 0.544 / 0.000 mm at leafAngle 35 / 50 / 70 / 85 for stemDiameter 6, 3 and 12 alike (6.66e-16 mm, the emitted 48-gon\'s vertex edge at the leaf\'s azimuth). docs/bloom-leaf-stem-instrument-outcome.md',
+  },
   'leafangle-x-tooth @ leafToothDepth': {
     maxMoveMm: 0,
     note: "the teeth are cut into the leaf's MARGIN and the nearest blade point to the stem is at its BASE, so the serration moves this measure by exactly 0.000e+0 at all four angles — bit-identically, not merely under the band. The leaf's own emitted vertex stream DOES move with the tooth depth, so the control is wired and reaching the leaf; it does not reach this measure. Measured 2026-09-19 on c29a8b5.",
@@ -1777,7 +1829,97 @@ function segDist(p, a, b) {
   return Math.hypot(ap[0] - ab[0] * t, ap[1] - ab[1] * t, ap[2] - ab[2] * t);
 }
 
-/* HOW CLOSE THE LEAF BLADE COMES TO THE FREE STEM. Every leaf the plan
+/* HOW CLOSE THE LEAF BLADE COMES TO THE STEM, ON THE EMITTED ARTEFACT (the
+   leaf-stem instrument session, Oct 25 — T5's ambiguity 8, Eva's ruling 7).
+
+   WHY THE OLD MEASURE COULD NOT SEE A CONTACT AT 70 DEG, measured rather than
+   argued (`measureLeafStemAnalyticMm` below is it, kept for the must-fail):
+     (1) THE STEM WAS A SECOND PRODUCER. It read every blade vertex against
+         `freeStemDistanceMm` — the plan's ANALYTIC solid cylinder — so
+         anything the builder does to the stem's surface (T5's relief, which
+         stands up to `textureHeight` proud of that cylinder) is invisible by
+         construction: at leafAngle 70 on the gate's own base it read
+         0.5404 mm at EVERY height 0.4..1.5 while the blade and the emitted
+         wall touch from H 0.8 (0.001 mm).
+     (2) THE LEAF WAS A SECOND BUILD. Each leaf was rebuilt into a throwaway
+         accumulator OUTSIDE the bloom's build — it agrees with the emitted
+         leaf to the bit on every state measured (0 of 24,872 x 9 floats
+         differ, textured), but only because nothing in the bloom's leaf loop
+         moves a leaf after `buildLeafInto` returns. A leaf moved there (the
+         must-fail's plant: one pushed 1 mm into the stem) is not the leaf the
+         old measure looked at, so it read 0.5404 on a blade passing THROUGH
+         the wall.
+     (3) IT SAMPLED VERTICES ONLY, so a facet passing through the stem with
+         its three corners outside read positive.
+   WHAT REPLACES IT: ONE EXPORT build and its own stream. The stem is the
+   triangles the builder emitted for it (T5's lattice range when the organs
+   are textured, `[hubTriEnd, stemTriEnd)` otherwise — the builder's own
+   indices, never re-derived); the leaves are each leaf's own emitted block
+   (`leavesBuilt[*].triStart/tris`, the builder's tally). A blade vertex reads
+   its distance to the nearest STEM TRIANGLE (tools/bloom-inflo-approach.mjs's
+   `triGrid`/`nearest` — the inflorescence measures' one engine), 0 if it lies
+   INSIDE the free stem's solid (the geometry's own `freeStemDistanceMm` is 0
+   — a vertex-to-surface distance is positive inside a body), and the whole
+   reading is 0 if any blade EDGE crosses a stem triangle (`crosses`), because
+   two closed solids passing through each other leave every vertex off the
+   other's skin. Both halves are reported (`inside`, `crossing`).
+   THE RODS ARE EXCLUDED BY NAME, AS BEFORE: every vertex on a rod the leaf
+   builder reports (`rodAxes` — the petiole, a compound leaf's rachis and
+   stalks) is not a blade vertex, and an edge both of whose ends are rod
+   vertices is not tested for crossing (the petiole is rooted THROUGH the wall
+   by design; ST9's remedy — name the rod, never widen the region).
+   NAMES ITS SAMPLING (the durable mode-and-sampling rule): EXPORT mode, every
+   distinct emitted blade VERTEX against every emitted stem TRIANGLE, plus every
+   blade edge against every stem triangle for the crossing; searched out to
+   `SEARCH_CAP_MM` (a reading past it is reported AT the cap — the bar is 1 mm).
+   The stem's emitted polygon is INSCRIBED in the analytic cylinder, so an
+   untextured cell reads a hair FARTHER than the old measure (0.5440 against
+   0.5404 at 70 deg) — the artefact, not the plan.
+   A `--root` tree whose builder predates the per-leaf tally falls back to the
+   old measure and says so (`fallback`). */
+export function measureLeafStemApproachMm(G, state, exportMode) {
+  const acc = new G.MeshBuilder({ exportMode });
+  const m = G.buildBloomInto(acc, state);
+  if (!m.stem || !m.stem.present) return { mm: Infinity, why: 'no stem is built, so there is nothing for a blade to approach' };
+  if (!m.leaf || !m.leaf.present) return { mm: Infinity, why: 'no leaf is built' };
+  const LB = (m.leavesBuilt || []).filter((lb) => lb && lb.triStart >= 0 && lb.tris > 0);
+  if (!LB.length || !Number.isFinite(m.hubTriEnd) || !Number.isFinite(m.stemTriEnd)) return { ...measureLeafStemAnalyticMm(G, state, exportMode), fallback: 'the builder reports no per-leaf triangle block — the analytic measure' };
+  const P = acc.positions;
+  const organStem = m.texture && m.texture.organs && m.texture.organs.stem && m.texture.organs.stem.organ ? m.texture.organs.stem.organ.triRange : null;
+  const stemRange = organStem || [m.hubTriEnd, m.stemTriEnd];
+  const grid = triGrid(P, [{ lo: stemRange[0] * 9, hi: stemRange[1] * 9, owner: 'stem' }]);
+  let best = INFLO_SEARCH_CAP_MM, at = null, verts = 0, inside = false, crossing = false;
+  for (const lb of LB) {
+    const axes = (Array.isArray(lb.rodAxes) ? lb.rodAxes : [lb.petioleAxis]).filter(Boolean);
+    const onRod = (p) => axes.some((ax) => (G.rodAxisExcessMm ? G.rodAxisExcessMm(ax, p[0], p[1], p[2]) : segDist(p, ax.inner, ax.outer) - ax.radiusMm) <= ax.radiusMm * 1e-6);
+    const lo = lb.triStart * 9, hi = (lb.triStart + lb.tris) * 9;
+    const where = { node: lb.nodeIndex };
+    const seen = new Set();
+    for (let j = lo; j < hi; j += 3) {
+      const sk = `${P[j]},${P[j + 1]},${P[j + 2]}`;
+      if (seen.has(sk)) continue;
+      seen.add(sk);
+      const p = [P[j], P[j + 1], P[j + 2]];
+      if (onRod(p)) continue;
+      verts++;
+      if (G.freeStemDistanceMm(m.stem, p[0], p[1], p[2]) === 0) { if (best > 0 || !inside) { best = 0; inside = true; at = { ...where, inside: true, p: p.map((x) => Number(x.toFixed(3))) }; } continue; }
+      const d = nearest(grid, p, null, best);
+      if (d < best) { best = d; at = { ...where, p: p.map((x) => Number(x.toFixed(3))) }; }
+    }
+    if (!crossing && crosses(grid, P, lo, hi, 'leaf', (q) => !onRod(q))) { crossing = true; best = 0; at = { ...where, crossing: true }; }
+  }
+  if (!verts) return { mm: Infinity, why: 'every emitted vertex is the petiole rod — there is no blade to measure' };
+  return { mm: best >= INFLO_SEARCH_CAP_MM ? INFLO_SEARCH_CAP_MM : best, at, leaves: LB.length, verts, inside, crossing, stemTris: stemRange[1] - stemRange[0], capped: best >= INFLO_SEARCH_CAP_MM };
+}
+
+
+/* RETIRED AS THE GATE'S MEASURE (the leaf-stem instrument session, Oct 25),
+   KEPT ONLY AS THE MUST-FAIL'S "old instrument": the control's leaf-stem leg
+   requires a planted contact to be RED on `measureLeafStemApproachMm` and
+   INVISIBLE here, which is what says the plant is the class this one could not
+   see. Nothing else calls it. Its own header, as it shipped:
+
+   HOW CLOSE THE LEAF BLADE COMES TO THE FREE STEM. Every leaf the plan
    places is rebuilt into a throwaway accumulator through the SHIPPED
    `buildLeafInto` — `petalFreeStemApproachMm`'s own construction, for its
    own reason: a second producer of the blade would agree with a broken
@@ -1789,7 +1931,7 @@ function segDist(p, a, b) {
    outcome doc measured too. A chord between two cleared vertices can dip
    nearer than either by at most the mesh's own chord scale; that is a
    sub-mesh effect and it is reported rather than absorbed into the bar. */
-export function measureLeafStemApproachMm(G, state, exportMode) {
+export function measureLeafStemAnalyticMm(G, state, exportMode) {
   const acc = new G.MeshBuilder({ exportMode });
   const m = G.buildBloomInto(acc, state);
   if (!m.stem || !m.stem.present) return { mm: Infinity, why: 'no stem is built, so there is nothing for a blade to approach' };
@@ -2648,6 +2790,49 @@ async function control({ root = HERE } = {}) {
     for (const f of other) console.log(`         collateral: ${f.slice(0, 140)}`);
     if (!ok) console.error(`         MISSED: ${want} stayed green under a plant that names it — that clause is not measuring the tree`);
     if (!plant.only) last = plant;
+  }
+
+  /* THE LEAF PUSHED INTO THE STEM (the leaf-stem instrument session, Oct 25 —
+     Eva's ruling 7: plant it, see it RED on the new measure and INVISIBLE on the
+     old one). A COPY of the geometry whose bloom build moves every leaf it has
+     just emitted 1 mm toward the stem's axis (its rods' recorded axes with it,
+     so the rods stay named) — the class the old measure could not see, because
+     it measured a leaf rebuilt OUTSIDE the bloom against a cylinder and never
+     the leaf the bloom emitted. The copy sits beside bloom-geometry.js (it
+     imports ./bloom-curve.js) and is removed in a finally. */
+  {
+    const ST = { stemLength: 70, leafLength: 52, leafWidth: 17, leafNodes: 3, stemDiameter: 6, leafAngle: 70 };
+    const from = 'const lb = buildLeafInto(acc, leafPlanned, state, i, az, capability); lb.nodeIndex = i; leavesBuilt.push(lb);';
+    const to = 'const lb = buildLeafInto(acc, leafPlanned, state, i, az, capability); lb.nodeIndex = i; leavesBuilt.push(lb); { const cx = Math.cos(az), cy = Math.sin(az), P = acc.positions; for (let t = lb.triStart * 9; t < (lb.triStart + lb.tris) * 9; t += 3) { P[t] -= cx; P[t + 1] -= cy; } const mv = (q) => { if (q) { q[0] -= cx; q[1] -= cy; } }; for (const ax of lb.rodAxes || []) { mv(ax.inner); mv(ax.outer); mv(ax.bladeBase); } }';
+    const src = fs.readFileSync(path.join(root, 'bloom-geometry.js'), 'utf8');
+    const n = src.split(from).length - 1;
+    if (n !== 1) { console.error(`REFUSED (the leaf plant's anchor matches ${n} times in bloom-geometry.js, never exactly once — re-anchor it).`); return 2; }
+    const tmp = path.join(root, `.bloom-geometry.leafplant.${process.pid}.js`);
+    let ok = false, line = '';
+    try {
+      fs.writeFileSync(tmp, src.replace(from, to));
+      const { G: G0, R: R0 } = await loadTree(root);
+      const Gp = await import(pathToFileURL(tmp).href);
+      const state = { ...R0.DEFAULTS, ...ST };
+      const cleanNew = measureLeafStemApproachMm(G0, state, true), cleanOld = measureLeafStemAnalyticMm(G0, state, true);
+      const plantNew = measureLeafStemApproachMm(Gp, state, true), plantOld = measureLeafStemAnalyticMm(Gp, state, true);
+      /* THE WITNESS, on the MUTATED module and not on the measure under test:
+         its own bloom build emitted a leaf that is not the clean one. */
+      const a0 = new G0.MeshBuilder({ exportMode: true }), b0 = G0.buildBloomInto(a0, state);
+      const a1 = new Gp.MeshBuilder({ exportMode: true }), b1 = Gp.buildBloomInto(a1, state);
+      const L = b0.leavesBuilt[0];
+      let moved = 0;
+      for (let t = L.triStart * 9; t < (L.triStart + L.tris) * 9; t++) moved = Math.max(moved, Math.abs(a1.positions[t] - a0.positions[t]));
+      const barMm = G0.MIN_FEATURE_MM;
+      const newRed = plantNew.mm < barMm && (plantNew.crossing || plantNew.inside) && cleanNew.mm > 0 && !cleanNew.crossing && !cleanNew.inside;
+      const oldBlind = plantOld.mm === cleanOld.mm;
+      ok = moved > 0.99 && newRed && oldBlind && b1.leavesBuilt.length === b0.leavesBuilt.length;
+      line = `witness: the planted bloom's leaf moved ${moved.toFixed(3)} mm · NEW measure clean ${cleanNew.mm.toFixed(4)} mm -> planted ${plantNew.mm.toFixed(4)} mm (crossing ${plantNew.crossing}, inside ${plantNew.inside}) · OLD measure clean ${cleanOld.mm.toFixed(4)} -> planted ${plantOld.mm.toFixed(4)} mm (${oldBlind ? 'INVISIBLE — the same double' : 'it moved'})`;
+    } finally { try { fs.unlinkSync(tmp); } catch {} }
+    if (!ok) bad++;
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${'leaf-stem: a leaf pushed 1 mm into the stem at 70 deg'.padEnd(62)} RED on the emitted measure, invisible on the analytic one`);
+    console.log(`         ${line}`);
+    if (!ok) console.error('         MISSED: the planted contact was not RED on the emitted measure, or the old measure saw it (then the plant is not the class this instrument was built for)');
   }
 
   /* THE RED, THROUGH THE GATE'S OWN PRINTER. Everything above reads the

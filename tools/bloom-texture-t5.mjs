@@ -4,11 +4,13 @@
    docs/bloom-surface-texture-t5-outcome.md). Every figure the outcome doc
    quotes comes out of this tool, each AS A FUNCTION OF THE HEIGHT where it
    can be, so it carries over to BONE (Q12):
-     (A) LEAF TO STEM — the combination gate's own measure (`leaf-stem`: every
-         leaf BLADE vertex against the free stem as a solid cylinder, the rods
-         named and excluded) on the textured leaf, and the EMITTED measure the
-         gate cannot take (every blade vertex against the stem's own relieved
-         triangles), at leafAngle 35 and 70 on the gate's own base state.
+     (A) LEAF TO STEM — the RETIRED analytic measure (every leaf BLADE vertex
+         against the free stem as a solid cylinder, the rods named and
+         excluded; `measureLeafStemAnalyticMm`), the combination gate's own
+         `leaf-stem` measure as it now ships (the EMITTED stem, vertices plus
+         crossings — the leaf-stem instrument session, Oct 25), and T5's own
+         vertex-only emitted figure, at leafAngle 35 and 70 on the gate's own
+         base state.
      (B) PETAL / SEPAL TO HUB — per VISIBLE hub vertex of the lattice, the
          distance to the nearest petal (and sepal) triangle with nothing
          relieved (the organs latticed, the relief withheld, the petals pinned
@@ -43,6 +45,7 @@ for (const angle of [35, 70]) {
   const row = [];
   for (const H of [0, ...HEIGHTS]) {
     const st = { ...LEAF_BASE, leafAngle: angle, ...(H ? { petalTexture: 'PEBBLE', textureHeight: H } : {}) };
+    const old = C.measureLeafStemAnalyticMm(G, st, true).mm;
     const gate = C.measureLeafStemApproachMm(G, st, true).mm;
     /* the emitted measure: every blade vertex of the whole build against the
        stem's own emitted (relieved) triangles */
@@ -59,7 +62,7 @@ for (const angle of [35, 70]) {
         best = nearest(grid, p, null, best);
       }
     }
-    row.push(`${H ? `H ${H.toFixed(1)}` : 'untextured'}: gate ${fmt(gate)} / emitted ${fmt(best)}`);
+    row.push(`${H ? `H ${H.toFixed(1)}` : 'untextured'}: analytic ${fmt(old)} / gate ${fmt(gate)} / emitted vertices ${fmt(best)}`);
   }
   console.log(`  leafAngle ${angle}: ${row.join(' · ')}`);
 }
