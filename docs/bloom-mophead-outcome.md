@@ -306,4 +306,36 @@ built compound umbel.
   (the dome's florets still fuse, 0.0000 mm).
 
 ### 12d. Bytes and the phase
-*Filled in at close — see the PR.*
+
+**Byte partition: 15 movers / 1,573 holders, 0 floats on any holder**, both modes, positionally
+under `Object.is`, from the BASE tree's own record.
+- **Command:** `node tools/verify-bloom-defaults-bytes.mjs --base <worktree of 6697558> --mover
+  depth2 --redefined '^MOPHEAD: '`, run in 12 shards plus block 81 and closed with `--merge`.
+- **Size:** 2,264,510,268 export floats and 223,991,200 captured-grid values.
+- **The predicate is the ruling's own:** a row moves iff the base BUILDS depth 2 (its
+  `inflorescence` record: present, compound) on a row whose base set leaves at least one overlay id
+  unnamed — "builds depth 2 off the defaults".
+- **Who moves and who holds:** every predeclared mover moved and every holder held. The 15 are
+  block 81's depth-2 rows that left an overlay value unnamed. THE MOPHEAD and the 15 cm dome named
+  every value and hold, and so do the three GATED rows, which build no depth 2.
+- **Pairing:** the 17 redefined rows pair by index (each tree builds its own row) and are listed by
+  name.
+- **The control fired:** a 1e-9 move of the default row's stream is reported.
+- **The other 1,568 rows** carry deep-equal states on both trees: `bloom-geometry.js` is
+  sha-identical to `main` and `DEFAULTS` deep-equal.
+
+**The tool owed two fixes to run at all.** It predated the role retirement, threw on the first
+`@scopes` row, and built scoped rows without their scopes. It now skips the reserved entry and
+hands each tree's build `rowScopesForBuild(row)`. It also gained `--mover depth2` and
+`--redefined <regex>`.
+
+**Frozen tags:** every frozen baseline's bytes still reproduce. The geometry is unchanged and the
+registry's `DEFAULTS` are deep-equal; the overlay is read only by a hand switch on the page and by
+block 81's live rows. A frozen row is data, so no frozen row's state or code moved.
+
+**`frozen/phase88` IS owed**, because the row set changed: block 81's 17 rows are redefined in place,
+14 of them relabelled.
+- It is the 1,588 rows at `6697558`, registered in both maps and proved deep-equal
+  (`--verify-frozen --phase88`).
+- No workflow file is edited, so it is expected to publish when `bloom-frozen-tags` is dispatched
+  after the merge.
