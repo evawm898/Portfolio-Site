@@ -150,7 +150,7 @@ definition reads the two as one shell: **208 pairs, worst span 0.5896 mm**, iden
 builder's doubles and in the browser. Attributed by EMITTER (the ray blocks and, inside each, the
 sub-umbel's floret / sub-boss / ray-stem ranges): every pair is two different parts, 0 within one
 part. Declared in `SELF_INTERSECTION_XFAIL` by value; at every other angle in the matrix the
-census reads 0.
+census reads 0. **[Oct 25: the entry is REMOVED — under depth 2's ruled defaults (§12) the row reads 0 within-shell pairs in the browser; the smaller round florets no longer reach the neighbouring rod.]**
 
 ## 9. Gates
 
@@ -299,6 +299,11 @@ built compound umbel.
     overlay value; it keeps Florets 3 and tells both; the switch back restores every registry
     default.
   - The route count does not move.
+
+- **Census:** block 81 through the export gate in the browser: 20 of 20 watertight, live = export
+  triangle counts on every row. **`MOPHEAD: rays at 90 deg`'s weld (208 / 0.5896) reads 0** — its
+  `SELF_INTERSECTION_XFAIL` entry is removed. Every `INFLO_APPROACH_XFAIL` value still reproduces
+  (the dome's florets still fuse, 0.0000 mm).
 
 ### 12d. Bytes and the phase
 *Filled in at close — see the PR.*
