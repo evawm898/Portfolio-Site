@@ -328,6 +328,20 @@ const PREDICATE_MOVERS = {
     const b = base.buildBloomInto(acc, { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
     return !!((b.hubBuilt && !b.hubBuilt.absent) || (b.stem && b.stem.present) || (b.tube && b.tube.rings && b.tube.rings.length) || (b.inflorescence && b.inflorescence.present));
   },
+  /* THE T5 RULINGS (Eva, Oct 25): coverage (the hub top under the feet smooth),
+     the derived fade width and the floret hubs in the world frame all act on
+     RELIEVED organ vertices and on nothing else. A row moves iff it is
+     textured (texture on, infill off) AND the BASE tree's own build relieved
+     some organ vertex (an organ record with `displaced > 0`) — read off the
+     base builder's record, never this tree's (the quantity under test). Every
+     untextured row holds by branch; the shipping default is untextured. */
+  't5-rulings': (st, row) => {
+    if (String(st.petalTexture ?? 'NONE') === 'NONE' || String(st.petalInfill ?? 'NONE') !== 'NONE') return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
+    const O = (b.texture && b.texture.organs) || {};
+    return ['hub', 'stem', 'tube'].some((k) => O[k] && O[k].displaced > 0) || !!(b.inflorescence && b.inflorescence.present);
+  },
   /* RULING 6 — NODES DECOUPLED FROM LEAVES (stem session 2). A row moves iff
      it asks for nodes on a BARE stem: a stem, a prominence away from 0, no
      raceme, and no leaves. Written from the CONTROLS — the ruling's own

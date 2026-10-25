@@ -373,7 +373,8 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     /* THE ORGANS' LATTICE (texture T5): the hub and the stem re-emitted here
        are the SHIPPED parts; the whole build refined each on its own lattice,
        and the record says by how many triangles — counted in, never hidden */
-    const t5Extra = Object.values((builtFull.texture && builtFull.texture.organs) || {}).reduce((n, r) => n + (r.organ ? r.organ.refinedTris - r.organ.shippedTris : 0), 0);
+    /* a FLORET's organs ('floret hub', ruling 5) are relieved in the parent's pass and recorded there, but their lattice is emitted inside the floret build the inflorescence appends, which the centre-only capture already counts */
+    const t5Extra = Object.entries((builtFull.texture && builtFull.texture.organs) || {}).reduce((n, [k, r]) => n + (r.organ && !k.startsWith('floret ') ? r.organ.refinedTris - r.organ.shippedTris : 0), 0);
     if (petalTris + accHC.triangleCount + accST.triangleCount + t5Extra !== accFull.triangleCount) {
       bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) + the organs' lattice (${t5Extra}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount + t5Extra}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
     }

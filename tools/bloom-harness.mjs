@@ -6098,6 +6098,40 @@ function txEscapesRestated(G, o, d) {
     idx[k] += st[k]; if (idx[k] < 0 || idx[k] >= n[k]) return true; tMax[k] += tD[k];
   }
 }
+function txSegmentHitsRestated(G, o, d, tStop, skip) {
+  const { pos, lo, h, n, cells, mark } = G, id = ++G.id;
+  const idx = [0, 1, 2].map((k) => Math.floor((o[k] - lo[k]) / h));
+  if (idx.some((v, k) => v < 0 || v >= n[k])) return false;
+  const st = d.map((x) => (x > 0 ? 1 : -1)), tMax = [], tD = [];
+  for (let k = 0; k < 3; k++) { if (d[k] === 0) { tMax.push(Infinity); tD.push(Infinity); } else { tMax.push((lo[k] + (idx[k] + (d[k] > 0 ? 1 : 0)) * h - o[k]) / d[k]); tD.push(h / Math.abs(d[k])); } }
+  for (;;) {
+    const l = cells.get((idx[2] * n[1] + idx[1]) * n[0] + idx[0]);
+    if (l) for (const t of l) {
+      if (mark[t] === id) continue; mark[t] = id;
+      if (skip(t)) continue;
+      const b = t * 9, A = [pos[b], pos[b + 1], pos[b + 2]];
+      const e1 = [pos[b + 3] - A[0], pos[b + 4] - A[1], pos[b + 5] - A[2]], e2 = [pos[b + 6] - A[0], pos[b + 7] - A[1], pos[b + 8] - A[2]];
+      const p = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]];
+      const det = e1[0] * p[0] + e1[1] * p[1] + e1[2] * p[2]; if (det === 0) continue;
+      const inv = 1 / det;
+      const sv = [o[0] - A[0], o[1] - A[1], o[2] - A[2]], u = (sv[0] * p[0] + sv[1] * p[1] + sv[2] * p[2]) * inv; if (u < -1e-9 || u > 1 + 1e-9) continue;
+      const q = [sv[1] * e1[2] - sv[2] * e1[1], sv[2] * e1[0] - sv[0] * e1[2], sv[0] * e1[1] - sv[1] * e1[0]];
+      const v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) * inv; if (v < -1e-9 || u + v > 1 + 1e-9) continue;
+      const tt = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) * inv;
+      if (tt >= 0 && tt <= tStop) return true;
+    }
+    const k = tMax[0] < tMax[1] ? (tMax[0] < tMax[2] ? 0 : 2) : (tMax[1] < tMax[2] ? 1 : 2);
+    if (tMax[k] > tStop) return false;
+    idx[k] += st[k]; if (idx[k] < 0 || idx[k] >= n[k]) return false; tMax[k] += tD[k];
+  }
+}
+/* TX13's restatement of the fade width (Eva's ruling 2, Oct 25): the quintic
+   ease's own peak slope, from its derivative 30 t^2 (1 - t)^2 at t = 1/2 — an
+   owner the builder's numerical read of `rimEase` does not share — times the
+   height, never shorter than one lattice edge */
+const TX_EASE = (t) => { const x = t <= 0 ? 0 : t >= 1 ? 1 : t; return x * x * x * (x * (x * 6 - 15) + 10); };
+const TX_EASE_PEAK = 30 * 0.25 * 0.25;
+export function txFadeWidthRestated(H, edgeMm) { return Math.max(H * TX_EASE_PEAK, edgeMm); }
 export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, recU, twinAcc, C, edgeMm, pageMesh = null) {
   const bad = [];
   const want = [];
@@ -6196,6 +6230,21 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
       if (!(dot >= 0.5)) { bad.push(`TX10: ${name}: the relief's normal at ${q.p0.map((x) => x.toFixed(4)).join(',')} is ${Math.acos(Math.max(-1, Math.min(1, dot))) * 180 / Math.PI | 0} degrees off the outward facet normal the undisplaced lattice carries there — the organ is relieved INWARD or off its own surface`); break; }
     }
     if (o.displaced > 0 && !nSamp) bad.push(`TX10: ${name}: displaced vertices and no sample reached the record`);
+    /* TX13 — THE FADE IS DERIVED (Eva's ruling 2): the record's width is the
+       restated law of the CONTROL's height and the edge in force, and every
+       relieved sample's weight is the restated ease of its own fade distance
+       over that width */
+    {
+      const lam = txFadeWidthRestated(Number(ui.textureHeight), edgeMm);
+      if (!(Math.abs(O.fadeMm - lam) <= 1e-9)) bad.push(`TX13: ${name}: the fade is ${O.fadeMm} mm where max(H x 15/8, e) = max(${ui.textureHeight} x 1.875, ${edgeMm}) = ${lam} mm — the fade width is not the derived one`);
+      let off = 0, firstOff = null;
+      for (const q of o.skinSamples || []) {
+        if (!Number.isFinite(q.fadeDistMm)) continue;
+        const want = q.fadeDistMm >= lam ? 1 : TX_EASE(q.fadeDistMm / lam);
+        if (!(Math.abs(q.g - want) <= 1e-9)) { off++; if (!firstOff) firstOff = q; }
+      }
+      if (off) bad.push(`TX13: ${name}: ${off} relieved sample(s) carry a fade weight that is not the ease of their own fade distance over ${lam} mm (first: distance ${firstOff.fadeDistMm} mm, weight ${firstOff.g})`);
+    }
     /* TX11 — a vertex is DEEPLY ENCLOSED when no ray escapes from just
        outside it AND the same holds for its whole one-ring on the lattice:
        the knife edge where a covering part's own edge crosses the organ (a
@@ -6215,12 +6264,28 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
       }
       for (let c = 0; c < 3; c++) { ring[ids[c]].add(ids[(c + 1) % 3]); ring[ids[c]].add(ids[(c + 2) % 3]); }
     }
-    const enc = new Uint8Array(Pv.length), clr = new Uint8Array(Pv.length);
+    const enc = new Uint8Array(Pv.length), clr = new Uint8Array(Pv.length), cov = new Uint8Array(Pv.length);
+    /* TX12's restatement (Eva's ruling 1, Oct 25): a vertex is COVERED when the
+       segment its relief would occupy — just inside the surface out to the full
+       height H along its own facet normal — meets a triangle a PETAL emitted
+       (the feet on the hub's top; the ruling names the feet and nothing else,
+       so only the hub can be covered). The petals are read off the PETAL
+       BUILDER's own per-petal ranges (`petalsAll[*].triRange`), an owner the
+       organ record's `cover` does not share; the harness's own segment test,
+       its own grid, the relief-withheld mesh; the height from the CONTROL,
+       never the builder's record. */
+    const Hc = Number(ui.textureHeight);
+    const feet = name === 'hub' ? (recOff.petalsAll || []).filter((p) => p && p.triRange).map((p) => p.triRange) : [];
+    const inOrgan = (t) => !feet.some(([x, y]) => t >= x && t < y);
+    for (let i = 0; i < Pv.length; i++) {
+      const p0 = Pv[i], fn = Fn[i];
+      if (fn && feet.length) cov[i] = txSegmentHitsRestated(G, [p0[0] - fn[0] * 1e-4, p0[1] - fn[1] * 1e-4, p0[2] - fn[2] * 1e-4], fn, Hc + 1e-4, inOrgan) ? 1 : 0;
+    }
     for (let i = 0; i < Pv.length; i++) {
       const p0 = Pv[i], fn = Fn[i];
       const o0 = fn ? [p0[0] + fn[0] * 1e-4, p0[1] + fn[1] * 1e-4, p0[2] + fn[2] * 1e-4] : p0;
       const alongN = fn ? txEscapesRestated(G, o0, fn) : false;
-      clr[i] = alongN ? 1 : 0;
+      clr[i] = alongN && !cov[i] ? 1 : 0;
       /* the builder's own declared directions (a DECLARATION, imported as ST3
          imports Eva's wall) and this gate's 26 besides, in every direction —
          a superset, so enclosed here is enclosed for the builder too */
@@ -6235,9 +6300,50 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
       deep++;
       if (Mv[i]) { movedEnclosed++; if (!firstBad) firstBad = Pv[i]; }
     }
+    /* TX12 — COVERED STAYS SMOOTH: a vertex covered by the restatement whose
+       whole one-ring is covered too (a knife edge where a foot's margin crosses
+       the organ is not a claim either way) must not move */
+    let movedCovered = 0, deepCovered = 0, firstCov = null;
+    for (let i = 0; i < Pv.length; i++) {
+      if (!cov[i] || ![...ring[i]].every((j) => cov[j])) continue;
+      deepCovered++;
+      if (Mv[i]) { movedCovered++; if (!firstCov) firstCov = Pv[i]; }
+    }
+    if (movedCovered) bad.push(`TX12: ${name}: ${movedCovered} of ${deepCovered} vertices COVERED by another part (its face within the relief's own height H = ${Hc} mm along the vertex's normal, every neighbour covered too) were relieved (first at ${firstCov.map((x) => x.toFixed(4)).join(',')}): the surface under a petal's foot is not a visible surface (Eva's ruling 1)`);
+    if (name !== 'hub' && O.covered > 0) bad.push(`TX12: ${name}: the record declares ${O.covered} vertices covered — ruling 1 covers the hub's top under the petal FEET and no other contact (the ${name} keeps the T5 rule)`);
+    if (deepCovered > 0 && !(O.covered > 0)) bad.push(`TX12: ${name}: ${deepCovered} vertices are deeply covered by another part and the record declares none covered`);
     if (movedEnclosed) bad.push(`TX11: ${name}: ${movedEnclosed} of ${moved} moved vertices are DEEPLY ENCLOSED — no ray from just outside them or any neighbour escapes the bloom (first at ${firstBad.map((x) => x.toFixed(4)).join(',')}): a BURIED face is textured (Q7)`);
     if (clear > 100 && clearMoved < 0.5 * clear) bad.push(`TX11: ${name}: ${clear} vertices see the open air along their own normal and only ${clearMoved} were relieved — the relief stopped short of the visible surface`);
     if (deep > 0 && !(O.buried + (O.vertices - O.relievable) > 0)) bad.push(`TX11: ${name}: ${enclosed} enclosed vertices and the record declares none buried`);
+  }
+  /* TX14 — FLORET HUBS IN THE WORLD FRAME (Eva's ruling 5, Oct 25): one shared
+     layer, so no two florets carry the same copy of the pattern. Read off the
+     EMITTED stream: every pair of florets built from ONE unit (the builder's own
+     `unit` index, the same triangles) is brought back into the floret's frame
+     through the inverse of each placement's own rigid matrix, and the two must
+     DIFFER somewhere (a relieved hub sampling the one field at two places); a
+     floret relieved in its own frame is one copy laid N times and reads
+     identical to the float's last bits. The relief-withheld rebuild is the
+     control: there the same pair is identical (only the relief can part them),
+     so the difference is the relief's and not a placement's. */
+  {
+    const B = recT.inflorescenceBuilt, Boff = recOff.inflorescenceBuilt;
+    const fh = organs['floret hub'];
+    if (B && B.placed && B.placed.length > 1) {
+      if (!fh || !fh.organ) bad.push(`TX14: ${B.placed.length} florets are built on a textured bloom and the build carries no 'floret hub' relief record — the florets' hubs are not relieved in the world frame`);
+      const local = (P, q, k) => { const M = q.M, x = P[q.at + k] - M[3], y = P[q.at + k + 1] - M[7], z = P[q.at + k + 2] - M[11]; return [M[0] * x + M[4] * y + M[8] * z, M[1] * x + M[5] * y + M[9] * z, M[2] * x + M[6] * y + M[10] * z]; };
+      const diff = (P, a, b) => { let d = 0; for (let k = 0; k < a.tris * 9; k += 3) { const p = local(P, a, k), q = local(P, b, k); d = Math.max(d, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2])); } return d; };
+      let pairs = 0, same = 0, worstOff = 0;
+      for (let i = 0; i < B.placed.length; i++) for (let j = i + 1; j < B.placed.length; j++) {
+        const a = B.placed[i], b = B.placed[j];
+        if (a.unit !== b.unit || a.tris !== b.tris) continue;
+        pairs++;
+        if (diff(accT.positions, a, b) <= 1e-6) same++;
+        if (Boff && Boff.placed[i] && Boff.placed[j]) worstOff = Math.max(worstOff, diff(accOff.positions, Boff.placed[i], Boff.placed[j]));
+      }
+      if (same) bad.push(`TX14: ${same} of ${pairs} pairs of florets built from one unit are IDENTICAL in their own frame — one copy of the pattern laid N times, not one world layer (Eva's ruling 5)`);
+      if (pairs && !(worstOff <= 1e-6)) bad.push(`TX14: the relief-withheld rebuild already parts two florets of one unit by ${worstOff} mm — the control is not a control`);
+    }
   }
   return bad;
 }
@@ -15380,7 +15486,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      approaches itself) is a ruling, not a constant. */
   'TEXTURE: CELLULAR x a COMPOUND leaf (every leaflet in the one field)': { pairs: 59, worstMm: 0.1963, note: 'the CELLULAR relief at the leaflets\' free base beads (T3, Oct 22; the lattice alone and the untextured leaf read 0)' },
   'TEXTURE T5: CELLULAR x the hemisphere (headRise 1) x a stem': { pairs: 352, worstMm: 0.3349, note: 'NOT T5\'s: the CELLULAR relief folding each PETAL on a hemisphere head, 44 pairs a petal, every pair petal-against-the-same-petal (attributed by emitter range); the identical state reads 352 on b3163de, where no organ is relieved (T5, Oct 23)' },
-  'TEXTURE T5: CELLULAR x a 60 mm stem x textureHeight max (1.5 on the organs)': { pairs: 40, worstMm: 0.1286, note: 'T5\'s, at the 1.5 mm MAXIMUM: outward relief into the CONCAVE hub-to-stem join folds where the height passes the join\'s own radius of curvature — every pair hub-against-hub at r 7.1 mm, z -1.7; as a function of height on this state CELLULAR reads 0 / 0 / 3 / 98 / 40 pairs at 0.4 / 0.8 / 1.0 / 1.2 / 1.5 mm and PEBBLE 0 / 0 / 0 / 14 / 0 (b3163de reads 0: no organ relieved). Declared, never clamped — the max-height fold class T3 reported (T5, Oct 23)' },
+  /* REMOVED (the T5 rulings, Oct 25): 'TEXTURE T5: CELLULAR x a 60 mm stem x textureHeight max (1.5 on the organs)' was 40 / 0.1286 (the hub-to-stem join folding under relief); it reads 0 since ruling 1's coverage (2,052 hub vertices covered; the mechanism at the join is not isolated further). Attributed on the state: coverage off and the 2H fade 40 / 0.1286 (the old record), coverage off and the derived fade 64 / 0.2440, coverage on 0 at either fade. */
   'TEXTURE: PEBBLE x cup 1.2 x curl 180 (the field read in world space on a curled blade)': { pairs: 147, worstMm: 0.0918, note: 'the relief closing the cupped crown\'s own self-approach at the tips (T3, Oct 22; the lattice alone and the untextured state read 0; §18a measured 1.031 mm of clearance there, which two 0.4 mm skins close)' },
   /* ===================================================================
      REMOVED BY SPINE-CUP-FOLD (Oct 20), NINETEEN ENTRIES, ALL ONE MECHANISM:

@@ -74,6 +74,10 @@ const VIEWS = {
   stem: (f) => ({ r: 13, at: [0, 0, -25], dir: [0.25, -0.95, 0.18] }),
   join: (f) => ({ r: 10, at: [f.join.outerR + 3, 0, f.join.rootZ - f.join.depth + 2], dir: [0.15, -0.95, 0.27] }),
   tube: (f) => ({ r: f.R * 1.9, at: [0, 0, 3], dir: [0.35, -0.85, 0.4] }),
+  /* an explicit frame (the florets: each floret's own hub, one floret-local view) */
+  at: (f) => ({ r: f.r, at: f.at, dir: f.dir, up: f.up }),
+  /* the hub's underside where it meets the stem, from below (the fade) */
+  under: (f) => ({ r: 7, at: [0, 0, -1.2], dir: [0.3, -0.55, -0.78] }),
 };
 async function setPreview(on) {
   await page.evaluate((v) => { const el = document.getElementById('printPreview'); el.checked = v; el.dispatchEvent(new Event('change', { bubbles: true })); }, on);
@@ -84,7 +88,7 @@ async function setPreview(on) {
 }
 async function shoot(file, view, frame) {
   const f = VIEWS[view](frame);
-  await page.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir), f);
+  await page.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir, a.up || null), f);
   let prev = null, buf = null;
   for (let k = 0; k < 20; k++) { await page.waitForTimeout(200); buf = await page.screenshot({ clip: { x: 0, y: 0, width: 800, height: 800 } }); if (prev && buf.equals(prev)) break; prev = buf; }
   fs.writeFileSync(file, buf);
@@ -95,16 +99,20 @@ async function shoot(file, view, frame) {
   if (frac < 0.02) await die(`${path.basename(file)}: the frame is ${(frac * 100).toFixed(1)}% content — not a picture anyone should rule from`);
   return path.basename(file);
 }
-async function cell({ label, set: sets = [], view, frame = null, ruling = '', join = false }) {
+async function cell({ label, set: sets = [], view, frame = null, ruling = '', join = false, cap = null }) {
   await openBloom(page, port);
   const bad = await applyConfig(page, sets, null, { settleMs: settleMsForRow(label) });
   if (bad.length) await die(`${label}: ${bad.join('; ')}`);
+  /* a BEFORE cell (Eva's Oct 25 rulings): the old behaviour through a lever no
+     control reaches, photographed on this very tree; the TX family is NOT run
+     on it (TX12 / TX13 are the clauses the old behaviour fails) */
+  if (cap) { await page.evaluate((c) => window.__bloomCapability(c), cap); await settleBuild(page); }
   const drift = await fullStateDrift(page, sets);
   if (drift.length) await die(`${label}: state is not DEFAULTS+set: ${drift.join('; ')}`);
   const row = { label, set: sets };
   const jct = await junctionAssertions(page, row);
   if (jct.length) await die(`${label}: junction: ${jct.join('; ')}`);
-  const tx = await textureAssertions(page, row);
+  const tx = cap ? [] : await textureAssertions(page, row);
   if (tx.length) await die(`${label}: TX: ${tx.join('; ')}`);
   const buf = await exportStl(page, tmp);
   if (!buf) await die(`${label}: no STL download`);
@@ -118,11 +126,12 @@ async function cell({ label, set: sets = [], view, frame = null, ruling = '', jo
   await setPreview(true);
   const m = await page.evaluate(() => window.__bloomMetrics());
   const shot = await shoot(path.join(outDir, `${slug(label)}-${view}.png`), view, frame || own);
+  if (cap) { await page.evaluate(() => window.__bloomCapability(null)); }
   const readout = await page.evaluate(() => document.getElementById('readout').textContent);
   await setPreview(false);
   const T = m.texture;
   const organs = T ? Object.fromEntries(Object.entries(T.organs || {}).filter(([, r]) => r.organ).map(([k, r]) => [k, { ...r.organ, relief: r.reliefMaxMm, displaced: r.displaced }])) : {};
-  const rec = { label, ruling, shot, own, tag: modeTag(m), sha: sha(buf), bytes: buf.length, tris: stl.tris, organs, edge: T && T.edgeCap ? T.edgeCap.usedMm : null, join: jm, texLine: readout.split('\n').find((l) => /^TEXTURE/.test(l)) || 'no TEXTURE line (untextured)' };
+  const rec = { label, ruling, shot, own, before: !!cap, tag: modeTag(m), sha: sha(buf), bytes: buf.length, tris: stl.tris, organs, edge: T && T.edgeCap ? T.edgeCap.usedMm : null, join: jm, texLine: readout.split('\n').find((l) => /^TEXTURE/.test(l)) || 'no TEXTURE line (untextured)' };
   console.log(`  ${label.padEnd(64)} ${String(rec.tris).padStart(8)} tris · ${Object.entries(organs).map(([k, o]) => `${k} ${o.shippedTris}->${o.refinedTris} vis ${o.visible}/bur ${o.buried}`).join(' · ')}${jm ? ` · join clearance ${jm.mm.toFixed(3)} mm` : ''} · ${rec.tag}`);
   return rec;
 }
@@ -143,8 +152,42 @@ for (const [title, base, view, ruling, join] of [
   rows.push({ title, cells });
 }
 
+/* ---------- EVA'S OCT 25 RULINGS: before and after, on this tree ---------- */
+const ruled = [];
+{
+  /* ruling 1 — the hub's top under the petal feet: coverage off (the T5 build) against on */
+  const base = { petalTexture: 'PEBBLE', textureHeight: 1.5 };
+  const cells = [];
+  cells.push(await cell({ label: 'ruling 1 — the hub top, coverage OFF (as T5 shipped)', set: set(base), view: 'hub', ruling: 'the hub top textured under the feet: coincident with each foot\'s top skin, its escape ray left the union', cap: { label: 'sheet: coverage off', textureCoverageOff: true } }));
+  cells.push(await cell({ label: 'ruling 1 — the hub top, coverage ON (shipped)', set: set(base), view: 'hub', frame: cells[0].own, ruling: 'smooth wherever another part\'s face lies within the relief\'s own height along the normal (derived from the emitted feet); the exposed top stays textured' }));
+  ruled.push({ title: 'Ruling 1 — the hub top is smooth under the petal feet (PEBBLE 1.5 mm, no stem)', cells });
+}
+{
+  /* ruling 2 — the fade at the hub-to-stem junction, typed 2H against derived */
+  const H = 1.5, base = { petalTexture: 'PEBBLE', textureHeight: H, stemLength: 60 };
+  const cells = [];
+  cells.push(await cell({ label: `ruling 2 — the fade typed at 2H = ${(2 * H).toFixed(3)} mm (as T5 shipped)`, set: set(base), view: 'under', ruling: `steepest ramp the fade adds: 15/8 x H / 2H = 0.9375 (43.2 deg)`, cap: { label: 'sheet: typed fade', textureFadeWidthMm: 2 * H } }));
+  cells.push(await cell({ label: `ruling 2 — the fade derived, max(H x 15/8, e) = ${G.textureFadeWidthMm(H, 0.4).toFixed(4)} mm (shipped)`, set: set(base), view: 'under', frame: cells[0].own, ruling: `steepest ramp exactly 45 deg; the edge term (one lattice edge) does not bind on today's ranges` }));
+  ruled.push({ title: 'Ruling 2 — the fade width is derived from the height and the lattice edge (PEBBLE 1.5 mm, a 60 mm stem, the hub underside from below)', cells });
+}
+{
+  /* ruling 5 — two florets of one umbel, one floret-local view each */
+  const st = { ...R.DEFAULTS, petalTexture: 'PEBBLE', textureHeight: 1.5, inflorescence: 'UMBEL', umbelHead: 'ON', stemLength: 60 };
+  const acc = new G.MeshBuilder({ exportMode: true }), b = G.buildBloomInto(acc, st, { below: null });
+  const pl = b.inflorescenceBuilt.placed, P = acc.positions;
+  const loc = (q, k) => { const M = q.M, x = P[q.at + k] - M[3], y = P[q.at + k + 1] - M[7], z = P[q.at + k + 2] - M[11]; return [M[0] * x + M[4] * y + M[8] * z, M[1] * x + M[5] * y + M[9] * z, M[2] * x + M[6] * y + M[10] * z]; };
+  let dmax = 0; for (let k = 0; k < pl[0].tris * 9; k += 3) { const p = loc(pl[0], k), q = loc(pl[1], k); dmax = Math.max(dmax, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2])); }
+  const rot = (M, v) => [M[0] * v[0] + M[1] * v[1] + M[2] * v[2], M[4] * v[0] + M[5] * v[1] + M[6] * v[2], M[8] * v[0] + M[9] * v[1] + M[10] * v[2]];
+  const hubR = b.inflorescenceBuilt.units[0].hubRadius;
+  const frameOf = (q) => ({ r: hubR * 2.2, at: [q.M[3], q.M[7], q.M[11]], dir: rot(q.M, [0.35, -0.55, -0.76]), up: rot(q.M, [0, 0, 1]) });
+  const sets = set({ petalTexture: 'PEBBLE', textureHeight: 1.5, inflorescence: 'UMBEL', umbelHead: 'ON', stemLength: 60 });
+  const cells = [];
+  for (const i of [0, 1]) cells.push(await cell({ label: `ruling 5 — floret ${i + 1} of ${pl.length}, its own hub from below (one floret-local view)`, set: sets, view: 'at', frame: frameOf(pl[i]), ruling: `the two florets differ by up to ${dmax.toFixed(3)} mm in their own frame (T5: 0.000 — one copy laid ${pl.length} times)` }));
+  ruled.push({ title: 'Ruling 5 — floret hubs in the WORLD frame: no two florets carry the same copy (PEBBLE 1.5 mm, an umbel, head ON)', cells });
+}
+
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
-const orgLine = (o, k) => `${k}: ${o.shippedTris.toLocaleString('en-US')} shipped &rarr; <b>${o.refinedTris.toLocaleString('en-US')}</b> lattice tris · <b>${o.visible}</b> visible / <b>${o.buried}</b> buried of ${o.relievable} vertices · relief 0..${o.relief.toFixed(3)} mm · fade ${o.fadeMm.toFixed(2)} mm${o.cavityTris ? ` · ${o.cavityTris} cavity tris as shipped` : ''}`;
+const orgLine = (o, k) => `${k}: ${o.shippedTris.toLocaleString('en-US')} shipped &rarr; <b>${o.refinedTris.toLocaleString('en-US')}</b> lattice tris · <b>${o.visible}</b> visible / <b>${o.buried}</b> buried${o.covered ? ` (<b>${o.covered}</b> of them covered)` : ''} of ${o.relievable} vertices · relief 0..${o.relief.toFixed(3)} mm · fade ${o.fadeMm.toFixed(4)} mm${o.cavityTris ? ` · ${o.cavityTris} cavity tris as shipped` : ''}`;
 const fig = (c) => `<figure><img src="${c.shot}"><figcaption><b>${esc(c.label)}</b><br><small>${esc(c.ruling)}</small><br><b>${esc(c.tag)}</b> · ${c.tris.toLocaleString('en-US')} tris in the file${c.edge ? ` · edge ${c.edge.toFixed(2)} mm` : ''} · STL ${c.sha} (${(c.bytes / 1024).toFixed(0)} KiB)${Object.entries(c.organs).map(([k, o]) => `<br>${orgLine(o, k)}`).join('')}${c.join ? `<br>leaf-stem clearance (emitted, EXPORT): <b>${c.join.mm.toFixed(3)} mm</b>` : ''}</figcaption></figure>`;
 const html = `<title>Surface texture T5</title>
 <style>body{background:#0c0f0e;color:#dfe9e3;font:14px/1.5 system-ui,sans-serif;margin:24px}
@@ -154,7 +197,10 @@ figure{margin:0}img{width:100%;border:1px solid #26302b;border-radius:6px;backgr
 figcaption{margin-top:8px}small{color:#7f948a}</style>
 <h1>Surface texture (T5) — the hub, the stem and the tube ring take the field</h1>
 <p class="note"><b>Every canvas cell is the PRINT PREVIEW</b>, chrome hidden and auto-rotate off, asserted; the junction assertions and the whole TX family (TX10 / TX11 included) ran before every shutter, and every STL exported watertight with no degenerate triangle. Each row is one camera: untextured, PEBBLE at the 0.4 mm floor, PEBBLE at the 1.5 mm maximum. VISIBLE faces only (Q7): a face inside another part, or on a closed cavity, stays smooth. The rods (filaments, the style, anthers, pedicels, petioles) stay smooth, pending the BONE sheet (Q12).</p>
-${rows.map((r) => `<h2>${esc(r.title)}</h2><main>${r.cells.map(fig).join('')}</main>`).join('\n')}`;
+${rows.map((r) => `<h2>${esc(r.title)}</h2><main>${r.cells.map(fig).join('')}</main>`).join('\n')}
+<h1 style="margin-top:34px">Eva's rulings of Oct 25 — before and after, on this tree</h1>
+<p class="note">Each BEFORE cell is the T5 behaviour through a lever no control reaches (coverage off; the fade pinned at 2H), photographed on this tree with the TX family withheld (TX12 / TX13 are exactly the clauses it fails); each AFTER cell ran every clause. The floret pair is two cells of ONE build, each framed by that floret's own placement matrix, so a copy would photograph identically.</p>
+${ruled.map((r) => `<h2>${esc(r.title)}</h2><main style="grid-template-columns:repeat(2,minmax(0,1fr))">${r.cells.map(fig).join('')}</main>`).join('\n')}`;
 fs.writeFileSync(path.join(outDir, 'index.html'), html);
 console.log(`\nwrote ${outDir}/index.html`);
 if (PNG_OUT) {
