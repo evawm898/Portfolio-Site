@@ -4,6 +4,11 @@
 sheet (Q12) and nothing about them is built. Ambiguities this build had to settle without a ruling are
 listed in §8, each flagged rather than resolved by fiat.**
 
+**[Oct 25: §8 is RULED. Rulings 1 (the hub top under the feet smooth), 2 (the fade derived) and 5 (floret hubs
+in the world frame) are built in `docs/bloom-surface-texture-t5-rulings-outcome.md`; 3, 4 and 6 are accepted as
+declared; 7 (the leaf-stem instrument) is `docs/bloom-leaf-stem-instrument-outcome.md`. The figures below are
+T5's as built, kept as the record.]**
+
 Base `main` at `b3163de` (#457, the edge cap). Discovery and its rulings:
 `docs/bloom-surface-texture-discovery.md` §0, §8, §10–§12 (§10 now marks T4 STRUCK, T5 DONE, T6 FOLDED
 in). T3: `docs/bloom-surface-texture-t3-outcome.md`. Sheet: `docs/img/bloom-texture-t5.png`

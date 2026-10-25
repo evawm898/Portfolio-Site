@@ -1447,7 +1447,8 @@ decision twin in `buildBloomCore`, TX10 / TX11 or block 80).
   every emitted triangle (closed 1e-9 acceptance — an open one let rays slip down shared edges). Buried
   vertices take nothing; the relief fades in over a GEODESIC 2H (`TEXTURE_CONTACT_FADE_K`, typed — flagged).
   **The hub top under the feet IS textured** (coincident faces are outside the union): the feet still meet
-  it and 0 printable gaps close at any height (flagged). CAVITY faces (the bore, the void caps, the sphere's
+  it and 0 printable gaps close at any height (flagged). **[Oct 25: BOTH SUPERSEDED by Eva's rulings — the hub
+  top under the feet is smooth and the fade is `max(H × 15/8, e)`; the T5 rulings block below.]** CAVITY faces (the bore, the void caps, the sphere's
   inner sphere) are excluded BY NAME and never refined — Q15: 0 of 240 mid-wall bore probes see air, but the
   bore's top ring on the hub's top plane does (a coplanar knife edge), which is why it is the name and not the ray.
 - **Rods take nothing (Q12)**; a floret build passes `pedicel: true` so its stem (a pedicel) stays smooth.
@@ -1472,6 +1473,27 @@ decision twin in `buildBloomCore`, TX10 / TX11 or block 80).
   forms at the mismatch before believing either.**
   T4 is STRUCK (texture and infill are exclusive), T6 folded into `docs/img/bloom-texture-t5.png`
   (`tools/shot-bloom-texture-t5.mjs`); measurements `node tools/bloom-texture-t5.mjs`.
+
+**THE T5 RULINGS (Oct 25): THE HUB TOP UNDER THE FEET IS SMOOTH, THE FADE IS DERIVED, FLORET HUBS SHARE ONE
+WORLD LAYER** (Eva's rulings 1/2/5; 3/4/6 accepted as declared — read `docs/bloom-surface-texture-t5-rulings-outcome.md`
+before touching `textureVertexCovered`, an organ's `cover`, `organReliefPass`'s `earlier` set,
+`textureFadeWidthMm` / `TEXTURE_FADE_PEAK_SLOPE`, `t5Deferred` / `t5FloretOrgans`, TX12–TX14).
+- **Coverage is derived from the emitted feet**: a visible HUB vertex is covered iff the segment `q − δn → +H`
+  along its normal meets a triangle in the petal range — only the hub carries a `cover`. Default: 2,130 hub
+  vertices covered, 1,256 left visible (main 3,386). A closed tube covers 0 (its petals start at r 12.5 on a
+  7.66 mm hub). **Coverage also reaches the hub's UNDERSIDE under a coplanar foot — flagged, Eva's to rule.**
+- **A vertex an EARLIER organ also emits takes no relief on the later copy** (`shared`; a decision made without a
+  ruling): covering the hub's copy of a hub/tube coincident vertex and not the tube's welded the shells in the
+  census (12,066 within-shell pairs). The tube row reads 3 shared, 8 shells, 0 pairs.
+- **The fade is `max(H × 15/8, e)`** — the quintic ease's own peak slope, so the fade ramp is exactly 45°;
+  `TEXTURE_CONTACT_FADE_K` is gone. 0.80 → 0.75 mm at H 0.4. The edge floor binds nowhere today.
+- **Floret hubs are relieved in the WORLD frame**: a floret build defers its organs, the inflorescence append
+  carries them through each placement's M, and the parent's pass relieves them on the one field. Floret PETALS
+  stay own-frame copies; the umbel's boss is not an organ and stays smooth.
+- `TEXTURE T5: CELLULAR x a 60 mm stem x textureHeight max` reads 0 (was 40 / 0.1286), entry removed. Gates
+  TX12 (coverage restated from the petal builder's ranges), TX13 (the fade restated from `30·¼·¼`), TX14 (two
+  florets of one unit differ in their own frame; the withheld rebuild the control); four witnessed apex mutants;
+  two block-80 smoke rows. No row added, no phase owed; triangle counts unmoved on every row.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,

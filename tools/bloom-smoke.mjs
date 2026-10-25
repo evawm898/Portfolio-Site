@@ -1909,6 +1909,13 @@ export const SMOKE_BLOCKS = [
         path: "TX10 the floor taken on the export twin, TX7 the counts live = export, TX11 visibility on the thin hub" },
       { label: "TEXTURE T5: PEBBLE x a noded stem (the flower's 0.48 on 100 x 6 mm, three leaves)",
         path: "TX10 the noded wall's radial normal from its own axis, TX11 the petiole roots buried, ST9 the petioles excused by name" },
+      /* Eva's rulings of Oct 25 (the T5 follow-ups): the hub top under the
+         petal feet stays smooth (TX12), the fade width is derived (TX13), and
+         floret hubs are relieved in the WORLD frame, one shared layer (TX14) */
+      { label: 'TEXTURE T5: PEBBLE x a dome (headRise 0.5) x a stem',
+        path: "TX12 the cap under the feet covered and unmoved, TX13 the fade width derived from the height and the edge" },
+      { label: "TEXTURE T5: PEBBLE x an UMBEL, head ON (the florets' hubs textured, their pedicels smooth)",
+        path: "TX14 six floret hubs sampling the one world field (no two the same copy), TX12 each floret hub under its own feet covered" },
     ],
   },
 ];

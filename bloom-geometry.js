@@ -12946,10 +12946,21 @@ function textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, cap = null) 
    root) is enclosed by that part's closed shell and no ray escapes; a face
    COINCIDENT with another part's face (the hub's top under the feet, which sit
    ON it) is on the outside of the union and is visible, so the hub textures
-   over the buried feet. A buried vertex takes no relief, and the relief fades
-   in from the nearest buried vertex over `TEXTURE_CONTACT_FADE_K x H` — K = 2
-   keeps the steepest ramp the fade itself adds under 45 degrees (the ease's
-   peak slope is 15/8). The organ's own CAVITY faces (the stem's bore and the
+   over the buried feet — SUPERSEDED by Eva's ruling 1 (Oct 25): a visible
+   hub vertex whose relief would stand up into a PETAL FOOT is COVERED and
+   takes none (`textureVertexCovered`, below; the feet and nothing else). A
+   vertex two organs both emit is relieved on the earlier organ only (the
+   weld rule in the relief pass). A buried or covered vertex takes no
+   relief, and the relief fades in from the nearest one over a width DERIVED
+   from the relief height and the lattice edge (Eva's ruling 2, Oct 25 — it
+   was a typed K = 2, `2H`): `textureFadeWidthMm(H, e) = max(H x s, e)`, where
+   `s` is the ease's OWN peak slope, read off `rimEase` itself at module load
+   (`TEXTURE_FADE_PEAK_SLOPE`, 15/8 for the quintic), so the steepest ramp the
+   fade adds over a full-height relief is exactly 45 degrees and no steeper —
+   and never shorter than one lattice edge `e`, because a fade with no vertex
+   inside it is not drawn as a ramp at all but as a step between two lattice
+   neighbours. On today's ranges the edge term never binds (the 0.4 mm floor
+   height gives 0.75 mm against the 0.5 mm edge cap) — said rather than hidden. The organ's own CAVITY faces (the stem's bore and the
    void's caps, the sphere hub's inner sphere) are named by the emitter,
    never refined and never relieved (Q15); `tools/bloom-texture-t5.mjs`
    confirms by the same escape test that no ray leaves them.
@@ -12962,7 +12973,16 @@ function textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, cap = null) 
    shipped one, by branch.
    =================================================================== */
 export const TEXTURE_RELIEF_ORGANS = Object.freeze(['hub', 'stem', 'tube']);
-export const TEXTURE_CONTACT_FADE_K = 2;
+/* the ease's own peak slope, read off the function it is (a central difference
+   on a dyadic lattice of [0, 1], products and sums only — engine-agreed); the
+   quintic's is 15/8 to within 5h^2 of the step */
+export const TEXTURE_FADE_PEAK_SLOPE = (() => {
+  const N = 1 << 16, h = 1 / (1 << 20);
+  let best = 0;
+  for (let k = 1; k < N; k++) { const t = k / N, d = (rimEase(t + h) - rimEase(t - h)) / (2 * h); if (d > best) best = d; }
+  return best;
+})();
+export function textureFadeWidthMm(heightMm, edgeMm) { return Math.max(heightMm * TEXTURE_FADE_PEAK_SLOPE, edgeMm); }
 export const TEXTURE_VISIBILITY_OFFSET_MM = 1e-4;
 /* the escape directions — the six axes and the eight cube diagonals, turned
    once by a fixed rotation so no one of them lies along a symmetry axis of
@@ -13367,6 +13387,76 @@ export function textureVertexVisible(G, q, n, delta = TEXTURE_VISIBILITY_OFFSET_
   return false;
 }
 export function textureVisibilityGrid(positions) { return t5Grid(positions); }
+/* COVERED (Eva's ruling 1, Oct 25 — T5's ambiguity 1): a vertex whose relief
+   would stand up INTO another part is under that part — a contact, not a
+   visible surface — even when its escape ray leaves the union. On the flat
+   head the petal feet's top skin is COINCIDENT with the hub's top face, so a
+   ray from just above the hub starts just above the foot and escapes; on a
+   dome the foot is laid on the cap in chords and stands 0.00..0.05 mm off it.
+   DERIVED FROM THE EMITTED GEOMETRY AND THE RELIEF'S OWN REACH, never from a
+   typed radius or a list of parts: the vertex is covered iff the segment the
+   relief would occupy — from just inside the surface (`q - delta n`, the
+   visibility offset) out to the full peak-to-valley height `H` along its own
+   outward normal — meets a triangle THE PETAL FEET emitted: the triangle range
+   `cover` = [a, b) the organ's record names for the parts that sit on it (the
+   head's hub: every petal, `[0, petalTriEnd)`; a floret's hub: that floret's
+   petals, offset where the append put them). The ruling names the feet and
+   nothing else, so the stem's junction ring, a tube ring on the hub, a leaf
+   near the stem and every other contact keep the T5 rule (a first cut that
+   counted ANY other part's triangles left a closed tube's ring and the hub
+   top under it both unrelieved, on coincident vertices, and the census welded
+   the two into one shell). An organ with no `cover` is never covered. The
+   acceptance is closed, as the escape test's is, so a foot's margin landing
+   exactly on a vertex covers it. */
+export function textureVertexCovered(G, q, n, reachMm, cover, delta = TEXTURE_VISIBILITY_OFFSET_MM) {
+  if (!cover) return false;
+  const o = [q[0] - n[0] * delta, q[1] - n[1] * delta, q[2] - n[2] * delta];
+  return t5HitsWithin(G, o, n, reachMm + delta, -1, -1, cover);
+}
+function t5HitsWithin(G, o, d, tStop, from, to, only = null) {
+  const { pos, lo, h, nx, ny, nz, start, items, stamp } = G;
+  const id = ++G.ray;
+  let ix = Math.floor((o[0] - lo[0]) / h), iy = Math.floor((o[1] - lo[1]) / h), iz = Math.floor((o[2] - lo[2]) / h);
+  if (ix < 0 || iy < 0 || iz < 0 || ix >= nx || iy >= ny || iz >= nz) return false;
+  const st = [d[0] > 0 ? 1 : -1, d[1] > 0 ? 1 : -1, d[2] > 0 ? 1 : -1];
+  const tMax = [0, 0, 0], tDel = [0, 0, 0], idx = [ix, iy, iz];
+  for (let k = 0; k < 3; k++) {
+    if (d[k] === 0) { tMax[k] = Infinity; tDel[k] = Infinity; continue; }
+    const edge = lo[k] + (idx[k] + (d[k] > 0 ? 1 : 0)) * h;
+    tMax[k] = (edge - o[k]) / d[k]; tDel[k] = h / Math.abs(d[k]);
+  }
+  for (let tCell = 0; ;) {
+    const c = (idx[2] * ny + idx[1]) * nx + idx[0];
+    for (let r = start[c]; r < start[c + 1]; r++) {
+      const t = items[r];
+      if (t >= from && t < to) continue;
+      if (only && (t < only[0] || t >= only[1])) continue;
+      if (stamp[t] === id) continue;
+      stamp[t] = id;
+      const b = t * 9;
+      const e1x = pos[b + 3] - pos[b], e1y = pos[b + 4] - pos[b + 1], e1z = pos[b + 5] - pos[b + 2];
+      const e2x = pos[b + 6] - pos[b], e2y = pos[b + 7] - pos[b + 1], e2z = pos[b + 8] - pos[b + 2];
+      const px = d[1] * e2z - d[2] * e2y, py = d[2] * e2x - d[0] * e2z, pz = d[0] * e2y - d[1] * e2x;
+      const det = e1x * px + e1y * py + e1z * pz;
+      if (det === 0) continue;
+      const inv = 1 / det;
+      const sx = o[0] - pos[b], sy = o[1] - pos[b + 1], sz = o[2] - pos[b + 2];
+      const u = (sx * px + sy * py + sz * pz) * inv;
+      if (u < -T5_RAY_EDGE || u > 1 + T5_RAY_EDGE) continue;
+      const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+      const v = (d[0] * qx + d[1] * qy + d[2] * qz) * inv;
+      if (v < -T5_RAY_EDGE || u + v > 1 + T5_RAY_EDGE) continue;
+      const tt = (e2x * qx + e2y * qy + e2z * qz) * inv;
+      if (tt >= 0 && tt <= tStop) return true;
+    }
+    const k = tMax[0] < tMax[1] ? (tMax[0] < tMax[2] ? 0 : 2) : (tMax[1] < tMax[2] ? 1 : 2);
+    tCell = tMax[k];
+    if (tCell > tStop) return false;
+    idx[k] += st[k];
+    if (idx[k] < 0 || idx[k] >= (k === 0 ? nx : k === 1 ? ny : nz)) return false;
+    tMax[k] += tDel[k];
+  }
+}
 /* THE RELIEF PASS, once every part exists: visibility, the fade, the field,
    the displacement written in place. Returns one record per organ. */
 function organReliefPass(acc, T, organs, capability = null) {
@@ -13375,13 +13465,35 @@ function organReliefPass(acc, T, organs, capability = null) {
   const off = !!(capability && capability.organReliefOff);
   if (!organs.length) return {};
   const G = t5Grid(acc.positions);
-  const H = T.heightMm, Lam = TEXTURE_CONTACT_FADE_K * H;
+  /* (a sheet-only lever, reached by no control: `textureFadeWidthMm` pins the
+     fade so the BEFORE of ruling 2 can be photographed on the same tree) */
+  const H = T.heightMm, Lam = capability && capability.textureFadeWidthMm > 0 ? capability.textureFadeWidthMm : textureFadeWidthMm(H, T.edgeMm);
   const recs = {};
   const SAMPLE_EVERY = 97;
-  /* every organ's visibility first, against the undisplaced organs */
+  /* every organ's visibility first, against the undisplaced organs.
+     A VERTEX TWO ORGANS BOTH EMIT (the same double — a closed tube ring's foot
+     edge landing on a hub lattice vertex) is ONE point of the union: relieved
+     on both sides by the one field along one normal it moves on both sides to
+     the same place, and the two closed shells are joined there, so a census
+     that welds by position reads their by-design overlap as a fold (measured:
+     6,275 within-shell pairs on the closed tube once the fade's length moved
+     the weights that had kept the two apart by chance). The organ emitted
+     LATER yields: its copy takes no relief, so the earlier organ's relief
+     stands over it and the two never share a point again. */
+  const earlier = new Set();
   const vis = organs.map((O) => {
     const nV = O.P.length / 3, v = new Uint8Array(nV);
-    for (let i = 0; i < nV; i++) if (O.relievable[i]) v[i] = textureVertexVisible(G, [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]], [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]]) ? 1 : 0;
+    let covered = 0, shared = 0;
+    for (let i = 0; i < nV; i++) if (O.relievable[i]) {
+      const q = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]];
+      if (earlier.has(`${q[0]},${q[1]},${q[2]}`)) { shared++; continue; }
+      v[i] = textureVertexVisible(G, q, [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]]) ? 1 : 0;
+      /* ruling 1: a visible vertex lying under a petal foot is a contact and
+         takes no relief (the hub's top under the feet) */
+      if (v[i] && !(capability && capability.textureCoverageOff) && textureVertexCovered(G, q, [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]], H, O.cover)) { v[i] = 0; covered++; }
+    }
+    O.coveredCount = covered; O.sharedCount = shared;
+    for (let i = 0; i < nV; i++) earlier.add(`${O.P[i * 3]},${O.P[i * 3 + 1]},${O.P[i * 3 + 2]}`);
     return v;
   });
   organs.forEach((O, oi) => {
@@ -13414,7 +13526,7 @@ function organReliefPass(acc, T, organs, capability = null) {
       }
     }
     const rec = { blades: 1, refused: {}, panels: 0, subRows: 0, cfMax: 1, skinTris: O.refinedTris - O.cavityTris, floorTris: 0, rimTris: 0, reliefMaxMm: 0, reliefMinMm: Infinity, displaced: 0, skinSamples: [], apexSamples: [], edgeMismatch: O.edgeMm === T.edgeMm ? 0 : 1,
-      organ: { shippedTris: O.shippedTris, refinedTris: O.refinedTris, cavityTris: O.cavityTris, vertices: nV, relievable: O.relievable.reduce((n, x) => n + x, 0), visible, buried, fadeMm: Lam, fans: O.fans, pairs: O.pairs, normalFallback: O.normalFallback, twin: O.twin, twinMismatch: O.twinMismatch, triRange: [O.from, O.to] } };
+      organ: { shippedTris: O.shippedTris, refinedTris: O.refinedTris, cavityTris: O.cavityTris, vertices: nV, relievable: O.relievable.reduce((n, x) => n + x, 0), visible, buried, covered: O.coveredCount || 0, shared: O.sharedCount || 0, fadeMm: Lam, fans: O.fans, pairs: O.pairs, normalFallback: O.normalFallback, twin: O.twin, twinMismatch: O.twinMismatch, triRange: [O.from, O.to] } };
     const disp = new Float64Array(nV * 3);
     let tick = 0;
     for (let i = 0; i < nV; i++) {
@@ -13459,7 +13571,7 @@ function organReliefPass(acc, T, organs, capability = null) {
       const r = recs[key];
       r.blades++; r.skinTris += rec.skinTris; r.displaced += rec.displaced; r.reliefMaxMm = Math.max(r.reliefMaxMm, rec.reliefMaxMm); r.reliefMinMm = Math.min(r.reliefMinMm, rec.reliefMinMm); r.edgeMismatch += rec.edgeMismatch;
       for (const q of rec.skinSamples) if (r.skinSamples.length < 96) r.skinSamples.push(q);
-      for (const k of ['shippedTris', 'refinedTris', 'cavityTris', 'vertices', 'relievable', 'visible', 'buried', 'fans', 'pairs', 'normalFallback']) r.organ[k] += rec.organ[k];
+      for (const k of ['shippedTris', 'refinedTris', 'cavityTris', 'vertices', 'relievable', 'visible', 'buried', 'covered', 'shared', 'fans', 'pairs', 'normalFallback']) r.organ[k] += rec.organ[k];
       r.organ.twinMismatch = r.organ.twinMismatch || rec.organ.twinMismatch;
       r.organ.triRanges = [...(r.organ.triRanges || [r.organ.triRange]), rec.organ.triRange];
       for (const q of rec.organ.buriedSamples) if (r.organ.buriedSamples.length < 48) r.organ.buriedSamples.push(q);
@@ -24029,6 +24141,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
      law's claim and must always clear; every other node's is reported, and
      an overtopping node is told on the read-out and declared by name. */
   const floretsMaxZByNode = Array.from({ length: plan.nodes }, () => -Infinity);
+  const t5FloretOrgans = [];
   /* THE DISTANCE IS `freeStemDistanceMm`'s, NOT A SECOND COPY OF IT. The
      first cut wrote `hypot(max(0, r - outerR), max(0, tipZ - z, z - rootZ))`
      out again here — which is that function term for term, i.e. exactly the
@@ -24065,6 +24178,25 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
       const at = acc.positions.length;
       const n = acc.appendTransformed(U.sub, pl.M);
       const M = pl.M, src = U.sub.positions;
+      /* (ruling 5) THE FLORET'S DEFERRED ORGANS, CARRIED INTO THE WORLD: the
+         same lattice, its vertices and normals through this placement's rigid
+         matrix, its triangle range offset to where the append put it — so the
+         parent's one relief pass samples the ONE field at world positions and
+         judges visibility against the whole bloom */
+      if (U.rec.t5Deferred) for (const O of U.rec.t5Deferred.organs) {
+        const nV = O.P.length / 3, P2 = new Array(nV * 3), N2 = new Float64Array(nV * 3), off = at / 9;
+        for (let v = 0; v < nV; v++) {
+          const x = O.P[v * 3], y = O.P[v * 3 + 1], z = O.P[v * 3 + 2];
+          P2[v * 3] = M[0] * x + M[1] * y + M[2] * z + M[3];
+          P2[v * 3 + 1] = M[4] * x + M[5] * y + M[6] * z + M[7];
+          P2[v * 3 + 2] = M[8] * x + M[9] * y + M[10] * z + M[11];
+          const a = O.N[v * 3], b = O.N[v * 3 + 1], c = O.N[v * 3 + 2];
+          N2[v * 3] = M[0] * a + M[1] * b + M[2] * c;
+          N2[v * 3 + 1] = M[4] * a + M[5] * b + M[6] * c;
+          N2[v * 3 + 2] = M[8] * a + M[9] * b + M[10] * c;
+        }
+        t5FloretOrgans.push({ ...O, organ: `floret ${O.organ}`, from: O.from + off, to: O.to + off, cover: O.cover ? [O.cover[0] + off, O.cover[1] + off] : null, P: P2, N: N2, T: U.rec.t5Deferred.T });
+      }
       /* THE SESSILE EMBED'S MEASURED SIDE — how far into the rachis the
          floret's OWN emitted vertices reach: the least cylindrical radius of
          any of them inside the rachis's own height span. The root law says
@@ -24143,6 +24275,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
   const headSpreadMm = headZ.length ? Math.max(...headZ) - Math.min(...headZ) : null;
   return {
     present: true, unitTris, tipZLocal, count: placed.length, placed, headSpreadMm, knot: knotBuilt,
+    t5FloretOrgans,
     floretsMaxZ: Number.isFinite(floretsMaxZ) ? floretsMaxZ : null,
     floretsMaxZByNode: floretsMaxZByNode.map((z) => (Number.isFinite(z) ? z : null)),
     /* EVERY DISTINCT UNIT, in node order — unit 0 is the topmost node's and
@@ -25171,7 +25304,7 @@ function buildBloomCore(acc, state, opts = {}) {
   if (!plan.active) {
     const built = buildBloomBody(acc, state, opts, null);
     built.tube = { ...plan, rings: [] };
-    return t5Finish(acc, built, [], opts.capability || null);
+    return t5Finish(acc, built, [], opts.capability || null, !!opts.pedicel);
   }
   /* pass 1: every fused petal's rows, no blade emitted */
   const collectHooks = plan.layers.map((lay) => (lay.free ? null : () => () => -1));
@@ -25203,17 +25336,32 @@ function buildBloomCore(acc, state, opts = {}) {
     }
   } else rings = emitTubeRings(acc, geo, n, opts.capability || null);
   built.tube = { ...plan, rings };
-  return t5Finish(acc, built, tubeOrgans, opts.capability || null);
+  return t5Finish(acc, built, tubeOrgans, opts.capability || null, !!opts.pedicel);
 }
 /* the relief pass once every part of this build exists, and its records into
    the texture summary (the organs' own beside the sheets') */
-function t5Finish(acc, built, extra, capability = null) {
-  if (!built.t5) return built;
-  const organs = [...(built.t5Organs || []), ...extra];
-  const recs = organReliefPass(acc, built.t5, organs, capability);
+function t5Finish(acc, built, extra, capability = null, pedicel = false) {
+  /* A RACEME'S OR AN UMBEL'S FLORETS carry organs of their own (a FLORET build
+     — `pedicel` — relieves no stem: its stem is its pedicel, Q12); their relief
+     is DEFERRED to the bloom they are appended into (Eva's ruling 5, Oct 25:
+     floret hubs are textured in the WORLD frame, one shared layer, so no two
+     florets carry the same copy of the pattern — `buildInflorescenceInto`
+     carries each placed floret's organs into the parent's pass) */
+  const floretOrgans = built.inflorescenceBuilt && built.inflorescenceBuilt.t5FloretOrgans ? built.inflorescenceBuilt.t5FloretOrgans : [];
+  if (!built.t5 && !floretOrgans.length) return built;
+  if (built.t5 && pedicel) {
+    built.t5Deferred = { T: built.t5, organs: [...(built.t5Organs || []), ...extra] };
+    delete built.t5Organs;
+    built.t5 = { organs: built.t5Deferred.organs.map((O) => O.organ), deferred: true };
+    return built;
+  }
+  const T = built.t5 || floretOrgans[0].T;
+  const organs = [...(built.t5Organs || []), ...extra, ...floretOrgans];
+  const recs = organReliefPass(acc, T, organs, capability);
   if (built.texture) for (const [k, r] of Object.entries(recs)) built.texture.organs[k] = r;
   delete built.t5Organs;
   built.t5 = { organs: organs.map((O) => O.organ) };
+  if (built.inflorescenceBuilt) delete built.inflorescenceBuilt.t5FloretOrgans;
   return built;
 }
 
@@ -25630,7 +25778,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   const t5Cut = (organ, from, cap) => { const d = t5Decide && t5Decide !== 'twin' && t5Decide[organ] ? { positions: t5Decide.positions, from: t5Decide[organ][0], to: t5Decide[organ][1] } : null; t5Organs.push(organLatticeInto(acc, from, cap, { organ, edgeMm: T5.edgeMm, decide: d })); };
   let hubBuilt;
   if (headOff) hubBuilt = HUB_ABSENT;
-  else if (T5) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); }
+  else if (T5) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); t5Organs[t5Organs.length - 1].cover = [0, petalTriEnd]; }
   else hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
   const hubTriEnd = acc.positions.length / 9;
   /* THE STEM (session 43) — ONE closed solid on the axis, rooted THROUGH the

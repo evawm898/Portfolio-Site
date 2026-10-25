@@ -747,13 +747,13 @@ const TEX_ROWS = /^surface texture/;
 const TEX_MUTANTS = /^(the-relief-goes-inward|the-bead-is-left-flat|the-field-is-sampled-per-organ|the-lattice-leaves-the-surface|the-exclusivity-is-dropped)$/;
 /* T5 (Oct 23): the organs' four mutants and the two rows they run over */
 const T5_ROWS = /^surface texture T5/;
-const T5_MUTANTS = /^(a-buried-face-is-textured|the-hub-is-skipped|the-stem-normal-points-inward|the-stem-relief-is-applied-inward|the-tube-ring-has-its-own-field)$/;
+const T5_MUTANTS = /^(a-buried-face-is-textured|the-hub-is-skipped|the-stem-normal-points-inward|the-stem-relief-is-applied-inward|the-tube-ring-has-its-own-field|the-hub-is-textured-under-a-foot|the-fade-width-is-typed|a-floret-hub-is-relieved-in-its-own-frame|the-coverage-reaches-every-part)$/;
 /* the organs' records as the MUTATED module builds them */
 function organFacts(G, st) {
   try {
     const b = G.buildBloomInto(new G.MeshBuilder({ exportMode: true }), st, {});
     const o = (b.texture && b.texture.organs) || {};
-    return Object.fromEntries(['hub', 'stem', 'tube'].map((k) => [k, o[k] && o[k].organ ? { ...o[k].organ, displaced: o[k].displaced, skin: o[k].skinSamples || [] } : null]));
+    return Object.fromEntries(['hub', 'stem', 'tube', 'floret hub'].map((k) => [k, o[k] && o[k].organ ? { ...o[k].organ, displaced: o[k].displaced, skin: o[k].skinSamples || [] } : null]));
   } catch (e) { return { threw: String(e && e.message || e) }; }
 }
 /* THE EDGE CAP (Eva, Oct 23): its three mutants run on the `texture edge cap`
@@ -3116,10 +3116,13 @@ const MUTANTS = [
     into: "export function textureVertexVisible(G, q, n, delta = TEXTURE_VISIBILITY_OFFSET_MM) {\n  return true;\n", names: ['TX11'],
     witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      return (m.stem && m.hub && m.stem.buried === 0 && m.hub.buried === 0 && c.stem.buried > 0 && c.hub.buried > 0) ? null : `the mutant's stem buries ${m.stem && m.stem.buried} and hub ${m.hub && m.hub.buried} (clean ${c.stem && c.stem.buried} / ${c.hub && c.hub.buried})`; } },
+      /* (Oct 25) a COVERED vertex (ruling 1) is counted buried too, and the
+         coverage test is not what this mutant breaks — so the witness is that
+         nothing is buried BEYOND what is covered */
+      return (m.stem && m.hub && m.stem.buried === m.stem.covered && m.hub.buried === m.hub.covered && c.stem.buried > c.stem.covered && c.hub.buried > c.hub.covered) ? null : `the mutant's stem buries ${m.stem && m.stem.buried} (covered ${m.stem && m.stem.covered}) and hub ${m.hub && m.hub.buried} (covered ${m.hub && m.hub.covered}); clean ${c.stem && c.stem.buried}/${c.stem && c.stem.covered} and ${c.hub && c.hub.buried}/${c.hub && c.hub.covered}`; } },
   { id: 'the-hub-is-skipped', rows: T5_ROWS, why: "the hub is emitted as shipped and never latticed or relieved: a textured bloom stands on a smooth hub (T5 says the hub takes the field) — 0 floats move on the hub and every count is a plausible one",
-    find: "  else if (T5) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); }",
-    into: "  else if (false) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); }", names: ['TX10'],
+    find: "  else if (T5) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); t5Organs[t5Organs.length - 1].cover = [0, petalTriEnd]; }",
+    into: "  else if (false) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); t5Organs[t5Organs.length - 1].cover = [0, petalTriEnd]; }", names: ['TX10'],
     witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (!m.hub && c.hub && c.hub.displaced > 0 && m.stem && m.stem.displaced > 0) ? null : `the mutant's hub record ${m.hub ? 'exists' : 'is absent'} (clean ${c.hub ? `${c.hub.displaced} displaced` : 'absent'})`; } },
@@ -3146,6 +3149,37 @@ const MUTANTS = [
       let moved = 0; for (let i = 0; i < Math.min(m.tube.skin.length, c.tube.skin.length); i++) if (Math.abs(m.tube.skin[i].s - c.tube.skin[i].s) > 1e-6) moved++;
       const hubSame = m.hub.skin.every((q, i) => c.hub.skin[i] && q.s === c.hub.skin[i].s);
       return (moved > 0 && hubSame) ? null : `${moved} tube samples changed, hub unchanged ${hubSame}`; } },
+  /* ===================================================================
+     THE T5 RULINGS (Eva, Oct 25): one mutant a ruling, each witnessed on the
+     MUTATED module's own build, run on the T5 rows.
+     =================================================================== */
+  { id: 'the-hub-is-textured-under-a-foot', rows: T5_ROWS, why: "the coverage test is dropped: the hub's top under the petal feet — coincident with each foot's top skin, so its escape ray leaves the union — is relieved through the feet again (ruling 1 says it stays smooth); every count is unchanged and the union exports watertight, as one piece",
+    find: "      if (v[i] && !(capability && capability.textureCoverageOff) && textureVertexCovered(",
+    into: "      if (false && v[i] && !(capability && capability.textureCoverageOff) && textureVertexCovered(", names: ['TX12'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.hub && c.hub && m.hub.covered === 0 && c.hub.covered > 0 && m.hub.displaced > c.hub.displaced) ? null : `the mutant's hub covers ${m.hub && m.hub.covered} and relieves ${m.hub && m.hub.displaced} (clean ${c.hub && c.hub.covered} / ${c.hub && c.hub.displaced})`; } },
+  { id: 'the-coverage-reaches-every-part', rows: T5_ROWS, why: "the coverage test counts every triangle emitted before the organ, not only the petal feet: the stem's junction ring under the hub (and a tube ring's coincident vertices on the hub's top) stop taking relief — the ruling covers the hub's top under the FEET and nothing else; every count is unchanged",
+    find: "H, O.cover)) { v[i] = 0; covered++; }",
+    into: "H, [0, O.from])) { v[i] = 0; covered++; }", names: ['TX12'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.stem && c.stem && m.stem.covered > 0 && c.stem.covered === 0) ? null : `the mutant's stem covers ${m.stem && m.stem.covered} (clean ${c.stem && c.stem.covered})`; } },
+  { id: 'the-fade-width-is-typed', rows: T5_ROWS, why: "the fade width is the typed 2H T5 shipped with, not derived from the height and the lattice edge (ruling 2): every fade is 0.05 mm longer at the floor height, every count is the same and no gate the STL reads can tell",
+    find: ": textureFadeWidthMm(H, T.edgeMm);",
+    into: ": 2 * H;", names: ['TX13'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.hub && c.hub && Math.abs(m.hub.fadeMm - 0.8) < 1e-12 && Math.abs(c.hub.fadeMm - 0.75) < 1e-12) ? null : `the mutant's fade is ${m.hub && m.hub.fadeMm} mm (clean ${c.hub && c.hub.fadeMm})`; } },
+  { id: 'a-floret-hub-is-relieved-in-its-own-frame', rows: T5_ROWS, why: "a floret build relieves its own hub in its own frame again, before it is appended: every floret is one copy of the pattern laid N times (ruling 5 says one world layer) — every count and every placement is unchanged",
+    find: "  if (built.t5 && pedicel) {",
+    into: "  if (built.t5 && false) {", names: ['TX14'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', inflorescence: 'UMBEL', umbelHead: 'ON', stemLength: 60 };
+      const same = (G) => { const acc = new G.MeshBuilder({ exportMode: true }), b = G.buildBloomInto(acc, st, {}), P = acc.positions, [a, c] = b.inflorescenceBuilt.placed; let d = 0;
+        const loc = (q, k) => { const Mx = q.M, x = P[q.at + k] - Mx[3], y = P[q.at + k + 1] - Mx[7], z = P[q.at + k + 2] - Mx[11]; return [Mx[0] * x + Mx[4] * y + Mx[8] * z, Mx[1] * x + Mx[5] * y + Mx[9] * z, Mx[2] * x + Mx[6] * y + Mx[10] * z]; };
+        for (let k = 0; k < a.tris * 9; k += 3) { const p = loc(a, k), q = loc(c, k); d = Math.max(d, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2])); } return d; };
+      let dm, dc; try { dm = same(M); dc = same(C); } catch (e) { return `the witness threw: ${e && e.message || e}`; }
+      return (dm <= 1e-6 && dc > 1e-3) ? null : `two florets differ by ${dm} mm on the mutant (clean ${dc})`; } },
   /* ===================================================================
      THE TEXTURE EDGE CAP (Eva's ruling of Oct 23). Three mutants, each
      witnessed on the MUTATED module's own edge-cap record, scoped to
@@ -4211,6 +4245,7 @@ const ROWS = [
   /* T5: the hub and the stem, and a closed tube — scoped to the organ mutants */
   { label: 'surface texture T5 — PEBBLE x a 60 mm stem (the hub, the stem)', for: T5_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'stemLength', value: '60' }] },
   { label: 'surface texture T5 — PEBBLE x a closed tube (6 petals, k 0)', for: T5_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '6' }, { id: 'tubeLayer1', value: '0' }] },
+  { label: 'surface texture T5 — PEBBLE x an UMBEL, head ON (the florets\' hubs in the world frame)', for: T5_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelHead', value: 'ON' }, { id: 'stemLength', value: '60' }] },
   /* THE EDGE CAP (Oct 23): the corner the ruling is about and a state past
      the cap, scoped to the cap mutants; the shipped PEBBLE row above also
      runs under them (CAP_ROWS) for the typed-edge mutant. */
