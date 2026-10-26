@@ -281,6 +281,9 @@ built compound umbel.
   - **every floret dropped while dragging:** the smallest mesh. The dome disappears exactly while
     its shape is being adjusted.
 
+**RULED Oct 26: the drag-light extension is NOT built yet. The page-side cost (~10 s of the 11–17 s
+step) is profiled first, in its own session.**
+
 ### 12c. The matrix, the defaults bar and the gate
 
 - **Block 81 is redefined in place, 20 rows, 1,588 unchanged.** Every row that builds depth 2
