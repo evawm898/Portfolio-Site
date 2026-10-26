@@ -1920,7 +1920,7 @@ export const SMOKE_BLOCKS = [
   },
   {
     n: 81, title: 'the mophead — a compound umbel, depth 2 (Oct 24)',
-    anchor: 'MOPHEAD: 2 rays x the registry\'s 6 florets a ray',
+    anchor: 'MOPHEAD: 2 rays x depth 2\'s ruled defaults (12 round four-petal florets a sub-umbel at the floor)',
     /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
        compound arm of the inflorescence plan (rays rooted on the main boss,
        each ending in a headless SUB-UMBEL built once and appended per ray),
@@ -1940,7 +1940,7 @@ export const SMOKE_BLOCKS = [
         path: "UM7 asked 144 florets against the clamp's built count, the bloom's own triangles the record's exact prediction under the budget, the floret priced off the emitted unit, no larger count a ray would have fit; UM6 the reduced lattice on twelve-petal florets; UM8 every built floret rooted in its sub-boss" },
       { label: 'MOPHEAD: THE MOPHEAD — 12 rays x 12 round four-petal florets at the FLORET FLOOR, 12 mm pedicels at 20 deg',
         path: "UM6 the reduced lattice read off the emitted rim of a round four-petal floret at the floor, UM8 144 floret roots each inside its own sub-boss and twelve sub-bosses on their rays, UM9 the floored size restated, UM7 the build under the budget unclamped" },
-      { label: 'MOPHEAD: 2 rays x the registry\'s 6 florets a ray',
+      { label: 'MOPHEAD: 2 rays x depth 2\'s ruled defaults (12 round four-petal florets a sub-umbel at the floor)',
         path: "UM1 the main boss restated on two rays at their own angle, UM5 the depth's two statements and the ray's headless depth-1 sub-umbel, UM8 two sub-bosses on their rays and twelve roots, UM9 the floor restated from a probe floret's emitted rows, ID1/ID6/ID7 the rays read as the outer pedicels, ID4 the second level's floret identity" },
       { label: 'MOPHEAD: x the head ON (the boss on the stem below it, the reach inset)',
         path: "UM6 the head's petals on the full 10-column, 4-segment lattice while the florets carry 6 / 2, UM0 the head built, UM3 the main boss under the head" },

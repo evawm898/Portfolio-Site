@@ -150,7 +150,7 @@ definition reads the two as one shell: **208 pairs, worst span 0.5896 mm**, iden
 builder's doubles and in the browser. Attributed by EMITTER (the ray blocks and, inside each, the
 sub-umbel's floret / sub-boss / ray-stem ranges): every pair is two different parts, 0 within one
 part. Declared in `SELF_INTERSECTION_XFAIL` by value; at every other angle in the matrix the
-census reads 0.
+census reads 0. **[Oct 25: the entry is REMOVED — under depth 2's ruled defaults (§12) the row reads 0 within-shell pairs in the browser; the smaller round florets no longer reach the neighbouring rod.]**
 
 ## 9. Gates
 
@@ -197,3 +197,145 @@ of 40 mm at 50°**, the umbel's own 6 florets a ray on 20 mm pedicels at 35°, f
 0.60x (so 21 × 9.6 mm, above the floor). The mophead row of the matrix (12 × 12 round four-petal
 florets at the floor on 12 mm pedicels at 20°) is the session's proposal for what a "mophead"
 preset would be, and is on the sheet.
+**[Oct 25: RULED — the 12 × 12 floor-floret mophead is depth 2's DEFAULT, no preset; depth 1 and
+every other default unchanged. §12.]**
+
+**RULED Oct 25: the floor-floret mophead is depth 2's default; no preset.** §12 is the session that
+carried it.
+
+## 12. Depth 2's default — the floor-floret mophead (Eva's ruling, Oct 25)
+
+> the 12 × 12 floor-floret mophead becomes the DEFAULT for umbel depth 2. No preset (ruling 10
+> stands). Depth 2's defaults: 12 rays, 12 florets per sub-umbel, round four-petal florets at the
+> derived floor (13.13 × 6.00 mm), 12 mm pedicels at 20°. Keep whatever ray length and angle the
+> sheet's mophead used. Depth 1 and every other default are unchanged.
+
+### 12a. Why an overlay and not eight new `default`s
+
+A depth-2 umbel reads controls it SHARES: its florets, their pedicels and the florets' petals and
+size with depth 1 (and the pedicels with the raceme), and the petal shape with the whole bloom. A
+control has one `default`, and "depth 1 and every other default are unchanged" — so depth 2's
+defaults are an OVERLAY, `UMBEL_DEPTH2_DEFAULTS` in `bloom-registry.js`, the one owner:
+
+| control | registry default | depth 2's default |
+|---|---|---|
+| `umbelFlorets` | 6 | **12** |
+| `floretPetals` | 5 | **4** |
+| `floretScale` | 0.60 | **0.20** (built at the derived floor, 13.13 × 6.00 mm) |
+| `pedicelLength` | 20 mm | **12 mm** |
+| `pedicelAngle` | 35° | **20°** |
+| `petalTipShape` | 1.70 | **2.00** (round) |
+| `petalCup` | 0 | **0.20** |
+| `petalTilt` | 25° | **15°** |
+
+Rays, ray length and ray angle (12, 40 mm, 50°) are depth-2-only controls whose registry defaults
+already are the sheet mophead's, so they are not in the overlay. The registry checks the table at
+module load (every id a slider, in range, on its step, and different from its registry default).
+
+**Three readers, no fourth:**
+- **The page** (`onDepthSwitch` in `bloom.js`) writes it on a HAND switch to depth 2. These are
+  placements made without a ruling, and each is told on the depth's read-out:
+  - a control still at its registry default takes the overlay;
+  - a control the visitor has set is KEPT;
+  - the hand switch back to depth 1 restores the registry default wherever the overlay still
+    stands, so a switch there and back with no edit returns the page it was;
+  - a picked scope ends first, because two of the overlay's controls are scopeable.
+  - A load, Reset, a design file, `applyConfig` and a matrix row never trigger it (no `isTrusted`
+    event — the curve seed's precedent). A design file carries every control anyway.
+- **The matrix** — block 81's depth-2 rows spread the overlay under their own values: a row asks
+  what it names and leaves depth 2's default, not depth 1's.
+- **The defaults bar** — the ruled-default row is re-pinned to it (below).
+
+### 12b. The rebuild and a held slider — measured before building
+
+On this box (headless Chromium, software GL, 1100 × 800; numbers travel only as ratios):
+
+| state | tris | geometry build (Node) | page rebuild at rest | one held-slider step | release |
+|---|---|---|---|---|---|
+| **the mophead default (12 × 12)** | 1,241,994 | 1.9 s | **8.6–13.4 s** | **11.2–17.2 s** (Ray angle, Pedicel angle, Cup; 5 steps each) | 6.5–9.7 s |
+| 2 rays × 12 florets | 208,018 | 0.9–1.2 s | 1.7–1.9 s | 2.6–3.2 s | 1.6 s |
+| 12 rays × 2 florets | 212,394 | 0.8 s | 1.8–2.0 s | 2.5–3.4 s | 1.5 s |
+
+**A drag at the default is UNUSABLE**: every step of a held slider costs 11–17 s, the page shows
+nothing in between, and the drag-light path does nothing here (it drops only the infill and the
+texture; `lightOnScreen` read `false` through every drag, because a mophead has neither).
+
+**Where the time goes:** about 2 s of a mophead step is the geometry. The other 9–15 s are
+page-side — the buffer upload, the read-outs and the render of 1.24 M triangles — and scale with
+the MESH. So "build one sub-umbel and append it" would save nothing: the builder already builds
+ONE floret and ONE sub-umbel and appends the sub-umbel per ray (§0). The lever is how much mesh a
+drag hands the page.
+
+**Proposed, NOT built (Eva's to rule) — the smallest drag-light extension:** add
+`umbelFlorets: 2` to `DRAG_LIGHT_OVERRIDE` for a depth-2 umbel, and make `dragLight()` true for a
+built compound umbel.
+- While a slider is held, every sub-umbel draws 2 florets in place of 12. That is the same
+  override mechanism as the infill (no builder change), and the release pays the full build as now.
+- Measured at exactly that shape (12 rays × 2 florets, 212 K tris): **2.5–3.4 s a step** against
+  11–17 s, about 5× faster.
+- The rays, the bosses, the floret size and shape all stay what the drag is changing, so most
+  sliders still show their effect.
+- Two alternatives, priced by the same table:
+  - **one ray's sub-umbel kept, the others as rays and bosses only:** about the 2-ray figure. It
+    needs a builder flag.
+  - **every floret dropped while dragging:** the smallest mesh. The dome disappears exactly while
+    its shape is being adjusted.
+
+### 12c. The matrix, the defaults bar and the gate
+
+- **Block 81 is redefined in place, 20 rows, 1,588 unchanged.** Every row that builds depth 2
+  spreads the overlay under its own values; the three GATED rows (depth 1, RACEME, NONE) take
+  nothing. The sweeps are relabelled by what they now are:
+  - **rays:** 2 and 6 rays at depth 2's defaults;
+  - **florets:** 2 / 4 / 8 a sub-umbel, the rest at depth 2's defaults (12 × 12 IS the mophead row);
+  - **two rows** now name only what they vary: THE MOPHEAD (nothing beyond the overlay) and the
+    15 cm dome (ray length and angle). Both hold.
+- **Defaults bar:** "the mophead at its ruled defaults" is pinned to THE MOPHEAD row. Its set is
+  read from the registry's overlay, never restated. It reads **44.14 mm on `floret-stem`**.
+- **Panel route (aq)** gains DEPTH 2'S DEFAULTS ON THE HAND SWITCH, with three mutants that must
+  each fire (the switch writes nothing, a set control is overwritten, a load writes the overlay).
+  - The ruled values are restated in the route and held against the registry's table first.
+  - The route checks four things: a load to depth 2 writes nothing; a keyboard switch writes every
+    overlay value; it keeps Florets 3 and tells both; the switch back restores every registry
+    default.
+  - The route count does not move.
+
+- **Census:** block 81 through the export gate in the browser: 20 of 20 watertight, live = export
+  triangle counts on every row. **`MOPHEAD: rays at 90 deg`'s weld (208 / 0.5896) reads 0** — its
+  `SELF_INTERSECTION_XFAIL` entry is removed. Every `INFLO_APPROACH_XFAIL` value still reproduces
+  (the dome's florets still fuse, 0.0000 mm).
+
+### 12d. Bytes and the phase
+
+**Byte partition: 15 movers / 1,573 holders, 0 floats on any holder**, both modes, positionally
+under `Object.is`, from the BASE tree's own record.
+- **Command:** `node tools/verify-bloom-defaults-bytes.mjs --base <worktree of 6697558> --mover
+  depth2 --redefined '^MOPHEAD: '`, run in 12 shards plus block 81 and closed with `--merge`.
+- **Size:** 2,264,510,268 export floats and 223,991,200 captured-grid values.
+- **The predicate is the ruling's own:** a row moves iff the base BUILDS depth 2 (its
+  `inflorescence` record: present, compound) on a row whose base set leaves at least one overlay id
+  unnamed — "builds depth 2 off the defaults".
+- **Who moves and who holds:** every predeclared mover moved and every holder held. The 15 are
+  block 81's depth-2 rows that left an overlay value unnamed. THE MOPHEAD and the 15 cm dome named
+  every value and hold, and so do the three GATED rows, which build no depth 2.
+- **Pairing:** the 17 redefined rows pair by index (each tree builds its own row) and are listed by
+  name.
+- **The control fired:** a 1e-9 move of the default row's stream is reported.
+- **The other 1,568 rows** carry deep-equal states on both trees: `bloom-geometry.js` is
+  sha-identical to `main` and `DEFAULTS` deep-equal.
+
+**The tool owed two fixes to run at all.** It predated the role retirement, threw on the first
+`@scopes` row, and built scoped rows without their scopes. It now skips the reserved entry and
+hands each tree's build `rowScopesForBuild(row)`. It also gained `--mover depth2` and
+`--redefined <regex>`.
+
+**Frozen tags:** every frozen baseline's bytes still reproduce. The geometry is unchanged and the
+registry's `DEFAULTS` are deep-equal; the overlay is read only by a hand switch on the page and by
+block 81's live rows. A frozen row is data, so no frozen row's state or code moved.
+
+**`frozen/phase88` IS owed**, because the row set changed: block 81's 17 rows are redefined in place,
+5 of them relabelled (the ray and floret sweeps).
+- It is the 1,588 rows at `6697558`, registered in both maps and proved deep-equal
+  (`--verify-frozen --phase88`).
+- No workflow file is edited, so it is expected to publish when `bloom-frozen-tags` is dispatched
+  after the merge.

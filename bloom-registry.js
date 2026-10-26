@@ -5382,6 +5382,45 @@ export function leafCurveTwinControls(rows) {
 
 export const DEFAULTS = Object.fromEntries(CONTROLS.map((c) => [c.id, c.default]));
 
+/* DEPTH 2'S DEFAULTS — THE FLOOR-FLORET MOPHEAD (Eva's ruling, Oct 25: "the
+   12 x 12 floor-floret mophead becomes the DEFAULT for umbel depth 2. No
+   preset"; read §12 of docs/bloom-mophead-outcome.md). A depth-2 umbel's
+   controls are SHARED with depth 1 (its florets, their pedicels, the florets'
+   petals and size) and the petal-shape controls with the whole bloom, and
+   "depth 1 and every other default are unchanged" — so a depth-2 default
+   cannot be a control's one `default` and is this OVERLAY instead: the values
+   a depth-2 umbel takes for every control it is not told otherwise. Rays,
+   ray length and ray angle (12, 40 mm, 50 deg) are depth-2-only controls
+   whose registry defaults already are the mophead's, so they are not here.
+   ONE OWNER, three readers: the page writes it on a HAND switch to depth 2
+   (bloom.js `onDepthSwitch` — a control still at its registry default takes
+   the overlay, one the visitor set is kept, both told; the hand switch back
+   to depth 1 restores what still reads the overlay), the matrix's depth-2
+   rows spread it under their own values (block 81), and the defaults bar's
+   ruled-default row is built from it. A load, Reset, `applyConfig` and a
+   matrix row never trigger the switch (no `isTrusted` event) — the seed
+   precedent's own split. Checked at module load: every id a slider, every
+   value inside its range, on its step and DIFFERENT from its registry default
+   (an entry equal to the default would be an overlay that does nothing). */
+export const UMBEL_DEPTH2_DEFAULTS = Object.freeze({
+  umbelFlorets: 12,     // 12 florets a sub-umbel (12 x 12 = 144 on the 12 rays)
+  floretPetals: 4,      // four-petal florets
+  floretScale: 0.20,    // asked at the slider's floor; built at the derived FLORET FLOOR (13.13 x 6.00 mm on the 35 x 16 petal)
+  pedicelLength: 12,    // 12 mm pedicels
+  pedicelAngle: 20,     // at 20 deg
+  petalTipShape: 2.0,   // ROUND florets: the true ellipse at the tip,
+  petalCup: 0.2,        // a shallow cup,
+  petalTilt: 15,        // and a shallower tilt off the floret's hub
+});
+for (const [id, v] of Object.entries(UMBEL_DEPTH2_DEFAULTS)) {
+  const c = CONTROLS.find((x) => x.id === id);
+  if (!c || c.kind !== 'slider') throw new Error(`UMBEL_DEPTH2_DEFAULTS: ${id} is not a registry slider`);
+  if (!(v >= c.min && v <= c.max)) throw new Error(`UMBEL_DEPTH2_DEFAULTS: ${id} ${v} is outside ${c.min}..${c.max}`);
+  const k = (v - c.min) / c.step;
+  if (Math.abs(k - Math.round(k)) > 1e-9) throw new Error(`UMBEL_DEPTH2_DEFAULTS: ${id} ${v} is off the slider's ${c.step} step`);
+  if (Number(c.default) === v) throw new Error(`UMBEL_DEPTH2_DEFAULTS: ${id} ${v} is its registry default — an overlay entry that changes nothing`);
+}
+
 /* Run the relation check at module load — see verifySections() above. */
 verifySections();
 

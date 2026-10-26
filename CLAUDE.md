@@ -6837,6 +6837,19 @@ rulings on the hydrangea discovery; read `docs/bloom-mophead-outcome.md` before 
   interleave — never clamped); defaults bar row on `floret-stem`.
 - Block 81 (20 rows, 1,588), smoke block 81 (5, `--conn`); `frozen/phase87` = the 1,568 rows at `2000b1b`. Sheet:
   `node tools/shot-bloom-mophead.mjs <dir> --png docs/img/mophead.png`.
+- **RULED Oct 25: the floor-floret mophead is depth 2's DEFAULT; no preset** (§12 of the outcome doc).
+  - **One owner:** `UMBEL_DEPTH2_DEFAULTS` in the registry is an OVERLAY, because the controls are shared with
+    depth 1 and the whole bloom: 12 florets, 4 petals, scale 0.20, 12 mm pedicels at 20°, tip shape 2.0,
+    cup 0.2, tilt 15.
+  - **On the page:** a HAND switch to depth 2 writes it (`onDepthSwitch`). A control the visitor set is
+    kept, both are told, and the switch back restores. A load never writes it.
+  - **In the matrix:** block 81's depth-2 rows spread it under their own values. The defaults bar is
+    re-pinned to THE MOPHEAD row. Panel route (aq) has three more mutants.
+  - **A held slider at the default costs 11–17 s a step on this box** (drag-light drops nothing, since a
+    mophead has no infill). The proposed fix is `umbelFlorets: 2` in `DRAG_LIGHT_OVERRIDE` (2.5–3.4 s
+    measured). It is NOT built and is Eva's to rule.
+  - `frozen/phase88` = the 1,588 rows at `6697558`. `verify-bloom-defaults-bytes` gained `--mover depth2`
+    and `--redefined`, and reads `@scopes` rows now.
 
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of

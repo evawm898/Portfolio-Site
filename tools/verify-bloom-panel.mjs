@@ -560,6 +560,15 @@
          bloom-registry.js): the rays shown at depth 1, and the clamp never
          told. Three edits: this entry, the block, the negative control's
          flags and banner.
+         DEPTH 2'S DEFAULTS (Eva's ruling, Oct 25 — the floor-floret mophead
+         is depth 2's default): the registry's overlay is held against the
+         ruled values restated in the block; a LOAD to depth 2 writes
+         nothing; a HAND switch (the keyboard on the select) writes every
+         overlay value still at its registry default, keeps a control the
+         route set first and tells both on the depth's read-out; the switch
+         back restores the registry defaults. Three mutants (bloom.js): the
+         switch writes nothing, a set control is overwritten, a load writes
+         the overlay. Still route (aq) — the route count does not move.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -567,7 +576,7 @@ import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, CONTROLS, SECTIONS,
          RETIRED_IDS, DEFAULTS, evalPredicate, predicateDrivers, verifySections,
          SPIRAL_LEGIBLE_COUNT, exportStl, settleBuild, shownModeOf, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, footCapRestated, footSpanRestated } from './bloom-harness.mjs';
-import { sectionLabel } from '../bloom-registry.js';
+import { sectionLabel, UMBEL_DEPTH2_DEFAULTS } from '../bloom-registry.js';
 import { mirrorPartner } from '../bloom-geometry.js';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
@@ -4963,6 +4972,78 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (aq) DEPTH 2'S DEFAULTS ON THE HAND SWITCH (Oct 25) -----
+   Eva's ruling: the floor-floret mophead is depth 2's default. The overlay is
+   the registry's `UMBEL_DEPTH2_DEFAULTS`; the RULED values are restated here
+   and compared against it first (a moved table is a ruling, not a refactor),
+   so the expected values have an owner the page does not write. Clauses: a
+   LOAD to depth 2 (applyConfig — no isTrusted event) writes nothing; a HAND
+   switch (the keyboard on the select) writes every overlay value still at its
+   registry default, KEEPS the one this route set first (Florets 3) and tells
+   both on the depth's read-out; the hand switch back restores every registry
+   default and keeps the 3. */
+{
+  const tag = '[depth defaults]';
+  const RULED_D2 = { umbelFlorets: 12, floretPetals: 4, floretScale: 0.2, pedicelLength: 12, pedicelAngle: 20, petalTipShape: 2.0, petalCup: 0.2, petalTilt: 15 };
+  if (JSON.stringify(Object.entries(UMBEL_DEPTH2_DEFAULTS).sort()) !== JSON.stringify(Object.entries(RULED_D2).sort())) note(`${tag} the registry's UMBEL_DEPTH2_DEFAULTS ${JSON.stringify(UMBEL_DEPTH2_DEFAULTS)} is not Eva's ruled overlay ${JSON.stringify(RULED_D2)}`);
+  const settle = async (pg) => { await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await settleBuild(pg, 300000); };
+  const ids = Object.keys(RULED_D2);
+  const read = (pg) => pg.evaluate((list) => {
+    const o = Object.fromEntries(list.map((i) => [i, Number(document.getElementById(i).value)]));
+    const el = document.getElementById('umbelDepth'), w = el.closest('.bl-ctrl'), v = w && w.querySelector('.bl-val');
+    return { vals: o, depth: el.value, text: v ? v.textContent : '' };
+  }, ids);
+  const pick = async (pg, key) => { await pg.evaluate(() => { for (let d = document.getElementById('umbelDepth').closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) d.open = true; }); await pg.focus('#umbelDepth'); await pg.keyboard.press(key); await settle(pg); };
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  const run = async (pg, label) => {
+    const p = [];
+    let bad = await applyConfig(pg, [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '3' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    bad = await applyConfig(pg, [{ id: 'umbelDepth', value: '2' }], null, { settleMs: 300000 });
+    let r = await read(pg);
+    const loadWrote = ids.filter((i) => i !== 'umbelFlorets' && !near(r.vals[i], Number(DEFAULTS[i])));
+    if (bad.length || r.depth !== '2' || loadWrote.length) p.push(`a LOAD to depth 2 wrote the overlay (moved ${loadWrote.join(', ') || 'nothing'}; ${bad.join('; ')}) — only a hand switch may`);
+    bad = await applyConfig(pg, [{ id: 'umbelDepth', value: '1' }]);
+    await pick(pg, '2');
+    r = await read(pg);
+    if (r.depth !== '2') p.push(`the keyboard switch did not reach depth 2 (the select reads ${r.depth})`);
+    else {
+      const missed = ids.filter((i) => i !== 'umbelFlorets' && !near(r.vals[i], RULED_D2[i]));
+      if (missed.length) p.push(`the hand switch to depth 2 left ${missed.map((i) => `${i} ${r.vals[i]} (ruled ${RULED_D2[i]})`).join(', ')} — depth 2's defaults were not written`);
+      if (!near(r.vals.umbelFlorets, 3)) p.push(`the hand switch OVERWROTE the Florets this route set (3 -> ${r.vals.umbelFlorets}) — a control the visitor set is kept`);
+      if (!/DEPTH 2'S DEFAULTS written on the switch/.test(r.text) || !/KEPT as you set them: Florets 3\b/.test(r.text)) p.push(`the depth's read-out does not tell what was written and what was kept: ${JSON.stringify(r.text.slice(0, 260))}`);
+    }
+    await pick(pg, '1');
+    r = await read(pg);
+    const notBack = ids.filter((i) => i !== 'umbelFlorets' && !near(r.vals[i], Number(DEFAULTS[i])));
+    if (r.depth !== '1' || notBack.length || !near(r.vals.umbelFlorets, 3)) p.push(`the hand switch back to depth 1 did not restore the registry defaults (${notBack.map((i) => `${i} ${r.vals[i]}`).join(', ') || 'restored'}; Florets ${r.vals.umbelFlorets}, depth ${r.depth})`);
+    if (!/back to depth 1: the registry defaults restored/.test(r.text)) p.push(`the read-out does not tell the restore: ${JSON.stringify(r.text.slice(0, 200))}`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: a load to depth 2 writes nothing; a hand switch writes depth 2's ruled defaults, keeps the set Florets 3 and tells both; the switch back restores every registry default`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'depth 2\'s defaults');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the switch writes nothing', from: "window.addEventListener('change', onDepthSwitch, true);\n", to: '\n' },
+      { name: 'a set control is overwritten', from: '    if (sameSlider(inputs[id].value, from)) { inputs[id].value = String(to);', to: '    if (true) { inputs[id].value = String(to);' },
+      { name: 'a load writes the overlay', from: "  if (!e.isTrusted) { delete seedNotes.umbelDepth; return; }\n", to: '' },
+    ];
+    for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (appSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: appSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -5099,10 +5180,13 @@ if (NEGATIVE_CONTROL) {
     /* ROUTE (aq), THE MOPHEAD'S DEPTH — one flag per mutant */
     const sawMopheadRays = fail.some((f) => /^\[mophead\] MUTANT \(the rays are shown at depth 1\).*ray controls are SHOWN/.test(f));
     const sawMopheadClamp = fail.some((f) => /^\[mophead\] MUTANT \(the clamp is never told\).*does not say .* asked and .* built/.test(f));
+    const sawDepthWrites = fail.some((f) => /^\[depth defaults\] MUTANT \(the switch writes nothing\).*depth 2's defaults were not written/.test(f));
+    const sawDepthKeeps = fail.some((f) => /^\[depth defaults\] MUTANT \(a set control is overwritten\).*OVERWROTE the Florets/.test(f));
+    const sawDepthLoad = fail.some((f) => /^\[depth defaults\] MUTANT \(a load writes the overlay\).*a LOAD to depth 2 wrote the overlay/.test(f));
     /* ROUTE (ap), THE UMBEL'S HEAD TOGGLE — one flag per mutant */
     const sawUmbelLabel = fail.some((f) => /^\[umbel head\] MUTANT \(the label is never derived\).*it must say its controls shape the florets/.test(f));
     const sawUmbelCount = fail.some((f) => /^\[umbel head\] MUTANT \(the head petal count shows with the head off\).*the head-only controls show/.test(f));
-    if (sawMopheadRays && sawMopheadClamp && sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    if (sawMopheadRays && sawMopheadClamp && sawDepthWrites && sawDepthKeeps && sawDepthLoad && sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
@@ -5110,7 +5194,7 @@ if (NEGATIVE_CONTROL) {
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
         && sawTextureGrey && sawTextureLine
         && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-FOUR ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}, umbel head — the label never derived: ${sawUmbelLabel}, the petal count shown: ${sawUmbelCount}, mophead — the rays at depth 1: ${sawMopheadRays}, the clamp untold: ${sawMopheadClamp}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}, umbel head — the label never derived: ${sawUmbelLabel}, the petal count shown: ${sawUmbelCount}, mophead — the rays at depth 1: ${sawMopheadRays}, the clamp untold: ${sawMopheadClamp}, depth 2's defaults — never written: ${sawDepthWrites}, a set control overwritten: ${sawDepthKeeps}, a load writes: ${sawDepthLoad}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');
