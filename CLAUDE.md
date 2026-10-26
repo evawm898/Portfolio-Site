@@ -6847,7 +6847,8 @@ rulings on the hydrangea discovery; read `docs/bloom-mophead-outcome.md` before 
     re-pinned to THE MOPHEAD row. Panel route (aq) has three more mutants.
   - **A held slider at the default costs 11–17 s a step on this box** (drag-light drops nothing, since a
     mophead has no infill). The proposed fix is `umbelFlorets: 2` in `DRAG_LIGHT_OVERRIDE` (2.5–3.4 s
-    measured). It is NOT built and is Eva's to rule.
+    measured). **RULED Oct 26: NOT built yet — the page-side cost (~10 s of the 11–17 s step) is
+    profiled first, in its own session** (§12b of the outcome doc).
   - `frozen/phase88` = the 1,588 rows at `6697558`. `verify-bloom-defaults-bytes` gained `--mover depth2`
     and `--redefined`, and reads `@scopes` rows now.
 
