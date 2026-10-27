@@ -1995,6 +1995,14 @@ export function tipControls(t) {
   }));
 }
 
+/* THE HUB CONTROLS' UMBEL NOTE (Oct 27): on an umbel they shape the junctions —
+   with the head OFF that is all they shape, said on the control itself. */
+export function umbelJunctionNote(ui) {
+  if (!ui || String(ui.inflorescence) !== 'UMBEL' || !(Number(ui.stemLength) >= 1)) return '';
+  const headOff = String(ui.umbelHead ?? 'OFF') !== 'ON';
+  const mop = String(ui.umbelDepth ?? '1') === '2';
+  return ` · shapes the UMBEL JUNCTION${mop ? 'S (the stem-top knot and every ray tip)' : ' (the stem-top knot)'}${headOff ? ' — the head is OFF, so that is all it shapes' : ' as well as the head\'s own hub'}`;
+}
 export const CONTROLS = [
   { id: 'petalCount', section: 'arrangement', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
     /* CLAMPED AND TOLD, ON THE CONTROL (the sphere-stem session). On a SPHERE
@@ -4322,13 +4330,18 @@ export const CONTROLS = [
      names Eva may want to separate on the preview.
      =================================================================== */
   { id: 'hubStyle', section: 'hub', kind: 'choice', default: 'GOBLET',
+    /* see `umbelJunctionNote` (module scope, below the row table's helpers) */
     options: [
       { value: 'GOBLET', label: 'Goblet (rounded flare — ships today)' },
       { value: 'ANGLED', label: 'Angled (straight cone, hard shoulders)' },
       { value: 'CURVED', label: 'Curved (smooth into the stem, no shoulder)' },
     ],
     label: 'Hub style',
-    fmt: (v) => (v === 'ANGLED' ? 'a straight conical taper' : v === 'CURVED' ? 'a smooth continuous curve into the stem' : 'the rounded flare (today\'s shape at amount 1)'),
+    /* ON AN UMBEL (Oct 27, Eva's ruling) the three Hub controls shape the UMBEL
+       JUNCTIONS too — the stem-top knot and every ray tip on a mophead — the
+       hub-to-stem join run in reverse; with the head OFF that is all they shape,
+       and the read-out says so rather than reading inert. */
+    fmt: (v, ui) => (v === 'ANGLED' ? 'a straight conical taper' : v === 'CURVED' ? 'a smooth continuous curve into the stem' : 'the rounded flare (today\'s shape at amount 1)') + umbelJunctionNote(ui),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
   { id: 'hubShapeAmount', section: 'hub', kind: 'slider',
     min: HUB_SHAPE_AMOUNT_RANGE[0], max: HUB_SHAPE_AMOUNT_RANGE[1], step: 0.05, default: HUB_SHAPE_AMOUNT_DEFAULT,
@@ -4337,7 +4350,7 @@ export const CONTROLS = [
        on today's shape at one slider value, and GOBLET does — at exactly 1.00,
        where `x * 1 === x` reproduces today. 0 is a straight join (no flare) for
        all three styles; above 1 exaggerates. One-sided by ruling — no waist. */
-    fmt: (v) => (Number(v) === 0 ? 'straight — no flare' : Number(v) === 1 ? '1.00x — today\'s shape (GOBLET)' : `${Number(v).toFixed(2)}x pronounced`),
+    fmt: (v, ui) => (Number(v) === 0 ? 'straight — no flare' : Number(v) === 1 ? '1.00x — today\'s shape (GOBLET)' : `${Number(v).toFixed(2)}x pronounced`) + umbelJunctionNote(ui),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
   { id: 'hubLength', section: 'hub', kind: 'slider',
     min: HUB_LENGTH_RANGE[0], max: HUB_LENGTH_RANGE[1], step: 0.5, default: 0,
@@ -4347,7 +4360,7 @@ export const CONTROLS = [
        reproduce today on every state. Above 0 it is that reach in millimetres,
        floored at the sheet. hubLength ADDS to the object's height; the read-out
        states the total (Eva's ruling). */
-    fmt: (v) => (Number(v) === 0 ? 'auto — the derived reach (the read-out says the mm)' : `${Number(v).toFixed(1)} mm below the head`),
+    fmt: (v, ui) => (Number(v) === 0 ? 'auto — the derived reach (the read-out says the mm)' : `${Number(v).toFixed(1)} mm below the head`) + umbelJunctionNote(ui),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
 
   /* ===================================================================

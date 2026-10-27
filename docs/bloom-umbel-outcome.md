@@ -288,6 +288,12 @@ ruling's law, and a deeper band at 90° would be a typed height.
 
 ## 10. The flat underside and the crossing's margin (Oct 24, Eva's two rulings)
 
+**RULED Oct 27 (from the deploy preview): the flat coin bosses read as unnatural ("the disk is
+just everywhere"); every umbel junction becomes a HUB — the hub-to-stem join run in reverse, a
+flare from the incoming rod out to the band that holds the root discs, driven by the three Hub
+controls (the umbel-hubs session). The flat-underside ruling of Oct 24 below is SUPERSEDED by
+the hub's own flare; the band, its disc-holding law and the 90° crossing margin stand.**
+
 **RULED Oct 24: flat underside; the overhang rule was FDM's and the target
 process is SLS.** The first print is SLS PA12, which needs no supports, so the
 45° underside cone goes. The profile is now

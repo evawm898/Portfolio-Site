@@ -1721,6 +1721,7 @@ let lastSepals = null, lastSepalsBuilt = null, lastSepalsAbsent = true, lastSepa
    is written down: the claim it would serve is already a MEASURED zero the
    builder reports as `placementResidual`, by a second expression beside the
    method under test. */
+let lastTriRanges = null;
 let lastInflo = null, lastInfloBuilt = null, lastInfloAbsent = true, lastInfloTris = 0, lastUmbelHeadAbsent = false, lastUmbelCompound = false, lastHeadLattices = null;
 let lastNodeVarianceAbsent = true;
 /* THE SPHERE'S STEM CHANNEL (the sphere-stem session) — which slots were NOT
@@ -1957,6 +1958,10 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastSepalsAskedUnderSphere = built.foot.sphereMode ? Math.round(Number(uiForBuild.sepalCount) || 0) : 0;
     lastInflo = built.inflorescence && built.inflorescence.present ? built.inflorescence : null;
     lastInfloBuilt = built.inflorescenceBuilt || null;
+    /* THE HUB'S AND THE STEM'S TRIANGLE RANGES IN THE STREAM (Oct 27, ST13):
+       the builder's own tallies, so a clause on the exported file can name
+       which triangles are the stem's and the join's without a geometric guess */
+    lastTriRanges = { hub: [built.petalTriEnd, built.hubTriEnd], stem: [built.hubTriEnd, built.stemTriEnd] };
     lastInfloTris = built.inflorescenceBuilt ? built.inflorescenceBuilt.tris : 0;
     lastInfloAbsent = inflorescenceIsAbsent(uiForBuild);
     lastUmbelHeadAbsent = umbelHeadIsAbsent(uiForBuild);
@@ -3050,6 +3055,26 @@ function overtopLine(plan, builtInflo) {
   return ` — A LOWER FLORET OVERTOPS THE HEAD: node ${worst + 1}'s (${plan.pedicelLensMm[worst].toFixed(1)} mm pedicel, ${(plan.pedicelLensMm[worst] / Math.max(1e-9, plan.pedicelLensMm[0])).toFixed(2)}x the top's) stands ${intr.toFixed(2)} mm into the gap under the head${over > 1 ? ` (${over} of ${by.length - 1} lower nodes do)` : ''} — the inset is the TOP floret's reach and a longer lower pedicel outreaches it (told, never clamped)`;
 }
 
+/* THE UMBEL JUNCTION AS A HUB (Oct 27, Eva's ruling): the band (the disc-holding
+   law, unchanged) and the FLARE under it — the hub-to-stem join run in reverse,
+   driven by the three Hub controls. Asked against built, the clamp and the
+   no-room case told, the auto reach named for what it is. */
+function junctionLine(knot, builtKnot, what) {
+  if (!knot) return '';
+  const F = knot.flare;
+  const band = `band ${(2 * knot.halfHeightMm).toFixed(2)} mm tall x ${(2 * knot.radiusMm).toFixed(2)} mm across (the root discs' own)`;
+  if (!F) return `\n     ${what} JUNCTION ${band} — a coin (no hub record)`;
+  const flare = F.built
+    ? `FLARE ${F.style} ${F.amount.toFixed(2)}x, ${F.swellMm.toFixed(2)} mm from the band's foot down to the ${(2 * F.rodR + knot.gapMm).toFixed(2)} mm rod (meeting it ${(knot.gapMm / 2).toFixed(2)} mm inside its wall)`
+      + (F.auto ? ` — auto: as deep as it is wide (${F.widthMm.toFixed(2)} mm), the one placement made without a ruling` : ` — Hub length ${F.lengthAsked.toFixed(1)} mm in all`)
+      + (F.clamped ? ` — CLAMPED from ${F.swellAskedMm.toFixed(2)} mm: the rod below the band is only ${Math.max(0, F.roomMm - knot.halfHeightMm).toFixed(2)} mm long before its end (told, not refused)` : '')
+      + (builtKnot && builtKnot.tris ? ` · ${builtKnot.tris} tris` : '')
+    : F.noRoom ? `NO FLARE — amount ${F.amount.toFixed(2)}x asked ${F.swellAskedMm.toFixed(2)} mm and the rod below the band has no room for it (told)`
+    : F.amount === 0 ? 'STRAIGHT — amount 0, the band alone (the Oct 24 coin, by branch)'
+    : 'NO FLARE — the band is no wider than the rod';
+  return `\n     ${what} JUNCTION a HUB · ${band} · ${flare} · the Hub controls shape this junction (the head is ${what === 'UMBEL' ? 'off or on the stem above it' : 'the ray\'s'})`;
+}
+
 function infloLine(plan, builtInflo) {
   /* THE COMPOUND UMBEL (the mophead): rays, sub-umbels, the floret floor, the
      reduced lattice and the budget clamp — asked against built, always. */
@@ -3063,7 +3088,9 @@ function infloLine(plan, builtInflo) {
       + (bf ? ` · FLORET FLOOR ${bf.lengthMm.toFixed(2)} x ${bf.widthMm.toFixed(2)} mm (${bf.scale.toFixed(3)}x — the least scale at which a petal still keeps its full sheet body ${bf.taperMm.toFixed(1)} mm in from both margins and the drawn tip, past the root blend)${F.sizeClamped ? ' — FLOORED' : ''}` : '')
       + (lat && lat.lattice ? ` · the REDUCED lattice: ${lat.lattice.columns} columns, a ${lat.lattice.beadCap}-segment bead (a declared exception to the edge profile's four, florets of a depth-2 umbel only)` : '')
       + (sb ? ` · ${sb.floretUnit.tris.toLocaleString('en-US')} tris a floret, ${builtInflo.unitTris.toLocaleString('en-US')} a sub-umbel, ${builtInflo.tris.toLocaleString('en-US')} in all` : '')
-      + (F ? `\n     SUB-UMBEL ${sb.count} florets on ${F.pedicelLenMm.toFixed(0)} mm pedicels at ${F.angleDeg} deg off each ray, ${(2 * F.pedicelR).toFixed(2)} mm across, rooted in a boss ${(2 * sb.knot.radiusMm).toFixed(2)} mm across at the ray's end` : '');
+      + (F ? `\n     SUB-UMBEL ${sb.count} florets on ${F.pedicelLenMm.toFixed(0)} mm pedicels at ${F.angleDeg} deg off each ray, ${(2 * F.pedicelR).toFixed(2)} mm across, rooted in a boss ${(2 * sb.knot.radiusMm).toFixed(2)} mm across at the ray's end` : '')
+      + junctionLine(plan.knot, builtInflo && builtInflo.knot, 'UMBEL')
+      + (F && sb.plan && sb.plan.knot ? junctionLine(sb.plan.knot, sb.knot, 'RAY TIP') : '');
   }
   const per = plan.perNode;
   const n = builtInflo ? builtInflo.count : plan.built;
@@ -3091,6 +3118,7 @@ function infloLine(plan, builtInflo) {
     + (plan.crossesSolidMm === null ? ''
       : `\n     ROOTED at r = ${plan.rootR.toFixed(2)} mm, the stem WALL's mid-thickness · crosses ${plan.crossesSolidMm.toFixed(2)} mm of solid`
         + (plan.crossesSolidMm > 0 ? '' : ' — CROSSES NOTHING: this pedicel is a detached shell that still exports watertight (told, never refused)'))
+    + (plan.umbel ? junctionLine(plan.knot, builtInflo && builtInflo.knot, 'UMBEL') : '')
     + `\n     NODES top ${plan.nodeDepthsMm[0].toFixed(1)} mm below the hub`
     /* THE INTERNODE FLOOR IS THE FLORETS' OWN (build 3, ruling 1): derived
        from the floret unit's emitted triangles — the shift at which a floret
@@ -3474,9 +3502,11 @@ function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
     + (stem.swellActive
         ? ` · ${stem.hubAmount.toFixed(2)}x pronounced · reaches ${stem.axisDepth.toFixed(2)} mm below the head`
           + (stem.hubLengthAuto ? ' (auto — the derived join depth)' : ' (Hub length)')
+          + (stem.hubReachFloored ? ` — FLOORED at ${stem.capReachMin.toFixed(2)} mm: the cap's own sag under a ${(2 * stem.outerR).toFixed(1)} mm stem plus half a sheet, so the stem's root ring sits inside the join at its own radius (told)` : '')
         : stem.joinReason === 'shell' ? ' · INERT on a sphere — the shell wall IS the join, so style, amount and length do nothing here (told)'
           : Number(stem.hubAmount) === 0 ? ' · STRAIGHT — amount 0, no flare'
           : ' · STRAIGHT — the head is not wider than the stem, so there is no room for a flare (the stem\'s solid root band joins them)')
+    + (stem.domedTop ? ` · the stem's top ring lies ON the cap's mid-surface at r = ${stem.outerR.toFixed(2)} (${stem.stemTopSagMm.toFixed(2)} mm under the apex), so nothing of it shows through the head's skin` : '')
     + ` · TOTAL ${stem.belowHeadMm.toFixed(1)} mm below the head\'s top face (hub ${stem.axisDepth.toFixed(2)} + stem ${stem.lengthMm} — Hub length ADDS to the height, stem length unchanged)`
     + stemNodesLine(stem)
     + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm thick at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — thickness DERIVED from the stem's own section, no control` : inertBecause}\n`
@@ -4596,6 +4626,13 @@ window.__bloomMetrics = () => ({
        the land count). SC1 restates the cut from the CONTROLS and reads the
        emitted ring; ST10's end-face clause reads the emitted face. */
     cut: lastStem.cut ? JSON.parse(JSON.stringify(lastStem.cut)) : null,
+    /* THE DOMED TOP (Oct 27): the stem's top ring on the cap's mid-surface at
+       its own radius, the bore's at the bore's; the sag under the apex; the
+       reach FLOOR it put on the join; and the builder's own stream ranges, so
+       ST13 can read the stem and the join off the exported file by name */
+    domedTop: !!lastStem.domedTop, stemTopZ: lastStem.stemTopZ, stemTopInnerZ: lastStem.stemTopInnerZ, stemTopSagMm: lastStem.stemTopSagMm,
+    hubReachFloored: !!lastStem.hubReachFloored, capReachMin: lastStem.capReachMin,
+    triRanges: lastTriRanges ? { hub: lastTriRanges.hub.slice(), stem: lastTriRanges.stem.slice() } : null,
     tubeStations: lastStem.tubeStations ? lastStem.tubeStations.slice() : null,
     emittedCut: lastStemBuilt && lastStemBuilt.emittedCut ? JSON.parse(JSON.stringify(lastStemBuilt.emittedCut)) : null,
     emittedTopZ: lastStemBuilt ? lastStemBuilt.emittedTopZ : undefined,

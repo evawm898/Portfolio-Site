@@ -520,6 +520,24 @@ const PREDICATE_MOVERS = {
      builds. Read off the base's record, never the label; every other row —
      every NONE, every RACEME, the GATED umbel rows with no stem — must hold to
      the bit in both modes, because only the junction's emitter changed. */
+  /* THE UMBEL JUNCTION AS A HUB AND THE STEM'S DOMED TOP (Oct 27). A row moves
+     iff the BASE tree builds an umbel on it (the junction's emitter changed —
+     `umbel-boss`'s own predicate) OR builds a stem rooted through a CAP wider
+     than itself with the head present (`stem-top`: the stem's top ring moves
+     onto the mid-surface on every such row, since the cap's sagitta at the
+     stem's radius is never 0). Every other row holds to the bit. */
+  'stem-top': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    const fr = base.footRing(bs, acc);
+    const sp = fr.hub && base.stemPlan(bs, fr.hub, acc);
+    if (!(sp && sp.present)) return false;
+    const dome = fr.hub.dome;
+    if (!dome || dome.closed) return false;
+    if (typeof base.umbelHeadIsAbsent === 'function' && base.umbelHeadIsAbsent(bs)) return false;
+    return sp.hubR > sp.outerR;
+  },
+  'umbel-hubs': (st) => PREDICATE_MOVERS['umbel-boss'](st) || PREDICATE_MOVERS['stem-top'](st),
   'umbel-boss': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const bs = baseState(st);

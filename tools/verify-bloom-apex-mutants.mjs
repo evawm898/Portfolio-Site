@@ -1533,6 +1533,58 @@ const MUTANTS = [
     } },
   /* RE-ANCHORED by the boss session (Eva's ruling, Oct 23): the junction is a
      squat BOSS now, and the typed size is the boss's RIM radius. */
+  /* THE STEM THROUGH THE HEAD AND THE JUNCTION AS A HUB (Oct 27, Eva's two
+     rulings). Four mutants: the defect restored, the junction deaf to the Hub
+     controls, a root disc ON the band's face, and a ray tip reading the STEM's
+     radius for its rod. Each witnessed on the mutated module's own build. */
+  { id: 'the-stem-top-is-laid-at-the-apex', rows: /^a domed head/,
+    why: "the stem's top ring goes back to the cap's APEX — Eva's Oct 27 defect: a flat disc at the stem's radius stands above the cap's skin by its sagitta there (0.31 mm on her state, 2.15 at rise 1 with a 12 mm stem), a ring showing through the head at its centre; watertight, one piece, the same triangle count",
+    find: '  const zs = [plan.domedTop ? plan.stemTopZ : plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];',
+    into: '  const zs = [plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];', names: ['ST13', 'ST10'],
+    witness: (M, C) => {
+      const f = (X) => { const acc = new X.MeshBuilder({ exportMode: true }); const b = X.buildBloomInto(acc, { ...REGISTRY_DEFAULTS, petalCount: 8, spread: 2, headRise: 0.35, hubStyle: 'CURVED', hubShapeAmount: 1.6, stemLength: 60 });
+        const d = b.hub.dome, t = b.stem.hubT, P = acc.positions; let worst = -Infinity;
+        for (let i = b.hubTriEnd * 9; i < b.stemTriEnd * 9; i += 3) { const r = Math.hypot(P[i], P[i + 1]); if (r > b.hub.radius) continue; const z = P[i + 2] - (d.centreZ + Math.sqrt((d.Rd + t / 2) ** 2 - r * r)); if (z > worst) worst = z; }
+        return worst; };
+      const m = f(M), c = f(C);
+      return (m > 0.2 && c < 0) ? null : `the stem stands ${m.toFixed(4)} mm above the skin on the mutant and ${c.toFixed(4)} on the clean tree`;
+    } },
+  { id: 'the-join-reach-floor-is-dropped', rows: /^a domed head with a WIDE/,
+    why: "the join's reach floor on a domed top is removed, so under a thin join and a wide stem the stem's ROOT ring (its first station, at the join's underside on the axis) stands above the rim ring and through the cap's skin — the second half of the Oct 27 defect, independent of the top disc",
+    find: '  const capReachMin = domedTop ? stemTopSagMm + hubT / 2 : 0;',
+    into: '  const capReachMin = 0;', names: ['ST13', 'ST5'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), { ...REGISTRY_DEFAULTS, headRise: 0.35, stemDiameter: 12, hubShapeAmount: 0, stemLength: 60 }).stem;
+      const m = f(M), c = f(C);
+      return (!m.hubReachFloored && c.hubReachFloored && m.axisDepth < c.axisDepth - 0.5) ? null : `the reach is ${m.axisDepth} (floored ${m.hubReachFloored}) on the mutant and ${c.axisDepth} (floored ${c.hubReachFloored}) on the clean tree`;
+    } },
+  { id: 'the-junction-ignores-the-hub-controls', rows: /^an umbel|^a mophead/,
+    why: 'the umbel junction never reads the three Hub controls, so every junction is the Oct 24 coin whatever style, amount and length ask — watertight, one piece, 192 triangles a junction',
+    find: '  let flare = null;\n  if (hub) {',
+    into: '  let flare = null;\n  if (false) {', names: ['UM1', 'UM8'],
+    witness: (M, C) => {
+      const f = (X) => { const k = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescenceBuilt.knot; return k.bottomZ - k.rimBottomZ; };
+      const m = f(M), c = f(C);
+      return (Math.abs(m) < 1e-9 && c < -1) ? null : `the junction's foot stands ${m} mm under its band on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'a-root-disc-on-the-junctions-face', rows: /^an umbel/,
+    why: "the band's half-height drops its half gap, so every pedicel's root disc reaches exactly the band's top and bottom faces — ON the surface, the tangency that welds (749 pairs on the sphere); watertight, one piece",
+    find: '  const h0 = rP * Math.abs(ca) + gap / 2;',
+    into: '  const h0 = rP * Math.abs(ca);', names: ['UM1', 'UM2'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescenceBuilt.knot.halfHeightMm;
+      const m = f(M), c = f(C);
+      return (c - m > 0.49 && c - m < 0.51) ? null : `the band's half-height is ${m} on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-ray-junction-reads-the-stems-radius', rows: /^a mophead/,
+    why: "a sub-umbel keeps the HEAD's stem diameter instead of its own ray's, so every ray tip's rod — and the junction flared onto it — is sized from the stem; watertight, one piece",
+    find: '    umbelFlorets: plan.floretsPerRay,\n    stemLength: lengthMm,\n    stemDiameter: 2 * plan.pedicelR,\n  };',
+    into: '    umbelFlorets: plan.floretsPerRay,\n    stemLength: lengthMm,\n  };', names: ['UM8'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), MOPHEAD_STATE()).inflorescenceBuilt.sub.knot.flare.rodR;
+      const m = f(M), c = f(C);
+      return (m > c + 0.5) ? null : `the ray tip's rod is ${m} mm on the mutant and ${c} on the clean tree`;
+    } },
   { id: 'the-boss-radius-is-typed', rows: /^an umbel/,
     why: "the junction boss's rim is a typed 6 mm radius instead of the reach the count, the pedicel radius and the angle derive — at twelve florets the pedicels then root on a ring wider than the boss, every root disc out past its rim",
     find: '  const radiusMm = Math.max(R0, rho + crossMinMm * ca);',
@@ -1554,10 +1606,13 @@ const MUTANTS = [
   /* THE FLAT UNDERSIDE AND THE CROSSING'S MARGIN (Eva's rulings, Oct 24). */
   { id: 'the-boss-underside-cones-again', rows: /^an umbel/,
     why: "the boss's flat underside is replaced by a cone down to a point on the axis — the FDM overhang the SLS ruling removed: watertight, one piece, every root disc still held",
-    find: '    const zBot = c[2] - h;',
-    into: '    const zBot = c[2] - h - R;', names: ['UM1'],
+    /* RE-ANCHORED by the umbel-hubs session (Oct 27): the foot is the flare's
+       where one is built; the witness reads the COIN (amount 0), where the
+       clean tree's foot is the band's own. */
+    find: '    const zBot = F ? c[2] - h - F.swellMm : c[2] - h;',
+    into: '    const zBot = (F ? c[2] - h - F.swellMm : c[2] - h) - R;', names: ['UM1'],
     witness: (M, C) => {
-      const f = (X) => { const k = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescenceBuilt.knot; return k.bottomZ - k.rimBottomZ; };
+      const f = (X) => { const k = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE({ hubShapeAmount: 0 })).inflorescenceBuilt.knot; return k.bottomZ - k.rimBottomZ; };
       const m = f(M), c = f(C);
       return (m < -1 && Math.abs(c) < 1e-9) ? null : `the boss's bottom stands ${m} mm below its rim's foot on the mutant and ${c} on the clean tree`;
     } },
@@ -2035,7 +2090,10 @@ const MUTANTS = [
       return m.emittedVoid ? null : 'the mutant emitted no void on the crossover state either — the two closures still cannot cross'; } },
 
   { id: 'hairline-root', why: 'the stem STARTS at the hub underside instead of running THROUGH the slab — the overlap becomes a touch, and no boundary census or flood fill can see the difference',
-    find: '  const zs = [plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];',
+    /* RE-ANCHORED by the umbel-hubs session (Oct 27): the top ring is the
+       domed top's on a cap, the apex on a flat hub — the stem-facts state is a
+       flat hub, where the span is the slab's. */
+    find: '  const zs = [plan.domedTop ? plan.stemTopZ : plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];',
     into: '  const zs = [plan.rootZ, ...plan.stations.map((mm) => plan.rootZ - mm)];', names: ['ST4'],
     witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
@@ -3180,8 +3238,9 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (!m.hub && c.hub && c.hub.displaced > 0 && m.stem && m.stem.displaced > 0) ? null : `the mutant's hub record ${m.hub ? 'exists' : 'is absent'} (clean ${c.hub ? `${c.hub.displaced} displaced` : 'absent'})`; } },
   { id: 'the-stem-normal-points-inward', rows: T5_ROWS, why: "the stem wall's normal is its own axis's radial NEGATED — and the visibility test reads the same normal, so every escape ray now starts INSIDE the stem and the wall reads BURIED almost everywhere: the stem is left nearly smooth on an exposed wall and the few vertices still relieved go INTO it, while every scalar record reads 0 <= s <= H along the recorded normal (TX1/TX2 blind). Measured: it fires TX11 (the clearly exposed wall stops being relieved), not TX10, which reads too few relieved samples to meet one — the claim is what it does; TX10's normal clause has its own mutant below",
-    find: "      return L > 0 ? [dx / L, dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') return [0, 0, 1];",
-    into: "      return L > 0 ? [-dx / L, -dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') return [0, 0, 1];", names: ['TX11'],
+    /* RE-ANCHORED (Oct 27): the top face's normal has a domed arm now */
+    find: "      return L > 0 ? [dx / L, dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') {",
+    into: "      return L > 0 ? [-dx / L, -dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') {", names: ['TX11'],
     witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const inward = (F) => F.stem.skin.filter((q) => { const r = Math.hypot(q.p0[0], q.p0[1]); return r > 2.9 && (q.p1[0] * q.p0[0] + q.p1[1] * q.p0[1]) / r < r - 0.01; }).length;
@@ -4169,16 +4228,23 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'pedicelLength', value: '250' }] },
   /* THE UMBEL (the umbel session): six florets with the head OFF, and twelve
      with the head ON — scoped to the four umbel mutants and they to these. */
-  { label: 'an umbel: six florets, the head OFF (the spider lily\'s default)', for: /umbel|head-is-built|boss-/,
+  /* THE STEM THROUGH THE HEAD (Oct 27): Eva's own defect state — scoped to the
+     stem-top mutant, which is scoped to it (a flat hub has no sag to lay a disc
+     above). */
+  { label: 'a domed head with a stem: 8 petals, spread 2, rise 0.35, CURVED 1.60, a 60 mm stem (Eva\'s Oct 27 state)', for: /stem-top|the-join-reach-floor/,
+    set: [{ id: 'petalCount', value: '8' }, { id: 'spread', value: '2' }, { id: 'headRise', value: '0.35' }, { id: 'hubStyle', value: 'CURVED' }, { id: 'hubShapeAmount', value: '1.6' }, { id: 'stemLength', value: '60' }] },
+  { label: 'a domed head with a WIDE stem and a THIN join: rise 0.35, a 12 mm stem, amount 0 (the root ring poked on main)', for: /stem-top|the-join-reach-floor/,
+    set: [{ id: 'headRise', value: '0.35' }, { id: 'stemDiameter', value: '12' }, { id: 'hubShapeAmount', value: '0' }, { id: 'stemLength', value: '60' }] },
+  { label: 'an umbel: six florets, the head OFF (the spider lily\'s default)', for: /umbel|head-is-built|boss-|junction/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }] },
-  { label: 'an umbel: twelve florets, the head ON', for: /umbel|head-is-built|boss-/,
+  { label: 'an umbel: twelve florets, the head ON', for: /umbel|head-is-built|boss-|junction/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '12' }, { id: 'umbelHead', value: 'ON' }] },
   /* THE MOPHEAD (Oct 24): two rays of three florets with the head OFF, and the
      same with the head ON (the head's petals beside the reduced florets) —
      scoped to the five mophead mutants and they to these. */
-  { label: 'a mophead: two rays of three florets, the head OFF, at the floor', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor/,
+  { label: 'a mophead: two rays of three florets, the head OFF, at the floor', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor|junction/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'floretScale', value: '0.2' }] },
-  { label: 'a mophead: two rays of three florets, the head ON', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor/,
+  { label: 'a mophead: two rays of three florets, the head ON', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor|junction/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'umbelHead', value: 'ON' }] },
   /* the 90 deg knife edge (Eva, Oct 24): the only angle at which the crossing's
      margin binds on the band's height, so the margin mutant has a row to fire on */

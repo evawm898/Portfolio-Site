@@ -6852,6 +6852,37 @@ rulings on the hydrangea discovery; read `docs/bloom-mophead-outcome.md` before 
   - `frozen/phase88` = the 1,588 rows at `6697558`. `verify-bloom-defaults-bytes` gained `--mover depth2`
     and `--redefined`, and reads `@scopes` rows now.
 
+**THE STEM'S TOP ON A CAP IS THE CAP'S MID-SURFACE, THE JOIN'S REACH IS FLOORED UNDER IT, AND
+EVERY UMBEL JUNCTION IS A HUB — THE HUB-TO-STEM JOIN RUN IN REVERSE** (Oct 27, Eva's two rulings
+from the deploy preview — read `docs/bloom-umbel-hubs-outcome.md` before touching `stemPlan`'s
+`domedTop` / `stemTopZ` / `capReachMin`, `buildStemInto`'s top ring, `umbelBoss`'s `flare`,
+`umbelFlareDepthAt`, `UMBEL_FLARE_RINGS`, `umbelJunctionNote`, ST13, `umbelFlareExpected` /
+`umbelFlareClauses` or block 82).
+- **THE DEFECT, REPRODUCED FIRST:** a ring showing through a domed head at its centre. The stem's
+  flat top disc was laid at the cap's APEX, so its rim stood above the skin by the cap's sagitta at
+  the stem's radius — 0.31 mm on Eva's state (8 petals, spread 2, rise 0.35, a 6 mm stem), 2.15 at
+  rise 1 with a 12 mm stem, 0 on a flat hub; **hub style, amount and length move none of it**. A
+  second half, independent of the disc: the ROOT ring (station 0, at the join's underside on the
+  axis) pokes too where the join is thinner than the cap's curvature over the stem's radius.
+- **The fix at its owner (`stemPlan`):** on a cap wider than its stem with the head present, the
+  top rim ring sits ON the cap's MID-surface at the stem's radius and the bore opens at the
+  mid-surface at the bore's; the join's reach is floored at that sag plus half a sheet (told
+  FLOORED). Flat hub, sphere and a head not wider than its stem are byte-identical by branch.
+  **ST13** reads the exported file by the builder's own stream ranges against the HUB BUILDER's
+  emitted dome and the control's radius; ST4 keeps the slab; ST10's band restated on a domed top.
+- **The junction:** the BAND (the disc-holding law, the 90° margin) stands; under it a FLARE from
+  the band's rim to the incoming rod — stem, or the RAY at a mophead's ray tip, at its own radius —
+  driven by the three Hub controls (one owner; told on the controls that they shape the junctions
+  while the head is off). GOBLET constant-stress, ANGLED cone, CURVED smoothstep; amount 0 the
+  Oct 24 coin BY BRANCH. **The AUTO reach is GEOMETRIC — as deep as it is wide — the one placement
+  made without a ruling**: the head's section-modulus auto floors at the plate and a band two
+  discs tall asks for nothing, so it would leave every umbel a coin. The foot meets the rod half a
+  gap inside its wall; the depth is CLAMPED to the rod's mode-free room, told. 960 tris a junction.
+- **WAITING ON EVA (the sheet `docs/img/umbel-hubs.png`): the default style / amount / length.**
+  After the ruling: the byte partition closes (`--movers-predicate umbel-hubs`: a row moves iff
+  the base builds an umbel or a stem on a cap wider than it), and `frozen/phase89` is owed
+  (1,588 → 1,605, block 82).
+
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of
 `docs/bloom-organic-variance-discovery.md`; read `docs/bloom-organic-variance-size-outcome.md`

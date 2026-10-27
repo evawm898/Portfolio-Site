@@ -8203,7 +8203,12 @@ function hubShapeExpected(hubR, hubT, outerR, sphere, style, amount, lengthAsked
   const refReach = sphere ? joinT : (lengthAsked > 0 ? Math.max(hubT, lengthAsked) : joinT);
   const axisRaw = amount === 1 ? refReach : hubT + amount * (refReach - hubT);
   const capMax = (capRd > 0 && !sphere) ? Math.max(hubT, capRd - hubT / 2) : Infinity;
-  const axisDepth = Math.min(axisRaw, capMax);
+  /* THE DOMED TOP'S FLOOR (Oct 27): on a cap wider than the stem the reach is
+     at least the mid-surface's sag under the stem's rim plus half a sheet, so
+     the stem's root ring is inside the join at its own radius — restated from
+     the cap's radius, the stem's and the sheet, never read from the plan */
+  const capMin = (capRd > 0 && !sphere && hubR > outerR) ? ((capRd + hubT / 2) - Math.sqrt(capRd * capRd - outerR * outerR)) + hubT / 2 : 0;
+  const axisDepth = Math.min(Math.max(axisRaw, capMin), capMax);
   const swellActive = !sphere && hubR > outerR && (axisDepth - hubT) > 0;
   const swell = axisDepth - hubT;
   const blend = swellActive
@@ -8225,7 +8230,7 @@ function hubShapeExpected(hubR, hubT, outerR, sphere, style, amount, lengthAsked
       : 1 - Math.sqrt(Math.max(0, 1 - x * x));
     return hubT + swell * f;
   };
-  return { swellActive, axisDepth, blend, at };
+  return { swellActive, axisDepth, blend, at, capMin, floored: axisRaw < axisDepth - 1e-9 };
 }
 
 /* ST12's CLAUSES AS A PURE FUNCTION of the records the page reports — called by
@@ -8290,7 +8295,7 @@ export function stemCountClause({ S, stemTris }) {
 
 /* ST10, FACTORED for the same reason: the bore's two closures, the faces'
    winding, the end face (flat or cut) and the plug's own length. */
-export function stemPlugClauses({ S, ui, NL }) {
+export function stemPlugClauses({ S, ui, NL, dome = null }) {
   const bad = [];
   const P = S;
   if (P.tipPlugMm === undefined) {
@@ -8419,8 +8424,17 @@ export function stemPlugClauses({ S, ui, NL }) {
          that ignored it, never a plan that derived it wrongly. Said narrowly
          rather than claimed broadly. */
       const bandBuilt = P.emittedTopZ - P.emittedVoidTopZ;
-      if (Math.abs(bandBuilt - P.solidBandMm) > 1e-9) {
-        bad.push(`ST10: the emitted bore starts ${bandBuilt} mm below the emitted top face; the plan's root band is ${P.solidBandMm} mm`);
+      /* ON A DOMED TOP (Oct 27) the bore opens at the cap's mid-surface at the
+         BORE's radius while the rim ring sits at the mid-surface at the STEM's,
+         so the two differ by the sphere's own chord drop between the two radii —
+         restated from the hub builder's dome and the control's two radii, never
+         from the plan's `stemTopInnerZ`; a band never exists there (a domed top
+         is a head wider than its stem, and a band needs one narrower than its bore). */
+      const capD = P.domedTop && dome && !dome.closed ? dome : null;
+      const wantBand = capD ? (Math.sqrt(capD.Rd * capD.Rd - P.outerR * P.outerR) - Math.sqrt(capD.Rd * capD.Rd - P.boreR * P.boreR)) : P.solidBandMm;
+      if (capD && P.solidBandMm > 0) bad.push(`ST10: a domed top with a ${P.solidBandMm} mm root band — a band belongs to a head narrower than its bore, a domed top to a cap wider than its stem`);
+      if (Math.abs(bandBuilt - wantBand) > 1e-9) {
+        bad.push(`ST10: the emitted bore starts ${bandBuilt} mm below the emitted top face; ${capD ? `on a domed top the bore's ring sits on the mid-sphere at r ${P.boreR} and the rim at r ${P.outerR}, ${wantBand} mm apart` : `the plan's root band is ${P.solidBandMm} mm`}`);
       }
     } else if (hollow) {
       /* (e) WHERE THE TWO MEET, NO INNER RING WAS EMITTED AT ALL. The narrowest
@@ -8830,7 +8844,13 @@ export async function stemAssertions(page, row) {
      shape (the umbel session): the stem ENDS inside the umbel's knot, which
      UM1-UM4 hold. ST4-ST6 and ST11 are the head's and stop here. */
   if (m.headAbsent === true) return bad;
-  if (!(S.rootSpanMm >= hubT - 1e-9)) bad.push(`ST4: the stem's root spans ${S.rootSpanMm} mm of a ${hubT} mm hub — it is a hairline overlap, not a root through the slab`);
+  /* ON A DOMED TOP (Oct 27) the stem's top ring is on the cap's MID-SURFACE at
+     its own radius, so `emittedTop - rootZ` is the join's reach LESS the sag and
+     half a sheet, not the slab's span; the root's burial there is ST13's (the
+     rim on the mid-sphere, nothing above the skin, read off the exported file
+     against the hub builder's own dome). ST4 keeps its subject: the SLAB. */
+  if (!S.domedTop && !(S.rootSpanMm >= hubT - 1e-9)) bad.push(`ST4: the stem's root spans ${S.rootSpanMm} mm of a ${hubT} mm hub — it is a hairline overlap, not a root through the slab`);
+  if (S.domedTop && !(S.rootSpanMm >= hubT / 2 - 1e-9)) bad.push(`ST4: on a domed top the stem's rim ring stands ${S.rootSpanMm} mm above the join's underside on the axis; the reach floor puts it at least half a sheet (${hubT / 2}) above it`);
   /* ST5 — THE JOIN'S THICKNESS STAYS DERIVED, AND IT IS ACTIVE WHEN THE STYLE
      SAYS SO. This clause used to assert the whole join followed the fixed
      constant-stress law "no control"; the hub-shape session made the SHAPE a
@@ -8956,7 +8976,7 @@ export async function stemAssertions(page, row) {
      at the widest bore — and it is available rather than built. If a session
      ever makes the builder's report and the file disagree, that is the clause
      to write. */
-  for (const msg of stemPlugClauses({ S, ui, NL })) bad.push(msg);
+  for (const msg of stemPlugClauses({ S, ui, NL, dome: m.hubBuilt && m.hubBuilt.dome ? m.hubBuilt.dome : null })) bad.push(msg);
 
   /* ===================================================================
      ST7 — THE OMISSION IS THE STEM'S OWN, IN BOTH DIRECTIONS.
@@ -12774,6 +12794,55 @@ export function pedicelPinClauses(F, U) {
    UM4 THE CUT IS ON THE FREE END: the stem's emitted cut (when made) sits at
        its TIP, a stem length away from the knot, and the knot holds none of
        it — the florist's cut never reaches the top. */
+/* ===================================================================
+   THE JUNCTION'S FLARE, RESTATED FROM THE CONTROLS (Oct 27 — the umbel
+   junction as a hub, the hub-to-stem join run in reverse). `R` and `h` are the
+   band this harness has already restated from the count, the pedicel and the
+   angle; the rod's radius is the CONTROL's (the stem's diameter, or the ray's
+   derived radius on a mophead); the room is the rod's own length below the
+   band from the asked stem length and the plan's mode-free inset. The reach
+   law is written again here rather than imported from `umbelBoss`: auto = as
+   deep as it is wide; `hubLength` above 0 the total height, floored at the
+   band; amount folded once; GOBLET the constant-stress `sqrt(ln(R/r)/ln(R/
+   rodR))`, ANGLED `x`, CURVED the smoothstep, x from the band's rim to the
+   rod. Returns the swell and a profile `depthAt(r)` for the emitted rings. */
+export function umbelFlareExpected({ style, amount, lengthAsked, R, h, outerR, roomMm }) {
+  const gap = MIN_FEATURE_MM;
+  const st = ['GOBLET', 'ANGLED', 'CURVED'].includes(style) ? style : 'GOBLET';
+  const rodR = outerR - gap / 2, widthMm = R - rodR, bandMm = 2 * h;
+  const auto = !(lengthAsked > 0);
+  const reachMm = auto ? bandMm + widthMm : Math.max(bandMm, lengthAsked);
+  const swellAskedMm = amount === 1 ? reachMm - bandMm : amount * (reachMm - bandMm);
+  const swellMm = Math.min(swellAskedMm, Math.max(0, roomMm - h));
+  const built = rodR > 0 && widthMm > 0 && swellMm > 0;
+  const depthAt = (r) => {
+    if (!built) return 0;
+    const x = Math.min(1, Math.max(0, (R - r) / widthMm));
+    const f = st === 'ANGLED' ? x : st === 'CURVED' ? x * x * (3 - 2 * x)
+      : Math.sqrt(Math.max(0, Math.log(R / Math.max(r, rodR)) / Math.log(R / rodR)));
+    return swellMm * Math.min(1, Math.max(0, f));
+  };
+  return { style: st, rodR, widthMm, swellMm, swellAskedMm, built, clamped: swellAskedMm > swellMm + 1e-9, depthAt, rings: built ? GEOMETRY.UMBEL_FLARE_RINGS : 0 };
+}
+/* the clauses on one emitted junction (`K`) against one restated flare (`F`):
+   the band's foot is the rim's foot, the bottom is the band's foot less the
+   swell, every emitted flare ring is on the styled profile, and the ring count
+   is the drawing's own. `tag` names the family (UM1 for the stem-top knot,
+   UM8 for a ray tip). */
+export function umbelFlareClauses(tag, K, F, wantBot, tolR, who) {
+  const bad = [];
+  if (Math.abs(K.rimBottomZ - wantBot) > tolR) bad.push(`${tag}: ${who}'s band foot is at z ${K.rimBottomZ.toFixed(6)} mm; the band restated from the root discs puts it at ${wantBot.toFixed(6)}`);
+  const wantLow = wantBot - F.swellMm;
+  if (Math.abs(K.bottomZ - wantLow) > tolR) bad.push(`${tag}: ${who} reaches down to z ${K.bottomZ.toFixed(6)} mm; the flare restated from the Hub controls (${F.style} ${F.swellMm.toFixed(4)} mm of swell${F.clamped ? ', CLAMPED to the rod' : ''}) ends at ${wantLow.toFixed(6)}`);
+  const rings = Array.isArray(K.flareEmitted) ? K.flareEmitted : [];
+  if (rings.length !== F.rings) bad.push(`${tag}: ${who} emitted ${rings.length} flare ring(s); the drawing's own count for a ${F.built ? 'built' : 'coin (no)'} flare is ${F.rings}`);
+  let worst = 0;
+  for (const g of rings) { const d = Math.abs(g.z - (wantBot - F.depthAt(g.r))); if (d > worst) worst = d; }
+  if (worst > tolR) bad.push(`${tag}: ${who}'s flare rings leave the ${F.style} profile restated from the controls by up to ${worst.toExponential(3)} mm`);
+  if (rings.length && Math.abs(rings[0].r - F.rodR) > tolR) bad.push(`${tag}: ${who}'s flare meets the rod at r ${rings[0].r.toFixed(6)} mm; half a gap inside the ${(2 * (F.rodR + MIN_FEATURE_MM / 2)).toFixed(4)} mm rod's wall is ${F.rodR.toFixed(6)}`);
+  return bad;
+}
+
 export function umbelClauses(m, ui) {
   const bad = [];
   const stemOn = Number(ui.stemLength) >= 1;
@@ -12848,7 +12917,14 @@ export function umbelClauses(m, ui) {
     if (Math.abs(K.radiusMm - R) > tolR || Math.abs(K.radiusMinMm - R) > tolR) bad.push(`UM1: the boss's rim was emitted at radius ${K.radiusMinMm.toFixed(6)}..${K.radiusMm.toFixed(6)} mm; restated from ${n} pedicels of ${rP.toFixed(4)} mm at ${aDeg} deg off a ${(2 * S.outerR).toFixed(3)} mm stem it is ${R.toFixed(6)} mm (a ring ${rho.toFixed(4)} mm holding them one ${gap} mm gap apart, the root disc's reach and half a gap, or the crossing's ${crossMin.toFixed(9)} mm through the rim, whichever is larger)`);
     if (Math.abs(K.halfHeightMm - h) > tolR) bad.push(`UM1: the boss's band was emitted ${(2 * K.halfHeightMm).toFixed(9)} mm tall; the root disc at ${aDeg} deg reaches ${(rP * Math.abs(Math.cos(aRad))).toFixed(4)} mm above and below its ring (half a gap more each way), and a pedicel must cross ${crossMin.toFixed(9)} mm of it — so it is ${(2 * h).toFixed(9)} mm`);
     const wantBot = K.centre[2] - h;
-    if (Math.abs(K.bottomZ - wantBot) > tolR || Math.abs(K.rimBottomZ - wantBot) > tolR) bad.push(`UM1: the boss's underside reaches z ${K.bottomZ.toFixed(6)} mm (its rim's foot ${K.rimBottomZ.toFixed(6)}); it is FLAT at the band's own foot, ${wantBot.toFixed(6)} mm — no cone below it (SLS, Eva's Oct 24 ruling)`);
+    /* THE FLARE UNDER THE BAND (Oct 27, the junction as a hub) — restated from
+       the three Hub controls, the stem's own radius and the rod's room below
+       the band (the asked stem length less the plan's mode-free inset, a gap
+       and the cut's span); the Oct 24 flat-underside clause stood here. */
+    const roomMm = Number(ui.stemLength) - (headOffAsked ? 0 : Math.min(P.insetNeededMm, GEOMETRY.LEAF_NODE_BOTTOM * Number(ui.stemLength))) - gap - (S.cut && S.cut.made ? S.cut.spanMm : 0);
+    const FL = umbelFlareExpected({ style: ui.hubStyle || 'GOBLET', amount: ui.hubShapeAmount === undefined ? 1 : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), R, h, outerR: S.outerR, roomMm });
+    bad.push(...umbelFlareClauses('UM1', K, FL, wantBot, tolR, 'the stem-top junction'));
+    /* (the Oct 24 flat-underside clause stood here; the flare clauses above replace it) */
     /* the crossing itself, through the EMITTED boss along the pedicel's own
        direction from the restated ring: it clears half a feature by the margin */
     const sn = Math.sin(aRad), cs = Math.cos(aRad);
@@ -13085,6 +13161,11 @@ export function mopheadClauses(m, ui, { discReach, gap }) {
     const hS = Math.max(h0, crossMin * Math.abs(Math.sin(aS))), RS = Math.max(R0, rhoS + crossMin * Math.cos(aS));
     const tolR = 64 * Number.EPSILON * Math.max(1, Math.abs(SK.centre[2]) + RS) + 1e-9;
     if (Math.abs(SK.radiusMm - RS) > tolR || Math.abs(SK.halfHeightMm - hS) > tolR) bad.push(`UM8: the sub-boss was emitted ${(2 * SK.radiusMm).toFixed(6)} mm across and ${(2 * SK.halfHeightMm).toFixed(6)} mm tall; restated from ${kSub} pedicels of ${rPs.toFixed(4)} mm at ${ui.pedicelAngle} deg off a ${(2 * rayR).toFixed(4)} mm ray it is ${(2 * RS).toFixed(6)} x ${(2 * hS).toFixed(6)} mm`);
+    /* THE RAY TIP'S FLARE scales with ITS RAY (Oct 27): the rod is the ray at
+       the area rule's own radius, the room the ray's own length below the band
+       (a pedicel carries no cut), the controls the same three */
+    const FS = umbelFlareExpected({ style: ui.hubStyle || 'GOBLET', amount: ui.hubShapeAmount === undefined ? 1 : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), R: RS, h: hS, outerR: rayR, roomMm: Number(ui.umbelRayLength) - gap });
+    bad.push(...umbelFlareClauses('UM8', SK, FS, SK.centre[2] - hS, tolR, 'the ray tip junction'));
     if (Math.abs(sub.plan.pedicelR - rPs) > 1e-9) bad.push(`UM8: the sub-umbel's pedicel is ${(2 * sub.plan.pedicelR).toFixed(4)} mm; the area rule off the ${(2 * rayR).toFixed(4)} mm ray for ${kSub} florets gives ${(2 * rPs).toFixed(4)} mm`);
     let worst = null, n = 0;
     for (const ray of B.placed || []) {
@@ -14806,6 +14887,69 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
   return bad;
 }
 
+/* ===================================================================
+   ST13 — NOTHING OF THE STEM OR THE JOIN STANDS ABOVE THE HEAD'S TOP SKIN
+   (Eva's Oct 27 defect: a ring showing through a domed head at its centre).
+
+   READ OFF THE EXPORTED FILE, by the builder's own stream ranges (`triRanges`,
+   the tallies `buildBloomInto` returns — which triangles are the join's and
+   the stem's), against the HUB BUILDER'S OWN EMITTED DOME (`m.hubBuilt.dome`:
+   its mid radius, centre and thickness) and the CONTROL's stem radius. Three
+   owners, none the stem plan: a plan that laid the top ring at the apex and
+   said "mid-surface" would be red here.
+     (a) every stem vertex and every join vertex within the hub's radius lies
+         at or under the OUTER skin `cz + sqrt((Rd + t/2)^2 - r^2)` (a few ulp
+         of the build's own scale — the hub's own outer vertices lie ON it);
+     (b) the stem's top RIM — its highest ring at the control's own radius —
+         lies ON the cap's MID-sphere, `cz + sqrt(Rd^2 - outerR^2)`: half a
+         sheet under the skin and half above the inner one, inside the wall;
+         on a FLAT hub it is the slab's own top face, `+t/2`;
+     (c) the ranges name what they claim: the stem's range reads radii at the
+         control's outer radius (and the bore's), so a hook handing over the
+         wrong range cannot pass as the stem.
+   A SPHERE head is out (the stem leaves its reserved pole downward and the
+   ring there is inside the wall — measured), an umbel with its head OFF has
+   no head skin (UM3 holds the knot), and a head NOT WIDER than the stem keeps
+   the apex by declaration (its silhouette is the stem's; the root band's).
+   =================================================================== */
+export function stemTopClauses(positions, m, ui) {
+  const bad = [];
+  if (!m || !(Number(ui.stemLength) > 0) || m.headAbsent === true) return bad;
+  const S = m.stem, R = m.stem && m.stem.triRanges, D = m.hubBuilt && m.hubBuilt.dome;
+  if (!S || !S.lengthMm) return bad;
+  if (!R || !Array.isArray(R.stem) || !Array.isArray(R.hub)) { bad.push('ST13: the hook reports no stream ranges for the hub and the stem — the file cannot be read by part'); return bad; }
+  if (!(positions && positions.length / 9 >= R.stem[1])) { bad.push(`ST13: the exported file holds ${positions ? positions.length / 9 : 0} triangles and the stem's range ends at ${R.stem[1]}`); return bad; }
+  const outerR = Number(ui.stemDiameter) / 2;
+  const hubR = m.hubRadius ?? S.hubR;
+  const sphere = !!(D && D.closed);
+  if (sphere || !(hubR > outerR)) return bad;
+  const t = D ? D.thickness : S.hubT;
+  const scale = Math.max(1, Math.abs(D ? D.centreZ : 0) + (D ? D.Rd : hubR) + t);
+  const tol = 64 * Number.EPSILON * scale + 2e-6;            // the STL's own float32 grain at the build's scale, plus ulp
+  const skinAt = (r) => (D ? D.centreZ + Math.sqrt(Math.max(0, (D.Rd + t / 2) ** 2 - r * r)) : t / 2);
+  const midRim = D ? D.centreZ + Math.sqrt(D.Rd * D.Rd - outerR * outerR) : t / 2;
+  let over = 0, worst = -Infinity, worstR = 0, worstWho = '';
+  let rimTop = -Infinity, sawOuter = false, sawBore = false, stemVerts = 0;
+  const boreR = boreExpected(outerR);
+  for (const [who, range] of [['stem', R.stem], ['join', R.hub]]) {
+    for (let i = range[0] * 9; i < range[1] * 9; i += 3) {
+      const r = Math.hypot(positions[i], positions[i + 1]), z = positions[i + 2];
+      if (who === 'stem') {
+        stemVerts++;
+        if (Math.abs(r - outerR) < 1e-3) { sawOuter = true; if (z > rimTop) rimTop = z; }
+        if (boreR > 0 && Math.abs(r - boreR) < 1e-3) sawBore = true;
+      }
+      if (r > hubR + tol) continue;
+      const d = z - skinAt(r);
+      if (d > tol) { over++; if (d > worst) { worst = d; worstR = r; worstWho = who; } }
+    }
+  }
+  if (!stemVerts || !sawOuter) { bad.push(`ST13: the stem's declared range [${R.stem}] carries ${stemVerts} vertices and ${sawOuter ? 'some' : 'NONE'} at the control's radius ${outerR} — it is not the stem`); return bad; }
+  if (over) bad.push(`ST13: ${over} ${worstWho === 'stem' ? 'stem' : 'join'} vertex(es) stand above the head's top skin within the hub's radius — the worst ${worst.toFixed(6)} mm over at r ${worstR.toFixed(3)} (${D ? `cap Rd ${D.Rd.toFixed(3)}, rise` : 'a flat hub'}) — the stem shows through the head`);
+  if (Math.abs(rimTop - midRim) > tol) bad.push(`ST13: the stem's top rim stands at z ${rimTop.toFixed(6)} mm; ${D ? `the cap's mid-sphere at r ${outerR} is ${midRim.toFixed(6)}` : `the slab's top face is ${midRim.toFixed(6)}`} (the stem is rooted ${rimTop > midRim ? 'ABOVE' : 'BELOW'} the mid-surface by ${Math.abs(rimTop - midRim).toFixed(6)} mm)`);
+  return bad;
+}
+
 export function stemChannelAssertions(positions, row, m, ui) {
   const bad = [];
   /* ST9 ENTERS ON THE SPHERE AND THE CONTROL, NEVER ON THE CHANNEL'S OWN
@@ -14823,6 +14967,7 @@ export function stemChannelAssertions(positions, row, m, ui) {
      UM3 the knot's place on the stem's top end). */
   const onSphere = m && m.sphereMode === true && m.headAbsent !== true;
   const asked = Number(ui.stemLength) > 0;
+  bad.push(...stemTopClauses(positions, m, ui));
   if (!onSphere || !asked) return bad;      // no stem, or not a sphere — nothing to claim
   const outerR = Number(ui.stemDiameter) / 2;
   const boreR = boreExpected(outerR);
@@ -20250,6 +20395,53 @@ export function buildMatrix() {
   mo('GATED — the depth and the rays at their extremes under depth 1 (hidden AND inert)', { umbelDepth: '1', umbelRays: 2, umbelRayLength: 120, umbelRayAngle: -60 });
   mo('GATED — the depth and the rays under a RACEME (hidden AND inert)', { inflorescence: 'RACEME', umbelRays: 2, umbelRayLength: 120, umbelRayAngle: -60 });
   mo('GATED — the depth and the rays under NONE (hidden AND inert)', { inflorescence: 'NONE', umbelRays: 2, umbelRayLength: 120, umbelRayAngle: -60 });
+
+  /* 82. THE STEM THROUGH THE HEAD, AND THE UMBEL JUNCTION AS A HUB (Oct 27,
+        Eva's two rulings from the deploy preview — docs/bloom-umbel-hubs-
+        outcome.md). The DEFECT first: on a domed head the stem's flat top disc
+        was laid at the cap's APEX and its rim stood above the skin by the cap's
+        own sagitta at the stem's radius — a ring showing through the head at
+        its centre. Rows: Eva's own state (8 petals, spread 2.00, rise 0.35,
+        CURVED 1.60, a 60 mm stem — 0.31 mm over on main); the worst corner
+        (rise 1, a 12 mm stem — 2.15 mm); a thin join under a wide stem (amount
+        0 x 12 mm at rise 0.35 — the ROOT ring poked on main, so the reach is
+        FLOORED now); a 3 mm solid stem on a steep cap at the longest hub
+        length (the apex clamp above the floor); a hollow stem under a SPHERE
+        head (the stem leaves the reserved pole — a holder by branch); the
+        sepals and a stamen crown on a domed head with a stem (ST13 beside the
+        parts that legitimately rise above the skin). Then the JUNCTION: every
+        umbel junction — the stem-top knot and every ray tip of a mophead — is
+        the hub-to-stem join run in reverse, a flare from the rod out to the
+        disc-holding band, driven by the three Hub controls: each style at the
+        spider lily's defaults, amount 0 (the Oct 24 coin BY BRANCH), amount 2
+        with a Hub length, the widest band (12 florets at 90 deg) on CURVED,
+        the flare CLAMPED to a 3 mm stem's room, the head ON on a DOMED head
+        (both rulings on one row), and the mophead at each style and at a Hub
+        length (the ray tips at their own rays' radius). ST13, UM1's and UM8's
+        flare clauses, ST4's domed arm and ST10's domed band on every one.
+        Appended as the FINAL block, after 81. */
+  const ST = { stemLength: 60 };
+  const stp = (label, sets) => rows.push({ label: `STEM TOP: ${label}`, set: Object.entries({ ...ST, ...sets }).map(([id, value]) => ({ id, value: String(value) })) });
+  stp("Eva's state — 8 petals x spread 2.00 x rise 0.35 x CURVED 1.60 x a 60 mm stem (0.31 mm through the head on main)", { petalCount: 8, spread: 2, headRise: 0.35, hubStyle: 'CURVED', hubShapeAmount: 1.6 });
+  stp('rise 1 x a 12 mm stem (the worst overshoot on main, 2.15 mm)', { headRise: 1, stemDiameter: 12 });
+  stp('rise 0.35 x a 12 mm stem x amount 0 (the root ring poked on main; the reach FLOORED)', { headRise: 0.35, stemDiameter: 12, hubShapeAmount: 0 });
+  stp('rise 0.6 x a 3 mm SOLID stem x Hub length 40 (the apex clamp above the floor)', { headRise: 0.6, stemDiameter: 3, hubLength: 40 });
+  stp('a 12 mm stem under a SPHERE head (the reserved pole — a holder by branch)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemDiameter: 12 });
+  stp('rise 0.5 x 8 sepals x 30 stamens x a style on a 6 mm stem (ST13 beside the parts that rise above the skin)', { headRise: 0.5, sepalCount: 8, stamenCount: 30, gynoecium: 'STYLE' });
+  const UH = { stemLength: 120, inflorescence: 'UMBEL', umbelFlorets: 6 };
+  const uh = (label, sets) => {
+    const st = { ...UH, ...sets };
+    const d2 = st.inflorescence === 'UMBEL' && String(st.umbelDepth) === '2' ? UMBEL_DEPTH2_DEFAULTS : {};
+    rows.push({ label: `UMBEL HUB: ${label}`, set: Object.entries({ ...UH, ...d2, ...sets }).map(([id, value]) => ({ id, value: String(value) })) });
+  };
+  for (const sty of ['GOBLET', 'ANGLED', 'CURVED']) uh(`${sty} at the spider lily's defaults (6 florets, head off, auto reach)`, { hubStyle: sty });
+  uh('amount 0 — the band alone (the Oct 24 coin, by branch)', { hubShapeAmount: 0 });
+  uh('amount 2 x Hub length 20 (the reach asked, the swell doubled)', { hubShapeAmount: 2, hubLength: 20 });
+  uh('12 florets at 90 deg x CURVED (the widest band on a 6 mm stem)', { umbelFlorets: 12, pedicelAngle: 90, hubStyle: 'CURVED' });
+  uh('a 3 mm stem (the flare CLAMPED to the room below the band, told)', { stemLength: 3 });
+  uh('x the head ON on a DOMED head (rise 0.35) x ANGLED — the stem-top fix and the junction on one row', { umbelHead: 'ON', headRise: 0.35, hubStyle: 'ANGLED' });
+  for (const sty of ['ANGLED', 'CURVED']) uh(`THE MOPHEAD x ${sty} (12 x 12 at the floor; every ray tip a hub at its own ray's radius)`, { umbelDepth: '2', hubStyle: sty });
+  uh('THE MOPHEAD x Hub length 10 x amount 1.5', { umbelDepth: '2', hubLength: 10, hubShapeAmount: 1.5 });
 
   return rows.map(storedRow);
 }
