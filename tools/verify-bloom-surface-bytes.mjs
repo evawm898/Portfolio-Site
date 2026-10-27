@@ -537,7 +537,30 @@ const PREDICATE_MOVERS = {
     if (typeof base.umbelHeadIsAbsent === 'function' && base.umbelHeadIsAbsent(bs)) return false;
     return sp.hubR > sp.outerR;
   },
-  'umbel-hubs': (st) => PREDICATE_MOVERS['umbel-boss'](st) || PREDICATE_MOVERS['stem-top'](st),
+  /* THE UMBEL HUBS (Oct 27): a row moves iff it is a `stem-top` mover OR the
+     BASE builds an umbel knot on it AND the junction's flare is BUILT there —
+     `umbelBoss`'s own branch: Hub amount > 0, a flare width (the band's rim
+     past the rod at `outerR - gap/2`) and room below the band for a swell
+     (`roomMm - halfHeightMm > 0`, the room read off the BASE's own knot centre
+     against its stem tip, less the gap and the cut's span). Amount 0 is the
+     Oct 24 coin BY BRANCH and holds — the first predicate named it a mover and
+     the run said so. */
+  'umbel-hubs': (st) => {
+    if (PREDICATE_MOVERS['stem-top'](st)) return true;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    if (base.umbelIsAbsent(bs)) return false;
+    const fr = base.footRing(bs, acc);
+    const sp = fr.hub && base.stemPlan(bs, fr.hub, acc);
+    if (!(sp && sp.present)) return false;
+    const P = base.inflorescencePlan(bs, sp, acc);
+    if (!(P && P.present && P.umbel && P.knot)) return false;
+    if (!(Number(st.hubShapeAmount) > 0)) return false;
+    const K = P.knot, gap = base.MIN_FEATURE_MM;
+    const widthMm = K.radiusMm - (sp.outerR - gap / 2);
+    const roomMm = K.centre[2] - P.stemTipZ - gap - (sp.cut && sp.cut.made ? sp.cut.spanMm : 0);
+    return widthMm > 0 && roomMm - K.halfHeightMm > 0;
+  },
   'umbel-boss': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const bs = baseState(st);
