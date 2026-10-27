@@ -226,6 +226,9 @@ Both rows were taken in the same run, with the box otherwise idle:
 **Proposed, not built.** Eva's ruling of Oct 26 holds it until this profile was in. The numbers
 above are what she rules on.
 
+**RULED Oct 27: Eva dragged the mophead on her own machine and it feels fine. The 2-florets drag
+build is NOT built; closed.**
+
 ## 6. Recorded, not done
 
 - **`tipInscribedRadius`** (`petalForm`'s `apexScale`) is half the 240-petal head's geometry (2.3 of
