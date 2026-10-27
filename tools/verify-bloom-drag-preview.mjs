@@ -365,7 +365,10 @@ const MUTANTS = [
      value enters the drag" both leave nothing to see, because an arrow key and
      F5's commit fire input THEN change in one task, and the change ends the
      drag before the rAF build runs. That is the property, and D3 holds it. */
-  { id: 'input-events-are-the-drag', breaks: ['D3', 'D4', 'D5'],
+  /* (the page profile) D10 sees it too, and truly: the config's own input
+     events enter the drag, so the umbel sits AT REST on a light build with
+     its reports deferred — the stranded light build, on an inflorescence. */
+  { id: 'input-events-are-the-drag', breaks: ['D3', 'D4', 'D5', 'D10'],
     edits: [
       ["document.addEventListener('pointerdown', (e) => { if (isSlider(e.target)) dragActive = true; }, true);",
         "document.addEventListener('input', (e) => { if (isSlider(e.target)) dragActive = true; }, true);"],
