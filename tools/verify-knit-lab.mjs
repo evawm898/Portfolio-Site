@@ -173,8 +173,10 @@ const SPECS = [   // the longest first, so four at a time finishes soonest
   { name: 'mf-course-phase3b', swatch: 'plain', dir: 'course', mutant: 'jaw-velocity-stale', params: { COURSE_TOP: 'needle', PULL_MAX_EXTENSION: 0.05 } },
   // the clamp fixture holds every point of the last course, so an untied end cannot unravel there: the
   // must-fail is the comb fixture (phases 1-3) with the end left free
-  // capped at 60%: unravelling, it never reaches the jam and would otherwise walk to 300% (hours)
-  { name: 'mf-tail-untied', swatch: 'plain', params: { FIXTURE: 'comb', PLATE_HALF_GAP: 1.6, TAIL_TIED: 0, PULL_MAX_EXTENSION: 0.6 } },
+  // capped at 60%. It loads on past the jam to the load limit (STOP_AT 'limit'): the unravelling it witnesses
+  // happens under load PAST the jam (the load fell to 36% of its peak at 57%), and stopped at the jam this swatch
+  // shows nothing — the check would be handed nothing it can fail on (measured Oct 27: ACCEPTED).
+  { name: 'mf-tail-untied', swatch: 'plain', params: { FIXTURE: 'comb', PLATE_HALF_GAP: 1.6, TAIL_TIED: 0, PULL_MAX_EXTENSION: 0.6, STOP_AT: 'limit' } },
   ...seeded({ name: 'plain-step0.5', swatch: 'plain', params: { STEP_EXT: 0.005 } }),
   ...seeded({ name: 'rib-step0.5', swatch: 'rib', params: { STEP_EXT: 0.005 } }),
   ...seeded({ name: 'plain', swatch: 'plain', audit: true, peakHold: 600 }),

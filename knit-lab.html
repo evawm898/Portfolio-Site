@@ -111,7 +111,16 @@
     <section class="project__section project__section--disclaimer">
       <h2 class="project__section-title"><span>04</span>What this is, and isn&rsquo;t</h2>
       <div class="project__section-body">
-        <p>A feasibility spike, not a finished field note. Forces are in model units, not newtons; the yarn has no twist, no compressible cross-section and no material data, and its friction coefficient is a plausible number, not a measured one. Even without friction the swatch does not come back along the way it went out: about a tenth of the work is lost. That is the model, not knitting. The yarn is a chain of short straight pieces, so a yarn sliding over another rides over a small bump at every joint, and the bumps hold it like friction; with the contact taken between smooth curves instead, the same excursion comes back to within half a percent, but that version never comes to rest. What it is for is to find out whether a browser can relax, load and unload a yarn-level knit, and whether the result behaves like a knit.</p>
+        <p>A feasibility spike, not a finished field note. Forces are in model units, not newtons; the yarn has no twist, no compressible cross-section and no material data, and its friction coefficient is a plausible number, not a measured one. What it is for is to find out whether a browser can relax, load and unload a yarn-level knit, and whether the result behaves like a knit.</p>
+        <p><strong>Even without friction a cycle to the jam loses about a tenth of its work (10.6% along the wales, 6.5% across the courses): that is this model&rsquo;s baseline, not knitting, and friction&rsquo;s loss and set are read as what it adds above it.</strong> The yarn is a chain of short straight pieces, so a yarn sliding over another rides over a small bump at every joint, and the bumps hold it like friction.</p>
+        <p>What it measured, from the topology alone: across the courses 1&times;1 rib jams at 34% against jersey&rsquo;s 22% (1.55&times;), and at rest it draws in to 0.85&times; jersey&rsquo;s width. Each test is run three times with the start nudged by a part in a billion, because one run of this model scatters by several percent; the figures are the medians.</p>
+        <p>Known limitations, each measured and not tuned away:</p>
+        <ul>
+          <li><strong>Decreases do not keep which loop lies on top.</strong> The swatch is relaxed without friction, and then nothing holds a k2tog&rsquo;s or an ssk&rsquo;s two stacked loop heads stacked: they slide apart by one or two yarn diameters. One k2tog loses its order during the test and two ssk decreases while settling, and the ssk eyelet row opens only two clear holes at rest instead of four. Relaxed with friction, every decrease keeps its order and the row opens.</li>
+          <li><strong>Friction stiffens the soft start more than it should:</strong> 2.46&times; the frictionless stiffness before the jam, where a knit should still rearrange freely (the check asks for at most 2&times;).</li>
+          <li><strong>Rib across the courses does not come back cleanly at the bottom.</strong> Near zero load, where the swatch, longer now than it started, goes into compression, a few unloading steps rise instead of falling (by up to about 1% of the peak load).</li>
+          <li><strong>Every test stops at the jam.</strong> Past it the load is carried by straight pieces of yarn pressed end to end, which this model does not get right.</li>
+        </ul>
       </div>
     </section>
   </div>
