@@ -67,10 +67,13 @@ import * as THREE from`],
   ['function regenerate() {\n  buildCount++;', `function regenerate() {
   buildCount++;
   __PROF.cur = { build: buildCount, start: performance.now(), t: performance.now(), phases: [] };`],
-  ['  const built = buildBloomInto(acc, uiForBuild, { below: null, capability, scopes: scopesForBuild(scopes) });',
-    `  __mark('pre-build (readUI, the accumulator)');
-  const built = buildBloomInto(acc, uiForBuild, { below: null, capability, scopes: scopesForBuild(scopes) });
-  __mark('buildBloomInto (the geometry, every instrument it runs)');`],
+  /* anchored on the line's PREFIX and on the line after it, so the profile
+     instruments a tree whose call passes more options too (--src) */
+  ['\n  const built = buildBloomInto(acc, uiForBuild, ', `\n  __mark('pre-build (readUI, the accumulator)');
+  const built = buildBloomInto(acc, uiForBuild, `],
+  ['\n  if (record) {\n    lastShownMode', `\n  __mark('buildBloomInto (the geometry, every instrument it runs)');
+  if (record) {
+    lastShownMode`],
   ['  const geo = new THREE.BufferGeometry();\n  geo.setAttribute(\'position\'', `  __mark('the record block (the telemetry cache)');
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position'`],
@@ -95,8 +98,8 @@ import * as THREE from`],
   geo.computeBoundingSphere();
   __mark('computeBoundingSphere');
   lastFitRadius`],
-  ['  shownSummary = (light ? DRAG_LINE : \'\') + showingLine(mode) + summarise(', `  __mark('camera fit');
-  shownSummary = (light ? DRAG_LINE : '') + showingLine(mode) + summarise(`],
+  ['\n  shownSummary = (light ? ', `\n  __mark('camera fit');
+  shownSummary = (light ? `],
   ['  readout.textContent = shownSummary;\n}', `  __mark('summarise + materialLines (the read-out text)');
   readout.textContent = shownSummary;
   __mark('readout.textContent');
