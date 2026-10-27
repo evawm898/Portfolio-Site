@@ -11637,14 +11637,43 @@ to a load limit and UNLOADED.
 - **Friction μ 0.25 is the default.** The phase-1 "μ 0.1 locks the loops" was the free tail and the
   stretch solve, not friction; the cap is the normal multiplier of THIS substep (both multipliers
   reset every substep). A cap read from an accumulated multiplier is the gate's must-fail.
-- **The test ends on `LOAD_LIMIT`**, then unloads to the start; the strain stop is a safety the gate
-  asserts never fires. `PULL_DAMPING` is 1 (15 made a frictionless swatch lag the jaw: fake hysteresis).
+- **Every test stops AT THE JAM** (`STOP_AT: 'jam'`, Eva's decision, Oct 27): loading ends the step the
+  analysis's own `findJam` finds the jam, then unloads to the start. `LOAD_LIMIT` is a safety only
+  (`'limit'` is kept for the untied-tail must-fail, whose unravelling happens past the jam). The strain stop
+  is a safety the gate asserts never fires. `PULL_DAMPING` is 1 (15 made a frictionless swatch lag the jaw).
 - **The topology is `through` per loop**; `placeCourse` has a case for 0 (yo), 1 and 2 (k2tog: the
   right parent's head drawn over the left's) parents. The start is drawn `INITIAL_DEPTH` (2.5×) deep and
-  the plates close / the yarn reels to length over the first frames — a decrease needs the room.
+  squeezed while the yarn reels to length over the first frames — a decrease needs the room.
   Linking numbers (`legLinks`) certify the drawn start; the pass-through certificate carries it after.
-- `tools/verify-knit-lab.mjs` (Node + `--browser`, ~5 min): gates T/F/I/C/E/S/W, each with a must-fail.
-  `tools/shot-knit-lab.mjs <dir>` takes the screenshots. **No CI covers it.**
+- **Phase 3b (Oct 22): the clamp fixture** (`FIXTURE: 'clamp'`). The top jaw clamps every point of the
+  last course plus the tail, the cast-on is the bottom jaw, the side edges are free and there are NO
+  plates. The deep start is squeezed only while it reels in. Interior loops feel a weak mid-plane spring
+  (`OUT_OF_PLANE_K` 300, on each loop's centroid, z only); it crumples at ≤ 100.
+- **`CONTACT_VELOCITY` + 64 substeps:** a restitution-0 velocity pass on every contact and pin push.
+  Without it a held swatch never rests (0.14 d/s at 32 substeps): the contacts bounced. With it, it rests
+  exactly.
+- **THE FRICTIONLESS LOSS (~9.7%) IS THE POLYLINE CORRUGATION, NOT A SOLVER KNOB.** A chord tube has a
+  bump at every vertex (an effective μ ~ π·seg·κ/4 ≈ 0.26). The loss grows with the segment length, and
+  no iteration, substep, damping, spring or contact-softness setting removes it.
+  - `CONTACT_SMOOTH` (B-spline contact, Newton closest points) removes it: the excursion comes back to
+    0.4% instead of 4%.
+  - **But the swatch never comes to rest on it (~0.1 d/s), so it is OFF. RULED Oct 27: do not build smooth
+    contact; the frictionless loss (10.6% wales / 6.5% courses to the jam) is RECORDED as the model's
+    baseline and friction reported as the excess over it.**
+- **THE COURSE TEST CONVERGES ON RAILS (Oct 27, read Phase 4 of the doc).** Both course edges ride rails (y, z
+  held, free along x: `COURSE_TOP: 'rail'`), and `clampSides()` zeroes the gripped points' velocities. The old
+  needle let the live loop beside a jaw slide along its free pin and climb it out of the plane without end; the
+  stale velocities biased the jaws 4.5% at rest (the velocity pass READS a w = 0 point's v). Jaws within 0.20%
+  on every step; gate K, must-fail the phase-3b fixture. Rib jams at 34% across vs jersey's 22% (1.55×).
+- **Step-size and monotonicity checks judge the MEDIAN OF THREE SEEDS** (preload ±1e-9): one run scatters by
+  several percent. Phase 3b's rib 12.9% loading fall is seed 0 only.
+- **Known limitations, on the page:** decreases lose their head order and the ssk row stays closed under the
+  FRICTIONLESS settle (heads unstack 1–2 d; settled with μ 0.25 they hold — not changed, Eva's call); F 2.46×;
+  rib-course unloading rises near zero load (compression).
+- `tools/verify-knit-lab.mjs` (Node + `--browser`; ~9 CPU-hours, 43 runs, chunk with `--reuse <dir> --out
+  <new>`): gates K/Q/M/H/T/O/F/I/C/E/D/R/S/W, each with a must-fail; `--no-course` for iteration;
+  `KNIT_PROGRESS=1` logs each step of a `--run`. `tools/shot-knit-lab.mjs <dir> --runs <gate dir>` takes the
+  screenshots and plots. **No CI covers it.**
 - `textile-knit-loops.js` is imported for the starting curve and must not be forked; the stretch
   simulator is untouched.
 

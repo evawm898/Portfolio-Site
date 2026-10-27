@@ -49,7 +49,12 @@ const asin = x => Math.asin(x < -1 ? -1 : x > 1 ? 1 : x);
 
 // x: Float64Array of points; loopOf / uOf: per point, its loop id and loop parameter (from
 // buildYarn). Returns { rows: [{ id, kind, through, links: {parentId: [left, right]} }], bad: [...] }.
-export function legLinks(topo, x, loopOf, uOf, courses = null) {
+// SIGN: a knit leg passes through its parent from the back and a purl leg from the front, so their
+// linking numbers have opposite signs. On every drawn start measured, a knit (and k2tog / ssk) half
+// links its parent -1 and a purl half +1; legLinks demands that sign, so a purl drawn knitwise
+// (both legs once through its parent, the wrong way) is refused, not accepted.
+export const LINK_SIGN = kind => (kind === 'purl' ? 1 : -1);
+export function legLinks(topo, x, loopOf, uOf, courses = null, sign = LINK_SIGN) {
   const pts = new Map();
   for (let i = 0; i < loopOf.length; i++) if (loopOf[i] >= 0) { let a = pts.get(loopOf[i]); if (!a) pts.set(loopOf[i], a = []); a.push([x[3 * i], x[3 * i + 1], x[3 * i + 2], uOf[i]]); }
   const P = id => (pts.get(id) || []).slice().sort((a, b) => a[3] - b[3]);
@@ -67,11 +72,32 @@ export function legLinks(topo, x, loopOf, uOf, courses = null) {
       if (v[0] || v[1]) links[pid] = v;
     }
     const want = new Set(l.through), got = Object.keys(links).map(Number);
-    const ok = got.length === want.size && got.every(p => want.has(p) && (links[p] === null || (Math.abs(links[p][0]) === 1 && links[p][0] === links[p][1])));
-    if (!ok) bad.push(`${l.kind} loop ${id} (course ${c}) should pass through [${l.through}] with both legs; measured ${JSON.stringify(links)}`);
+    const sg = sign ? sign(l.kind) : null;
+    const ok = got.length === want.size && got.every(p => want.has(p) && (links[p] === null || (Math.abs(links[p][0]) === 1 && links[p][0] === links[p][1] && (sg === null || links[p][0] === sg))));
+    if (!ok) bad.push(`${l.kind} loop ${id} (course ${c}) should pass through [${l.through}] with both legs${sg === null ? '' : ` (linking ${sg})`}; measured ${JSON.stringify(links)}`);
     rows.push({ id, kind: l.kind, through: l.through, links, undetermined });
   }
   return { rows, bad, undetermined: rows.reduce((a, r) => a + r.undetermined, 0), pairs: rows.length };
+}
+
+// ---- which parent of a decrease lies on top -------------------------------------------------------
+// A k2tog's right parent and an ssk's left parent end ON TOP (the record lists that one first): its
+// head lies in front of the other parent's head, toward the technical face (+z), and the decrease
+// leans that way. Linking numbers cannot see it (both legs pass through both parents either way), so
+// it is read off the geometry: the mean depth of each parent's head (loop parameter 0.4-0.6). Without
+// a pass-through the two heads cannot swap, so the drawn start and the relaxed swatch must agree.
+export function decreaseOrder(topo, x, loopOf, uOf) {
+  const z = new Map(), k = new Map();
+  for (let i = 0; i < loopOf.length; i++) { const l = loopOf[i]; if (l < 0 || uOf[i] < 0.4 || uOf[i] > 0.6) continue; z.set(l, (z.get(l) || 0) + x[3 * i + 2]); k.set(l, (k.get(l) || 0) + 1); }
+  const head = id => z.get(id) / k.get(id);
+  const rows = [], bad = [];
+  for (const l of topo.loops) if (l.through.length === 2) {
+    const [top, under] = l.through, dz = head(top) - head(under);
+    const leans = topo.loops[top].slot > topo.loops[under].slot ? 'right' : 'left';
+    rows.push({ id: l.id, kind: l.kind, top, under, dz, leans });
+    if (!(dz > 0)) bad.push(`${l.kind} loop ${l.id}: the parent recorded on top (${top}) has its head ${dz.toFixed(2)} d in front of the other's — not on top`);
+  }
+  return { rows, bad };
 }
 
 // ---- the curve ----------------------------------------------------------------------------------
@@ -103,8 +129,12 @@ export function findJam(rows, ratio = JAM_RATIO) {
 // load, as an elastic-recovery test reads it. (The extension where unloading reaches zero load is
 // not used: both curves are nearly flat there, so the answer is whatever the noise says.)
 export const SET_LOAD = 0.02;
+// A STEPPED (quasi-static) test's rows are its settled points (r.step), already one per step: they are
+// used as they are, unbinned, and the set is read where each curve crosses the reference load by
+// linear interpolation between the two points either side (so it does not move in step-sized jumps).
 export function cycleStats(rows, restHeight, ref = SET_LOAD) {
   const load = rows.filter(r => r.phase === 'pulling'), un = rows.filter(r => r.phase === 'unloading' || r.phase === 'returned');
+  if (rows.length && rows[0].step) return stepCycle(load, un, restHeight, ref);
   const work = rs => { let w = 0; for (let i = 1; i < rs.length; i++) w += 0.5 * (rs[i].load + rs[i - 1].load) * (rs[i].ext - rs[i - 1].ext) * restHeight; return w; };
   const wLoad = work(load), wUn = -work(un);
   const lb = bin(load), ub = bin(un);
@@ -113,6 +143,17 @@ export function cycleStats(rows, restHeight, ref = SET_LOAD) {
   const up = lb.find(p => p.load >= thr)?.ext ?? NaN;                 // loading: first bin at the reference load
   let down = NaN; for (let i = ub.length - 1; i >= 0; i--) if (ub[i].load <= thr) { down = ub[i].ext; break; }   // unloading, from the top
   return { workLoad: wLoad, workUnload: wUn, hysteresis: wLoad - wUn, lossFraction: (wLoad - wUn) / wLoad, set: down - up, setLoad: thr, setAtLoading: up, setAtUnloading: down, peak, preload: L0 };
+}
+
+function stepCycle(load, un, restHeight, ref) {
+  const work = rs => { let w = 0; for (let i = 1; i < rs.length; i++) w += 0.5 * (rs[i].load + rs[i - 1].load) * (rs[i].ext - rs[i - 1].ext) * restHeight; return w; };
+  const peakRow = load.reduce((m, r) => (r.load > m.load ? r : m), load[0]);
+  const back = [peakRow, ...un];                                       // unloading starts at the peak
+  const wLoad = work(load), wUn = -work(back), peak = peakRow.load, L0 = load[0].load, thr = L0 + ref * peak;
+  const cross = (a, b) => a.ext + (b.ext - a.ext) * (thr - a.load) / (b.load - a.load || 1);
+  let up = NaN; for (let i = 1; i < load.length; i++) if (load[i].load >= thr) { up = cross(load[i - 1], load[i]); break; }
+  let down = NaN; for (let i = 1; i < back.length; i++) if (back[i].load <= thr) { down = cross(back[i - 1], back[i]); break; }
+  return { workLoad: wLoad, workUnload: wUn, hysteresis: wLoad - wUn, lossFraction: (wLoad - wUn) / wLoad, set: down - up, setLoad: thr, setAtLoading: up, setAtUnloading: down, peak, preload: L0, points: load.length + un.length };
 }
 
 // ---- holes: openings in the fabric seen face-on -------------------------------------------------
