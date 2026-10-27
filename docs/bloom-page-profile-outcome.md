@@ -185,8 +185,8 @@ appended floret vertex) and threw them away. It asks only in EXPORT now (`captur
     deferred. Claimed rather than tuned out.
   - `every-input-builds-light`: its anchor moved with `dragLight()` and it now reddens D10 too.
 - **0 bytes moved on the export, whole matrix (1,588 rows), both modes**:
-  - `verify-bloom-surface-bytes --base <worktree of 7861569>`: RESULT_PLAIN
-  - `--defer` (this tree's deferred build against the base tree's full build): RESULT_DEFER
+  - `verify-bloom-surface-bytes --base <worktree of 7861569>`: **PASS — 0 floats moved on all 1,588 rows × 2 modes**, 2,268,902,844 export floats over 252,100,316 triangles and 82,596,220 captured-grid values, positionally under `Object.is` (8 chunks, `--merge`)
+  - `--defer` (this tree's deferred build against the base tree's full build): **PASS — 0 floats moved on all 1,588 rows × 2 modes**, the same 2,268,902,844 floats and 82,596,220 grid values. `--defer --control` fires both clauses on a 1e-9 perturbation, so the run is not vacuous
 - **Panel gate** (`node tools/verify-bloom-panel.mjs`): **PASS** ("every control is declared once, rendered once, and reachable through the real UI from inside a collapsed section").
 - **Design-file gate** (`node tools/verify-bloom-design-file.mjs`): **PASS, 21 clauses**.
 - No matrix row was added or removed, so no frozen phase is owed. `bloom-geometry.js`'s REST build
@@ -197,7 +197,31 @@ appended floret vertex) and threw them away. It asks only in EXPORT now (`captur
 Measured with the same tool on the same box, against the page as it now stands (`--only
 mophead-2`: 12 rays × 2 florets, depth 2's defaults otherwise, EXPORT):
 
-RESULT_M2
+Both rows were taken in the same run, with the box otherwise idle:
+
+| EXPORT, as shipped | the mophead (12 × 12), 1,241,994 tris | 12 rays × 2 florets, 212,394 tris |
+|---|---|---|
+| held step, input → drawn | **1,763 (1,737–1,782)** | **487 (475–558)** |
+| — `regenerate()` | 865 (837–879) | 327 (314–376) |
+| — of it `buildBloomInto` (reports deferred) | 705 (660–719) | 302 (290–341) |
+| — build end → first frame (SwiftShader) | ~890 | ~165 |
+| at rest, input → drawn | 2,184 (2,149–2,205) | 595 |
+| release → drawn | 3,003 | 666 |
+
+- **Against the new baseline, a 2-florets-a-ray drag build would take the held step 1.76 s → ~0.49 s
+  (3.6×) on this box.**
+  - #466 measured 2.5–3.4 s for this shape, before these fixes and very likely in LIVE.
+  - The release would still pay the full mophead build (~3.0 s here, as today).
+- **What is left on the mophead's own held step:**
+  - ~0.86 s of page JavaScript, almost all geometry (the floret and sub-umbel builds in both modes,
+    the 144 appends).
+  - ~0.89 s of software-GL frame.
+- **On a real GPU** the frame is milliseconds. The held step would then be ~0.9 s at 12 × 12 and
+  ~0.33 s at 12 × 2.
+- **Whether the mophead's ~0.9 s is close enough to the ~1 s bar** is Eva's to judge, with the
+  12 × 2 build's ~0.3–0.5 s beside it. While the slider is held, that drag build shows a sparse
+  dome (2 of 12 florets a ray). The rays, the bosses and the florets' size and shape still move with
+  the slider (#466 §12b).
 
 **Proposed, not built.** Eva's ruling of Oct 26 holds it until this profile was in. The numbers
 above are what she rules on.
