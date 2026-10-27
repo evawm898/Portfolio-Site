@@ -171,7 +171,7 @@ appended floret vertex) and threw them away. It asks only in EXPORT now (`captur
   - the on-screen bytes equal the geometry module's own full build in the page (a different owner
     from `bloom.js`'s routing);
   - after pointerup the screen is the exported STL and every report is back.
-- **Its negative control is 10 mutants.** Every anchor is checked before any of them runs, and each
+- **Its negative control is 10 mutants; it passes** (the full sweep ran 9 clean; the tenth, `input-events-are-the-drag`, reddened D10 as well, was re-claimed, and re-ran alone, PASS). Every anchor is checked before any of them runs, and each
   must redden exactly the clauses it names. Four are new: two in `bloom.js` and two in the geometry
   (`file: 'bloom-geometry.js'`, served through the same route).
   - `the-held-build-defers-nothing` (the witness that the deferral happens) — D10.
@@ -187,8 +187,8 @@ appended floret vertex) and threw them away. It asks only in EXPORT now (`captur
 - **0 bytes moved on the export, whole matrix (1,588 rows), both modes**:
   - `verify-bloom-surface-bytes --base <worktree of 7861569>`: RESULT_PLAIN
   - `--defer` (this tree's deferred build against the base tree's full build): RESULT_DEFER
-- **Panel gate** (`node tools/verify-bloom-panel.mjs`): RESULT_PANEL.
-- **Design-file gate** (`node tools/verify-bloom-design-file.mjs`): RESULT_DF.
+- **Panel gate** (`node tools/verify-bloom-panel.mjs`): **PASS** ("every control is declared once, rendered once, and reachable through the real UI from inside a collapsed section").
+- **Design-file gate** (`node tools/verify-bloom-design-file.mjs`): **PASS, 21 clauses**.
 - No matrix row was added or removed, so no frozen phase is owed. `bloom-geometry.js`'s REST build
   is unchanged (the plain run above).
 
