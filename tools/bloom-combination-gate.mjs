@@ -45,13 +45,19 @@
                 of roots is the ROOTS FUSE flag's and is excluded by
                 starting at the outer root. Overlapping closed rods export
                 watertight, so both STL gates are blind to it.
-     leaf-stem  every LEAF BLADE vertex against the free stem solid,
-                through the geometry's own `freeStemDistanceMm`. The
-                PETIOLE is excluded by the leaf builder's OWN reported
-                `petioleAxis` — it is rooted THROUGH the wall by design
-                and reads exactly 0, and a clearance criterion means
-                nothing between two solids that are fused (ST9's scope,
-                and its remedy: name the rod, never widen the region).
+     leaf-stem  every emitted LEAF BLADE vertex against the stem's own
+                EMITTED triangles (so the stem's T5 relief is in it), 0 if
+                the vertex is inside the free stem's solid, and 0 if any
+                blade edge crosses a stem triangle — on ONE export build's
+                own stream (the leaf-stem instrument session, Oct 25; until
+                then it read a leaf REBUILT outside the bloom against the
+                plan's ANALYTIC cylinder and could not see a contact at
+                70 deg — `measureLeafStemApproachMm`'s header). The RODS
+                are excluded by the leaf builder's OWN reported `rodAxes`
+                — the petiole is rooted THROUGH the wall by design, and a
+                clearance criterion means nothing between two solids that
+                are fused (ST9's scope, and its remedy: name the rod, never
+                widen the region).
 
    THREE TIERS, AND THE TIER IS A FIELD THE GATE READS (CG6). TIER 1 is
    a defect measured and CITED on this pair; TIER 2 is a SHARED
@@ -165,7 +171,7 @@
    =================================================================== */
 
 import { measureInfillWallMm } from './bloom-infill-wall.mjs';
-import { measureInfloApproachMm, SEARCH_CAP_MM as INFLO_SEARCH_CAP_MM } from './bloom-inflo-approach.mjs';
+import { measureInfloApproachMm, SEARCH_CAP_MM as INFLO_SEARCH_CAP_MM, triGrid, nearest, crosses } from './bloom-inflo-approach.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -184,6 +190,7 @@ export const COMBINATION_TOLERANCE_MM = 5e-4;
 /* THE INFLORESCENCE'S MEASURES and the words the table prints for each. */
 const INFLO_MEASURES = new Map([
   ['floret-floret', `FLORET against every OTHER floret (emitted vertices against emitted triangles, edge crossings read 0, searched to ${INFLO_SEARCH_CAP_MM} mm; the pedicel-to-rachis join inside the rachis's own solid excluded by construction)`],
+  ['subumbel-floret', `FLORET against every OTHER floret of ITS OWN SUB-UMBEL (the mophead, depth 2: ray 0's florets, every ray's under its rigid matrix; the sub-umbel's own boss excluded as its join; edge crossings read 0, searched to ${INFLO_SEARCH_CAP_MM} mm). At depth 2 \`floret-floret\` reads whole SUB-UMBELS against each other`],
   ['floret-head', `FLORET against the TERMINAL HEAD (the petals and the hub, [0, hubTriEnd); edge crossings read 0, searched to ${INFLO_SEARCH_CAP_MM} mm)`],
   ['floret-stem', 'FLORET against the FREE RACHIS (freeStemDistanceMm, the geometry\'s own; its own pedicel rod excluded by the builder\'s pedicelAxis, a SESSILE floret excluded whole — its hub IS the join)'],
   ['leaf-floret', `SUBTENDING LEAF against every FLORET, pedicel included (the shared node's own approach; the petiole-to-rachis join excluded; searched to ${INFLO_SEARCH_CAP_MM} mm)`],
@@ -335,6 +342,27 @@ export const PAIRS = [
     verdict: 'single-reaches',
     cite: 'docs/bloom-leaves-outcome.md — 1.853 / 4.356 / 5.492 / 4.910 / 4.019 / 2.804 / 1.853 / 0.824 / 0.289 / 0.000 mm at leafAngle -60..90, reproduced here exactly through an instrument that shares no code with the one that produced it',
     why: "the escape length is `outerR / cos(theta)`, so a steeper angle lays the blade back along the stem; Eva's ruled 35 deg reads 4.019 mm, four times the gap",
+  },
+  {
+    id: 'leafangle-x-textureheight',
+    tier: 1,
+    label: 'leafAngle x textureHeight — the blade against the RELIEVED stem it hangs off',
+    measure: 'leaf-stem',
+    base: { stemLength: 70, leafLength: 52, leafWidth: 17, leafNodes: 3, petalTexture: 'PEBBLE' },
+    a: { id: 'leafAngle', values: [35, 50, 70, 85] },
+    b: { id: 'textureHeight', values: [0.4, 0.8, 1.2, 1.5] },
+    /* THE PAIR THE INSTRUMENT SESSION WAS FOR (Eva's ruling 7, Oct 25; T5's
+       ambiguity 8). T5's own measurement: at leafAngle 70 the blade and the
+       RELIEVED stem wall touch from H 0.8 up, and the old `leaf-stem` measure
+       — the analytic cylinder — read 0.540 at every height. On the emitted
+       measure the 70-deg column reads 0.252 at the floor and a CROSSING from
+       0.8 (the stem's relief passing through the blade); the 35-deg row falls
+       ~0.88 mm per mm of height and never reaches the bar. `single-reaches`
+       because the angle reaches the bar at the floor height alone (0.252 at
+       70, 0 at 85) — the height deepens a contact the angle already makes. */
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-surface-texture-t5-outcome.md §3a and §8 item 8 — 0.544 untextured, 0.252 at H 0.4, touching from H 0.8 at leafAngle 70; the analytic measure read 0.540 at every height',
+    why: "the stem's relief stands up to `textureHeight` proud of the cylinder the blade's clearance was measured against, so every millimetre of height comes off a gap the angle has already narrowed",
   },
 
   /* ------------------------------------------------------------ TIER 2
@@ -669,7 +697,7 @@ export const PAIRS = [
     label: 'petalCup x petalWidth — the cup on a broad blade',
     measure: 'self',
     a: { id: 'petalCup', values: [0, 0.6, 0.9, 1.2] },
-    b: { id: 'petalWidth', values: [16, 23, 30] },
+    b: { id: 'petalWidth', values: [16, 23, 30, 46] },
     verdict: 'product-only',
     cite: 'docs/bloom-combination-gate.md §4 — a guess that measured as a product-only failure',
     why: "a guess: that a cup of the same amplitude closes further across a wider blade, since the amplitude is a fraction of the half-width and the half-width is what the two margins have to cross",
@@ -693,7 +721,7 @@ export const PAIRS = [
     label: 'petalCup x petalLength — the cup on a short blade',
     measure: 'self',
     a: { id: 'petalCup', values: [0, 0.6, 0.9, 1.2] },
-    b: { id: 'petalLength', values: [35, 20, 60] },
+    b: { id: 'petalLength', values: [35, 20, 60, 80, 100] },   /* 80 and 100 joined with the range (big petals, Oct 21): the ruled reach of the control, and the law's own thick root under every cup */
     /* VERDICT RE-DECLARED BY THE APEX NIB: was CLEARS, and #263's own citation for it predicted this in words: 'measured CLEAR and close: 1.012 mm at cup 1.2 x a 20 mm blade, twelve microns of headroom'. The twelve microns are spent and one interior cell is now under the bar, with neither single reaching it. CG4 partitions the three arms so no declaration is unfalsifiable, and it fired on this pair rather than letting the change pass as a magnitude move. */
     /* PRODUCT-ONLY -> CLEARS, BY THE FOLD CLAMP (this PR): its one declared cell (cup 1.2 x a 20 mm blade) clears at 1.053.
        It was 0.994 — the cell the apex nib itself added, and #263 predicted before that ("twelve microns of headroom"). The clamp gives them back.
@@ -704,6 +732,17 @@ export const PAIRS = [
     verdict: 'clears',
     cite: 'docs/bloom-combination-gate.md §4 — a guess, measured CLEAR and close: 1.012 mm at cup 1.2 x a 20 mm blade, twelve microns of headroom',
     why: 'a guess: that a short blade cups into a tighter tube. It does, and it stops just above the bar — which is why a measured clear is worth gating rather than dropping',
+  },
+  {
+    id: 'length-x-tilt',
+    tier: 2,
+    label: 'petalLength x petalTilt — a long, thickened root turned at the seam',
+    measure: 'self',
+    a: { id: 'petalLength', values: [35, 60, 80, 100] },
+    b: { id: 'petalTilt', values: [25, 0, 60, 90] },
+    verdict: 'clears',
+    cite: 'docs/bloom-big-petals-outcome.md — the seam clearance (t/2) sin(theta) is multiplied by the root factor, so a long petal clears a thicker kink at every tilt; the pair is bought by the ruling (Oct 21) that took petalLength to 100 mm',
+    why: 'a shared mechanism argued from bloom-geometry.js: the root taper thickens exactly the stretch the seam must clear and the fold limit must protect, and the tilt sets how sharp that kink is — two controls acting on one quantity',
   },
   {
     id: 'lobedepth-x-curl',
@@ -896,6 +935,81 @@ export const PAIRS = [
     cite: 'docs/bloom-inflorescence-node-laws-outcome.md — the corymb solve lands every head on one level, so the heads stand side by side at one height',
     why: 'level tops put every head in one plane; a shallow angle spreads them far apart in length and a steep one stacks them close',
   },
+  /* ---------------------------------------------- THE UMBEL (Oct 22)
+     Every floret on ONE node at the stem's top, evenly round the KNOT, so the
+     internode that clears a raceme's florets does not exist. Three pairs, the
+     inflorescence's own measures (tools/bloom-inflo-approach.mjs), the KNOT
+     excluded as the umbel's join region exactly as the rachis is a raceme's. */
+  {
+    id: 'umbel-florets-x-angle',
+    tier: 2,
+    label: 'umbelFlorets x pedicelAngle — the umbel\'s florets against each other',
+    measure: 'floret-floret',
+    base: { stemLength: 120, inflorescence: 'UMBEL' },
+    a: { id: 'umbelFlorets', values: [6, 2, 5, 12] },
+    b: { id: 'pedicelAngle', values: [35, -60, 90] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-umbel-outcome.md — every floret of an umbel stands on one node, so the florets are spaced by their count round the knot and by the angle alone',
+    why: 'more florets round one knot sit closer; the angle sets how far out each floret stands before its petals open',
+  },
+  /* ---------------------------------------------- THE MOPHEAD (Oct 24)
+     A compound umbel: rays from one boss, each ending in a sub-umbel. Two
+     approaches, the ruling's own: florets INSIDE one sub-umbel, and the
+     sub-umbels AGAINST each other (`floret-floret` at depth 2, whose blocks
+     are the rays). Both declared by value, never clamped — the dome's florets
+     interleave as a real mophead's do. */
+  {
+    id: 'mophead-subumbel-florets-x-angle',
+    tier: 2,
+    label: 'umbelFlorets x pedicelAngle at depth 2 — the florets of ONE sub-umbel against each other',
+    measure: 'subumbel-floret',
+    base: { stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2', umbelRays: 2 },
+    a: { id: 'umbelFlorets', values: [6, 2, 12] },
+    b: { id: 'pedicelAngle', values: [35, -60, 90] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-mophead-outcome.md — a sub-umbel is an umbel on one node at its ray\'s end, so its florets are spaced by their count round the sub-boss and by the angle alone',
+    why: 'more florets round one sub-boss sit closer; the angle sets how far out each stands before its petals open',
+  },
+  {
+    id: 'mophead-rays-x-florets',
+    tier: 2,
+    label: 'umbelRays x umbelFlorets — the SUB-UMBELS of a mophead against each other',
+    measure: 'floret-floret',
+    base: { stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2' },
+    a: { id: 'umbelRays', values: [12, 2, 6] },
+    b: { id: 'umbelFlorets', values: [6, 2, 12] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-mophead-outcome.md — the dome is rays of equal length from one boss, so neighbouring sub-umbels are spaced by the ray count and their own spread by the floret count',
+    why: 'more rays put the sub-umbels closer round the dome; more florets widen each sub-umbel toward its neighbours',
+  },
+  {
+    id: 'umbel-length-x-angle',
+    tier: 2,
+    label: 'pedicelLength x pedicelAngle — an umbel floret against the stem below it',
+    measure: 'floret-stem',
+    base: { stemLength: 120, inflorescence: 'UMBEL' },
+    a: { id: 'pedicelLength', values: [20, 5, 60, 250] },
+    b: { id: 'pedicelAngle', values: [35, -60, 90] },
+    verdict: 'single-reaches',
+    cite: 'docs/bloom-umbel-outcome.md — a downturned or short pedicel stands its floret against the stem the knot sits on',
+    why: 'a pedicel turned down past the horizontal carries its floret back along the stem; a short one keeps the floret beside it',
+  },
+  {
+    id: 'umbel-head-length-x-angle',
+    tier: 2,
+    label: 'pedicelLength x pedicelAngle — an umbel floret against the head ON',
+    measure: 'floret-head',
+    base: { stemLength: 120, inflorescence: 'UMBEL', umbelHead: 'ON' },
+    a: { id: 'pedicelLength', values: [20, 5, 60] },
+    b: { id: 'pedicelAngle', values: [35, -60, 90] },
+    /* CLEARS, measured: the reach inset puts the knot so the florets' highest
+       point stands one gap under the head, and the nearest cell is the 5 mm
+       pedicel at 35 deg, 1.087 mm. KEPT so the day a floret reaches the head
+       this grid says so. */
+    verdict: 'clears',
+    cite: 'docs/bloom-umbel-outcome.md — with the head ON the knot sits below it at the reach inset, which clears the TOP of the floret and not its sides',
+    why: 'a steep pedicel lifts its floret beside the head the inset was derived to clear from below',
+  },
 
   /* ------------------------------------------- THE SEPALS (R6, Oct 9)
      Eva's ruling R6 (docs/bloom-sepal-discovery.md §6): the sepal is measured
@@ -1064,7 +1178,7 @@ export const TRIPLES = [
          worse than their maximum somewhere, but never under the bar there. */
       { id: 'petalCup', values: [0, 1, 1.2] },
       { id: 'petalTipShape', values: [1.7, 3] },
-      { id: 'petalWidth', values: [16, 30] },
+      { id: 'petalWidth', values: [16, 30, 46] },
     ],
     verdict: 'pair-reaches',
     /* WIDTH, NOT TIP THINNING — both are declared PRODUCT-ONLY with cup, and
@@ -1237,12 +1351,24 @@ export const COMBINATION_XFAIL = Object.freeze({
 
   /* THE LEAF CELLS — `leafAngle`'s hazard, at every stem diameter, which
      is what CG4's `single-reaches` arm asserts about this pair. */
-  'leafangle-x-stem @ leafAngle=70 x stemDiameter=6': { mm: 0.821, note: "docs/bloom-leaves-outcome.md's own figure (0.824), reproduced exactly through an instrument that shares no code with the one that produced it. RE-RECORDED 0.824 -> 0.821 by leaf/stem build S2: the leaf's margin closes on the bead now, and the near point to the stem is at the blade's base margin, where the bead's profile replaces the flat wall's corner." },
-  'leafangle-x-stem @ leafAngle=70 x stemDiameter=3': { mm: 0.822, note: 'measured 2026-09-19 on 937263a. RE-RECORDED 0.826 -> 0.822 by S2 (the bead at the base margin).' },
-  'leafangle-x-stem @ leafAngle=70 x stemDiameter=12': { mm: 0.821, note: "measured 2026-09-19 on 937263a — 0.002 mm from the 6 mm stem's reading, which is the whole of what the second control contributes. RE-RECORDED 0.822 -> 0.821 by S2 (the bead at the base margin)." },
+  'leafangle-x-stem @ leafAngle=70 x stemDiameter=6': { mm: 0.544, note: "docs/bloom-leaves-outcome.md's own figure (0.824), reproduced exactly through an instrument that shares no code with the one that produced it. RE-RECORDED 0.824 -> 0.821 by leaf/stem build S2: the leaf's margin closes on the bead now, and the near point to the stem is at the blade's base margin, where the bead's profile replaces the flat wall's corner. RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade's base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.540 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
+  'leafangle-x-stem @ leafAngle=70 x stemDiameter=3': { mm: 0.544, note: 'measured 2026-09-19 on 937263a. RE-RECORDED 0.826 -> 0.822 by S2 (the bead at the base margin). RE-RECORDED 0.822 -> 0.541 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade\'s base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.541 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf\'s azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md.' },
+  'leafangle-x-stem @ leafAngle=70 x stemDiameter=12': { mm: 0.544, note: "measured 2026-09-19 on 937263a — 0.002 mm from the 6 mm stem's reading, which is the whole of what the second control contributes. RE-RECORDED 0.822 -> 0.821 by S2 (the bead at the base margin). RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade's base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.540 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
   'leafangle-x-stem @ leafAngle=85 x stemDiameter=6': { mm: 0, note: "docs/bloom-leaves-outcome.md's 80-90 deg cell: the blade reaches the stem's own surface. `LEAVES: the STEEP angle (85 deg)` is a shipped MATRIX ROW, so this hazard was reachable, built and exported on every full gate run — nothing measured it." },
   'leafangle-x-stem @ leafAngle=85 x stemDiameter=3': { mm: 0, note: 'measured 2026-09-19 on 937263a.' },
   'leafangle-x-stem @ leafAngle=85 x stemDiameter=12': { mm: 0, note: 'measured 2026-09-19 on 937263a.' },
+  /* THE RELIEVED STEM (the leaf-stem instrument session, Oct 25) — every cell
+     the emitted measure reads under the bar on `leafangle-x-textureheight`.
+     The analytic measure read 0.540 / 0.000 at every height here: it could
+     not see the stem's relief at all. */
+  'leafangle-x-textureheight @ leafAngle=70 x textureHeight=0.4': { mm: 0.252, note: 'a SINGLE-axis cell (the floor height): T5 §3a\'s 0.252, reproduced through the gate. The stem\'s relief stands proud of the cylinder the old measure read (0.540 here). Measured 2026-10-25, Node 22, EXPORT.' },
+  'leafangle-x-textureheight @ leafAngle=70 x textureHeight=0.8': { mm: 0, note: 'a CROSSING: an edge of the blade passes through the relieved stem wall (T5 §3a read the nearest vertex at 0.001 mm; the crossing is what makes it 0). Measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=70 x textureHeight=1.2': { mm: 0, note: 'a CROSSING (T5 §3a: 0.010 nearest vertex). Measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=70 x textureHeight=1.5': { mm: 0, note: 'a CROSSING (T5 §3a: 0.003 nearest vertex). Measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=85 x textureHeight=0.4': { mm: 0, note: 'the blade inside the stem at 85 deg whatever the height — `leafangle-x-stem @ leafAngle=85` textured. Measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=85 x textureHeight=0.8': { mm: 0, note: 'measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=85 x textureHeight=1.2': { mm: 0, note: 'measured 2026-10-25.' },
+  'leafangle-x-textureheight @ leafAngle=85 x textureHeight=1.5': { mm: 0, note: 'measured 2026-10-25.' },
   /* leafarch-x-angle (leaf/stem build S2): the arch's own grid. Four cells are
      the 85 deg column, which the angle reaches alone; ONE is the product. */
   'leafarch-x-angle @ leafArch=0 x leafAngle=85': { mm: 0, note: 'a SINGLE-axis cell — the 85 deg blade reaches the stem with no arch at all (`leafangle-x-stem @ leafAngle=85` declares the same state). Measured on the S2 tree.' },
@@ -1363,9 +1489,9 @@ export const COMBINATION_XFAIL = Object.freeze({
      own two failing angles re-read three times each. They are declared
      because CG2 declares every cell under the bar and an undeclared one
      is a red; what they are worth is the inertness record above them. */
-  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.26': { mm: 0.821, note: "a SINGLE-axis cell, and the same state `leafangle-x-stem @ leafAngle=70 x stemDiameter=6` declares at the same figure. Measured 2026-09-19 on c29a8b5 at 0.824; RE-RECORDED 0.821 by S2 (the bead at the base margin)." },
-  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.6': { mm: 0.821, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the cell above it; the teeth do not reach this measure. RE-RECORDED 0.824 -> 0.821 by S2.' },
-  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=1': { mm: 0.821, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the two cells above it. RE-RECORDED 0.824 -> 0.821 by S2.' },
+  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.26': { mm: 0.544, note: "a SINGLE-axis cell, and the same state `leafangle-x-stem @ leafAngle=70 x stemDiameter=6` declares at the same figure. Measured 2026-09-19 on c29a8b5 at 0.824; RE-RECORDED 0.821 by S2 (the bead at the base margin). RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade's base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.540 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
+  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=0.6': { mm: 0.544, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the cell above it; the teeth do not reach this measure. RE-RECORDED 0.824 -> 0.821 by S2. RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade\'s base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.540 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf\'s azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md.' },
+  'leafangle-x-tooth @ leafAngle=70 x leafToothDepth=1': { mm: 0.544, note: 'measured 2026-09-19 on c29a8b5 — bit-identical to the two cells above it. RE-RECORDED 0.824 -> 0.821 by S2. RE-RECORDED 0.821 -> 0.540 by ROOT SUPPORT (Oct 21): the 52 mm leaf takes the root law at its own length (x1.499, a 1.80 mm root on the 1.20 mm sheet), so the blade\'s base — the near point to the stem — stands half the added thickness (0.30 mm) nearer it. docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.540 -> 0.544 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf\'s azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md.' },
   'leafangle-x-tooth @ leafAngle=85 x leafToothDepth=0.26': { mm: 0, note: 'a SINGLE-axis cell: the blade reaches the stem surface at 85 deg whatever the teeth do. Measured 2026-09-19 on c29a8b5.' },
   'leafangle-x-tooth @ leafAngle=85 x leafToothDepth=0.6': { mm: 0, note: 'measured 2026-09-19 on c29a8b5.' },
   'leafangle-x-tooth @ leafAngle=85 x leafToothDepth=1': { mm: 0, note: 'measured 2026-09-19 on c29a8b5.' },
@@ -1376,6 +1502,10 @@ export const COMBINATION_XFAIL = Object.freeze({
   'cup-x-width @ petalCup=0.9 x petalWidth=30': { mm: 0.942, note: "measured 2026-09-19 on c29a8b5; petalWidth 30 alone reads 1.219 and cup 0.9 alone 1.138, both clear. — RE-RECORDED BY THE APEX NIB: was 0.954 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22. — RE-RECORDED BY THE FOLD CLAMP: was 0.947 mm. The fold clamp is the mover and it is the ONLY one: every figure above reproduces EXACTLY on a worktree of 84e641d, the commit before the clamp's first owner. `cupScale` holds the section's curvature across the nib at the value it already had at the entry, and the cap `|c| <= hb / (FOLD_CLAMP_MARGIN * t)` binds on the converging stretch BELOW the nib too — which the wall instrument's `nibFromU` exclusion does not exclude — so the rows just under the entry take a different normal (`trueNormalRows` crosses against its NEIGHBOURS). Measured on the merged tree, Node 22." },
   'cup-x-width @ petalCup=1.2 x petalWidth=23': { mm: 0.981, note: "NEW WITH THE FOLD CLAMP, and it is the twelve-microns story a second time: 1.0002 mm on a worktree of 84e641d (the commit before the clamp), 0.9814 here — two tenths of a micron of headroom spent. The fold clamp is the mover and it is the ONLY one: every figure above reproduces EXACTLY on a worktree of 84e641d, the commit before the clamp's first owner. `cupScale` holds the section's curvature across the nib at the value it already had at the entry, and the cap `|c| <= hb / (FOLD_CLAMP_MARGIN * t)` binds on the converging stretch BELOW the nib too — which the wall instrument's `nibFromU` exclusion does not exclude — so the rows just under the entry take a different normal (`trueNormalRows` crosses against its NEIGHBOURS). Measured on the merged tree, Node 22." },
   'cup-x-width @ petalCup=1.2 x petalWidth=30': { mm: 0.884, note: "measured 2026-09-19 on c29a8b5 — the worst cell of this pair. — RE-RECORDED BY THE APEX NIB: was 0.932 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22. — RE-RECORDED BY THE FOLD CLAMP: was 0.916 mm. The fold clamp is the mover and it is the ONLY one: every figure above reproduces EXACTLY on a worktree of 84e641d, the commit before the clamp's first owner. `cupScale` holds the section's curvature across the nib at the value it already had at the entry, and the cap `|c| <= hb / (FOLD_CLAMP_MARGIN * t)` binds on the converging stretch BELOW the nib too — which the wall instrument's `nibFromU` exclusion does not exclude — so the rows just under the entry take a different normal (`trueNormalRows` crosses against its NEIGHBOURS). Measured on the merged tree, Node 22." },
+
+  'cup-x-width @ petalCup=0.6 x petalWidth=46': { mm: 0.902, note: "NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
+  'cup-x-width @ petalCup=0.9 x petalWidth=46': { mm: 0.788, note: "NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
+  'cup-x-width @ petalCup=1.2 x petalWidth=46': { mm: 0.712, note: "NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22. The worst cell of this pair now (0.884 at width 30)." },
 
   /* THE CUP ON A THINNED TIP — a guess that paid, and the second control
      SATURATES AGAINST THE PRINT FLOOR: 0.4 and 0.8 read the same number
@@ -1451,6 +1581,10 @@ export const COMBINATION_XFAIL = Object.freeze({
   "curl-x-twist-x-roll @ petalSpineCurl=360 x petalTwist=180 x petalRoll=330": { mm: 0.19, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs -0.520 mm against its nearest face (petalSpineCurl=360 x petalTwist=180 x petalRoll=0) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721) — RE-RECORDED BY THE FOOT TARGETS (gate-hygiene, Oct 6): was 0.527 mm, now 0.19 mm. `measureWall` used to drop the foot rows, so a tip coiling back onto its OWN FOOT was invisible to `self`; the foot now joins as a SELF target (never a query, never inside the seam window, so `wall` is unchanged by construction). The worst site is now at u 0.983, the curl's tip against its own foot. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
 
   /* ===== cup-x-tipshape-x-width (the headroom PR, §21) */
+  "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=1.7 x petalWidth=46": { mm: 0.759, note: "a FACE of the triple at the new width maximum. NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
+  "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=3 x petalWidth=46": { mm: 0.194, note: "THE TRIPLE'S OWN CELL at the new width maximum (0.457 at width 30). NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
+  "cup-x-tipshape-x-width @ petalCup=1.2 x petalTipShape=1.7 x petalWidth=46": { mm: 0.712, note: "a FACE of the triple, the same state as cup-x-width @ petalCup=1.2 x petalWidth=46 read on the triple's face. NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
+  "cup-x-tipshape-x-width @ petalCup=1.2 x petalTipShape=3 x petalWidth=46": { mm: 0.189, note: "the triple's worst cell at the new width maximum (0.390 at width 30). NEW WITH THE WIDTH RANGE (Eva's ruling 2, Oct 21 — `petalWidth` max 30 -> 46, docs/bloom-big-petals-outcome.md): the grid's width axis was extended to the new maximum, and width 46 ALONE reads 1.236 mm and clears; the cup is a fraction of the half-width, so a wider blade closes further under the same cup. Declared by value, never clamped. Measured on the big-petals tree, EXPORT, Node 22." },
   "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=1.7 x petalWidth=30": { mm: 0.92, note: "a FACE of the triple (petalCup x petalWidth moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
   "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=3 x petalWidth=16": { mm: 0.788, note: "a FACE of the triple (petalCup x petalTipShape moved, the third axis at its default) \u2014 the same state a pair would measure; declared here because the triple produces the key. Measured on the headroom PR's tree" },
   "cup-x-tipshape-x-width @ petalCup=1 x petalTipShape=3 x petalWidth=30": { mm: 0.457, note: "THE TRIPLE'S OWN CELL, all three axes off their defaults: the third control costs 0.331 mm against its nearest face (petalCup=1 x petalTipShape=3 x petalWidth=16) \u2014 reported, never a bar. Measured by the gate on the headroom PR's tree, EXPORT, Node 22 (docs/bloom-organic-variance-form-outcome.md \u00a721)" },
@@ -1512,6 +1646,34 @@ export const COMBINATION_XFAIL = Object.freeze({
   'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=35': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-leafangle-x-pedicelangle @ leafAngle=60 x pedicelAngle=0': { mm: 0, note: 'the leaf crosses its pedicel or the floret it carries — the two rods converge (the leaf steeper) or the leaf is longer than the floret is far out (an edge crossing)' + ' — measured on the node-laws tree (754e3aa + this session), Node 22, EXPORT, emitted vertices against emitted triangles.' },
   'inflo-corymb-angle-x-length @ pedicelAngle=60 x pedicelLength=0': { mm: 0.2144, note: 'RE-RECORDED by build 3 ruling 1 (the florets\' own internode floor): read 0.000 (an edge crossing) through builds 2 and 3 Phase A; under the floor the three level-topped heads on a 60 mm rachis stand 0.2144 mm apart — the ONE corymb cell still under the bar, an INTERIOR cell (the sessile top at 60 deg), so the pair is PRODUCT-ONLY now. The floor is derived for EQUAL pedicels and the corymb lengthens the lower ones to one level, which is why the floor clears the other eight cells and not this one' + ' — measured by build 3 (ruling 1), Node 22, EXPORT, emitted vertices against emitted triangles.' },
+
+  /* THE UMBEL (Oct 22) — docs/bloom-umbel-outcome.md §7. */
+  'mophead-subumbel-florets-x-angle @ umbelFlorets=6 x pedicelAngle=35': { mm: 0, note: "every floret of a SUB-UMBEL stands on ONE node at its ray's end, evenly round the sub-boss, so no internode moves two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from six up and at every angle, and at two once the pedicels stand parallel (90 deg). A mophead's florets interleave; declared by value, never clamped (Eva's ruling on the mophead) — the count and the angle are the sub-umbel's own two controls — measured on the mophead tree (Oct 24), Node 22, EXPORT, ray 0's florets, emitted vertices against emitted triangles." },
+  'mophead-subumbel-florets-x-angle @ umbelFlorets=6 x pedicelAngle=-60': { mm: 0, note: "every floret of a SUB-UMBEL stands on ONE node at its ray's end, evenly round the sub-boss, so no internode moves two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from six up and at every angle, and at two once the pedicels stand parallel (90 deg). A mophead's florets interleave; declared by value, never clamped (Eva's ruling on the mophead) — the count and the angle are the sub-umbel's own two controls — measured on the mophead tree (Oct 24), Node 22, EXPORT, ray 0's florets, emitted vertices against emitted triangles." },
+  'mophead-subumbel-florets-x-angle @ umbelFlorets=6 x pedicelAngle=90': { mm: 0, note: "every floret of a SUB-UMBEL stands on ONE node at its ray's end, evenly round the sub-boss, so no internode moves two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from six up and at every angle, and at two once the pedicels stand parallel (90 deg). A mophead's florets interleave; declared by value, never clamped (Eva's ruling on the mophead) — the count and the angle are the sub-umbel's own two controls — measured on the mophead tree (Oct 24), Node 22, EXPORT, ray 0's florets, emitted vertices against emitted triangles." },
+  'mophead-subumbel-florets-x-angle @ umbelFlorets=2 x pedicelAngle=90': { mm: 0, note: "every floret of a SUB-UMBEL stands on ONE node at its ray's end, evenly round the sub-boss, so no internode moves two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from six up and at every angle, and at two once the pedicels stand parallel (90 deg). A mophead's florets interleave; declared by value, never clamped (Eva's ruling on the mophead) — the count and the angle are the sub-umbel's own two controls — measured on the mophead tree (Oct 24), Node 22, EXPORT, ray 0's florets, emitted vertices against emitted triangles." },
+  'mophead-subumbel-florets-x-angle @ umbelFlorets=12 x pedicelAngle=35': { mm: 0, note: "every floret of a SUB-UMBEL stands on ONE node at its ray's end, evenly round the sub-boss, so no internode moves two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from six up and at every angle, and at two once the pedicels stand parallel (90 deg). A mophead's florets interleave; declared by value, never clamped (Eva's ruling on the mophead) — the count and the angle are the sub-umbel's own two controls — measured on the mophead tree (Oct 24), Node 22, EXPORT, ray 0's florets, emitted vertices against emitted triangles." },
+  'mophead-subumbel-florets-x-angle @ umbelFlorets=12 x pedicelAngle=-60': { mm: 0, note: "every floret of a SUB-UMBEL stands on ONE node at its ray's end, evenly round the sub-boss, so no internode moves two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from six up and at every angle, and at two once the pedicels stand parallel (90 deg). A mophead's florets interleave; declared by value, never clamped (Eva's ruling on the mophead) — the count and the angle are the sub-umbel's own two controls — measured on the mophead tree (Oct 24), Node 22, EXPORT, ray 0's florets, emitted vertices against emitted triangles." },
+  'mophead-subumbel-florets-x-angle @ umbelFlorets=12 x pedicelAngle=90': { mm: 0, note: "every floret of a SUB-UMBEL stands on ONE node at its ray's end, evenly round the sub-boss, so no internode moves two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from six up and at every angle, and at two once the pedicels stand parallel (90 deg). A mophead's florets interleave; declared by value, never clamped (Eva's ruling on the mophead) — the count and the angle are the sub-umbel's own two controls — measured on the mophead tree (Oct 24), Node 22, EXPORT, ray 0's florets, emitted vertices against emitted triangles." },
+  'mophead-rays-x-florets @ umbelRays=12 x umbelFlorets=6': { mm: 0, note: "the dome is rays of equal length from ONE boss, so neighbouring SUB-UMBELS stand round the dome spaced by the ray count alone and spread by their own floret count: from six rays up, and at two rays with twelve florets, a sub-umbel's florets pass through its neighbour's (an edge crossing, 0.000 mm). A mophead's florets fuse into one dome; declared by value, never clamped (Eva's ruling on the mophead) — measured on the mophead tree (Oct 24), Node 22, EXPORT, every sub-umbel against every other, emitted vertices against emitted triangles." },
+  'mophead-rays-x-florets @ umbelRays=12 x umbelFlorets=2': { mm: 0, note: "the dome is rays of equal length from ONE boss, so neighbouring SUB-UMBELS stand round the dome spaced by the ray count alone and spread by their own floret count: from six rays up, and at two rays with twelve florets, a sub-umbel's florets pass through its neighbour's (an edge crossing, 0.000 mm). A mophead's florets fuse into one dome; declared by value, never clamped (Eva's ruling on the mophead) — measured on the mophead tree (Oct 24), Node 22, EXPORT, every sub-umbel against every other, emitted vertices against emitted triangles." },
+  'mophead-rays-x-florets @ umbelRays=12 x umbelFlorets=12': { mm: 0, note: "the dome is rays of equal length from ONE boss, so neighbouring SUB-UMBELS stand round the dome spaced by the ray count alone and spread by their own floret count: from six rays up, and at two rays with twelve florets, a sub-umbel's florets pass through its neighbour's (an edge crossing, 0.000 mm). A mophead's florets fuse into one dome; declared by value, never clamped (Eva's ruling on the mophead) — measured on the mophead tree (Oct 24), Node 22, EXPORT, every sub-umbel against every other, emitted vertices against emitted triangles." },
+  'mophead-rays-x-florets @ umbelRays=2 x umbelFlorets=12': { mm: 0, note: "the dome is rays of equal length from ONE boss, so neighbouring SUB-UMBELS stand round the dome spaced by the ray count alone and spread by their own floret count: from six rays up, and at two rays with twelve florets, a sub-umbel's florets pass through its neighbour's (an edge crossing, 0.000 mm). A mophead's florets fuse into one dome; declared by value, never clamped (Eva's ruling on the mophead) — measured on the mophead tree (Oct 24), Node 22, EXPORT, every sub-umbel against every other, emitted vertices against emitted triangles." },
+  'mophead-rays-x-florets @ umbelRays=6 x umbelFlorets=6': { mm: 0, note: "the dome is rays of equal length from ONE boss, so neighbouring SUB-UMBELS stand round the dome spaced by the ray count alone and spread by their own floret count: from six rays up, and at two rays with twelve florets, a sub-umbel's florets pass through its neighbour's (an edge crossing, 0.000 mm). A mophead's florets fuse into one dome; declared by value, never clamped (Eva's ruling on the mophead) — measured on the mophead tree (Oct 24), Node 22, EXPORT, every sub-umbel against every other, emitted vertices against emitted triangles." },
+  'mophead-rays-x-florets @ umbelRays=6 x umbelFlorets=2': { mm: 0, note: "the dome is rays of equal length from ONE boss, so neighbouring SUB-UMBELS stand round the dome spaced by the ray count alone and spread by their own floret count: from six rays up, and at two rays with twelve florets, a sub-umbel's florets pass through its neighbour's (an edge crossing, 0.000 mm). A mophead's florets fuse into one dome; declared by value, never clamped (Eva's ruling on the mophead) — measured on the mophead tree (Oct 24), Node 22, EXPORT, every sub-umbel against every other, emitted vertices against emitted triangles." },
+  'mophead-rays-x-florets @ umbelRays=6 x umbelFlorets=12': { mm: 0, note: "the dome is rays of equal length from ONE boss, so neighbouring SUB-UMBELS stand round the dome spaced by the ray count alone and spread by their own floret count: from six rays up, and at two rays with twelve florets, a sub-umbel's florets pass through its neighbour's (an edge crossing, 0.000 mm). A mophead's florets fuse into one dome; declared by value, never clamped (Eva's ruling on the mophead) — measured on the mophead tree (Oct 24), Node 22, EXPORT, every sub-umbel against every other, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=6 x pedicelAngle=35': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=6 x pedicelAngle=-60': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=6 x pedicelAngle=90': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=2 x pedicelAngle=90': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=5 x pedicelAngle=35': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=5 x pedicelAngle=-60': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=5 x pedicelAngle=90': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=12 x pedicelAngle=35': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=12 x pedicelAngle=-60': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-florets-x-angle @ umbelFlorets=12 x pedicelAngle=90': { mm: 0, note: "every floret of an umbel stands on ONE node, evenly round the knot, so there is no internode to move two florets apart: neighbouring florets' petals pass through each other (an edge crossing, 0.000 mm) at every count from five up and at every angle, and at two florets once the pedicels stand parallel (90 deg). A real umbel's florets interleave; declared by value, never clamped — the count and the angle are the umbel's own two controls — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-length-x-angle @ pedicelLength=20 x pedicelAngle=-60': { mm: 0, note: "at -60 deg the pedicel turns DOWN from the knot on the stem's top end and its floret's petals reach back onto the stem below (floret-stem, the floret's own rod excluded); a 20 mm or a 5 mm pedicel leaves the floret beside the stem, 60 mm and longer carry it clear — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
+  'umbel-length-x-angle @ pedicelLength=5 x pedicelAngle=-60': { mm: 0, note: "at -60 deg the pedicel turns DOWN from the knot on the stem's top end and its floret's petals reach back onto the stem below (floret-stem, the floret's own rod excluded); a 20 mm or a 5 mm pedicel leaves the floret beside the stem, 60 mm and longer carry it clear — measured on the umbel tree (Oct 22), Node 22, EXPORT, emitted vertices against emitted triangles." },
   /* ===== THE FOOT JOINS THE MEASURE (gate-hygiene session, Oct 6) — 34 cells
      that cleared while `measureWall` dropped the foot rows and read under the bar
      once the foot is a SELF target. Every one is a tip coiling onto its own foot:
@@ -1532,9 +1694,9 @@ export const COMBINATION_XFAIL = Object.freeze({
   "gradient-x-curl @ petalCupGradient=0.6 x petalSpineCurl=360": { mm: 0.691, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.123 mm (clear) while `measureWall` dropped the foot rows, now 0.691 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "gradient-x-curl @ petalCupGradient=0.9 x petalSpineCurl=360": { mm: 0.695, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.058 mm (clear) while `measureWall` dropped the foot rows, now 0.695 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT." },
   "curl-x-twist @ petalSpineCurl=360 x petalTwist=0": { mm: 0.676, note: "NEW UNDER THE BAR BY THE FOOT TARGETS (gate-hygiene, Oct 6): read 1.23 mm (clear) while `measureWall` dropped the foot rows, now 0.676 mm at u 0.932. Nothing in the geometry moved (0 floats, the byte partition in docs/bloom-gate-hygiene-outcome.md); the instrument can now see a tip coiling onto its own foot, which is the curl-360 census fold (`petalSpineCurl max (360)`, declared in SELF_INTERSECTION_XFAIL) and, on the inner whorls, block 44's composed state. Measured on main's geometry at 7af97f4, Node 22, EXPORT. TRUE CAUSE (Eva's ruling, Oct 6): petalSpineCurl 360 ALONE reaches this — every other axis of this cell is at its default, so it is not this pair's or triple's hazard. The single-control guard is SELF_XFAIL['curl-max'] in tools/bloom-wall-thickness.mjs; this entry stays because the number appears here and removing it would redden CG2." },
-  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=34": { mm: 0.6544, note: "S4c re-record, WORSE by 0.0447 mm: the shipped sinus roundness 0.12 widens the first sinus, which sits near the blade base the stem approaches (S4b: 0.6991 at roundness 0, which still reads 0.699 — `lobedround-x-sinus`'s own grid at 70 degrees). leafAngle 70 ALONE reaches this class (the SIMPLE leaf's own `leafangle-x-stem`). Measured on this tree, Node 22, EXPORT." },
-  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=10": { mm: 0.5865, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
-  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=40": { mm: 0.6991, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
+  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=34": { mm: 0.411, note: "S4c re-record, WORSE by 0.0447 mm: the shipped sinus roundness 0.12 widens the first sinus, which sits near the blade base the stem approaches (S4b: 0.6991 at roundness 0, which still reads 0.699 — `lobedround-x-sinus`'s own grid at 70 degrees). leafAngle 70 ALONE reaches this class (the SIMPLE leaf's own `leafangle-x-stem`). Measured on this tree, Node 22, EXPORT. RE-RECORDED 0.6544 -> 0.4071 by ROOT SUPPORT (Oct 21): the 46 mm lobed leaf takes the root law at its own length (x1.318, a 1.58 mm root), and the near point to the stem moves to the thickened base, where no lobed control reaches (lobedWidth is now bit-identically inert here, declared in COMBINATION_INERT). docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.4071 -> 0.411 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
+  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=10": { mm: 0.411, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT. RE-RECORDED 0.5865 -> 0.4071 by ROOT SUPPORT (Oct 21): the 46 mm lobed leaf takes the root law at its own length (x1.318, a 1.58 mm root), and the near point to the stem moves to the thickened base, where no lobed control reaches (lobedWidth is now bit-identically inert here, declared in COMBINATION_INERT). docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.4071 -> 0.411 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
+  "lobedwidth-x-leafangle @ leafAngle=70 x lobedWidth=40": { mm: 0.411, note: "leafAngle 70 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT. RE-RECORDED 0.6991 -> 0.4071 by ROOT SUPPORT (Oct 21): the 46 mm lobed leaf takes the root law at its own length (x1.318, a 1.58 mm root), and the near point to the stem moves to the thickened base, where no lobed control reaches (lobedWidth is now bit-identically inert here, declared in COMBINATION_INERT). docs/bloom-root-support-outcome.md §6. RE-RECORDED 0.4071 -> 0.411 by THE LEAF-STEM INSTRUMENT (Oct 25): the measure reads the EMITTED stem now (an inscribed 48-gon whose vertex lies at the leaf's azimuth) where it read the analytic cylinder — the instrument moved, no geometry did. docs/bloom-leaf-stem-instrument-outcome.md." },
   "lobedwidth-x-leafangle @ leafAngle=85 x lobedWidth=34": { mm: 0.0, note: "leafAngle 85 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
   "lobedwidth-x-leafangle @ leafAngle=85 x lobedWidth=10": { mm: 0.0, note: "leafAngle 85 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
   "lobedwidth-x-leafangle @ leafAngle=85 x lobedWidth=40": { mm: 0.0, note: "leafAngle 85 ALONE reaches this (the SIMPLE leaf's own `leafangle-x-stem` reads the same class); the lobed envelope moves it by at most 0.11 mm. NEW with S4b's lobed pair, measured on this tree, Node 22, EXPORT." },
@@ -1621,6 +1783,21 @@ for (const [k, e] of Object.entries(COMBINATION_XFAIL)) {
    should hear about it". That is an xfail, and this project has one
    shape for an xfail: a number the gate reads, failing both ways. */
 export const COMBINATION_INERT = Object.freeze({
+  /* ROOT SUPPORT (Oct 21) — on the 46 mm LOBED leaf the blade takes the root
+     law at its own length (x1.318), and its nearest point to the free stem
+     moves to the thickened BASE, which neither the envelope width nor the
+     sinus roundness reaches: both axes read bit-identically 0 across their
+     whole travel (0.407 mm at 70 deg for every lobedWidth; 3.346 / 3.405 mm
+     across lobedSinus for every lobedRound). Declared with the number, never
+     dropped: the day a lobed control reaches the base again CG7 fails. */
+  'lobedwidth-x-leafangle @ lobedWidth': {
+    maxMoveMm: 0,
+    note: 'measured 2026-10-21 on the root-support tree: 3.346 / 2.214 / 0.407 / 0.000 mm at leafAngle 35 / 50 / 70 / 85 for lobedWidth 34, 10 and 40 alike — the near point is the thickened root (docs/bloom-root-support-outcome.md §6)',
+  },
+  'lobedround-x-sinus @ lobedRound': {
+    maxMoveMm: 0,
+    note: 'measured 2026-10-21 on the root-support tree: 3.346 / 3.405 / 3.346 mm at lobedSinus 0.55 / 0 / 0.9 for lobedRound 0.12, 0 and 0.5 alike — the near point is the thickened root, where the round bottom does not reach (docs/bloom-root-support-outcome.md §6)',
+  },
   /* S4 — the infill's density is bit-identically inert for `self` on both
      of its pairs; the header of `density-x-cup` has the two measurements. */
   'density-x-cup @ infillDensity': {
@@ -1642,6 +1819,19 @@ export const COMBINATION_INERT = Object.freeze({
   'inflo-leaf-nodes-x-leafangle @ floretNodes': {
     maxMoveMm: 0,
     note: "the florets' own internode floor (17.97 mm on this raceme) caps the count at five on the span the reach inset leaves, so 5 and 12 asked build one layout and the measure moves by exactly 0.000e+0 mm — measured by build 3 (ruling 1), Node 22, EXPORT.",
+  },
+  /* THE LEAF-STEM INSTRUMENT (Oct 25) — on the EMITTED stem the second control
+     of the tier-1 leaf pair is inert, and that is the artefact speaking: the
+     stem is an inscribed 48-gon with a VERTEX at the leaf's azimuth 0, so the
+     blade's nearest point is to that vertical edge, and a line's distance is
+     unchanged when the stem's radius and the leaf move out together. The
+     analytic cylinder curved away under the blade and moved by 0.0013 mm across
+     3 / 6 / 12 mm — the cylinder's curvature, not the stem's. Declared with the
+     number, never dropped: a stem polygon that rotates, or a leaf that stops
+     standing a fixed distance off the wall, fails CG7. */
+  'leafangle-x-stem @ stemDiameter': {
+    maxMoveMm: 0,
+    note: 'measured 2026-10-25: 3.847 / 2.574 / 0.544 / 0.000 mm at leafAngle 35 / 50 / 70 / 85 for stemDiameter 6, 3 and 12 alike (6.66e-16 mm, the emitted 48-gon\'s vertex edge at the leaf\'s azimuth). docs/bloom-leaf-stem-instrument-outcome.md',
   },
   'leafangle-x-tooth @ leafToothDepth': {
     maxMoveMm: 0,
@@ -1684,7 +1874,97 @@ function segDist(p, a, b) {
   return Math.hypot(ap[0] - ab[0] * t, ap[1] - ab[1] * t, ap[2] - ab[2] * t);
 }
 
-/* HOW CLOSE THE LEAF BLADE COMES TO THE FREE STEM. Every leaf the plan
+/* HOW CLOSE THE LEAF BLADE COMES TO THE STEM, ON THE EMITTED ARTEFACT (the
+   leaf-stem instrument session, Oct 25 — T5's ambiguity 8, Eva's ruling 7).
+
+   WHY THE OLD MEASURE COULD NOT SEE A CONTACT AT 70 DEG, measured rather than
+   argued (`measureLeafStemAnalyticMm` below is it, kept for the must-fail):
+     (1) THE STEM WAS A SECOND PRODUCER. It read every blade vertex against
+         `freeStemDistanceMm` — the plan's ANALYTIC solid cylinder — so
+         anything the builder does to the stem's surface (T5's relief, which
+         stands up to `textureHeight` proud of that cylinder) is invisible by
+         construction: at leafAngle 70 on the gate's own base it read
+         0.5404 mm at EVERY height 0.4..1.5 while the blade and the emitted
+         wall touch from H 0.8 (0.001 mm).
+     (2) THE LEAF WAS A SECOND BUILD. Each leaf was rebuilt into a throwaway
+         accumulator OUTSIDE the bloom's build — it agrees with the emitted
+         leaf to the bit on every state measured (0 of 24,872 x 9 floats
+         differ, textured), but only because nothing in the bloom's leaf loop
+         moves a leaf after `buildLeafInto` returns. A leaf moved there (the
+         must-fail's plant: one pushed 1 mm into the stem) is not the leaf the
+         old measure looked at, so it read 0.5404 on a blade passing THROUGH
+         the wall.
+     (3) IT SAMPLED VERTICES ONLY, so a facet passing through the stem with
+         its three corners outside read positive.
+   WHAT REPLACES IT: ONE EXPORT build and its own stream. The stem is the
+   triangles the builder emitted for it (T5's lattice range when the organs
+   are textured, `[hubTriEnd, stemTriEnd)` otherwise — the builder's own
+   indices, never re-derived); the leaves are each leaf's own emitted block
+   (`leavesBuilt[*].triStart/tris`, the builder's tally). A blade vertex reads
+   its distance to the nearest STEM TRIANGLE (tools/bloom-inflo-approach.mjs's
+   `triGrid`/`nearest` — the inflorescence measures' one engine), 0 if it lies
+   INSIDE the free stem's solid (the geometry's own `freeStemDistanceMm` is 0
+   — a vertex-to-surface distance is positive inside a body), and the whole
+   reading is 0 if any blade EDGE crosses a stem triangle (`crosses`), because
+   two closed solids passing through each other leave every vertex off the
+   other's skin. Both halves are reported (`inside`, `crossing`).
+   THE RODS ARE EXCLUDED BY NAME, AS BEFORE: every vertex on a rod the leaf
+   builder reports (`rodAxes` — the petiole, a compound leaf's rachis and
+   stalks) is not a blade vertex, and an edge both of whose ends are rod
+   vertices is not tested for crossing (the petiole is rooted THROUGH the wall
+   by design; ST9's remedy — name the rod, never widen the region).
+   NAMES ITS SAMPLING (the durable mode-and-sampling rule): EXPORT mode, every
+   distinct emitted blade VERTEX against every emitted stem TRIANGLE, plus every
+   blade edge against every stem triangle for the crossing; searched out to
+   `SEARCH_CAP_MM` (a reading past it is reported AT the cap — the bar is 1 mm).
+   The stem's emitted polygon is INSCRIBED in the analytic cylinder, so an
+   untextured cell reads a hair FARTHER than the old measure (0.5440 against
+   0.5404 at 70 deg) — the artefact, not the plan.
+   A `--root` tree whose builder predates the per-leaf tally falls back to the
+   old measure and says so (`fallback`). */
+export function measureLeafStemApproachMm(G, state, exportMode) {
+  const acc = new G.MeshBuilder({ exportMode });
+  const m = G.buildBloomInto(acc, state);
+  if (!m.stem || !m.stem.present) return { mm: Infinity, why: 'no stem is built, so there is nothing for a blade to approach' };
+  if (!m.leaf || !m.leaf.present) return { mm: Infinity, why: 'no leaf is built' };
+  const LB = (m.leavesBuilt || []).filter((lb) => lb && lb.triStart >= 0 && lb.tris > 0);
+  if (!LB.length || !Number.isFinite(m.hubTriEnd) || !Number.isFinite(m.stemTriEnd)) return { ...measureLeafStemAnalyticMm(G, state, exportMode), fallback: 'the builder reports no per-leaf triangle block — the analytic measure' };
+  const P = acc.positions;
+  const organStem = m.texture && m.texture.organs && m.texture.organs.stem && m.texture.organs.stem.organ ? m.texture.organs.stem.organ.triRange : null;
+  const stemRange = organStem || [m.hubTriEnd, m.stemTriEnd];
+  const grid = triGrid(P, [{ lo: stemRange[0] * 9, hi: stemRange[1] * 9, owner: 'stem' }]);
+  let best = INFLO_SEARCH_CAP_MM, at = null, verts = 0, inside = false, crossing = false;
+  for (const lb of LB) {
+    const axes = (Array.isArray(lb.rodAxes) ? lb.rodAxes : [lb.petioleAxis]).filter(Boolean);
+    const onRod = (p) => axes.some((ax) => (G.rodAxisExcessMm ? G.rodAxisExcessMm(ax, p[0], p[1], p[2]) : segDist(p, ax.inner, ax.outer) - ax.radiusMm) <= ax.radiusMm * 1e-6);
+    const lo = lb.triStart * 9, hi = (lb.triStart + lb.tris) * 9;
+    const where = { node: lb.nodeIndex };
+    const seen = new Set();
+    for (let j = lo; j < hi; j += 3) {
+      const sk = `${P[j]},${P[j + 1]},${P[j + 2]}`;
+      if (seen.has(sk)) continue;
+      seen.add(sk);
+      const p = [P[j], P[j + 1], P[j + 2]];
+      if (onRod(p)) continue;
+      verts++;
+      if (G.freeStemDistanceMm(m.stem, p[0], p[1], p[2]) === 0) { if (best > 0 || !inside) { best = 0; inside = true; at = { ...where, inside: true, p: p.map((x) => Number(x.toFixed(3))) }; } continue; }
+      const d = nearest(grid, p, null, best);
+      if (d < best) { best = d; at = { ...where, p: p.map((x) => Number(x.toFixed(3))) }; }
+    }
+    if (!crossing && crosses(grid, P, lo, hi, 'leaf', (q) => !onRod(q))) { crossing = true; best = 0; at = { ...where, crossing: true }; }
+  }
+  if (!verts) return { mm: Infinity, why: 'every emitted vertex is the petiole rod — there is no blade to measure' };
+  return { mm: best >= INFLO_SEARCH_CAP_MM ? INFLO_SEARCH_CAP_MM : best, at, leaves: LB.length, verts, inside, crossing, stemTris: stemRange[1] - stemRange[0], capped: best >= INFLO_SEARCH_CAP_MM };
+}
+
+
+/* RETIRED AS THE GATE'S MEASURE (the leaf-stem instrument session, Oct 25),
+   KEPT ONLY AS THE MUST-FAIL'S "old instrument": the control's leaf-stem leg
+   requires a planted contact to be RED on `measureLeafStemApproachMm` and
+   INVISIBLE here, which is what says the plant is the class this one could not
+   see. Nothing else calls it. Its own header, as it shipped:
+
+   HOW CLOSE THE LEAF BLADE COMES TO THE FREE STEM. Every leaf the plan
    places is rebuilt into a throwaway accumulator through the SHIPPED
    `buildLeafInto` — `petalFreeStemApproachMm`'s own construction, for its
    own reason: a second producer of the blade would agree with a broken
@@ -1696,7 +1976,7 @@ function segDist(p, a, b) {
    outcome doc measured too. A chord between two cleared vertices can dip
    nearer than either by at most the mesh's own chord scale; that is a
    sub-mesh effect and it is reported rather than absorbed into the bar. */
-export function measureLeafStemApproachMm(G, state, exportMode) {
+export function measureLeafStemAnalyticMm(G, state, exportMode) {
   const acc = new G.MeshBuilder({ exportMode });
   const m = G.buildBloomInto(acc, state);
   if (!m.stem || !m.stem.present) return { mm: Infinity, why: 'no stem is built, so there is nothing for a blade to approach' };
@@ -2555,6 +2835,49 @@ async function control({ root = HERE } = {}) {
     for (const f of other) console.log(`         collateral: ${f.slice(0, 140)}`);
     if (!ok) console.error(`         MISSED: ${want} stayed green under a plant that names it — that clause is not measuring the tree`);
     if (!plant.only) last = plant;
+  }
+
+  /* THE LEAF PUSHED INTO THE STEM (the leaf-stem instrument session, Oct 25 —
+     Eva's ruling 7: plant it, see it RED on the new measure and INVISIBLE on the
+     old one). A COPY of the geometry whose bloom build moves every leaf it has
+     just emitted 1 mm toward the stem's axis (its rods' recorded axes with it,
+     so the rods stay named) — the class the old measure could not see, because
+     it measured a leaf rebuilt OUTSIDE the bloom against a cylinder and never
+     the leaf the bloom emitted. The copy sits beside bloom-geometry.js (it
+     imports ./bloom-curve.js) and is removed in a finally. */
+  {
+    const ST = { stemLength: 70, leafLength: 52, leafWidth: 17, leafNodes: 3, stemDiameter: 6, leafAngle: 70 };
+    const from = 'const lb = buildLeafInto(acc, leafPlanned, state, i, az, capability); lb.nodeIndex = i; leavesBuilt.push(lb);';
+    const to = 'const lb = buildLeafInto(acc, leafPlanned, state, i, az, capability); lb.nodeIndex = i; leavesBuilt.push(lb); { const cx = Math.cos(az), cy = Math.sin(az), P = acc.positions; for (let t = lb.triStart * 9; t < (lb.triStart + lb.tris) * 9; t += 3) { P[t] -= cx; P[t + 1] -= cy; } const mv = (q) => { if (q) { q[0] -= cx; q[1] -= cy; } }; for (const ax of lb.rodAxes || []) { mv(ax.inner); mv(ax.outer); mv(ax.bladeBase); } }';
+    const src = fs.readFileSync(path.join(root, 'bloom-geometry.js'), 'utf8');
+    const n = src.split(from).length - 1;
+    if (n !== 1) { console.error(`REFUSED (the leaf plant's anchor matches ${n} times in bloom-geometry.js, never exactly once — re-anchor it).`); return 2; }
+    const tmp = path.join(root, `.bloom-geometry.leafplant.${process.pid}.js`);
+    let ok = false, line = '';
+    try {
+      fs.writeFileSync(tmp, src.replace(from, to));
+      const { G: G0, R: R0 } = await loadTree(root);
+      const Gp = await import(pathToFileURL(tmp).href);
+      const state = { ...R0.DEFAULTS, ...ST };
+      const cleanNew = measureLeafStemApproachMm(G0, state, true), cleanOld = measureLeafStemAnalyticMm(G0, state, true);
+      const plantNew = measureLeafStemApproachMm(Gp, state, true), plantOld = measureLeafStemAnalyticMm(Gp, state, true);
+      /* THE WITNESS, on the MUTATED module and not on the measure under test:
+         its own bloom build emitted a leaf that is not the clean one. */
+      const a0 = new G0.MeshBuilder({ exportMode: true }), b0 = G0.buildBloomInto(a0, state);
+      const a1 = new Gp.MeshBuilder({ exportMode: true }), b1 = Gp.buildBloomInto(a1, state);
+      const L = b0.leavesBuilt[0];
+      let moved = 0;
+      for (let t = L.triStart * 9; t < (L.triStart + L.tris) * 9; t++) moved = Math.max(moved, Math.abs(a1.positions[t] - a0.positions[t]));
+      const barMm = G0.MIN_FEATURE_MM;
+      const newRed = plantNew.mm < barMm && (plantNew.crossing || plantNew.inside) && cleanNew.mm > 0 && !cleanNew.crossing && !cleanNew.inside;
+      const oldBlind = plantOld.mm === cleanOld.mm;
+      ok = moved > 0.99 && newRed && oldBlind && b1.leavesBuilt.length === b0.leavesBuilt.length;
+      line = `witness: the planted bloom's leaf moved ${moved.toFixed(3)} mm · NEW measure clean ${cleanNew.mm.toFixed(4)} mm -> planted ${plantNew.mm.toFixed(4)} mm (crossing ${plantNew.crossing}, inside ${plantNew.inside}) · OLD measure clean ${cleanOld.mm.toFixed(4)} -> planted ${plantOld.mm.toFixed(4)} mm (${oldBlind ? 'INVISIBLE — the same double' : 'it moved'})`;
+    } finally { try { fs.unlinkSync(tmp); } catch {} }
+    if (!ok) bad++;
+    console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${'leaf-stem: a leaf pushed 1 mm into the stem at 70 deg'.padEnd(62)} RED on the emitted measure, invisible on the analytic one`);
+    console.log(`         ${line}`);
+    if (!ok) console.error('         MISSED: the planted contact was not RED on the emitted measure, or the old measure saw it (then the plant is not the class this instrument was built for)');
   }
 
   /* THE RED, THROUGH THE GATE'S OWN PRINTER. Everything above reads the

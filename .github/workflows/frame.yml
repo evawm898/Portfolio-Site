@@ -15,8 +15,16 @@ on:
       - frame-registry.js
       - frame-geometry.js
       - frame-profile-editor.js
+      - frame-relief.js
+      - frame-view3d.js
+      - frame-filigree.js
       - tools/verify-frame.mjs
+      - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
+      - tools/shot-frame-relief.mjs
+      - tools/shot-frame-skeletons.mjs
+      - tools/shot-frame-scrolls.mjs
+      - tools/frame-fold-boundary.mjs
       - docs/frame-charter.md
       - .github/workflows/frame.yml
   push:
@@ -28,8 +36,16 @@ on:
       - frame-registry.js
       - frame-geometry.js
       - frame-profile-editor.js
+      - frame-relief.js
+      - frame-view3d.js
+      - frame-filigree.js
       - tools/verify-frame.mjs
+      - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
+      - tools/shot-frame-relief.mjs
+      - tools/shot-frame-skeletons.mjs
+      - tools/shot-frame-scrolls.mjs
+      - tools/frame-fold-boundary.mjs
       - docs/frame-charter.md
   workflow_dispatch: {}
 
@@ -42,7 +58,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,13 +67,27 @@ jobs:
       # Pinned playwright, the same pin every other workflow here carries (see
       # flower-export-watertight.yml for why the pin exists). The gate imports
       # playwright-core, which playwright pins and npm hoists.
-      - name: Install render deps (pinned playwright)
-        run: npm i --no-save playwright@1.62.1
+      - name: Install render deps (pinned playwright; three served from node_modules for the Relief view)
+        run: npm i --no-save playwright@1.62.1 three@0.161.0
       - name: Drop Google's Chrome apt source (it is not used, and it broke CI)
         run: |
           sudo rm -fv /etc/apt/sources.list.d/google-chrome* || true
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
+      # Phase 2: the relief STL gate (Node only), with the SVG byte-identity
+      # clause against the commit the relief was built on. fetch-depth 0 so
+      # the base commit is reachable for the worktree.
+      # Phase 2b: every arch row's SVG AND STL bytes against e759041 (phase 2's
+      # merge), the base the closed skeletons were built on.
+      - name: Relief gate (watertight, connected, registered, embedded, floored, seam) + arch SVG and STL bytes vs e759041
+        run: |
+          git fetch --depth=1 origin e7590411d20754b84aef66845358d0b76f18d9d8
+          git worktree add /tmp/frame-base e7590411d20754b84aef66845358d0b76f18d9d8
+          node tools/verify-frame-relief.mjs --base /tmp/frame-base
+      - name: Ruling 5 — the clamps sit on the measured fold
+        run: node tools/frame-fold-boundary.mjs
+      - name: Relief negative control
+        run: node tools/verify-frame-relief.mjs --negative-control
       - name: Frame gate (part one Node, part two Chromium)
         run: node tools/verify-frame.mjs
       - name: Negative control (every mutant must redden exactly what it names)

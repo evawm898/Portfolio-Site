@@ -198,7 +198,14 @@ async function nodeClauses(F, rec) {
       const r = F.readDoc(JSON.parse(F.toText(F.composeDoc(st, { savedAt: 'x', ...(rec0 ? { scopes: rec0 } : {}) }))));
       if (!r.ok) { p.push(`${row.label}: refused — ${r.error}`); continue; }
       const bad = [];
-      if (r.notes.length) bad.push(`${r.notes.length} note(s): ${r.notes.slice(0, 2).map((n) => n.text).join(' | ')}`);
+      /* a row with BOTH the infill and a texture on is told so by the reader
+         (Q9: reported, never silently picked) — the one note a clean round
+         trip carries, EXPECTED exactly where the controls say both are on,
+         restated here from the row's own state and never from the reader */
+      const bothOn = String(st.petalInfill) === 'VORONOI' && String(st.petalTexture ?? 'NONE') !== 'NONE';
+      const notes = r.notes.filter((n) => !(bothOn && n.kind === 'conflict'));
+      if (bothOn && !r.notes.some((n) => n.kind === 'conflict')) bad.push('both the infill and a texture are on and the reader did not say so (Q9)');
+      if (notes.length) bad.push(`${notes.length} note(s): ${notes.slice(0, 2).map((n) => n.text).join(' | ')}`);
       if (rec0 && JSON.stringify(r.doc.overrides) !== JSON.stringify({ layers: rec0.layers || [], petals: rec0.petals || [], tiers: rec0.tiers || [], strands: rec0.strands || [] })) bad.push(`the overrides did not round-trip: ${JSON.stringify(r.doc.overrides)}`);
       for (const c of REG.CONTROLS) if (!(c.id in r.doc.controls) || !same(c, r.doc.controls[c.id], st[c.id])) { bad.push(`${c.id} ${JSON.stringify(st[c.id])} -> ${JSON.stringify(r.doc.controls[c.id])}`); break; }
       if (bad.length) p.push(`${row.label}: ${bad.join('; ')}`); else clean++;

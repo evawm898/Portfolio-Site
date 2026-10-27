@@ -1192,6 +1192,309 @@ DOES; SERRATION STAYS ON A DRAWN OUTLINE; AND THE SEED REACHES ITS TOLERANCE OR 
   values against the PETAL id list** and so built every sepal tier's own curve WITHOUT it on the base side —
   two block-72 rows read as moved; a tier strips against `SEPAL_SCOPE_VALUE_IDS` now.
 
+**A PETAL REACHES 100 mm, AND A LONG PETAL THICKENS AT ITS ROOT BY ITS OWN LENGTH; THE HUB FOLLOWS**
+(big petals, Oct 21 — Eva's rulings; read `docs/bloom-big-petals-outcome.md` before touching `petalRootTaper`,
+`rootTaperFactor`, `thicknessProfile`'s `rootTaper`, `hubRootTaperLengthMm`, `seamClearanceMm`'s `rootFactor`,
+`spineBendTable`'s `tauAt`, the T family or block 75).
+- `petalLength` is 20–100 mm (default 35, unchanged); `OVERRIDE_BOUNDS` follows. The blanket row is
+  `petalLength max (100)` and `ALL MAX` carries 100 (both redefined).
+- **The law is the self-weight cantilever against the SHIPPING petal (35 mm on 1.2 mm), UNVALIDATED** — nothing
+  has been printed; it keeps every longer root's stress at that one's, no more. Width cancels. The taper starts
+  35 mm from the tip (a length the petal owns) and is fully stressed inward: `dtau/dzeta = sqrt((8/3)tau^3 + 4/3) /
+  (2 tau)`, RK4 (arithmetic + sqrt, cross-engine identical). Root 1.200 / 2.100 / 2.931 / **3.883 mm** at
+  35 / 60 / 80 / 100. Reads the ASKED length (mode-free). **At or under 35 mm it is `null` — the identity by
+  branch.** One law with tip thinning, one owner (`thicknessProfile`).
+- Followers: seam clearance and `seamHalfMm` x the root factor (A7 restated); the fold limit's margin per
+  substep (C5 restated); the cup fold clamp per row; the roll floor against the root; the rim bead (feet
+  untapered, so root skins are `+/- t_root/2`); the hub plate = sheet x the factor of the LONGEST petal the bloom
+  can build (scopes and the size field — an upper bound; J4a restated, exact at or under 35); the join floor reads
+  the thickened hub; a stamen's and the style's ROOT spans the thickened hub (`rootSpan`; the parts stay one sheet
+  thick) — MISSED in the first push and found by CI's JS1 on `ALL MAX` (§6d; apex mutant
+  `the-part-root-spans-the-sheet`), and the two style rows on the mum it had "fixed" read 272 / 0.0664 again.
+  `ALL MAX`'s settle has the export click's 120 s (`settleMsForRow`, declared refusals only; every other row 30 s).
+  Sepals PINNED OFF, leaves untouched, florets taper (declared, Eva's to rule). **[Oct 21: SUPERSEDED — sepals and leaves take
+  the law at their own length; the root-support block below.]**
+- **T0–T4** in both STL gates read the thickness off the EXPORTED skins (root, untapered rows, hub, sepal roots)
+  against the law RESTATED through the other integral (Simpson + bisection, 1e-9). J1/J4a/A7/C5/roll floor
+  restated, never relaxed. Must-fail `node tools/verify-bloom-root-taper.mjs [--control]` (four mutants, each
+  witnessed on the mutated module), SPAWNED by `verify-bloom-defaults-bar.mjs` both arms (DB3: the default builds
+  no taper) — no workflow edit.
+- Block 75 (28 rows, 1,485), smoke block 75 (7); combination `cup-x-length` gains 80/100, `length-x-tilt` new
+  (both CLEAR). Four block-75 folds declared by value, each folding with the law OFF too, plus
+  `FAN x PER-PETAL: ALL PER-PETAL MAX x ALL THIN x spread min` (294 / 0.3223, 0 on main, all in the root blend of
+  a 70 mm petal on a 0.6 sheet — found by the browser X2, missed by the Node census sweep).
+- **Byte partition: 100 movers (19 of them width movers too, 0 width-only) / 1,385 holders at 0 floats**, both
+  modes (`--movers-predicate root-taper`, predeclared from the base tree).
+- **`petalWidth` is 8–46 (RULED Oct 21, default 16 unmoved)** — the shipping 35:16 proportion at 100 mm.
+  `petalWidth max (46)` is redefined; `verify-bloom-surface-bytes`' `root-taper` predicate carries the width
+  (a COMPOSED width past the base's 30 moves; a bare global does not — the base clamps compositions only) and a
+  ROW-DEF guard against the base's own matrix (3 declared, 28 added). `ALL MAX` refusal 3,334,106 tris (all of
+  the width's +641,932 is the FRINGE, measured with it off), census 78,222 / 34.0787. Nine FAN census rows
+  re-recorded (petal 1's +16 now builds 32). `cup-x-width` and its triple reach 46: seven cells under the bar,
+  declared (worst 0.189 mm). The foot's 10 mm clamp now binds over 56% of the slider — reported, unchanged. **[Oct 21: RETIRED —
+  the foot cap is the ring's own arc; the root-support block below.]**
+- **Sepals pinned OFF and leaves never wired stay on the 1.2 mm sheet at any length** (a 120 mm one is 11.8x the
+  reference stress) — measured and stated in §3b, open for Eva. SO13's original condition was planted on the new
+  geometry and reddens the restated clause; `an-owned-length-moves-the-foot` is its standing mutant.
+- **A 100 mm petal's ROOT RIM turns ~53.5° against E2's 45° — RULED Oct 21: accepted, a chamfer (declared on the three smoke rows):** the rim
+  taper eases a 3.88 mm root to the 1 mm bead in 3 mm. A bead scaled by the root factor moved it to 80 mm (61.9°); a
+  lengthened buried-end ramp made it worse (88.7°, the gate excludes the ramp). `ALL MAX` (a 150 mm petal) carried one
+  E7 edge (`E7_INSET_XFAIL`) until the width reached 46, where it reads 0 and the entry came off.
+- Sheet: `node tools/shot-bloom-big-petals.mjs <dir> --png docs/img/big-petals.png` (2b: the root rim side-on).
+
+**SEPALS AND LEAVES TAKE THE ROOT LAW AT THEIR OWN LENGTH, AND THE FOOT IS CAPPED BY THE ARC IT OWNS AT ITS
+RING** (root support, Oct 21 — Eva's two rulings; read `docs/bloom-root-support-outcome.md` before touching
+`sepalAskedLengthMm`, `hubRootTaperLengthMm`, `leafBladeLaw`'s `rootLengthMm`, `petioleRootFloorMm`, the foot cap in
+`footRing` (petal rings and the sepal descriptor), `footCapClauses`, T4–T6, FC1 or block 76).
+- **Sepals**: the big-petals pin is lifted; each tier at its own asked length; the foot height is half the ROOT
+  above the attachment; the plate is held to the longest blade it carries, sepals included (a 120 mm sepal: a
+  4.961 mm plate). Measured: with the plate at the sheet, 23 of 30 states had less flare above the attachment than
+  the sepal's root. **Consequence**: a plate past the join makes the join inert and the sepals stand on the RIM
+  (from 80 mm on a 6 mm stem, 120 mm on 12 mm) — told, Eva's to judge.
+- **Leaves**: `leafBladeLaw(…, rootLengthMm)` names the root's owner at every call (the simple leaf's node length,
+  each leaflet's own `sp.L`, never the rachis or the petal); `tAt` reaches emitPanel, the form, the fold limit and the
+  curve rise. **The petiole's diameter is at least the blade's root** (`petioleRootFloorMm`), CLAMPED at the stem's
+  cap through `petioleClampMm` and told (120 mm leaf on 6 mm: 2.239 of 2.481 mm radius). **Compound stalks stay the
+  wire** (S3's ruling), said on the read-out.
+- **The foot cap**: the ring is placed by the area rule over the ASKED (floored, uncapped) feet; each foot is then
+  `asked > radius × span ? max(floor, radius × span) : asked` (span = the fan step or 2π/n) — a branch, so the
+  default is its old double. The fixed point (ring over capped feet) was measured and refused: the foot becomes
+  `4π s² t / n` whatever is asked. Binds on 28 / 37 / 39 of 39 widths at 8 / 16 / 40 petals (the old clamp: 21);
+  at the shipping width from TEN petals up; D_max falls to 2 everywhere. `node tools/bloom-foot-cap.mjs --base <wt>`.
+- **The cap's ring is the EXPORT floor's in BOTH modes** (`footCapRadiusMm`, the area rule at `max(sheet,
+  MIN_FEATURE_MM)` — the ring's own radius by branch at or above 1 mm): CI found the first cut mode-dependent
+  (`INFILL: x sheetThickness 0.60`, 91,360 live vs 108,928 export). Gates restate it (`footCapRadiusRestated`).
+- **A foot capped exactly at its arc meets a slit tube's columns to the bit** (12 petals): the vertex weld merges a
+  petal and a tube panel and the by-design overlap reads as within-shell pairs — seven TUBE rows declared by value,
+  never nudged. Two hemisphere-at-spread-0.6 census rows got much WORSE (272 → 1,424, 264 → 1,268): the cap on a
+  2.65 mm ring, attributed and reported, not tuned. T5 declares a blade the rim taper covers whole.
+  **[Oct 22: SUPERSEDED by the foot clearance (the block below) — the cap stands 2^-19 rad inside the arc, the
+  seven tube declarations are REMOVED (all weld, all 0 now), and 1,048 / 932 of the two hemisphere rows' pairs were
+  WELDS between neighbouring petals that this paragraph's nearest-lamina attribution could not see; their genuine
+  folds are 376 / 336, root blend and foot only.]**
+- **Gates**: T4 restated (sepals at their own length, off the file), T5 (every leaf blade off the file), T6 (the
+  petiole's rooted ring off the FILE — its first cut read the harness's own rebuild and could not fire), FC1
+  (`footCapClauses`, pure; `FC` without a digit was invisible to the smoke census). Z3 / SP3 / SP11 / LF18 / LF26 /
+  SO13 / panel route (j) re-derived. `verify-bloom-root-taper --control` (`--only=`) runs 9 witnessed mutants,
+  five new. `rootTaperFactor` is memoised on the exact double (pure; the four-tier corner went 16 → 24 s without).
+- **Declared, not done**: the sepal angle limit's contact test reads one sheet, not each root.
+- Block 76 (21 rows, 1,506), smoke block 76 (7, `--conn`); block 75's eight-sepal row relabelled;
+  `frozen/phase82` = the 1,485 rows at `8403b47`. Sheet: `node tools/shot-bloom-root-support.mjs <dir> --base <wt>`
+  → `docs/img/root-support.png`.
+- **Bytes: 413 movers / 1,093 holders, 0 floats on any holder**, both modes (`--movers-predicate root-support`,
+  from the BASE record; three predicate corrections first — the shared-node petiole's ASKED length, lower sepal
+  tiers on their own rings, a closed tube's feet are a record). **Frozen sweep: all 81 baselines carry a mover**
+  (19,294 of 72,837 rows); the sweep's `--memo <file>` lets it close in `--frozen-only` batches.
+
+**THE FOOT CAP STANDS 2^-19 RAD INSIDE THE ARC, SO A CAPPED FOOT NEVER SHARES A VERTEX WITH ITS NEIGHBOUR OR A
+TUBE COLUMN** (the foot clearance, Oct 22 — Eva's ruling on #435; read `docs/bloom-foot-clearance-outcome.md` before
+touching `footCapMm`, `FOOT_CAP_CLEARANCE_RAD`, `footCapRestated`, `footVertexClauses` / FC2 or the petal record's
+`triRange`).
+- **The mechanism**: a foot capped EXACTLY on `r x span` puts its margins at the half-step azimuth where its
+  neighbour's are, and wherever the across-row lies on a circle about the axis — the slit tube's ring curve (an edge
+  petal's blended half; an uncut sinus's knot, which sits at the sinus centre = the margin at zero gap), the
+  hemisphere's equator — two parts emit ONE double, the census welds them into one shell and counts their
+  by-design overlap as a fold. Removed, never declared (the leaf petiole's half-step precedent).
+- **The clearance is what the weld needs, derived**: the weld is exact equality on the STL's float32s; a float32 step
+  at r is at most r x 2^-23, so a gap of r x 2^-19 puts each margin (and the tube's knot at the gap's centre) EIGHT
+  float32 steps of the ring's radius from the half-step (X0's own 8). An ANGLE, so it scales with every foot row's
+  radius. Mode-free (reads only the export-floor cap ring and the span); a foot inside its cap is the asked double BY
+  BRANCH; a floored foot holds. The move: 0 at 8 petals, −23.9 nm at 16, −37.7 nm at 40 on the default width;
+  triangle counts identical. NOT half a foot column (a ~0.3 mm notch) and NOT a printable gap (a slit fuses in print).
+- **Diagnose by EMITTER, never by nearest lamina or by edge-connected primitive**: `node
+  tools/bloom-weld-attribute.mjs --only <re> [--root <tree>]` tags each triangle by the stream range of the part that
+  emitted it (the petal and sepal records' `triRange`, telemetry; the tube rings' `triFrom`/`triTo`). Neighbours
+  coincide along whole EDGES on the k 6 tube (one primitive), and a nearest-lamina label hands a foot corner to the
+  neighbour — both read welds as folds. #435's hemisphere attribution was that.
+- **Census**: the seven tube entries REMOVED (263 .. 2,236 pairs, all weld, all 0 now at their base shell counts);
+  `DOME: rise 1 x RADIAL x spread min (0.6)` 1,424 → **376**, `x 6 layers` 1,268 → **336** — genuine folds (root
+  blend + foot, 0 blade), the narrower capped foot, declared with that cause; two FAN per-petal spans and the aligned
+  sepal FAN row (petal x sepal, the ALIGNED WELD class, not this ruling's subject) re-recorded. Browser-confirmed.
+- **FC2** (export gate, beside X0): no position of the exported FILE carried by two parts (petal x petal, petal x
+  tube, sepal x sepal; a sepal on its petal is the declared aligned weld). 0 rows on this tree; on `main` exactly the
+  nine rows. Mutant `the-foot-cap-lands-on-the-arc` in `verify-bloom-root-taper --control` (fires FC1 + FC2). FC1
+  restates the clearance; the harness refuses to load if the constant moves.
+- **Bytes: 247 movers / 1,259 holders, 0 floats on any holder**, both modes (`--movers-predicate foot-clearance`, from
+  the BASE record); frozen sweep 14,930 of 72,837 rows over all 81 baselines; no row added, no phase owed.
+  `--frozen-sweep --memo` now checkpoints inside a baseline.
+
+**SURFACE TEXTURE IS RULED AND PLANNED, NOT BUILT: B, OUTWARD ONLY, HEIGHT A CONTROL WITH A FLOOR**
+(Eva's rulings on #436, Oct 22 — read `docs/bloom-surface-texture-discovery.md` §0, §8 and §10 before any
+texture work). The prototype is `bloom-texture-lab.html` / `bloom-texture-lab-core.js` (unlinked,
+`noindex`, imports the shipped geometry read-only; nothing shipped imports it).
+- **Attachment B**: one world-space field sampled INSIDE the emitters. A (post-pass) and A′ (union
+  re-mesh) are not built; A′ is parked with its costing.
+- **Outward only — relief never thins a sheet.** Centred, inward and emboss are dropped.
+- **No coupon first; height is ruled from renders and ships as a control with a FLOOR**, never a default
+  that assumes it prints (the floor's value is open, Q13).
+- **Visibility**: a light preview while dragging, the full relief on release and in the export (the
+  print preview's F7 pattern); never rebuilt live on every drag.
+- **/plot gets no say in bloom decisions** (a downstream consumer).
+- **Session discipline (Eva, Oct 23 — replaces the "FOREGROUND only" wording that stood here): a run
+  longer than the foreground ceiling may run as a HARNESS-TRACKED background task, chunked with
+  `--resume`. No scheduled check-ins, no sleeping waiters, no PR subscriptions** (drop any the system
+  adds). The discovery lost a 40-minute run to a container restart, which is why a long run is chunked
+  and checkpointed whichever way it runs.
+- **T1 IS DONE (Oct 22, §11 of the doc): the prototype's red-green split is replaced by the 'rows' split**
+  (each edge into ⌈L/e⌉ equal segments, coplanar strip quads cut as one unit, rows from the corner opposite
+  the least-cut edge). Stem 429,378 → 20,244 triangles at 0.6 mm, its outward bore folds 4,058 → 0 in both
+  arms; the whole bloom 23.7 % of the budget at 0.4 mm (was 128 %); the corners are BUILT now (infill × 40 ×
+  3: 239 %). `node tools/bloom-texture-lab-quality.mjs` (TQ0–TQ3, `--control` 10 legs — red-green must FAIL
+  it on the stem) is the check. The edge-count split ALONE left 119 bore folds; only the quad pairing
+  cleared them, and the check restates the quads itself so it catches that intermediate.
+- **T1's open questions for T2/T5 are §11.7 (Q14–Q16)**: T2's bar against 2A/e² is not reachable by a
+  refinement of the shipped lattice; whether B refines the bore at all; the split's counts differ between
+  Chromium and Node on the whole bloom, so a T2 sub-lattice count must come from engine-agreed quantities.
+  **Q14 RULED (Oct 22): T2's bar is the CONFORMING FLOOR (TQ1's), never a typed ratio of 2A/e²** — §10's
+  "near 99,000" is struck.
+- **T2 IS DONE AS A PROTOTYPE (Oct 22, §12 of the doc) — read §12.1 before porting it.**
+  `bloom-texture-lab-lattice.js` is a runtime-patched COPY of `bloom-geometry.js` (anchored edits, each
+  exactly once): `emitPanel` dispatches to the shipped text verbatim (OFF) or to `emitPanelLattice`, which
+  inserts sub-rows through the organ's own `rowAt(u)` (petal/sepal `petalSurface`, leaf `leafSurface`) and
+  sub-columns through `row.sect(v)`, every per-row decision taken on the SHIPPED rows so the ladder's skin
+  vertices are bit-identical. Not refined in u: the petal foot and seam gap, buckled petals, tube-lobe rows;
+  the tube ring, hub, stem and rods stay on T1's split. `node tools/bloom-texture-lab-lattice.mjs` is TX0–TX4
+  (`--control` 9 legs, among them a moved shipped row and sub-points on flat chords; `--browser` engine
+  agreement; `--budget`). Measured: the default 162,064 at 0.4 mm (T1 183,168), the corners 196 % / 120 %
+  (Q9 open); Node and Chromium agree on all 12 rows (Q16 diagnosed: stamen edges exactly 0.6 mm — counts are
+  decided on lengths snapped to 2⁻²⁰ mm); B thins nothing on the lattice. Open: items 18–22 of §12.8 (strict
+  vs 2.0× floor; the infill cell region is WORSE than T1 on slivers; the tube ring has no row law).
+  **The measure's weld is per organ instance now** (`weld(soup, { groups })`): a global float32 weld merged
+  the lattice's 9 shells into 1 and read buried feet as the hub's material.
+- Plan: T1 split fix (prototype) → T2 own-coordinate lattice through `petalSurface` → T3 field, guard and
+  outward relief on sheets → ~~T4 Voronoi walls (the midline ridge)~~ → T5 hub/stem/rod fallback → T6 sheet.
+  **[Oct 23: T4 STRUCK (texture and infill are exclusive); T5 DONE for the hub, stem and tube ring, the rods
+  DEFERRED pending BONE; T6 folded into T5's sheet — the T5 block below.]**
+  Gate family **TX**.
+
+**SURFACE TEXTURE T3 SHIPS: ONE WORLD FIELD OVER THE SHEETS, OUTWARD, OVER THE BEAD, ON A 0.4 mm LATTICE,
+BEHIND A CHOICE GUARD THAT SHIPS OFF — AND THE WORST-CORNER CAP IS EVA'S OPEN QUESTION** (Oct 22 — read
+`docs/bloom-surface-texture-t3-outcome.md` before touching `textureField`, `textureFor`, `emitPanel`'s
+lattice or relief, `textureContext`, `TEXTURE_*`, `TEXTURE_BAR_XFAIL`, TX0–TX8, panel route (ao) or block 77).
+- `petalTexture` (NONE / PEBBLE / CELLULAR, a CHOICE — out of the blanket sweep, `ALL MAX` untextured),
+  `textureHeight` (0.4–1.5 mm PEAK-TO-VALLEY, default the 0.4 floor — Eva's Q13, UNVALIDATED), `textureSize`
+  (1.6–12 mm; four lattice edges is the floor). The field is built from floor / imul / products / sqrt ONLY
+  (engine-agreed; TX2 restates it at 2.8e-17). No ribbing (Q6).
+- **THE LATTICE REACHES ONLY WHERE `g > 0`.** The first cut refined the foot rows, put a sub-column at `v = 0`
+  on the hub's rim vertex and WELDED every petal to the hub (5,808 within-shell pairs on every textured row).
+- **Texture and the Voronoi infill are EXCLUSIVE (Q9): greyed, never switched; BOTH ON (a loaded design) greys
+  neither, the texture is REFUSED with the word `infill` and TOLD** — an ON control is never greyed, which is
+  what keeps both-on reachable to undo. `bloom-file.js` reports the conflict; F2 expects it exactly there.
+- The relief runs OVER the bead (Q4/Q5): a textured petal's outline moves out by up to H (apex measured
+  0.36–1.5 mm), an untextured one is byte-identical. The hub, stem, rods and tube ring stay out (T5). A
+  LOBED leaf is out (no row law), told. Sepals, leaves, leaflets and florets (each in its own frame) are in.
+- **TX4's bar is 1.25× the untextured twin's conforming floor per organ; the default petal reads 1.033× (TX4's owner: skin + rim against the twin); the read-out's `x its floor` is the BUILDER's own estimate, 1.147× there, a different owner ~0.1–0.2 above the gate's.**
+  `TEXTURE: PEBBLE x cup 1.2 x curl 180` reads **1.577×** and is declared in `TEXTURE_BAR_XFAIL` (±0.005 both
+  ways): the column factor is ROW-UNIFORM and a curled, cupped row's columns differ 2–3× in length. A
+  per-span count is a lengths decision, not built.
+- **Two relief folds declared by value** (0 untextured, 0 lattice-only): the compound CELLULAR leaflets' free
+  bases (59 / 0.1963) and the cup × curl tips (147 / 0.0918). **Three more fold at the 1.5 mm MAXIMUM and are
+  REPORTED WITH RENDERS, not masked and not rows**: the 0.40 mm nib at PEBBLE 1.5 (19 / 0.5011), cup × curl at
+  1.5 on both patterns (1,588 / 0.2727, 1,298 / 0.2975). At the 0.4 mm default nothing measured folds but the
+  declared row. The default's neighbour clearance is 0.000 textured AND untextured (the accepted crossing).
+- Cost: the default 24,688 → **151,792** at PEBBLE 0.4; **40 × 3 whorls is 1,542,832 (102.9%) at the ruled
+  edge** — the cap's three mechanisms were measured and NONE picked on Oct 22; **RULED Oct 23: COARSEN THE
+  EDGE, TOLD — the block below.**
+- Gates: TX0–TX8 in both STL gates, five witnessed apex mutants, panel route (ao) (THIRTY-TWO routes) with
+  the section's geometry witness, block 77 (19 rows, 1,525), smoke block 77, E carves relieved parts out BY
+  NAME, the texture sliders are `SCOPE_UNSCOPED`. `frozen/phase83` = the 1,506 rows at `56f91f4` (row-for-row `d60e734`'s); 0 frozen
+  rows name a texture id. **Its tag was REFUSED on `frame.yml`** (#452 edited it after the base, merged mid-CI; the
+  phase65 shape) and is declared in `TAG_PUSH_XFAIL`; the registration is what pins it. Sheet: `node tools/shot-bloom-texture-t3.mjs` → `docs/img/bloom-texture-t3.png`;
+  `tools/bloom-texture-bead.mjs` and `tools/bloom-texture-corner.mjs` are the measurements.
+
+**THE TEXTURE'S LATTICE EDGE IS DERIVED FROM THE EXPORT BUDGET: OVER IT AT 0.4 mm THE EDGE COARSENS TO THE
+FINEST 0.01 mm RUNG THAT FITS, NEVER PAST 0.5, TOLD; PAST 0.5 THE EXPORT IS REFUSED, SAID** (Eva's ruling of
+Oct 23 on the worst corner — read §7 of `docs/bloom-surface-texture-t3-outcome.md` before touching THE EDGE CAP
+block beside `textureFor`, `buildBloomInto`'s outer wrapper, `TEXTURE_EDGE_IN_FORCE`, `textureEdgeRung`,
+`texture.edgeCap`, TX9, `TEXTURE_CAP_ROW` or block 79).
+- `buildBloomInto` builds at the ruled 0.4 into the caller's own accumulator first (a build that fits pays
+  nothing — the shipping default is one trial, 151,792, unmoved), and only over `EXPORT_TRI_BUDGET` bisects
+  the rungs `(40 + k) / 100` between 0.4 and `TEXTURE_EDGE_CAP_MM` (0.5) with REAL whole-bloom trial builds —
+  the cap first, then halving — so the finest fitting rung is derived, never typed per state. The 40 × 3 corner
+  lands on **0.41 mm (1,478,672, 98.6%)**, the whole bloom at that count on 0.43; the corner pays five builds.
+- **ONE EDGE FOR THE WHOLE BLOOM**: `TEXTURE_EDGE_IN_FORCE` is read by every organ and every floret through
+  `textureEdgeInForce`; `cap.textureEdgeMm` is a PIN now (every organ, the derivation off) — the corner tool's
+  measuring route, the sheet's refused-0.4 cell, and TX9's rebuild of the next finer rung.
+- Past the cap the build stands at 0.5 and the export is refused as before, with `EVEN 0.50 mm DOES NOT FIT` on
+  the read-out: 40 × 3 + whorled leaves (148% at 0.4), 40 × 2 + 40 sepals + leaves, the 12 × 12 × 1.00 umbel, and
+  40 × 3 at 100 × 46 mm petals (548%) are refused; block 79's declared refusal is 40 × 3 + 40 sepals × 4 tiers +
+  whorled leaves at **1,795,898** on 0.5. **No matrix row of the 1,552 trips the cap** (the byte partition's
+  predeclared movers are exactly block 79's three added rows); the states that do are §7b of the doc.
+- The decision reads the caller's own mode's count; the gates' `tris(live) === tris(export)` is what makes it
+  mode-free (measured on the corner: both modes land on 0.41 with the same five trials).
+- Gates: **TX9** (the edge used = the derived edge: the law, the rung, every blade on it, `fits` against the
+  BUILDER's tally, the next finer rung does not fit through the PIN, the read-out's words); TX0 checks the ASKED
+  edge; three witnessed apex mutants (the cap removed, the edge typed at 0.5 — the default moves —, coarsened
+  past 0.5); block 79 (3 rows, 1,555), smoke block 79, `EXPORT_REFUSED_XFAIL` + XR1 on the refusal; capped rows
+  take the refused rows' 120 s settle. `frozen/phase85` = the 1,552 rows at `908221c`. Sheet §6: the corner at
+  0.4 (pinned, refused) beside the derived edge with relief close-ups and the counts in the captions.
+
+**SURFACE TEXTURE T5: THE HUB, THE STEM AND THE TUBE RING TAKE THE ONE FIELD, VISIBLE FACES ONLY, DERIVED;
+THE RODS ARE DEFERRED PENDING BONE; THE PLAN IS CLOSED** (Oct 23 — Eva's rulings Q7 / Q12 / Q15; read
+`docs/bloom-surface-texture-t5-outcome.md` before touching `organLatticeInto`, `organReliefPass`,
+`organNormalOf`, `faceTag` / `normalSink`, `textureVertexVisible`, `TEXTURE_CONTACT_FADE_K`, the export
+decision twin in `buildBloomCore`, TX10 / TX11 or block 80).
+- **No new control.** Same field, height, size and derived edge as the sheets (TX2 reads the organs too).
+  Untextured is the shipped tree BY BRANCH (`organT5For` null): the default 24,688 and its bytes unmoved.
+- **No row law, so each organ is refined ON ITS OWN SHIPPED LATTICE**: edges into ceil(L/e) on 2^-20-snapped
+  lengths, coplanar strip quads, a closed centre fan (≥ 8 spokes within 1.5×) re-meshed as rings sized by
+  circumference, rows elsewhere. The TUBE RING the same way on its own emitted (row, column) lattice, with
+  its own law's normals handed over as emitted (`acc.normalSink`); 164 wall vertices with none stay smooth.
+- **Counts are decided on the EXPORT mesh** — an untextured export TWIN on a live build with sheet < 1 mm —
+  so tris(live) === tris(export) by construction. The relief is written at the END of the build, in place.
+- **Normals are the organ's own, per face** (the emitter tags each triangle); a crease takes the summed normal.
+- **Q7, VISIBLE = an escape ray** from `q + 1e-4 n` along a tilted n or 14 rotated world directions misses
+  every emitted triangle (closed 1e-9 acceptance — an open one let rays slip down shared edges). Buried
+  vertices take nothing; the relief fades in over a GEODESIC 2H (`TEXTURE_CONTACT_FADE_K`, typed — flagged).
+  **The hub top under the feet IS textured** (coincident faces are outside the union): the feet still meet
+  it and 0 printable gaps close at any height (flagged). **[Oct 25: BOTH SUPERSEDED by Eva's rulings — the hub
+  top under the feet is smooth and the fade is `max(H × 15/8, e)`; the T5 rulings block below.]** CAVITY faces (the bore, the void caps, the sphere's
+  inner sphere) are excluded BY NAME and never refined — Q15: 0 of 240 mid-wall bore probes see air, but the
+  bore's top ring on the hub's top plane does (a coplanar knife edge), which is why it is the name and not the ray.
+- **Rods take nothing (Q12)**; a floret build passes `pedicel: true` so its stem (a pedicel) stays smooth.
+- **Measured (EXPORT):** leaf-stem at leafAngle 70 untextured 0.544 emitted / 0.540 gate → **0.252 at H 0.4,
+  touching (0.001–0.010) from H 0.8** — the gate's analytic cylinder cannot see it (flagged) **[Oct 25: ANSWERED —
+  the gate's `leaf-stem` reads the EMITTED stem now (vertices + crossings on one export build), the plant (a leaf pushed
+  1 mm in) is RED there and invisible on the old measure, `leafangle-x-textureheight` declares 0.252 / a crossing from
+  H 0.8; `docs/bloom-leaf-stem-instrument-outcome.md`]**; at 35° 3.847 →
+  2.532 at H 1.5. Feet / sepals to hub: 0 gaps closed, narrowest gaps WIDEN (the fade). Budget: five §7b
+  states coarsen one or two rungs (40 × 3 0.41 → 0.42), none newly refused; block 79's refusal re-recorded
+  1,795,898 → 1,873,730. PEBBLE default 151,792 → 158,912 (hub 192 → 7,312).
+- **Gates:** TX10 (organs predicted from the untextured twin, ranges, 1.25× floor, normals against the
+  emitted facets), TX11 (visibility restated, read off the PAGE's organ mesh via `__bloomOrganMesh`), four
+  witnessed mutants (`a-buried-face-is-textured`, `the-hub-is-skipped`, `the-stem-normal-points-inward`,
+  `the-tube-ring-has-its-own-field`), block 80 (13 rows, 1,568), smoke block 80; coverage R1 counts the
+  organ lattice delta; ST1 reads the SHIPPED stem count. `frozen/phase86` = the 1,555 rows at `b3163de`.
+- **Found, pre-existing, fixed: `floretPitchFloorMm`'s dense grid read ANOTHER azimuth's box in Chromium**
+  (azimuth 0 carried pi's i0) when the box loop destructured `decode()`'s array — the textured raceme threw
+  its own cross-check 1 run in 4 on `b3163de`, never in Node, and a wrong bound on a non-winning pair would
+  have passed silently. Scalar decodes (the same integers): 8 of 8 clean. **A cross-check that throws in the
+  browser and never in Node is evidence about the browser's JIT, not about the arithmetic — recompute both
+  forms at the mismatch before believing either.**
+  T4 is STRUCK (texture and infill are exclusive), T6 folded into `docs/img/bloom-texture-t5.png`
+  (`tools/shot-bloom-texture-t5.mjs`); measurements `node tools/bloom-texture-t5.mjs`.
+
+**THE T5 RULINGS (Oct 25): THE HUB TOP UNDER THE FEET IS SMOOTH, THE FADE IS DERIVED, FLORET HUBS SHARE ONE
+WORLD LAYER** (Eva's rulings 1/2/5; 3/4/6 accepted as declared — read `docs/bloom-surface-texture-t5-rulings-outcome.md`
+before touching `textureVertexCovered`, an organ's `cover`, `organReliefPass`'s `earlier` set,
+`textureFadeWidthMm` / `TEXTURE_FADE_PEAK_SLOPE`, `t5Deferred` / `t5FloretOrgans`, TX12–TX14).
+- **Coverage is derived from the emitted feet**: a visible HUB vertex is covered iff the segment `q − δn → +H`
+  along its normal meets a triangle in the petal range — only the hub carries a `cover`. Default: 2,130 hub
+  vertices covered, 1,256 left visible (main 3,386). A closed tube covers 0 (its petals start at r 12.5 on a
+  7.66 mm hub). **Coverage also reaches the hub's UNDERSIDE under a coplanar foot — flagged, Eva's to rule.**
+- **A vertex an EARLIER organ also emits takes no relief on the later copy** (`shared`; a decision made without a
+  ruling): covering the hub's copy of a hub/tube coincident vertex and not the tube's welded the shells in the
+  census (12,066 within-shell pairs). The tube row reads 3 shared, 8 shells, 0 pairs.
+- **The fade is `max(H × 15/8, e)`** — the quintic ease's own peak slope, so the fade ramp is exactly 45°;
+  `TEXTURE_CONTACT_FADE_K` is gone. 0.80 → 0.75 mm at H 0.4. The edge floor binds nowhere today.
+- **Floret hubs are relieved in the WORLD frame**: a floret build defers its organs, the inflorescence append
+  carries them through each placement's M, and the parent's pass relieves them on the one field. Floret PETALS
+  stay own-frame copies; the umbel's boss is not an organ and stays smooth.
+- `TEXTURE T5: CELLULAR x a 60 mm stem x textureHeight max` reads 0 (was 40 / 0.1286), entry removed. Gates
+  TX12 (coverage restated from the petal builder's ranges), TX13 (the fade restated from `30·¼·¼`), TX14 (two
+  florets of one unit differ in their own frame; the withheld rebuild the control); four witnessed apex mutants;
+  two block-80 smoke rows. No row added, no phase owed; triangle counts unmoved on every row.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
@@ -5653,7 +5956,11 @@ then closes in six `timeout 555` chunks inside single Bash calls — the tool's 
 waiting in-turn. **A `send_later` check-in is NOT the thing that fails** — it wakes the
 session reliably; what does not survive is the PROCESS, so a check-in that expects to read a
 finished background run reads a dead one. Do not re-derive this by backgrounding a sweep and
-coming back to it.
+coming back to it. **[Oct 23: SUPERSEDED IN PART by Eva's session-discipline ruling (the texture block): a run
+longer than the foreground ceiling may run as a HARNESS-TRACKED background task (one the harness
+itself started and reports the end of — never a `nohup` the turn walks away from), chunked with
+`--resume`; no scheduled check-ins, no sleeping waiters, no PR subscriptions. The measurement above
+is what a process the harness does not track does, and it still holds for one.]**
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
@@ -6437,6 +6744,113 @@ its own azimuth on both trees** (−0.248 → −0.378 mm): declared, never clam
 corymb solves level only up to an 81 mm rachis at the defaults; raising the 120 mm cap is Eva's
 ruling. #231 blocks the 544 % corner from ever being a row.
 Sheet: `node tools/shot-bloom-node-laws.mjs <png>`.
+
+**A BLOOM CAN BE AN UMBEL: FLORETS ON PEDICELS FROM ONE KNOT AT THE STEM'S TOP, THE HEAD A TOGGLE THAT
+SHIPS OFF** (the umbel session, Oct 22 — Eva's rulings of Oct 21–22, the spider lily; read
+`docs/bloom-umbel-outcome.md` before touching `umbelBoss`, `umbelRootDiscReachMm`, `umbelIsAbsent` / `umbelHeadIsAbsent`, `HUB_ABSENT`,
+`inflorescencePlan`'s umbel arm, the knot in `buildInflorescenceInto`, `headPresent` / `racemePresent`,
+`umbelClauses` (UM0–UM4) or block 78).
+- **The raceme was probed first and cannot do it**: `floretNodes 1` whorled is exactly three florets, 66 mm
+  down (`LEAF_NODE_SOLO`), rooted in the wall, the head always on. UMBEL is a third TYPE of the one
+  inflorescence plan — the floret build, the memo, the placement, the area rule and the reach inset are the
+  raceme's own on ONE node; never a second law.
+- `inflorescence` UMBEL with `umbelFlorets` (2–12, default 6) and `umbelHead` (OFF / ON, default OFF). The
+  raceme's node count, phyllotaxy, corymb and gradient hide and are inert under UMBEL (`racemePresent`).
+- **RULED Oct 23: 6 florets, head OFF is the default.**
+- **RULED Oct 23: the floret-stem contact at -60° is accepted as declared.**
+- **RULED Oct 23: the knot becomes a flatter boss (this session).** §9 of the outcome doc.
+- **The ring is derived**: `rho = max((rP + gap/2)/sin(pi/n), head ON ? outerR + rP + gap : 0)` (one printable gap
+  between neighbours — the 90-deg parallel case — and, with the head ON, off the stem that runs on past it).
+- **The junction is a BOSS, not a sphere** (`umbelBoss`; the sphere read as a ball, 12 mm at 6 florets, 19.45 at
+  12): a flat-topped band of radius `R` = the root disc's farthest reach from the axis (`umbelRootDiscReachMm`, closed
+  form) + gap/2, half-height `h` = `rP |cos pedicelAngle|` + gap/2 (the one angle IS the steepest pedicel's).
+  Half a gap on every face so no root-disc edge lies ON the boss (the sphere's exact tangency welded: 749 pairs).
+  Head OFF: centred on the stem's top end, which ends inside the band; the florist's cut stays on the free end (UM4).
+  Head ON: on the stem at the reach-inset depth.
+- **RULED Oct 24: the underside is FLAT** (the 45° cone was FDM's overhang rule; the first print is SLS PA12) — the
+  boss is a disc, 192 triangles (the cone's boss 288), 10.72 x 3.46 mm at 6 florets / 35°. The cone held no root disc
+  (UM2 holds every disc in the band alone). **And the crossing clears its floor by a DERIVED margin**: the band grows
+  only where a pedicel's crossing (`h/|sin a|`, `(R-rho)/cos a`) would fall under `gap/2 + margin`, the margin EIGHT
+  float32 steps of the boss's own coordinate magnitude (`UMBEL_CROSSING_MARGIN_REL = 2^-20`, X0's and the foot
+  clearance's 8 — the check's conditioning carried to the STL), so a vertical pedicel crosses 0.500006–0.500033 mm,
+  never exactly 0.500. Binds only at 90°. Read §10 of the outcome doc.
+- **Head OFF builds no head at all**: `buildBloomBody` emits no petal, hub, stamen, style or sepal and reports
+  `HUB_ABSENT` (`absent: true`) in place of the hub record; every head-only family (form, J, ST4+, JS, JG, SP, Z,
+  VS5, coverage, crowding, ST9's sphere channel) stands down on that record, and UM0 holds it true against the
+  controls both ways. The PETAL controls stay visible and the Petal section's label says they shape the FLORETS.
+- **Found on main and fixed**: the `shown` record `fmt` reads never carried the inflorescence plan, so the Type
+  read-out said "no stem to carry it" on every raceme and the gradient cap's hatch was never drawn.
+- `frozen/phase84` is the 1,525 rows at `89bb3bf` (T3 took block 77 and phase83 while this was in CI — phase83 is the same
+  1,506 rows the umbel first froze, so its copy was dropped and block, route and phase each moved up one).
+- **The florets of one umbel overlap by construction** (no internode): every row but the two-floret ones reads
+  0.0000 mm floret-to-floret — declared by value in `INFLO_APPROACH_XFAIL` and in the combination gate's
+  `umbel-florets-x-angle`, never clamped. ST9 names the boss by its own `triRange`.
+- Budget corner (12 x 12 petals x 1.00, head ON): 1,381,266 export tris, 92.1%, measured before building.
+- Gates: UM0–UM4 in both STL gates (UM1/UM2 restated for the boss — UM1 rebuilds `R`, `h` and the underside from the
+  controls by a brute disc-rim maximisation, never the geometry's closed form, plus the margin and the crossing); seven witnessed mutants in the apex table
+  (`/^an umbel/` rows; `the-boss-radius-is-typed`, `the-boss-height-is-typed`, `the-boss-underside-cones-again`,
+  `the-boss-crossing-margin-is-dropped`); panel route
+  (ap) (THIRTY-THREE routes); three combination pairs; block 78 (27 rows, 1,552), smoke block 78 (8, `--conn`).
+  Sheet: `node tools/shot-bloom-umbel.mjs <dir> --png docs/img/umbel.png`; the boss's before/after junction sheet
+  `node tools/shot-bloom-umbel-boss.mjs docs/img/umbel-boss.png --base <worktree>` (side-on and from below).
+
+**THE MOPHEAD HYDRANGEA IS DISCOVERED, NOT BUILT — ~100–120 FLORETS FIT TODAY, THE FLOOD FILL CANNOT SEE
+ROOTING, AND THE STRUCTURE IS EVA'S** (Oct 24 — read `docs/bloom-hydrangea-discovery.md` before any mophead work).
+- **Floret cost (EXPORT = LIVE):** 4 petals x 3,062 + a 192 flat hub = **12,440 (120 fit 1.5 M)**; any pedicel
+  +1,916 (104 fit). Petal tip shape >= 2.50 ramps rows (18,264 at 2.5). The root law is inert at 20 mm petals.
+- **Reduced floret (patched copies, none chosen):** NV 6 + K 2 at NU 56 = 6,664 at the shipped outline chords
+  (~225 fit); NU 28 NV 6 K 2 = 3,528 (~425 fit) at a 0.62 mm round apex. A floret-only row count must also pin
+  the apex ramp's absolute 112 and `CURL_START_MIN`. A 12-sector pedicel is 476 against 1,916.
+- **Three prototypes, all watertight, 0 within-shell pairs, one flood-fill region:** (A) 113 sessile florets on a
+  ball (94.1 %) — the capitulum reading ruling 1 refused; (B) a compound umbel 9 x 11 = 99 (95.1 %) via ONE
+  patched line (`floretState`'s inflorescence pin lifted one level) — a dome, open below; (C) 97 florets on stubs
+  from an inner sphere (93.2 %). **Florets alone read ONE region in all three**, so a ball owes a per-floret root
+  clause (UM2's shape).
+- The 20 mm petal floor makes a round floret 52 mm (a real one is 25–38 mm). The SPHERE hub and every plugged
+  stem bore are sealed cavities (trapped powder, pre-existing). #231 need not land first: the count is exact after
+  one floret build. Tools: `tools/bloom-hydrangea-lib.mjs`, `tools/bloom-hydrangea-measure.mjs`,
+  `tools/shot-bloom-hydrangea-discovery.mjs` -> `docs/img/hydrangea-discovery.png`. None in CI.
+
+**THE MOPHEAD SHIPS: A COMPOUND UMBEL OF DEPTH 2 — RAYS FROM ONE BOSS, A HEADLESS SUB-UMBEL ON EACH, THE
+FLORETS ON A REDUCED LATTICE DOWN TO A DERIVED FLOOR, THEIR COUNT CLAMPED TO THE BUDGET AND TOLD** (Oct 24 — Eva's
+rulings on the hydrangea discovery; read `docs/bloom-mophead-outcome.md` before touching `umbelDepth`,
+`umbelDepthRefusal`, `subUmbelState`, `floretBodyFloor`, `withReducedFloretLattice`, `NV` / `NV_FULL`,
+`RIM_BEAD_SEGMENTS_IN_FORCE`, `umbelBudgetClamp`, `mopheadClauses` (UM5–UM9) or block 81).
+- `umbelDepth` (`1` / `2`, default `1`) is a LEVEL control on the umbel, not a fourth type: at depth 2 the umbel's own
+  controls keep their meaning on each sub-umbel and only the rays are new (`umbelRays` 2–12 / 12, `umbelRayLength`
+  5–120 / 40 mm, `umbelRayAngle` / 50°). `subUmbelState` is the ONE place the floret pin is lifted; depth 3 (a head
+  asking `3`, a sub-umbel asking `2`) is refused BY NAME. One floret build serves every floret, one sub-umbel build is
+  appended per ray.
+- **The floor is derived**: the least scale at which a petal keeps its full sheet body `RIM_TAPER_MM` in from both
+  margins and the drawn tip past the root blend, read off a real reduced-lattice probe build — **13.13 × 6.00 mm** on
+  the 35 × 16 petal (0.75x / 26 mm on a narrow 35 × 8 one). The head's 20 mm floor does not move.
+- **The reduced lattice** (6 columns, a 2-segment bead, rows at NU 56) is a DECLARED EXCEPTION to the edge-profile
+  ruling and the fixed lattice, by branch from ONE call site: a 0.707 mm bead facet against PA12's ~0.35–0.4 mm (it
+  may print as a chamfer), sagitta 0.146 mm. 6,664 tris a sessile floret at the floor (225 fit), 8,580 on a pedicel.
+- **The clamp** prices a floret from the EMITTED unit and is exact: the clamp corner asks 3,105,930 and builds
+  1,297,914 (5 a ray). The export never refuses for it.
+- **UM5–UM9**: depth's two statements; the lattice read off the EMITTED rim (and every head petal on 10 / 4); the clamp
+  exact against the bloom's own count; **every floret's root disc inside its sub-boss and every sub-boss on its ray, in
+  the world frame — the flood fill cannot witness rooting here** (fused florets read one region); the floor restated.
+  ID family reads the rays as the outer pedicels at depth 2. Five witnessed mutants; panel route (aq) (THIRTY-FOUR
+  routes); combination measure `subumbel-floret`, two pairs, 14 cells at 0.000 declared by value (the dome's florets
+  interleave — never clamped); defaults bar row on `floret-stem`.
+- Block 81 (20 rows, 1,588), smoke block 81 (5, `--conn`); `frozen/phase87` = the 1,568 rows at `2000b1b`. Sheet:
+  `node tools/shot-bloom-mophead.mjs <dir> --png docs/img/mophead.png`.
+- **RULED Oct 25: the floor-floret mophead is depth 2's DEFAULT; no preset** (§12 of the outcome doc).
+  - **One owner:** `UMBEL_DEPTH2_DEFAULTS` in the registry is an OVERLAY, because the controls are shared with
+    depth 1 and the whole bloom: 12 florets, 4 petals, scale 0.20, 12 mm pedicels at 20°, tip shape 2.0,
+    cup 0.2, tilt 15.
+  - **On the page:** a HAND switch to depth 2 writes it (`onDepthSwitch`). A control the visitor set is
+    kept, both are told, and the switch back restores. A load never writes it.
+  - **In the matrix:** block 81's depth-2 rows spread it under their own values. The defaults bar is
+    re-pinned to THE MOPHEAD row. Panel route (aq) has three more mutants.
+  - **A held slider at the default costs 11–17 s a step on this box** (drag-light drops nothing, since a
+    mophead has no infill). The proposed fix is `umbelFlorets: 2` in `DRAG_LIGHT_OVERRIDE` (2.5–3.4 s
+    measured). **RULED Oct 26: NOT built yet — the page-side cost (~10 s of the 11–17 s step) is
+    profiled first, in its own session** (§12b of the outcome doc).
+  - `frozen/phase88` = the 1,588 rows at `6697558`. `verify-bloom-defaults-bytes` gained `--mover depth2`
+    and `--redefined`, and reads `@scopes` rows now.
 
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of
@@ -11388,13 +11802,40 @@ top the jambs stand on, the jamb and head inner edges the lights read); shading 
 from the profile's own normal against the registry's one fixed `LIGHT`, never painted. Phase 1
 is the arch only; phase 1b carried Eva's rulings on it (intensity 1.00, line weight follows
 darkness, outer sub-arches on the jamb's inner edge, cross-hatch above an Advanced-tier
-threshold). Gate: `node tools/verify-frame.mjs` (`--negative-control` required before
-quoting a pass from a changed harness; `--no-browser` for iteration) — **it runs in CI**
-(`frame.yml`, gate plus negative control). Sheet: `node tools/shot-frame-sheet.mjs <dir>`,
-by hand. **The two flower gates no longer carry `'tools/**'`** (narrowed in 1b to the files
+threshold). **Phase 2 (Oct 22, Eva's ruling 1): the RELIEF STL is the primary output and the
+SVG the secondary** — `frame-relief.js` lifts every band's profile over a flat back as one
+closed shell per band, each EMBEDDED one `MIN_FEATURE_MM` into the neighbour it abuts (a
+declared `spine.embed`, because bands touch face to face and the voxel gate cannot tell a
+graze from an overlap), pierced or backed lights, `Get STL`, and a three.js Relief view
+(`frame-view3d.js`, one light, no auto-rotate). `MIN_FEATURE_MM` 1.0 is an ASSUMPTION (print
+process undecided, ruling 3) that caps output and is told. Gates: `node tools/verify-frame.mjs`
+(2-D + the page) and `node tools/verify-frame-relief.mjs` (W watertight, C voxel-connected,
+R registered on `offsetCurve`, L clear widths, B embeds land, F the floor; `--base <worktree>`
+for the SVG byte identity), each with `--negative-control` required before quoting a pass
+from a changed harness — **both run in CI** (`frame.yml`). Sheets: `node
+tools/shot-frame-sheet.mjs <dir>` (the engraving) and `node tools/shot-frame-relief.mjs <dir>`
+(the relief), by hand. **The two flower gates no longer carry `'tools/**'`** (narrowed in 1b to the files
 they reach), so a frame-, cards-, print-, plot- or scene-only PR that adds a tool no longer
 runs them — the "adding a tool runs the flower gates" corollary recorded in several
 sections above is history as of Oct 1.
+**Phase 2b (Oct 22): the RECTANGLE (mitre / rounded / notched / eared corners) and the OVAL
+(aspect; the circle is 1:1) are CLOSED LOOPS** — one spine, `closed: true`, no duplicated
+vertex, the seam at the bottom centre — through the same sweep, relief and SVG; `offsetCurve`
+trims between neighbouring joins and wraps through the seam; named ANCHORS are declared in the
+registry; the interior is open / backed / recessed. Every arch row's SVG and STL is
+byte-identical to `e759041` (CI's `--base`). Read §7b of the charter before touching a closed
+skeleton. Sheet: `node tools/shot-frame-skeletons.mjs <dir>`.
+**Phase 3a (Oct 22): the SCROLL primitive (`frame-filigree.js`) — C and S scrolls by a
+curvature law, log-spiral volutes, groups of 2–5, swept by `bandSolid` — with the tightness range
+FITTED to each scroll (Eva's ruling: no dead travel; the volute's share rises to 0.8, then the
+range's top is the most that prints, told) and a half-round wire by default; ruling 5's clamps
+MEASURED (`tools/frame-fold-boundary.mjs`). Step 2 ATTACHES it: `withOrnament(model)` builds the
+groups in PRINT mm at the skeleton's right-hand anchors (crest, bottom, corners/springings,
+sides), seats each in the molding by the embed (no graze), mirrors to the bit, and adds wire
+bands to the SVG and wire solids to the STL; filigree off returns the model itself (77 of 77
+rows byte-identical to `e4ce6eb`). The FRAME's box sets the print scale (`frameBox`). Read §10 of
+the charter. Sheets: `node tools/shot-frame-scrolls.mjs <dir>`, `node
+tools/shot-frame-filigree.mjs <dir>`; gates SC1–SC7, OR1–OR6 and K5.
 
 ## `/marble` — the paper-marbling simulator (pointer only)
 
@@ -11509,3 +11950,60 @@ numbered steps and ±1 mm figure, P23 a fresh profile opens on 4 × 3). Sheet:
 pin, B in use at 90° and 60°). Phase 2 (image → tile)
 is designed in §10 and not built. Nothing has been printed: every printability number there is a
 declared rule of thumb.
+
+## `/lantern` — the paper star lantern (pointer only)
+
+Hidden generative page (`lantern.html`, `lantern.css`, `lantern.js`,
+`lantern-geometry.js`, `lantern-view.js`, `lantern-pattern.js`, `lantern-validate.js`,
+`lantern-material.js`, `lantern-export.js`, `lantern-build.js`; `noindex`, unlinked). Its governing
+document is **`lantern-design-doc.md`** — read §2 before touching the solver.
+The law: `solveLantern(state)` in `lantern-geometry.js` is the ONE owner of the
+geometry — the FINISHED star is what the user specifies and the FLAT pattern is
+derived (the inverse problem); every view, export and gate reads the same model.
+**Two mirrored halves glued at a planar rim cannot be made of rigid flat
+triangles (the rim edge would have to shrink), so a facet is a PLEATED CONE
+from the raised centre, and the one freedom that closes it is a convex bow on
+the flat edge, solved by bisection** (doc §2.2–2.3, with the measured closure
+table: a slender straight-edged pentagram closes at depth ≈ 0.41 × width — the
+commercial proportion — and slender-and-shallow has no planar rim at all; the
+solver clamps the depth to the nearest closing one and tells). The point
+outline reuses `bloom-curve.js` (the value, the PCHIP sampler, `proposeEdit`)
+with its own SVG editor in `lantern.js`. Gates, both in CI (`lantern-gate.yml`,
+path-scoped to the lantern's files plus `bloom-curve.js`): `node
+tools/verify-lantern.mjs` (L0–L11 + the sweep, `--negative-control` nine
+mutants of the geometry) and `node tools/verify-lantern-page.mjs` (P0–P16 in
+Chromium, `--negative-control` twenty-two mutants of the page). Sheet: `node
+tools/shot-lantern.mjs <dir>`. Phase 1 (geometry, shell, Flat + Folded) is
+built. **Phase 2 is built too (doc §4): `lantern-pattern.js` lays out a scroll
+skeleton (a stem, stem-rooted volutes, fillers, a rim band) or a lattice per
+facet TYPE in the facet's own frame, and `lantern-validate.js` judges it on a
+0.25 mm raster — islands (a real failure, auto-bridged at the ELEMENT level by
+splitting a stroke, never by re-tracing a raster), thin paper, narrow cuts and
+keep-outs — with every finding clickable into the Flat view; the folded view
+carries the cuts as per-type alpha maps on UVs the geometry emits in the facet
+frame.** `node tools/verify-lantern-pattern.mjs` (PA0–PA10, ten mutants) rides
+beside the other two. **Phase 3 is built (doc §5, §6, §8): `lantern-material.js`
+derives every cutting rule from the stock's caliper with floors (starting values
+— the default stock reproduces phase 2's numbers exactly, so nothing moved), and
+`lantern-export.js` splits a half that does not fit the bed into one module per
+point on the VALLEY folds with a seam tab and a label pair per seam, nests the
+pieces on shelves, and writes one SVG per sheet (CUT / SCORE / PERF / ENGRAVE)
+zipped with a README and the design.** `node tools/verify-lantern-export.mjs`
+(X0–X10, fifteen mutants) is the third Node gate; the page gate is P0–P15 with
+eighteen mutants. **Phase 4 is built (doc §7, §9): `lantern-build.js` lays one
+tissue BACKING piece per point per half behind the cut field, held off every
+fold, colours cycling by point from a palette (drawn in the folded view as a
+translucent skin); the Build view and the jsPDF instructions draw ONE step list
+with this star's counts (LED only); the test grid marks the stock's derived
+values and the coupon is one point alone.** **Phase 5 is built (doc §10): the
+page OPENS LIT (ruling 7) — a point light inside the star, the paper EMISSIVE
+through a glow map built from the cut canvas (a hole white, the paper a 0.42
+share), the cuts still holes, and the lamp casting shadows THROUGH them onto a
+wall and floor by a `MeshDistanceMaterial` carrying the same alpha map. Two
+things that cost a cycle: three's shadow pass copies the OBJECT material's
+`alphaTest` onto the distance material, so a material with `alphaTest 0` throws
+a SOLID shadow (measured, 43 of 2,115 wall samples lit against 1,583
+unshadowed; 131 once the holes stayed holes) — keep `alphaTest 0.5` on the cut
+material in lit mode; and the lamp is sized from the WALL distance (`I ∝ d²`)
+so the wall reads at any star size. Four Light sliders are view state saved
+in the design file; Folded restores every phase-1 value (`setLit(null)`).**

@@ -62,6 +62,53 @@ export const SHEET_THICKNESS_MM = 1.2;
    A printed coupon replaces this guess with a measurement. */
 export const FOOT_MIN_WIDTH_MM = 1.6;
 
+/* THE FOOT CAP'S CLEARANCE (the foot-clearance session, Oct 22 — Eva's ruling
+   on #435: "the foot cap must not land exactly on the arc"). Read
+   docs/bloom-foot-clearance-outcome.md before touching it.
+
+   WHAT WENT WRONG. A foot capped EXACTLY at the arc it owns (`r x span`) has
+   its margins at exactly the half-step azimuth, where its neighbour's margins
+   are too: the two feet ABUT with a gap of zero. Wherever the across-direction
+   is laid on a circle about the axis — a slit tube's ring curve (the lobe hook
+   blends a foot's open half onto it), the equator of a hemispherical head —
+   both neighbours then evaluate the same circle at the same angle and emit the
+   SAME DOUBLE, and the uncut tube sinus (zero gap, so no notch) puts its knot at
+   the sinus centre, which IS the margin. The census's exact-position weld reads
+   two closed shells sharing one vertex as one shell, so their by-design overlap
+   is counted as a fold: 263 .. 2,236 pairs on the seven tube rows, and 1,048 /
+   932 of the two hemisphere-at-spread-0.6 rows' 1,424 / 1,268
+   (`tools/bloom-weld-attribute.mjs` names every pair). The leaf petiole's
+   remedy, a third time: REMOVE the shared vertex, never declare its pairs.
+
+   THE CLEARANCE IS AN ANGLE, 2^-19 RAD, AND IT IS WHAT THE WELD NEEDS — NOT A
+   TYPED EPSILON. The weld is EXACT EQUALITY of positions, and the positions a
+   print gets are the STL's FLOAT32s, so two vertices are distinct for every
+   reader (the census on the builder's doubles, a slicer on the file) only if
+   they differ by whole float32 steps of the coordinate they are differenced
+   from. A float32 step at magnitude r is at most r x 2^-23. Capping each foot at
+   `r x (span - 2^-19)` opens a gap of r x 2^-19 between neighbouring margins,
+   so each margin stands r x 2^-20 = EIGHT float32 steps of the ring's own
+   radius from the half-step azimuth — and the tube's knot, which sits at the
+   gap's centre, eight steps from each margin. Eight is the count X0 already
+   derived for a cancellation residue (`X0_TOL_ULPS`), and the clearance is an
+   ANGLE so the separation scales with the radius at every foot row: a row
+   nearer the axis is nearer by the same factor its float32 step is smaller.
+   What it is NOT: a fraction of the lattice (half a foot column is ~0.3 mm,
+   a visible notch Eva did not ask for), nor a printable gap (a slit under
+   MIN_FEATURE_MM fuses in print — this one is 2.07e-5 mm at the 12-petal ring,
+   two orders under the float32 grain a printer resolves, and exists for the
+   census and the file, not for the object).
+
+   MODE-FREE BY CONSTRUCTION: which shells a solid has is topology, and the
+   clearance reads only the cap's ring (`footCapRadiusMm`, the export floor's
+   in both modes) and the span. A foot inside its cap is the asked double by
+   BRANCH; a foot the floor wins keeps 1.6 mm (it overruns its arc either way,
+   so its corners pass their neighbour's rather than meeting it). */
+export const FOOT_CAP_CLEARANCE_RAD = 2 ** -19;
+/* the one owner of the capped width: the arc a foot owns at its ring, less the
+   clearance — read by every petal ring and every sepal tier */
+export function footCapMm(radiusMm, spanRad) { return radiusMm * (spanRad - FOOT_CAP_CLEARANCE_RAD); }
+
 /* THE FOOT'S UPPER CLAMP — a number that has always been here as a bare `10`
    inside footRing()'s clamp, given a name (Eva's ruling, Sep 1, option b)
    because it BINDS and nothing said so.
@@ -77,14 +124,27 @@ export const FOOT_MIN_WIDTH_MM = 1.6;
        petalWidth 25 -> foot 10.00 mm, ring 11.0558 mm
        petalWidth 30 -> foot 10.00 mm, ring 11.0558 mm   (blade +20%, ring +0%)
 
+   [Oct 21, big petals: `petalWidth`'s max went 30 -> 46 (Eva's ruling 2, the
+   shipping 35 x 16 proportion at 100 mm). The clamp did not move, so it now
+   binds over 22 of the slider's 39 reachable values (25..46, 56%): a 46 mm
+   blade stands on the same 10 mm foot and the same ring as a 25 mm one —
+   blade +84%, ring +0%. Reported, not changed (docs/bloom-big-petals-outcome.md
+   §6b); widening the foot would move every ring through the area rule.]
+
    This predates the zygomorphy work by four sessions; a per-role size
    multiplier is simply the fastest route to it, which is why it surfaced
    here. NO GEOMETRY MOVES: the constant is the same double the literal was,
    and the fix is the (CLAMPED) discipline this project already applies
    everywhere else arriving where it was always missing — `widthClampedHigh`
    beside `widthClamped`, and a ceiling twin of the read-out's floor line.
-   A slider that has stopped moving must say so. */
-export const FOOT_MAX_WIDTH_MM = 10;
+   A slider that has stopped moving must say so.
+
+   [Oct 21, root support — RETIRED (Eva's ruling 2): "the foot's fixed 10 mm
+   clamp is replaced by a cap derived from the hub — the ring's own room, the
+   arc each foot owns at its ring, so a crowded ring caps lower and a sparse
+   one higher." The constant is gone; `footArcMm` in footRing() is the cap. See
+   the FOOT CAP block there for the law, the fixed point that was measured and
+   refused, and docs/bloom-root-support-outcome.md for the numbers.] */
 
 /* HOW MANY WHORLS THE ARRANGEMENT MAY STACK. SIX (Eva, Sep 3, raised from
    three), and the number is argued from a measurement rather than from a
@@ -1355,6 +1415,19 @@ export class MeshBuilder {
        is a different quantity for a different job and stays where it is. */
     this.lo = [Infinity, Infinity, Infinity];
     this.hi = [-Infinity, -Infinity, -Infinity];
+    /* THE ORGAN RELIEF'S TWO SIDE CHANNELS (surface texture T5) — both OFF
+       (null) on every build that is not textured, and OFF outside the one
+       emitter call the relief is about, so no shipped path pays for either
+       and neither decides anything that is BUILT. `faceTags`, while an array,
+       takes the emitter's current `faceTag` per triangle (which face of the
+       hub, the stem or the tube ring the triangle is), so the organ's own
+       analytic normal can be asked of the face it lies on; `normalSink`,
+       while a function, is handed each tube-ring vertex with the normal the
+       ring's own law gave it. Setting `faceTag` on an untagged build is a
+       property write and moves no byte. */
+    this.faceTags = null;
+    this.faceTag = null;
+    this.normalSink = null;
   }
   /* Extent along each axis, and the max bounding dimension in mm — the number
      that decides whether a design fits a given process. SLS nests in any
@@ -1389,6 +1462,7 @@ export class MeshBuilder {
   noteSheet(t) { if (this.exportMode && t < this.minThickness) this.minThickness = t; }
   tri(a, b, c) {
     this.positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+    if (this.faceTags) this.faceTags.push(this.faceTag);
     for (const p of [a, b, c]) {
       for (let k = 0; k < 3; k++) { if (p[k] < this.lo[k]) this.lo[k] = p[k]; if (p[k] > this.hi[k]) this.hi[k] = p[k]; }
     }
@@ -1692,8 +1766,8 @@ let APPLIED_BASES = null;
 export const OVERRIDE_BOUNDS = new Map([
   ['petalSpineCurl', { min: -180, max: 360 }],
   ['petalCup', { min: -0.8, max: 1.2 }],
-  ['petalLength', { min: 20, max: 60 }],
-  ['petalWidth', { min: 8, max: 30 }],
+  ['petalLength', { min: 20, max: 100 }],
+  ['petalWidth', { min: 8, max: 46 }],
   ['petalTilt', { min: 0, max: 120 }],
 ]);
 
@@ -1765,7 +1839,13 @@ export const OVERRIDE_BOUNDS = new Map([
    WHAT THE RETIRED ROLES BECAME is `migrateRoles` in bloom-registry.js (the
    ALL deltas into the global, INNER into layer or pair entries, the per-petal
    groups into pair entries, the RADIAL labellum and hood dropped by ruling). */
-export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness']);
+export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness',
+  /* SURFACE TEXTURE (T3): the relief is ONE world-space field over the whole
+     bloom (Eva's ruling 1), so its height and feature size are not a layer's
+     or a pair's to own — a per-scope texture would be a second field. A
+     placement made without a ruling; lifting it is one entry here and the
+     builder reading `ps` for the two (it reads `textureFor(ps)` already). */
+  'textureHeight', 'textureSize'])
 /* ===================================================================
    SCOPED VALUES — what a scope OWNS OUTRIGHT rather than offsets (F6-scope,
    Oct 18; read docs/bloom-outline-curve-scope-outcome.md). A curve is not a
@@ -2413,7 +2493,12 @@ export function footRing(state, acc, opts = {}) {
       const lambda = lambdaAt(k);
       const scale = Math.pow(state.layerSize, lambda);
       const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;
-      const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
+      /* THE ASKED FOOT — floored, never capped here: the cap is the ring's own
+         room, which the ring's radius decides, and the radius is the area rule
+         over these asked feet (see THE FOOT CAP after the ring map). Where the
+         asked foot is inside [floor, old 10 mm ceiling] this is the double the
+         clamp returned (`Math.min(10, Math.max(lo, a))` is `Math.max(lo, a)`). */
+      const width = Math.max(FOOT_MIN_WIDTH_MM, authoredWidth);
       const rFoot = Math.sqrt((width * thickness) / Math.PI);
       /* A CONTINUOUS RING CARRIES EXACTLY ONE PETAL. `1 * x * x` is `x * x`
          exactly in IEEE-754 (multiplication by 1.0 is exact for every finite x). */
@@ -2456,7 +2541,7 @@ export function footRing(state, acc, opts = {}) {
     const own = layerOwnedValues(tierScopes, L, slotCount, state);
     const ownWidth = own && 'petalWidth' in own ? own.petalWidth : null;
     const authoredWidth = ownWidth === null ? state.petalWidth * scale * 0.4 * state.footDelicacy : ownWidth * 0.4 * state.footDelicacy;
-    const width = clamp(authoredWidth, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
+    const width = Math.max(FOOT_MIN_WIDTH_MM, authoredWidth);   // the ASKED foot (floored; the cap follows the ring map)
     const rFoot = Math.sqrt((width * thickness) / Math.PI);
     const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;
     /* The group is the whole whorl and `footCount` is `state.petalCount` (or
@@ -2509,6 +2594,27 @@ export function footRing(state, acc, opts = {}) {
   const guardResidual = guarded ? Math.abs(generalDerived - derivedRadius) : null;
 
   const R0 = derivedRadius * state.spread;         // the ONLY use of spread
+  /* THE RING THE FOOT CAP IS MEASURED ON IS THE EXPORT FLOOR'S, IN BOTH MODES
+     (root support, found by CI: `INFILL: x sheetThickness 0.60` built 91,360
+     triangles live and 108,928 in export). The area rule places the ring from
+     `sqrt(width x sheet)`, and the sheet is floored at export, so a sheet under
+     MIN_FEATURE_MM puts the LIVE ring nearer the axis than the EXPORT one; a cap
+     read off the live ring then bound where the export's did not, the feet
+     differed, and the infill — planned against the outline the feet set —
+     differed in TOPOLOGY. Which feet a print gets is the export's question, and
+     a topology may not depend on the mode (session 32's rule, a seventh time),
+     so the cap's radius is the area rule at `max(sheet, MIN_FEATURE_MM)` — the
+     export's own expression on the export's own thickness, the same doubles in
+     both modes. WHERE THE SHEET IS AT OR ABOVE THE FLOOR it IS this ring's R0
+     (a branch, no product formed), so every export build and every live build
+     on a printable sheet reads the radius it always read. */
+  const capThickness = Math.max(Number(state.sheetThickness), MIN_FEATURE_MM);
+  const capR0 = capThickness === thickness ? R0 : (() => {
+    let s2 = 0;
+    for (const p of raw) { const rf = Math.sqrt((p.width * capThickness) / Math.PI); s2 += p.footCount * rf * rf; }
+    const d = guarded ? Math.sqrt((raw[0].width * capThickness) / Math.PI) * Math.sqrt(slotCount) : Math.sqrt(s2);
+    return d * state.spread;
+  })();
   /* THE HUB GROWS TO THE WIDEST OWNED RING (Eva's ruling, Oct 16, replacing the
      rim hold). A layer that owns a width wider than Petal width asks for a ring
      at `R0 x own / petalWidth`, past layer 1's; the hub's rim moves out to the
@@ -2612,9 +2718,53 @@ export function footRing(state, acc, opts = {}) {
        same expression on the same double as the field it has always been —
        so the axis-crossing flag below reads it rather than restating it. */
     const overhang = Math.max(1.5, radius * 0.4);
+    /* ===================================================================
+       THE FOOT CAP (root support, Oct 21 — Eva's ruling 2, replacing the fixed
+       10 mm clamp): a foot may be no wider than THE ARC IT OWNS AT ITS RING —
+       the ring's own circumference shared among the feet on it, `r x 2 pi / n`
+       (n the petals of one whorl, or of one TURN under CONTINUOUS and on the
+       sphere, where the golden-angle sequence lays n a turn), and on a FAN one
+       step of the fan's own lattice, `r x step`. A LENGTH FROM LENGTHS: the
+       ring's radius (this ring's, as the area rule placed it) and the angle
+       each foot owns; nothing typed. A crowded ring caps lower, a sparse one
+       higher, and the floor is unchanged and WINS (`Math.max(floor, arc)`), so
+       a ring too crowded to give even a floored foot its arc keeps the floored
+       foot and says so (`footArcUnderFloor`).
+
+       WHICH RING — the one the area rule places from the ASKED feet, and THAT
+       IS A DECISION, measured before it was made. The other reading closes the
+       loop: cap the feet, re-place the ring from the capped feet, cap again, to
+       the fixed point. It was solved in closed form for one ring — wherever the
+       cap binds the fixed point is w = 4 pi s^2 t / n and the ring radius
+       R0 = 2 s^2 t, INDEPENDENT OF THE PETAL COUNT AND THE PETAL WIDTH — so
+       every capped head would carry one hub, 9.60 mm at the defaults, and a
+       40-petal head's hub would halve (19.78 -> 9.89 mm) while even its floored
+       1.6 mm foot overran the 1.55 mm arc it was capped to. A hub that stops
+       depending on what feeds it is the opposite of the area rule's intent, so
+       the ring stays where the asked feet put it ("a cap derived from the hub",
+       the ruling's words) and the feet are capped to their room ON it.
+       docs/bloom-root-support-outcome.md §4 has both tables.
+
+       THE BRANCH: a foot inside its arc is the asked double, no product formed,
+       so the shipping default (6.40 mm against a 6.95 mm arc) is the expression
+       it was. */
+    const footSpanRad = fanMode ? fan.step : TAU / n;
+    /* the cap's ring (above): this ring's radius where the sheet is printable,
+       else the same law on the export floor's R0 (the sphere's Rd floor at the
+       export thickness too) */
+    const capRadiusMm = capR0 === R0 ? radius : sphere
+      ? Math.max(capR0, HEAD_RISE_MIN_RADIUS_FACTOR * capThickness) * Math.sin(polar)
+      : capR0 * p.ringFactor;
+    const footArcMm = capRadiusMm * footSpanRad;
+    /* THE CLEARANCE (Oct 22, `FOOT_CAP_CLEARANCE_RAD` above): the cap stands a
+       hair inside the arc so a capped foot never shares a vertex with its
+       neighbour or a tube column; the arc stays in the record beside it */
+    const footCapWidthMm = footCapMm(capRadiusMm, footSpanRad);
+    const footCapped = p.width > footCapWidthMm;
+    const width = footCapped ? Math.max(FOOT_MIN_WIDTH_MM, footCapWidthMm) : p.width;
     return {
       index: L,
-      radius, derivedRadius, width: p.width, thickness,
+      radius, derivedRadius, width, thickness,
       overhang,
       /* THE LAYER'S PLACEMENT, owned here so no consumer computes it. All
          three are EXACTLY the pre-layer constants at L = 0: Math.pow(x, 0) is
@@ -2733,8 +2883,13 @@ export function footRing(state, acc, opts = {}) {
       /* THE CEILING TWIN (Eva, Sep 1). The floor has been reported since the
          thickness layer and the ceiling never was, so a quarter of the
          petalWidth slider moved the blade and not the ring in silence. See
-         FOOT_MAX_WIDTH_MM's note for the measurement. Telemetry only. */
-      widthClampedHigh: p.authoredWidth > FOOT_MAX_WIDTH_MM,
+         the FOOT CAP above for the law (the 10 mm constant is retired). Telemetry only. */
+      widthClampedHigh: footCapped && width < p.width,
+      /* THE FOOT CAP'S RECORD (root support): the asked foot (floored), the arc
+         this foot owns at its ring, the angle that arc is of, whether the cap
+         bound, and whether the arc is under the floor (the floor then wins and
+         the feet on this ring still overrun their room — told). */
+      widthAskedMm: p.width, footArcMm, footCapMm: footCapWidthMm, footCapRadiusMm: capRadiusMm, footSpanRad, footCapped, footArcUnderFloor: footCapWidthMm < FOOT_MIN_WIDTH_MM,
       /* A statement about the EXPORT, true in either mode — the read-out has
          to warn about a floor it is not currently applying. */
       thicknessFloorBinds: state.sheetThickness < MIN_FEATURE_MM,
@@ -2803,7 +2958,19 @@ export function footRing(state, acc, opts = {}) {
   /* ON THE SPHERE THE HUB'S RADIUS IS THE SPHERE'S — the equator, which
      every ring's plan radius is under by construction (Rd sin phi <= Rd).
      Cap and flat: R0, verbatim. */
-  const hub = { radius: sphere ? dome.Rd : Rhub, thickness, derivedRadius, dome, growth: hubGrowth };
+  /* THE HUB FOLLOWS THE THICKEST ROOT (big petals, Oct 21 — Eva's ruling 2:
+     "the hub thickens to match, so the root never sits on a plate thinner than
+     itself"). The plate is the sheet times the root factor of the LONGEST
+     petal this state can build (`hubRootTaperLengthMm`), never less than any
+     root, so every hub reader — the builder's slab, cap and sphere, the
+     hub-to-stem join's floor (`stemPlan`'s `hubT`), the sepal attachment, the
+     head's own bowl — follows it from this one field. A BRANCH: null at or
+     under the reference length, where `thickness` is the double it was. The
+     rings and the reproductive parts keep the SHEET (`thickness`): a foot's
+     own thickness is the petal's law at u = 0, and a filament is one sheet. */
+  const hubRootTaper = petalRootTaper(hubRootTaperLengthMm(state, tierScopes));
+  const hubThickness = hubRootTaper === null ? thickness : thickness * hubRootTaper.rootFactor;
+  const hub = { radius: sphere ? dome.Rd : Rhub, thickness: hubThickness, derivedRadius, dome, growth: hubGrowth, rootTaper: hubRootTaper, sheetThickness: thickness };
 
   /* THE REPRODUCTIVE PARTS' OWN RADIUS — ONE OWNER (session 24). A filament
      and a style are each ONE SHEET THICK (Part thickness owns the material
@@ -2821,6 +2988,18 @@ export function footRing(state, acc, opts = {}) {
      exactly the coupling session 22 ruled against when it made each part
      independently present or absent. */
   const partRadius = thickness / 2;
+  /* THE PARTS' ROOT SPAN IS THE HUB'S THICKNESS, NOT THE SHEET'S (big petals,
+     Oct 21). A stamen and the style are rooted THROUGH the slab, inner face on
+     the hub's underside and outer face on its top, so the overlap the slicer
+     unions is a solid and the filament's length is measured from the top face.
+     The hub plate is `thickness x the root factor` once a petal passes 35 mm
+     and straddles the mid-surface (+/- hubThickness/2), so a root one SHEET
+     long sat wholly INSIDE the plate and every stamen lost (hub - sheet)/2 of
+     its visible length (5.6 mm on ALL MAX) — found by JS1 in CI. The PART
+     stays one sheet thick (`partRadius`); only the root's span follows the
+     hub. At or under 35 mm the hub IS the sheet (the same double), so every
+     such row is built from the doubles it was. */
+  const rootSpan = hubThickness;
 
   /* ===================================================================
      THE ANDROECIUM DESCRIPTOR (session 21) — this owner's second kind. Null
@@ -2948,7 +3127,7 @@ export function footRing(state, acc, opts = {}) {
       buildWhorlInto({ count, radius: () => 0, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0,
         placement: disc ? 'SPIRAL' : 'RADIAL', blade: (slot) => { braidAzimuths[slot.index] = slot.azimuth; } });
       const s0 = surfaceAt(0, null);
-      bundleFrame = rodFrame({ radius: 0, slope: s0.slope, z: s0.z }, 0, thickness);
+      bundleFrame = rodFrame({ radius: 0, slope: s0.slope, z: s0.z }, 0, rootSpan);
     }
     let strandsScoped = 0, gathersClamped = 0, foldsClamped = 0, gatherMaxMm = -Infinity, revolutionsMin = Infinity, revolutionsMax = -Infinity;
     const stamens = [];
@@ -2972,7 +3151,7 @@ export function footRing(state, acc, opts = {}) {
            the BUNDLE's one curvature (the control's length). */
         const az = braidAzimuths[i];
         const Ri = strandValue(state, strandTerm, 'stamenCoilRadius'), ni = strandValue(state, strandTerm, 'stamenCoilTurns');
-        const Fi = rodFrame({ radius: r, slope: s.slope, z: s.z }, az, thickness);
+        const Fi = rodFrame({ radius: r, slope: s.slope, z: s.z }, az, rootSpan);
         const refL = Number(state.stamenLength), curl = state.stamenCurl * D2R;
         const w0 = [Fi.outer[0] - bundleFrame.outer[0], Fi.outer[1] - bundleFrame.outer[1], Fi.outer[2] - bundleFrame.outer[2]];
         coil = stamenBraidFor(i, { lengthMm: L.builtMm, refLengthMm: refL, radiusMm: Ri, turnsAsked: ni, floorRadius: diameter, w0, up: Fi.Up, bundle: bundleFrame, azimuth: az, curlRad: curl });
@@ -3012,7 +3191,7 @@ export function footRing(state, acc, opts = {}) {
     }
     return {
       count, layout: state.stamenLayout, diameter, rFil, length: state.stamenLength, curlDeg: state.stamenCurl, curlRad: state.stamenCurl * D2R,
-      derivedRadius, spread: state.stamenSpread, asked, radius, clamped, limit, onAxis, hubRadius: hub.radius, clearRadius, anther, thickness, dome,
+      derivedRadius, spread: state.stamenSpread, asked, radius, clamped, limit, onAxis, hubRadius: hub.radius, clearRadius, anther, thickness, rootSpan, dome,
       /* THE INNER LIMIT (session 24) — see the block above. `innerLimit` is a
          property of the PARTS and is a number on both layouts; `innerUsed`
          and `noRoom` describe the DISC and are null under RING. */
@@ -3084,7 +3263,7 @@ export function footRing(state, acc, opts = {}) {
       hubRadius: hub.radius, widerThanHub: rSty > hub.radius,
       inPetalRootAnnulus: rings.some((rg) => rSty > rg.radius - rg.overhang),
       clearRadius: Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang))),
-      lobe, thickness, dome,
+      lobe, thickness, rootSpan, dome,
       /* SLENDERNESS — free length over the FLOORED diameter, telemetry only
          (Q7), on the same read-out line as the filament's: UNMEASURED — no
          coupon has been printed. */
@@ -3219,7 +3398,11 @@ export function footRing(state, acc, opts = {}) {
     const own = sepalOwnSize(st);
     const footScale = own.widthMm !== null ? own.widthMm / Number(st.petalWidth) : scale;
     const footAskedMm = outer.width * footScale * breadth;
-    const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
+    /* THE FOOT CAP (root support — the petal ring's own law, one whorl over):
+       no wider than the arc each sepal owns at ITS ring, computed below once the
+       ring's radius is known. The sepal ring is placed by the attachment, never
+       by its feet, so there is no loop to close here. */
+    const footFlooredMm = Math.max(FOOT_MIN_WIDTH_MM, footAskedMm);
     /* WHERE THE WHORL SITS (the attachment-height ruling — `sepalAttachment`
        below the sepal block owns the solve): partway down the hub's flare at
        `sepalHeight` of its axial extent when there is a hub below the head,
@@ -3234,9 +3417,20 @@ export function footRing(state, acc, opts = {}) {
     const radius = onHub ? attachment.rAttach : hub.radius;
     const surf = surfaceAt(radius, null);
     const slope = onHub ? 0 : surf.slope, arc = surf.arc, relief = surf.relief;
-    const height = onHub ? attachment.zAttach + thickness / 2 : 0;
+    /* THE FOOT'S BOTTOM SKIN PASSES THROUGH THE ATTACHMENT POINT, so the ring
+       row stands HALF THE ROOT above it (root support: a sepal past the
+       reference length roots at `sheet x tau(L)`, the foot rows carrying the
+       law's u = 0 factor). A BRANCH: at or under the reference the root is the
+       sheet and this is the expression it was. */
+    const sepalRootTaper = petalRootTaper(sepalAskedLengthMm(st));
+    const height = onHub ? attachment.zAttach + (sepalRootTaper === null ? thickness / 2 : (thickness * sepalRootTaper.rootFactor) / 2) : 0;
     const z = onHub ? height : surf.z;
     const overhang = Math.max(1.5, radius * 0.4);
+    const footSpanRad = fanMode ? fan.step : TAU / count;
+    const footArcMm = radius * footSpanRad;
+    const footCapWidthMm = footCapMm(radius, footSpanRad);
+    const footCapped = footFlooredMm > footCapWidthMm;
+    const footMm = footCapped ? Math.max(FOOT_MIN_WIDTH_MM, footCapWidthMm) : footFlooredMm;
     let azimuths, placement, startAzimuth = outer.phase + phaseRad, mirrorSymmetric = null;
     if (fanMode) {
       placement = 'LIST';
@@ -3259,7 +3453,7 @@ export function footRing(state, acc, opts = {}) {
       scale, breadth, phaseFrac, pitchRad, pitchDeg: (pitchRad * 180) / Math.PI, phaseRad, phaseDeg: (phaseRad * 180) / Math.PI,
       phaseAgainst: fanMode ? 'the fan step' : continuousMode ? 'a turn\'s pitch, 2 pi / n (a golden-angle spiral has no pitch to interleave with)' : 'the petal pitch',
       startAzimuth, azimuths, placement, mirrorSymmetric,
-      footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: FOOT_MAX_WIDTH_MM, footScale,
+      footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: footCapWidthMm, footArcMm, footCapMm: footCapWidthMm, footSpanRad, footCapped: footCapped && footMm < footFlooredMm, footArcUnderFloor: footCapWidthMm < FOOT_MIN_WIDTH_MM, footScale,
       own: { lengthMm: own.lengthMm, widthMm: own.widthMm, lengthFloored: own.lengthFloored, widthFloored: own.widthFloored, scaleInert: sepalScaleInert(st) },
       /* THE ATTACHMENT — the whorl's height (the `height` the whorl primitive
          is handed; 0 at the rim, where the flat arm reads `slot.z` as the
@@ -3748,6 +3942,9 @@ export function spacingVarianceField(state, fr) {
    `verify-bloom-surface-bytes` measures rather than argues. */
 export function footList(built) {
   const fr = built.foot;
+  /* an UMBEL WITH ITS HEAD OFF builds no head whorl, so there is no foot on
+     any base — the base itself is absent (`HUB_ABSENT`) */
+  if (built.hubBuilt && built.hubBuilt.absent) return [];
   const feet = [];
   const rec = (d, az, layer, slot) => ({ radius: d.radius, overhang: d.overhang, width: d.width, az, ring: d.index, layer, slot, z: d.z, slope: d.slope, arc: d.arc });
   /* A FOOT THE STEM CHANNEL DID NOT BUILD IS NOT ON THE BASE (the sphere-stem
@@ -4797,7 +4994,17 @@ export function ladderGapFactor(buckleFreq) {
    `seamHalfMm` call this rather than restating it, so the live gate's A7
    clause and the clearance itself cannot drift apart. */
 export function seamHalfThicknessMm(sheetMm) { return Math.max(sheetMm, MIN_FEATURE_MM) / 2; }
-export function seamClearanceMm(turnRad, sheetMm) {
+export function seamClearanceMm(turnRad, sheetMm, rootFactor = 1) {
+  /* THE ROOT TAPER'S FACTOR (big petals, Oct 21): a long petal's root is
+     `rootFactor` sheets thick, so the offset the kink folds is that much
+     larger. A BRANCH at 1, which is every caller that passes none — the
+     expression it always was. */
+  const c = seamClearanceOnTheSheetMm(turnRad, sheetMm);
+  return rootFactor === 1 ? c : c * rootFactor;
+}
+/* the clearance on the bare sheet — ONE expression, so the mutant table's
+   anchor (`seam-floor-removed`) reaches every arm of seamClearanceMm */
+function seamClearanceOnTheSheetMm(turnRad, sheetMm) {
   return seamHalfThicknessMm(sheetMm) * Math.sin(Math.max(0, Math.min(turnRad, Math.PI / 2)));
 }
 /* THE ONE OWNER of which lattice station the blade starts at — the first
@@ -5295,13 +5502,22 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
   if (report) report.blend = lo;
   return mix(lo);
 }
-const NV = 10;   // columns across one span
+/* THE COLUMNS ACROSS ONE SPAN — 10, EVEN, so no column lies on the midrib.
+   A `let` since the mophead (Oct 24): a FLORET OF A DEPTH-2 UMBEL is built on
+   the REDUCED LATTICE (`withReducedFloretLattice`, below) and only there, by
+   branch; every other build reads `NV_FULL`, the same 10 it always read. */
+const NV_FULL = 10;
+let NV = NV_FULL;
 /* ONE FROZEN ROW OF `true`, shared by every plain captured row — the mask is
    per (row, column) and a plain panel's is constant, so this allocates once
    for the whole build rather than NV booleans per row per petal. Frozen
    because it is shared: a consumer that wrote through it would write through
    every row of every petal. */
 const GRID_ALL_MATERIAL = Object.freeze(new Array(NV).fill(true));
+/* the reduced floret's twin (the mophead): one more frozen row, of its own
+   length — a captured row's mask is as long as its columns */
+const gridAllMaterialOf = (n) => (n === GRID_ALL_MATERIAL.length ? GRID_ALL_MATERIAL : (GRID_ALL_MATERIAL_BY_N.get(n) || GRID_ALL_MATERIAL_BY_N.set(n, Object.freeze(new Array(n).fill(true))).get(n)));
+const GRID_ALL_MATERIAL_BY_N = new Map();
 /* How many rows adjacent panels share. ONE gives a real overlapping VOLUME:
    both panels occupy the slab between these rows, so the slicer unions
    solid material rather than being asked to join two shells that merely
@@ -7041,16 +7257,214 @@ export function thicknessIsUniform(state) {
   return state.tipThinning === 0;
 }
 
-export function thicknessProfile(ring, state) {
+export function thicknessProfile(ring, state, rootTaper = null) {
   const base = ring.thickness;          // footRing() is the owner; this reads it
   const thin = state.tipThinning;
+  /* THE ROOT TAPER IS THE SECOND FACTOR OF THE SAME LAW (big petals, Oct 21 —
+     Eva's ruling: "if the tip-thinning control already varies thickness along
+     the petal, compose the root taper with it as ONE thickness law with one
+     owner"). t(u) = base * tau(u) * (1 - thin * u): the cantilever's root
+     factor `tau` (petalRootTaper below) times the tip thinning, both in the
+     blade's own length coordinate. A BRANCH on `rootTaper === null`, which is
+     every petal at or under the reference length and every sepal, so those
+     take `base * (1 - thin * u)` operation for operation. */
+  if (rootTaper === null) {
+    return {
+      base, thin, rootTaper: null,
+      /* Unfloored — the AUTHORED law. The caller applies the accumulator's
+         floor, so the floor is applied in exactly one place and the telemetry
+         can report both the authored and the emitted number. */
+      at(u) { return base * (1 - thin * u); },
+    };
+  }
   return {
-    base, thin,
-    /* Unfloored — the AUTHORED law. The caller applies the accumulator's
-       floor, so the floor is applied in exactly one place and the telemetry
-       can report both the authored and the emitted number. */
-    at(u) { return base * (1 - thin * u); },
+    base, thin, rootTaper,
+    at(u) { return base * rootTaper.at(u) * (1 - thin * u); },
   };
+}
+
+/* ===================================================================
+   THE ROOT TAPER — a long petal thickens at the ROOT and tapers out to the
+   sheet toward the tip, sized by its length (big petals, Oct 21 — Eva's
+   ruling 2; read docs/bloom-big-petals-outcome.md before touching it).
+
+   THE REFERENCE IS UNVALIDATED AND THAT IS SAID FIRST. Nothing in this
+   project has ever been printed. The reference is the SHIPPING petal — 35 mm
+   on the 1.2 mm sheet — and the claim is only that a longer petal's root is
+   stressed no more than that one's, under the same self-weight. Whether the
+   shipping petal's root is itself strong enough is not known; this law makes
+   every longer petal exactly as strong as it, and no stronger.
+
+   THE DERIVATION — the cantilever under its own weight. Treat the blade as a
+   strip of width w (uniform along its length — the idealisation, stated) and
+   thickness t(z), z the distance in mm from the TIP. The bending moment at
+   section z is the weight beyond it times its lever,
+       M(z) = rho g w INT_0^z t(z') (z - z') dz',   so   M''(z) = rho g w t(z),
+   and the root's bending stress is the moment over the section modulus,
+       sigma(z) = 6 M(z) / (w t(z)^2).
+   THE WIDTH CANCELS: the moment carries w and the modulus carries w, so a
+   petal of any width compares against the reference at its own width, and
+   the foot is a fixed fraction of that width (`0.4 x footDelicacy`), so the
+   same holds at the root section. What remains is a law in LENGTH alone,
+   which is what the ruling asked for ("sized by petal length").
+
+   THE REFERENCE: a uniform sheet t0 over the reference length l carries, at
+   its root, M_ref = rho g w t0 l^2 / 2 and sigma_ref = 3 rho g l^2 / t0.
+
+   THE OUTER STRETCH NEEDS NOTHING: within l of the tip a uniform t0 is
+   stressed 3 rho g z^2 / t0 <= sigma_ref. It reaches exactly sigma_ref at
+   z = l — the section that carries the reference root's own moment — and
+   past it a uniform sheet would be over-stressed. So the taper begins at
+       z = l    (u = 1 - l / L, a distance l from the tip),
+   which is a LENGTH THE PETAL OWNS (its length less the reference), derived
+   from the relation and never a fraction typed for convenience. The taper
+   runs over the inner L - l of the blade.
+
+   THE INNER STRETCH IS FULLY STRESSED — the least material that keeps every
+   section at sigma_ref. With tau = t / t0, mu = M / M_ref and zeta = z / l:
+       tau^2 = mu          (sigma = sigma_ref)
+       mu''  = 2 tau       (M'' = rho g w t, in zeta)
+   matched to the outer stretch at zeta = 1, where mu = 1 and mu' = 2. The
+   ADDED MATERIAL'S OWN WEIGHT IS IN IT — the moment integrates the thickened
+   sheet, not the reference one — which is why this is not the first-order
+   `tau = zeta` (that would leave a 100 mm root 12% under-thick, 3.43 mm
+   against 3.88). Multiplying mu'' = 2 sqrt(mu) by mu' and integrating once:
+       mu'^2 = (8/3) mu^(3/2) + 4/3
+   and with mu = tau^2, mu' = 2 tau tau':
+       d tau / d zeta = sqrt( (8/3) tau^3 + 4/3 ) / (2 tau),   tau(1) = 1.
+   That is the law. Its slope at the junction is exactly 1 (the outer
+   stretch's is 0 — a crease in the SKIN of t0 / l, 0.034 mm/mm on the
+   reference sheet, under two degrees); far from it tau grows as zeta^2 / 6,
+   the fully stressed self-weight cantilever's own quadratic.
+   The integral `zeta(tau) = 1 + sqrt(3) INT_1^tau x / sqrt(2 x^3 + 1) dx` is
+   elliptic, so tau(zeta) is computed by fourth-order Runge-Kutta from the
+   junction at fixed steps of at most 1 / ROOT_TAPER_STEPS_PER_UNIT —
+   arithmetic and `Math.sqrt` alone, both correctly rounded, so every engine
+   computes the same double (no transcendental is involved, which is what the
+   page/Node X0 comparison needs). The harness restates it through the OTHER
+   form (the integral, by Simpson, inverted by bisection): two integrators,
+   two owners.
+
+   WHAT THE LAW READS. The ASKED length (`bladeAskedLengthMm`, mode-free —
+   the control the ruling is stated in, and the length the branch is decided
+   on) and the blade's own station u: zeta = (1 - u) L / l. At u = 0 (the
+   ring row and the three foot rows, which all carry u = 0) the factor is the
+   ROOT's, tau_r = tau(L / l).
+
+   THE BRANCH. At or under the reference length the factor is identically 1
+   and this returns NULL; every consumer branches on that null and takes its
+   pre-taper expression verbatim. So the shipping default and every row at or
+   under 35 mm hold 0 floats by construction, never by the arithmetic `x * 1`.
+
+   ROOT FACTORS (sheet 1.20 mm): 35 mm -> 1.000 (1.200 mm), 60 mm -> 1.750
+   (2.100 mm), 100 mm -> 3.236 (3.883 mm).
+   =================================================================== */
+export const ROOT_TAPER_REF_MM = 35;
+export const ROOT_TAPER_STEPS_PER_UNIT = 64;
+/* tau(zeta) — 1 for zeta <= 1; the fully stressed law beyond it. */
+/* MEMOISED ON THE EXACT DOUBLE (root support): the law is a pure function of
+   zeta, so a cached answer IS the computed one, bit for bit, and the cache can
+   move no float. It is owed because sepals now take the law: the angle limit's
+   trial builds and the fold clamp ask the same stations of the same lengths
+   thousands of times, and the integration from the junction each call took the
+   four-tier x 40-sepal corner from 16 s to 24 s a build. Bounded: cleared when
+   it grows past ROOT_TAPER_MEMO_MAX, which only costs recomputation. */
+const ROOT_TAPER_MEMO = new Map();
+const ROOT_TAPER_MEMO_MAX = 200000;
+export function rootTaperFactor(zeta) {
+  if (!(zeta > 1)) return 1;
+  const hit = ROOT_TAPER_MEMO.get(zeta);
+  if (hit !== undefined) return hit;
+  const tau = rootTaperIntegrate(zeta);
+  if (ROOT_TAPER_MEMO.size >= ROOT_TAPER_MEMO_MAX) ROOT_TAPER_MEMO.clear();
+  ROOT_TAPER_MEMO.set(zeta, tau);
+  return tau;
+}
+function rootTaperIntegrate(zeta) {
+  const n = Math.max(1, Math.ceil((zeta - 1) * ROOT_TAPER_STEPS_PER_UNIT));
+  const h = (zeta - 1) / n;
+  const f = (tau) => Math.sqrt((8 / 3) * tau * tau * tau + 4 / 3) / (2 * tau);
+  let tau = 1;
+  for (let i = 0; i < n; i++) {
+    const k1 = f(tau), k2 = f(tau + 0.5 * h * k1), k3 = f(tau + 0.5 * h * k2), k4 = f(tau + h * k3);
+    tau += (h / 6) * (k1 + 2 * k2 + 2 * k3 + k4);
+  }
+  return tau;
+}
+/* THE LAW FOR ONE BLADE — null BY BRANCH at or under the reference length.
+   `at(u)` is the factor at the blade's own station; `rootFactor` is it at
+   u = 0 (the ring row, the foot rows), and `extentMm` the inner stretch the
+   taper runs over, `L - l`. */
+export function petalRootTaper(askedLengthMm) {
+  const L = Number(askedLengthMm);
+  if (!(L > ROOT_TAPER_REF_MM)) return null;
+  const k = L / ROOT_TAPER_REF_MM;
+  const rootFactor = rootTaperFactor(k);
+  return {
+    lengthMm: L, refMm: ROOT_TAPER_REF_MM, extentMm: L - ROOT_TAPER_REF_MM,
+    uEnd: 1 - ROOT_TAPER_REF_MM / L, rootFactor,
+    at(u) { return u <= 0 ? rootFactor : rootTaperFactor((1 - u) * k); },
+  };
+}
+/* THE LAW FOR A BLADE OF THE PETAL BUILDER — petals and, since root support
+   (Oct 21, Eva's ruling 1), SEPALS: the big-petals pin (`rootTaper: 'OFF'` on
+   the sepal substate) is lifted, so nothing sets it any more. The pin's READ is
+   kept as the one place an organ could be held off the law (a state carrying
+   it is refused by nothing and built untapered), and every petal-side consumer
+   still asks through here. Leaves have their own surface law and ask
+   `petalRootTaper` directly at THEIR OWN length (leafBladeLaw). */
+export function petalRootTaperFor(ps, askedLengthMm) {
+  return ps.rootTaper === 'OFF' ? null : petalRootTaper(askedLengthMm);
+}
+/* THE LONGEST BLADE THE HUB MUST CARRY — the petal length any petal of this
+   state can be asked at, so the hub's factor is never under a root's:
+     - the whole bloom's `petalLength` (the outer whorl's scale is exactly 1;
+       every deeper whorl's is under 1 — `layerSize` <= 0.90, a continuous
+       ring's `layerSize^lambda` — so they ask for less);
+     - a live LAYER or PETAL scope entry's petalLength offset on top of it,
+       clamped into the slider's own range as the resolver clamps it (a layer
+       that OWNS its length takes no ramp, scale 1, which this already is);
+     - the SIZE field's largest factor, `1 + varianceSize` (its law is
+       `1 + A g`, |g| <= 1).
+   An UPPER bound where a field or a scope makes the petals differ, and the
+   EXACT longest petal everywhere else (the outer whorl's); the harness
+   restates the same three terms from the controls and the row's scopes, and
+   asserts the hub at least as thick as every EMITTED root (T4).
+   AND THE SEPALS (root support, Oct 21): a sepal takes the law at its own
+   length now, and its foot stands either ON the plate (the rim fallback, at
+   the plate's mid-plane, so its root fits inside the plate iff the plate is at
+   least the root) or partway down the hub-to-stem join's flare, where the
+   material above the attachment point is the join's depth at that radius —
+   never less than the plate, since the join only ever adds material BELOW the
+   plate's underside. So "the hub thickens to match" means, for a sepal, the
+   same thing it means for a petal: THE PLATE IS AT LEAST THE THICKEST ROOT
+   THAT STANDS ON THE HUB, and the join's floor (`max(join, hub thickness)`)
+   carries it down the flare. The longest sepal of every tier is therefore in
+   the bound. A BRANCH: with no sepals the petal-side expression is returned
+   verbatim, and where no sepal is longer than the petal bound `Math.max`
+   returns that bound's own double. (A sepal on the flare could in principle
+   stand on less — the depth there is the join's — and holding the plate to it
+   is an UPPER bound, stated, as the bound already is under scopes and the size
+   field; docs/bloom-root-support-outcome.md §2 measures the spare.) */
+export function hubRootTaperLengthMm(state, scopes = null) {
+  const L = petalHubLengthMm(state, scopes);
+  if (sepalsAbsent(state)) return L;
+  let Ls = 0;
+  for (let k = 0; k < sepalTierCount(state); k++) { const l = sepalAskedLengthMm(sepalTierState(state, scopes, k).state); if (l > Ls) Ls = l; }
+  return Math.max(L, Ls);
+}
+/* the petal half of the bound — the expression `hubRootTaperLengthMm` was
+   before sepals took the law, character for character */
+function petalHubLengthMm(state, scopes) {
+  const LB = OVERRIDE_BOUNDS.get('petalLength');
+  let L = Number(state.petalLength);
+  if (scopes) {
+    let off = 0;
+    if (scopeLayersLive(state)) for (const e of scopes.layers || []) { const o = e.offsets && e.offsets.petalLength; if (typeof o === 'number' && o > off) off = o; }
+    if (scopePetalsLive(state)) for (const e of scopes.petals || []) { const o = e.offsets && e.offsets.petalLength; if (typeof o === 'number' && o > off) off = o; }
+    if (off > 0) L = Math.min(LB.max, Math.max(LB.min, L + off));
+  }
+  return varianceIsAbsent(state) ? L : L * (1 + Number(state.varianceSize));
 }
 
 /* ===================================================================
@@ -8232,7 +8646,7 @@ export function spineBendRefusal(curve, bends) {
    the editor's validator through `spineCurveRefusal` — the refusal IS the
    clamp asked in advance, on the same doubles.
    =================================================================== */
-export function spineBendTable({ length, rows, reachAt, floorRadius, t }) {
+export function spineBendTable({ length, rows, reachAt, floorRadius, t, tauAt = null }) {
   const N = rows * SPINE_SUBSTEPS;
   const marginMm = t / 2;   // the inner skin, measured from the mid-surface — Eva's ruling, no margin past it
   const reachPos = new Float64Array(N), reachNeg = new Float64Array(N), kPos = new Float64Array(N), kNeg = new Float64Array(N);
@@ -8240,7 +8654,15 @@ export function spineBendTable({ length, rows, reachAt, floorRadius, t }) {
   for (let i = 0; i < N; i++) {
     const r = reachAt((i + 0.5) / N);
     reachPos[i] = r.pos; reachNeg[i] = r.neg;
-    const Rp = r.pos + marginMm, Rn = r.neg + marginMm;
+    /* THE ROOT TAPER (big petals, Oct 21): a long petal's skin stands half ITS
+       OWN thickness off the mid-surface, which near the root is the root
+       factor's times the sheet's — so the margin is read at the substep's own
+       station. A BRANCH: with no taper it is the one scalar it always was.
+       Where the root is thicker than two sheets this binds on a FLAT section
+       too (reach 0 + half the root past the floor's one sheet), which is the
+       floor's own protection carried to the thick root. */
+    const m = tauAt === null ? marginMm : (t * tauAt((i + 0.5) / N)) / 2;
+    const Rp = r.pos + m, Rn = r.neg + m;
     kPos[i] = Rp > floorRadius ? 1 / Rp : Infinity;
     kNeg[i] = Rn > floorRadius ? 1 / Rn : Infinity;
     if (kPos[i] !== Infinity || kNeg[i] !== Infinity) binds = true;
@@ -8869,7 +9291,13 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
      wrap angle per row, radius proportional to that row's half-width) puts
      a 0.127 mm radius at the 0.8 mm tip row and inverts on every petal. */
   const kReq = (state.petalRoll * D2R) / halfW;
-  const kMax = 1 / (ROLL_MIN_RADIUS_FACTOR * t);
+  /* THE ROOT TAPER (big petals, Oct 21): one curvature for the whole petal,
+     so it is floored against the THICKEST section — the doctrine this floor
+     was always written in ("the THICKEST row, since thinning only ever removes
+     material"), which a thickened root now names. Null on every petal at or
+     under the reference length: the expression it was. */
+  const rootTaper = buckleCtx && buckleCtx.rootTaper ? buckleCtx.rootTaper : null;
+  const kMax = rootTaper === null ? 1 / (ROLL_MIN_RADIUS_FACTOR * t) : 1 / (ROLL_MIN_RADIUS_FACTOR * t * rootTaper.rootFactor);
   const kappa = Math.sign(kReq) * Math.min(Math.abs(kReq), kMax);
   const clamped = Math.abs(kReq) > kMax;
 
@@ -8999,7 +9427,9 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
        is exactly `2/(margin*t)` whatever `hb` is — the radius is pinned at
        `margin * t/2` and the clamp is TOLD, never silent. */
     const cRaw = cAt(u, r) * cupScale;
-    const cCap = hb / (FOLD_CLAMP_MARGIN * t);
+    /* the row's OWN thickness under the root taper (a thick root folds at a
+       larger cup radius than the sheet beyond it); a branch otherwise */
+    const cCap = rootTaper === null ? hb / (FOLD_CLAMP_MARGIN * t) : hb / (FOLD_CLAMP_MARGIN * t * rootTaper.at(u));
     const c = Math.abs(cRaw) <= cCap ? cRaw : (cRaw < 0 ? -cCap : cCap);
     if (c !== cRaw && !quiet) {
       const askedR = hb / (2 * Math.abs(cRaw)), drawnR = hb / (2 * Math.abs(c));
@@ -9169,7 +9599,7 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
            sheet legitimately permits a 0.60 mm radius and would have read as
            a FAIL, and a 2.40 mm sheet clamps at 2.40 so a genuinely inverting
            radius would have read as a PASS. One owner, and it is here. */
-        rollMinRadiusMm: ROLL_MIN_RADIUS_FACTOR * t,
+        rollMinRadiusMm: rootTaper === null ? ROLL_MIN_RADIUS_FACTOR * t : ROLL_MIN_RADIUS_FACTOR * t * rootTaper.rootFactor,
         sheetThicknessMm: t,
         /* The ratio |dP/dv| / |dP/dv|_flat. The flat sheet already has
            |dP/dv| = h(u) (v is normalised, not arc length), so the raw
@@ -9300,6 +9730,15 @@ export function petalSurface(state, ring, slot, cap, acc) {
      The profile is built once at the asked length — the nib's plan is
      computed inside it, from the law, and the drawn length comes back out. */
   const askedLength = bladeAskedLengthMm(ps, lengthScale);   // the substate's own mm where a sepal set one, else the petal's x the slot's scale
+  /* THE ROOT TAPER (big petals, Oct 21) — null BY BRANCH at or under
+     ROOT_TAPER_REF_MM and on every sepal (its substate's pin), so every
+     consumer below takes its pre-taper expression there. Read on the ASKED
+     length, which is mode-free: how thick a section is never depends on the
+     export floor's verdict about the tip. `tRoot` is the thickest section of
+     this blade (the root's), the number every law that guards the WHOLE blade
+     against its thickest row reads in place of `t`. */
+  const rootTaper = petalRootTaperFor(ps, askedLength);
+  const tRoot = rootTaper === null ? t : t * rootTaper.rootFactor;
   /* THE AFFINE ANGLE, PLUS THE DOME'S OWN LEAN (Sep 4) — three terms, read
      from three owners: `ps.petalTilt` the base control, `slot.tiltExtra` the
      layered ramp footRing() computed per this descriptor, `ring.domeLean`
@@ -9344,8 +9783,13 @@ export function petalSurface(state, ring, slot, cap, acc) {
      accumulator's mode-dependent `t`. Row positions are topology and the
      export floor may not move them — `ladderHalfAt`'s own rule, and session
      32's mode-dependence defect refusing to ship a third time. */
-  const seamHalfMm = seamHalfThicknessMm(ps.sheetThickness);
-  const seamClearMm = seamClearanceMm(seamTurnRad, ps.sheetThickness);
+  /* AND THE ROOT TAPER MOVES IT (big petals): the fold the clearance clears
+     is the offset of the sheet AT THE KINK, which is the root's own half
+     thickness — the reference sheet's times the root factor. Mode-free still:
+     the factor reads the asked length. A branch: no taper, no factor. */
+  const seamRootFactor = rootTaper === null ? 1 : rootTaper.rootFactor;
+  const seamHalfMm = seamRootFactor === 1 ? seamHalfThicknessMm(ps.sheetThickness) : seamHalfThicknessMm(ps.sheetThickness) * seamRootFactor;
+  const seamClearMm = seamClearanceMm(seamTurnRad, ps.sheetThickness, seamRootFactor);
   const seamStep = seamLatticeStep(seamClearMm, length);
   const seamBaseU = seamStep / NU;
 
@@ -9361,6 +9805,9 @@ export function petalSurface(state, ring, slot, cap, acc) {
      byte-identical. */
   const form = petalFormIsFlat(ps) ? null : petalForm(ps, halfW, t, {
     slotIndex: slot.index, halfW, length, floorRadius: ROLL_MIN_RADIUS_FACTOR * t,
+    /* the root taper, so the fold clamp reads each row's OWN thickness and the
+       roll's one curvature is floored against the thickest (null: neither moves) */
+    rootTaper,
     /* The profile, so apexScale() derives R and u0 from widthProfile()`s own
        answer rather than from a second statement of the outline. */
     profile,
@@ -9380,8 +9827,8 @@ export function petalSurface(state, ring, slot, cap, acc) {
      The roll curvature floor is expressed against `t` — the THICKEST row,
      since thinning only ever removes material — so the floor keeps
      protecting the whole blade rather than only its tip. */
-  const uniformThickness = thicknessIsUniform(ps);
-  const profileT = thicknessProfile(ring, ps);
+  const uniformThickness = thicknessIsUniform(ps) && rootTaper === null;
+  const profileT = thicknessProfile(ring, ps, rootTaper);
   const tAt = uniformThickness ? () => t : (u) => acc.floorThickness(profileT.at(u));
 
   /* THE FLAT CROSS-SECTION, and the reason it is a closure.
@@ -9605,7 +10052,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
     }
     return { pos, neg };
   };
-  const bend = form !== null && (kC !== 0 || curveLaw !== null) ? spineBendTable({ length, rows: NU, reachAt: bendReachAt, floorRadius, t }) : null;
+  const bend = form !== null && (kC !== 0 || curveLaw !== null) ? spineBendTable({ length, rows: NU, reachAt: bendReachAt, floorRadius, t, tauAt: rootTaper === null ? null : rootTaper.at }) : null;
   const law = form && (kC !== 0 || curveLaw !== null) ? spineLaw({ curlRad: form.curlRad, bias: curveLaw ? 0 : ps.curlBias, start: curveLaw ? 0 : ps.curlStart, length, tilt, floorRadius, startFloor: seamBaseU, curve: curveLaw, bend: bend && bend.binds ? bend : null }) : null;
   /* a uniform arc the fold limit clamped is no longer the closed-form arc */
   const generalSpine = SPINE_WIRED && law !== null && (curveLaw !== null || !form.curlUniform || law.bendClamped);
@@ -9714,7 +10161,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
     t, ps, length, tilt, halfW, footHalf, R, T, Z, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, flatSect, spineAt, law, kC,
     curveLaw, askedLength, bend,
-    floorRadius, uniformThickness, profileT, tAt,
+    floorRadius, uniformThickness, profileT, tAt, rootTaper, tRoot,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm,
     formClamped, formScaled,
     outlineRes,
@@ -9917,7 +10364,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     t, ps, length, tilt, halfW, R, T, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, spineAt, law, floorRadius,
     curveLaw, askedLength, bend,
-    uniformThickness, profileT, tAt,
+    uniformThickness, profileT, tAt, rootTaper,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm, formClamped, formScaled,
     outlineRes,
   } = surface;
@@ -10105,9 +10552,24 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       infill = { ...infill, densitySweep: sweep, densityCap: at ? at.density : null, densityBest: best };
     }
   }
+  /* THE SURFACE TEXTURE (T3) — the field, the lattice and the relief, one
+     context per petal handed to `emitPanel`; null on every untextured build
+     (the guard, a CHOICE) and on a petal whose blade is INFILLED (Q9: the two
+     are exclusive, the record says `refused: 'infill'` and the read-out speaks
+     it — nothing is picked silently). The lattice evaluates sub-rows through
+     this petal's own `surface.rowAt`, never between its FOOT rows or across
+     the seam gap (`footS.length` is the first refinable gap), and in columns
+     only on a BUCKLED petal (its normal is `trueNormalRows`' lattice quantity).
+     A capability hook may pin it off (`noTexture`) for a trial build that
+     reads the lamina alone. */
+  /* `cap.textureEdgeMm` (a capability hook no control reaches) PINS the
+     lattice edge for every organ and switches the budget-derived cap off; see
+     THE EDGE CAP beside `textureFor`. */
+  const texR = textureFor(ps, cap);
+  const tex = texR && !texR.refused && !(cap && cap.noTexture) ? textureContext(texR, 'petal', surface.rowAt, footS.length, form && form.buckle !== null ? 'buckle' : null, isRep) : null;
   for (const panel of panels) {
     const useInfill = infill && !infill.refused && panel === panels[0];
-    const g = useInfill ? emitInfillPanel(acc, rows, panel, tAt, rim, infill, cap) : emitPanel(acc, rows, panel, tAt, rim);
+    const g = useInfill ? emitInfillPanel(acc, rows, panel, tAt, rim, infill, cap) : emitPanel(acc, rows, panel, tAt, rim, tex);
     if (capturedPanels) capturedPanels.push({ label: panel.label, rowFrom: panel.rowFrom, rowTo: panel.rowTo, rows: g });
   }
 
@@ -10288,6 +10750,9 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     bendClamped: law ? law.bendClamped : false,
     floorClamped: law ? law.floorClamped : false,
     bendApplied: law ? law.bendApplied : [],
+    /* the substep count the applied indices count in (big petals: C5 reads each
+       substep's own station under the root taper) */
+    bendN: bend ? bend.N : null,
     substeps: law ? law.substeps : null,
     /* THE SECTION'S REACH ON THE EMITTED ROWS — every blade row's own `sect`
        (the one the mesh was offset from), toward each side of the curl plane's
@@ -10741,6 +11206,11 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        docs/bloom-session-28-outcome.md for the measured step at that seam —
        it is the TILT, not a change of cross-section law. */
     grid: acc.captureGrid ? capturedPanels : null,
+    /* THE TEXTURE'S OWN RECORD (T3) — null at the guard; where it is on, the
+       controls as read, the refusal word if any, and one record per emitted
+       panel (sub-rows, column factor, the skin's lattice count against its
+       conforming floor, the relief's extremes, the samples TX restates). */
+    texture: textureRecord(texR, tex),
     /* THE SAME PANELS UNDER THE BUILDER'S OWN NAME (organic variance, build 1):
        `grid` keeps meaning "captured iff the accumulator was asked to capture a
        grid" — verify-bloom-grid's clause 1b, the .glb export's contract — and
@@ -10790,6 +11260,13 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     /* THE BUILDER'S OWN TALLY of what this call emitted (the leaf builder's
        precedent) — SP1 sums the sepals' own against the whorl's. */
     tris: acc.triangleCount - tris0,
+    /* AND WHERE IN THE ACCUMULATOR'S STREAM THEY SIT — [first, end) triangle
+       index (the foot-clearance session): an instrument reading the EMITTED mesh
+       tags each triangle with the petal that emitted it from this range rather
+       than from the nearest lamina point, which mislabels a foot corner beside
+       its neighbour's. Telemetry; nothing here moves a byte. */
+    triRange: [tris0, acc.triangleCount],
+    triStart: tris0,   // where this blade's triangles begin in the accumulator (the texture gate's TX4 reads it with `tris`; leaves and leaflets carry it too, which `triRange` does not)
     /* THE RING ROW'S POINT, THE SEAM STEP AND THE SLOT THIS PETAL WAS BUILT AT —
        read by the sepal angle scan (a trial sepal is rotated about its ring
        tangent through `base`, one builder call per seam-step bucket) and by
@@ -10849,6 +11326,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       floorBinds: profileT.at(1) < MIN_FEATURE_MM,
       exportMode: acc.exportMode,
       uniform: uniformThickness,
+      /* THE ROOT TAPER (big petals, Oct 21) — null at or under the reference
+         length and on a sepal, by branch; otherwise the law's own declaration
+         (the asked length it was read on, the root factor, the station the
+         taper ends at) and the ROOT the builder emitted. T0 restates the law
+         from the controls and pins this both ways; T1/T2 read the thickness
+         off the exported file, never off this. */
+      rootTaper: rootTaper === null ? null : {
+        askedLengthMm: rootTaper.lengthMm, refMm: rootTaper.refMm, rootFactor: rootTaper.rootFactor,
+        extentMm: rootTaper.extentMm, uEnd: rootTaper.uEnd, rootMm: rows[0].tUsed,
+      },
     },
     thicknessGuardResidual,
     /* THE EDGE PROFILE, as the builder measured it rather than as the
@@ -10858,6 +11345,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        and varies with the petal's length and the tip law), and every row
        where the narrow-span clamp took the rim below RIM_FLOOR_MM. */
     rim,
+    /* THE LATTICE THIS PETAL WAS BUILT ON (the mophead) — the columns across a
+       span and the bead's segment cap in force while it was emitted: 10 / 4
+       on every petal but a depth-2 floret's (6 / 2). UM6 holds the floret's
+       against its EMITTED rim and every other petal's against the full
+       lattice. */
+    lattice: { columns: NV, beadCap: RIM_BEAD_SEGMENTS_IN_FORCE },
   };
 }
 
@@ -10952,6 +11445,58 @@ export const RIM_BEAD_RADIUS_MM = 0.5;
 export const RIM_TAPER_MM = 3.0;
 export const RIM_BEAD_SEGMENTS = 4;
 export const RIM_BEAD_SEGMENTS_MIN = 3;
+/* ===================================================================
+   THE REDUCED FLORET LATTICE (the mophead, Oct 24 — Eva's ruling 3 on
+   docs/bloom-hydrangea-discovery.md; read docs/bloom-mophead-outcome.md).
+   A FLORET OF A DEPTH-2 UMBEL, and nothing else, is built with SIX columns
+   across a span (still EVEN, so no column lands on the midrib) and a
+   TWO-segment rim bead. The rows stay at NU 56 (`NU_BASE`): the row count is
+   the one knob that costs shape (the discovery's §2c — 0.62 mm at a round
+   apex at NU 28), and the columns and the bead are nearly free.
+
+   A DECLARED EXCEPTION, TWICE OVER, and said so here rather than left to be
+   rediscovered: (i) to the edge-profile ruling (FOUR bead segments, ruled
+   from eight because eight put facets at ~0.2 mm, under Nylon 12's ~0.35-0.4
+   mm resolvable detail), and (ii) to the fixed lattice (`NV` 10 everywhere).
+   WHY IT IS ACCEPTABLE ON A FLORET, measured on the half-round the bead draws
+   (`RIM_BEAD_RADIUS_MM` 0.5 mm, the radius every reachable floret's bead takes
+   — the room arm clamps it smaller only on the narrow last millimetre before
+   the nib):
+     * a facet of a K-segment half round is the chord `2 r sin(pi / 2K)`:
+       0.383 mm at K 4, **0.707 mm at K 2** — LARGER than the resolvable
+       detail, so a printed two-facet bead may read as a chamfer (two flats
+       meeting at the apex) rather than a round. That is the cost, stated.
+     * its departure from the true round is the sagitta `r (1 - cos(pi / 2K))`:
+       0.038 mm at K 4, **0.146 mm at K 2** — under the resolvable detail, so
+       the print cannot tell the drawn edge from the round one by how far it
+       strays from it.
+     * across the blade the cup's own facet error is `c hb / (NV - 1)^2`: on the
+       floor floret (half-width 3.0 mm) at cup 0.35, 0.042 mm at NV 6 against
+       0.013 at NV 10.
+   A floret is ~1/100 of a mophead and the eye reads the dome, not a floret's
+   edge; the same floret at the full lattice costs 1.9x (12,440 against 6,664
+   sessile, 4 petals), which is the difference between ~120 and ~225 florets
+   in the 1,500,000 budget.
+
+   BY BRANCH: `withReducedFloretLattice` is called from ONE place, the
+   depth-2 floret's own unit build in `floretUnitMemo`, and restores both
+   values in a `finally`. Everywhere else `NV` is `NV_FULL` and the bead cap is
+   `RIM_BEAD_SEGMENTS`, so every row that builds no depth-2 umbel forms the
+   expressions it always did. Module-scoped like `NU` and the texture edge, and
+   for their reason: every reader of a lattice constant is deep inside the
+   emitter, and a value threaded through every call would be a second
+   producer of it. `the-reduced-lattice-reaches-a-non-floret` is the standing
+   mutant. =================================================================== */
+export const FLORET_REDUCED_NV = 6;
+export const FLORET_REDUCED_BEAD_SEGMENTS = 2;
+let RIM_BEAD_SEGMENTS_IN_FORCE = RIM_BEAD_SEGMENTS;
+export function latticeInForce() { return { nv: NV, beadSegments: RIM_BEAD_SEGMENTS_IN_FORCE }; }
+export function withReducedFloretLattice(fn) {
+  const nv = NV, k = RIM_BEAD_SEGMENTS_IN_FORCE;
+  NV = FLORET_REDUCED_NV;
+  RIM_BEAD_SEGMENTS_IN_FORCE = FLORET_REDUCED_BEAD_SEGMENTS;
+  try { return fn(); } finally { NV = nv; RIM_BEAD_SEGMENTS_IN_FORCE = k; }
+}
 export const RIM_ROOM_FRACTION = 0.45;
 /* How many steps the profile pivots through at an apex corner. Three takes the
    default's worst corner turn from 65.63 degrees to under the bar; it is a
@@ -11086,8 +11631,9 @@ const rimDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
    bead is made of. Measured cost of leaving it out: the ten-tooth fringe. */
 const rimSegments = (sheetMm) => {
   const r = Math.min(RIM_BEAD_RADIUS_MM, Math.max(sheetMm, MIN_FEATURE_MM) / 2);
-  const raw = Math.round(RIM_BEAD_SEGMENTS * (r / RIM_BEAD_RADIUS_MM));
-  const k = Math.min(RIM_BEAD_SEGMENTS, Math.max(RIM_BEAD_SEGMENTS_MIN, raw));
+  const cap = RIM_BEAD_SEGMENTS_IN_FORCE;
+  const raw = Math.round(cap * (r / RIM_BEAD_RADIUS_MM));
+  const k = Math.min(cap, Math.max(RIM_BEAD_SEGMENTS_MIN, raw));
   return k % 2 === 0 ? k : k + 1;
 };
 
@@ -11160,10 +11706,18 @@ const rimInsetV = (sect, vEdge, vIn, want) => {
    `closed` false sweeps an OPEN chain (an outline edge between two cells),
    which is the loop with its wrap-around strip left out.
    =================================================================== */
-function rimProfile(acc, K, C, n, b, apex, topP, botP) {
+function rimProfile(acc, K, C, n, b, apex, topP, botP, sOf = null, TR = null, gRim = null) {
+  /* `sOf` (surface texture T3): the row's relief closure, or null on every
+     untextured build — THE RELIEF RUNS OVER THE BEAD (Q4/Q5). Each interior
+     profile point is pushed along its own closed-form normal by sOf(point); the
+     apex along the apex direction w-hat; the two end points arrive already
+     displaced by the skins (the same closure at the same two points, so the
+     bead's first facet meets the skin's displaced vertex to the double). A
+     buried profile (the wall case below) takes no relief — the skins' ramp is
+     exactly 0 there and sOf is null. `TR` is the panel's relief record. */
   const APEX = K / 2;
   const pts = new Array(K + 1);
-  const ns = acc.captureNormals ? new Array(K + 1) : null;
+  const ns = (acc.captureNormals || acc.normalSink) ? new Array(K + 1) : null;
   pts[0] = topP; pts[K] = botP;
   const wx = apex[0] - C[0], wy = apex[1] - C[1], wz = apex[2] - C[2];
   /* A PROFILE THE TREATMENT DID NOT REACH IS A STEP, NOT A SUBDIVISION, AND
@@ -11199,6 +11753,17 @@ function rimProfile(acc, K, C, n, b, apex, topP, botP) {
     return { pts, ns: null };
   }
   pts[APEX] = apex;
+  const aLen0 = Math.hypot(wx, wy, wz);
+  if (sOf !== null) {
+    const sA = sOf(apex);
+    pts[APEX] = [apex[0] + (wx / aLen0) * sA, apex[1] + (wy / aLen0) * sA, apex[2] + (wz / aLen0) * sA];
+    if (TR) {
+      if (sA > TR.reliefMaxMm) TR.reliefMaxMm = sA;
+      if (sA < TR.reliefMinMm) TR.reliefMinMm = sA;
+      TR.displaced++;
+      if (TR.apexSamples.length < 48 && (TR.displaced % 53) === 0) TR.apexSamples.push({ o: apex, r: pts[APEX], s: sA, g: gRim, w: [wx / aLen0, wy / aLen0, wz / aLen0] });
+    }
+  }
   /* HOW THE PROFILE IS SPACED ALONG THE NORMAL, and it is NOT simply the
      cosine. At a full bead `a` equals `b` and the cosine is the half round,
      which is what the shape has to be. Where the treatment has ramped to
@@ -11240,6 +11805,18 @@ function rimProfile(acc, K, C, n, b, apex, topP, botP) {
     const sn = aLen > 0 ? Math.sin(th) : 0;
     const cs = (1 - ratio) * (1 - (2 * m) / K) + ratio * Math.cos(th);
     pts[m] = [C[0] + n[0] * b * cs + wx * sn, C[1] + n[1] * b * cs + wy * sn, C[2] + n[2] * b * cs + wz * sn];
+    if (sOf !== null) {
+      /* the relief, along the bead's own closed-form normal (below) at the
+         undisplaced profile point */
+      let px = n[0] * aLen * Math.cos(th) + (wx / aLen) * b * sn;
+      let py = n[1] * aLen * Math.cos(th) + (wy / aLen) * b * sn;
+      let pz = n[2] * aLen * Math.cos(th) + (wz / aLen) * b * sn;
+      const Lq = Math.hypot(px, py, pz);
+      if (Lq > 0) { px /= Lq; py /= Lq; pz /= Lq; } else { px = n[0]; py = n[1]; pz = n[2]; }
+      const s = sOf(pts[m]);
+      pts[m] = [pts[m][0] + px * s, pts[m][1] + py * s, pts[m][2] + pz * s];
+      if (TR) { if (s > TR.reliefMaxMm) TR.reliefMaxMm = s; if (s < TR.reliefMinMm) TR.reliefMinMm = s; TR.displaced++; }
+    }
     /* THE BEAD'S OWN NORMAL, IN CLOSED FORM, AND IT IS THE CROSS-SECTION'S.
        In the (n, w-hat) plane the profile is the ellipse
        (b cos th along n, aLen sin th along w-hat), whose outward normal is
@@ -11266,8 +11843,10 @@ function rimProfile(acc, K, C, n, b, apex, topP, botP) {
     ns[0] = [n[0], n[1], n[2]];
     ns[K] = [-n[0], -n[1], -n[2]];
     ns[APEX] = [wx / aLen, wy / aLen, wz / aLen];
+    /* the bead's closed-form normals, handed to the organ relief (T5) */
+    if (acc.normalSink) for (let m = 0; m <= K; m++) acc.normalSink(pts[m], ns[m]);
   }
-  return { pts, ns };
+  return { pts, ns: acc.captureNormals ? ns : null };
 }
   /* A profile pair that shares its skin point — the two corners, where the
      margin run hands over to the tip run — collapses its end quads to
@@ -11323,7 +11902,7 @@ function emitRimLoop(acc, profs, K, closed = true) {
    the emitted bead APEX, as the same double.
 
    RETURNS null when the accumulator was not asked to capture. */
-function emitPanel(acc, rows, panel, tAt, rim) {
+function emitPanel(acc, rows, panel, tAt, rim, tex = null) {
   /* THE WRAP-AROUND OPTION (the TUBE, corolla fusion). A `periodic` panel is a
      CLOSED band — the corolla ring — whose v runs once round and meets itself:
      NV columns rather than NV - 1 intervals, faces that wrap from the last
@@ -11365,18 +11944,61 @@ function emitPanel(acc, rows, panel, tAt, rim) {
      bar and the lobe demand. The bead's semi-axis along the length is then
      the ladder's own last gap rather than the ruled radius — reported, per
      state, on `rim.tipAxis`. */
-  const skinTo = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;
-  const skinFrom = baseExposed ? Math.min(skinTo, rowFrom + RIM_TIP_ROWS) : rowFrom;
-  const skOf = (i) => Math.min(Math.max(i, skinFrom), skinTo) - skinFrom;
-  const sOff = skinFrom - rowFrom;
+  const skinToS = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;
+  const skinFromS = baseExposed ? Math.min(skinToS, rowFrom + RIM_TIP_ROWS) : rowFrom;
 
-  /* ---- the original boundary: the apexes, the room, and the arc measure ---- */
-  const NROW = rowTo - rowFrom + 1;
-  const oV = [], oP = [], oN = [], sMargin = [], roomMm = [], tBodyOf = [];
-  let sAcc = 0;
-  for (let i = rowFrom; i <= rowTo; i++) {
-    const row = rows[i];
-    const sp = panel.spanAt(i);
+  /* ===================================================================
+     THE TEXTURE'S LATTICE AND RELIEF (surface texture T3 — read the TEXTURE
+     block above `textureFor` and docs/bloom-surface-texture-t3-outcome.md).
+     Both ride in THIS function as a FACTOR on the panel, never as a second
+     emitter: with `tex` null (every untextured build — the shipping default,
+     every row of every frozen phase) the expanded row list `X` IS the panel's
+     shipped rows and the column factor `cf` is 1 on every row, so each
+     expression below forms the doubles it formed before the texture existed
+     (the byte partition measures that over the whole matrix in both modes;
+     `--movers-predicate texture`). The TUBE RING (`periodic`, `thinAt`, `nv`)
+     takes neither: it has no row law to evaluate between its rows (T5's, the
+     discovery doc §12.8 item 20).
+
+     THE LATTICE (T2, ported from `bloom-texture-lab-lattice.js`): SUB-ROWS
+     between two ladder stations are the organ's own row plan at an
+     intermediate u — `petalSurface(...).rowAt(u)`, a leaf's `rowAt` — so a new
+     point is ON the surface, never on a chord; SUB-COLUMNS are the row's own
+     `sect(v)` at an intermediate v. THE LADDER IS NOT MOVED: every shipped row
+     is the same object at the same station, and every quantity decided per row
+     or per column (the room, the margin arc, the bead's ramp, the drawn radius,
+     the inset, the taper's distance) is decided on the SHIPPED rows and
+     columns and read INTERPOLATED on a sub-point. The counts are ceil(L / e)
+     on a length snapped to 2^-20 mm first (Q16 — a count is a discrete decision
+     both engines must take alike). NOT refined in u: the petal's FOOT rows and
+     the SEAM gap (the clearance law is a fold guard), a BUCKLED petal
+     (`trueNormalRows` makes its normal a lattice quantity of the ladder's own
+     neighbours — columns only), and a tube-lobe row the hook reshaped.
+
+     THE RELIEF (attachment B, OUTWARD ONLY, PEAK-TO-VALLEY — Eva's rulings):
+     each skin is offset by `b + g · H · f(P ± n·b)` instead of `b`, the field
+     sampled in WORLD space at the undisplaced skin point and the displacement
+     taken along that skin's OWN outward normal (+n on the top skin, −n on the
+     bottom), so the sheet is `t + s_top + s_bot >= t` everywhere: relief never
+     thins. `g` is the bead's own buried-end ramp, so a buried foot and a
+     buried panel base carry no relief by the same zero the bead carries none
+     by. THE RELIEF RUNS OVER THE BEAD (Q4/Q5): `rimProfile` is handed the same
+     closure and displaces every profile point along its closed-form normal,
+     the apex included — so on a TEXTURED petal the silhouette moves outward by
+     up to H, which supersedes the edge-profile ruling's fixed outline for
+     textured petals only (an untextured petal's rim is the ruled one, byte for
+     byte). The per-panel RECORD (`tex.panels`) is what the TX family reads.
+     =================================================================== */
+  const latOK = tex && !per && !panel.thinAt && panel.nv === undefined;
+  const L = latOK && tex.lattice ? tex.lattice : null;
+  const RL = latOK && tex.relief ? tex.relief : null;
+  const e = L ? L.edgeMm : 0;
+  /* THE COUNT LAW: ceil(L / e) on L snapped to 2^-20 mm (Q16) */
+  const nOf = (len) => { const Ls = Math.round(len * 1048576) / 1048576; return Math.max(1, Math.ceil(Ls / e)); };
+  const own = (r) => !r.ownSect || r.sect === r.ownSect;
+
+  /* ---- the original boundary at the SHIPPED columns: the shipped arithmetic ---- */
+  const baseOf = (row, sp) => {
     const vs = [], Ps = [], Ns = [];
     for (let j = 0; j < NVp; j++) {
       const v = sp[0] + ((sp[1] - sp[0]) * j) / (per ? NVp : NVp - 1);
@@ -11385,24 +12007,121 @@ function emitPanel(acc, rows, panel, tAt, rim) {
     }
     let w = 0;
     for (let j = 1; j < NVp; j++) w += rimDist(Ps[j - 1], Ps[j]);
-    const k = i - rowFrom;
-    if (k > 0) sAcc += rimDist(oP[k - 1][0], Ps[0]);
-    oV.push(vs); oP.push(Ps); oN.push(Ns); sMargin.push(sAcc); roomMm.push(w);
+    return { vs, Ps, Ns, w };
+  };
+  /* THE SHIPPED ROWS: the apexes, the room, the arc measure and the sheet */
+  const S = [];
+  let sAcc = 0;
+  for (let i = rowFrom; i <= rowTo; i++) {
+    const row = rows[i], sp = panel.spanAt(i), b = baseOf(row, sp);
+    if (i > rowFrom) sAcc += rimDist(S[S.length - 1].b.Ps[0], b.Ps[0]);
     const t = tAt(row.u);
     row.tUsed = t; acc.noteSheet(t);
-    tBodyOf.push(t);
+    S.push({ row, sIdx: i, sp, b, sM: sAcc, t, exempt: false });
   }
+  /* THE LATTICE REACHES ONLY WHERE THE RELIEF CAN — the ramp `g` below is
+     EXACTLY 0 over the buried end (the foot rows inside the hub, the seam's
+     first stretch), and there the lattice refines a skin the relief never
+     moves. It also WELDS: a sub-column at v = 0 on a foot row lands on the
+     hub's own rim vertex to the bit (the ring point both are computed from),
+     and the exact-position weld then reads every by-design foot overlap as
+     WITHIN one shell — measured, 5,808 pairs on the textured default, 0 with
+     the foot rows left at the shipped lattice. NV is EVEN so that no shipped
+     column lies on v = 0; a sub-column must not put one there either where
+     the row is buried. So a row at g = 0 keeps the shipped columns and a gap
+     with g = 0 at both ends gets no sub-rows. */
+  const sBaseS = S[baseEnd - rowFrom].sM, sTipS = S[S.length - 1].sM;
+  const gOfS = (sM) => { const gB = baseExposed ? 1 : rimEase((sM - sBaseS) / RIM_TAPER_MM); return tipExposed ? gB : Math.min(gB, rimEase((sTipS - sM) / RIM_TAPER_MM)); };
+  /* ---- THE EXPANDED ROWS: the shipped rows, and the sub-rows between them ---- */
+  const X = [], E = new Int32Array(rowTo - rowFrom + 1);
+  let subRows = 0;
+  for (let i = rowFrom; i <= rowTo; i++) {
+    const s = S[i - rowFrom];
+    E[i - rowFrom] = X.length;
+    X.push(s);
+    if (!L || i === rowTo) continue;
+    const s2 = S[i - rowFrom + 1];
+    const eligible = !L.noSubRows && i >= L.firstSub && own(s.row) && own(s2.row) && s2.row.u > s.row.u && (gOfS(s.sM) > 0 || gOfS(s2.sM) > 0);
+    /* a gap the law cannot refine (the foot, the seam, a reshaped or buckled row) is EXEMPT and said so */
+    s.exempt = !eligible;
+    if (!eligible) continue;
+    let dmax = 0;
+    for (let j = 0; j < NVp; j++) { const d = rimDist(s.b.Ps[j], s2.b.Ps[j]); if (d > dmax) dmax = d; }
+    let m = nOf(dmax), subs = [];
+    /* THE COUNT IS CHECKED ON THE ROWS IT PLACED, NOT ONLY ON THE GAP. The two
+       ladder rows bound the gap's chord, not what lies between them: a sub-row
+       can land in a SINUS the ladder stepped over (a leaf's teeth), so its
+       margin stands far from both neighbours. Each chain is measured at the
+       shipped columns and the count raised until every consecutive pair is
+       within e — the same snapped law, so both engines take the same count.
+       Bounded at 8x the first count. */
+    for (const m0 = m; ; m++) {
+      subs = [];
+      for (let q = 1; q < m; q++) {
+        const f = q / m;
+        const u = s.row.u + (s2.row.u - s.row.u) * f;
+        const row = L.rowAt(u);
+        const sp = [s.sp[0] + (s2.sp[0] - s.sp[0]) * f, s.sp[1] + (s2.sp[1] - s.sp[1]) * f];
+        subs.push({ row, sIdx: -1, sp, b: baseOf(row, sp), sM: s.sM + (s2.sM - s.sM) * f, t: 0, exempt: false });
+      }
+      const chain = [s, ...subs, s2];
+      let worst = 0;
+      for (let c = 1; c < chain.length; c++) for (let j = 0; j < NVp; j++) { const d = rimDist(chain[c - 1].b.Ps[j], chain[c].b.Ps[j]); if (d > worst) worst = d; }
+      if (m === 1 || nOf(worst) <= 1 || m >= 8 * m0) break;
+    }
+    for (const sub of subs) {
+      const t = tAt(sub.row.u);
+      sub.row.tUsed = t; acc.noteSheet(t); sub.t = t;
+      X.push(sub);
+      subRows++;
+    }
+  }
+  const kOf = (i) => E[i - rowFrom];
+  const kTo = X.length - 1, kSkinTo = kOf(skinToS), kSkinFrom = kOf(skinFromS);
+  const skOf = (k) => Math.min(Math.max(k, kSkinFrom), kSkinTo) - kSkinFrom;
+  /* ---- the column factor per expanded row (1 everywhere without a lattice);
+          the apex rings take their skin row's ---- */
+  const cfOf = new Int32Array(X.length).fill(1);
+  if (L) {
+    for (let k = kSkinFrom; k <= kSkinTo; k++) {
+      let dmax = 0;
+      for (let j = 1; j < NVp; j++) { const d = rimDist(X[k].b.Ps[j - 1], X[k].b.Ps[j]); if (d > dmax) dmax = d; }
+      cfOf[k] = gOfS(X[k].sM) > 0 ? nOf(dmax) : 1;
+    }
+    for (let k = 0; k < kSkinFrom; k++) cfOf[k] = cfOf[kSkinFrom];
+    for (let k = kSkinTo + 1; k <= kTo; k++) cfOf[k] = cfOf[kSkinTo];
+  }
+  const NVk = (k) => (per ? NVp : (NVp - 1) * cfOf[k] + 1);
+  /* ---- the refined original boundary: the shipped arrays at cf 1, the
+          shipped formula with j / cf in place of j between them ---- */
+  const oV = [], oP = [], oN = [];
+  for (let k = 0; k <= kTo; k++) {
+    const cf = cfOf[k], { sp, b, row } = X[k];
+    if (cf === 1) { oV.push(b.vs); oP.push(b.Ps); oN.push(b.Ns); continue; }
+    const n = NVk(k), vs = new Array(n), Ps = new Array(n), Ns = new Array(n);
+    for (let j = 0; j < n; j++) {
+      if (j % cf === 0) { vs[j] = b.vs[j / cf]; Ps[j] = b.Ps[j / cf]; Ns[j] = b.Ns[j / cf]; continue; }
+      const v = sp[0] + ((sp[1] - sp[0]) * (j / cf)) / (NVp - 1);
+      const q = row.sect(v);
+      vs[j] = v; Ps[j] = q.P; Ns[j] = q.n;
+    }
+    oV.push(vs); oP.push(Ps); oN.push(Ns);
+  }
+  /* THE RELIEF'S OWN RECORD on this panel, for TX (null when there is none) */
+  const TR = RL ? { reliefMaxMm: 0, reliefMinMm: Infinity, skinSamples: [], apexSamples: [], displaced: 0 } : null;
+  const SAMPLE_EVERY = 97;   // a prime, so the recorded skin samples are not all on one column
+  let sampleTick = 0;
 
-  /* ---- per row: the drawn radius, the ramp, the inset, the skin ---- */
-  const sBase = sMargin[baseEnd - rowFrom], sTip = sMargin[NROW - 1];
-  const top = [], bot = [], skinV = [], skinP = [], skinN = [], skinB = [];
+  /* ---- per skin row: the drawn radius, the ramp, the inset, the skin ---- */
+  const sBase = X[kOf(baseEnd)].sM, sTip = X[kTo].sM;
+  const top = [], bot = [], skinV = [], skinP = [], skinN = [], skinB = [], skinS = [], skinG = [];
   const insetOf = new Map();
   const roomSide = [];
   const rimClamped = [];
   let drawnMax = 0, sheetMax = 0;
-  for (let i = skinFrom; i <= skinTo; i++) {
-    const k = i - rowFrom, row = rows[i], tBody = tBodyOf[k];
-    const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);
+  for (let k = kSkinFrom; k <= kSkinTo; k++) {
+    const { row, b: base } = X[k], tBody = X[k].t, room = base.w, cf = cfOf[k], NVr = NVk(k);
+    const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * room);
     /* F6-asym — ON A TWO-SIDED ROW EACH HALF'S BEAD FITS ITS OWN HALF. The
        room is the span across the whole section, and Eva's fraction of it is
        a fraction of TWO halves; on an asymmetric outline the narrow half can
@@ -11414,11 +12133,11 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        halves give `2h / (h + h)`, exactly 1, so the room, the radius and every
        byte below are the symmetric ones by arithmetic. The sides are named by
        the section's own parameter: index 0 is v = -1, the RIGHT half. */
-    let rLo = r, rHi = r, roomLo = roomMm[k], roomHi = roomMm[k];
+    let rLo = r, rHi = r, roomLo = room, roomHi = room;
     if (row.h === null && !per) {
       const hs = row.hL + row.hR;
       if (hs > 0) {
-        roomLo = roomMm[k] * ((2 * row.hR) / hs); roomHi = roomMm[k] * ((2 * row.hL) / hs);
+        roomLo = room * ((2 * row.hR) / hs); roomHi = room * ((2 * row.hL) / hs);
         rLo = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomLo);
         rHi = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomHi);
       }
@@ -11428,8 +12147,8 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        inset AND the taper's depth together, so at a buried end the panel
        emits the flat wall at the body's own thickness — which is the whole
        of "the base stretch must emit exactly what it emits today". */
-    const gBase = baseExposed ? 1 : rimEase((sMargin[k] - sBase) / RIM_TAPER_MM);
-    const g = tipExposed ? gBase : Math.min(gBase, rimEase((sTip - sMargin[k]) / RIM_TAPER_MM));
+    const gBase = baseExposed ? 1 : rimEase((X[k].sM - sBase) / RIM_TAPER_MM);
+    const g = tipExposed ? gBase : Math.min(gBase, rimEase((sTip - X[k].sM) / RIM_TAPER_MM));
     /* AND A FLOOR ON THE DRAWN RADIUS WHERE IT IS ALREADY NON-ZERO. The fan
        gate above is the ruled fix and it does not finish the job. Measured on
        the shipped tree with THIS LINE REVERTED and the gate left in place,
@@ -11456,8 +12175,9 @@ function emitPanel(acc, rows, panel, tAt, rim) {
     if (a > drawnMax) drawnMax = a;
     if (aLo > drawnMax) drawnMax = aLo;
     if (aHi > drawnMax) drawnMax = aHi;
-    if (tBody > sheetMax) sheetMax = tBody;
-    const vLo = oV[k][0], vHi = oV[k][NVp - 1], vMid = (vLo + vHi) / 2;
+    /* the bead's segment count is read on the SHIPPED rows' sheets, so K is the shipped K */
+    if (X[k].sIdx >= 0 && tBody > sheetMax) sheetMax = tBody;
+    const vLo = oV[k][0], vHi = oV[k][NVr - 1], vMid = (vLo + vHi) / 2;
     const side = a > 0 && !per;
     const inLo = side ? rimInsetV(row.sect, vLo, vMid, aLo) : vLo;
     const inHi = side ? rimInsetV(row.sect, vHi, vMid, aHi) : vHi;
@@ -11470,13 +12190,13 @@ function emitPanel(acc, rows, panel, tAt, rim) {
          twelve halvings leave 1/4096 of it — in mm, of the half's own ARC
          (a rolled section's chord under-reads it) */
       const Pm = row.sect(vMid).P, half = NVp >> 1;
-      let arcLo = rimDist(oP[k][half - 1], Pm), arcHi = rimDist(oP[k][half], Pm);
-      for (let j = 1; j < half; j++) { arcLo += rimDist(oP[k][j - 1], oP[k][j]); arcHi += rimDist(oP[k][NVp - j], oP[k][NVp - 1 - j]); }
-      insetOf.set(i, { aLo, aHi, chordLo: rimDist(oP[k][0], Pm), chordHi: rimDist(oP[k][NVp - 1], Pm), tolLo: arcLo / 4096, tolHi: arcHi / 4096 });
+      let arcLo = rimDist(base.Ps[half - 1], Pm), arcHi = rimDist(base.Ps[half], Pm);
+      for (let j = 1; j < half; j++) { arcLo += rimDist(base.Ps[j - 1], base.Ps[j]); arcHi += rimDist(base.Ps[NVp - j], base.Ps[NVp - 1 - j]); }
+      insetOf.set(k, { aLo, aHi, chordLo: rimDist(base.Ps[0], Pm), chordHi: rimDist(base.Ps[NVp - 1], Pm), tolLo: arcLo / 4096, tolHi: arcHi / 4096 });
     }
     const vs = [], Ps = [], Ns = [], Bs = [], ht = [], hb = [], Cl = [];
-    for (let j = 0; j < NVp; j++) {
-      const v = side ? inLo + ((inHi - inLo) * j) / (NVp - 1) : oV[k][j];
+    for (let j = 0; j < NVr; j++) {
+      const v = side ? inLo + ((inHi - inLo) * (j / cf)) / (NVp - 1) : oV[k][j];
       const q = side ? row.sect(v) : { P: oP[k][j], n: oN[k][j] };
       vs.push(v); Ps.push(q.P); Ns.push(q.n);
     }
@@ -11484,18 +12204,31 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        a chord to the margin: on a rolled row the chord under-reads the
        surface distance badly, and the taper would then fire further in than
        3 mm. The two inset stretches are added at the ends because they are
-       surface too — the bead's own footprint. */
-    const arc = [0];
-    for (let j = 1; j < NVp; j++) arc.push(arc[j - 1] + rimDist(Ps[j - 1], Ps[j]));
+       surface too — the bead's own footprint. Measured on the SHIPPED
+       columns' chords; a sub-column reads it interpolated (at cf 1 the two
+       are the same array, term for term). */
+    const arcB = [0];
+    for (let j0 = 1; j0 < NVp; j0++) arcB.push(arcB[j0 - 1] + rimDist(Ps[cf * (j0 - 1)], Ps[cf * j0]));
+    let arc = arcB;
+    if (cf !== 1) {
+      arc = new Array(NVr);
+      for (let j = 0; j < NVr; j++) { const j0 = Math.floor(j / cf), qq = j - cf * j0; arc[j] = qq === 0 ? arcB[j0] : arcB[j0] + (qq / cf) * (arcB[j0 + 1] - arcB[j0]); }
+    }
     const dEdge = a;
-    const dTipRow = tipExposed ? (sTip - sMargin[k]) : Infinity;
-    const dBaseRow = baseExposed ? (sMargin[k] - sBase) : Infinity;
+    const dTipRow = tipExposed ? (sTip - X[k].sM) : Infinity;
+    const dBaseRow = baseExposed ? (X[k].sM - sBase) : Infinity;
+    /* THE RELIEF CLOSURE FOR THIS ROW — `g` baked in, so the buried ramp the
+       bead takes is the ramp the relief takes, and `rimProfile` below is handed
+       the same closure so the bead's first profile point agrees with the top
+       skin's displaced point to the double. */
+    const sOf = RL && g > 0 ? (p) => g * (RL.heightMm * RL.f(p)) : null;
+    skinS.push(sOf); skinG.push(sOf ? g : 0);
     /* each half's distance from ITS edge, and each column's radius its own
        half's (one radius, `a` and `r`, on every one-sided row and on equal
        halves — the old expressions term for term) */
     const twoR = rLo !== rHi || aLo !== aHi;
-    for (let j = 0; j < NVp; j++) {
-      const dLo = (twoR ? aLo : dEdge) + arc[j], dHi = (twoR ? aHi : dEdge) + (arc[NVp - 1] - arc[j]);
+    for (let j = 0; j < NVr; j++) {
+      const dLo = (twoR ? aLo : dEdge) + arc[j], dHi = (twoR ? aHi : dEdge) + (arc[NVr - 1] - arc[j]);
       const d = per ? dTipRow
         : baseExposed ? Math.min(dLo, dHi, dTipRow, dBaseRow)
           : Math.min(dLo, dHi, dTipRow);
@@ -11503,18 +12236,50 @@ function emitPanel(acc, rows, panel, tAt, rim) {
       const b0 = tBody / 2 + g * (rj - tBody / 2) * (1 - rimEase(d / RIM_TAPER_MM));
       /* a panel that declares `thinAt` (the tube's ring, and nothing else) is
          trimmed where another shell lies on it; every other panel takes b0 */
-      const b = panel.thinAt ? b0 * panel.thinAt(i, vs[j]) : b0;
+      const b = panel.thinAt ? b0 * panel.thinAt(X[k].sIdx, vs[j]) : b0;
       Bs.push(b);
       const P = Ps[j], n = Ns[j];
-      ht.push([P[0] + n[0] * b, P[1] + n[1] * b, P[2] + n[2] * b]);
-      hb.push([P[0] - n[0] * b, P[1] - n[1] * b, P[2] - n[2] * b]);
+      if (sOf === null) {
+        ht.push([P[0] + n[0] * b, P[1] + n[1] * b, P[2] + n[2] * b]);
+        hb.push([P[0] - n[0] * b, P[1] - n[1] * b, P[2] - n[2] * b]);
+        /* THE RING'S OWN NORMAL AT EACH SKIN VERTEX, handed to the organ relief
+           (T5) when it asks — null on every other build, so nothing is pushed */
+        if (acc.normalSink) { acc.normalSink(ht[ht.length - 1], n); acc.normalSink(hb[hb.length - 1], [-n[0], -n[1], -n[2]]); }
+      } else {
+        /* OUTWARD, ON EACH SKIN'S OWN SIDE: the field at the undisplaced skin
+           point, the displacement added to the offset — never subtracted */
+        const pT = [P[0] + n[0] * b, P[1] + n[1] * b, P[2] + n[2] * b];
+        const pB = [P[0] - n[0] * b, P[1] - n[1] * b, P[2] - n[2] * b];
+        const sT = sOf(pT), sB = sOf(pB);
+        const hT = [pT[0] + n[0] * sT, pT[1] + n[1] * sT, pT[2] + n[2] * sT];
+        const hB = [pB[0] - n[0] * sB, pB[1] - n[1] * sB, pB[2] - n[2] * sB];
+        ht.push(hT);
+        hb.push(hB);
+        TR.displaced += 2;
+        if (sT > TR.reliefMaxMm) TR.reliefMaxMm = sT; if (sB > TR.reliefMaxMm) TR.reliefMaxMm = sB;
+        if (sT < TR.reliefMinMm) TR.reliefMinMm = sT; if (sB < TR.reliefMinMm) TR.reliefMinMm = sB;
+        if (sampleTick++ % SAMPLE_EVERY === 0 && TR.skinSamples.length < 64) {
+          TR.skinSamples.push({ p0: pT, p1: hT, mid: [P[0], P[1], P[2]], n: [n[0], n[1], n[2]], s: sT, g, u: row.u, v: vs[j], sIdx: X[k].sIdx, side: 'top', rep: tex.rep ?? null });
+          TR.skinSamples.push({ p0: pB, p1: hB, mid: [P[0], P[1], P[2]], n: [-n[0], -n[1], -n[2]], s: sB, g, u: row.u, v: vs[j], sIdx: X[k].sIdx, side: 'bottom', rep: tex.rep ?? null });
+        }
+      }
       const wasClamped = 2 * b < RIM_FLOOR_MM - 1e-9 && 2 * b < tBody - 1e-9;
       Cl.push(wasClamped);
       if (rim && wasClamped) {
-        rim.clamps.push({ panel: panel.label, row: i, u: row.u, col: j, thicknessMm: 2 * b, bodyMm: tBody, roomMm: !twoR ? roomMm[k] : vs[j] < 0 ? roomLo : roomHi });
+        rim.clamps.push({ panel: panel.label, row: X[k].sIdx, u: row.u, col: j, thicknessMm: 2 * b, bodyMm: tBody, roomMm: !twoR ? room : vs[j] < 0 ? roomLo : roomHi });
       }
     }
     top.push(ht); bot.push(hb); skinV.push(vs); skinP.push(Ps); skinN.push(Ns); skinB.push(Bs); rimClamped.push(Cl); roomSide.push(twoR ? { lo: roomLo, hi: roomHi } : null);
+    /* THE CENTRE LOCATOR (big petals, Oct 21): the two columns either side of
+       the midrib — their mid-surface point and normal, the line each skin was
+       offset ALONG — so the T family can find the two emitted skin vertices
+       in an exported file and read the thickness off the file. A locator,
+       never a thickness: nothing here says how far apart the skins are.
+       References to arrays already built; no number moves. */
+    if (rim && !per) {
+      const c1 = NVr >> 1, c0 = c1 - 1;
+      (rim.centre || (rim.centre = [])).push({ panel: panel.label, row: X[k].sIdx, u: row.u, halfWidth: row.h === null ? Math.min(row.hL, row.hR) : row.h, P: [Ps[c0], Ps[c1]], n: [Ns[c0], Ns[c1]], arc: [arc[c0], arc[NVr - 1] - arc[c1]], dTip: dTipRow, dBase: dBaseRow });
+    }
   }
   /* THE EMITTED SKIN LATTICE, on request (leaf/stem build S4): the mid-surface
      points the two skins are offset from, row by row — what the LOBED fold
@@ -11522,10 +12287,10 @@ function emitPanel(acc, rows, panel, tAt, rim) {
      no petal and no other leaf does, so nothing else moves. */
   if (rim && rim.wantSkin) rim.skin = skinP.map((r) => r.map((P) => [P[0], P[1], P[2]]));
 
-  /* ---- the captured grid: the ORIGINAL span, the BODY thickness ---- */
+  /* ---- the captured grid: the LADDER's rows at the ORIGINAL span, the BODY thickness ---- */
   if (grid) {
     for (let i = rowFrom; i <= rowTo; i++) {
-      const k = i - rowFrom;
+      const k = kOf(i), b = X[k].b;
       /* THE MATERIAL MASK. Every sample a plain panel captures is material by
          construction, so this arm writes the shared frozen row; the INFILL arm
          is the only thing that writes a false. It is present on EVERY captured
@@ -11537,53 +12302,117 @@ function emitPanel(acc, rows, panel, tAt, rim) {
       /* ONE literal, so the row's capture has one site (verify-bloom-grid's
          mutant table anchors on it); readers take the field by name */
       const twoSidedRow = rows[i].h === null;
-      const gridRow = { row: i, u: rows[i].u, halfWidth: twoSidedRow ? rows[i].hL : rows[i].h, thickness: tBodyOf[k], v: oV[k], mid: oP[k], normal: oN[k], material: GRID_ALL_MATERIAL };
+      const gridRow = { row: i, u: rows[i].u, halfWidth: twoSidedRow ? rows[i].hL : rows[i].h, thickness: X[k].t, v: b.vs, mid: b.Ps, normal: b.Ns, material: gridAllMaterialOf(b.vs.length) };
       if (twoSidedRow) gridRow.halfWidthRight = rows[i].hR;
       grid.push(gridRow);
     }
   }
 
   const NR = top.length;
+  const skinTris0 = acc.triangleCount;
   /* THE WINDING IS OUTWARD, AND THAT IS MEASURED RATHER THAN ASSERTED
      (session 36). The top skin is offset along +n, so its triangles are wound
      counter-clockwise SEEN FROM +n. The witness is the O family in both STL
      gates — per-shell signed volume by the divergence theorem AND a ray-parity
      test, agreeing — calibrated on a unit cube in
      `node tools/bloom-self-intersection.mjs --orientation`. */
+  /* TWO CONSECUTIVE ROWS OF DIFFERENT COLUMN COUNTS (the lattice only) ARE
+     ZIPPED IN PARAMETER SPACE: advance whichever polyline's next fraction is
+     smaller, decided as an INTEGER comparison so no engine can disagree; where
+     the two candidate diagonals differ by more than ZIP_SLACK_MM the SHORTER
+     is taken (a tooth flank's diagonal read 1.80 e under the parameter rule
+     alone), and within the slack the integer rule decides, so a last-bit
+     difference between two engines cannot flip a triangle. Rows of EQUAL
+     counts — every row of every untextured build — take the shipped quads. */
+  const ZIP_SLACK_MM = 1e-6;
+  const zip = (A, B, As, Bs) => {
+    const na = A.length - 1, nb = B.length - 1;
+    let i = 0, j = 0;
+    while (i < na || j < nb) {
+      let advB = i === na || (j < nb && (j + 1) * na <= (i + 1) * nb);
+      if (i < na && j < nb) {
+        const diff = rimDist(A[i], B[j + 1]) - rimDist(A[i + 1], B[j]);
+        if (diff > ZIP_SLACK_MM) advB = false; else if (diff < -ZIP_SLACK_MM) advB = true;
+      }
+      if (advB) { acc.tri(A[i], B[j], B[j + 1]); acc.tri(As[i], Bs[j + 1], Bs[j]); j++; }
+      else { acc.tri(A[i], B[j], A[i + 1]); acc.tri(As[i], As[i + 1], Bs[j]); i++; }
+    }
+  };
   for (let i = 0; i < NR - 1; i++) {
-    for (let j = 0; j < (per ? NVp : NVp - 1); j++) {
-      const jn = per ? (j + 1) % NVp : j + 1;
+    const ka = i + kSkinFrom, kb = ka + 1;
+    if (cfOf[ka] !== cfOf[kb]) { zip(top[i], top[i + 1], bot[i], bot[i + 1]); continue; }
+    const NVr = NVk(ka);
+    for (let j = 0; j < (per ? NVr : NVr - 1); j++) {
+      const jn = per ? (j + 1) % NVr : j + 1;
       acc.quad(top[i][j], top[i + 1][j], top[i + 1][jn], top[i][jn]);   // top skin: normal +n
       acc.quad(bot[i][j], bot[i][jn], bot[i + 1][jn], bot[i + 1][j]);   // bottom skin: normal -n
+    }
+  }
+  const skinTris = acc.triangleCount - skinTris0;
+  /* THE CONFORMING FLOOR of the skins the lattice replaced (Q14's bar): over
+     the SHIPPED rows at the SHIPPED columns, on the UNDISPLACED skins, each
+     shipped triangle's `max(n_ab + n_bc + n_ca - 2, 2A / e^2)` with n the
+     snapped ceil(L / e). Computed only where there is a lattice to hold to it. */
+  let floorTris = null;
+  if (L) {
+    floorTris = 0;
+    const tri3 = (A, B, C) => {
+      const na = nOf(rimDist(A, B)), nb = nOf(rimDist(B, C)), nc = nOf(rimDist(C, A));
+      const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2], vx = C[0] - A[0], vy = C[1] - A[1], vz = C[2] - A[2];
+      const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+      const area = 0.5 * Math.sqrt(cx * cx + cy * cy + cz * cz);
+      floorTris += Math.max(na + nb + nc - 2, (2 * area) / (e * e));
+    };
+    const ship = [];
+    for (let k = kSkinFrom; k <= kSkinTo; k++) if (X[k].sIdx >= 0) ship.push(k);
+    for (let q = 0; q < ship.length - 1; q++) {
+      const ka = ship[q], kb = ship[q + 1], ca = cfOf[ka], cb = cfOf[kb], sa = ka - kSkinFrom, sb = kb - kSkinFrom;
+      for (let j0 = 0; j0 < NVp - 1; j0++) {
+        for (const [sk, sgn] of [[skinP, 1], [skinP, -1]]) {
+          const pt = (s, j, cf) => { const P = sk[s][j * cf], n = skinN[s][j * cf], b = skinB[s][j * cf] * sgn; return [P[0] + n[0] * b, P[1] + n[1] * b, P[2] + n[2] * b]; };
+          const A = pt(sa, j0, ca), B = pt(sb, j0, cb), C = pt(sb, j0 + 1, cb), D = pt(sa, j0 + 1, ca);
+          tri3(A, B, C); tri3(A, C, D);
+        }
+      }
     }
   }
 
   /* ---- the rim: ONE closed loop of profiles ---- */
   const K = rimSegments(sheetMax);
+  const rimTris0 = acc.triangleCount;
+  const finishTex = () => {
+    if (!tex) return;
+    tex.panels.push({ label: panel.label, organ: tex.organ, shippedRows: rowTo - rowFrom + 1, subRows, cfMax: L ? Math.max(...Array.from(cfOf)) : 1,
+      noSubRows: L ? (L.noSubRows || null) : 'no lattice', skinTris, floorTris, rimTris: acc.triangleCount - rimTris0,
+      reliefMaxMm: TR ? TR.reliefMaxMm : 0, reliefMinMm: TR && TR.displaced ? TR.reliefMinMm : 0, displaced: TR ? TR.displaced : 0,
+      skinSamples: TR ? TR.skinSamples : [], apexSamples: TR ? TR.apexSamples : [] });
+  };
   /* A PERIODIC PANEL'S RIM IS TWO CLOSED LOOPS, one per free edge: the base
      row ascending and the top row descending, so both are wound with the
      skins (boundary 0, directed census 0 — measured by the prototype's sweep
      and by the TU family). */
   if (per) {
-    const mk = (i, js) => js.map((j) => { const sk = skOf(i); return rimProfile(acc, K, skinP[sk][j], skinN[sk][j], skinB[sk][j], oP[i - rowFrom][j], top[sk][j], bot[sk][j]); });
+    const mk = (i, js) => js.map((j) => { const sk = skOf(kOf(i)); return rimProfile(acc, K, skinP[sk][j], skinN[sk][j], skinB[sk][j], oP[kOf(i)][j], top[sk][j], bot[sk][j]); });
     const asc = Array.from({ length: NVp }, (_, j) => j);
     emitRimLoop(acc, mk(rowFrom, asc), K);
     emitRimLoop(acc, mk(rowTo, asc.slice().reverse()), K);
+    finishTex();
     return grid;
   }
-  /* The loop, as (row, column) pairs on the ORIGINAL boundary. Its direction
-     is the one that leaves the rim wound with the two skins; the witness is
-     `boundaryEdges === 0` plus O1/O2, not this comment. */
+  /* The loop, as (row, column) pairs on the ORIGINAL boundary — the EXPANDED
+     rows and their own columns. Its direction is the one that leaves the rim
+     wound with the two skins; the witness is `boundaryEdges === 0` plus O1/O2,
+     not this comment. */
   const loop = [];
   const RUN = [];                                                        // index of each run's first entry
   RUN.push(loop.length);
-  for (let j = 0; j < NVp; j++) loop.push([rowFrom, j]);                  // inner end cap
+  for (let j = 0; j < NVk(0); j++) loop.push([0, j]);                     // inner end cap
   RUN.push(loop.length);
-  for (let i = rowFrom + 1; i <= rowTo; i++) loop.push([i, NVp - 1]);     // the +v margin
+  for (let k = 1; k <= kTo; k++) loop.push([k, NVk(k) - 1]);              // the +v margin
   RUN.push(loop.length);
-  for (let j = NVp - 2; j >= 0; j--) loop.push([rowTo, j]);               // the tip
+  for (let j = NVk(kTo) - 2; j >= 0; j--) loop.push([kTo, j]);            // the tip
   RUN.push(loop.length);
-  for (let i = rowTo - 1; i > rowFrom; i--) loop.push([i, 0]);           // the -v margin
+  for (let k = kTo - 1; k > 0; k--) loop.push([k, 0]);                   // the -v margin
   const isRunStart = new Set(RUN);
 
   /* THE CORNER IS SUBDIVIDED, AND THE REASON IS A MEASUREMENT. Where the
@@ -11598,20 +12427,20 @@ function emitPanel(acc, rows, panel, tAt, rim) {
      inserted apexes lie ON the segment the rim already had. Only the two real
      apexes are captured points, and E4 asks about those. */
   const entries = [];
-  for (let k = 0; k < loop.length; k++) {
-    const [i, j] = loop[k];
-    const sk = skOf(i);
-    entries.push({ apex: oP[i - rowFrom][j], sk, j });
-    const n = (k + 1) % loop.length;
-    const [i2, j2] = loop[n];
-    const sk2 = skOf(i2);
+  for (let q = 0; q < loop.length; q++) {
+    const [k, j] = loop[q];
+    const sk = skOf(k);
+    entries.push({ apex: oP[k][j], sk, j });
+    const nq = (q + 1) % loop.length;
+    const [k2, j2] = loop[nq];
+    const sk2 = skOf(k2);
     /* A PIVOT ONLY WHERE THE TREATMENT IS. At a buried end the profile is the
        flat wall and its apex IS its skin point, so an interpolated apex would
        point along the margin from a skin point that has no bead — a flap main
        does not have, in the one place that must emit what main emits.
        Measured: with the pivots ungated, `layerCount 6` read 800 census pairs
        against main's 0, and 0 with them gated. */
-    if (rimSameP(oP[i - rowFrom][j], skinP[sk][j])) continue;
+    if (rimSameP(oP[k][j], skinP[sk][j])) continue;
     /* A PIVOT IS EITHER OF TWO THINGS, and both are the same corner seen from
        two sides. The first is a pair that already shares its skin point, which
        is what the dropped tip rows produce along the margin. The second is a
@@ -11630,7 +12459,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        whole strip is skipped as degenerate — the foot costs nothing and needs
        no special case. */
     if (sk2 === sk && j2 === j) {
-      const a0 = oP[i - rowFrom][j], a1 = oP[i2 - rowFrom][j2];
+      const a0 = oP[k][j], a1 = oP[k2][j2];
       /* THE OUTLINE SEGMENT THIS CORNER SPANS, read off the ORIGINAL boundary
          `oP` and never off the inset skin — so it carries none of the drawn
          bead radius, which differs ~200x between the modes on a cramped petal.
@@ -11644,19 +12473,19 @@ function emitPanel(acc, rows, panel, tAt, rim) {
       if (rim) rim.pivots.push(seg);
       /* NO TURN TO SPREAD, SO NO SUBDIVISION. */
       if (seg < RIM_CORNER_MIN_MM) { if (rim) rim.pivotsSkipped++; continue; }
-      for (let q = 1; q < RIM_CORNER_STEPS; q++) {
-        const f = q / RIM_CORNER_STEPS;
+      for (let c = 1; c < RIM_CORNER_STEPS; c++) {
+        const f = c / RIM_CORNER_STEPS;
         entries.push({ apex: [a0[0] + (a1[0] - a0[0]) * f, a0[1] + (a1[1] - a0[1]) * f, a0[2] + (a1[2] - a0[2]) * f], sk, j });
       }
-    } else if (isRunStart.has(n)) {
-      const a0 = oP[i - rowFrom][j], a1 = oP[i2 - rowFrom][j2];
-      for (let q = 1; q <= RIM_CORNER_STEPS; q++) {
-        const f = q / (RIM_CORNER_STEPS + 1);
+    } else if (isRunStart.has(nq)) {
+      const a0 = oP[k][j], a1 = oP[k2][j2];
+      for (let c = 1; c <= RIM_CORNER_STEPS; c++) {
+        const f = c / (RIM_CORNER_STEPS + 1);
         entries.push({ apex: [a0[0] + (a1[0] - a0[0]) * f, a0[1] + (a1[1] - a0[1]) * f, a0[2] + (a1[2] - a0[2]) * f], sk, j });
       }
     }
   }
-  const profs = entries.map(({ apex, sk, j }) => rimProfile(acc, K, skinP[sk][j], skinN[sk][j], skinB[sk][j], apex, top[sk][j], bot[sk][j]));
+  const profs = entries.map(({ apex, sk, j }) => rimProfile(acc, K, skinP[sk][j], skinN[sk][j], skinB[sk][j], apex, top[sk][j], bot[sk][j], skinS[sk], TR, skinG[sk]));
   emitRimLoop(acc, profs, K);
   if (rim) {
     if (acc.captureRim) {
@@ -11674,11 +12503,11 @@ function emitPanel(acc, rows, panel, tAt, rim) {
          is one derived quantity that covers all of them and any future rim
          law, and it is measured on the emitted points rather than read from
          any law's declaration. */
-      const turnAt = (k) => {
-        const [ip, jp] = loop[(k - 1 + loop.length) % loop.length];
-        const [ic, jc] = loop[k];
-        const [iN, jN] = loop[(k + 1) % loop.length];
-        const A = oP[ip - rowFrom][jp], B = oP[ic - rowFrom][jc], C = oP[iN - rowFrom][jN];
+      const turnAt = (q) => {
+        const [kp, jp] = loop[(q - 1 + loop.length) % loop.length];
+        const [kc, jc] = loop[q];
+        const [kn, jn] = loop[(q + 1) % loop.length];
+        const A = oP[kp][jp], B = oP[kc][jc], C = oP[kn][jn];
         const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2];
         const vx = C[0] - B[0], vy = C[1] - B[1], vz = C[2] - B[2];
         const lu = Math.hypot(ux, uy, uz), lv = Math.hypot(vx, vy, vz);
@@ -11687,9 +12516,9 @@ function emitPanel(acc, rows, panel, tAt, rim) {
         d = d > 1 ? 1 : d < -1 ? -1 : d;
         return (Math.acos(d) * 180) / Math.PI;
       };
-      for (let k = 0; k < loop.length; k++) {
-        const [i, j] = loop[k], sk = skOf(i);
-        const apex = oP[i - rowFrom][j];
+      for (let q = 0; q < loop.length; q++) {
+        const [k, j] = loop[q], sk = skOf(k);
+        const apex = oP[k][j];
         /* THE THREE EMITTED VERTICES OF A TREATED PROFILE, as the SAME arrays
            the mesh got — the apex and the two points where the bead meets the
            skins. The gate proves all three are in the emitted vertex set
@@ -11697,9 +12526,9 @@ function emitPanel(acc, rows, panel, tAt, rim) {
            artefact rather than standing in for it: the rim's thickness is
            |top - bot| between two vertices the mesh demonstrably has. */
         if (!rimSameP(apex, skinP[sk][j])) {
-          const ins = insetOf.get(i);
-          rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: i, col: j, bodyMm: tBodyOf[sk + sOff], clamped: rimClamped[sk][j], roomMm: roomSide[sk] ? (skinV[sk][j] < 0 ? roomSide[sk].lo : roomSide[sk].hi) : roomMm[sk + sOff], outlineTurnDeg: turnAt(k),
-            inset: ins && i >= skinFrom && i <= skinTo && (j === 0 || j === NVp - 1) ? { mm: j === 0 ? ins.aLo : ins.aHi, chordToMidribMm: j === 0 ? ins.chordLo : ins.chordHi, tolMm: j === 0 ? ins.tolLo : ins.tolHi } : null });
+          const ins = insetOf.get(k), last = NVk(k) - 1;
+          rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: X[k].sIdx, col: j, bodyMm: X[sk + kSkinFrom].t, clamped: rimClamped[sk][j], roomMm: roomSide[sk] ? (skinV[sk][j] < 0 ? roomSide[sk].lo : roomSide[sk].hi) : X[sk + kSkinFrom].b.w, outlineTurnDeg: turnAt(q),
+            inset: ins && k >= kSkinFrom && k <= kSkinTo && (j === 0 || j === last) ? { mm: j === 0 ? ins.aLo : ins.aHi, chordToMidribMm: j === 0 ? ins.chordLo : ins.chordHi, tolMm: j === 0 ? ins.tolLo : ins.tolHi } : null });
         }
         /* AND THE PERIMETER THE TREATMENT DID NOT REACH — the buried stretch,
            which is a flat wall at ninety degrees BY DESIGN on this tree and on
@@ -11722,24 +12551,25 @@ function emitPanel(acc, rows, panel, tAt, rim) {
          quietly excluded, and E2 reports its turn beside the bar it is exempt
          from. On main the same corner is part of a 90 degree wall. */
       for (const r of RUN) {
-        const [i, j] = loop[r === 0 ? loop.length - 1 : r - 1];
-        const sk = skOf(i);
-        if (!rimSameP(oP[i - rowFrom][j], skinP[sk][j])) rim.corner.push(oP[i - rowFrom][j]);
+        const [k, j] = loop[r === 0 ? loop.length - 1 : r - 1];
+        const sk = skOf(k);
+        if (!rimSameP(oP[k][j], skinP[sk][j])) rim.corner.push(oP[k][j]);
       }
     }
     rim.segments = Math.max(rim.segments, K);
     rim.drawnMaxMm = Math.max(rim.drawnMaxMm, drawnMax);
-    if (skinTo < rowTo) {
-      const gap = rimDist(oP[NROW - 1][0], skinP[skinTo - skinFrom][0]);
+    if (kSkinTo < kTo) {
+      const gap = rimDist(oP[kTo][0], skinP[kSkinTo - kSkinFrom][0]);
       rim.tipAxisMm = rim.tipAxisMm === null ? gap : Math.min(rim.tipAxisMm, gap);
     }
     /* THE FREE BASE'S OWN SEMI-AXIS, the tip's mirror — reported only where a
        panel declared one, so no existing record grows a field. */
-    if (baseExposed && skinFrom > rowFrom) {
+    if (baseExposed && kSkinFrom > 0) {
       const gap = rimDist(oP[0][0], skinP[0][0]);
       rim.baseAxisMm = rim.baseAxisMm === undefined || rim.baseAxisMm === null ? gap : Math.min(rim.baseAxisMm, gap);
     }
   }
+  finishTex();
   return grid;
 }
 /* ===================================================================
@@ -11919,6 +12749,912 @@ export const INFILL_SEED = 7;                 // the field is deterministic; a s
    TWO STATEMENTS, this one and `PREDICATES.infillPresent` in the registry;
    the harness checks them against each other at load. */
 export function infillIsAbsent(state) { return String(state.petalInfill ?? 'NONE') === 'NONE'; }
+
+/* ===================================================================
+   SURFACE TEXTURE — T3 of docs/bloom-surface-texture-discovery.md §10
+   (read docs/bloom-surface-texture-t3-outcome.md before touching any of it).
+
+   WHAT SHIPS. One world-space relief field over the whole bloom's SHEETS —
+   petals, sepals and leaves — sampled INSIDE `emitPanel` at the moment it
+   offsets a skin (attachment B, Eva's ruling 1), OUTWARD ONLY (ruling 2: the
+   sheet is `t + s_top + s_bot`, never less than t), its height PEAK-TO-VALLEY
+   (Q2: the field spans [0, 1], so H is how far the texture stands proud of
+   the sheet), and the sheet refined first on B's OWN LATTICE (T2, ported:
+   sub-rows through the organ's own `rowAt`, sub-columns through the row's own
+   `sect`, at a 0.4 mm edge — Eva's ruling) so a millimetre relief is not drawn
+   on a 1.6 mm lattice. THE RELIEF RUNS OVER THE RIM BEAD (Q4/Q5): a textured
+   petal's silhouette moves out by up to H; an untextured one keeps the
+   edge-profile ruling's fixed outline byte for byte.
+
+   THE GUARD IS A CHOICE (`petalTexture` NONE / PEBBLE / CELLULAR), the infill's
+   precedent: `SWEEPABLE` filters `SLIDERS()`, so the blanket sweep never
+   reaches it and `ALL MAX` stays untextured; the height and feature-size
+   sliders are hidden at the guard and out of the sweep through the derived
+   `TEXTURE_SUBS`. TWO STATEMENTS — `textureIsAbsent` here and
+   `PREDICATES.texturePresent` in the registry — and the harness checks them
+   against each other at load. TEXTURE AND THE VORONOI INFILL ARE EXCLUSIVE
+   (Q9): with the infill on, the texture is REFUSED with the word 'infill' and
+   told, never silently picked, and the panel greys each control out while the
+   other is on. The hub, stem, rods and tube ring stay untextured (T5's).
+
+   THE FIELD IS ENGINE-AGREED BY CONSTRUCTION. X0 compares Chromium's STL
+   against a Node rebuild at an 8-ulp bar, and `Math.sin` / `Math.cos` /
+   `Math.atan2` / `Math.hypot` are not correctly rounded across engines — so
+   both patterns are built from `Math.floor`, products, an integer hash
+   (`Math.imul`, shifts) and `Math.sqrt`, which are. Non-directional only (Q6):
+   PEBBLE is two octaves of gradient noise, CELLULAR the Worley F2 - F1
+   distance. The ribbing value is not built.
+
+   THE LATTICE BAR (Q14, re-ruled Oct 22): each organ's lattice SKIN triangles
+   are at most 1.25x the conforming floor of the shipped skin triangles they
+   replace (TX4). The floor is computed in `emitPanel` on the undisplaced
+   skins at the shipped rows and columns.
+   =================================================================== */
+export const TEXTURE_TYPES = Object.freeze(['NONE', 'PEBBLE', 'CELLULAR']);
+/* THE HEIGHT'S FLOOR IS EVA'S 0.4 mm (Q13) — UNVALIDATED: nothing in this
+   project has been printed, and 0.4 is the edge-profile ruling's own guess at
+   SLS Nylon 12 White's resolvable detail. It is the slider's MINIMUM, so 0 is
+   not reachable and NONE is the choice guard's job. The default is the floor
+   itself (ruling 3: never a default that assumes it prints). */
+export const TEXTURE_HEIGHT_RANGE = Object.freeze([0.4, 1.5]);
+export const TEXTURE_HEIGHT_STEP = 0.05;
+export const TEXTURE_HEIGHT_DEFAULT = 0.4;
+/* THE LATTICE EDGE — ruled 0.4 mm, a constant and never a control. */
+export const TEXTURE_EDGE_MM = 0.4;
+/* THE FEATURE SIZE: its floor is tied to the lattice (lambda >= 4 e, §10 T3). */
+export const TEXTURE_SIZE_RANGE = Object.freeze([4 * TEXTURE_EDGE_MM, 12]);
+export const TEXTURE_SIZE_STEP = 0.1;
+export const TEXTURE_SIZE_DEFAULT = 4;
+export const TEXTURE_SEED = 7;                 // the field is deterministic; a seed control is not proposed
+export const TEXTURE_LATTICE_BAR = 1.25;       // Q14: the lattice skin against its conforming floor
+export function textureIsAbsent(state) { return String(state.petalTexture ?? 'NONE') === 'NONE'; }
+
+/* the integer hash and the two noises — products, floor, imul, sqrt only */
+function texHash3(x, y, z, s) {
+  let h = (x * 374761393 + y * 668265263 + z * 2147483647 + s * 1274126177) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+const TEX_GRAD = Object.freeze([[1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0], [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1], [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1]]);
+const texFade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+function texGradNoise(x, y, z, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const xf = x - xi, yf = y - yi, zf = z - zi;
+  const u = texFade(xf), v = texFade(yf), w = texFade(zf);
+  let acc = 0;
+  for (let dz = 0; dz < 2; dz++) for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
+    const g = TEX_GRAD[texHash3(xi + dx, yi + dy, zi + dz, seed) % 12];
+    const d = g[0] * (xf - dx) + g[1] * (yf - dy) + g[2] * (zf - dz);
+    acc += d * (dx ? u : 1 - u) * (dy ? v : 1 - v) * (dz ? w : 1 - w);
+  }
+  return acc;
+}
+function texWorley(x, y, z, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  let f1 = Infinity, f2 = Infinity;
+  for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const cx = xi + dx, cy = yi + dy, cz = zi + dz;
+    const h = texHash3(cx, cy, cz, seed);
+    const px = cx + ((h & 1023) / 1023) - x, py = cy + (((h >>> 10) & 1023) / 1023) - y, pz = cz + (((h >>> 20) & 1023) / 1023) - z;
+    const d = Math.sqrt(px * px + py * py + pz * pz);
+    if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) f2 = d;
+  }
+  return f2 - f1;
+}
+/* THE FIELD: a scalar f(p) in [0, 1] of WORLD position (mm). 1 is the high of
+   the relief; `lambda` is the feature size in mm. */
+export function textureField(type, lambda, seed = TEXTURE_SEED) {
+  const k = 1 / lambda;
+  if (type === 'PEBBLE') return (p) => {
+    const n = texGradNoise(p[0] * k, p[1] * k, p[2] * k, seed) + 0.5 * texGradNoise(p[0] * 2 * k, p[1] * 2 * k, p[2] * 2 * k, seed + 1);
+    const f = 0.5 + 0.75 * n;
+    return f > 1 ? 1 : f < 0 ? 0 : f;
+  };
+  if (type === 'CELLULAR') return (p) => {
+    const e = texWorley(p[0] * k, p[1] * k, p[2] * k, seed) / 0.35;   // 0 on a cell wall, rising to 1 inside the cell
+    return e >= 1 ? 1 : e * e * (3 - 2 * e);
+  };
+  throw new Error(`textureField: ${JSON.stringify(type)} is not a texture type (${TEXTURE_TYPES.join(' / ')})`);
+}
+/* THE CONTROLS AS READ, ONE OWNER. Null at the guard. A height or size past
+   its range is clamped (the reader clamps a file's value too) and said. */
+export function textureFor(state, cap = null) {
+  if (textureIsAbsent(state)) return null;
+  const type = String(state.petalTexture);
+  if (!TEXTURE_TYPES.includes(type)) throw new Error(`petalTexture ${JSON.stringify(state.petalTexture)} is not one of ${TEXTURE_TYPES.join(' / ')}`);
+  const clampTo = (x, r) => (x < r[0] ? r[0] : x > r[1] ? r[1] : x);
+  const hAsked = Number(state.textureHeight ?? TEXTURE_HEIGHT_DEFAULT), sAsked = Number(state.textureSize ?? TEXTURE_SIZE_DEFAULT);
+  const heightMm = clampTo(hAsked, TEXTURE_HEIGHT_RANGE), sizeMm = clampTo(sAsked, TEXTURE_SIZE_RANGE);
+  const refused = !infillIsAbsent(state) ? 'infill' : null;
+  return { type, heightMm, sizeMm, edgeMm: textureEdgeInForce(cap), heightClamped: heightMm !== hAsked, sizeClamped: sizeMm !== sAsked, refused, f: refused ? null : textureField(type, sizeMm) };
+}
+/* ===================================================================
+   THE EDGE CAP (Eva's ruling of Oct 23, on the worst corner: COARSEN THE EDGE,
+   TOLD). A textured build that would exceed `EXPORT_TRI_BUDGET` at the ruled
+   0.4 mm lattice edge is rebuilt on the FINEST edge that fits, never coarser
+   than `TEXTURE_EDGE_CAP_MM` (0.5); if even 0.5 does not fit the build stands
+   at 0.5 and the export is REFUSED as today, said on the read-out. THE EDGE IS
+   DERIVED FROM THE BUDGET, NEVER TYPED PER STATE: `textureEdgeCapDecision`
+   (inside `buildBloomInto`) builds at 0.4 into the caller's own accumulator
+   first — so every build that fits pays nothing — and only when that count is
+   over the budget bisects the rungs of `TEXTURE_EDGE_GRID_MM` between 0.4 and
+   0.5 with real whole-bloom trial builds (a count is an integer and the lattice
+   counts fall with a coarser edge, so the finest fitting rung is what the
+   bisection returns). ONE EDGE FOR THE WHOLE BLOOM: `TEXTURE_EDGE_IN_FORCE` is
+   the rung under trial, read by every organ (petal, sepal, leaf, leaflet, a
+   floret) through `textureEdgeInForce`, so no two sheets of one bloom are
+   latticed differently. `cap.textureEdgeMm` (a capability hook no control
+   reaches) PINS the edge for every organ and switches the derivation OFF — it
+   is how the corner instrument measures coarser edges than the cap allows, how
+   the sheet renders the refused 0.4 mm corner, and how TX9 rebuilds the next
+   finer rung to show it does not fit. The rungs are `(40 + k) / 100`, the
+   correctly rounded decimals, so a pinned 0.45 and a derived 0.45 are one
+   double. The decision reads `acc.triangleCount` in the caller's own mode:
+   the two STL gates hold `tris(live) === tris(export)` on every row, which is
+   what makes the derived edge mode-free. The record (`texture.edgeCap`) names
+   the asked edge, the edge used, the cap, every trial's count and whether the
+   used edge fits; the read-out prints the edge used whenever it differs from
+   0.4 (the ruling's own wording). */
+export const TEXTURE_EDGE_CAP_MM = 0.5;
+export const TEXTURE_EDGE_GRID_MM = 0.01;
+/* the rung index k -> the edge, one owner (k 0 is the ruled edge, k 10 the cap) */
+export function textureEdgeRung(k) { return (Math.round(TEXTURE_EDGE_MM * 100) + k * Math.round(TEXTURE_EDGE_GRID_MM * 100)) / 100; }
+export const TEXTURE_EDGE_CAP_RUNGS = Math.round((TEXTURE_EDGE_CAP_MM - TEXTURE_EDGE_MM) / TEXTURE_EDGE_GRID_MM);
+let TEXTURE_EDGE_IN_FORCE = null;
+let TEXTURE_CAP_ACTIVE = false;
+function textureEdgeInForce(cap) {
+  if (cap && cap.textureEdgeMm > 0) return cap.textureEdgeMm;
+  return TEXTURE_EDGE_IN_FORCE === null ? TEXTURE_EDGE_MM : TEXTURE_EDGE_IN_FORCE;
+}
+/* FOR AN INSTRUMENT THAT COPIES buildBloomInto's ORCHESTRATION (the two
+   coverage censuses re-emit every part through the builders directly, and
+   their R1 sums the parts against a whole build): the parts must be emitted
+   under the edge the whole build DERIVED, exactly as buildBloomInto emits them
+   — so this runs `fn` with that edge in force and the cap's own re-entrancy
+   flag set (a nested floret build derives nothing), and restores both. */
+export function withTextureEdgeInForce(edgeMm, fn) {
+  const prevE = TEXTURE_EDGE_IN_FORCE, prevA = TEXTURE_CAP_ACTIVE;
+  if (edgeMm > 0) { TEXTURE_EDGE_IN_FORCE = edgeMm; TEXTURE_CAP_ACTIVE = true; }
+  try { return fn(); } finally { TEXTURE_EDGE_IN_FORCE = prevE; TEXTURE_CAP_ACTIVE = prevA; }
+}
+/* the per-blade context `emitPanel` reads: the relief closure, the lattice's
+   row law and what it may not refine, and the panel records it appends */
+function textureContext(T, organ, rowAt, firstSub, noSubRows, rep = null) {
+  return { organ, rep, relief: { heightMm: T.heightMm, f: T.f }, lattice: { edgeMm: T.edgeMm, rowAt, firstSub, noSubRows }, panels: [] };
+}
+/* the record a blade carries — the controls, the refusal, and its panels */
+function textureRecord(T, tex) {
+  if (!T) return null;
+  return { type: T.type, heightMm: T.heightMm, sizeMm: T.sizeMm, edgeMm: T.edgeMm, heightClamped: T.heightClamped, sizeClamped: T.sizeClamped, refused: T.refused || null, panels: tex ? tex.panels : [] };
+}
+/* the whole bloom's record, from every organ's own */
+function textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, cap = null) {
+  const T = textureFor(state, cap);
+  if (!T) return null;
+  const organs = {};
+  const add = (name, rec) => {
+    if (!rec) return;
+    const o = organs[name] || (organs[name] = { blades: 0, refused: {}, panels: 0, subRows: 0, cfMax: 1, skinTris: 0, floorTris: 0, rimTris: 0, reliefMaxMm: 0, reliefMinMm: Infinity, displaced: 0, skinSamples: [], apexSamples: [], edgeMismatch: 0 });
+    o.blades++;
+    if (rec.edgeMm !== T.edgeMm) o.edgeMismatch++;   // ONE edge for the whole bloom (the edge cap); TX9 reads it
+    if (rec.refused) { o.refused[rec.refused] = (o.refused[rec.refused] || 0) + 1; return; }
+    for (const p of rec.panels) {
+      o.panels++; o.subRows += p.subRows; if (p.cfMax > o.cfMax) o.cfMax = p.cfMax;
+      /* a bounded set of the builder's own samples for the gate (TX2 restates
+         the field at `p0`; TX5 the apex along its own `w`) */
+      for (const q of p.skinSamples) if (o.skinSamples.length < 96) o.skinSamples.push(q);
+      for (const q of p.apexSamples) if (o.apexSamples.length < 64) o.apexSamples.push(q);
+      o.skinTris += p.skinTris; o.floorTris += p.floorTris || 0; o.rimTris += p.rimTris;
+      if (p.reliefMaxMm > o.reliefMaxMm) o.reliefMaxMm = p.reliefMaxMm;
+      if (p.displaced && p.reliefMinMm < o.reliefMinMm) o.reliefMinMm = p.reliefMinMm;
+      o.displaced += p.displaced;
+    }
+  };
+  for (const p of petalsAll) if (p) add('petal', p.texture);
+  if (sepalsBuilt && sepalsBuilt.tiers) for (const tier of sepalsBuilt.tiers) for (const s of (tier && tier.built) || []) if (s) add('sepal', s.texture);
+  for (const lb of leavesBuilt || []) {
+    if (!lb) continue;
+    if (lb.texture !== undefined) add('leaf', lb.texture);
+    if (lb.leaflets) for (const lf of lb.leaflets) add('leaf', lf.texture);
+  }
+  for (const o of Object.values(organs)) if (!Number.isFinite(o.reliefMinMm)) o.reliefMinMm = 0;
+  return { type: T.type, heightMm: T.heightMm, sizeMm: T.sizeMm, edgeMm: T.edgeMm, bar: TEXTURE_LATTICE_BAR, refused: T.refused || null, heightClamped: T.heightClamped, sizeClamped: T.sizeClamped, organs };
+}
+
+/* ===================================================================
+   THE ORGANS' RELIEF — surface texture T5 (docs/bloom-surface-texture-t5-
+   outcome.md; Eva's rulings of Oct 23). The HUB, the STEM and the TUBE RING
+   take the one world field the sheets take (attachment B), OUTWARD ONLY, at
+   the same PEAK-TO-VALLEY height, on the same 0.4 mm lattice edge the budget
+   cap derives for the whole bloom. RODS (filaments, the style, anthers,
+   PEDICELS, petioles, the rachis) are DEFERRED to the BONE sheet (Q12) and
+   take nothing here: a floret's own stem is its pedicel, so a floret build
+   relieves its hub and never its stem.
+
+   WHY A SECOND CONSTRUCTION AND NOT emitPanel's. The sheets have a row law
+   (`rowAt(u)`) and their lattice is refined in the surface's own (u, v); the
+   hub, the stem and the tube ring have none (the discovery's T5, §12.8 item
+   20). So each is REFINED ON ITS OWN SHIPPED LATTICE — every edge of the
+   organ's shipped triangles into ceil(L / e) equal segments (L snapped to
+   2^-20 mm, Q16), a coplanar strip quad cut as one unit, a closed centre fan
+   re-meshed as concentric rings, anything else by rows (T1's 'rows' split,
+   ported; its zip is the emitter's integer rule with a slack, so no last bit
+   decides a triangle) — and every new point lies ON a shipped facet. The
+   tube ring is therefore refined in its own (row, column) coordinates,
+   linearly, between the rows and columns its own law placed (`tubePanelRows`)
+   — the ring's normal at a new point is its own law's normals at the facet's
+   corners interpolated, never a second law.
+
+   EVERY COUNT IS MODE-FREE. A count is decided on the organ's shipped mesh IN
+   EXPORT MODE: on an export build that is the organ itself; on a live build
+   whose sheet the export floor raises (the only case the two differ — the hub
+   radius follows the floored sheet through the area rule, the rim band IS the
+   sheet), on an untextured export TWIN of the same state, built for the
+   purpose, whose organ meshes have the same topology triangle for triangle. So
+   tris(live) === tris(export) holds by construction, as both STL gates require.
+
+   THE NORMAL IS THE ORGAN'S OWN, PER FACE (TX10 restates it from the part's
+   axis or surface, never from the mesh): the emitter names the face each
+   triangle lies on (`faceTag`) and supplies the face's analytic normal —
+   the hub's +-z, its rim's radial, the dome's and the sphere's from their
+   centre, the join's profile normal, the stem wall's horizontal radial from
+   its own axis at its own depth, the end faces' +-z and the cut plane's; the
+   tube ring's own `sect` normals, handed over as it emits them. A vertex on
+   a CREASE (a hub's rim edge, the stem's end edge) takes the normalised sum of
+   its faces' normals, so ONE displacement per position: the relief runs over
+   the crease (the bead's own Q4/Q5 ruling) and nothing cracks.
+
+   VISIBLE (Q7) IS DERIVED FROM THE GEOMETRY, PER VERTEX: a vertex is visible
+   iff some ray from just outside it (q + delta n) escapes the whole bloom's
+   emitted triangles, tried along n and along each of a fixed set of world
+   directions in its outward hemisphere. A point inside another part (the
+   stem's top inside the hub, the hub's underside inside the stem, the rim
+   under a petal's root, the ring under a petal, the wall under a petiole's
+   root) is enclosed by that part's closed shell and no ray escapes; a face
+   COINCIDENT with another part's face (the hub's top under the feet, which sit
+   ON it) is on the outside of the union and is visible, so the hub textures
+   over the buried feet — SUPERSEDED by Eva's ruling 1 (Oct 25): a visible
+   hub vertex whose relief would stand up into a PETAL FOOT is COVERED and
+   takes none (`textureVertexCovered`, below; the feet and nothing else). A
+   vertex two organs both emit is relieved on the earlier organ only (the
+   weld rule in the relief pass). A buried or covered vertex takes no
+   relief, and the relief fades in from the nearest one over a width DERIVED
+   from the relief height and the lattice edge (Eva's ruling 2, Oct 25 — it
+   was a typed K = 2, `2H`): `textureFadeWidthMm(H, e) = max(H x s, e)`, where
+   `s` is the ease's OWN peak slope, read off `rimEase` itself at module load
+   (`TEXTURE_FADE_PEAK_SLOPE`, 15/8 for the quintic), so the steepest ramp the
+   fade adds over a full-height relief is exactly 45 degrees and no steeper —
+   and never shorter than one lattice edge `e`, because a fade with no vertex
+   inside it is not drawn as a ramp at all but as a step between two lattice
+   neighbours. On today's ranges the edge term never binds (the 0.4 mm floor
+   height gives 0.75 mm against the 0.5 mm edge cap) — said rather than hidden. The organ's own CAVITY faces (the stem's bore and the
+   void's caps, the sphere hub's inner sphere) are named by the emitter,
+   never refined and never relieved (Q15); `tools/bloom-texture-t5.mjs`
+   confirms by the same escape test that no ray leaves them.
+
+   THE RELIEF IS DEFERRED TO THE END OF THE BUILD because visibility needs
+   every part: the lattice is cut right after the organ is emitted (so every
+   later triangle range is where it was), the displacement is written in place
+   once everything else exists, positions only, no count moves. An untextured
+   build takes none of this: `organsT5` is null and every expression is the
+   shipped one, by branch.
+   =================================================================== */
+export const TEXTURE_RELIEF_ORGANS = Object.freeze(['hub', 'stem', 'tube']);
+/* the ease's own peak slope, read off the function it is (a central difference
+   on a dyadic lattice of [0, 1], products and sums only — engine-agreed); the
+   quintic's is 15/8 to within 5h^2 of the step */
+export const TEXTURE_FADE_PEAK_SLOPE = (() => {
+  const N = 1 << 16, h = 1 / (1 << 20);
+  let best = 0;
+  for (let k = 1; k < N; k++) { const t = k / N, d = (rimEase(t + h) - rimEase(t - h)) / (2 * h); if (d > best) best = d; }
+  return best;
+})();
+export function textureFadeWidthMm(heightMm, edgeMm) { return Math.max(heightMm * TEXTURE_FADE_PEAK_SLOPE, edgeMm); }
+export const TEXTURE_VISIBILITY_OFFSET_MM = 1e-4;
+/* the escape directions — the six axes and the eight cube diagonals, turned
+   once by a fixed rotation so no one of them lies along a symmetry axis of
+   any organ (a ray down an edge of the hub's 48 sectors would ask its
+   question of a knife edge) */
+export const TEXTURE_VISIBILITY_DIRS = (() => {
+  const raw = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  for (const a of [1, -1]) for (const b of [1, -1]) for (const c of [1, -1]) raw.push([a, b, c]);
+  /* a rotation by 0.3 rad about (0.31, 0.53, 0.79), written as its matrix
+     once with products only (the directions are constants of the law) */
+  const ax = [0.31, 0.53, 0.79], L = Math.sqrt(ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]);
+  const k = [ax[0] / L, ax[1] / L, ax[2] / L], c = 0.955336489125606, s = 0.29552020666133955, v = 1 - c;
+  const M = [[c + k[0] * k[0] * v, k[0] * k[1] * v - k[2] * s, k[0] * k[2] * v + k[1] * s], [k[1] * k[0] * v + k[2] * s, c + k[1] * k[1] * v, k[1] * k[2] * v - k[0] * s], [k[2] * k[0] * v - k[1] * s, k[2] * k[1] * v + k[0] * s, c + k[2] * k[2] * v]];
+  return Object.freeze(raw.map((d) => { const n = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]); const e = [d[0] / n, d[1] / n, d[2] / n]; return Object.freeze([M[0][0] * e[0] + M[0][1] * e[1] + M[0][2] * e[2], M[1][0] * e[0] + M[1][1] * e[1] + M[1][2] * e[2], M[2][0] * e[0] + M[2][1] * e[1] + M[2][2] * e[2]]); }));
+})();
+const T5_HEMISPHERE_DOT = 0.3;
+const T5_RAY_EDGE = 1e-9;               // the barycentric slack a ray along a shared edge is caught by
+/* the first ray is the normal turned by a fixed small angle off it: a radial
+   normal lies in the plane of the hub's own sector edges, and a ray down an
+   edge asks its question of a knife edge */
+const T5_NORMAL_TILT = Object.freeze([0.031, 0.053, 0.079]);          // a direction is tried where it leaves the surface at more than ~17 degrees
+const T5_PAIR_PLANE_MM = 1e-9;          // a strip quad's fourth point within this of the others' plane
+const T5_ZIP_SLACK_MM = 1e-6;           // emitPanel's own ZIP_SLACK_MM: within it the integer rule decides
+const T5_FAN_MIN_SPOKES = 8;            // a closed fan of at least this many spokes is a centre (the hub's 48, a pole's)
+const T5_FAN_SPOKE_RATIO = 1.5;         // ... with every spoke within this factor of the shortest
+const T5_FAN_RING_MIN = 6;              // the innermost ring of a re-meshed centre is a hexagon, never the fan's own 48 slivers
+/* the emitter's own normal function for the organ it is emitting, recorded
+   only while a capture is open (a textured build) */
+function organNormalOf(acc, fn) { if (acc.faceTags) acc.organNormal = fn; }
+const t5IsCavity = (tag) => tag === 'hub.cavity' || tag === 'stem.cavity';
+/* run one emitter with the face channel open; returns the tags of the
+   triangles it emitted and the normal function it declared */
+function organCapture(acc, fn) {
+  acc.faceTags = []; acc.faceTag = null; acc.organNormal = null;
+  try { const out = fn(); return { out, tags: acc.faceTags, normalOf: acc.organNormal }; }
+  finally { acc.faceTags = null; acc.faceTag = null; acc.organNormal = null; }
+}
+/* weld a triangle soup by exact position — the organ's own vertices are the
+   same doubles wherever two of its faces meet (they are made by one call) */
+function t5Weld(pos, from, to) {
+  const map = new Map(), P = [], tri = new Int32Array((to - from) * 3);
+  for (let t = from; t < to; t++) for (let c = 0; c < 3; c++) {
+    const o = t * 9 + c * 3, x = pos[o], y = pos[o + 1], z = pos[o + 2];
+    const key = `${x}|${y}|${z}`;
+    let id = map.get(key);
+    if (id === undefined) { id = P.length / 3; map.set(key, id); P.push(x, y, z); }
+    tri[(t - from) * 3 + c] = id;
+  }
+  return { P, tri, nT: to - from, map };
+}
+/* THE ORGAN'S LATTICE, cut in place right after the organ is emitted.
+   `decide` (null on every build where this mode IS the export mode, or the
+   export floor does not bind) is the organ's shipped mesh in export mode,
+   triangle for triangle the same topology: every count, pair, fan and zip
+   decision is taken on it, the geometry on this mesh. */
+function organLatticeInto(acc, from, cap, { organ, edgeMm, decide = null, sink = null }) {
+  const to = acc.triangleCount;
+  const tags = cap.tags || [];
+  const W = t5Weld(acc.positions, from, to);
+  const nT = W.nT, P = W.P;
+  let D = null, twinMismatch = false;
+  if (decide) {
+    const Wd = t5Weld(decide.positions, decide.from, decide.to);
+    if (Wd.nT === nT && Wd.P.length === P.length && Wd.tri.every((v, i) => v === W.tri[i])) D = Wd.P;
+    else twinMismatch = true;
+  }
+  if (!D) D = P;
+  const twoMeshes = D !== P;
+  const e = edgeMm, snap = (L) => Math.round(L * 1048576) / 1048576;
+  const dist = (A, i, j) => { const dx = A[j * 3] - A[i * 3], dy = A[j * 3 + 1] - A[i * 3 + 1], dz = A[j * 3 + 2] - A[i * 3 + 2]; return Math.sqrt(dx * dx + dy * dy + dz * dz); };
+  const tri = W.tri;
+  const kept = new Uint8Array(nT);
+  for (let t = 0; t < nT; t++) if (t5IsCavity(tags[t])) kept[t] = 1;
+  const ek = (i, j) => (i < j ? i * 4294967296 + j : j * 4294967296 + i);
+  const frozen = new Set();
+  for (let t = 0; t < nT; t++) if (kept[t]) for (let k = 0; k < 3; k++) frozen.add(ek(tri[t * 3 + k], tri[t * 3 + (k + 1) % 3]));
+  /* every count from the DECISION mesh, snapped (Q16) */
+  const segs = (i, j) => { if (frozen.has(ek(i, j))) return 1; const L = snap(dist(D, i, j)); return L <= e ? 1 : Math.ceil(L / e); };
+  /* the normals the tube ring handed over, per shipped vertex */
+  const NA = sink ? [] : null;
+  if (sink) for (let id = 0; id < P.length / 3; id++) { const n = sink.get(`${P[id * 3]}|${P[id * 3 + 1]}|${P[id * 3 + 2]}`); NA.push(n ? n[0] : 0, n ? n[1] : 0, n ? n[2] : 0); }
+  const addPoint = (i, j, f) => {
+    const id = P.length / 3;
+    P.push(P[i * 3] + (P[j * 3] - P[i * 3]) * f, P[i * 3 + 1] + (P[j * 3 + 1] - P[i * 3 + 1]) * f, P[i * 3 + 2] + (P[j * 3 + 2] - P[i * 3 + 2]) * f);
+    if (twoMeshes) D.push(D[i * 3] + (D[j * 3] - D[i * 3]) * f, D[i * 3 + 1] + (D[j * 3 + 1] - D[i * 3 + 1]) * f, D[i * 3 + 2] + (D[j * 3 + 2] - D[i * 3 + 2]) * f);
+    if (NA) NA.push(NA[i * 3] + (NA[j * 3] - NA[i * 3]) * f, NA[i * 3 + 1] + (NA[j * 3 + 1] - NA[i * 3 + 1]) * f, NA[i * 3 + 2] + (NA[j * 3 + 2] - NA[i * 3 + 2]) * f);
+    return id;
+  };
+  const edgeCache = new Map();
+  const edgePts = (i, j) => {
+    const lo = i < j ? i : j, hi = i < j ? j : i, k = ek(lo, hi);
+    let pts = edgeCache.get(k);
+    if (!pts) {
+      const n = segs(lo, hi);
+      pts = [lo];
+      for (let q = 1; q < n; q++) pts.push(addPoint(lo, hi, q / n));
+      pts.push(hi);
+      edgeCache.set(k, pts);
+    }
+    return i === lo ? pts : pts.slice().reverse();
+  };
+  const faceN = (A, a, b, c) => {
+    const ux = A[b * 3] - A[a * 3], uy = A[b * 3 + 1] - A[a * 3 + 1], uz = A[b * 3 + 2] - A[a * 3 + 2];
+    const vx = A[c * 3] - A[a * 3], vy = A[c * 3 + 1] - A[a * 3 + 1], vz = A[c * 3 + 2] - A[a * 3 + 2];
+    return [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+  };
+  const out = [], src = [];
+  /* the strip between two chains, zipped by the INTEGER rule (advance the
+     chain whose next fraction is smaller) unless one diagonal is shorter by
+     more than the slack — decided on the decision mesh — and wound with the
+     parent face */
+  const zip = (Lc, Rc, n0, s) => {
+    const a = Lc.length - 1, b = Rc.length - 1;
+    let i = 0, j = 0;
+    const emit = (x, y, z) => {
+      if (x === y || y === z || x === z) return;
+      const f = faceN(D, x, y, z);
+      if (f[0] * n0[0] + f[1] * n0[1] + f[2] * n0[2] < 0) out.push(x, z, y); else out.push(x, y, z);
+      src.push(s);
+    };
+    while (i < a || j < b) {
+      let advL = j === b || (i < a && (i + 1) * b <= (j + 1) * a);
+      if (i < a && j < b) {
+        const diff = dist(D, Lc[i + 1], Rc[j]) - dist(D, Lc[i], Rc[j + 1]);
+        if (diff < -T5_ZIP_SLACK_MM) advL = true; else if (diff > T5_ZIP_SLACK_MM) advL = false;
+      }
+      if (advL) { emit(Lc[i], Lc[i + 1], Rc[j]); i++; } else { emit(Lc[i], Rc[j + 1], Rc[j]); j++; }
+    }
+  };
+  const rowBetween = (Lp, Rp) => {
+    const m = segs(Lp, Rp), row = [Lp];
+    for (let q = 1; q < m; q++) row.push(addPoint(Lp, Rp, q / m));
+    row.push(Rp);
+    return row;
+  };
+  /* ---- the edge use, for the strip quads and the centre fans ---- */
+  const use = new Map();
+  for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) { const key = ek(tri[t * 3 + k], tri[t * 3 + (k + 1) % 3]); const l = use.get(key); if (l) l.push(t); else use.set(key, [t]); }
+  /* ---- CLOSED CENTRE FANS (the hub's apexes and poles): re-meshed as rings ---- */
+  const fanOf = new Int32Array(nT).fill(-1), fans = [];
+  {
+    const inc = new Map();
+    for (let t = 0; t < nT; t++) if (!kept[t]) for (let k = 0; k < 3; k++) { const v = tri[t * 3 + k]; const l = inc.get(v); if (l) l.push(t); else inc.set(v, [t]); }
+    for (const [v, ts] of inc) {
+      if (ts.length < T5_FAN_MIN_SPOKES) continue;
+      const tag = tags[ts[0]];
+      if (!ts.every((t) => tags[t] === tag && fanOf[t] < 0)) continue;
+      /* every spoke shared by exactly two of these triangles, and the opposite
+         edges form ONE closed loop */
+      const opp = new Map(); let ok = true;
+      for (const t of ts) {
+        const k = [0, 1, 2].find((q) => tri[t * 3 + q] === v);
+        const a = tri[t * 3 + (k + 1) % 3], b = tri[t * 3 + (k + 2) % 3];
+        if (opp.has(a)) { ok = false; break; }
+        opp.set(a, { b, t });
+      }
+      if (!ok || opp.size !== ts.length) continue;
+      for (const t of ts) for (let k = 0; k < 3; k++) { const a = tri[t * 3 + k], b = tri[t * 3 + (k + 1) % 3]; if (a === v || b === v) { const u = use.get(ek(a, b)); if (!u || u.length !== 2 || !u.every((x) => ts.includes(x))) ok = false; } }
+      if (!ok) continue;
+      const start = opp.keys().next().value;
+      const loop = []; let cur = start, guard = 0;
+      do { const o = opp.get(cur); if (!o) { ok = false; break; } loop.push({ a: cur, b: o.b, t: o.t }); cur = o.b; } while (cur !== start && ++guard <= ts.length);
+      if (!ok || loop.length !== ts.length || cur !== start) continue;
+      /* a CENTRE: every spoke the same length to within the factor (a
+         lattice's interior vertex is not one) */
+      let sMin = Infinity, sMax = 0;
+      for (const L of loop) { const d = dist(D, v, L.a); if (d < sMin) sMin = d; if (d > sMax) sMax = d; }
+      if (!(sMax <= T5_FAN_SPOKE_RATIO * sMin)) continue;
+      for (const t of ts) fanOf[t] = fans.length;
+      fans.push({ v, loop, tag });
+    }
+  }
+  /* ---- STRIP QUADS: two triangles across their mutual longest edge, coplanar
+          and convex, rails at least as long as the ends (T1's rule) ---- */
+  const pairOf = new Int32Array(nT).fill(-1);
+  const longest = (t) => { let best = -1, bk = 0; for (let k = 0; k < 3; k++) { const i = tri[t * 3 + k], j = tri[t * 3 + (k + 1) % 3], d = dist(D, i, j); if (d > best) { best = d; bk = ek(i, j); } } return bk; };
+  const railLoop = (Lq) => { const a = Math.min(segs(Lq[0], Lq[1]), segs(Lq[3], Lq[2])), b = Math.min(segs(Lq[1], Lq[2]), segs(Lq[0], Lq[3])); return b > a ? [Lq[1], Lq[2], Lq[3], Lq[0]] : Lq; };
+  for (let t = 0; t < nT; t++) {
+    if (pairOf[t] >= 0 || kept[t] || fanOf[t] >= 0) continue;
+    const kt = longest(t), bi = Math.floor(kt / 4294967296), bj = kt % 4294967296;
+    if (segs(bi, bj) === 1) continue;
+    const users = use.get(kt);
+    if (!users || users.length !== 2) continue;
+    const u = users[0] === t ? users[1] : users[0];
+    if (pairOf[u] >= 0 || kept[u] || fanOf[u] >= 0 || tags[u] !== tags[t] || longest(u) !== kt) continue;
+    const T = [tri[t * 3], tri[t * 3 + 1], tri[t * 3 + 2]], U = [tri[u * 3], tri[u * 3 + 1], tri[u * 3 + 2]];
+    const q = U.find((x) => !T.includes(x));
+    if (q === undefined) continue;
+    let r = 0; while (U.includes(T[(r + 2) % 3])) r++;
+    const i = T[r], j = T[(r + 1) % 3], p = T[(r + 2) % 3];
+    const nn = faceN(D, i, j, p), nl = Math.sqrt(nn[0] * nn[0] + nn[1] * nn[1] + nn[2] * nn[2]);
+    if (!(nl > 0)) continue;
+    const off = ((D[q * 3] - D[i * 3]) * nn[0] + (D[q * 3 + 1] - D[i * 3 + 1]) * nn[1] + (D[q * 3 + 2] - D[i * 3 + 2]) * nn[2]) / nl;
+    if (Math.abs(off) > T5_PAIR_PLANE_MM) continue;
+    const Lq = [j, p, i, q];
+    let convex = true;
+    for (let k = 0; k < 4 && convex; k++) { const A = Lq[k], B = Lq[(k + 1) % 4], C = Lq[(k + 2) % 4]; const f = [D[B * 3] - D[A * 3], D[B * 3 + 1] - D[A * 3 + 1], D[B * 3 + 2] - D[A * 3 + 2]], g = [D[C * 3] - D[B * 3], D[C * 3 + 1] - D[B * 3 + 1], D[C * 3 + 2] - D[B * 3 + 2]]; if ((f[1] * g[2] - f[2] * g[1]) * nn[0] + (f[2] * g[0] - f[0] * g[2]) * nn[1] + (f[0] * g[1] - f[1] * g[0]) * nn[2] <= 0) convex = false; }
+    if (!convex) continue;
+    const [w0, w1, w2, w3] = railLoop(Lq);
+    if (Math.min(segs(w0, w1), segs(w3, w2)) < Math.max(segs(w0, w3), segs(w1, w2))) continue;
+    pairOf[t] = u; pairOf[u] = t;
+  }
+  /* ---- emit ---- */
+  const doneFan = new Uint8Array(fans.length);
+  for (let t = 0; t < nT; t++) {
+    const a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2];
+    if (kept[t]) { out.push(a, b, c); src.push(t); continue; }
+    if (fanOf[t] >= 0) {
+      const fi = fanOf[t];
+      if (doneFan[fi]) continue;
+      doneFan[fi] = 1;
+      const F = fans[fi], v = F.v;
+      /* the outer chain, the fan's own loop edges at their split points */
+      const chain = [];
+      for (const L of F.loop) { const pts = edgePts(L.a, L.b); for (let q = 0; q < pts.length - 1; q++) chain.push(pts[q]); }
+      const nOut = chain.length;
+      let M = 1; for (const L of F.loop) M = Math.max(M, segs(v, L.a));
+      /* the ring's own length, read on the decision mesh: ring m carries as
+         many points as its circumference needs at the edge, never more than
+         the chain it is drawn from */
+      let perim = 0; for (let q = 0; q < nOut; q++) perim += dist(D, chain[q], chain[(q + 1) % nOut]);
+      const n0 = faceN(D, v, F.loop[0].a, F.loop[0].b);
+      /* ring m (1..M-1) is the chain scaled toward the apex by m / M, its point
+         count the chain's scaled likewise (at least the loop's own count);
+         every ring point is on one shipped facet (a point between two chain
+         points of one loop edge, drawn toward the apex) */
+      const ringAt = (m) => {
+        const cnt = Math.min(nOut, Math.max(T5_FAN_RING_MIN, Math.ceil(snap((perim * m) / M) / e)));
+        const pts = [];
+        for (let q = 0; q < cnt; q++) {
+          const pos = (q * nOut) / cnt, i0 = Math.floor(pos), fr = pos - i0;
+          const A = chain[i0 % nOut], B = chain[(i0 + 1) % nOut];
+          const on = fr === 0 ? A : addPoint(A, B, fr);
+          pts.push(addPoint(v, on, m / M));
+        }
+        return pts;
+      };
+      let prev = [v];
+      for (let m = 1; m <= M; m++) {
+        const ring = m === M ? chain : ringAt(m);
+        if (prev.length === 1) {
+          for (let q = 0; q < ring.length; q++) { const x = v, y = ring[q], z = ring[(q + 1) % ring.length]; const f = faceN(D, x, y, z); if (f[0] * n0[0] + f[1] * n0[1] + f[2] * n0[2] < 0) out.push(x, z, y); else out.push(x, y, z); src.push(F.loop[0].t); }
+        } else zip([...prev, prev[0]], [...ring, ring[0]], n0, F.loop[0].t);
+        prev = ring;
+      }
+      continue;
+    }
+    if (pairOf[t] >= 0) {
+      const u = pairOf[t];
+      if (u < t) continue;
+      const T = [a, b, c], U = [tri[u * 3], tri[u * 3 + 1], tri[u * 3 + 2]];
+      let r = 0; while (U.includes(T[(r + 2) % 3])) r++;
+      const i = T[r], j = T[(r + 1) % 3], p = T[(r + 2) % 3], q = U.find((x) => x !== i && x !== j);
+      const n0 = faceN(D, i, j, p);
+      const [v0, v1, v2, v3] = railLoop([j, p, i, q]);
+      const rA = edgePts(v0, v1), rB = edgePts(v3, v2);
+      const n1 = rA.length - 1, n2 = rB.length - 1, K = Math.max(n1, n2);
+      let prev = edgePts(v0, v3);
+      for (let k = 1; k <= K; k++) {
+        const row = k === K ? edgePts(v1, v2) : rowBetween(rA[Math.round((k * n1) / K)], rB[Math.round((k * n2) / K)]);
+        zip(prev, row, n0, t);
+        prev = row;
+      }
+      continue;
+    }
+    const ab = edgePts(a, b), bc = edgePts(b, c), ca = edgePts(c, a);
+    if (ab.length === 2 && bc.length === 2 && ca.length === 2) { out.push(a, b, c); src.push(t); continue; }
+    const n0 = faceN(D, a, b, c);
+    /* the apex is opposite the edge with the fewest segments (ties: the
+       shorter edge on the decision mesh, then the triangle's own order) */
+    const cand = [[bc, a, b, c, dist(D, b, c), 0], [ca, b, c, a, dist(D, c, a), 1], [ab, c, a, b, dist(D, a, b), 2]];
+    cand.sort((x, y) => (x[0].length - y[0].length) || (snap(x[4]) - snap(y[4])) || (x[5] - y[5]));
+    const [base, A, B, Cc] = cand[0];
+    const sB = edgePts(A, B), sC = edgePts(A, Cc);
+    const n1 = sB.length - 1, n2 = sC.length - 1, K = Math.max(n1, n2);
+    let prev = [A];
+    for (let k = 1; k <= K; k++) {
+      const row = k === K ? base : rowBetween(sB[Math.round((k * n1) / K)], sC[Math.round((k * n2) / K)]);
+      zip(prev, row, n0, t);
+      prev = row;
+    }
+  }
+  /* ---- the organ's vertices: their faces, their normal, relievable or not ---- */
+  const nV = P.length / 3;
+  const vTags = Array.from({ length: nV }, () => null);
+  for (let k = 0; k < out.length; k++) {
+    const v = out[k], tg = tags[src[(k / 3) | 0]];
+    const l = vTags[v];
+    if (!l) vTags[v] = [tg]; else if (!l.includes(tg)) l.push(tg);
+  }
+  const N = new Float64Array(nV * 3), relievable = new Uint8Array(nV);
+  let normalFallback = 0;
+  for (let v = 0; v < nV; v++) {
+    const l = vTags[v];
+    if (!l || l.some(t5IsCavity)) continue;
+    let nx = 0, ny = 0, nz = 0, got = 0;
+    const p = [P[v * 3], P[v * 3 + 1], P[v * 3 + 2]];
+    for (const tg of l) {
+      let n = null;
+      if (NA) { const a = [NA[v * 3], NA[v * 3 + 1], NA[v * 3 + 2]], L = Math.hypot(a[0], a[1], a[2]); n = L > 0 ? [a[0] / L, a[1] / L, a[2] / L] : null; }
+      else if (cap.normalOf) n = cap.normalOf(tg, p);
+      if (!n) continue;
+      nx += n[0]; ny += n[1]; nz += n[2]; got++;
+      if (NA) break;
+    }
+    const L = Math.hypot(nx, ny, nz);
+    if (!got || !(L > 0)) { normalFallback++; continue; }
+    N[v * 3] = nx / L; N[v * 3 + 1] = ny / L; N[v * 3 + 2] = nz / L;
+    relievable[v] = 1;
+  }
+  /* ---- write the lattice in place of the shipped triangles ---- */
+  const nOutT = out.length / 3;
+  acc.positions.length = from * 9;
+  if (acc.normals) acc.normals.length = from * 9;
+  for (let k = 0; k < nOutT; k++) {
+    const a = out[k * 3], b = out[k * 3 + 1], c = out[k * 3 + 2];
+    acc.positions.push(P[a * 3], P[a * 3 + 1], P[a * 3 + 2], P[b * 3], P[b * 3 + 1], P[b * 3 + 2], P[c * 3], P[c * 3 + 1], P[c * 3 + 2]);
+    if (acc.normals) { const f = faceN(P, a, b, c), L = Math.hypot(f[0], f[1], f[2]) || 1; acc.normals.push(f[0] / L, f[1] / L, f[2] / L, f[0] / L, f[1] / L, f[2] / L, f[0] / L, f[1] / L, f[2] / L); }
+  }
+  let cavityTris = 0; for (let t = 0; t < nT; t++) if (kept[t]) cavityTris++;
+  return { organ, from, to: from + nOutT, shippedTris: nT, refinedTris: nOutT, cavityTris, edgeMm: e, tri: Int32Array.from(out), P, N, relievable, fans: fans.length, pairs: pairOf.reduce((n, x) => n + (x >= 0 ? 1 : 0), 0) / 2, normalFallback, twin: twoMeshes, twinMismatch, vTags };
+}
+
+/* THE VISIBILITY GRID — every triangle the build emitted, in a dense CSR
+   uniform grid, for the escape rays */
+function t5Grid(pos) {
+  const nT = pos.length / 9;
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { const x = pos[i + k]; if (x < lo[k]) lo[k] = x; if (x > hi[k]) hi[k] = x; }
+  for (let k = 0; k < 3; k++) { lo[k] -= 1; hi[k] += 1; }
+  const ext = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
+  const h = Math.max(0.5, Math.cbrt((ext[0] * ext[1] * ext[2]) / 400000));
+  const nx = Math.max(1, Math.ceil(ext[0] / h)), ny = Math.max(1, Math.ceil(ext[1] / h)), nz = Math.max(1, Math.ceil(ext[2] / h));
+  const cellOf = (x, k, n) => { const c = Math.floor((x - lo[k]) / h); return c < 0 ? 0 : c >= n ? n - 1 : c; };
+  const count = new Int32Array(nx * ny * nz + 1);
+  const span = (t) => {
+    const o = t * 9;
+    const x0 = Math.min(pos[o], pos[o + 3], pos[o + 6]), x1 = Math.max(pos[o], pos[o + 3], pos[o + 6]);
+    const y0 = Math.min(pos[o + 1], pos[o + 4], pos[o + 7]), y1 = Math.max(pos[o + 1], pos[o + 4], pos[o + 7]);
+    const z0 = Math.min(pos[o + 2], pos[o + 5], pos[o + 8]), z1 = Math.max(pos[o + 2], pos[o + 5], pos[o + 8]);
+    return [cellOf(x0, 0, nx), cellOf(x1, 0, nx), cellOf(y0, 1, ny), cellOf(y1, 1, ny), cellOf(z0, 2, nz), cellOf(z1, 2, nz)];
+  };
+  for (let t = 0; t < nT; t++) { const [a0, a1, b0, b1, c0, c1] = span(t); for (let i = a0; i <= a1; i++) for (let j = b0; j <= b1; j++) for (let k = c0; k <= c1; k++) count[(k * ny + j) * nx + i + 1]++; }
+  for (let i = 1; i < count.length; i++) count[i] += count[i - 1];
+  const fill = count.slice(), items = new Int32Array(count[count.length - 1]);
+  for (let t = 0; t < nT; t++) { const [a0, a1, b0, b1, c0, c1] = span(t); for (let i = a0; i <= a1; i++) for (let j = b0; j <= b1; j++) for (let k = c0; k <= c1; k++) items[fill[(k * ny + j) * nx + i]++] = t; }
+  return { pos, lo, h, nx, ny, nz, start: count, items, stamp: new Int32Array(nT), ray: 0 };
+}
+/* does a ray from `o` along unit `d` reach the grid's edge without meeting a
+   triangle? (Moller-Trumbore, products and quotients only) */
+function t5Escapes(G, o, d) {
+  const { pos, lo, h, nx, ny, nz, start, items, stamp } = G;
+  const id = ++G.ray;
+  let ix = Math.floor((o[0] - lo[0]) / h), iy = Math.floor((o[1] - lo[1]) / h), iz = Math.floor((o[2] - lo[2]) / h);
+  if (ix < 0 || iy < 0 || iz < 0 || ix >= nx || iy >= ny || iz >= nz) return true;
+  const st = [d[0] > 0 ? 1 : -1, d[1] > 0 ? 1 : -1, d[2] > 0 ? 1 : -1];
+  const tMax = [0, 0, 0], tDel = [0, 0, 0], idx = [ix, iy, iz];
+  for (let k = 0; k < 3; k++) {
+    if (d[k] === 0) { tMax[k] = Infinity; tDel[k] = Infinity; continue; }
+    const edge = lo[k] + (idx[k] + (d[k] > 0 ? 1 : 0)) * h;
+    tMax[k] = (edge - o[k]) / d[k]; tDel[k] = h / Math.abs(d[k]);
+  }
+  for (;;) {
+    const c = (idx[2] * ny + idx[1]) * nx + idx[0];
+    for (let q = start[c]; q < start[c + 1]; q++) {
+      const t = items[q];
+      if (stamp[t] === id) continue;
+      stamp[t] = id;
+      const b = t * 9;
+      const e1x = pos[b + 3] - pos[b], e1y = pos[b + 4] - pos[b + 1], e1z = pos[b + 5] - pos[b + 2];
+      const e2x = pos[b + 6] - pos[b], e2y = pos[b + 7] - pos[b + 1], e2z = pos[b + 8] - pos[b + 2];
+      const px = d[1] * e2z - d[2] * e2y, py = d[2] * e2x - d[0] * e2z, pz = d[0] * e2y - d[1] * e2x;
+      const det = e1x * px + e1y * py + e1z * pz;
+      if (det === 0) continue;
+      const inv = 1 / det;
+      const sx = o[0] - pos[b], sy = o[1] - pos[b + 1], sz = o[2] - pos[b + 2];
+      /* the acceptance is CLOSED and a hair wide: a ray that runs exactly along
+         a shared edge (an organ's sector edge lies in the same plane as the
+         hub's) must meet one of the two triangles, never slip between them —
+         blocked is the conservative answer */
+      const u = (sx * px + sy * py + sz * pz) * inv;
+      if (u < -T5_RAY_EDGE || u > 1 + T5_RAY_EDGE) continue;
+      const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+      const v = (d[0] * qx + d[1] * qy + d[2] * qz) * inv;
+      if (v < -T5_RAY_EDGE || u + v > 1 + T5_RAY_EDGE) continue;
+      const tt = (e2x * qx + e2y * qy + e2z * qz) * inv;
+      if (tt > 1e-9) return false;
+    }
+    const k = tMax[0] < tMax[1] ? (tMax[0] < tMax[2] ? 0 : 2) : (tMax[1] < tMax[2] ? 1 : 2);
+    idx[k] += st[k];
+    if (idx[k] < 0 || idx[k] >= (k === 0 ? nx : k === 1 ? ny : nz)) return true;
+    tMax[k] += tDel[k];
+  }
+}
+/* VISIBLE: some ray from just outside the vertex escapes — along its own
+   normal first, then along each fixed direction in its outward hemisphere */
+export function textureVertexVisible(G, q, n, delta = TEXTURE_VISIBILITY_OFFSET_MM) {
+  const o = [q[0] + n[0] * delta, q[1] + n[1] * delta, q[2] + n[2] * delta];
+  const t = [n[0] + T5_NORMAL_TILT[0], n[1] + T5_NORMAL_TILT[1], n[2] + T5_NORMAL_TILT[2]], tl = Math.sqrt(t[0] * t[0] + t[1] * t[1] + t[2] * t[2]);
+  if (t5Escapes(G, o, [t[0] / tl, t[1] / tl, t[2] / tl])) return true;
+  for (const d of TEXTURE_VISIBILITY_DIRS) if (d[0] * n[0] + d[1] * n[1] + d[2] * n[2] > T5_HEMISPHERE_DOT && t5Escapes(G, o, d)) return true;
+  return false;
+}
+export function textureVisibilityGrid(positions) { return t5Grid(positions); }
+/* COVERED (Eva's ruling 1, Oct 25 — T5's ambiguity 1): a vertex whose relief
+   would stand up INTO another part is under that part — a contact, not a
+   visible surface — even when its escape ray leaves the union. On the flat
+   head the petal feet's top skin is COINCIDENT with the hub's top face, so a
+   ray from just above the hub starts just above the foot and escapes; on a
+   dome the foot is laid on the cap in chords and stands 0.00..0.05 mm off it.
+   DERIVED FROM THE EMITTED GEOMETRY AND THE RELIEF'S OWN REACH, never from a
+   typed radius or a list of parts: the vertex is covered iff the segment the
+   relief would occupy — from just inside the surface (`q - delta n`, the
+   visibility offset) out to the full peak-to-valley height `H` along its own
+   outward normal — meets a triangle THE PETAL FEET emitted: the triangle range
+   `cover` = [a, b) the organ's record names for the parts that sit on it (the
+   head's hub: every petal, `[0, petalTriEnd)`; a floret's hub: that floret's
+   petals, offset where the append put them). The ruling names the feet and
+   nothing else, so the stem's junction ring, a tube ring on the hub, a leaf
+   near the stem and every other contact keep the T5 rule (a first cut that
+   counted ANY other part's triangles left a closed tube's ring and the hub
+   top under it both unrelieved, on coincident vertices, and the census welded
+   the two into one shell). An organ with no `cover` is never covered. The
+   acceptance is closed, as the escape test's is, so a foot's margin landing
+   exactly on a vertex covers it. */
+export function textureVertexCovered(G, q, n, reachMm, cover, delta = TEXTURE_VISIBILITY_OFFSET_MM) {
+  if (!cover) return false;
+  const o = [q[0] - n[0] * delta, q[1] - n[1] * delta, q[2] - n[2] * delta];
+  return t5HitsWithin(G, o, n, reachMm + delta, -1, -1, cover);
+}
+function t5HitsWithin(G, o, d, tStop, from, to, only = null) {
+  const { pos, lo, h, nx, ny, nz, start, items, stamp } = G;
+  const id = ++G.ray;
+  let ix = Math.floor((o[0] - lo[0]) / h), iy = Math.floor((o[1] - lo[1]) / h), iz = Math.floor((o[2] - lo[2]) / h);
+  if (ix < 0 || iy < 0 || iz < 0 || ix >= nx || iy >= ny || iz >= nz) return false;
+  const st = [d[0] > 0 ? 1 : -1, d[1] > 0 ? 1 : -1, d[2] > 0 ? 1 : -1];
+  const tMax = [0, 0, 0], tDel = [0, 0, 0], idx = [ix, iy, iz];
+  for (let k = 0; k < 3; k++) {
+    if (d[k] === 0) { tMax[k] = Infinity; tDel[k] = Infinity; continue; }
+    const edge = lo[k] + (idx[k] + (d[k] > 0 ? 1 : 0)) * h;
+    tMax[k] = (edge - o[k]) / d[k]; tDel[k] = h / Math.abs(d[k]);
+  }
+  for (let tCell = 0; ;) {
+    const c = (idx[2] * ny + idx[1]) * nx + idx[0];
+    for (let r = start[c]; r < start[c + 1]; r++) {
+      const t = items[r];
+      if (t >= from && t < to) continue;
+      if (only && (t < only[0] || t >= only[1])) continue;
+      if (stamp[t] === id) continue;
+      stamp[t] = id;
+      const b = t * 9;
+      const e1x = pos[b + 3] - pos[b], e1y = pos[b + 4] - pos[b + 1], e1z = pos[b + 5] - pos[b + 2];
+      const e2x = pos[b + 6] - pos[b], e2y = pos[b + 7] - pos[b + 1], e2z = pos[b + 8] - pos[b + 2];
+      const px = d[1] * e2z - d[2] * e2y, py = d[2] * e2x - d[0] * e2z, pz = d[0] * e2y - d[1] * e2x;
+      const det = e1x * px + e1y * py + e1z * pz;
+      if (det === 0) continue;
+      const inv = 1 / det;
+      const sx = o[0] - pos[b], sy = o[1] - pos[b + 1], sz = o[2] - pos[b + 2];
+      const u = (sx * px + sy * py + sz * pz) * inv;
+      if (u < -T5_RAY_EDGE || u > 1 + T5_RAY_EDGE) continue;
+      const qx = sy * e1z - sz * e1y, qy = sz * e1x - sx * e1z, qz = sx * e1y - sy * e1x;
+      const v = (d[0] * qx + d[1] * qy + d[2] * qz) * inv;
+      if (v < -T5_RAY_EDGE || u + v > 1 + T5_RAY_EDGE) continue;
+      const tt = (e2x * qx + e2y * qy + e2z * qz) * inv;
+      if (tt >= 0 && tt <= tStop) return true;
+    }
+    const k = tMax[0] < tMax[1] ? (tMax[0] < tMax[2] ? 0 : 2) : (tMax[1] < tMax[2] ? 1 : 2);
+    tCell = tMax[k];
+    if (tCell > tStop) return false;
+    idx[k] += st[k];
+    if (idx[k] < 0 || idx[k] >= (k === 0 ? nx : k === 1 ? ny : nz)) return false;
+    tMax[k] += tDel[k];
+  }
+}
+/* THE RELIEF PASS, once every part exists: visibility, the fade, the field,
+   the displacement written in place. Returns one record per organ. */
+function organReliefPass(acc, T, organs, capability = null) {
+  /* a gate-only lever, reached by no control: the lattice cut and every record
+     kept, the displacement not written — TX11 reads visibility off this mesh */
+  const off = !!(capability && capability.organReliefOff);
+  if (!organs.length) return {};
+  const G = t5Grid(acc.positions);
+  /* (a sheet-only lever, reached by no control: `textureFadeWidthMm` pins the
+     fade so the BEFORE of ruling 2 can be photographed on the same tree) */
+  const H = T.heightMm, Lam = capability && capability.textureFadeWidthMm > 0 ? capability.textureFadeWidthMm : textureFadeWidthMm(H, T.edgeMm);
+  const recs = {};
+  const SAMPLE_EVERY = 97;
+  /* every organ's visibility first, against the undisplaced organs.
+     A VERTEX TWO ORGANS BOTH EMIT (the same double — a closed tube ring's foot
+     edge landing on a hub lattice vertex) is ONE point of the union: relieved
+     on both sides by the one field along one normal it moves on both sides to
+     the same place, and the two closed shells are joined there, so a census
+     that welds by position reads their by-design overlap as a fold (measured:
+     6,275 within-shell pairs on the closed tube once the fade's length moved
+     the weights that had kept the two apart by chance). The organ emitted
+     LATER yields: its copy takes no relief, so the earlier organ's relief
+     stands over it and the two never share a point again. */
+  const earlier = new Set();
+  const vis = organs.map((O) => {
+    const nV = O.P.length / 3, v = new Uint8Array(nV);
+    let covered = 0, shared = 0;
+    for (let i = 0; i < nV; i++) if (O.relievable[i]) {
+      const q = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]];
+      if (earlier.has(`${q[0]},${q[1]},${q[2]}`)) { shared++; continue; }
+      v[i] = textureVertexVisible(G, q, [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]]) ? 1 : 0;
+      /* ruling 1: a visible vertex lying under a petal foot is a contact and
+         takes no relief (the hub's top under the feet) */
+      if (v[i] && !(capability && capability.textureCoverageOff) && textureVertexCovered(G, q, [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]], H, O.cover)) { v[i] = 0; covered++; }
+    }
+    O.coveredCount = covered; O.sharedCount = shared;
+    for (let i = 0; i < nV; i++) earlier.add(`${O.P[i * 3]},${O.P[i * 3 + 1]},${O.P[i * 3 + 2]}`);
+    return v;
+  });
+  organs.forEach((O, oi) => {
+    const nV = O.P.length / 3, V = vis[oi];
+    /* THE FADE IS GEODESIC: the distance ALONG THE ORGAN'S OWN MESH from the
+       nearest vertex that stays where it is (buried, a cavity's, or one with
+       no normal), by a multi-source Dijkstra over the lattice's edges cut off
+       at the fade length — never a straight line through the material, which
+       would let the hub's buried underside fade its own top face */
+    let buried = 0, visible = 0;
+    const dist = new Float64Array(nV).fill(Infinity);
+    const heap = [];
+    const push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+    for (let i = 0; i < nV; i++) {
+      if (!O.vTags[i]) continue;
+      if (O.relievable[i] && V[i]) { visible++; continue; }
+      if (O.relievable[i]) buried++;
+      dist[i] = 0; push(0, i);
+    }
+    const adj = Array.from({ length: nV }, () => []);
+    for (let t = 0; t < O.tri.length; t += 3) for (let k = 0; k < 3; k++) { const a = O.tri[t + k], b = O.tri[t + (k + 1) % 3]; adj[a].push(b); adj[b].push(a); }
+    while (heap.length) {
+      const [d, i] = pop();
+      if (d > dist[i] || d >= Lam) continue;
+      for (const j of adj[i]) {
+        const dx = O.P[j * 3] - O.P[i * 3], dy = O.P[j * 3 + 1] - O.P[i * 3 + 1], dz = O.P[j * 3 + 2] - O.P[i * 3 + 2];
+        const nd = d + Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (nd < dist[j]) { dist[j] = nd; push(nd, j); }
+      }
+    }
+    const rec = { blades: 1, refused: {}, panels: 0, subRows: 0, cfMax: 1, skinTris: O.refinedTris - O.cavityTris, floorTris: 0, rimTris: 0, reliefMaxMm: 0, reliefMinMm: Infinity, displaced: 0, skinSamples: [], apexSamples: [], edgeMismatch: O.edgeMm === T.edgeMm ? 0 : 1,
+      organ: { shippedTris: O.shippedTris, refinedTris: O.refinedTris, cavityTris: O.cavityTris, vertices: nV, relievable: O.relievable.reduce((n, x) => n + x, 0), visible, buried, covered: O.coveredCount || 0, shared: O.sharedCount || 0, fadeMm: Lam, fans: O.fans, pairs: O.pairs, normalFallback: O.normalFallback, twin: O.twin, twinMismatch: O.twinMismatch, triRange: [O.from, O.to] } };
+    const disp = new Float64Array(nV * 3);
+    let tick = 0;
+    for (let i = 0; i < nV; i++) {
+      const q = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]];
+      disp[i * 3] = q[0]; disp[i * 3 + 1] = q[1]; disp[i * 3 + 2] = q[2];
+      if (!O.relievable[i] || !V[i]) continue;
+      const dmin = dist[i];
+      const w = dmin >= Lam ? 1 : rimEase(dmin / Lam);
+      if (!(w > 0)) continue;
+      const n = [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]];
+      const s = w * (H * T.f(q));
+      const p1 = [q[0] + n[0] * s, q[1] + n[1] * s, q[2] + n[2] * s];
+      disp[i * 3] = p1[0]; disp[i * 3 + 1] = p1[1]; disp[i * 3 + 2] = p1[2];
+      rec.displaced++;
+      if (s > rec.reliefMaxMm) rec.reliefMaxMm = s;
+      if (s < rec.reliefMinMm) rec.reliefMinMm = s;
+      if (tick++ % SAMPLE_EVERY === 0 && rec.skinSamples.length < 64) rec.skinSamples.push({ p0: q, p1, mid: q, n, s, g: w, u: 0, v: 0, sIdx: -1, side: 'outward', rep: null, organ: O.organ, tags: O.vTags[i].slice(), fadeDistMm: dmin });
+    }
+    if (!Number.isFinite(rec.reliefMinMm)) rec.reliefMinMm = 0;
+    /* a bounded set of the BURIED vertices too, for the visibility clause */
+    rec.organ.buriedSamples = [];
+    for (let i = 0, k = 0; i < nV && rec.organ.buriedSamples.length < 32; i++) if (O.relievable[i] && !V[i] && (k++ % 13 === 0)) rec.organ.buriedSamples.push({ p: [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]], n: [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]] });
+    /* the displacement, in place: positions only */
+    const pos = acc.positions;
+    if (off) { rec.organ.reliefOff = true; }
+    else
+    for (let t = 0; t < O.tri.length / 3; t++) for (let c = 0; c < 3; c++) {
+      const v = O.tri[t * 3 + c], o = (O.from + t) * 9 + c * 3;
+      pos[o] = disp[v * 3]; pos[o + 1] = disp[v * 3 + 1]; pos[o + 2] = disp[v * 3 + 2];
+      for (let k = 0; k < 3; k++) { const x = pos[o + k]; if (x < acc.lo[k]) acc.lo[k] = x; if (x > acc.hi[k]) acc.hi[k] = x; }
+    }
+    if (acc.normals) for (let t = O.from; t < O.to; t++) {
+      const b = t * 9;
+      const ux = pos[b + 3] - pos[b], uy = pos[b + 4] - pos[b + 1], uz = pos[b + 5] - pos[b + 2], vx = pos[b + 6] - pos[b], vy = pos[b + 7] - pos[b + 1], vz = pos[b + 8] - pos[b + 2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
+      for (let c = 0; c < 3; c++) { acc.normals[b + c * 3] = nx; acc.normals[b + c * 3 + 1] = ny; acc.normals[b + c * 3 + 2] = nz; }
+    }
+    const key = O.organ;
+    if (!recs[key]) recs[key] = rec;
+    else {
+      /* a second ring of the same organ (a tube on two whorls) folds in */
+      const r = recs[key];
+      r.blades++; r.skinTris += rec.skinTris; r.displaced += rec.displaced; r.reliefMaxMm = Math.max(r.reliefMaxMm, rec.reliefMaxMm); r.reliefMinMm = Math.min(r.reliefMinMm, rec.reliefMinMm); r.edgeMismatch += rec.edgeMismatch;
+      for (const q of rec.skinSamples) if (r.skinSamples.length < 96) r.skinSamples.push(q);
+      for (const k of ['shippedTris', 'refinedTris', 'cavityTris', 'vertices', 'relievable', 'visible', 'buried', 'covered', 'shared', 'fans', 'pairs', 'normalFallback']) r.organ[k] += rec.organ[k];
+      r.organ.twinMismatch = r.organ.twinMismatch || rec.organ.twinMismatch;
+      r.organ.triRanges = [...(r.organ.triRanges || [r.organ.triRange]), rec.organ.triRange];
+      for (const q of rec.organ.buriedSamples) if (r.organ.buriedSamples.length < 48) r.organ.buriedSamples.push(q);
+    }
+  });
+  for (const r of Object.values(recs)) if (!r.organ.triRanges) r.organ.triRanges = [r.organ.triRange];
+  return recs;
+}
+/* WHETHER THIS BUILD RELIEVES ITS ORGANS, and on what edge: the texture on and
+   not refused, the build not a collect pass */
+function organT5For(state, capability) {
+  const T = textureFor(state, capability || null);
+  return T && !T.refused ? T : null;
+}
+
 
 /* ---------------- plan geometry: convex polygons in (x, y) ---------------- */
 /* Ported from `tools/bloom-voronoi-proto.mjs` term for term. The prototype
@@ -15724,6 +17460,25 @@ export function buildStemInto(acc, plan) {
   }
   const outer = nodeOuter || (CUT ? zs.slice(0, zs.length - 1) : zs).map((z) => ringAt(R, z));
   if (!nodeOuter) measure(outer);
+  /* THE STEM'S FACES, NAMED FOR THE ORGAN RELIEF (T5) — a property write on
+     an untextured build, no byte moved — and its own normals: the wall's
+     horizontal radial from the axis AT ITS OWN DEPTH (the node law's centre on a
+     noded stem: the swelling's tilt is left out, so the direction is outward
+     and never the surface normal exactly — said in the outcome doc), the end
+     faces' +-z, the cut plane's own. The BORE and the void's caps are the
+     enclosed cavity: never refined, never relieved (Q15). */
+  acc.faceTag = 'stem.outer';
+  organNormalOf(acc, (tag, P) => {
+    if (tag === 'stem.outer') {
+      const c = plan.nodeLaw ? stemNodeAxisMm(plan.nodeLaw, plan.rootZ - P[2]) : [0, 0];
+      const dx = P[0] - c[0], dy = P[1] - c[1], L = Math.hypot(dx, dy);
+      return L > 0 ? [dx / L, dy / L, 0] : null;
+    }
+    if (tag === 'stem.top') return [0, 0, 1];
+    if (tag === 'stem.bottom' || tag === 'stem.land') return [0, 0, -1];
+    if (tag === 'stem.cutPlane') { const sl = CUT.slope, L = Math.hypot(sl, 1); return [-sl / L, 0, -1 / L]; }
+    return null;
+  });
   for (let i = 0; i < outer.length - 1; i++) {
     const up = outer[i], dn = outer[i + 1];
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k], dn[k], dn[k2], up[k2]); }
@@ -15803,6 +17558,8 @@ export function buildStemInto(acc, plan) {
      root band, and the last two shared everything but which end was shut. What
      is left is the VOID or the absence of one. */
   const endFace = (face, cap, closed, up) => {
+    const endTag = up ? 'stem.top' : 'stem.bottom';
+    acc.faceTag = endTag;
     if (closed) {
       /* BOTH DISCS ARE RIM FANS, never centre fans — the solid arm's own
          measured defect, one branch down: a vertex at exactly [0, 0, z] is a
@@ -15811,9 +17568,12 @@ export function buildStemInto(acc, plan) {
          self-intersection (528 pairs, measured). A rim fan shares no axis
          vertex with anything. */
       for (let k = 1; k < N - 1; k++) {
-        if (up) { acc.tri(face[0], face[k], face[k + 1]); acc.tri(cap[0], cap[k + 1], cap[k]); }
-        else { acc.tri(face[0], face[k + 1], face[k]); acc.tri(cap[0], cap[k], cap[k + 1]); }
+        acc.faceTag = endTag;
+        if (up) acc.tri(face[0], face[k], face[k + 1]); else acc.tri(face[0], face[k + 1], face[k]);
+        acc.faceTag = 'stem.cavity';
+        if (up) acc.tri(cap[0], cap[k + 1], cap[k]); else acc.tri(cap[0], cap[k], cap[k + 1]);
       }
+      acc.faceTag = null;
     } else {
       /* AND THE OPEN ARM'S WINDING IS THE OTHER WAY ROUND FROM THE ONE THIS
          FILE SHIPPED, WHICH IS A MEASUREMENT AND NOT A TIDY-UP. Both annuli of
@@ -15865,15 +17625,18 @@ export function buildStemInto(acc, plan) {
     const land = [];
     for (let i = iB; i < M; i++) land.push(cr[i]);
     for (let i = 0; i <= iA; i++) land.push(cr[i]);
+    acc.faceTag = 'stem.land';
     for (let j = 1; j < land.length - 1; j++) tri(land[0], land[j + 1], land[j]);
     const plane = [];
     for (let i = iA; i <= iB; i++) plane.push(cr[i % M]);
+    acc.faceTag = 'stem.cutPlane';
     for (let j = 1; j < plane.length - 1; j++) tri(plane[0], plane[j + 1], plane[j]);
+    acc.faceTag = null;
     cutFaceTo = acc.triangleCount;
   };
   /* The void's own floor under a cut: a rim fan facing UP into the bore —
      `endFace`'s closed cap, term for term, on the one ring. */
-  const voidCapInto = (cap) => { for (let k = 1; k < N - 1; k++) acc.tri(cap[0], cap[k], cap[k + 1]); };
+  const voidCapInto = (cap) => { acc.faceTag = 'stem.cavity'; for (let k = 1; k < N - 1; k++) acc.tri(cap[0], cap[k], cap[k + 1]); acc.faceTag = null; };
   let emittedVoid = false, emittedVoidTopZ, emittedVoidBottomZ;
   if (plan.voidMm > 0) {
     /* THE VOID GETS ITS OWN LADDER FROM THE ONE PLACER, over its own length,
@@ -15901,10 +17664,12 @@ export function buildStemInto(acc, plan) {
       ? nodeVoidLadder(plan.voidMm).map((mm) => nodeInner(mm))
       : stemStations(plan.voidMm).map((mm) => ringAt(b, plan.voidTopZ - mm));
     if (nodeMeasureInner) nodeMeasureInner(inner); else measure(inner);
+    acc.faceTag = 'stem.cavity';
     for (let i = 0; i < inner.length - 1; i++) {
       const up = inner[i], dn = inner[i + 1];
       for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k2], dn[k2], dn[k], up[k]); }
     }
+    acc.faceTag = null;
     /* THE EMITTED VOID — ST10's measured side, and it is here rather than read
        off the plan for ST2's and ST3's own reason: a builder that put the plug
        at the wrong end, or at five times its length, emits the SAME triangle
@@ -15919,7 +17684,9 @@ export function buildStemInto(acc, plan) {
   } else if (CUT) {
     /* NO BORE under a CUT: the top cap as the solid arm emits it, the cut
        face below. */
+    acc.faceTag = 'stem.top';
     for (let k = 1; k < N - 1; k++) acc.tri(tOut[0], tOut[k], tOut[k + 1]);
+    acc.faceTag = null;
     cutFaceInto();
   } else {
     /* NO BORE LEFT TO SEE — either the stem never had one (at or under the 3 mm
@@ -15937,9 +17704,12 @@ export function buildStemInto(acc, plan) {
        pairs on the 3 mm row, worst span 0.1962 mm, against 0 on every hollow
        one (a bore leaves no axis vertex to share). */
     for (let k = 1; k < N - 1; k++) {
+      acc.faceTag = 'stem.top';
       acc.tri(tOut[0], tOut[k], tOut[k + 1]);           // top cap, facing up
+      acc.faceTag = 'stem.bottom';
       acc.tri(bOut[0], bOut[k + 1], bOut[k]);           // bottom cap, facing down
     }
+    acc.faceTag = null;
   }
   /* THE STEM'S OWN DIRECTED-EDGE CENSUS — ST10's witness for which way these
      faces point, and the only one available.
@@ -16243,11 +18013,13 @@ export function leafletOutlineWidthScale(lengthMm, widthMm) {
    the rows emit (the petal's `bendReachAt`), so a drawn spine never bends a
    cupped leaf through itself. Null where the leaf's spine is the slider's —
    every arch that shipped is built by the expressions it was, by branch. */
-export function leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt = null }) {
+export function leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt = null, tauAt = null }) {
   if (!form || form.spineCurve === null || form.spineCurve === undefined) return null;
   const curveLaw = spineCurveLaw(form.spineCurve, Lmm);
   const floorRadius = ROLL_MIN_RADIUS_FACTOR * t;
-  const bend = reachAt ? spineBendTable({ length: Lmm, rows: nu, reachAt, floorRadius, t }) : null;
+  /* (root support: the fold limit's margin is half the thickness AT EACH
+     SUBSTEP on a tapered blade — the petal's `tauAt`, null BY BRANCH) */
+  const bend = reachAt ? (tauAt === null ? spineBendTable({ length: Lmm, rows: nu, reachAt, floorRadius, t }) : spineBendTable({ length: Lmm, rows: nu, reachAt, floorRadius, t, tauAt })) : null;
   const law = spineLaw({ curlRad: 0, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius, rows: nu, curve: curveLaw, bend: bend && bend.binds ? bend : null });
   return { curveLaw, bend, law, floorRadius };
 }
@@ -16293,11 +18065,11 @@ export function leafCurveRiseMm(state, lengthMm, angleDeg) {
   if (leafIsLobed(state)) {
     const LL = lobedLaws(acc, { lengthMm }, state);
     const reach = LL.form ? lobedBendReachAt(LL.form, LL.profE) : null;
-    spine = leafSpineCurveLaw({ form: LL.form, Lmm: lengthMm, th, t: LL.t, nu: LL.nu, reachAt: reach });
+    spine = leafSpineCurveLaw({ form: LL.form, Lmm: lengthMm, th, t: LL.t, nu: LL.nu, reachAt: reach, tauAt: LL.rootTauAt });
   } else {
     const bs = leafBladeState({ ...state, leafLength: lengthMm });
-    const { form, nu, prof, t } = leafBladeLaw(acc, bs, Number(state.leafWidth), lengthMm, state.sheetThickness);
-    spine = leafSpineCurveLaw({ form, Lmm: lengthMm, th, t, nu, reachAt: form ? leafBendReachAt(form, prof) : null });
+    const { form, nu, prof, t, rootTauAt } = leafBladeLaw(acc, bs, Number(state.leafWidth), lengthMm, state.sheetThickness, lengthMm);
+    spine = leafSpineCurveLaw({ form, Lmm: lengthMm, th, t, nu, reachAt: form ? leafBendReachAt(form, prof) : null, tauAt: rootTauAt });
   }
   let best = 0;
   if (spine) for (let i = 0; i <= spine.law.substeps; i++) { const q = spine.law.at((lengthMm * i) / spine.law.substeps); if (q.dZ > best) best = q.dZ; }
@@ -16712,7 +18484,7 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
      shared node's seating and floret cap were measured on the simple blade.) */
   const askedCompound = leafIsCompound(state) || leafIsLobed(state);
   const typeAsked = String(state.leafType);
-  if (askedCompound && inflo && inflo.present) state = { ...state, ...SHARED_NODE_LEAF_PINS };
+  if (askedCompound && inflo && inflo.present && !inflo.umbel) state = { ...state, ...SHARED_NODE_LEAF_PINS };
   const lengthMm = Number(state.leafLength);
   /* A LOBED LEAF'S WIDTH IS ITS ENVELOPE's (`lobedWidth`, the twin) */
   const lobed = leafIsLobed(state);
@@ -16749,10 +18521,17 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
      lose their leaf are a SUFFIX, and the plan's node list is the prefix that
      keeps one — `nodeIndex` stays the floret's own, which is what lets the
      shared-node family pair a leaf with its pedicel by index. */
-  const shared = !!(inflo && inflo.present);
+  /* A RACEME'S leaves stand one under each pedicel (the shared node); an
+     UMBEL's pedicels all leave ONE point, so its leaves keep the stem's own
+     node law — the shared arm is the raceme's alone. */
+  const shared = !!(inflo && inflo.present && !inflo.umbel);
   let sharedRec = null;
   if (shared) {
-    const petioleRFree = leafNodePitchFloorMm(state.sheetThickness) / 2;
+    /* (root support: the mode-free rod the offset reads carries the blade's
+       root too — the same floor and the same clamp as the built petiole) */
+    const wireFreeR = leafNodePitchFloorMm(state.sheetThickness) / 2;
+    const freeFloor = petioleRootFloorMm(wireFreeR, lengthMm);
+    const petioleRFree = freeFloor === null ? wireFreeR : petioleClampMm(wireFreeR, freeFloor, stem, angleDeg, state.sheetThickness).radiusMm;
     const bladeP = leafBladeLocalTris(state, widthMm, lengthMm);
     const bladeReach = bladeReachMm(bladeP, inflo.pedicelR + MIN_FEATURE_MM);
     const offsetRodMm = sharedNodeOffsetMm(inflo.pedicelR, petioleRFree, inflo.angleDeg, angleDeg);
@@ -16797,7 +18576,15 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
      Oct 8), capped by the stem exactly as the compound one is —
      `lobedPetiolePlan` is its one owner. Simple leaves keep the wire. */
   const lobedPetiole = lobed && !compoundRec ? lobedPetiolePlan(state, lengthMm, petioleR0, stem, angleDeg) : null;
-  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : petioleR0;
+  /* A SIMPLE LEAF'S PETIOLE CARRIES ITS BLADE'S ROOT (root support): past the
+     reference length the wire gives way to half the root, through the one
+     petiole clamp (`petioleRootFloorMm` above). The wire, verbatim, by branch. */
+  const simpleRootFloorMm = compoundRec || lobedPetiole ? null : petioleRootFloorMm(petioleR0, lengthMm);
+  const simplePetiole = simpleRootFloorMm === null ? null : (() => {
+    const c = petioleClampMm(petioleR0, simpleRootFloorMm, stem, angleDeg, state.sheetThickness);
+    return { askedMm: simpleRootFloorMm, capMm: c.capMm, radiusMm: c.radiusMm, clamped: c.thickens && simpleRootFloorMm > c.capMm, thickens: c.thickens, wireR: petioleR0 };
+  })();
+  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;
   /* THE STEM'S NODES, WHERE THEY EXIST (`stem.nodeLaw`, null with both node amounts
      0). Two things move with them and nothing else does: every petiole roots
      on the DISPLACED axis at its own depth (`nodeOffsets`), and the clearance
@@ -16936,6 +18723,8 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
     })() : null,
     /* the LOBED petiole's area law (S4b) — null otherwise */
     lobedPetiole,
+    /* the simple blade's root-carrying petiole (root support), null at or under the reference */
+    simplePetiole,
     compound: compoundRec, wireR: petioleR0,
   };
 }
@@ -17040,8 +18829,24 @@ export function leafBladeState(state) {
    with the petiole cap and the tooth floor, `LEAF_BLADE_ROWS`. One blade law,
    never a second; a leaflet differs from a simple blade only in the length
    and width it is handed and the frame it is laid on. */
-function leafBladeLaw(acc, bs, widthMm, Lmm, sheetThickness) {
-  const form = petalFormIsFlat(bs) ? null : petalForm(bs, widthMm / 2, acc.floorThickness(sheetThickness));
+/* THE ROOT LAW REACHES EVERY LEAF BLADE (root support, Oct 21 — Eva's ruling
+   1): the ONE law (`petalRootTaper`) at THIS BLADE'S OWN LENGTH — the simple
+   leaf's, a lobed leaf's (lobedLaws calls the same law), and each COMPOUND
+   LEAFLET's own (never the rachis's: the rachis is a rod, carried by the load
+   taper). It reaches the blade through the three readers a petal has: the
+   thickness emitPanel lays (`tAt`), the form's cup fold clamp and roll floor
+   (handed `{ rootTaper }`, the petal's own buckleCtx field), and a drawn
+   spine's fold limit (`tauAt`, leafSpineCurveLaw). A BRANCH: at or under the
+   reference the law is null and every one of the three is the expression it
+   was — `() => t`, no ctx, no tauAt. */
+/* `rootLengthMm` is the length the ROOT LAW reads, named at every call (root
+   support, Oct 21): the blade's own — the simple leaf's at its node, each
+   compound LEAFLET's own, never the rachis's and never the petal's. It equals
+   `Lmm` at every call; it is a separate argument so the organ whose length it
+   is stands at the call site, where a wrong one can be seen (and mutated). */
+function leafBladeLaw(acc, bs, widthMm, Lmm, sheetThickness, rootLengthMm) {
+  const rootTaper = petalRootTaper(rootLengthMm);
+  const form = petalFormIsFlat(bs) ? null : rootTaper === null ? petalForm(bs, widthMm / 2, acc.floorThickness(sheetThickness)) : petalForm(bs, widthMm / 2, acc.floorThickness(sheetThickness), { rootTaper });
   const nu = LEAF_BLADE_ROWS;
   const cap = { petiole: true, rowCapacity: nu };
   /* THE TOOTH RELIEF IS FLOORED AT THE MINIMUM FEATURE (Eva's ruling, Oct 6:
@@ -17054,7 +18859,8 @@ function leafBladeLaw(acc, bs, widthMm, Lmm, sheetThickness) {
   cap.toothReliefFloorMm = MIN_FEATURE_MM;
   const prof = widthProfile(bs, { width: 0, thickness: sheetThickness }, widthMm / 2, cap, acc, Lmm);
   const t = acc.floorThickness(sheetThickness);
-  return { form, nu, cap, prof, t };
+  const tAt = rootTaper === null ? () => t : (u) => t * rootTaper.at(u);
+  return { form, nu, cap, prof, t, rootTaper, tAt, rootTauAt: rootTaper === null ? null : rootTaper.at };
 }
 /* ONE ROW's half-widths and cross-section on a given frame — the leaf row's
    own expressions, extracted verbatim for the same reason. */
@@ -17120,7 +18926,7 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
      takes the flat arm below rather than the zero-form law argued exact. Before
      the cup was a control no reachable leaf was flat, so this moves nothing
      that shipped. */
-  const { form, nu, cap, prof, t } = leafBladeLaw(acc, bs, plan.widthMm, Lmm, state.sheetThickness);
+  const { form, nu, cap, prof, t, rootTaper, tAt, rootTauAt } = leafBladeLaw(acc, bs, plan.widthMm, Lmm, state.sheetThickness, Lmm);
   const D0 = form ? form.frameAt(R, T, th, 0).D : [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
   /* ON THE DISPLACED AXIS where the stem has nodes, and the pre-node
      expression verbatim where it has none (a branch, never `+ 0`). */
@@ -17140,7 +18946,7 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
      by its one read, so `kC` is 0 and the spine is the curve's law
      (`leafSpineCurveLaw`, the one owner, with the fold limit); a branch taken
      FIRST, so every slider leaf runs the two arms below as they were. */
-  const spine = leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt: form ? leafBendReachAt(form, prof) : null });
+  const spine = leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt: form ? leafBendReachAt(form, prof) : null, tauAt: rootTauAt });
   const law = spine ? spine.law : kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: nu }) : null;
   const rowAt = (u) => {
     let C, fr, phi = th;
@@ -17162,7 +18968,7 @@ export function leafSurface(acc, plan, state, nodeIndex, az) {
     const { h, hb, hL, hR, hbL, hbR, sect } = leafRowSect(prof, form, C, fr.T, fr.N, u);
     return prof.twoSided ? { u, h, hb, hL, hR, hbL, hbR, C, D: fr.D, T: fr.T, N: fr.N, phi, sect } : { u, h, hb, C, D: fr.D, T: fr.T, N: fr.N, phi, sect };
   };
-  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, t, D0, o, base, pLen, bb, kC, law, spine, rowAt };
+  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, t, D0, o, base, pLen, bb, kC, law, spine, rowAt, rootTaper, tAt };
 }
 
 /* THE DIRECTED-EDGE CENSUS over the triangles emitted since `tris0`. */
@@ -17237,7 +19043,14 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
   const panel = free
     ? { label, rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1], baseExposed: true }
     : { label, rowFrom: 0, rowTo: nu, spanAt: () => [-1, 1] };
-  emitPanel(acc, rows, panel, () => t, rim);
+  /* (root support: a tapered blade's thickness at each row's own station —
+     `opts.tAt`, the blade law's; the constant sheet otherwise, BY BRANCH) */
+  const tAtRow = opts && opts.tAt ? opts.tAt : () => t;
+  /* (T3) the leaf's texture context, when the caller built one — its lattice
+     evaluates sub-rows through this blade's own `rowAt` */
+  const texL = opts && opts.texture ? opts.texture : null;
+  if (texL) texL.lattice.rowAt = rowAt;
+  emitPanel(acc, rows, panel, tAtRow, rim, texL);
   /* THE TIP, TOLD (the leaf tip-shape session; S5). Before S5 the half-width
      was `max(profile, TIP_HALF_MM)` to the end, so the blade ended on a
      2 x TIP_HALF_MM stub and this said how much of the leaf it was. Since S5
@@ -17324,7 +19137,7 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
       return l || r ? { ...(l || r), twoSided: true, sides: { left: l, right: r } } : null;
     })()
     : serrationOf(prof, rowHalfBaseMm, rowHalfMm);
-  return { rows, rowU: rows.map((r) => r.u), rowHalfBaseMm, rowHalfMm, rowHalfBaseRightMm, rowHalfRightMm, twoSided: two, rowCentre, rowNormal, rowMarginLiftMm, rowMarginAcrossMm: rowMarginAcrossMm.length ? rowMarginAcrossMm : null, rim, tipClamp, serration };
+  return { rows, rowU: rows.map((r) => r.u), rowThicknessMm: rows.map((r) => tAtRow(r.u)), rowHalfBaseMm, rowHalfMm, rowHalfBaseRightMm, rowHalfRightMm, twoSided: two, rowCentre, rowNormal, rowMarginLiftMm, rowMarginAcrossMm: rowMarginAcrossMm.length ? rowMarginAcrossMm : null, rim, tipClamp, serration, texturePanels: texL ? texL.panels : null };
 }
 
 /* buildLeafInto — ONE leaf: a petiole rod rooted in the wall, and a blade on
@@ -17363,13 +19176,13 @@ function emitLeafBladeInto(acc, rowAt, nu, t, prof, Lmm, widthMm, label, free, o
 function leafRootBase(plan, o, R, z) {
   return o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];
 }
-export function buildLeafInto(acc, plan, state, nodeIndex, az) {
+export function buildLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
   /* A COMPOUND LEAF (leaf/stem build S3) is its own builder, chosen by the
      PLAN — the one owner of the leaf's type — and never by the state, so a
      raceme's shared node, which pins the type to SIMPLE in the plan, cannot be
      overridden by a control the plan has already overruled. A BRANCH: a simple
      leaf runs every line below exactly as before. */
-  if (plan.compound) return buildCompoundLeafInto(acc, plan, state, nodeIndex, az);
+  if (plan.compound) return buildCompoundLeafInto(acc, plan, state, nodeIndex, az, cap);
   const tris0 = acc.triangleCount;
   const S = leafSurface(acc, plan, state, nodeIndex, az);
   const { R, T, D0, base, pLen, Lmm, nu, prof, t, form, law } = S;
@@ -17428,7 +19241,16 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   /* ---- the blade, UNIFORM stations: no ladder, no seam, no foot rows ---- */
   const bladeTris0 = acc.triangleCount;
   const leafSt = lobedRow0 ? null : leafBladeStations(prof, nu);
-  const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false, lobedRow0 ? { tipProf: S.profE, wantSkin: true, stations: lobedSt } : leafSt ? { stations: leafSt } : null);
+  const rootT = S.rootTaper === null ? null : { tAt: S.tAt };
+  /* (T3) THE LOBED BLADE IS DECLARED OUT of the texture: its chevron lattice
+     is its own fold law (LF19-LF23 read the emitted skin rows' planform
+     Jacobian), and a sub-row between two chevron rows is a row that law never
+     measured. A decision made without a ruling; the record says `refused:
+     'lobed'` and the read-out speaks it. */
+  const texR = textureFor(state, cap);
+  const texRefused = texR && !texR.refused && lobedRow0 ? { ...texR, refused: 'lobed' } : texR;
+  const texC = texRefused && !texRefused.refused ? textureContext(texRefused, 'leaf', S.rowAt, 0, null) : null;
+  const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false, { ...(lobedRow0 ? { tipProf: S.profE, wantSkin: true, stations: lobedSt, ...rootT } : leafSt ? { stations: leafSt, ...rootT } : rootT), texture: texC });
   const { rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rim } = B;
   /* HOW FAR ALONG ITS OWN AXIS THE EMITTED BLADE REACHES from the leaf's root
      — read off the triangles this builder EMITTED (the bead included), never
@@ -17488,10 +19310,15 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
       for (const q of ring) { x += q[0]; y += q[1]; z += q[2]; }
       return [x / ring.length, y / ring.length, z / ring.length];
     };
-    return PM ? { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR, bladeBase: mid(PM) } : { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR };
+    /* (root support) the rooted ring's radius AS EMITTED — T6's measured side:
+       the petiole carries the blade's root, read off the ring, never the plan */
+    const radiusEmittedMm = ringRadius(PA);
+    return PM ? { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR, radiusEmittedMm, bladeBase: mid(PM) } : { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR, radiusEmittedMm };
   })();
   return {
     directedMismatch, emittedReachMm,
+    /* (T3) the texture as built on this blade — null at the guard */
+    texture: textureRecord(texRefused, texC),
     /* THE HALF-WIDTHS THE BLADE WAS BUILT FROM, row by row, the BASE outline
        before any cut — the value handed to the cross-section as `hb`. LF9
        reads the tip exponent back off these, so a plan reporting one exponent
@@ -17501,6 +19328,11 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
        spends LEAF_ARC_ROWS of them on its arc, so `i / nu` is no longer the
        answer and nothing may assume it) */
     rowU: B.rowU,
+    /* THE THICKNESS EACH ROW WAS LAID AT, and the root law's record (root
+       support): T5 reads the root off the EXPORTED skins against the law
+       restated from the controls; this is what the builder says it built. */
+    rowThicknessMm: B.rowThicknessMm,
+    rootTaper: S.rootTaper === null ? null : { askedLengthMm: S.rootTaper.lengthMm, refMm: S.rootTaper.refMm, rootFactor: S.rootTaper.rootFactor, extentMm: S.rootTaper.extentMm, uEnd: S.rootTaper.uEnd, rootMm: B.rowThicknessMm[0] },
     /* and the DRAWN half-width (after the cut), the centre and frame normal
        each row was built on, and each margin's cup lift — LF11 (the arch) and
        LF12 (the cup) read these against laws restated from the controls. */
@@ -17621,6 +19453,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
        this file has already shipped a stem arm whose computed count was wrong
        by 48. */
     tris: acc.triangleCount - tris0,
+    triStart: tris0,
     rootBlendDown: leafBlendIsDown(prof),
     serrationBuilt: leafSerrationBuilt(prof),
   };
@@ -18992,8 +20825,11 @@ function lobedLaws(acc, plan, state) {
   const Lmm = plan.lengthMm;
   const O = lobedOutline(state, Lmm, !!acc.exportMode);
   const t = acc.floorThickness(state.sheetThickness);
-  const form = petalFormIsFlat(O.bs) ? null : petalForm(O.bs, O.halfW, t);
-  const out = { ...O, state, exportMode: !!acc.exportMode, Lmm, t, form };
+  /* (root support: the one root law at the lobed blade's own length — the
+     simple blade's three readers, one organ over; null BY BRANCH) */
+  const rootTaper = petalRootTaper(Lmm);
+  const form = petalFormIsFlat(O.bs) ? null : rootTaper === null ? petalForm(O.bs, O.halfW, t) : petalForm(O.bs, O.halfW, t, { rootTaper });
+  const out = { ...O, state, exportMode: !!acc.exportMode, Lmm, t, form, rootTaper, tAt: rootTaper === null ? () => t : (u) => t * rootTaper.at(u), rootTauAt: rootTaper === null ? null : rootTaper.at };
   LOBED_LAWS.set(plan, out);
   return out;
 }
@@ -19159,20 +20995,39 @@ export function petioleClampMm(wireR, askedMm, wall, angleDeg, sheetThickness) {
   const radiusMm = thickens ? Math.max(wireR, Math.min(askedMm, capMm)) : wireR;
   return { capMm, thickens, radiusMm };
 }
+/* THE PETIOLE CARRIES THE BLADE'S ROOT (root support, Oct 21 — Eva's ruling 1,
+   the leaf half: "decide whether the petiole radius must be at least half the
+   blade root"). DECIDED: YES — a rod whose DIAMETER is under the thickness of
+   the blade root it holds is the leaf's version of a root standing on a plate
+   thinner than itself, which is exactly what "the hub thickens to match" ruled
+   out for petals. So a blade past the reference length asks a petiole radius of
+   at least `wire x tau_root` (`wire` is t/2, so that is half the root), on the
+   blade's ASKED length (an upper bound wherever a raceme's shared node caps a
+   node's blade shorter — a capped blade's root is thinner, never thicker).
+   The geometric criterion, not a load one — the hub follower's own kind — and
+   it is CAPPED by the one petiole clamp (`petioleClampMm`: the rooted end must
+   still fit the stem), clamped and TOLD where the stem cannot hold it. A
+   BRANCH: null law, the asked radius untouched. */
+export function petioleRootFloorMm(wireR, bladeLengthMm) {
+  const rt = petalRootTaper(bladeLengthMm);
+  return rt === null ? null : wireR * rt.rootFactor;
+}
 export function lobedPetiolePlan(state, Lmm, wireR, wall, angleDeg) {
   const areaMm2 = lobedBladeAreaMm2(lobedOutline(state, Lmm, true), Lmm);
   const refAreaMm2 = simpleDefaultBladeAreaMm2(state, Lmm);
   const ratio = areaMm2 / refAreaMm2;
-  const askedMm = lobedPetioleRadiusMm(wireR, ratio);
+  const areaAskedMm = lobedPetioleRadiusMm(wireR, ratio);
+  const rootFloorMm = petioleRootFloorMm(wireR, Lmm);
+  const askedMm = rootFloorMm === null ? areaAskedMm : Math.max(areaAskedMm, rootFloorMm);
   const { capMm, thickens, radiusMm } = petioleClampMm(wireR, askedMm, wall, angleDeg, state.sheetThickness);
-  return { areaMm2, refAreaMm2, ratio, askedMm, capMm, radiusMm, clamped: thickens && askedMm > capMm, thickens, floored: askedMm < wireR, wireR };
+  return { areaMm2, refAreaMm2, ratio, askedMm, areaAskedMm, rootFloorMm, capMm, radiusMm, clamped: thickens && askedMm > capMm, thickens, floored: askedMm < wireR, wireR };
 }
 function lobedSurface(acc, plan, state, nodeIndex, az) {
   const th = (plan.angleDeg * Math.PI) / 180;
   const R = [Math.cos(az), Math.sin(az), 0], T = [-Math.sin(az), Math.cos(az), 0];
   const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
   const perNode = false;
-  const { Lmm, bs, t, form, nu, law, profE, profL, tilt, tauAt, cap, prof, round, lobeYield, roundness } = lobedLaws(acc, plan, state);
+  const { Lmm, bs, t, form, nu, law, profE, profL, tilt, tauAt, cap, prof, round, lobeYield, roundness, rootTaper, tAt, rootTauAt } = lobedLaws(acc, plan, state);
   const D0 = form ? form.frameAt(R, T, th, 0).D : [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
   const o = plan.nodeOffsets ? plan.nodeOffsets[nodeIndex] : null;
   const base = leafRootBase(plan, o, R, z);
@@ -19182,7 +21037,7 @@ function lobedSurface(acc, plan, state, nodeIndex, az) {
   /* THE DRAWN SPINE (curves-leaves) reaches a LOBED blade as the arch does —
      the one owner, the fold limit read off the ENVELOPE's own section (the
      section every chevron point is lifted by) — taken first, a branch */
-  const spine = leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt: form ? lobedBendReachAt(form, profE) : null });
+  const spine = leafSpineCurveLaw({ form, Lmm, th, t, nu, reachAt: form ? lobedBendReachAt(form, profE) : null, tauAt: rootTauAt });
   const sLaw = spine ? spine.law : kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: 0, start: 0, length: Lmm, tilt: th, floorRadius: ROLL_MIN_RADIUS_FACTOR * t, rows: nu }) : null;
   const flatN = [-R[0] * Math.sin(th), -R[1] * Math.sin(th), Math.cos(th)];
   /* THE ARC AT `s` mm along the midrib (the simple leaf's centreline law,
@@ -19229,7 +21084,7 @@ function lobedSurface(acc, plan, state, nodeIndex, az) {
     };
     return { u, h, hb, hLobe, tau, C: A.C, D: A.fr.D, T: A.fr.T, N: A.fr.N, phi: A.phi, sect: (v) => { const p = point(v); return { P: p.P, n: p.n }; }, pointAt: point };
   };
-  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, profE, profL, t, D0, o, base, pLen, bb, kC, law: sLaw, spine, rowAt, chevron: law, tilt, tauAt, round, lobeYield, roundness };
+  return { th, R, T, z, perNode, Lmm, bs, form, nu, cap, prof, profE, profL, t, D0, o, base, pLen, bb, kC, law: sLaw, spine, rowAt, chevron: law, tilt, tauAt, round, lobeYield, roundness, rootTaper, tAt };
 }
 /* the fold limit's reach on a LOBED blade: the cup section on the ENVELOPE at
    u (the section `lobedSurface` lifts every chevron point of row u by) */
@@ -19548,6 +21403,14 @@ export function compoundLeafPlan(state, rachisMm, wireR, wall, angleDeg) {
     intervals.push({ fromMm: keys[j], toMm: keys[j + 1], carried, fromR: compoundRachisRadiusMm(taper, keys[j]), toR: compoundRachisRadiusMm(taper, keys[j + 1]) });
   }
   const stalkR = compoundRodRadiusMm(wireR);
+  /* THE STALKS STAY THE WIRE (root support, Oct 21 — a decision stated, not a
+     ruling taken): a leaflet past the reference length (leaflets reach 60 mm)
+     now ROOTS at `sheet x tau(L)`, thicker than the wire stalk that holds it
+     (2.10 against 1.20 mm at 60 mm). The S3 retune ruled the stalks the wire,
+     and thickening one past the rachis section it is rooted in would hand the
+     rachis's own load taper a second rule; so the stalk keeps its ruling and
+     the read-out TELLS the leaflet root that stands on a thinner stalk
+     (docs/bloom-root-support-outcome.md §3, open for Eva). */
   const stretches = compoundRachisStretches(taper, lay.terminalStalkMm, lay.lateral.map((q) => q.stationMm));
   const worst = stretches.reduce((a, b) => (b.ld > a.ld ? b : a), stretches[0]);
   return {
@@ -19602,7 +21465,7 @@ const ringRadius = (ring) => {
    rachis, terminal stalk: ONE polyline, one shell), then each lateral stalk,
    then every leaflet blade, laterals pair by pair (left, right) and the
    terminal last — the layout's own order. */
-function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
+function buildCompoundLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
   const tris0 = acc.triangleCount;
   const cp = plan.compound;
   const th = (plan.angleDeg * Math.PI) / 180;
@@ -19718,7 +21581,7 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
   const leaflets = specs.map((sp, i) => {
     const F = leafletFrames[i];
     const bs = leafletBladeState(state, sp.L, sp.W);
-    const { form, nu, prof } = leafBladeLaw(acc, bs, sp.W, sp.L, state.sheetThickness);
+    const { form, nu, prof, rootTaper: lfTaper, tAt: lfTAt } = leafBladeLaw(acc, bs, sp.W, sp.L, state.sheetThickness, sp.L);
     const B0 = [F.root[0] + F.D[0] * F.stalkMm, F.root[1] + F.D[1] * F.stalkMm, F.root[2] + F.D[2] * F.stalkMm];
     const rowAt = (u) => {
       const C = [B0[0] + F.D[0] * u * sp.L, B0[1] + F.D[1] * u * sp.L, B0[2] + F.D[2] * u * sp.L];
@@ -19727,13 +21590,20 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
     };
     const tb = acc.triangleCount;
     const lSt = leafBladeStations(prof, nu);
-    const Bl = emitLeafBladeInto(acc, rowAt, nu, t, prof, sp.L, sp.W, sp.role === 'terminal' ? 'leaflet T' : `leaflet ${sp.side > 0 ? 'L' : 'R'}${sp.k + 1}`, true, lSt ? { stations: lSt } : null);
+    const lfT = lfTaper === null ? null : { tAt: lfTAt };
+    /* (T3) every leaflet is a blade of the one blade law and takes the texture
+       through its own `rowAt`; the free base is relieved to its edge (g is 1) */
+    const texR = textureFor(state, cap);
+    const texC = texR && !texR.refused ? textureContext(texR, 'leaf', rowAt, 0, null) : null;
+    const Bl = emitLeafBladeInto(acc, rowAt, nu, t, prof, sp.L, sp.W, sp.role === 'terminal' ? 'leaflet T' : `leaflet ${sp.side > 0 ? 'L' : 'R'}${sp.k + 1}`, true, { ...(lSt ? { stations: lSt, ...lfT } : lfT), texture: texC });
     return {
+      texture: textureRecord(texR, texC),
       role: sp.role, k: sp.k, side: sp.side, lengthMm: sp.L, widthMm: sp.W, embedMm: sp.embedMm,
       root: F.root, base: B0, D: F.D, T: F.T, N: F.N,
       /* which rod holds it: the axis rod for the terminal, its own stalk else */
       holder: sp.role === 'terminal' ? 'axis' : `stalk ${i}`,
-      rowU: Bl.rowU, rowHalfBaseMm: Bl.rowHalfBaseMm, rowHalfMm: Bl.rowHalfMm, rowCentre: Bl.rowCentre, rowNormal: Bl.rowNormal, rowMarginLiftMm: Bl.rowMarginLiftMm,
+      rowU: Bl.rowU, rowThicknessMm: Bl.rowThicknessMm, rootTaper: lfTaper === null ? null : { askedLengthMm: lfTaper.lengthMm, refMm: lfTaper.refMm, rootFactor: lfTaper.rootFactor, extentMm: lfTaper.extentMm, uEnd: lfTaper.uEnd, rootMm: Bl.rowThicknessMm[0] }, stalkRMm: cp.stalkR,
+      rowHalfBaseMm: Bl.rowHalfBaseMm, rowHalfMm: Bl.rowHalfMm, rowCentre: Bl.rowCentre, rowNormal: Bl.rowNormal, rowMarginLiftMm: Bl.rowMarginLiftMm,
       rim: Bl.rim, tipClamp: Bl.tipClamp, serration: Bl.serration,
       cup: { coefficient: bs.petalCup, clamp: form ? { ...form.cupClamp } : null },
       arch: { turnRad: form ? form.curlRad : 0, radiusMm: Infinity, underFloor: false },
@@ -19742,6 +21612,7 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
       outline: leafOutlineRecord(prof),
       rowHalfBaseRightMm: Bl.rowHalfBaseRightMm, rowHalfRightMm: Bl.rowHalfRightMm, twoSided: Bl.twoSided,
       tris: acc.triangleCount - tb,
+      triStart: tb,
     };
   });
   const directedMismatch = leafDirectedMismatch(acc, tris0);
@@ -19782,6 +21653,7 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az) {
       startDeg: arc.curveLaw.startDeg, arcFrac: arc.curveLaw.arcFrac, substeps: arc.law.substeps,
     } : null,
     tris: acc.triangleCount - tris0,
+    triStart: tris0,
     rootBlendDown: leaflets.every((q) => q.rootBlendDown),
     serrationBuilt: leaflets.reduce((n, q) => Math.max(n, q.serrationBuilt), 0),
     /* the first leaflet's records stand for the leaf on the read-out (the
@@ -19861,8 +21733,13 @@ export function buildHubInto(acc, state, ring) {
       for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; if (outward) acc.tri(upper[k2], upper[k], apexS); else acc.tri(upper[k], upper[k2], apexS); }
     };
     const before = acc.triangleCount;
+    acc.faceTag = 'hub.sphereOuter';
     sphereInto(Rd + t / 2, true);
+    /* the inner sphere faces the HOLLOW — an enclosed cavity, never relieved (T5) */
+    acc.faceTag = 'hub.cavity';
     sphereInto(Rd - t / 2, false);
+    acc.faceTag = null;
+    organNormalOf(acc, (tag, P) => { const d = [P[0], P[1], P[2] - cz], L = Math.hypot(d[0], d[1], d[2]); return tag === 'hub.sphereOuter' && L > 0 ? [d[0] / L, d[1] / L, d[2] / L] : null; });
     /* A SPHERE'S WALL IS t EVERYWHERE and the hub-to-stem join is INERT here
        by declaration, not by arithmetic: `stemPlan` returns joinT = hubT on a
        closed shell (see its own note — a plate's section modulus does not
@@ -19909,11 +21786,33 @@ export function buildHubInto(acc, state, ring) {
        own expression term for term with no branch to keep in step. */
     const innerRad = (phi) => (Rd - t / 2) - (joinAt(Rd * Math.sin(phi)) - t);
     joinReport.undersideMagnitude = outerRad;
+    acc.faceTag = 'hub.domeOuter';
     cap(() => outerRad, true);
     for (let i = 0; i <= K; i++) { const phi = phiRim * (1 - i / K); underside.push([Rd * Math.sin(phi), outerRad - innerRad(phi)]); }   // the EMITTED difference, round-trip and all
+    acc.faceTag = 'hub.domeInner';
     cap(innerRad, false);
     const top = ringAt(outerRad, phiRim), bot = ringAt(innerRad(phiRim), phiRim);
+    acc.faceTag = 'hub.domeRim';
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(top[k], bot[k], bot[k2], top[k2]); }
+    acc.faceTag = null;
+    /* THE CAP'S OWN NORMALS (T5): the outer cap's from the sphere's centre;
+       the inner cap's from its own profile rho(phi) (the join reshapes it, so
+       the slope term rho' is the profile's, central-differenced); the rim band's
+       the meridian direction e_phi at the rim. */
+    organNormalOf(acc, (tag, P) => {
+      const x = P[0], y = P[1], z = P[2] - cz, rr = Math.hypot(x, y), phi = Math.atan2(rr, z);
+      const cth = rr > 0 ? x / rr : 1, sth = rr > 0 ? y / rr : 0;
+      const eR = [Math.sin(phi) * cth, Math.sin(phi) * sth, Math.cos(phi)], eP = [Math.cos(phi) * cth, Math.cos(phi) * sth, -Math.sin(phi)];
+      if (tag === 'hub.domeOuter') return eR;
+      if (tag === 'hub.domeRim') return eP;
+      if (tag === 'hub.domeInner') {
+        if (!(rr > 0)) return [0, 0, -1];
+        const h = 1e-5, a = Math.max(0, phi - h), b = phi + h, rho = innerRad(phi), d = (innerRad(b) - innerRad(a)) / (b - a);
+        const v = [-(rho * eR[0] - d * eP[0]), -(rho * eR[1] - d * eP[1]), -(rho * eR[2] - d * eP[2])], L = Math.hypot(v[0], v[1], v[2]);
+        return [v[0] / L, v[1] / L, v[2] / L];
+      }
+      return null;
+    });
     return { dome: { Rd, centreZ: cz, H: dome.H, closed: false, rimPhi: phiRim, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before, topFaceZ: cz + outerRad, ...joinReport };
   }
   const r = ring.radius;
@@ -19927,10 +21826,30 @@ export function buildHubInto(acc, state, ring) {
      only. ST6 is what asserts it, against a stemless build of the same state. */
   for (let k = 0; k < N; k++) {
     const k2 = (k + 1) % N;
+    acc.faceTag = 'hub.top';
     acc.tri(cTop, pt(k, zTop), pt(k2, zTop));                      // top fan (up)
+    acc.faceTag = 'hub.bottom';
     if (!joinActive) acc.tri(cBot, pt(k2, zBot), pt(k, zBot));     // bottom fan (down)
+    acc.faceTag = 'hub.rim';
     acc.quad(pt(k, zTop), pt(k, zBot), pt(k2, zBot), pt(k2, zTop)); // rim
   }
+  acc.faceTag = null;
+  /* THE SLAB'S OWN NORMALS (T5): the faces' +-z, the rim's radial, and the
+     join's underside z = zTop - J(r) its own profile normal (-J'(r) r^, -1),
+     J' central-differenced on the one owner of the profile. */
+  organNormalOf(acc, (tag, P) => {
+    const rr = Math.hypot(P[0], P[1]);
+    if (tag === 'hub.top') return [0, 0, 1];
+    if (tag === 'hub.bottom') return [0, 0, -1];
+    if (tag === 'hub.rim') return rr > 0 ? [P[0] / rr, P[1] / rr, 0] : null;
+    if (tag === 'hub.join') {
+      if (!(rr > 0)) return [0, 0, -1];
+      const h = 1e-5, a = Math.max(0, rr - h), b = rr + h, dJ = (joinAt(b) - joinAt(a)) / (b - a);
+      const v = [-dJ * P[0] / rr, -dJ * P[1] / rr, -1], L = Math.hypot(v[0], v[1], v[2]);
+      return [v[0] / L, v[1] / L, v[2] / L];
+    }
+    return null;
+  });
   if (!joinActive) {
     underside.push([r, t], [0, t]);                                  // one flat face, the hub's own thickness everywhere
     return { dome: null, tris: N * 4, topFaceZ: zTop, ...joinReport };   // N*4 is the shipped literal, kept
@@ -19942,6 +21861,7 @@ export function buildHubInto(acc, state, ring) {
      own thickness there by construction), so the rim quad above still closes. */
   const K = HUB_DOME_RINGS;
   const botRing = (rad) => { const z = zTop - joinAt(rad); return Array.from({ length: N }, (_, k) => { const th = (k * TAU) / N; return [rad * Math.cos(th), rad * Math.sin(th), z]; }); };
+  acc.faceTag = 'hub.join';
   let O = botRing(r); underside.push([r, joinAt(r)]);
   for (let i = 1; i < K; i++) {
     const rr = r * (1 - i / K);
@@ -19952,6 +21872,7 @@ export function buildHubInto(acc, state, ring) {
   underside.push([0, joinAt(0)]);
   const apexB = [0, 0, zTop - joinAt(0)];
   for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.tri(apexB, O[k2], O[k]); }
+  acc.faceTag = null;
   /* MEASURED, NEVER COMPUTED. The first version of this line carried the
      arithmetic and was WRONG BY 48 — it reported 1872 against an emitted 1824,
      because the top fan is N triangles and it had been written 2N. Both other
@@ -20147,10 +22068,10 @@ export function buildStamenInto(acc, andro, s, slot) {
      curl 60 where the straight strand reads the bundle's own.) An
      INDEPENDENT coil's call is the one it was. */
   const rod = s.coil && s.coil.mode === 'BRAIDED'
-    ? rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: 0, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
+    ? rodInto(acc, { t: andro.rootSpan, r: andro.rFil, curlRad: 0, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
     : s.coil
-    ? rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
-    : rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter }, s, slot.azimuth);
+    ? rodInto(acc, { t: andro.rootSpan, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter, coil: s.coil }, s, slot.azimuth)
+    : rodInto(acc, { t: andro.rootSpan, r: andro.rFil, curlRad: andro.curlRad, length: lengthMm, floorRadius: andro.diameter }, s, slot.azimuth);
   /* THE TIP: `lumps` of them sharing the rod's end, each `spreadRad` off its
      direction at azimuths a whole turn apart — the TRIFID's own law, one
      statement for both owners (session 29). At the shipping default the count
@@ -20210,7 +22131,7 @@ export function buildStamenInto(acc, andro, s, slot) {
    the lobe's own ring vector. Positive curl bends the style toward -Rs, the
    filament's own sign (at azimuth 0 that is -x). */
 export function buildStyleInto(acc, G) {
-  const rod = rodInto(acc, { t: G.thickness, r: G.rSty, curlRad: G.curlRad, length: G.length, floorRadius: G.diameter }, G, 0);
+  const rod = rodInto(acc, { t: G.rootSpan, r: G.rSty, curlRad: G.curlRad, length: G.length, floorRadius: G.diameter }, G, 0);
   const tip = rod.stations[rod.stations.length - 1], a = G.lobe.diameter / 2, Lc = G.lobe.length - 2 * a;
   const D = rod.at(G.length).D;
   /* THE TRIFID: `lobe.lumps` tips sharing the rod's tip (a control since session 30), each `spreadRad` off
@@ -20378,6 +22299,15 @@ export function sepalOwnSize(state) {
   const own = (v, range) => { const x = Number(v) || 0; if (!(x > 0)) return { mm: null, floored: false }; return x < range[0] ? { mm: range[0], floored: true } : { mm: x, floored: false }; };
   const L = own(state.sepalLength, SEPAL_LENGTH_RANGE), W = own(state.sepalWidth, SEPAL_WIDTH_RANGE);
   return { lengthMm: L.mm, widthMm: W.mm, lengthFloored: L.floored, widthFloored: W.floored };
+}
+/* A SEPAL'S ASKED LENGTH — the length its root law reads (root support, Oct
+   21): its own `sepalLength` where set, the petal's x `sepalScale` otherwise.
+   The same double `bladeAskedLengthMm(sepalBladeState(st), st.sepalScale)` is
+   inside the builder (the slot's scale IS `sepalScale`), stated here so the
+   hub bound and the descriptor's foot height can read it before a blade exists. */
+export function sepalAskedLengthMm(st) {
+  const own = sepalOwnSize(st);
+  return own.lengthMm !== null ? own.lengthMm : st.petalLength * Number(st.sepalScale);
 }
 export function sepalScaleInert(state) { const o = sepalOwnSize(state); return o.lengthMm !== null && o.widthMm !== null; }
 export function bladeAskedLengthMm(ps, slotScale) { return ps.bladeLengthMm > 0 ? ps.bladeLengthMm : ps.petalLength * slotScale; }
@@ -20584,6 +22514,13 @@ export function sepalBladeState(state, angleDeg, unclamped = false) {
      not a whorl's) and no FAN pairing (it is never mirrored), so a two-sided
      sepal outline faces the same hand on every sepal of a tier — the petals'
      RADIAL pinwheel. */
+  /* THE ROOT TAPER REACHES A SEPAL (root support, Oct 21 — Eva's ruling 1,
+     lifting the big-petals pin): a sepal is the petal builder on a second ring,
+     so `petalRootTaperFor` hands it the ONE law at ITS OWN asked length (its
+     `sepalLength`, or the petal's x `sepalScale`), each tier at its own. Where
+     the foot stands and what holds it is footRing's (the descriptor's foot
+     height, and the hub bound, which counts the longest sepal — see
+     `hubRootTaperLengthMm`). */
   const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE' };
   for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = unclamped && !sepalTwinIsValue(sepalId) ? Number(state[sepalId]) : sepalTwinValue(sepalId, state[sepalId]);
   /* the sepal's OWN size in mm, null where a row is 0 and the petal's x size applies */
@@ -20883,7 +22820,9 @@ export function rotateLamina(S, az, base0, dt) {
 export function sepalTrialLamina(state, sepals, angleDeg, exportMode, unclamped = false) {
   const acc = new MeshBuilder({ exportMode, captureLamina: true });
   const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: sepals.height, scale: sepals.scale, tiltExtra: 0 };
-  const p = buildPetalInto(acc, sepalBladeState(state, angleDeg, unclamped), sepals.ring, slot, null, false);
+  /* (T3) the scan reads the LAMINA, which the relief does not move — the
+     lattice would cost it a build per angle bucket for nothing */
+  const p = buildPetalInto(acc, sepalBladeState(state, angleDeg, unclamped), sepals.ring, slot, { noTexture: true }, false);
   return { lamina: laminaFromPanels(p.lamina, { rootExclusion: { origin: p.base, mm: sepalRootExclusionMm(state) } }), base: p.base, seamStep: p.seamStep, tilt: angleDeg };
 }
 /* THE PETALS' LAMINAE IN THE OTHER MODE, on the same (u, v) lattice the built
@@ -20996,7 +22935,223 @@ function petalLaminaInMode(site, state, exportMode) {
    =================================================================== */
 
 /* The law enum's values. NONE is the default and is the guard. */
-export const INFLORESCENCE_TYPES = Object.freeze(['NONE', 'RACEME']);
+export const INFLORESCENCE_TYPES = Object.freeze(['NONE', 'RACEME', 'UMBEL']);
+/* ===================================================================
+   THE UMBEL (Eva's rulings, Oct 21-22 — read `docs/bloom-umbel-outcome.md`).
+   Florets on pedicels radiating from ONE point at the top of the stem: the
+   spider lily. It is NOT a second inflorescence law. It is the raceme's own
+   plan (`inflorescencePlan`) with three things put differently, each a
+   BRANCH on `type === 'UMBEL'`, so every RACEME row forms the expressions it
+   always did:
+
+   1. ONE NODE carrying `umbelFlorets` (2..12) pedicels, their azimuths the
+      whorl primitive's own RADIAL law (`buildWhorlInto`, phase 0) — never a
+      third owner of "azimuth of the i-th organ".
+   2. THE PEDICELS ROOT ON A JUNCTION KNOT, not in the stem's wall: a solid
+      squat boss about the stem's axis whose size is DERIVED from the count and
+      the pedicel radius and the angle (`umbelBoss`, below), never typed.
+   3. THE HEAD IS OPTIONAL (`umbelHead`, OFF by default — the spider lily).
+      OFF: no head is built and the stem ENDS at the knot, centred on the
+      stem's own top end (`topZ`). ON: the head stands at the stem top as
+      always and the knot sits on the stem `insetNeeded` below it — the
+      raceme's own reach-inset law, unchanged.
+
+   The pedicel radius is the area rule read downward from the ASKED count
+   (the build-1 fixed-point argument, unchanged), the pedicel length is
+   `pedicelLength`, the angle `pedicelAngle` (its meaning — a rod's angle from
+   horizontal at its node — carries over exactly). One floret build, N
+   appends: build time stays O(1) in the count.
+   =================================================================== */
+export const UMBEL_FLORET_RANGE = Object.freeze([2, 12]);
+export const UMBEL_HEAD_VALUES = Object.freeze(['OFF', 'ON']);
+export function umbelIsAbsent(state) { return inflorescenceIsAbsent(state) || String(state.inflorescence) !== 'UMBEL'; }
+/* THE HEAD'S TWO STATEMENTS — this is the geometry's half; the registry's
+   twin is `PREDICATES.headPresent`, checked per row by UM0 and at harness
+   load. The head is absent exactly on an umbel whose head toggle is OFF. */
+export function umbelHeadIsAbsent(state) { return !umbelIsAbsent(state) && String(state.umbelHead ?? UMBEL_HEAD_VALUES[0]) !== 'ON'; }
+/* ===================================================================
+   THE COMPOUND UMBEL — DEPTH 2 (the mophead, Oct 24 — Eva's rulings on
+   docs/bloom-hydrangea-discovery.md; read docs/bloom-mophead-outcome.md
+   before touching any of it). The umbel's rays each end in a SUB-UMBEL of
+   florets, and every join is a shipped boss.
+
+   A LEVEL CONTROL, NOT A FOURTH TYPE (`umbelDepth`, a CHOICE of '1' and '2'
+   under UMBEL — default '1', the shipped umbel by branch). Every control the
+   shipped umbel reads keeps EXACTLY its meaning at depth 2, because a
+   sub-umbel IS the shipped umbel, headless, at the end of a ray:
+   `umbelFlorets` its florets, `pedicelLength` / `pedicelAngle` their stalks
+   (a pedicel carries one flower, botanically and here), `floretPetals` /
+   `floretScale` / `nodeVariance` the florets. What is NEW is only the level
+   that is new — the RAYS from the main junction: `umbelRays` (how many),
+   `umbelRayLength`, `umbelRayAngle` (a rod's angle from horizontal at the
+   junction, `PEDICEL_ANGLE_RANGE` — the same quantity, the same range).
+   A fourth `inflorescence` value would have had to restate every one of the
+   umbel's `type === 'UMBEL'` branches and its eight hidden-and-inert
+   predicates for a type that is the umbel; a level of the umbel is what it
+   is.
+
+   ONE LEVEL OF THE PIN IS LIFTED, AND ONLY ONE (ruling 1). `floretState`
+   pins `inflorescence: 'NONE'` (`PEDICEL_PINS`); at depth 2 the OUTER
+   umbel's "floret" is a sub-umbel state (`subUmbelState`) — headless, depth
+   '1', `umbelLevel` 2 — and THAT state's own florets go through the pin
+   unchanged. DEPTH 3 STAYS REFUSED, BY NAME: `umbelDepthRefusal` throws on any
+   depth outside `UMBEL_DEPTH_VALUES` and on a level-2 state asking depth 2,
+   and the registry offers the two values only (UM5 holds the two statements).
+
+   ONE FLORET BUILD SERVES EVERY FLORET, ONE SUB-UMBEL BUILD EVERY RAY (ruling
+   5's instancing one level up): the outer plan's unit memo builds the
+   sub-umbel ONCE per mode and appends it per ray; inside it the sub-umbel's
+   own memo builds the floret ONCE and appends it per pedicel. Build time does
+   not scale with the floret count.
+   =================================================================== */
+export const UMBEL_DEPTH_VALUES = Object.freeze(['1', '2']);
+export const UMBEL_DEPTH_MAX = 2;
+export const UMBEL_RAY_RANGE = Object.freeze([2, 12]);
+export const UMBEL_RAY_LENGTH_RANGE = Object.freeze([5, 120]);
+/* THE LEVEL a state is built at: 1 for every head, 2 for a sub-umbel at the
+   end of a ray. Internal — set by `subUmbelState` alone, never a control. */
+export function umbelLevelOf(state) { return Number(state.umbelLevel) === 2 ? 2 : 1; }
+/* THE REFUSAL, BY NAME — null where the asked depth is built, else why not.
+   The depth a state reaches is its level plus its own asked depth less one:
+   a head asking '2' reaches 2; a sub-umbel (level 2) asking '2' would reach 3. */
+export function umbelDepthRefusal(state) {
+  const d = String(state.umbelDepth ?? UMBEL_DEPTH_VALUES[0]);
+  if (!UMBEL_DEPTH_VALUES.includes(d)) return `an umbel of depth ${d} is refused: the floret pin is lifted for exactly ONE level (Eva's ruling 1, the mophead) — depth ${UMBEL_DEPTH_VALUES.join(' or ')} only`;
+  const reach = umbelLevelOf(state) + Number(d) - 1;
+  if (reach > UMBEL_DEPTH_MAX) return `an umbel of depth ${reach} is refused: the floret pin is lifted for exactly ONE level (Eva's ruling 1, the mophead) — a sub-umbel's florets are flowers, never umbels`;
+  return null;
+}
+/* THE COMPOUND UMBEL'S OUTER LEVEL: an umbel asking depth 2, at level 1. */
+export function umbelIsCompound(state) {
+  return !umbelIsAbsent(state) && String(state.umbelDepth ?? UMBEL_DEPTH_VALUES[0]) === '2' && umbelLevelOf(state) === 1;
+}
+/* THE JUNCTION KNOT — derived from the count `n`, the pedicel radius `rP`,
+   the pedicel angle and the stem's own radius, and nothing else typed but the
+   project's one printable gap. Built as a squat BOSS about the stem's axis
+   (Eva's ruling, Oct 23 — the least SPHERE that shipped first read as a ball:
+   12 mm across at six florets and 19.5 mm at twelve on a 6 mm stem).
+
+   THE ROOT RING. The pedicels root on a horizontal ring of radius `rho`
+   about the boss's centre, at their own evenly spread azimuths. `rho` is the
+   least radius on which `n` rods of radius `rP` stand ONE PRINTABLE GAP
+   apart: adjacent roots are `2 rho sin(pi/n)` apart, so
+       rho = (rP + MIN_FEATURE_MM / 2) / sin(pi / n).
+   That is the case the gap is for: at `pedicelAngle` 90 every pedicel is
+   VERTICAL and parallel to its neighbours along its whole length (measured on
+   paper first: at n = 2 a ring of exactly `rP` puts rod A's vertex at angle
+   pi and rod B's at angle 0 on the SAME double, an edge of four triangles).
+   At any lower angle the rods diverge from the ring, so the gap only grows.
+
+   THE BOSS is a solid of revolution whose profile, in (r, z) about the
+   centre, is
+       (0, +h) — (R, +h) — (R, -h) — (0, -h)
+   — a flat-topped, FLAT-BOTTOMED band (a disc) of radius `R` and half-height
+   `h`. Each length is DERIVED:
+     * `h` holds the ROOT DISC at its own angle: a pedicel at `a` from
+       horizontal has a root disc of radius `rP` normal to it, whose points
+       reach `rP |cos a|` above and below the ring's plane — and every pedicel
+       of an umbel stands at the one `pedicelAngle`, so that one disc IS the
+       steepest. Plus half a gap.
+     * `R` holds the same disc across: its farthest point from the axis is
+       `max over phi of sqrt((rho - rP sin(phi) sin a)^2 + rP^2 cos^2(phi))`,
+       in closed form (`umbelRootDiscReachMm`). Plus half a gap.
+     * HALF A GAP, NEVER ZERO, on both: a disc whose rim lies ON the boss's
+       surface is an exact tangency where the two emitted surfaces can share a
+       double and weld into one shell — measured on the sphere this replaces,
+       749 within-shell pairs on `UMBEL: 6 florets at 90 deg, head ON`, every
+       one at that point; half a gap in, 0.
+     * THE UNDERSIDE IS FLAT (Eva's ruling, Oct 24: the 45 deg cone that
+       carried the band into the stem was the FDM overhang rule, and the first
+       print is SLS PA12, which needs no supports). The cone held no disc:
+       the band alone already holds every root disc half a gap in on all four
+       faces (UM2, unchanged), so the cone is gone and nothing it held is
+       lost; at twelve florets it was 7 of the boss's 10 mm of height.
+     * THE CROSSING CLEARS ITS FLOOR BY A DERIVED MARGIN (Oct 24). A pedicel
+       crosses the boss from its root on the ring out along its own direction;
+       ID2's floor is half a printable feature. At 90 deg the root disc lies
+       flat on the ring, so `h` above gave EXACTLY that floor — a vertical
+       pedicel crossed 0.500 mm, ON the check's minimum. So the band grows
+       where the crossing is shortest, and only there: the crossing through
+       the top/bottom face is `h / |sin a|` and through the rim
+       `(R - rho) / cos a`, so the band takes
+           h = max(disc + gap/2, Cmin |sin a|),
+           R = max(reach + gap/2, rho + Cmin cos a),
+       with `Cmin = gap/2 + margin`. THE MARGIN IS THE CHECK'S OWN
+       CONDITIONING, CARRIED TO THE ARTEFACT: the band's faces and the pedicel
+       root are written to the STL as float32, each coordinate rounded by at
+       most one float32 step, and a float32 step at magnitude `M` is at most
+       `M 2^-23`. The margin is EIGHT such steps (X0's own 8, and the foot
+       clearance's 8 — `FOOT_CAP_CLEARANCE_RAD`) of the boss's own coordinate
+       magnitude, `M = max(R0, |cz| + h0) + gap` (an upper bound on every
+       vertex the boss emits, since the growth is under a gap):
+           margin = M 2^-20   (`UMBEL_CROSSING_MARGIN_REL`).
+       It is CONTINUOUS in M (never rounded to a power of two), so the gate's
+       restatement from the emitted centre agrees with it to the ulp. On the
+       spider lily it is ~1e-5 mm: invisible, and the crossing the file
+       carries can no longer read under the floor. The print-floor reading (a
+       whole MIN_FEATURE_MM crossing) is the costed alternative, not built —
+       the outcome doc §10.
+   With the head OFF the boss's centre is the stem's own top end, and the
+   stem's top face lies inside the band (`R > rho > outerR`), `h` deep — never
+   less than `Cmin`, the same crossing. With the head ON the stem runs on
+   through the boss to the head. One expression, read by the plan, the builder
+   and UM1's restatement's owner-independent twin in the harness. */
+export const UMBEL_CROSSING_MARGIN_REL = 2 ** -20;
+export function umbelRootDiscReachMm(rho, rP, angleDeg) {
+  const th = (angleDeg * Math.PI) / 180, sa = Math.abs(Math.sin(th)), ca = Math.cos(th);
+  /* f(s) = (rho + rP s sa)^2 + rP^2 (1 - s^2), s = -sin(phi) in [-1, 1]: a
+     downward parabola in s whose vertex is at s = rho sa / (rP ca^2) — inside
+     the interval only when that is at most 1, else the maximum is at s = 1. */
+  return rho * sa <= rP * ca * ca
+    ? Math.sqrt(rho * rho + rP * rP + (rho * sa) * (rho * sa) / (ca * ca))
+    : rho + rP * sa;
+}
+export function umbelRingRho(n, rP, outerR, headOn = false) {
+  const gap = MIN_FEATURE_MM;
+  const ringRho = (rP + gap / 2) / Math.sin(Math.PI / n);
+  /* WITH THE HEAD ON the stem runs ON past the boss to the head, so a pedicel
+     at 90 deg rises PARALLEL TO THE STEM: its ring must stand one printable
+     gap off the stem's own surface too, `outerR + rP + gap` (measured before
+     it was derived: 623 within-shell pairs, the six pedicels inside the stem
+     wall above a 6 mm stem's junction, on `UMBEL: 6 florets at 90 deg, head
+     ON`). With the head OFF the stem ENDS at the boss — nothing runs beside
+     the pedicels to clear. A floor taken by `max`, so the ring is the count's
+     own wherever that already clears the stem. */
+  const stemRho = headOn ? outerR + rP + gap : 0;
+  return { rho: Math.max(ringRho, stemRho), ringRho, stemRho };
+}
+export function umbelBoss(n, rP, angleDeg, outerR, headOn = false, centreZ = 0) {
+  const gap = MIN_FEATURE_MM;
+  const { rho, ringRho, stemRho } = umbelRingRho(n, rP, outerR, headOn);
+  const th = (angleDeg * Math.PI) / 180, sa = Math.abs(Math.sin(th)), ca = Math.cos(th);
+  const h0 = rP * Math.abs(ca) + gap / 2;
+  const R0 = umbelRootDiscReachMm(rho, rP, angleDeg) + gap / 2;
+  const marginMm = (Math.max(R0, Math.abs(centreZ) + h0) + gap) * UMBEL_CROSSING_MARGIN_REL;
+  const crossMinMm = gap / 2 + marginMm;
+  const halfHeightMm = Math.max(h0, crossMinMm * sa);
+  const radiusMm = Math.max(R0, rho + crossMinMm * ca);
+  return { rho, radiusMm, halfHeightMm, gapMm: gap, ringRho, stemRho, stemBound: stemRho > ringRho,
+    marginMm, crossMinMm, heightGrown: halfHeightMm > h0, radiusGrown: radiusMm > R0, discHalfHeightMm: h0, discRadiusMm: R0 };
+}
+/* THE BOSS'S LATTICE — the stem's own sector count round. A constant of the
+   boss's DRAWING, not of its size. */
+export const UMBEL_BOSS_SECTORS = HUB_SECTORS;
+export function umbelBossCrossingMm(B, angleDeg) {
+  const th = (angleDeg * Math.PI) / 180, c = Math.cos(th), sn = Math.sin(th);
+  let best = Infinity;
+  if (sn > 0) best = Math.min(best, B.halfHeightMm / sn);                       // the top
+  if (c > 0) best = Math.min(best, (B.radiusMm - B.rho) / c);                   // the rim
+  if (sn < 0) best = Math.min(best, B.halfHeightMm / -sn);                      // the flat bottom (a convex profile: the exit is the least crossing of an edge it leaves through)
+  return best;
+}
+/* THE ABSENT HUB'S RECORD — what `buildBloomBody` reports in place of
+   `buildHubInto`'s record when an umbel's head is OFF. Every field says
+   NOTHING WAS BUILT (`absent`, zero triangles, no join, no faces) rather than
+   leaving every reader of the hub record to learn a null; a reader that needs
+   a hub must ask `absent` first, and UM0 asserts the record is this one iff
+   the head is off. */
+export const HUB_ABSENT = Object.freeze({ absent: true, tris: 0, dome: null, joinActive: false, joinThickness: null, joinBlendRadius: null,
+  undersideMagnitude: null, underside: Object.freeze([]), topFaceZ: null });
 /* THE RANGES, exported so the registry IMPORTS them rather than restating
    them (Q6's discipline, session 29: a slider wider than the law was proved on
    makes a ruling false with nothing failing, and the harness fails at module
@@ -21251,6 +23406,8 @@ export function floretPitchFloorMm(bodyOf, pairs, gapMm) {
     }
     return [...by.values()];
   })();
+  const decodeJ = (key2) => { const jw = ((key2 % KEY) + KEY) % KEY; return jw > KEY / 2 ? jw - KEY : jw; };
+  const decodeI = (key2) => (key2 - (((key2 % KEY) + KEY) % KEY)) / KEY;
   const decode = (key2) => { const jw = ((key2 % KEY) + KEY) % KEY; const i = (key2 - jw) / KEY; const j = jw > KEY / 2 ? jw - KEY : jw; return [i, j]; };
   /* a map as dense arrays over its own bounding box, and the lower's dilations */
   const denses = new Map();
@@ -21259,12 +23416,20 @@ export function floretPitchFloorMm(bodyOf, pairs, gapMm) {
     const key = Math.round(w * 1e9);
     if (denses.has(key)) return denses.get(key);
     const m = map(w);
+    /* THE BOX IS READ WITH SCALAR DECODES, never by destructuring decode()'s
+       array: in CHROMIUM's V8 the destructured form sometimes handed this
+       loop ANOTHER map's box (measured: the dense grid of azimuth 0 carried
+       azimuth pi's i0, -151 for 3, with its own z arrays intact), so the
+       bound was read at the wrong offset, `whereOf`'s cross-check threw on
+       `TEXTURE: PEBBLE x a RACEME` about one run in four on b3163de — never
+       in Node — and a wrong bound for a pair that does not win would have
+       passed silently. The same integers, as two functions of the key. */
     let i0 = Infinity, i1 = -Infinity, j0 = Infinity, j1 = -Infinity;
-    for (const k of m.keys()) { const [i, j] = decode(k); if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
+    for (const k of m.keys()) { const i = decodeI(k), j = decodeJ(k); if (i < i0) i0 = i; if (i > i1) i1 = i; if (j < j0) j0 = j; if (j > j1) j1 = j; }
     if (!(i0 <= i1)) { denses.set(key, { empty: true }); return denses.get(key); }
     const W = i1 - i0 + 1, H = j1 - j0 + 1;
     const zmin = new Float64Array(W * H).fill(Infinity), zmax = new Float64Array(W * H).fill(-Infinity);
-    for (const [k, r] of m) { const [i, j] = decode(k); const x = (i - i0) * H + (j - j0); zmin[x] = r[0]; zmax[x] = r[1]; }
+    for (const [k, r] of m) { const x = (decodeI(k) - i0) * H + (decodeJ(k) - j0); zmin[x] = r[0]; zmax[x] = r[1]; }
     /* dilations on a grid padded by SUB on every side, so an upper cell just
        outside the lower's box still reads the lower cells within a gap */
     const Wd = W + 2 * SUB, Hd = H + 2 * SUB;
@@ -21363,6 +23528,17 @@ export function floretPairClasses(phyllo, n, dMax) {
   return out;
 }
 
+/* THE UMBEL'S PAIRS — one node, so every pair is a SAME-NODE pair (`d` 0):
+   the internode floor has nothing to do and the plan reports only whether
+   two florets of the umbel may touch (`sameNodeMayTouch`), which they do by
+   nature and which is MEASURED, declared and never clamped. */
+export function umbelPairClasses(azimuths) {
+  const red = (x) => { let w = x % TAU; if (w < 0) w += TAU; return w; };
+  const out = [];
+  for (let p = 0; p < azimuths.length; p++) for (let q = p + 1; q < azimuths.length; q++) out.push({ a: red(azimuths[p]), b: red(azimuths[q]), d: 0 });
+  return out;
+}
+
 /* inflorescencePlan — THE ONE OWNER of where the florets are and what they
    are made of. Reads the RACHIS's plan for the four lengths it needs
    (`boreR`, `outerR`, `rootZ`, `lengthMm`) and computes nothing the stem
@@ -21370,16 +23546,33 @@ export function floretPairClasses(phyllo, n, dMax) {
    and the phyllotaxis rather than restating either, because there are already
    exactly two owners of "azimuth of the i-th organ" in this file and a third
    would be the registration rule's own failure. */
-export function inflorescencePlan(state, stem, acc) {
+export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {}) {
   if (inflorescenceIsAbsent(state) || !stem || !stem.present) {
     return { present: false, type: String(state.inflorescence ?? 'NONE'), nodes: 0, azimuths: [], nodeDepthsMm: [], built: 0 };
   }
   const type = String(state.inflorescence);
-  const nodesAsked = Math.round(Number(state.floretNodes));
-  const angleDeg = Number(state.pedicelAngle);
-  const phyllo = String(state.floretPhyllotaxy);
-  const pedicelLenMm = Number(state.pedicelLength);
-  const perNode = phyllo === 'opposite' ? 2 : phyllo === 'whorled' ? 3 : 1;
+  const umbel = type === 'UMBEL';
+  /* DEPTH (the mophead): refused by name past two levels; the compound
+     umbel's OUTER level reads the RAYS where the shipped umbel reads its
+     florets, and a sub-umbel (level 2) builds its florets on the reduced
+     lattice and down to the derived floret floor. Every other umbel forms
+     the expressions it always did, by branch. */
+  const depthRefusal = umbel ? umbelDepthRefusal(state) : null;
+  if (depthRefusal) throw new Error(depthRefusal);
+  const compound = umbel && umbelIsCompound(state);
+  const level = umbel ? umbelLevelOf(state) : 1;
+  const reducedFlorets = umbel && level === 2;
+  const headOff = umbel && umbelHeadIsAbsent(state);
+  const umbelCount = umbel ? Math.round(Number(compound ? state.umbelRays : state.umbelFlorets)) : 0;
+  /* THE UMBEL'S AZIMUTHS ARE THE WHORL PRIMITIVE'S OWN RADIAL LAW, collected
+     from its blade callback rather than restated (phase 0). */
+  const umbelAz = [];
+  if (umbel) buildWhorlInto({ count: umbelCount, radius: 0, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0, placement: 'RADIAL', blade: (sl) => { umbelAz.push(sl.azimuth); } });
+  const nodesAsked = umbel ? 1 : Math.round(Number(state.floretNodes));
+  const angleDeg = Number(compound ? state.umbelRayAngle : state.pedicelAngle);
+  const phyllo = umbel ? 'umbel' : String(state.floretPhyllotaxy);
+  const pedicelLenMm = Number(compound ? state.umbelRayLength : state.pedicelLength);
+  const perNode = umbel ? umbelCount : phyllo === 'opposite' ? 2 : phyllo === 'whorled' ? 3 : 1;
 
   /* THE PEDICEL'S RADIUS IS DERIVED BY THE AREA RULE AND IS NOT A CONTROL.
      `r_parent^2 = SUM r_child^2` is this project's own junction law and the
@@ -21412,8 +23605,12 @@ export function inflorescencePlan(state, stem, acc) {
      above about 75 degrees because its escape length runs away as
      `outerR / cos(th)`, while a rod rooted at mid-thickness gets MORE embedded
      as the angle steepens. Measured there, reused here unchanged. */
-  const rootR = rodWallRootMm(stem);
-  const embedMm = rodWallEmbedMm(stem);
+  /* UNDER AN UMBEL the pedicels root on the KNOT's ring, not in the wall: the
+     root point IS the ring point (the root disc lies inside the knot by the
+     knot's own construction, so no embed along the pedicel is needed — 0). */
+  const ring = umbel ? umbelRingRho(umbelCount, pedicelR, stem.outerR, !headOff) : null;
+  const rootR = umbel ? ring.rho : rodWallRootMm(stem);
+  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);
   /* THE FLORET'S OWN PETAL SIZE — a MULTIPLIER on the head's two, clamped into
      each base control's OWN range and TOLD (the `labellumSize` precedent:
      "SIZE x SATURATES, AND IT IS TOLD"). Size comes from PARAMETERS and never
@@ -21429,8 +23626,16 @@ export function inflorescencePlan(state, stem, acc) {
      of new constants here would be a second owner of the petal's range in the
      file that states the registration rule. */
   const LB = OVERRIDE_BOUNDS.get('petalLength'), WB = OVERRIDE_BOUNDS.get('petalWidth');
-  const petalLength = clamp(lengthAsked, LB.min, LB.max);
-  const petalWidth = clamp(widthAsked, WB.min, WB.max);
+  /* A SUB-UMBEL'S FLORETS (level 2) take the DERIVED FLORET FLOOR in place of
+     the petal sliders' own two floors (Eva's ruling 3, the mophead): the
+     scale is held at or above the least scale at which the floret's petal
+     still carries its full sheet BODY (`floretBodyFloor`), and the head's
+     own proportion is kept. The head's 20 mm floor does not move — it is
+     still the clamp on every head and every depth-1 floret, by branch. */
+  const bodyFloor = reducedFlorets ? floretBodyFloor(state) : null;
+  const scaleBuilt = bodyFloor ? Math.min(1, Math.max(scale, bodyFloor.scale)) : scale;
+  const petalLength = bodyFloor ? Math.min(LB.max, Number(state.petalLength) * scaleBuilt) : clamp(lengthAsked, LB.min, LB.max);
+  const petalWidth = bodyFloor ? Math.min(WB.max, Number(state.petalWidth) * scaleBuilt) : clamp(widthAsked, WB.min, WB.max);
   const sizeClamped = petalLength !== lengthAsked || petalWidth !== widthAsked;
   /* THE DEAD TRAVEL IS A NUMBER THE READ-OUT PRINTS, AND THE RANGE IS NOT
      NARROWED — `stamenSpread`'s ruling, and the floor binds on a HEAD-SIZED
@@ -21445,7 +23650,7 @@ export function inflorescencePlan(state, stem, acc) {
      bind: the scale is capped at 1.00 and the head's own two values are
      already inside their ranges, so the ceiling is unreachable by
      construction. ID4 asserts the biconditional in both directions. */
-  const sizeDeadBelow = Math.max(
+  const sizeDeadBelow = bodyFloor ? bodyFloor.scale : Math.max(
     Number(state.petalLength) > 0 ? LB.min / Number(state.petalLength) : 0,
     Number(state.petalWidth) > 0 ? WB.min / Number(state.petalWidth) : 0);
 
@@ -21490,8 +23695,12 @@ export function inflorescencePlan(state, stem, acc) {
      it — ONE extra floret build per raceme build (the other mode's unit),
      nothing rebuilt. The plan's own inputs to the unit are all above this
      line, which is why the size block moved up. */
+  /* A COMPOUND UMBEL'S RAYS carry the sub-umbel's floret count — the asked
+     one, or the budget clamp's (`umbelBudgetClamp`, which re-plans with it). */
+  const perRay = compound ? (floretsPerRay === null ? Math.round(Number(state.umbelFlorets)) : floretsPerRay) : null;
   const pre = { floretPetals: Math.round(Number(state.floretPetals)), petalLength, petalWidth,
-    pedicelR, pedicelLenMm, angleDeg, rootR, embedMm, rootZ: 0, nodeDepthsMm: [0] };
+    pedicelR, pedicelLenMm, angleDeg, rootR, embedMm, rootZ: 0, nodeDepthsMm: [0],
+    compound, floretsPerRay: perRay, reducedFlorets };
   const unitMemo = floretUnitMemo(state, pre);
   const sessileTop = pedicelLenMm === 0;
   /* OVER EVERY AZIMUTH THE PHYLLOTAXY PRODUCES ON ANY ASKED NODE — found by
@@ -21504,7 +23713,7 @@ export function inflorescencePlan(state, stem, acc) {
      makes the TOP node's inset conservative for every node (each lower node is
      deeper by at least the pitch), and the distinct azimuths are few (two,
      four, or whorled's rotating set), each a pass over the unit's vertices. */
-  const reachAzimuths = [...new Set(Array.from({ length: Math.max(1, nodesAsked) }, (_, i) => leafAzimuths(phyllo, i, DISTICHOUS_TURN)).flat())];
+  const reachAzimuths = umbel ? umbelAz.slice() : [...new Set(Array.from({ length: Math.max(1, nodesAsked) }, (_, i) => leafAzimuths(phyllo, i, DISTICHOUS_TURN)).flat())];
   const reachOf = (exportMode) => {
     let top = -Infinity;
     for (const az of reachAzimuths) {
@@ -21528,13 +23737,16 @@ export function inflorescencePlan(state, stem, acc) {
   const headFloorZ = Math.min(stem.rootZ, Number.isFinite(stem.lowestHubZ) ? stem.lowestHubZ : stem.rootZ);
   const insetAskedMm = LEAF_NODE_TOP * stem.lengthMm;
   const insetNeededMm = Math.max(0, reachMm + (stem.rootZ - headFloorZ) + MIN_FEATURE_MM);
-  const insetMm = Math.max(insetAskedMm, insetNeededMm);
-  const insetClamped = insetNeededMm > insetAskedMm;
+  /* THE UMBEL'S ONE NODE: with the head OFF it is the stem's own top end
+     (`topZ`, a negative depth below `rootZ`); with the head ON it is the
+     reach-inset law's own depth, nothing asked above it. */
+  const insetMm = umbel ? (headOff ? 0 : insetNeededMm) : Math.max(insetAskedMm, insetNeededMm);
+  const insetClamped = umbel ? false : insetNeededMm > insetAskedMm;
   /* CLAMPED AND TOLD, both directions, and `insetSatisfied` keeps the leaf's
      biconditional shape (ID9 asserts it against the emitted florets) — a floret
      through the head is legal geometry (overlapping closed shells) and an
      aesthetic fact, never an invariant violation. */
-  const insetSatisfied = insetNeededMm <= LEAF_NODE_BOTTOM * stem.lengthMm;
+  const insetSatisfied = headOff ? true : insetNeededMm <= LEAF_NODE_BOTTOM * stem.lengthMm;
   /* THE PITCH FLOOR IS TWO PEDICEL RADII — the leaf's own rule with the
      pedicel's own radius, so adjacent pedicels cannot merge. The COUNT is what
      gives when the span is short: clamped, told, never refused. */
@@ -21560,11 +23772,16 @@ export function inflorescencePlan(state, stem, acc) {
   };
   const extentMm = Math.max(unitExtentMm(false), unitExtentMm(true));
   const dMax = Math.max(1, Math.ceil((extentMm + MIN_FEATURE_MM) / pitchFloorRodMm));
-  const pairClasses = floretPairClasses(phyllo, Math.max(1, nodesAsked), dMax);
-  const pitchOf = (exportMode) => floretPitchFloorMm((az) => {
+  const pairClasses = umbel ? umbelPairClasses(umbelAz) : floretPairClasses(phyllo, Math.max(1, nodesAsked), dMax);
+  /* A COMPOUND UMBEL HAS ONE NODE AND NO PITCH TO FLOOR — nor has its
+     sub-umbel — and the compound's unit is a whole sub-umbel, whose column
+     map is the dominant cost of a build (measured, 3.4 of 6 s). Not computed
+     on either level, BY BRANCH; the florets' approach to each other is the
+     combination gate's measure (`mophead-*`). */
+  const pitchOf = (exportMode) => (compound || reducedFlorets ? { floorMm: 0, at: null, sameNodeMayTouch: true } : floretPitchFloorMm((az) => {
     const U = unitMemo.get(pedicelLenMm, exportMode, az);
     return { positions: U.sub.positions, M: pedicelPlacement(pre, 0, az, U.tipZLocal, sessileTop).M };
-  }, pairClasses, MIN_FEATURE_MM);
+  }, pairClasses, MIN_FEATURE_MM));
   const pitchLive = pitchOf(false), pitchExport = pitchOf(true);
   const pitchFloretRawMm = Math.max(pitchLive.floorMm, pitchExport.floorMm);
   const pitchFloretMm = Math.ceil(pitchFloretRawMm / INFLO_REACH_GRID_MM) * INFLO_REACH_GRID_MM;
@@ -21572,9 +23789,10 @@ export function inflorescencePlan(state, stem, acc) {
   const pitchFloorIsFlorets = pitchFloretMm > pitchFloorRodMm;
   const pitchFloorAt = pitchLive.floorMm >= pitchExport.floorMm ? { ...pitchLive.at, mode: 'live' } : { ...pitchExport.at, mode: 'export' };
   const sameNodeMayTouch = pitchLive.sameNodeMayTouch || pitchExport.sameNodeMayTouch;
-  const nodeDepthsMm = leafNodeDepthsMm(nodesAsked, stem.lengthMm, insetMm, pitchFloorMm);
+  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.topZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;
+  const nodeDepthsMm = umbel ? [umbelDepthMm] : leafNodeDepthsMm(nodesAsked, stem.lengthMm, insetMm, pitchFloorMm);
   const nodesClamped = nodeDepthsMm.length < nodesAsked;
-  const azimuths = nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i, DISTICHOUS_TURN));
+  const azimuths = umbel ? [umbelAz.slice()] : nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i, DISTICHOUS_TURN));
 
   /* ===================================================================
      THE PER-NODE PEDICEL LENGTH (the node-laws session). Two derived laws on
@@ -21659,14 +23877,30 @@ export function inflorescencePlan(state, stem, acc) {
      wall, which `buildInflorescenceInto` measures off the emitted floret
      (`wallReachR`) — so it is not in this minimum; `null` where every node is
      sessile. At one length the minimum is the one value, the same double. */
+  /* UNDER AN UMBEL the solid a pedicel crosses is the BOSS: from its root on
+     the ring out along its direction to the boss's surface. The pedicel lies
+     in the plane through the axis at its own azimuth, where the boss is a
+     CONVEX polygon (`umbelBoss`'s profile), so the exit is the least distance
+     to an edge the direction leaves through — the top (z = +h) going up, the
+     rim (r = R) going out, the 45 degree underside going down-and-out. */
+  const knot = umbel ? umbelBoss(umbelCount, pedicelR, angleDeg, stem.outerR, !headOff, stem.rootZ - umbelDepthMm) : null;
+  const knotCrossMm = umbel ? umbelBossCrossingMm(knot, angleDeg) : null;
   const crossings = pedicelLensMm.map((L) => (L > 0
-    ? rodWallCrossingMm({ boreR: stem.boreR, outerR: stem.outerR, rootR }, (angleDeg * Math.PI) / 180, L, embedMm)
+    ? (umbel ? Math.min(knotCrossMm, L) : rodWallCrossingMm({ boreR: stem.boreR, outerR: stem.outerR, rootR }, (angleDeg * Math.PI) / 180, L, embedMm))
     : null));
   const stalked = crossings.filter((c) => c !== null);
   const crossesSolidMm = stalked.length ? Math.min(...stalked) : null;
 
+  const knotRec = umbel ? { rho: knot.rho, radiusMm: knot.radiusMm, halfHeightMm: knot.halfHeightMm,
+    gapMm: knot.gapMm, marginMm: knot.marginMm, crossMinMm: knot.crossMinMm, heightGrown: knot.heightGrown, radiusGrown: knot.radiusGrown, centre: [0, 0, stem.rootZ - umbelDepthMm], crossMm: knotCrossMm } : null;
   return {
-    present: true, type, phyllotaxy: phyllo, perNode,
+    present: true, type, umbel, headOff, umbelCount: umbel ? umbelCount : null, knot: knotRec, phyllotaxy: phyllo, perNode,
+    /* DEPTH (the mophead): `compound` on the OUTER level of a depth-2 umbel,
+       whose units are sub-umbels; `level` 2 on a sub-umbel, whose florets are
+       built on the reduced lattice down to the derived floor. */
+    depth: umbel ? Number(String(state.umbelDepth ?? UMBEL_DEPTH_VALUES[0])) : null, level, compound, reducedFlorets,
+    floretsPerRay: perRay, floretsPerRayAsked: compound ? Math.round(Number(state.umbelFlorets)) : null, budgetClamp: null,
+    bodyFloor, scaleBuilt,
     nodes: nodeDepthsMm.length, nodesAsked, nodesBuilt: nodeDepthsMm.length, nodesClamped,
     nodeDepthsMm, azimuths, angleDeg, pedicelLenMm, pedicelR, pedicelRClamped, areaRuleR, pedicelRFloor,
     rootR, embedMm, crossesSolidMm, crossings,
@@ -21805,7 +24039,33 @@ export const PEDICEL_PINS = Object.freeze({
   stemNodeKink: 0,
   stemCut: 'FLAT',            // no florist's cut on a pedicel (ruling 7): its free end is the one rooted THROUGH the rachis wall
 });
+/* THE SUB-UMBEL'S OWN STATE (the mophead) — what a ray of a compound umbel
+   carries, and the ONE place the floret pin is lifted, for exactly one level.
+   It is the head's state with the PEDICEL'S pins (no leaves, no nodes, a FLAT
+   free end — a ray is rooted in the main boss, so its far end is a stalk's,
+   never the florist's cut), the tube free like a floret's, and then the
+   umbel's own: an UMBEL, HEADLESS (the ray ends in its sub-boss), depth '1'
+   at LEVEL 2 — so `umbelDepthRefusal` refuses it a level of its own — with
+   the plan's (possibly clamped) floret count. Its stem IS the ray: the ray's
+   length and the area rule's diameter. Its petal controls are the HEAD's,
+   untouched, because the sub-umbel's own plan scales them into florets. No
+   per-node term at this level: the florets inside take their own. */
+export function subUmbelState(state, plan, lengthMm) {
+  return {
+    ...state,
+    ...Object.fromEntries(Array.from({ length: MAX_LAYERS }, (_, i) => [`tubeLayer${i + 1}`, TUBE_K_MAX])),
+    ...PEDICEL_PINS,
+    inflorescence: 'UMBEL',
+    umbelHead: 'OFF',
+    umbelDepth: '1',
+    umbelLevel: 2,
+    umbelFlorets: plan.floretsPerRay,
+    stemLength: lengthMm,
+    stemDiameter: 2 * plan.pedicelR,
+  };
+}
 export function floretState(state, plan, lengthMm = plan.pedicelLenMm, az = null) {
+  if (plan.compound) return subUmbelState(state, plan, lengthMm);
   const nodeOverrides = floretNodeOverrides(state, plan, az);
   return {
     ...state,
@@ -21819,6 +24079,166 @@ export function floretState(state, plan, lengthMm = plan.pedicelLenMm, az = null
     petalWidth: plan.petalWidth,
     stemLength: lengthMm,
     stemDiameter: 2 * plan.pedicelR,
+  };
+}
+
+/* ===================================================================
+   THE FLORET FLOOR (the mophead, Eva's ruling 3: "florets — and only florets
+   on a depth-2 umbel — may go down to the petal length where the floret
+   still prints ... DERIVE the floor from the nib, the rim bead and the root
+   at that scale, and report it"). The head's 20 mm floor does not move.
+
+   THE CRITERION: A FLORET'S PETAL STILL CARRIES ITS BODY. The rim treatment
+   eases the sheet from its body thickness toward `RIM_FLOOR_MM` over
+   `RIM_TAPER_MM` of surface distance from every free edge and closes it on
+   the bead; the nib closes the tip; the root blend holds the base on the
+   foot. A petal PRINTS AS A PETAL while somewhere on it the sheet is at the
+   thickness the sheet control asks for — a point that is
+     * past the ROOT: on the law's own stretch, `u >= ROOT_BLEND_END`, where
+       the outline is the blade's and not the foot's floor;
+     * `RIM_TAPER_MM` in from BOTH MARGINS — the RIM BEAD's own taper (the
+       plan half-width is used, which never exceeds the surface distance on a
+       cupped section, so the reading is conservative);
+     * `RIM_TAPER_MM` back from the DRAWN TIP — the NIB and the tip's own
+       bead (the drawn length, which carries the nib's closing).
+   Below the floor no point of the petal is body: the whole petal is rim
+   taper, thinner everywhere than the sheet it was asked for.
+
+   IT IS A SCALE, AND IT IS EXACT IN THE SCALE. A floret's petal is the head's
+   petal times `floretScale`; in the region the criterion reads (past the
+   root blend, `RIM_TAPER_MM` clear of the tip) every half-width and every
+   length scales linearly with it, so the row at `u` first holds a body at
+       s(u) = max(RIM_TAPER_MM / h1(u), RIM_TAPER_MM / (L1 (1 - u)))
+   with `h1`, `L1` the head-size petal's own, and the floor is the least
+   `s(u)`. READ OFF ONE PROBE FLORET'S EMITTED PROFILE at the head's own size
+   (sessile, EXPORT — a constant mode, so the floor is mode-free by
+   construction — on the reduced lattice, whose rows are the full lattice's),
+   at its own ladder rows; a minimum over sampled rows is never under the
+   continuous one, so the floor errs toward the larger petal. An asymmetric
+   outline holds a body where the two halves together span two tapers, so
+   its `h` is the mean of the halves. At the shipping 35 x 16 mm petal the
+   floor is 0.375x, a 13.1 x 6.0 mm floret petal — the discovery's 12-14 mm,
+   reached from the rim's own constants rather than from a reference photo.
+   `the-floret-floor-is-typed` is its mutant. =================================================================== */
+const FLORET_FLOOR_MEMO = new Map();
+export function floretBodyFloor(state) {
+  const probePlan = { floretPetals: Math.round(Number(state.floretPetals)), petalLength: Number(state.petalLength), petalWidth: Number(state.petalWidth), pedicelR: STEM_DIAMETER_RANGE[0] / 2 };
+  const fs = floretState(state, probePlan, 0, null);
+  const key = JSON.stringify(fs);
+  if (FLORET_FLOOR_MEMO.has(key)) return FLORET_FLOOR_MEMO.get(key);
+  const acc = new MeshBuilder({ exportMode: true });
+  const rec = withReducedFloretLattice(() => buildBloomInto(acc, fs, { below: null, pedicel: true }));
+  const p = (rec.petalsAll || []).find(Boolean);
+  const T = RIM_TAPER_MM;
+  let best = Infinity, atU = null, rows = 0;
+  if (p) {
+    const L1 = p.length;
+    for (let i = 0; i < p.profileU.length; i++) {
+      const u = p.profileU[i];
+      if (!(u >= ROOT_BLEND_END) || !(u < 1)) continue;
+      const h = p.profileL && p.profileR ? (p.profileL[i] + p.profileR[i]) / 2 : p.profile[i];
+      if (!(h > 0)) continue;
+      rows++;
+      const sc = Math.max(T / h, T / (L1 * (1 - u)));
+      if (sc < best) { best = sc; atU = u; }
+    }
+  }
+  /* the head-size petal itself keeps no body (an exotic outline): the floret
+     is held at the head's own size, and the plan says so */
+  const out = { scale: Number.isFinite(best) ? best : 1, atU, rows, taperMm: T, probeLengthMm: p ? p.length : null,
+    headLengthMm: Number(state.petalLength), headWidthMm: Number(state.petalWidth),
+    lengthMm: (Number.isFinite(best) ? best : 1) * Number(state.petalLength), widthMm: (Number.isFinite(best) ? best : 1) * Number(state.petalWidth),
+    noBodyAtHeadSize: !(best <= 1) };
+  if (FLORET_FLOOR_MEMO.size > 32) FLORET_FLOOR_MEMO.clear();
+  FLORET_FLOOR_MEMO.set(key, out);
+  return out;
+}
+
+/* ===================================================================
+   THE MOPHEAD'S BUDGET CLAMP (Eva's ruling 4: "when the asked florets exceed
+   1.5 M triangles, the count is clamped before building, from one floret
+   build's exact cost. The read-out says asked vs built. The export never
+   refuses for this reason").
+
+   EXACT, NOT ESTIMATED, and from MEASURED builds, never from a row count. The
+   compound umbel's triangles are
+       boss + rays x (S + k x F(k))
+   where `F(k)` is ONE FLORET's emitted count (its unit, pedicel included —
+   the sub-umbel's own `unitTris`), `S` the sub-umbel's own fixed part (its
+   ray and its boss: the sub-umbel unit's count less its florets), and the
+   boss the main junction's (`umbelBossTris`, the revolve's own two rings and
+   two poles). The rest of the bloom is the accumulator's own count, read
+   after every other part is emitted. All of it is measured in BOTH modes and
+   the larger taken, so which florets exist is mode-free (topology).
+
+   WHAT GIVES IS THE FLORETS A RAY (`umbelFlorets`), down to the umbel's own
+   floor of two; the rays and the dome's shape do not move. `F(k)` depends on
+   `k` only through the sub-pedicel's area-rule radius — the same floret
+   state otherwise — so a count whose pedicel is the asked one's reuses the
+   asked floret's cost, and a count whose pedicel differs is MEASURED on a
+   sub-umbel built at it. The re-plan builds the clamped sub-umbel once per
+   mode, as any plan does. Recorded on the plan (`budgetClamp`) in full on
+   every compound build, clamped or not, so UM7 asserts the prediction
+   against the built count both ways. `the-clamp-reads-a-row-count` is its
+   mutant. =================================================================== */
+export function umbelBossTris() { return 4 * UMBEL_BOSS_SECTORS; }
+export function umbelBudgetClamp(state, stem, acc, plan, restTris) {
+  if (!plan || !plan.compound) return plan;
+  const rays = plan.umbelCount, kAsked = plan.floretsPerRayAsked, L = plan.pedicelLenMm;
+  const az0 = plan.azimuths[0][0];
+  const unitOf = (memo) => {
+    const Ul = memo.get(L, false, az0), Ue = memo.get(L, true, az0);
+    const fOf = (U) => U.rec.inflorescenceBuilt ? U.rec.inflorescenceBuilt.unitTris : 0;
+    return { F: Math.max(fOf(Ul), fOf(Ue)), U: Math.max(Ul.tris, Ue.tris), Fl: fOf(Ul), Fe: fOf(Ue) };
+  };
+  const asked = unitOf(plan.unitMemo);
+  const S = asked.U - kAsked * asked.F;
+  const bossTris = umbelBossTris();
+  const rP = (k) => Math.max(STEM_DIAMETER_RANGE[0] / 2, plan.pedicelR / Math.sqrt(k));
+  const fCache = new Map([[rP(kAsked), asked.F]]);
+  const F = (k) => {
+    const r = rP(k);
+    if (!fCache.has(r)) fCache.set(r, unitOf(floretUnitMemo(state, { ...plan, floretsPerRay: k })).F);
+    return fCache.get(r);
+  };
+  const total = (k) => restTris + bossTris + rays * (S + k * F(k));
+  let k = kAsked;
+  while (k > UMBEL_FLORET_RANGE[0] && total(k) > EXPORT_TRI_BUDGET) k--;
+  const rec = { budget: EXPORT_TRI_BUDGET, rays, floretsPerRayAsked: kAsked, floretsPerRay: k, askedFlorets: rays * kAsked, builtFlorets: rays * k,
+    clamped: k !== kAsked, floretTris: F(k), floretTrisAsked: asked.F, floretTrisLive: asked.Fl, floretTrisExport: asked.Fe, subFixedTris: S, bossTris, restTris,
+    askedTotal: total(kAsked), predictedTotal: total(k), fits: total(k) <= EXPORT_TRI_BUDGET };
+  const out = k === kAsked ? plan : inflorescencePlan(state, stem, acc, { floretsPerRay: k });
+  out.budgetClamp = rec;
+  return out;
+}
+
+function floretLatticeProbe(rec) {
+  return (rec.petalsAll || []).filter(Boolean).map((p) => {
+    const ap = p.rim && Array.isArray(p.rim.apex) ? p.rim.apex : [];
+    const rowsOf = [...new Set(ap.filter((a) => a.panel === ap[0]?.panel).map((a) => a.row))].sort((a, b) => a - b);
+    /* the mid-blade row both of whose side profiles were treated */
+    let mid = null;
+    for (const r of rowsOf.slice(Math.floor(rowsOf.length / 3))) {
+      const side = ap.filter((a) => a.row === r && (a.col === 0 || a.col > 0) && a.panel === ap[0].panel);
+      const cols = [...new Set(side.map((a) => a.col))];
+      if (cols.length >= 2) { const lo = side.find((a) => a.col === Math.min(...cols)), hi = side.find((a) => a.col === Math.max(...cols)); mid = { row: r, lo: { apex: lo.apex, top: lo.top, bot: lo.bot }, hi: { apex: hi.apex, top: hi.top, bot: hi.bot } }; break; }
+    }
+    return { triRange: p.triRange ? p.triRange.slice() : null, lattice: p.lattice ? { ...p.lattice } : null, beadSegments: p.rim ? p.rim.segments : null, mid };
+  });
+}
+function subUmbelSummary(rec) {
+  const B = rec.inflorescenceBuilt, P = rec.inflorescence;
+  if (!B || !P) return null;
+  return {
+    count: B.count, knot: B.knot, unitTris: B.unitTris, tris: B.tris,
+    placed: B.placed.map((q) => ({ az: q.az, root: q.root, headAt: q.headAt, pedicelAxis: q.pedicelAxis, M: q.M, at: q.at, tris: q.tris })),
+    plan: { umbelCount: P.umbelCount, pedicelR: P.pedicelR, pedicelLenMm: P.pedicelLenMm, angleDeg: P.angleDeg, rho: P.knot && P.knot.rho, level: P.level, depth: P.depth,
+      reducedFlorets: P.reducedFlorets, petalLength: P.petalLength, petalWidth: P.petalWidth, lengthAsked: P.lengthAsked, widthAsked: P.widthAsked, scale: P.scale, scaleBuilt: P.scaleBuilt,
+      sizeClamped: P.sizeClamped, bodyFloor: P.bodyFloor, floretPetals: P.floretPetals, outerR: P.outerR, rootZ: P.rootZ },
+    stem: rec.stem ? { outerR: rec.stem.outerR, tipZ: rec.stem.tipZ, rootZ: rec.stem.rootZ, topZ: rec.stem.topZ } : null,
+    stemBuilt: rec.stemBuilt ? { emittedTopZ: rec.stemBuilt.emittedTopZ, emittedTipZ: rec.stemBuilt.emittedTipZ, emittedMaxR: rec.stemBuilt.emittedMaxR } : null,
+    floretState: B.floretState, floretUnit: B.units && B.units[0] ? { tris: B.units[0].tris, lattice: B.units[0].lattice, positions: B.units[0].positions, petalsBuilt: B.units[0].petalsBuilt } : null,
+    headAbsent: rec.hub && rec.hub.absent === true,
   };
 }
 
@@ -21920,19 +24340,26 @@ export function floretUnitMemo(state, plan) {
        node's azimuth adds through `floretNodeOverrides` — nothing at amount 0
        with no field, so every azimuth then shares ONE unit, as shipped. */
     keyOf(L, exportMode, az = null) {
-      const o = floretNodeOverrides(state, plan, az);
+      /* a compound umbel's unit is ONE sub-umbel for every ray (no per-ray
+         term at that level) — ruling 5's one build, one level up */
+      const o = plan.compound ? null : floretNodeOverrides(state, plan, az);
       return `${exportMode ? 'E' : 'L'}|${L}|${o ? JSON.stringify(o) : ''}`;
     },
     get(L, exportMode, az = null) {
       const key = this.keyOf(L, exportMode, az);
       if (cache.has(key)) return cache.get(key);
-      const sub = new MeshBuilder({ exportMode });
+      /* A SUB-UMBEL'S FLORET (level 2) is built on the REDUCED LATTICE, its rim
+         captured (a capture moves no byte) so UM6 can read the columns and the
+         bead off the emitted rim; every other unit is built as it was. */
+      const sub = new MeshBuilder({ exportMode, captureRim: !!plan.reducedFlorets });
       const fs = floretState(state, plan, L, az);
-      const rec = buildBloomInto(sub, fs, { below: null });
+      const rec = plan.reducedFlorets
+        ? withReducedFloretLattice(() => buildBloomInto(sub, fs, { below: null, pedicel: true }))
+        : buildBloomInto(sub, fs, { below: null, pedicel: true });
       const stalked = !!(rec.stem && rec.stem.present);
       const hubT = sub.floorThickness(rec.hub.thickness);
       const tipZ = stalked ? rec.stem.tipZ : hubAxisTopZ(rec.hub.dome, hubT) - hubT;
-      const U = { lengthMm: L, az, nodeOverrides: floretNodeOverrides(state, plan, az), sub, fs, rec, stalked, tipZLocal: tipZ, tris: sub.triangleCount };
+      const U = { lengthMm: L, az, nodeOverrides: plan.compound ? null : floretNodeOverrides(state, plan, az), sub, fs, rec, stalked, tipZLocal: tipZ, tris: sub.triangleCount };
       cache.set(key, U);
       return U;
     },
@@ -21976,6 +24403,39 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
     return units.length - 1;
   };
   for (let i = 0; i < plan.nodes; i++) for (const az of plan.azimuths[i]) unitFor(plan.pedicelLensMm[i], az);
+  /* THE UMBEL'S JUNCTION — emitted FIRST, one closed BOSS about the plan's
+     own centre at the plan's own derived radius, half-height and underside
+     (`umbelBoss`), through the pill's emitter (`revolveInto`, explicit apex
+     fans at both poles — the flat bottom and the flat top): two rings,
+     `UMBEL_BOSS_SECTORS` round, 4 x 48 = 192 triangles (the coned boss of
+     Oct 23 was 288, the sphere it replaced 2,208). Its MEASURED side — the axis, the rim's radius and the band's
+     two faces read back off the vertices it emitted — is what UM1 holds
+     against the controls and UM2 holds every pedicel's root disc against, so
+     a boss emitted somewhere other than where the plan says is visible. */
+  let knotBuilt = null;
+  if (plan.umbel && plan.knot) {
+    const K = plan.knot, c = K.centre, R = K.radiusMm, h = K.halfHeightMm;
+    const t0 = acc.triangleCount;
+    const ringAt = (z, r) => ({ C: [c[0], c[1], z], e1: [1, 0, 0], e2: [0, 1, 0], r });
+    const zBot = c[2] - h;
+    const rings = [ringAt(c[2] - h, R), ringAt(c[2] + h, R)];
+    const pts = revolveInto(acc, rings, [c[0], c[1], zBot], [c[0], c[1], c[2] + h], new Array(UMBEL_BOSS_SECTORS).fill(1));
+    const rim = pts.slice(pts.length - 2);
+    let ax = 0, ay = 0, n = 0, rMax = 0, rMin = Infinity, zTop = -Infinity, zRimLo = Infinity, zLo = Infinity;
+    for (const ring of rim) for (const q of ring) { ax += q[0]; ay += q[1]; n++; const r = Math.hypot(q[0] - c[0], q[1] - c[1]); if (r > rMax) rMax = r; if (r < rMin) rMin = r; }
+    for (const q of rim[1]) if (q[2] > zTop) zTop = q[2];
+    for (const q of rim[0]) if (q[2] < zRimLo) zRimLo = q[2];
+    for (const ring of pts) for (const q of ring) if (q[2] < zLo) zLo = q[2];
+    /* the two POLES are emitted vertices too (the apex fans' centres): the
+       bottom is the lower of the rings and the south pole, so an underside
+       drawn down to a point (a cone) is visible here — UM1's flat-underside
+       clause reads it */
+    if (zBot < zLo) zLo = zBot;
+    if (c[2] + h > zTop) zTop = c[2] + h;
+    knotBuilt = { centre: [ax / n, ay / n, (zTop + zRimLo) / 2], radiusMm: rMax, radiusMinMm: rMin, halfHeightMm: (zTop - zRimLo) / 2,
+      topZ: zTop, rimBottomZ: zRimLo, bottomZ: zLo, rings: pts.length,
+      tris: acc.triangleCount - t0, triRange: [t0, acc.triangleCount] };
+  }
   const sub = units[0].sub, fs = units[0].fs, unit = units[0].rec;
   const unitTris = units[0].tris;
   const tipZLocal = units[0].tipZLocal;
@@ -22031,6 +24491,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
      law's claim and must always clear; every other node's is reported, and
      an overtopping node is told on the read-out and declared by name. */
   const floretsMaxZByNode = Array.from({ length: plan.nodes }, () => -Infinity);
+  const t5FloretOrgans = [];
   /* THE DISTANCE IS `freeStemDistanceMm`'s, NOT A SECOND COPY OF IT. The
      first cut wrote `hypot(max(0, r - outerR), max(0, tipZ - z, z - rootZ))`
      out again here — which is that function term for term, i.e. exactly the
@@ -22067,6 +24528,25 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
       const at = acc.positions.length;
       const n = acc.appendTransformed(U.sub, pl.M);
       const M = pl.M, src = U.sub.positions;
+      /* (ruling 5) THE FLORET'S DEFERRED ORGANS, CARRIED INTO THE WORLD: the
+         same lattice, its vertices and normals through this placement's rigid
+         matrix, its triangle range offset to where the append put it — so the
+         parent's one relief pass samples the ONE field at world positions and
+         judges visibility against the whole bloom */
+      if (U.rec.t5Deferred) for (const O of U.rec.t5Deferred.organs) {
+        const nV = O.P.length / 3, P2 = new Array(nV * 3), N2 = new Float64Array(nV * 3), off = at / 9;
+        for (let v = 0; v < nV; v++) {
+          const x = O.P[v * 3], y = O.P[v * 3 + 1], z = O.P[v * 3 + 2];
+          P2[v * 3] = M[0] * x + M[1] * y + M[2] * z + M[3];
+          P2[v * 3 + 1] = M[4] * x + M[5] * y + M[6] * z + M[7];
+          P2[v * 3 + 2] = M[8] * x + M[9] * y + M[10] * z + M[11];
+          const a = O.N[v * 3], b = O.N[v * 3 + 1], c = O.N[v * 3 + 2];
+          N2[v * 3] = M[0] * a + M[1] * b + M[2] * c;
+          N2[v * 3 + 1] = M[4] * a + M[5] * b + M[6] * c;
+          N2[v * 3 + 2] = M[8] * a + M[9] * b + M[10] * c;
+        }
+        t5FloretOrgans.push({ ...O, organ: `floret ${O.organ}`, from: O.from + off, to: O.to + off, cover: O.cover ? [O.cover[0] + off, O.cover[1] + off] : null, P: P2, N: N2, T: U.rec.t5Deferred.T });
+      }
       /* THE SESSILE EMBED'S MEASURED SIDE — how far into the rachis the
          floret's OWN emitted vertices reach: the least cylindrical radius of
          any of them inside the rachis's own height span. The root law says
@@ -22144,7 +24624,8 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
   const headZ = placed.map((q) => q.headAt[2]);
   const headSpreadMm = headZ.length ? Math.max(...headZ) - Math.min(...headZ) : null;
   return {
-    present: true, unitTris, tipZLocal, count: placed.length, placed, headSpreadMm,
+    present: true, unitTris, tipZLocal, count: placed.length, placed, headSpreadMm, knot: knotBuilt,
+    t5FloretOrgans,
     floretsMaxZ: Number.isFinite(floretsMaxZ) ? floretsMaxZ : null,
     floretsMaxZByNode: floretsMaxZByNode.map((z) => (Number.isFinite(z) ? z : null)),
     /* EVERY DISTINCT UNIT, in node order — unit 0 is the topmost node's and
@@ -22163,7 +24644,19 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
       floretState: { ...U.fs },
       az: U.az, nodeOverrides: U.nodeOverrides ? { ...U.nodeOverrides } : null,
       positions: U.sub.positions,
+      /* A SUB-UMBEL'S FLORET (the mophead): each petal's own block and lattice
+         record, and the two side profiles of its MID-BLADE row (apex, top and
+         bottom skin edge — emitted vertices, captured), from which UM6 reads
+         the columns and the bead's segments off the emitted rim. */
+      lattice: plan.reducedFlorets ? floretLatticeProbe(U.rec) : null,
     })),
+    /* THE COMPOUND UMBEL'S SUB-UMBEL (the mophead) — the unit every ray
+       carries, summarised in ITS OWN frame (every placed ray applies its own
+       matrix to these, exactly as to the unit's stream — ID5's identity): its
+       boss as emitted, its florets' pedicel ends and axes, its own plan's
+       numbers, and its floret unit with the lattice probe. */
+    sub: plan.compound ? subUmbelSummary(units[0].rec) : null,
+    budgetClamp: plan.budgetClamp || null,
     tris: acc.triangleCount - tris0, placementResidual: residual, placementCompared: compared,
     /* THE FLAG: how near any floret's own body (never its pedicel rod) comes
        to the free rachis. Infinity where nothing was appended. */
@@ -22483,7 +24976,11 @@ export function sepalAngleLimit(state, fr, acc, sites, unclamped = false, desc =
     let found = null;
     for (let deg = lo; deg <= hi && !found; deg += step) {
       /* the SUBSTATE's length (one owner — `state.petalLength * sepals.scale` here was a second producer of the sepal's length, found by the own-size session) */
-      const seamStep = seamLatticeStep(seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness), bladeAskedLengthMm(sepalBladeState(state, deg, unclamped), sepals.scale), sepalRows);
+      /* (root support: the sepal's own root factor, as the builder's seam reads
+         it — a bucket keyed on the bare sheet would hand a long sepal a trial
+         lamina built at another seam step) */
+      const sepalLen = bladeAskedLengthMm(sepalBladeState(state, deg, unclamped), sepals.scale), sepalRT = petalRootTaper(sepalLen);
+      const seamStep = seamLatticeStep(sepalRT === null ? seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness) : seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness, sepalRT.rootFactor), sepalLen, sepalRows);
       let trial = trials.get(seamStep);
       if (!trial) { trial = sepalTrialLamina(state, sepals, deg, exportMode, unclamped); trials.set(seamStep, trial); }
       scanned++;
@@ -22569,7 +25066,8 @@ function buildSepalTierInto(acc, state, fr, sepals, sites, stemPlanned, cap, unc
     blade: (slot) => {
       azimuths[slot.index] = slot.azimuth;
       slots[slot.index] = slot;
-      const p = buildPetalInto(acc, bs, sepals.ring, slot, null, built.length === 0);
+      /* a sepal reads the texture edge PIN and nothing else of the row's capability (the petal hooks are the petals') */
+      const p = buildPetalInto(acc, bs, sepals.ring, slot, cap && cap.textureEdgeMm > 0 ? { textureEdgeMm: cap.textureEdgeMm } : null, built.length === 0);
       /* THE STATE THIS BLADE WAS BUILT FROM, keyed by the petal name the law
          reads — SP6 compares it against the page's own sepal* read-back, an
          owner the builder does not write. */
@@ -22744,7 +25242,7 @@ export function tubeEligible(state) {
      `tubeLaw`), so the ring, the sinus and the slit edges read the LAW
      outline they always read. */
   if (state.petalInfill === 'VORONOI') return false;
-  if (Number(state.stemLength) >= 1 && state.inflorescence === 'RACEME') return false;
+  if (!inflorescenceIsAbsent(state)) return false;
   return true;
 }
 /* THE PLAN: per layer, the asked k, the built k and whether it fuses. */
@@ -23149,6 +25647,15 @@ function emitTubeRings(acc, geo, n, capability = null) {
 /* THE CORE WITH A TUBE. Every layer FREE (the default) is today's single pass,
    by branch. */
 function buildBloomCore(acc, state, opts = {}) {
+  /* T5's DECISION TWIN: a live build whose sheet the export floor raises
+     decides every organ count on the same organs built in export (untextured,
+     so the twin cuts nothing itself) — mode-free by construction */
+  if (!opts.t5Decide && !acc.exportMode && Number(state.sheetThickness) < MIN_FEATURE_MM && organT5For(state, opts.capability || null)) {
+    const tw = new MeshBuilder({ exportMode: true });
+    const tb = buildBloomCore(tw, { ...state, petalTexture: 'NONE' }, { ...opts, t5Decide: 'twin' });
+    const dec = { positions: tw.positions, hub: [tb.petalTriEnd, tb.hubTriEnd], stem: [tb.hubTriEnd, tb.stemTriEnd], tube: (tb.tube && tb.tube.rings || []).map((r) => [r.triFrom, r.triTo]) };
+    return buildBloomCore(acc, state, { ...opts, t5Decide: dec });
+  }
   const layerCount = Math.round(Number(state.layerCount) || 1);
   const n = Math.round(Number(state.petalCount));
   let plan = tubePlan(state, layerCount, n);
@@ -23159,26 +25666,122 @@ function buildBloomCore(acc, state, opts = {}) {
   if (!plan.active) {
     const built = buildBloomBody(acc, state, opts, null);
     built.tube = { ...plan, rings: [] };
-    return built;
+    return t5Finish(acc, built, [], opts.capability || null, !!opts.pedicel);
   }
   /* pass 1: every fused petal's rows, no blade emitted */
   const collectHooks = plan.layers.map((lay) => (lay.free ? null : () => () => -1));
-  const collected = buildBloomBody(new MeshBuilder({ exportMode: acc.exportMode }), state, opts, { hookFor: (L) => collectHooks[L] });
+  const collected = buildBloomBody(new MeshBuilder({ exportMode: acc.exportMode }), state, opts, { hookFor: (L) => collectHooks[L], collect: true });
   if (collected.foot.slotCount !== n || collected.foot.layerCount !== layerCount) throw new Error(`TUBE: the plan read ${layerCount} x ${n}, the whorl built ${collected.foot.layerCount} x ${collected.foot.slotCount}`);
   /* the same whorls in the OTHER mode, for the mode-free decisions only */
-  const collectedOther = buildBloomBody(new MeshBuilder({ exportMode: !acc.exportMode }), state, opts, { hookFor: (L) => collectHooks[L] });
+  const collectedOther = buildBloomBody(new MeshBuilder({ exportMode: !acc.exportMode }), state, opts, { hookFor: (L) => collectHooks[L], collect: true });
   const geoOther = tubeGeometry(plan, collectedOther);
   const geo = tubeGeometry(plan, collected, geoOther);
   for (const g of geo) if (g && geoOther[g.L].R1 !== g.R1) throw new Error(`TUBE: the ring's top row differs between the modes (${g.R1} against ${geoOther[g.L].R1}) — the ladder is not mode-free`);
   /* pass 2: each fused petal reduced to what stands above the ring */
   const built = buildBloomBody(acc, state, opts, { hookFor: (L) => (geo[L] ? (p) => tubeLobeHook(geo[L], n, p) : null) });
-  /* pass 3: the rings, last */
-  const rings = emitTubeRings(acc, geo, n, opts.capability || null);
+  /* pass 3: the rings, last — under T5 one ring at a time, each refined on its
+     own shipped lattice with its own law's normals */
+  let rings, tubeOrgans = [];
+  if (built.t5) {
+    rings = [];
+    let ri = 0;
+    for (const gg of geo) {
+      if (!gg) continue;
+      const sink = new Map();
+      acc.normalSink = (P, nn) => { const k = `${P[0]}|${P[1]}|${P[2]}`; if (nn && !sink.has(k)) sink.set(k, nn); };
+      const from = acc.triangleCount;
+      let rep;
+      try { const c = organCapture(acc, () => emitTubeRings(acc, [gg], n, opts.capability || null)); rep = c.out; const dd = opts.t5Decide && opts.t5Decide !== 'twin' && opts.t5Decide.tube[ri] ? { positions: opts.t5Decide.positions, from: opts.t5Decide.tube[ri][0], to: opts.t5Decide.tube[ri][1] } : null; tubeOrgans.push(organLatticeInto(acc, from, c, { organ: 'tube', edgeMm: built.t5.edgeMm, decide: dd, sink })); }
+      finally { acc.normalSink = null; }
+      for (const r of rep) { r.shippedTris = r.ringTris; r.triTo = acc.triangleCount; r.ringTris = r.triTo - r.triFrom; rings.push(r); }
+      ri++;
+    }
+  } else rings = emitTubeRings(acc, geo, n, opts.capability || null);
   built.tube = { ...plan, rings };
+  return t5Finish(acc, built, tubeOrgans, opts.capability || null, !!opts.pedicel);
+}
+/* the relief pass once every part of this build exists, and its records into
+   the texture summary (the organs' own beside the sheets') */
+function t5Finish(acc, built, extra, capability = null, pedicel = false) {
+  /* A RACEME'S OR AN UMBEL'S FLORETS carry organs of their own (a FLORET build
+     — `pedicel` — relieves no stem: its stem is its pedicel, Q12); their relief
+     is DEFERRED to the bloom they are appended into (Eva's ruling 5, Oct 25:
+     floret hubs are textured in the WORLD frame, one shared layer, so no two
+     florets carry the same copy of the pattern — `buildInflorescenceInto`
+     carries each placed floret's organs into the parent's pass) */
+  const floretOrgans = built.inflorescenceBuilt && built.inflorescenceBuilt.t5FloretOrgans ? built.inflorescenceBuilt.t5FloretOrgans : [];
+  if (!built.t5 && !floretOrgans.length) return built;
+  if (built.t5 && pedicel) {
+    built.t5Deferred = { T: built.t5, organs: [...(built.t5Organs || []), ...extra] };
+    delete built.t5Organs;
+    built.t5 = { organs: built.t5Deferred.organs.map((O) => O.organ), deferred: true };
+    return built;
+  }
+  const T = built.t5 || floretOrgans[0].T;
+  const organs = [...(built.t5Organs || []), ...extra, ...floretOrgans];
+  const recs = organReliefPass(acc, T, organs, capability);
+  if (built.texture) for (const [k, r] of Object.entries(recs)) built.texture.organs[k] = r;
+  delete built.t5Organs;
+  built.t5 = { organs: organs.map((O) => O.organ) };
+  if (built.inflorescenceBuilt) delete built.inflorescenceBuilt.t5FloretOrgans;
   return built;
 }
 
 export function buildBloomInto(acc, state, opts = {}) {
+  /* THE EDGE CAP (see THE EDGE CAP beside `textureFor`): decided OUTSIDE the
+     ramp's own budget decision, over whole builds; a nested floret build
+     inherits the rung in force and decides nothing. */
+  if (TEXTURE_CAP_ACTIVE) return buildBloomRamped(acc, state, opts);
+  const capT = textureFor(state, (opts && opts.capability) || null);
+  const pinned = !!(opts && opts.capability && opts.capability.textureEdgeMm > 0);
+  if (!capT || capT.refused || pinned) {
+    const built = buildBloomRamped(acc, state, opts);
+    if (built.texture) built.texture.edgeCap = capT && !capT.refused ? { askedMm: TEXTURE_EDGE_MM, usedMm: capT.edgeMm, capMm: TEXTURE_EDGE_CAP_MM, gridMm: TEXTURE_EDGE_GRID_MM, budget: EXPORT_TRI_BUDGET, pinned: true, trials: [{ edgeMm: capT.edgeMm, tris: acc.triangleCount }], fits: acc.triangleCount <= EXPORT_TRI_BUDGET } : null;
+    return built;
+  }
+  const spawnLike = () => new MeshBuilder({ exportMode: acc.exportMode, captureGrid: acc.captureGrid, captureLamina: acc.captureLamina, captureRim: acc.captureRim, captureNormals: acc.captureNormals });
+  const copyAccInto = (dst, src) => { dst.positions = src.positions; dst.normals = src.normals; dst.minThickness = src.minThickness; dst.lo = src.lo; dst.hi = src.hi; };
+  const trials = [];
+  const trial = (k, into) => {
+    TEXTURE_EDGE_IN_FORCE = textureEdgeRung(k);
+    const built = buildBloomRamped(into, state, opts);
+    trials.push({ edgeMm: TEXTURE_EDGE_IN_FORCE, tris: into.triangleCount });
+    return { built, acc: into, tris: into.triangleCount, k };
+  };
+  TEXTURE_CAP_ACTIVE = true;
+  try {
+    /* the ruled edge first, straight into the caller's accumulator: a build
+       that fits pays nothing more */
+    const base = trial(0, acc);
+    const capOn = true;   // the cap's own switch: the mutant table turns it off
+    let pick = base;
+    if (capOn && base.tris > EXPORT_TRI_BUDGET) {
+      /* the cap first: if even that rung is over, the build stands at the cap
+         and the export is refused (never coarser without a ruling) */
+      const topK = TEXTURE_EDGE_CAP_RUNGS;   // the ladder's top: the cap, never coarser without a ruling
+      const top = trial(topK, spawnLike());
+      pick = top;
+      if (top.tris <= EXPORT_TRI_BUDGET) {
+        /* bisect: lo does not fit, hi fits; the finest fitting rung is hi */
+        let lo = 0, hi = topK;
+        while (hi - lo > 1) {
+          const mid = (lo + hi) >> 1;
+          const t = trial(mid, spawnLike());
+          if (t.tris <= EXPORT_TRI_BUDGET) { hi = mid; pick = t; } else lo = mid;
+        }
+      }
+      copyAccInto(acc, pick.acc);
+    }
+    trials.sort((a, b) => a.edgeMm - b.edgeMm);
+    if (pick.built.texture) pick.built.texture.edgeCap = { askedMm: TEXTURE_EDGE_MM, usedMm: textureEdgeRung(pick.k), capMm: TEXTURE_EDGE_CAP_MM, gridMm: TEXTURE_EDGE_GRID_MM, budget: EXPORT_TRI_BUDGET, pinned: false, trials, fits: pick.tris <= EXPORT_TRI_BUDGET };
+    return pick.built;
+  } finally {
+    TEXTURE_EDGE_IN_FORCE = null;
+    TEXTURE_CAP_ACTIVE = false;
+  }
+}
+
+function buildBloomRamped(acc, state, opts = {}) {
   /* RE-ENTRANCY: `buildBloomCore` calls `buildBloomInto` again, once per
      FLORET, for an inflorescence. The budget is a property of the WHOLE
      composite plant, not of one floret in isolation, so a decision already
@@ -23263,11 +25866,14 @@ export function buildBloomInto(acc, state, opts = {}) {
   }
 }
 
-function buildBloomBody(acc, state, { below = null, capability = null, scopes = null } = {}, tube = null) {
+function buildBloomBody(acc, state, { below = null, capability = null, scopes = null, pedicel = false, t5Decide = null } = {}, tube = null) {
   if (below !== null && below !== 'stem' && below !== 'branch') {
     throw new Error(`below must be 'stem' | 'branch' | null, got ${JSON.stringify(below)}`);
   }
   if (below !== null) throw new Error(`below='${below}' is phase-2+ work; only null is built today`);
+  /* where this bloom's own triangles start in the accumulator — the mophead's
+     budget clamp reads the rest of the bloom as an exact count */
+  const bodyTris0 = acc.triangleCount;
 
   const fr = footRing(state, acc, { scopes });
   /* ONE WHORL PER LAYER — layers are instances of the arrangement primitive,
@@ -23368,7 +25974,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      here — `buildInflorescenceInto` runs after the sepals, last — so no byte
      moves by asking early, and the read-out can name the florets even on a
      row whose geometry is absent. */
-  const infloPlanned = inflorescencePlan(state, stemPlanned, acc);
+  let infloPlanned = inflorescencePlan(state, stemPlanned, acc);
   /* THE SIZE FIELD (organic variance, build 1): null at amount 0, the guard
      every consumer branches on. Asked once, before the omission mask, because
      the mask probes each slot's petal at the size this field gives it. */
@@ -23380,6 +25986,10 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      stands, so the omission mask probes each slot at its mapped azimuth. */
   const spacingField = spacingVarianceField(state, fr);
   const omission = stemOmission(state, fr, capability, stemPlanned, sizeField, formField, spacingField);
+  /* THE UMBEL'S HEAD TOGGLE (Eva's ruling 2, Oct 21): OFF builds no head at
+     all — no head petal, no hub, no centre, no sepals — and the stem ends at
+     the umbel's knot. The geometry's half of the two statements. */
+  const headOff = umbelHeadIsAbsent(state) && !!(stemPlanned && stemPlanned.present);
   /* ONE FACTOR ROW PER WHORL, parallel to `slotAzimuths` (the same shape, the
      same indexing, one entry per SLOT whether or not a petal was built on it),
      null when the field is — the metrics hook's per-slot applied record, which
@@ -23399,7 +26009,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      conditional on a sepal whorl. The capture moves no byte — verify-bloom-grid's
      clause 1 — and costs the row arrays alone. */
   acc.captureLamina = true;
-  if (fr.continuousMode) {
+  if (headOff) { /* THE UMBEL WITH ITS HEAD OFF builds no head petal (see `umbelHeadIsAbsent`) */ } else if (fr.continuousMode) {
     /* ONE WHORL, so one azimuth row — the continuous sequence's own. */
     const azOf = new Array(fr.rings.length);
     const fOf = varianceFactors ? new Array(fr.rings.length) : null;
@@ -23525,7 +26135,16 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   acc.captureLamina = laminaWas;
   /* every triangle before this index is a petal's (the TU family's probe set) */
   const petalTriEnd = acc.positions.length / 9;
-  const hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
+  /* THE ORGANS' RELIEF (T5): a textured build cuts the hub's and the stem's
+     lattice right after each is emitted; a tube's collect passes and every
+     untextured build take the shipped expressions, by branch */
+  const T5 = tube && tube.collect ? null : organT5For(state, capability);
+  const t5Organs = T5 ? [] : null;
+  const t5Cut = (organ, from, cap) => { const d = t5Decide && t5Decide !== 'twin' && t5Decide[organ] ? { positions: t5Decide.positions, from: t5Decide[organ][0], to: t5Decide[organ][1] } : null; t5Organs.push(organLatticeInto(acc, from, cap, { organ, edgeMm: T5.edgeMm, decide: d })); };
+  let hubBuilt;
+  if (headOff) hubBuilt = HUB_ABSENT;
+  else if (T5) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); t5Organs[t5Organs.length - 1].cover = [0, petalTriEnd]; }
+  else hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
   const hubTriEnd = acc.positions.length / 9;
   /* THE STEM (session 43) — ONE closed solid on the axis, rooted THROUGH the
      hub wall, overlapping it exactly as every stamen and the style already do.
@@ -23533,7 +26152,11 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      one owner above, the same object buildHubInto shaped the join from, so the
      stem and the hollow it leaves in the hub cannot disagree about where the
      underside is; it is emitted HERE, after the hub, where it always was. */
-  const stemBuilt = buildStemInto(acc, stemPlanned);
+  /* a floret's stem is its PEDICEL, a rod: deferred to BONE (Q12) */
+  let stemBuilt;
+  if (T5 && !pedicel && stemPlanned.present) { const c = organCapture(acc, () => buildStemInto(acc, stemPlanned)); stemBuilt = c.out; t5Cut('stem', hubTriEnd, c); stemBuilt = { ...stemBuilt, latticeTris: acc.positions.length / 9 - hubTriEnd }; }
+  else stemBuilt = buildStemInto(acc, stemPlanned);
+  const stemTriEnd = acc.positions.length / 9;
   /* LEAVES ON THE STEM. Built AFTER the stem because they read its plan for
      the three lengths they need (`boreR`, `outerR`, `rootZ`) and compute none
      of them — the petiole roots in the WALL, which is the one thing Phase A's
@@ -23555,7 +26178,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
     for (let i = 0; i < leafPlanned.azimuths.length; i++) {
       /* A NODE WHOSE CAP LEAVES NO BLADE BUILDS NO LEAF (told by the plan). */
       if (leafPlanned.nodeLengthsMm && !(leafPlanned.nodeLengthsMm[i] > 0)) continue;
-      for (const az of leafPlanned.azimuths[i]) leavesBuilt.push(buildLeafInto(acc, leafPlanned, state, i, az));
+      for (const az of leafPlanned.azimuths[i]) { const lb = buildLeafInto(acc, leafPlanned, state, i, az, capability); lb.nodeIndex = i; leavesBuilt.push(lb); }
     }
   }
   const leafTriRange = [leafTris0, acc.triangleCount];
@@ -23567,7 +26190,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      `freeEnds` is the builder's own tally, JS4's independent quantity. */
   const stamens = [];
   let freeEnds = 0;
-  if (fr.androecium) {
+  if (fr.androecium && !headOff) {
     const A = fr.androecium;
     buildWhorlInto({
       count: A.count,
@@ -23592,19 +26215,24 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      and inert). Its free end is its own census (JG4), never folded into the
      androecium's. */
   const styles = [];
-  if (fr.gynoecium) styles.push(buildStyleInto(acc, fr.gynoecium));
+  if (fr.gynoecium && !headOff) styles.push(buildStyleInto(acc, fr.gynoecium));
   /* THE SEPALS (sepals, part 1) — the petal builder a second time, on the
      hub's rim, at the angle the drawn limit allows, EMITTED LAST so the
      stream of a bloom without them is a prefix of the stream with them.
      Null by branch at sepalCount 0 and under SPHERE. */
-  const sepalsBuilt = buildSepalsInto(acc, state, fr, sites, stemPlanned, capability);
+  const sepalsBuilt = headOff ? null : buildSepalsInto(acc, state, fr, sites, stemPlanned, capability);
   /* THE INFLORESCENCE (this session) — N copies of ONE floret unit, each a
      whole bloom with its own pedicel built at the origin by this very
      function, appended under a rigid transform. EMITTED LAST, after the
      sepals, so the stream of a bloom without an inflorescence is a PREFIX of
      the stream with one. Null by branch at type NONE and where there is no
      rachis to hang it on. */
-  const inflorescenceBuilt = buildInflorescenceInto(acc, state, infloPlanned, floretUnits);
+  /* THE MOPHEAD'S BUDGET CLAMP (Eva's ruling 4): decided HERE, after every
+     other part of the bloom is emitted and before a single floret is
+     appended, so the rest of the bloom is an exact count rather than an
+     estimate. A re-plan only where it binds; null-op on every other build. */
+  if (infloPlanned && infloPlanned.compound) infloPlanned = umbelBudgetClamp(state, stemPlanned, acc, infloPlanned, acc.triangleCount - bodyTris0);
+  const inflorescenceBuilt = buildInflorescenceInto(acc, state, infloPlanned, infloPlanned && infloPlanned.compound ? infloPlanned.unitMemo : floretUnits);
   /* THE FILAMENT-AGAINST-STYLE FLAG (session 23; B2b's family, built on
      Eva's ruling of Sep 6 on the ±180 curl range: the crossing is not a
      property of the range's ends, so what closes the question is an
@@ -23672,7 +26300,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   const at = Math.max(0, petals.findIndex((p) => p !== null && p !== undefined));
   /* THE TOLD FLAG, after every solid is emitted (it reads records and moves
      no byte): assembled here so its feet list can carry the sepals'. */
-  const neighbour = neighbourFlag({ foot: fr, slotAzimuths, petalsAll, stemOmission: omission, sepals: sepalsBuilt });
+  const neighbour = headOff ? null : neighbourFlag({ foot: fr, slotAzimuths, petalsAll, stemOmission: omission, sepals: sepalsBuilt });
   /* THE SCOPES THIS BUILD WAS HANDED (Scoping-a), summarised for the read-out
      and the gate — null on every build with none, which is every shipped one. */
   /* `layersLive` / `petalsLive` (Scoping-b): whether the toggle that lets each
@@ -23718,7 +26346,11 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
     strands: (scopes.strands || []).length, strandsLive: stamenBraidBuilt(state),
     scopedStrands: [...new Set(((scopes.strands || []).filter(offsetCount)).filter((e) => stamenBraidBuilt(state) && fr.androecium && e.strand < fr.androecium.count).map((e) => e.strand))].sort((a, b) => a - b),
     keptStrands: [...new Set(((scopes.strands || []).filter(offsetCount)).filter((e) => !(stamenBraidBuilt(state) && fr.androecium && e.strand < fr.androecium.count)).map((e) => e.strand))].sort((a, b) => a - b) } : null;
-  return { petalTriEnd, hubTriEnd, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt,
+  /* THE TEXTURE'S WHOLE-BLOOM RECORD (T3): the controls as read, every
+     organ's lattice count against its conforming floor, the relief's extremes
+     and the refusals — what the TX family and the read-out read. */
+  const texture = textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, capability);
+  return { petalTriEnd, hubTriEnd, stemTriEnd, t5Organs, t5: T5, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt, texture,
     /* THE SIZE FIELD'S OWN RECORD (organic variance, build 1) — null at amount
        0, which is the guard every consumer of it branches on. The closure is
        left off (a function does not survive the metrics hook's clone); what a

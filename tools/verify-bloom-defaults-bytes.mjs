@@ -1,7 +1,7 @@
 /* ===================================================================
    verify-bloom-defaults-bytes.mjs — THE BYTE PARTITION OF A DEFAULTS MOVE.
 
-     node tools/verify-bloom-defaults-bytes.mjs --base <worktree> [--shard k/n] [--out <file>] [--control] [--mover infill|lobed|none] [--pair index|set] [--only <regex>]
+     node tools/verify-bloom-defaults-bytes.mjs --base <worktree> [--shard k/n] [--out <file>] [--control] [--mover infill|lobed|none|depth2] [--pair index|set] [--only <regex>] [--redefined <regex>]
      node tools/verify-bloom-defaults-bytes.mjs --merge <file> <file> ...
 
    WHY IT EXISTS. `verify-bloom-surface-bytes.mjs` builds BOTH trees from THIS
@@ -49,6 +49,7 @@ if (argv[0] === '--merge') {
   console.log(`  compared: ${sum('floats').toLocaleString('en-US')} export floats, ${sum('gridValues').toLocaleString('en-US')} captured-grid values`);
   if (parts.some((p) => p.control)) console.log(`  control: ${parts.filter((p) => p.control).map((p) => p.control).join('; ')}`);
   if (parts[0].pair === 'set') console.log(`  paired by control set: ${(parts[0].unpairedBase || []).length} base row(s) and ${(parts[0].unpairedHead || []).length} head row(s) with no partner — ${[...(parts[0].unpairedBase || []).map((l) => 'base: ' + l), ...(parts[0].unpairedHead || []).map((l) => 'head: ' + l)].join(' | ')}`);
+  { const rp = parts.flatMap((p) => p.redefinedPairs || []); if (rp.length) console.log(`  redefined in place (paired by index, each tree its own row): ${rp.length} — ${rp.join(' | ')}`); }
   for (const f of fails) console.log(`  FAIL ${f}`);
   console.log(fails.length ? `FAIL — ${fails.length} finding(s)` : 'PASS — the partition closes exactly as predeclared.');
   process.exit(fails.length ? 1 : 0);
@@ -69,14 +70,18 @@ function stateOf(Hm, D, row) {
   const kindOf = new Map(Hm.CONTROLS.map((c) => [c.id, c]));
   const s = { ...D };
   for (const w of row.set || []) {
+    /* THE RESERVED `@scopes` ENTRY (the role retirement) is not a control: the
+       row's scopes ride to the build through `rowScopesForBuild` (each tree's
+       own harness) — this tool predated it and threw on every scoped row. */
+    if (w.id === Hm.SCOPES_SET_ID) continue;
     const c = kindOf.get(w.id); if (!c) throw new Error(`${row.label}: no control ${w.id}`);
     s[w.id] = c.kind === 'slider' ? Number(w.value) : c.kind === 'check' ? (w.value === true || w.value === 'true') : w.value;
   }
   return s;
 }
-function build(Gm, state, row, exportMode) {
+function build(Gm, Hm, state, row, exportMode) {
   const acc = new Gm.MeshBuilder({ exportMode, captureGrid: true });
-  const built = Gm.buildBloomInto(acc, state, { below: null, capability: row.capability || null });
+  const built = Gm.buildBloomInto(acc, state, { below: null, capability: row.capability || null, scopes: Hm.rowScopesForBuild ? Hm.rowScopesForBuild(row) : null });
   const grid = [];
   for (const p of built.petalsAll || []) {
     grid.push(p ? 1 : 0);
@@ -109,6 +114,19 @@ const MOVER_OF = {
      pair — a bound narrowed on a control, whose only movers are the rows the
      narrowing REDEFINES (and so cannot pair by set: they are listed by name). */
   none: () => false,
+  /* `depth2` (Eva's ruling of Oct 25, the floor-floret mophead as depth 2's
+     default): the BASE builds a compound umbel (its own `inflorescence`
+     record: present, compound) on a row whose BASE set leaves at least one id
+     of the head registry's `UMBEL_DEPTH2_DEFAULTS` unnamed — "a row moves iff
+     it builds depth 2 off the defaults". A depth-2 row that named every
+     overlay value holds; a row that builds no depth 2 holds. The overlay is
+     the HEAD's (the base has none), the build record and the set the BASE's. */
+  depth2: (b, br) => {
+    const p = b.built.inflorescence;
+    if (!(p && p.present && p.compound)) return false;
+    const named = new Set((br.set || []).map((w) => w.id));
+    return Object.keys(R.UMBEL_DEPTH2_DEFAULTS || {}).some((id) => !named.has(id));
+  },
 };
 if (!MOVER_OF[MOVER]) { console.error(`--mover ${MOVER}: no such predicate (${Object.keys(MOVER_OF).join(', ')})`); process.exit(2); }
 /* `--pair set` (S4b): pair the two matrices by CONTROL SET (and capability)
@@ -147,6 +165,8 @@ if (CONTROL) {
 /* `--only <regex>` (the sepal ranges session): build only the pairs whose
    HEAD label matches — a subset, reported as one, never as the matrix. */
 const ONLY = arg('--only') ? new RegExp(arg('--only')) : null;
+const REDEFINED = arg('--redefined') ? new RegExp(arg('--redefined')) : null;
+const redefinedPairs = [];
 /* Before any build: every pair's two STATES (each tree's own DEFAULTS plus
    the row's set) must be deep-equal, over the WHOLE pairing whatever --only
    says — the inputs half of the byte claim, which costs nothing. */
@@ -160,12 +180,19 @@ for (let i = 0; i < Math.min(headRows.length, baseRows.length); i++) {
   if (i % N !== K) continue;
   if (ONLY && !ONLY.test(headRows[i].label)) continue;
   const hr = headRows[i], br = baseRows[i];
-  if (JSON.stringify(hr.set) !== JSON.stringify(br.set) || JSON.stringify(hr.capability || null) !== JSON.stringify(br.capability || null)) { fails.push(`row ${i}: the control sets differ ("${hr.label}" / "${br.label}") — not the same row`); continue; }
+  /* `--redefined <regex>` (the mophead's defaults, Oct 25): a change that
+     REDEFINES rows in place (block 81's depth-2 rows take the overlay under
+     their own values) pairs them BY INDEX anyway, each tree building its OWN
+     row — allowed only where the HEAD label matches, and every such pair is
+     listed; a set difference anywhere else is still "not the same row". */
+  const redefined = JSON.stringify(hr.set) !== JSON.stringify(br.set);
+  if (redefined && REDEFINED && REDEFINED.test(hr.label)) redefinedPairs.push(`row ${i}: "${br.label}" -> "${hr.label}"`);
+  else if (redefined || JSON.stringify(hr.capability || null) !== JSON.stringify(br.capability || null)) { fails.push(`row ${i}: the control sets differ ("${hr.label}" / "${br.label}") — not the same row`); continue; }
   const hs = stateOf(H, R.DEFAULTS, hr), bs = stateOf(BH, BR.DEFAULTS, br);
   let mover = null, moved = false, floats = 0, gridValues = 0;
   for (const exportMode of [true, false]) {
-    const b = build(BG, bs, br, exportMode), h = build(G, hs, hr, exportMode);
-    if (exportMode) mover = MOVER_OF[MOVER](b);
+    const b = build(BG, BH, bs, br, exportMode), h = build(G, H, hs, hr, exportMode);
+    if (exportMode) mover = MOVER_OF[MOVER](b, br);
     if (CONTROL && exportMode && hr.label === CONTROL_HOLDER) {
       if (mover) { fails.push(`control: the named holder "${CONTROL_HOLDER}" is a predeclared MOVER on the base tree, so it cannot carry the holder control — name a row this change holds`); }
       else { h.pos[0] += 1e-9; control = `perturbed "${hr.label}" by 1e-9`; }
@@ -186,7 +213,8 @@ if (CONTROL) {
   else if (j < 0) fails.push(`control: ${control} and the holder clause did NOT report it`);
   else { control += ' — the holder clause reported it'; fails.splice(j, 1); }
 }
-const res = { base: BASE, shard: `${K}/${N}`, rows: out, fails, control, mover: MOVER, pair: PAIR, unpairedBase, unpairedHead, statesEqual, only: ONLY ? String(ONLY) : null };
+if (redefinedPairs.length) { console.error(`redefined in place (paired by index, each tree its own row): ${redefinedPairs.length}`); for (const l of redefinedPairs) console.error(`  ${l}`); }
+const res = { base: BASE, shard: `${K}/${N}`, rows: out, fails, control, mover: MOVER, pair: PAIR, unpairedBase, unpairedHead, statesEqual, only: ONLY ? String(ONLY) : null, redefinedPairs };
 if (arg('--out')) fs.writeFileSync(arg('--out'), JSON.stringify(res));
 console.log(`shard ${K}/${N}: ${out.length} rows, ${out.filter((r) => r.mover).length} movers, ${fails.length} finding(s)${control ? ` · control: ${control}` : ''}`);
 process.exit(fails.length ? 1 : 0);

@@ -15,7 +15,7 @@ to disk.
 
 Every route below is `async def`, but the actual CV work (image decode,
 analyze_gauge, analyze_multi_roi, propose_measurement_rois,
-detect_ruler_calibration, count_repeats_by_template_match,
+detect_ruler_calibration, justify_ruler_calibration, count_repeats_by_template_match,
 analyze_loop_lattice_experiment) is synchronous and CPU-bound -- it is
 always run via `await run_in_threadpool(...)`, never called directly.
 Calling it directly would block this process's single asyncio event
@@ -49,6 +49,7 @@ from analysis.gauge_analysis import (
     analyze_loop_lattice_experiment,
     count_repeats_by_template_match,
     detect_ruler_calibration,
+    justify_ruler_calibration,
 )
 from storage import corrections_store
 
@@ -611,7 +612,11 @@ async def detect_ruler(file: UploadFile = File(...)) -> JSONResponse:
     success result to PRE-FILL the Calibrate Scale step's two points,
     known-distance, and unit -- never to skip the user's own confirm/
     override step, same as /propose-rois pre-fills but never auto-
-    approves measurement areas.
+    approves measurement areas. A success result is only returned when
+    justify_ruler_calibration can show the span is one unit of the
+    ruler's own tick pattern; a pattern it cannot justify returns
+    success=false with nothing pre-filled (and `declined_reason` saying
+    why), so the user calibrates by hand.
     """
     try:
         data = await file.read()
@@ -631,8 +636,25 @@ async def detect_ruler(file: UploadFile = File(...)) -> JSONResponse:
             ).model_dump(),
         )
 
+    # A found pattern is only OFFERED when its span can be justified from the
+    # ruler's own tick comb (see "Checking a ruler suggestion before it is
+    # offered" in analysis.gauge_analysis); otherwise nothing is pre-filled and
+    # the user calibrates by hand. Detection itself is untouched.
+    justification = justify_ruler_calibration(result)
+    if not justification.ok:
+        found = result.success
+        lead = "A ruler-like pattern was found, but its scale could not be verified." if found else result.message
+        if found:
+            logger.info("Ruler pre-fill declined: %s", justification.reason)
+        response = RulerCalibrationOut(
+            success=False,
+            message=f"{lead} Nothing was pre-filled: click two marks on your ruler, then type the distance between them.",
+            declined_reason=justification.reason if found else "",
+        )
+        return JSONResponse(status_code=200, content=response.model_dump())
+
     response = RulerCalibrationOut(
-        success=result.success,
+        success=True,
         message=result.message,
         point1_px=result.point1_px,
         point2_px=result.point2_px,
@@ -641,10 +663,11 @@ async def detect_ruler(file: UploadFile = File(...)) -> JSONResponse:
         minor_tick_spacing_px=result.minor_tick_spacing_px,
         major_tick_count=result.major_tick_count,
         confidence=result.confidence,
+        assumption=justification.assumption,
     )
-    # success=False here means "no plausible ruler found" -- not a
-    # request error, same convention as /propose-rois and /count-repeats:
-    # still a 200, and the frontend just leaves manual calibration as-is.
+    # success=False here means "no verified ruler" -- not a request error,
+    # same convention as /propose-rois and /count-repeats: still a 200, and
+    # the frontend just leaves manual calibration as-is.
     return JSONResponse(status_code=200, content=response.model_dump())
 
 
@@ -798,6 +821,7 @@ async def analyze_multi(
             loop_lattice_debug=_loop_lattice_to_out(m.loop_lattice, pixels_per_mm) if m.loop_lattice else None,
             wale_source=m.wale_source,
             wale_count_confidence=m.wale_count_confidence,
+            wale_count_note=m.wale_count_note,
         )
         for m in result.per_roi
     ]

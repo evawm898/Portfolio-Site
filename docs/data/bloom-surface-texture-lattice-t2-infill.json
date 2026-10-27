@@ -1,0 +1,252 @@
+{
+ "floorBar": 2,
+ "edges": [
+  0.6,
+  0.4
+ ],
+ "states": {
+  "infill": {
+   "name": "infill",
+   "runs": [
+    {
+     "edgeMm": 0.6,
+     "latticeTris": 213296,
+     "panels": {
+      "petal": {
+       "panels": 8,
+       "shippedRows": 64,
+       "subRows": 32,
+       "cfMax": 2,
+       "noSub": {}
+      }
+     },
+     "margins": {
+      "row": 0.05569400787353524,
+      "col": 0.00491657257080087,
+      "infill": 0.000014484952314663956,
+      "snap": 1.8425876602279345e-8,
+      "diag": 9.999999980015985e-7
+     },
+     "decisions": {
+      "row": 64,
+      "col": 96,
+      "infill": 111512
+     },
+     "tx1": {
+      "subject": 1280,
+      "missing": 0,
+      "samples": 4720,
+      "sampleDiff": 0,
+      "instanceLenDiff": 0,
+      "fails": []
+     },
+     "tx2": {
+      "checked": 3504,
+      "subRows": 32,
+      "chordMm": {
+       "petal": 0.09916
+      },
+      "fails": []
+     },
+     "edges": {
+      "petal": {
+       "refinedFaces": 4320,
+       "refinedP99xE": 0.859,
+       "refinedMaxxE": 0.911,
+       "exemptFaces": 1728,
+       "exemptMaxMm": 1.804,
+       "unplaced": 0
+      }
+     },
+     "tx3": {
+      "boundary": 0,
+      "nonManifold": 80,
+      "shippedNonManifold": 224,
+      "directed": 0,
+      "float32": {
+       "boundary": 0,
+       "nonManifold": 80
+      },
+      "fails": []
+     },
+     "counts": {
+      "native": {
+       "petal": 213104
+      },
+      "rest": {
+       "hub": 4608
+      },
+      "total": 217712,
+      "restShipped": 192
+     },
+     "prepTris": 217712,
+     "organs": {
+      "petal": {
+       "shipped": 108736,
+       "lattice": 213104,
+       "panelFloor": 208592,
+       "xPanelFloor": 1.02,
+       "total": 213104,
+       "floor": 208592,
+       "xFloor": 1.02,
+       "t1Rows": 197680,
+       "quality": {
+        "tris": 213104,
+        "minAngleP1": 0.19,
+        "minAngleP5": 1.01,
+        "minAngleP50": 13,
+        "aspectP99": 317.6,
+        "under1": 10592,
+        "under5": 60264,
+        "edgeP99": 0.697,
+        "edgeMax": 2.138
+       }
+      },
+      "hub": {
+       "shipped": 192,
+       "lattice": 0,
+       "panelFloor": 0,
+       "xPanelFloor": null,
+       "total": 4608,
+       "floor": 3360,
+       "xFloor": 1.37,
+       "t1Rows": 4608,
+       "quality": null
+      }
+     },
+     "t1RowsTotal": 202288,
+     "tx4": {
+      "fails": [],
+      "strict": [
+       "petal 1.02x"
+      ]
+     },
+     "ms": 18069
+    },
+    {
+     "edgeMm": 0.4,
+     "latticeTris": 310992,
+     "panels": {
+      "petal": {
+       "panels": 8,
+       "shippedRows": 64,
+       "subRows": 48,
+       "cfMax": 3,
+       "noSub": {}
+      }
+     },
+     "margins": {
+      "row": 0.007464218139648438,
+      "col": 0.012025642395019532,
+      "infill": 0.000020202059995710898,
+      "snap": 2.163724766024444e-8,
+      "diag": 9.999999980015985e-7
+     },
+     "decisions": {
+      "row": 72,
+      "col": 112,
+      "infill": 193384
+     },
+     "tx1": {
+      "subject": 1280,
+      "missing": 0,
+      "samples": 4720,
+      "sampleDiff": 0,
+      "instanceLenDiff": 0,
+      "fails": []
+     },
+     "tx2": {
+      "checked": 4400,
+      "subRows": 48,
+      "chordMm": {
+       "petal": 0.1352
+      },
+      "fails": []
+     },
+     "edges": {
+      "petal": {
+       "refinedFaces": 5904,
+       "refinedP99xE": 1.107,
+       "refinedMaxxE": 1.107,
+       "exemptFaces": 1728,
+       "exemptMaxMm": 1.804,
+       "unplaced": 0
+      }
+     },
+     "tx3": {
+      "boundary": 0,
+      "nonManifold": 80,
+      "shippedNonManifold": 224,
+      "directed": 0,
+      "float32": {
+       "boundary": 0,
+       "nonManifold": 80
+      },
+      "fails": []
+     },
+     "counts": {
+      "native": {
+       "petal": 310800
+      },
+      "rest": {
+       "hub": 9600
+      },
+      "total": 320400,
+      "restShipped": 192
+     },
+     "prepTris": 320400,
+     "organs": {
+      "petal": {
+       "shipped": 108736,
+       "lattice": 310800,
+       "panelFloor": 352945,
+       "xPanelFloor": 0.88,
+       "total": 310800,
+       "floor": 352945,
+       "xFloor": 0.88,
+       "t1Rows": 348496,
+       "quality": {
+        "tris": 310800,
+        "minAngleP1": 0.07,
+        "minAngleP5": 0.76,
+        "minAngleP50": 11.95,
+        "aspectP99": 789,
+        "under1": 19520,
+        "under5": 90024,
+        "edgeP99": 0.583,
+        "edgeMax": 2.138
+       }
+      },
+      "hub": {
+       "shipped": 192,
+       "lattice": 0,
+       "panelFloor": 0,
+       "xPanelFloor": null,
+       "total": 9600,
+       "floor": 6990,
+       "xFloor": 1.37,
+       "t1Rows": 9600,
+       "quality": null
+      }
+     },
+     "t1RowsTotal": 358096,
+     "tx4": {
+      "fails": [],
+      "strict": []
+     },
+     "ms": 26918
+    }
+   ],
+   "tx0": {
+    "floats": 980352,
+    "moved": 0,
+    "lengths": [
+     980352,
+     980352
+    ],
+    "fails": []
+   }
+  }
+ },
+ "complete": true
+}

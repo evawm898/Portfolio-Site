@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paper Star Lantern — Eva Maskalenko</title>
+<meta name="description" content="Paper Star Lantern — design a folded paper star lantern, see it folded and lit, and get the laser-cut files, backing pieces and assembly instructions.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<!-- three pinned to the version every other generator here uses, so the
+     headless tools serve one local copy from node_modules for all of them. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+<link rel="stylesheet" href="lantern.css">
+</head>
+<body>
+
+<aside class="ln-panel" aria-label="Controls">
+  <header class="ln-header">
+    <a class="ln-back" href="index.html">&larr; Index</a>
+    <div class="ln-eyebrow">EM / LANTERN</div>
+    <h1>Paper Star Lantern</h1>
+    <p class="ln-sub">— a folded paper star, cut full of light. Shape the finished star; the page solves the flat pattern, folds it, and writes the files.</p>
+    <div class="ln-row ln-history">
+      <button class="ln-btn ln-btn--sm" id="undo" title="Undo (Ctrl+Z)" disabled>↶ undo</button>
+      <button class="ln-btn ln-btn--sm" id="redo" title="Redo (Ctrl+Shift+Z)" disabled>↷ redo</button>
+      <button class="ln-btn ln-btn--sm" id="resetAll" title="Back to the default star">reset</button>
+    </div>
+  </header>
+
+  <details class="ln-sec" open id="secShape">
+    <summary>Shape</summary>
+    <div class="ln-sec-body">
+      <div class="ln-presets" id="shapePresets" aria-label="Shape presets"></div>
+      <div class="ln-row"><button class="ln-btn" id="randomShape" title="A random star that closes">⚄ random shape</button><span class="ln-note" id="presetNote"></span></div>
+      <div id="shapeCtrls"></div>
+      <div class="ln-sub-head">Point outline — tip to inner vertex</div>
+      <div class="ln-row" id="edgeModes"></div>
+      <div id="scallopCtrls"></div>
+      <div class="ln-curve" id="edgeEditor"></div>
+      <p class="ln-note">drag a point · double-click the curve to add one · double-click a point to remove it · mirrored to every point</p>
+      <div id="tipCtrls"></div>
+      <details class="ln-sub"><summary>Mounting and holes</summary><div class="ln-sec-body" id="mountCtrls"></div></details>
+      <div class="ln-derived" id="dims"></div>
+    </div>
+  </details>
+
+  <details class="ln-sec" open id="secPattern">
+    <summary>Pattern</summary>
+    <div class="ln-sec-body">
+      <div class="ln-presets" id="patternPresets" aria-label="Pattern presets"></div>
+      <div class="ln-row"><button class="ln-btn" id="randomPattern" title="A new pattern that passes every check">⚄ random pattern</button><button class="ln-btn ln-btn--sm" id="patReseed" title="Same settings, another arrangement">↻ reseed</button><span class="ln-note" id="patternNote"></span></div>
+      <div id="patternCtrls"></div>
+      <p class="ln-note">every point carries the same pattern, mirrored about its ridge; the spine and the fold lines stay solid paper</p>
+    </div>
+  </details>
+
+  <details class="ln-sec" id="secBacking">
+    <summary>Backing</summary>
+    <div class="ln-sec-body">
+      <div id="backingCtrls"></div>
+      <div class="ln-row" id="paletteSwatch"></div>
+      <p class="ln-note">translucent tissue behind each point's cuts, one piece per point per half, trimmed off every fold; its sheets ride in the ZIP</p>
+    </div>
+  </details>
+
+  <details class="ln-sec" id="secLit">
+    <summary>Light</summary>
+    <div class="ln-sec-body">
+      <div id="litCtrls"></div>
+      <p class="ln-note">the Lit view: an LED inside the star, the paper glowing, the cuts throwing their pattern on the wall behind — view settings, saved with the design, no effect on the files</p>
+    </div>
+  </details>
+
+  <details class="ln-sec" id="secProfile">
+    <summary>Profile</summary>
+    <div class="ln-sec-body" id="profileCtrls"></div>
+  </details>
+
+  <details class="ln-sec" open id="secChecks">
+    <summary>Checks <span class="ln-count" id="flagCount"></span></summary>
+    <div class="ln-sec-body"><ul class="ln-flags" id="flags"></ul><p class="ln-note" id="flagHint" hidden>click a cut finding to see it in the Flat view</p></div>
+  </details>
+
+  <details class="ln-sec" id="secMaterial">
+    <summary>Material &amp; Machine</summary>
+    <div class="ln-sec-body">
+      <div id="materialCtrls"></div>
+      <div class="ln-derived" id="rulesOut"></div>
+      <p class="ln-note">starting values — confirm with test cuts (the coupon, phase 4)</p>
+    </div>
+  </details>
+
+  <details class="ln-sec" open id="secExport">
+    <summary>Export</summary>
+    <div class="ln-sec-body">
+      <div class="ln-derived" id="planOut"></div>
+      <div class="ln-row"><button class="ln-btn ln-btn--solid" id="exportZip">Cut files (.zip)</button><button class="ln-btn" id="exportPng">Render (.png)</button></div>
+      <div class="ln-row"><button class="ln-btn ln-btn--sm" id="svgFront">Front half SVG</button><button class="ln-btn ln-btn--sm" id="svgBack">Back half SVG</button></div>
+      <div class="ln-row"><button class="ln-btn ln-btn--sm" id="testGrid" title="Cut this first on your stock: bridges, holes, strokes and keep-outs, the derived value marked">Test grid SVG</button><button class="ln-btn ln-btn--sm" id="coupon" title="One point of this star, alone: cut it before the whole">Coupon SVG</button><button class="ln-btn ln-btn--sm" id="instructionsPdf">Instructions PDF</button></div>
+      <p class="ln-msg" id="exportMsg"></p>
+      <div class="ln-row"><button class="ln-btn" id="saveDesign">Save design (.json)</button><label class="ln-btn ln-file">Open design<input type="file" id="openDesign" accept=".json,application/json"></label></div>
+      <p class="ln-msg" id="designMsg"></p>
+    </div>
+  </details>
+</aside>
+
+<main class="ln-main">
+  <section class="ln-card ln-preview" aria-label="Preview">
+    <div class="ln-card-head">
+      <span class="ln-label" id="previewLabel">Lit</span>
+      <span class="ln-hint" id="previewHint">drag to turn · scroll to zoom · it turns on its own when left alone</span>
+      <span class="ln-views" id="views">
+        <button class="ln-btn ln-btn--sm is-on" data-view="lit">Lit</button>
+        <button class="ln-btn ln-btn--sm" data-view="folded">Folded</button>
+        <button class="ln-btn ln-btn--sm" data-view="flat">Flat</button>
+        <button class="ln-btn ln-btn--sm" data-view="build">Build</button>
+      </span>
+    </div>
+    <div class="ln-stage">
+      <svg id="flatSvg" class="ln-svg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The flat cut pattern of one half" hidden></svg>
+      <canvas id="foldCanvas"></canvas>
+      <div id="buildView" class="ln-build" hidden></div>
+      <p class="ln-building" id="building" hidden>solving…</p>
+    </div>
+  </section>
+</main>
+
+<script type="module" src="lantern.js"></script>
+</body>
+</html>

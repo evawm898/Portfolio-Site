@@ -69,7 +69,7 @@ import { measureInfloApproachMm } from './bloom-inflo-approach.mjs';
 import { measureLeafStemApproachMm } from './bloom-combination-gate.mjs';
 import { measureInfillWallMm } from './bloom-infill-wall.mjs';
 import { measureWall } from './bloom-wall-thickness.mjs';
-import { buildMatrix } from './bloom-harness.mjs';
+import { buildMatrix, UMBEL_DEPTH2_DEFAULTS } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTROL = process.argv.includes('--control');
@@ -103,6 +103,19 @@ export const SHIPPED_STATES = Object.freeze([
      from the sheet; when she rules them this row follows. */
   { id: 'the lobed leaf at its shipped defaults', matrixRow: 'LOBED: the shipped lobed defaults (a 46 mm blade, 34 mm envelope, 3 alternate nodes)', set: { stemLength: 90, stemDiameter: 6, leafLength: 46, leafNodes: 3, leafType: 'LOBED' }, measures: ['self', 'leaf-stem'] },
   { id: 'the infill at its ruled defaults', matrixRow: 'INFILL: the ruled defaults (20 cells, 5 Lloyd passes, law 0.30, stretch 1.65, a 1.00 mm wall, a 1.50 mm hole bar)', set: { petalInfill: 'VORONOI' }, measures: ['self', 'infill-wall'] },
+  /* THE MOPHEAD (Oct 24) — the depth-2 umbel is a guarded feature, so its
+     shipped defaults join the table the day it lands: the defaults are the
+     session's, put to Eva from the sheet. ONE measure, `floret-stem` (every
+     sub-umbel against the free stem, its own ray named): the florets of a
+     dome FUSE by construction, inside a sub-umbel and between sub-umbels —
+     declared by value in the combination gate (`mophead-*`), never clamped —
+     so `floret-floret` is not a bar this state can be held to, and the head
+     is OFF, so there is no representative petal for `self` to read. */
+  /* RE-PINNED (Eva's ruling, Oct 25 — ruling 3's standing rule): the
+     floor-floret mophead IS depth 2's default now, so the row is the
+     registry's `UMBEL_DEPTH2_DEFAULTS` overlay on a 120 mm stem and nothing
+     else — read from the registry's one owner, never restated here. */
+  { id: 'the mophead at its ruled defaults', matrixRow: 'MOPHEAD: THE MOPHEAD — 12 rays x 12 round four-petal florets at the FLORET FLOOR, 12 mm pedicels at 20 deg', set: { stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2', ...UMBEL_DEPTH2_DEFAULTS }, measures: ['floret-stem'] },
   { id: 'the raceme at its defaults', matrixRow: 'INFLO: the raceme (5 nodes x 1, 5-petal florets on 20 mm pedicels)', set: { stemLength: 120, inflorescence: 'RACEME' }, measures: ['self', 'floret-floret', 'floret-head', 'floret-stem'] },
   { id: 'the shared node — a leaf under every pedicel', matrixRow: 'NODE LAWS: SHARED NODE — a raceme with a leaf under every pedicel', set: { stemLength: 120, inflorescence: 'RACEME', leafLength: 40 }, measures: ['leaf-floret', 'leaf-pedicel', 'floret-floret', 'floret-head', 'leaf-stem'] },
 ]);
@@ -200,9 +213,31 @@ export function verify(tree, table, matrix, { quiet = false } = {}) {
   return bad;
 }
 
+/* THE ROOT TAPER RIDES HERE (big petals, Oct 21). Its must-fail,
+   tools/verify-bloom-root-taper.mjs, is Node-only and imports the harness, so
+   it belongs exactly where this gate already sits in the export preflight —
+   and a workflow edit would cost the frozen tag owed by the same session.
+   So this gate SPAWNS it, the clean arm beside the gate and the mutant arm
+   beside --control, and fails if it does. And the ruling's own claim about
+   the shipped default — the law is the identity there, so not one float of
+   the default moves — is asserted here as a statement about DEFAULTS. */
+async function rootTaperArm(tree) {
+  const { spawnSync } = await import('node:child_process');
+  const bad = [];
+  const L = Number(tree.R.DEFAULTS.petalLength);
+  if (tree.G.petalRootTaper(L) !== null) bad.push(`DB3: the shipped default's petal (${L} mm) builds a root taper — the law must be the identity at the default`);
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/verify-bloom-root-taper.mjs'), ...(CONTROL ? ['--control'] : [])], { encoding: 'utf8' });
+  const tail = (r.stdout || '').trim().split('\n').slice(-1)[0];
+  console.log(`  root taper ${CONTROL ? 'must-fail' : 'clean'} arm: ${tail}`);
+  if (r.status !== 0) bad.push(`DB3: tools/verify-bloom-root-taper.mjs${CONTROL ? ' --control' : ''} exited ${r.status}: ${(r.stderr || '').trim().split('\n').slice(-3).join(' | ')}`);
+  return bad;
+}
+
 async function main() {
   const tree = await loadTree(ROOT);
   const matrix = buildMatrix();
+  const rootBad = await rootTaperArm(tree);
+  if (rootBad.length) { console.log(`defaults bar: FAILED — ${rootBad.length} root-taper finding(s)`); for (const b of rootBad) console.log('  - ' + b); process.exitCode = 1; return; }
   if (!CONTROL) {
     const bad = verify(tree, SHIPPED_STATES, matrix);
     if (bad.length) { console.log(`defaults bar: FAILED — ${bad.length} finding(s)`); for (const b of bad) console.log('  - ' + b); process.exitCode = 1; return; }

@@ -11,8 +11,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
+import { CONTROLS, SECTIONS, DEFAULTS, UMBEL_DEPTH2_DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, umbelHeadIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, umbelDepthRefusal, umbelIsCompound, UMBEL_DEPTH_VALUES, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -786,7 +786,8 @@ function refreshLabels(ui, shown = null, scopedUi = null) {
   for (const c of CONTROLS) {
     if (valSpans[c.id].dataset.editing) continue;
     const u = scopedUi && SCOPE_IDS.has(c.id) ? scopedUi : ui;
-    valSpans[c.id].textContent = c.fmt(u[c.id], u, shown) + (seedNotes[c.id] ? ` · ${seedNotes[c.id]}` : '');
+    valSpans[c.id].textContent = c.fmt(u[c.id], u, shown) + (seedNotes[c.id] ? ` · ${seedNotes[c.id]}` : '')
+      + (c.enabledWhen !== undefined && !evalPredicate(c.enabledWhen, ui) ? ` · ${c.disabledReason(ui)}` : '');
   }
   /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3; its first
      user, the rosette's hood group, was retired with the roles). Same snapshot, same pass, same owner
@@ -850,6 +851,16 @@ function applyVisibility() {
      other control is the whole bloom's and is decided on the whole bloom. */
   const vui = scopeView ? viewUi(ui) : ui;
   for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, scopeView && idsFor(scopeView).has(c.id) ? vui : ui);
+  /* GREYED, NOT HIDDEN (T3, Q9): a control whose `enabledWhen` is false stays
+     on screen, disabled — its value is still read by readUI() and still saved,
+     and nothing switches it. This is the ONLY setter of a control's disabled
+     state, as the loop above is of hidden. */
+  for (const c of CONTROLS) {
+    if (c.enabledWhen === undefined) continue;
+    const on = evalPredicate(c.enabledWhen, ui);
+    wrappers[c.id].classList.toggle('bl-ctrl--disabled', !on);
+    inputs[c.id].disabled = !on;
+  }
   /* CHILDREN BEFORE PARENTS — ONE PASS, AT ANY DEPTH. A section's answer
      READS its children's, so every child must have settled before its parent
      is reached. verifySections() refuses a section declared before its parent,
@@ -964,7 +975,8 @@ const STRAND_IDS = new Set(SCOPE_STRAND_IDS);
 const idsFor = (v) => (v && v.kind === 'tier' ? TIER_IDS : v && v.kind === 'strand' ? STRAND_IDS : SCOPE_IDS);
 let scopeView = null;              // { kind: 'layer' | 'petal' | 'tier' | 'strand', layer, slot } — the picked scope; null = the whole bloom
 const scopeGlobals = new Map();    // id -> the GLOBAL value's string, while a scope is picked
-let lastShown = null;              // the `shown` record regenerate() last built — a pick relabels from it without a rebuild
+let lastShown = null;
+let lastOrganMesh = null;           // T5: the organs' own emitted triangles, for TX11 (window.__bloomOrganMesh)              // the `shown` record regenerate() last built — a pick relabels from it without a rebuild
 const scopeBar = document.getElementById('scopeBar');
 const scopePick = document.getElementById('scopePick');
 const scopeStatus = document.getElementById('scopeStatus');
@@ -1680,8 +1692,11 @@ let lastShownMode = 'live';
 let dragActive = false;
 let lightOnScreen = false;
 let lightBuildCount = 0;   // how many light builds this page has made — the drag-preview gate's witness
-const DRAG_LIGHT_OVERRIDE = Object.freeze({ petalInfill: 'NONE' });
-function dragLight() { return dragActive && !infillIsAbsent(readUI()); }
+/* (T3) A HELD SLIDER DROPS THE TEXTURE TOO (Eva's ruling 4: a light preview
+   while dragging, the full relief on release and in the export) — the same
+   override, one more guard. */
+const DRAG_LIGHT_OVERRIDE = Object.freeze({ petalInfill: 'NONE', petalTexture: 'NONE' });
+function dragLight() { const ui = readUI(); return dragActive && (!infillIsAbsent(ui) || !textureIsAbsent(ui)); }
 
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
@@ -1706,7 +1721,7 @@ let lastSepals = null, lastSepalsBuilt = null, lastSepalsAbsent = true, lastSepa
    is written down: the claim it would serve is already a MEASURED zero the
    builder reports as `placementResidual`, by a second expression beside the
    method under test. */
-let lastInflo = null, lastInfloBuilt = null, lastInfloAbsent = true, lastInfloTris = 0;
+let lastInflo = null, lastInfloBuilt = null, lastInfloAbsent = true, lastInfloTris = 0, lastUmbelHeadAbsent = false, lastUmbelCompound = false, lastHeadLattices = null;
 let lastNodeVarianceAbsent = true;
 /* THE SPHERE'S STEM CHANNEL (the sphere-stem session) — which slots were NOT
    built, and how near the stem every one of them came. Null wherever the
@@ -1790,6 +1805,8 @@ let lastVariance = null, lastNeighbour = null, lastVarianceAbsent = true, lastPe
 let lastFormVariance = null, lastFormAbsent = true;
 let lastSpacingVariance = null, lastSpacingAbsent = true;
 let lastInfill = null, lastInfillAbsent = true;
+/* THE SURFACE TEXTURE (T3): the builder's whole-bloom record and the guard's own answer */
+let lastTexture = null, lastTextureAbsent = true;
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
    there is no registry row, no DOM input, and no listener that writes it —
@@ -1895,6 +1912,17 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
        already names, so the `?.` is load-bearing and not a tidiness. */
     lastInfill = (built.petalsAll && built.petalsAll[0] && built.petalsAll[0].infill) || null;
     lastInfillAbsent = infillIsAbsent(uiForBuild);
+    lastTexture = built.texture || null;
+    lastTextureAbsent = textureIsAbsent(uiForBuild);
+    /* THE ORGANS' EMITTED TRIANGLES (T5) — the hub's, the stem's and each tube
+       ring's, as this build emitted them, so TX11 can read what the PAGE moved
+       rather than what a Node rebuild moves. Null on every untextured build. */
+    lastOrganMesh = null;
+    if (built.texture && built.texture.organs) for (const [k, r] of Object.entries(built.texture.organs)) {
+      if (!r.organ) continue;
+      lastOrganMesh = lastOrganMesh || {};
+      lastOrganMesh[k] = r.organ.triRanges.map(([a, b]) => ({ from: a, to: b, positions: acc.positions.slice(a * 9, b * 9) }));
+    }
     lastPetalsAll = built.petalsAll || [];
     builtPetalWidth = Number(uiForBuild.petalWidth);   // what a refused width drag goes back to (F6-sym-2)
     builtCup = { petalCup: Number(uiForBuild.petalCup), petalCupGradient: Number(uiForBuild.petalCupGradient) };   // what a refused cup goes back to (spine-cup-fold)
@@ -1931,6 +1959,10 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastInfloBuilt = built.inflorescenceBuilt || null;
     lastInfloTris = built.inflorescenceBuilt ? built.inflorescenceBuilt.tris : 0;
     lastInfloAbsent = inflorescenceIsAbsent(uiForBuild);
+    lastUmbelHeadAbsent = umbelHeadIsAbsent(uiForBuild);
+    lastUmbelCompound = umbelIsCompound(uiForBuild);
+    /* every HEAD petal's lattice record (the mophead's UM6, its non-floret half) */
+    lastHeadLattices = (built.petalsAll || []).filter(Boolean).map((p) => (p.lattice ? { ...p.lattice } : null));
     lastNodeVarianceAbsent = nodeVarianceIsAbsent(uiForBuild);
     lastFootDigest = footFramesDigest(built);
     lastFootBySlot = footFramesBySlot(built);
@@ -2058,7 +2090,7 @@ function materialLines(ui, mode) {
    reader has to infer, and the toggle's whole reason to exist is that live
    and printed are different objects now. Reads shownMode(); owns nothing. */
 const DRAG_LINE = 'on screen while dragging: the infill cells are dropped — full print geometry rebuilds on release\n';
-let lastFullShownInfill = null;
+let lastFullShownInfill = null, lastFullShownTexture = null;
 function showingLine(mode) {
   return mode === 'export'
     ? `on screen: PRINT PREVIEW — export floor ${MIN_FEATURE_MM.toFixed(2)} mm applied to sheet, tip and foot, ring re-derived from the floored feet\n`
@@ -2135,11 +2167,19 @@ function clampedRingsPhrase(rings, hit) {
    floor and the foot floor already carry, arriving where it was always
    missing (Eva, Sep 1 — found by discovery, not by a visitor wondering why
    the ring stopped growing). No geometry moves; this is telemetry. */
+/* [Oct 21, root support — Eva's ruling 2: the ceiling is no longer a fixed
+   10 mm but each ring's OWN ROOM, the arc each foot owns at its ring
+   (footRing's `footArcMm`). The cap line names the ring, what was asked and
+   what the arc allowed, and says when even the floor overruns the arc.] */
 function footFloorLine(rings) {
   const lo = clampedRingsPhrase(rings, (r) => r.widthClamped);
   const hi = clampedRingsPhrase(rings, (r) => r.widthClampedHigh);
+  const capped = (rings || []).filter((r) => r.widthClampedHigh);
+  const worst = capped.length ? capped.reduce((a, r) => (r.width / r.widthAskedMm < a.width / a.widthAskedMm ? r : a), capped[0]) : null;
+  const under = clampedRingsPhrase(rings, (r) => r.footArcUnderFloor && r.widthAskedMm > (r.footCapMm ?? r.footArcMm));
   return (lo ? `FOOT WIDTH FLOORED at ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm on ${lo} — the blade keeps shrinking, the root does not\n` : '')
-       + (hi ? `FOOT WIDTH CAPPED at ${FOOT_MAX_WIDTH_MM.toFixed(2)} mm on ${hi} — the blade keeps widening, the ring does not\n` : '');
+       + (hi ? `FOOT WIDTH CAPPED by the ring's own room on ${hi} — ${worst.widthAskedMm.toFixed(2)} mm asked, ${worst.width.toFixed(2)} mm built: the arc each foot owns at its ring (${(worst.footCapRadiusMm ?? worst.radius).toFixed(2)} mm x ${((worst.footSpanRad * 180) / Math.PI).toFixed(1)}°), a hair inside it (2^-19 rad, so neighbouring feet never share a vertex); a crowded ring caps lower, a sparse one higher\n` : '')
+       + (under ? `FOOT ROOM UNDER THE FLOOR on ${under} — the arc each foot owns is under the ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm floor, the floor wins and the feet on that ring still overlap their neighbours\n` : '');
 }
 
 /* THE INNER-RING LINE (Eva, Sep 3) — the read-out that stands where a derived
@@ -2271,6 +2311,51 @@ function seamLine(petals) {
    line that cannot fire reads as absent, never as a passing zero. Reads EVERY
    built petal AND every built sepal, because a sepal is the petal builder on
    a second ring and meets the floor sooner for being scaled down. */
+/* THE ROOT TAPER (big petals, Oct 21) — told wherever a petal is longer than
+   the reference and thickens at its root, with the hub the root sits on.
+   Absent at or under the reference (a line that cannot fire reads as
+   absent). Reads every ring's representative petal's own record and the
+   hub's; computes nothing. Sepals and leaves take the law too (root support) and have their own lines below,
+   so this line is the petals' alone. */
+/* [Oct 21, root support: SEPALS and LEAVES take the law at their own length
+   (Eva's ruling 1). Each organ that tapers gets its own line, read off its own
+   built record: a sepal's root and the hub that carries it, a leaf's root and
+   the petiole that carries it (clamped and told where the stem cannot hold the
+   asked radius), and a compound leaf's worst leaflet with its stalk.] */
+function organRootTaperLines(sepalsBuilt, leavesBuilt, leafPlan, hub, mode) {
+  let out = '';
+  const ss = (sepalsBuilt || []).map((p) => p && p.thickness && p.thickness.rootTaper).filter(Boolean);
+  if (ss.length) {
+    const w = ss.reduce((a, t) => (t.rootFactor > a.rootFactor ? t : a), ss[0]);
+    out += `ROOT TAPER (sepal): a ${w.askedLengthMm.toFixed(1)} mm sepal is ${w.rootMm.toFixed(2)} mm thick at its root (×${w.rootFactor.toFixed(3)} the sheet), the same law as a petal at its own length (UNVALIDATED — no coupon has been printed)`
+         + (hub ? ` · the hub is ${hub.thickness.toFixed(2)} mm thick to carry it (${mode})` : '') + `\n`;
+  }
+  const L = (leavesBuilt || [])[0];
+  if (L && L.compound) {
+    const lf = L.leaflets.filter((q) => q.rootTaper);
+    if (lf.length) {
+      const w = lf.reduce((a, q) => (q.rootTaper.rootFactor > a.rootTaper.rootFactor ? q : a), lf[0]);
+      out += `ROOT TAPER (leaflet): a ${w.lengthMm.toFixed(1)} mm leaflet is ${w.rootTaper.rootMm.toFixed(2)} mm thick at its root (×${w.rootTaper.rootFactor.toFixed(3)}) on a ${(2 * w.stalkRMm).toFixed(2)} mm stalk — the stalks stay the wire (the compound ruling), so a tapered leaflet's root is thicker than the rod that holds it · ${lf.length} of ${L.leaflets.length} leaflets taper (UNVALIDATED — no coupon has been printed)\n`;
+    }
+  } else if (L && L.rootTaper) {
+    const pp = leafPlan ? (leafPlan.simplePetiole || leafPlan.lobedPetiole) : null;
+    out += `ROOT TAPER (leaf): a ${L.rootTaper.askedLengthMm.toFixed(1)} mm leaf blade is ${L.rootTaper.rootMm.toFixed(2)} mm thick at its root (×${L.rootTaper.rootFactor.toFixed(3)})`
+         + (leafPlan ? ` on a ${(2 * leafPlan.petioleR).toFixed(2)} mm petiole` : '')
+         + (pp && pp.clamped ? ` — the petiole is CLAMPED at the stem (${(2 * pp.radiusMm).toFixed(2)} of ${(2 * (pp.rootFloorMm ?? pp.askedMm)).toFixed(2)} mm asked: the rooted end must still fit the stem)` : '')
+         + ` (UNVALIDATED — no coupon has been printed)\n`;
+  }
+  return out;
+}
+function rootTaperLine(petals, fr, mode) {
+  const ts = (petals || []).map((p) => p && p.thickness && p.thickness.rootTaper).filter(Boolean);
+  if (!ts.length) return '';
+  const worst = ts.reduce((a, t) => (t.rootFactor > a.rootFactor ? t : a), ts[0]);
+  const hub = fr && fr.hub ? fr.hub : null;
+  return `ROOT TAPER: a ${worst.askedLengthMm.toFixed(1)} mm petal is ${worst.rootMm.toFixed(2)} mm thick at its root (×${worst.rootFactor.toFixed(3)} the sheet), tapering to the sheet ${worst.refMm} mm from its tip`
+       + ` — the cantilever law against the shipping ${worst.refMm} mm petal's root stress (UNVALIDATED — no coupon has been printed)`
+       + (ts.length > 1 ? ` · ${ts.length} rings taper` : '')
+       + (hub ? ` · the hub is ${hub.thickness.toFixed(2)} mm thick to carry it (${mode})` : '') + `\n`;
+}
 function cupClampLine(petals, sepals) {
   const parts = [...(petals || []), ...(sepals || [])].filter(Boolean);
   const cs = parts.map((p) => p && p.form && p.form.cupClamp).filter(Boolean);
@@ -2610,6 +2695,38 @@ function lobeLine(petals) {
    line that printed only the asked number would be naming a thing that is not
    the thing. It reads the BUILDER's own record; nothing here re-derives a
    count. Every reason the pattern is absent is a WORD, never a silence. */
+/* THE TEXTURE LINE (T3): the pattern, the height, the lattice, every organ's
+   count against its floor, and every refusal — a refusal is a word, never a
+   silence. Null at the guard. */
+function textureLine(T) {
+  if (!T) return '';
+  const word = T.type === 'PEBBLE' ? 'PEBBLE' : 'CELLULAR';
+  if (T.refused === 'infill') return `TEXTURE NOT BUILT — ${word} asked while the petals are INFILLED: texture and infill are exclusive (Q9); told, not picked. Set one of them to None.\n`;
+  const organs = Object.entries(T.organs || {});
+  if (!organs.length) return `TEXTURE ${word} ${T.heightMm.toFixed(2)} mm — no sheet carries it on this build\n`;
+  const parts = organs.map(([k, q]) => {
+    /* THE ORGANS (T5): the hub, the stem and the tube ring, each refined on its
+       own shipped lattice; VISIBLE faces only (Q7), the rest named */
+    if (q.organ) {
+      const O = q.organ;
+      return `${k}${q.blades > 1 ? ` (${q.blades} rings)` : ''}: ${Number(O.shippedTris).toLocaleString('en-US')} shipped -> ${Number(O.refinedTris).toLocaleString('en-US')} lattice tris, ${O.visible} of ${O.relievable} vertices visible (${O.buried} buried, smooth; the relief fades in over ${O.fadeMm.toFixed(2)} mm from them)${O.cavityTris ? `, ${O.cavityTris} cavity tris left as shipped` : ''}${O.normalFallback ? `, ${O.normalFallback} vertices with no normal from the ${k}'s own law left smooth` : ''}, relief 0..${q.reliefMaxMm.toFixed(3)} mm`;
+    }
+    const ref = Object.entries(q.refused || {}).map(([w, n]) => `${n} ${k}${n === 1 ? '' : 's'} refused (${w})`).join(', ');
+    const ratio = q.floorTris ? (q.skinTris / q.floorTris).toFixed(2) : '—';
+    return `${k}: ${q.panels} panel${q.panels === 1 ? '' : 's'}, ${q.subRows} sub-rows, columns x${q.cfMax}, skin ${q.skinTris} tris = ${ratio}x its floor (the builder's own estimate — TX4 reads the untextured twin, ~0.1 lower)${q.floorTris && q.skinTris / q.floorTris > TEXTURE_LATTICE_BAR ? ` (PAST THE ${TEXTURE_LATTICE_BAR}x BAR BY THIS ESTIMATE)` : ''}, relief 0..${q.reliefMaxMm.toFixed(3)} mm${ref ? `; ${ref}` : ''}`;
+  });
+  const clamp = (T.heightClamped ? ' · height CLAMPED to its range' : '') + (T.sizeClamped ? ' · feature size CLAMPED to its range' : '');
+  /* THE EDGE CAP (Eva, Oct 23): the edge actually used is printed whenever it
+     differs from the ruled 0.4 mm, with the counts the decision was made on;
+     past 0.5 the build stands at 0.5 and the export will be refused — said. */
+  const C = T.edgeCap;
+  const fmtTris = (n) => Number(n).toLocaleString('en-US');
+  const edgeWords = C && C.pinned ? `on a ${T.edgeMm.toFixed(2)} mm lattice (PINNED by a capability hook — the budget cap is off)`
+    : C && C.usedMm !== C.askedMm
+      ? `on a ${C.usedMm.toFixed(2)} mm lattice — COARSENED from the ruled ${C.askedMm.toFixed(2)} mm to fit the ${fmtTris(C.budget)} export budget (${C.trials.map((t) => `${t.edgeMm.toFixed(2)} mm: ${fmtTris(t.tris)}`).join(', ')}; the finest edge that fits, never past ${C.capMm.toFixed(2)})${C.fits ? '' : ` — EVEN ${C.capMm.toFixed(2)} mm DOES NOT FIT (${fmtTris(C.trials[C.trials.length - 1].tris)} tris): the export will be REFUSED`}`
+      : `on a ${T.edgeMm.toFixed(1)} mm lattice`;
+  return `TEXTURE ${word}: ${T.heightMm.toFixed(2)} mm peak to valley, ${T.sizeMm.toFixed(1)} mm features, outward only over the bead, ${edgeWords}${clamp} — ${parts.join(' · ')}. Buried faces stay smooth (Q7); the rods (filaments, the style, anthers, pedicels, petioles) stay smooth, pending the BONE sheet (Q12).\n`;
+}
 function infillLine(petals) {
   const F = petals && petals[0] && petals[0].infill;
   if (!F) return '';
@@ -2934,6 +3051,20 @@ function overtopLine(plan, builtInflo) {
 }
 
 function infloLine(plan, builtInflo) {
+  /* THE COMPOUND UMBEL (the mophead): rays, sub-umbels, the floret floor, the
+     reduced lattice and the budget clamp — asked against built, always. */
+  if (plan.compound) {
+    const sb = builtInflo && builtInflo.sub, cl = plan.budgetClamp, F = sb && sb.plan, bf = F && F.bodyFloor;
+    const lat = sb && sb.floretUnit && sb.floretUnit.lattice && sb.floretUnit.lattice[0];
+    return `\n     INFLORESCENCE a COMPOUND UMBEL (depth 2) · ${plan.umbelCount} rays of ${plan.pedicelLenMm.toFixed(0)} mm at ${plan.angleDeg} deg, ${(2 * plan.pedicelR).toFixed(2)} mm across, from a boss ${(2 * plan.knot.radiusMm).toFixed(2)} mm across`
+      + `\n     FLORETS ${cl ? `${cl.builtFlorets} built of ${cl.askedFlorets} asked (${cl.floretsPerRay} a ray of ${cl.floretsPerRayAsked})` : `${plan.umbelCount * plan.floretsPerRay}`}`
+      + (cl && cl.clamped ? ` — BUDGET CLAMPED: one floret is ${cl.floretTris.toLocaleString('en-US')} tris (measured), so the asked ${cl.askedFlorets} would be ${cl.askedTotal.toLocaleString('en-US')}; ${cl.predictedTotal.toLocaleString('en-US')} built against the ${cl.budget.toLocaleString('en-US')} budget (the export never refuses for this)` : cl ? ` · ${cl.predictedTotal.toLocaleString('en-US')} tris predicted against the ${cl.budget.toLocaleString('en-US')} budget` : '')
+      + (F ? `\n     FLORET ${F.floretPetals} petals at ${F.petalLength.toFixed(2)} x ${F.petalWidth.toFixed(2)} mm (${F.scaleBuilt.toFixed(3)}x the head's own)` : '')
+      + (bf ? ` · FLORET FLOOR ${bf.lengthMm.toFixed(2)} x ${bf.widthMm.toFixed(2)} mm (${bf.scale.toFixed(3)}x — the least scale at which a petal still keeps its full sheet body ${bf.taperMm.toFixed(1)} mm in from both margins and the drawn tip, past the root blend)${F.sizeClamped ? ' — FLOORED' : ''}` : '')
+      + (lat && lat.lattice ? ` · the REDUCED lattice: ${lat.lattice.columns} columns, a ${lat.lattice.beadCap}-segment bead (a declared exception to the edge profile's four, florets of a depth-2 umbel only)` : '')
+      + (sb ? ` · ${sb.floretUnit.tris.toLocaleString('en-US')} tris a floret, ${builtInflo.unitTris.toLocaleString('en-US')} a sub-umbel, ${builtInflo.tris.toLocaleString('en-US')} in all` : '')
+      + (F ? `\n     SUB-UMBEL ${sb.count} florets on ${F.pedicelLenMm.toFixed(0)} mm pedicels at ${F.angleDeg} deg off each ray, ${(2 * F.pedicelR).toFixed(2)} mm across, rooted in a boss ${(2 * sb.knot.radiusMm).toFixed(2)} mm across at the ray's end` : '');
+  }
   const per = plan.perNode;
   const n = builtInflo ? builtInflo.count : plan.built;
   return `\n     INFLORESCENCE ${plan.type} · ${n} floret${n === 1 ? '' : 's'} on ${plan.nodes} node${plan.nodes === 1 ? '' : 's'} · ${plan.phyllotaxy} (${per} a node)`
@@ -3297,7 +3428,7 @@ function sepalTierLine(S, B, first, mode, tag = '') {
       : ` · size ${S.scale.toFixed(2)}x`)
     + (S.own && (S.own.lengthFloored || S.own.widthFloored) ? ' — FLOORED at the ruled minimum (told)' : '')
     + (first ? (Math.abs(first.length - first.askedLength) > 0.05 ? ` (${first.askedLength.toFixed(1)} mm asked, DRAWN ${first.length.toFixed(1)} mm — ${first.length < first.askedLength ? 'the tip floor shortens a narrow blade' : 'the apex nib runs past the asked length'})` : ` (${first.length.toFixed(1)} mm)`) : '')
-    + `\n     SEPAL FOOT ${tag}${S.footMm.toFixed(2)} mm across` + (S.footClamped ? ` — CLAMPED from ${S.footAskedMm.toFixed(2)} (floor ${S.footFloorMm.toFixed(2)}, ceiling ${S.footCeilingMm.toFixed(2)} mm)` : ` (asked ${S.footAskedMm.toFixed(2)})`)
+    + `\n     SEPAL FOOT ${tag}${S.footMm.toFixed(2)} mm across` + (S.footClamped ? ` — CLAMPED from ${S.footAskedMm.toFixed(2)} (floor ${S.footFloorMm.toFixed(2)}, ceiling ${S.footCeilingMm.toFixed(2)} mm — the arc each sepal owns at its ring)` : ` (asked ${S.footAskedMm.toFixed(2)})`)
     + ` · ${footSurface}`
     + `\n     SEPAL ANGLE ${angleWord} — drawn on the built rows in both modes (bound by ${L.boundBy}: live ${L.perMode.live.limitDeg === null ? 'floor' : L.perMode.live.limitDeg}° / export ${L.perMode.export.limitDeg === null ? 'floor' : L.perMode.export.limitDeg}°), ${L.scanned} angles over ${L.configs} distinct neighbourhood(s), ${L.costMs.toFixed(0)} ms (${mode})\n`;
 }
@@ -3543,6 +3674,8 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + seamLine(petals)
+       + rootTaperLine(petals, built && built.hub ? { hub: built.hub } : fr, mode)
+       + (built ? organRootTaperLines(built.sepals ? built.sepals.tiers.flatMap((T) => T.built || []) : null, built.leavesBuilt, built.leaf, built.hub, mode) : '')
        + spineLine(petals, built ? built.petalsAll : null, String(ui.placement) === 'SPIRAL' ? 'turn' : 'layer')
        + cupClampLine(petals, built && built.sepals ? built.sepals.built : null)
        + lobeLine(petals)
@@ -3550,6 +3683,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + apexLine(petals)
        + tipRowBudgetLine(lastTipRowBudget)
        + infillLine(petals)
+       + textureLine(built ? built.texture : null)
        + edgeProfileLine(petals)
        + fringeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
@@ -3612,7 +3746,11 @@ function regenerate() {
      androecium's saturation did: `buckleAmp`'s read-out and its slider MARK
      must print the OWNER's cap rather than re-derive it from the sliders.
      The petal's own form telemetry is where it lives; null on a flat build. */
+  /* THE INFLORESCENCE (the umbel session): the plan and the placements, for the
+     Type / pedicel read-outs that quote them. Missing before, so the Type
+     read-out said "no stem to carry it" on every raceme — found on main. */
   const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium, tube: built.tube || null,
+                  inflorescence: built.inflorescence || null, inflorescenceBuilt: built.inflorescenceBuilt || null,
                   /* THE LEAVES' records (leaf/stem build S3), for the leaf controls'
                      own read-outs. `leafArch`, `leafCup` and `leafTipShape` have
                      read `shown.leaf` since S2 and the tip-shape session — and
@@ -3659,6 +3797,9 @@ function regenerate() {
                      the first BUILT petal because the plan is a property of a
                      blade; null where no blade carries one. */
                   infill: light ? lastFullShownInfill : ((built.petalsAll && built.petalsAll[0] && built.petalsAll[0].infill) || null),
+                  /* THE TEXTURE's record (T3), for the Texture controls' own read-outs — the
+                     last FULL build's while a light build is on screen */
+                  texture: light ? lastFullShownTexture : (built.texture || null),
                   /* THE SEPALS' record: the count ceiling and the angle limit are
                      the OWNER's numbers (footRing's and the builder's own scan),
                      printed on the two controls and hatched on their tracks; the
@@ -3676,7 +3817,7 @@ function regenerate() {
                   scopes: built.scopes || null };
   /* A LIGHT BUILD CARRIES NO INFILL PLAN, so the infill controls keep the
      last FULL build's numbers through a drag rather than flickering to none. */
-  if (!light) lastFullShownInfill = shown.infill;
+  if (!light) { lastFullShownInfill = shown.infill; lastFullShownTexture = shown.texture; }
   /* THE SCOPE VIEW (Scoping-b): the bar is re-synced against the build just
      made (a pick that no longer names a scope of this arrangement ends,
      writing nothing), and while a scope is picked the spans, the caps and the
@@ -3940,6 +4081,46 @@ function onSeedSwitch(e) {
   seedNotes[M.curve] = `SEEDED from ${M.leaf && M.kind === 'spine' ? 'the Arch slider\'s spine' : M.leaf ? 'the leaf\'s law outline' : seed.from} on the switch — ${seed.points} points, ${seed.met ? 'within' : 'NOT within'} the ${seed.tolMm.toFixed(2)} mm tolerance: it departs from it by ${seed.errorMm.toFixed(3)} mm${split}${!seed.met && seed.constraint ? ` — stopped by ${seed.constraint}` : ''}${seed.rotationDeg ? ` (drawn turned ${seed.rotationDeg.toFixed(0)}° so it stays in front of its root; the law lays it back along the blade)` : ''}${seed.clipped ? ' (wider than the box allows — clipped at half the length)' : ''}; a fit, not the slider build to the bit`;
 }
 window.addEventListener('change', onSeedSwitch, true);
+/* ===================================================================
+   DEPTH 2'S DEFAULTS ON THE SWITCH (Eva's ruling, Oct 25 — the floor-floret
+   mophead is depth 2's default; read §12 of docs/bloom-mophead-outcome.md).
+   The overlay is the registry's (`UMBEL_DEPTH2_DEFAULTS`, one owner); this is
+   where a HAND switch of `umbelDepth` writes it. Placements made without a
+   ruling, told on the depth's read-out:
+     - to depth 2, a control still at its REGISTRY default takes the overlay;
+       one the visitor set is KEPT (a default is all "untouched" can mean on a
+       page that records no history);
+     - back to depth 1, a control still reading the OVERLAY returns to its
+       registry default, one changed since is kept — so a switch there and
+       back with no edit between is the page it was, to the slider value;
+     - a picked scope ends first (it writes nothing), because two of the
+       overlay's controls are scopeable and the panel would otherwise be
+       writing the picked scope's view.
+   Only an `isTrusted` change does any of it: a design file, Reset, a matrix
+   row and `applyConfig` are LOADED states that carry their own values (the
+   seed precedent's split), and a load clears the note. */
+const sameSlider = (a, b) => Math.abs(Number(a) - Number(b)) < 1e-9;
+const labelOf = (id) => (CONTROLS.find((c) => c.id === id) || { label: id }).label;
+function onDepthSwitch(e) {
+  const t = e.target;
+  if (!t || t !== inputs.umbelDepth) return;
+  if (!e.isTrusted) { delete seedNotes.umbelDepth; return; }
+  const toTwo = t.value === '2';
+  if (scopeView) selectScope(null);
+  const wrote = [], kept = [];
+  for (const [id, v] of Object.entries(UMBEL_DEPTH2_DEFAULTS)) {
+    const from = toTwo ? DEFAULTS[id] : v, to = toTwo ? v : DEFAULTS[id];
+    if (sameSlider(inputs[id].value, from)) { inputs[id].value = String(to); wrote.push(`${labelOf(id)} ${to}`); }
+    else if (!sameSlider(inputs[id].value, to)) kept.push(`${labelOf(id)} ${inputs[id].value}`);
+  }
+  seedNotes.umbelDepth = (toTwo
+    ? `DEPTH 2'S DEFAULTS written on the switch (the floor-floret mophead, Eva's ruling of Oct 25)${wrote.length ? `: ${wrote.join(', ')}` : ': nothing to write'}`
+    : `back to depth 1: ${wrote.length ? `the registry defaults restored where depth 2's still stood — ${wrote.join(', ')}` : 'nothing still read depth 2\'s defaults'}`)
+    + (kept.length ? ` · KEPT as you set them: ${kept.join(', ')}` : '');
+  applyVisibility();
+  scheduleRegen();
+}
+window.addEventListener('change', onDepthSwitch, true);
 /* the seed's sentence is told until the curve is next edited */
 for (const M of Object.values(SEED_MODES)) inputs[M.curve].addEventListener('input', () => { delete seedNotes[M.curve]; });
 for (const c of CONTROLS) {
@@ -3979,6 +4160,7 @@ window.addEventListener('blur', endDrag);
 document.addEventListener('change', (e) => { if (isSlider(e.target)) endDrag(); }, true);
 /* For the drag-preview gate: whether a slider is held, and whether the build
    on screen is the light one. */
+window.__bloomOrganMesh = () => lastOrganMesh;
 window.__bloomDragState = () => ({ dragging: dragActive, lightOnScreen, lightBuilds: lightBuildCount });
 /* What is ON SCREEN, as a digest of the viewport mesh's own positions — the
    drag-preview gate compares it with the exported STL's. Negative zeros are
@@ -4348,6 +4530,10 @@ window.__bloomMetrics = () => ({
   /* THE HUB'S GROWTH FOR AN OWNED RING (Oct 16) — footRing()'s record, or null. */
   hubGrowth: lastHub.growth ? { ...lastHub.growth } : null,
   hubThickness: lastHub.thickness,
+  /* THE HUB'S OWN ROOT FACTOR (big petals): the law read on the longest blade
+     the hub must carry, or null — and the sheet it multiplies. */
+  hubRootTaper: lastHub.rootTaper ? { askedLengthMm: lastHub.rootTaper.lengthMm, rootFactor: lastHub.rootTaper.rootFactor } : null,
+  hubSheetThickness: lastHub.sheetThickness ?? null,
   /* THE STEM AND THE HUB-TO-STEM JOIN (session 43) — ST0-ST6's measured side.
      `stem` is NULL and not absent when there is no stem: ST1 distinguishes "the
      builder says there is none" from "the builder says nothing", and a missing
@@ -4470,6 +4656,9 @@ window.__bloomMetrics = () => ({
     lobed: lastLeaf.lobed ? JSON.parse(JSON.stringify(lastLeaf.lobed)) : null,
     /* the LOBED petiole's area law (S4b) — LF26's subject; null otherwise */
     lobedPetiole: lastLeaf.lobedPetiole ? { ...lastLeaf.lobedPetiole } : null,
+    /* (root support) the SIMPLE leaf's root-carrying petiole — LF18 / T6's
+       record of whether the stem clamped it; null where no root floor binds */
+    simplePetiole: lastLeaf.simplePetiole ? { ...lastLeaf.simplePetiole } : null,
     compound: lastLeaf.compound ? JSON.parse(JSON.stringify(lastLeaf.compound)) : null,
     /* PER BLADE, NOT PER LEAF (S3): every array below that describes a BLADE
        has one entry per emitted blade — a simple leaf's one, a compound
@@ -4616,6 +4805,16 @@ window.__bloomMetrics = () => ({
     pedicelLensMm: lastInflo.pedicelLensMm.slice(), pedicelLensAskedMm: lastInflo.pedicelLensAskedMm.slice(),
     lengthsClamped: lastInflo.lengthsClamped, lenCeilMm: lastInflo.lenCeilMm,
     sessileNodes: lastInflo.sessileNodes.slice(), stemTipZ: lastInflo.stemTipZ,
+    /* THE UMBEL (the umbel session): the type, the head toggle as the plan
+       read it, the count and the DECLARED knot — UM1 restates the knot from
+       the controls and holds the EMITTED one (below) to it. */
+    type: lastInflo.type, umbel: !!lastInflo.umbel, headOff: !!lastInflo.headOff, umbelCount: lastInflo.umbelCount ?? null,
+    /* THE COMPOUND UMBEL (the mophead): the level, the floret count a ray as
+       asked and as built, and the budget clamp's whole record */
+    depth: lastInflo.depth ?? null, level: lastInflo.level ?? null, compound: !!lastInflo.compound,
+    floretsPerRay: lastInflo.floretsPerRay ?? null, floretsPerRayAsked: lastInflo.floretsPerRayAsked ?? null,
+    budgetClamp: lastInflo.budgetClamp ? { ...lastInflo.budgetClamp } : null,
+    knot: lastInflo.knot ? { ...lastInflo.knot, centre: lastInflo.knot.centre.slice() } : null,
   } : null,
   /* WHAT THE BUILDER EMITTED. `unitPositions` is deliberately NOT here — the
      floret unit's whole triangle stream is up to 270k floats and the claim it
@@ -4630,7 +4829,17 @@ window.__bloomMetrics = () => ({
     placementResidual: lastInfloBuilt.placementResidual,
     placementCompared: lastInfloBuilt.placementCompared,
     rachisApproachMm: lastInfloBuilt.rachisApproachMm,
+    /* THE KNOT AS EMITTED — its centre and radius read back off its own
+       vertices by the builder, and its triangle range in the stream (ST9's
+       excusal names it by that range). */
+    knot: lastInfloBuilt.knot ? { ...lastInfloBuilt.knot, centre: lastInfloBuilt.knot.centre.slice(), triRange: lastInfloBuilt.knot.triRange.slice() } : null,
     floretState: { ...lastInfloBuilt.floretState },
+    /* THE COMPOUND UMBEL'S SUB-UMBEL, in its own frame (the mophead) — its
+       boss as emitted, its pedicels' emitted ends, its plan's numbers and its
+       ONE floret unit's stream with the lattice probe (~80k floats: UM6 reads
+       the columns and the bead off it, which no other record can say). */
+    sub: lastInfloBuilt.sub ? JSON.parse(JSON.stringify({ ...lastInfloBuilt.sub, floretUnit: lastInfloBuilt.sub.floretUnit ? { ...lastInfloBuilt.sub.floretUnit, positions: Array.from(lastInfloBuilt.sub.floretUnit.positions) } : null })) : null,
+    budgetClamp: lastInfloBuilt.budgetClamp ? { ...lastInfloBuilt.budgetClamp } : null,
     unit: {
       petalsBuilt: lastInfloBuilt.unit.petalsBuilt,
       hubRadius: lastInfloBuilt.unit.hub.radius, hubThickness: lastInfloBuilt.unit.hub.thickness,
@@ -4710,6 +4919,16 @@ window.__bloomMetrics = () => ({
      and can never disagree (session 41's L7). ID0 compares it against the
      REGISTRY's declaration. */
   inflorescenceAbsent: lastInfloAbsent,
+  /* THE GEOMETRY'S OWN HEAD STATEMENT, from the running module (UM0's half). */
+  umbelHeadAbsent: lastUmbelHeadAbsent,
+  /* THE COMPOUND UMBEL'S TWO STATEMENTS AND THE DEPTH REFUSAL, from the
+     running module (UM5): the geometry's values and its answer to a depth of
+     three, which the registry's two options must match */
+  umbelCompound: lastUmbelCompound,
+  umbelDepthValues: UMBEL_DEPTH_VALUES.slice(),
+  umbelDepth3Refusal: umbelDepthRefusal({ umbelDepth: '3' }),
+  umbelDepth2AtLevel2Refusal: umbelDepthRefusal({ umbelDepth: '2', umbelLevel: 2 }),
+  headPetalLattices: lastHeadLattices,
   nodeVarianceAbsent: lastNodeVarianceAbsent,
   /* ORGANIC VARIANCE (build 1, size): the builder's own field record — null
      at amount 0, which VS0 reads as the guard's own answer — with one factor
@@ -4780,6 +4999,11 @@ window.__bloomMetrics = () => ({
        read-out speaks — and `widthsMm`, which is one scalar a cell. */
     widthsMm: [...lastInfill.widthsMm] } : null,
   infillAbsent: lastInfillAbsent,
+  /* THE SURFACE TEXTURE (T3): the builder's own record (every organ's lattice
+     count against its floor, the relief's extremes, the refusals) and the
+     GEOMETRY's own guard answer through the page — TX0's two statements. */
+  texture: lastTexture ? JSON.parse(JSON.stringify(lastTexture)) : null,
+  textureAbsent: lastTextureAbsent,
   /* THE GEOMETRY'S OWN ANSWER TO "MAY THIS STATE HAVE A STEM", read from the
      module that is actually running. ST0 compares it against the REGISTRY's
      declaration, and it has to arrive through the page: a gate calling the
@@ -4956,8 +5180,10 @@ window.__bloomMetrics = () => ({
     /* THE CEILING TWIN of widthClamped (Eva, Sep 1). The foot's UPPER clamp
        has always been able to bind - from petalWidth 25, a quarter of that
        slider - with the blade widening and the area-ruled ring standing
-       still, and nothing reported it. See FOOT_MAX_WIDTH_MM. */
+       still, and nothing reported it. [Oct 21: the ceiling is the ring's own
+       room now — the foot cap's record rides beside it.] */
     widthClampedHigh: r.widthClampedHigh,
+    widthAskedMm: r.widthAskedMm, footArcMm: r.footArcMm, footCapMm: r.footCapMm, footCapRadiusMm: r.footCapRadiusMm, footSpanRad: r.footSpanRad, footCapped: r.footCapped, footArcUnderFloor: r.footArcUnderFloor,
     /* THE DEPTH TELEMETRY (Sep 3) — footRing()'s own two flags behind the
        read-out's RINGS NARROWER THAN A FOOT line, exposed so the panel gate
        asserts that line against the owner in both directions. */
@@ -4991,6 +5217,10 @@ window.__bloomMetrics = () => ({
      below is the LAST petal's and stays — A2, A4, A5 and A6 read it — but a
      clause that is about a RING may not read it. */
   petalRingTipCap: lastPetals.map((p) => (p ? p.tipCap : null)),
+  /* THE ROOT TAPER PER RING (big petals, Oct 21) — the builder's declaration
+     (null at or under the reference), which T0 restates from the controls and
+     pins both ways; the thickness itself is read off the exported file. */
+  petalRingRootTaper: lastPetals.map((p) => (p && p.thickness ? p.thickness.rootTaper : null)),
   petalRingProfileU: lastPetals.map((p) => (p ? p.profileU : null)),
   /* EVERY RING'S BASE OUTLINE (F6-sym): OC1 restates the outline curve on
      every ring's own emitted rows, not the last petal's alone. */
@@ -5056,6 +5286,9 @@ window.__bloomMetrics = () => ({
      passing 0. */
   ringGuardResidual: lastFoot.guardResidual,
   petalsBuilt: lastPetalsBuilt,
+  /* THE UMBEL'S HEAD TOGGLE: true exactly when the builder reported the
+     ABSENT hub record (`HUB_ABSENT`) — no head was built at all. */
+  headAbsent: !!(lastHubBuilt && lastHubBuilt.absent),
   /* WHAT EACH RING'S PETAL WAS ACTUALLY BUILT WITH, read from the builder's
      own effective state and never from the resolver, with the scope term it
      was handed. This is the only thing in the codebase that can see a scope

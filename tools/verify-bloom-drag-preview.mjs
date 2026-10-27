@@ -300,7 +300,7 @@ const MUTANTS = [
   { id: 'change-does-not-end-drag', breaks: ['D3'],
     edits: [["document.addEventListener('change', (e) => { if (isSlider(e.target)) endDrag(); }, true);", '']] },
   { id: 'every-input-builds-light', breaks: ['D0', 'D2', 'D3', 'D4', 'D5', 'D6'],
-    edits: [['function dragLight() { return dragActive && !infillIsAbsent(readUI()); }', 'function dragLight() { return !infillIsAbsent(readUI()); }']] },
+    edits: [['function dragLight() { const ui = readUI(); return dragActive && (!infillIsAbsent(ui) || !textureIsAbsent(ui)); }', 'function dragLight() { const ui = readUI(); return (!infillIsAbsent(ui) || !textureIsAbsent(ui)); }']] },
   /* A STREAM OF INPUT EVENTS IS NOT A DRAG — the realistic wrong design, and
      the only one that can strand a keyboard nudge or a typed value on light
      geometry. Two narrower mutants were tried first and are EQUIVALENT, so

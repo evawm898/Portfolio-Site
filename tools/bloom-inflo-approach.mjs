@@ -222,7 +222,21 @@ export function measureInfloApproachMm(G, state, measure) {
   const P = acc.positions;
   const rachis = m.stem;
   /* inside the rachis's own solid: the joins' region (see the header) */
-  const outsideRachis = (p) => G.freeStemDistanceMm(rachis, p[0], p[1], p[2]) > 0;
+  /* AN UMBEL's pedicels meet at the KNOT (the umbel session), built as a squat
+     BOSS since Eva's Oct 23 ruling: the junction every pedicel roots in, so a
+     vertex inside the boss's own emitted solid is the umbel's join and is
+     excluded exactly as the rachis's is — a REGION, named, the one place the
+     design puts every pedicel into one solid. The region is read off the
+     boss's EMITTED faces: the flat band (its underside flat since Eva's Oct 24
+     ruling — no cone below it). */
+  const K = B.knot || null;
+  const insideKnot = (p) => {
+    if (!K) return false;
+    const r = Math.hypot(p[0] - K.centre[0], p[1] - K.centre[1]), z = p[2];
+    if (z >= K.topZ || z <= K.bottomZ) return false;
+    return r < K.radiusMinMm;
+  };
+  const outsideRachis = (p) => G.freeStemDistanceMm(rachis, p[0], p[1], p[2]) > 0 && !insideKnot(p);
   const blocks = B.placed.map((q, k) => ({ lo: q.at, hi: q.at + q.tris * 9, owner: `floret${k}`, q }));
   const capped = (d) => (d >= SEARCH_CAP_MM ? SEARCH_CAP_MM : d);
 
@@ -245,6 +259,7 @@ export function measureInfloApproachMm(G, state, measure) {
 
   if (measure === 'floret-floret' || measure === 'floret-head') {
     const head = measure === 'floret-head';
+    if (head && m.hubBuilt && m.hubBuilt.absent) return { mm: Infinity, why: 'the umbel\'s head is OFF — there is no head to approach' };
     const ranges = head ? [{ lo: 0, hi: m.hubTriEnd * 9, owner: 'head' }] : blocks.map(({ lo, hi, owner }) => ({ lo, hi, owner }));
     if (!head && blocks.length < 2) return { mm: Infinity, why: 'one floret — there is no other floret to approach' };
     const grid = triGrid(P, ranges);
@@ -262,6 +277,40 @@ export function measureInfloApproachMm(G, state, measure) {
         if (d < best) { best = d; at = { node: b.q.nodeIndex, azDeg: (b.q.az * 180) / Math.PI }; }
       }
       if (best > 0 && crosses(grid, P, b.lo, b.hi, b.owner, head ? null : outsideRachis)) { best = 0; crossing = true; at = { node: b.q.nodeIndex, azDeg: (b.q.az * 180) / Math.PI, crossing: true }; }
+    }
+    return { mm: capped(best), at, verts, crossing, capped: best >= SEARCH_CAP_MM };
+  }
+
+  /* THE MOPHEAD (Oct 24): FLORET against every OTHER floret of ITS OWN
+     sub-umbel. At depth 2 `floret-floret` reads whole sub-umbels against each
+     other (the rays are the outer pedicels); this reads inside one. Every ray
+     carries the same sub-umbel under a rigid matrix (ID5 holds the stream to
+     those matrices), so ray 0's florets are every ray's. The sub-umbel's own
+     boss is its join and is excluded as the main boss is, read in the ray's
+     local frame (the matrix inverted — rigid, so its transpose). */
+  if (measure === 'subumbel-floret') {
+    const S = B.sub;
+    if (!S || !Array.isArray(S.placed) || S.placed.length < 2) return { mm: Infinity, why: S ? 'one floret a sub-umbel — there is no other floret to approach' : 'no sub-umbel is built (the umbel is not compound)' };
+    const ray = B.placed[0], M = ray.M, SK = S.knot;
+    const local = (p) => { const d = [p[0] - M[3], p[1] - M[7], p[2] - M[11]]; return [M[0] * d[0] + M[4] * d[1] + M[8] * d[2], M[1] * d[0] + M[5] * d[1] + M[9] * d[2], M[2] * d[0] + M[6] * d[1] + M[10] * d[2]]; };
+    const insideSub = (p) => { if (!SK) return false; const q = local(p); if (q[2] >= SK.topZ || q[2] <= SK.bottomZ) return false; return Math.hypot(q[0] - SK.centre[0], q[1] - SK.centre[1]) < SK.radiusMinMm; };
+    const fb = S.placed.map((f, k) => ({ lo: ray.at + f.at, hi: ray.at + f.at + f.tris * 9, owner: `f${k}`, f }));
+    const grid = triGrid(P, fb.map(({ lo, hi, owner }) => ({ lo, hi, owner })));
+    const keep = (p) => !insideSub(p);
+    let best = SEARCH_CAP_MM, at = null, verts = 0, crossing = false;
+    for (const b of fb) {
+      const seen = new Set();
+      for (let j = b.lo; j < b.hi; j += 3) {
+        const sk = `${P[j]},${P[j + 1]},${P[j + 2]}`;
+        if (seen.has(sk)) continue;
+        seen.add(sk);
+        const p = [P[j], P[j + 1], P[j + 2]];
+        if (!keep(p)) continue;
+        verts++;
+        const d = nearest(grid, p, b.owner, best);
+        if (d < best) { best = d; at = { floret: b.owner, azDeg: (b.f.az * 180) / Math.PI }; }
+      }
+      if (best > 0 && crosses(grid, P, b.lo, b.hi, b.owner, keep)) { best = 0; crossing = true; at = { floret: b.owner, azDeg: (b.f.az * 180) / Math.PI, crossing: true }; }
     }
     return { mm: capped(best), at, verts, crossing, capped: best >= SEARCH_CAP_MM };
   }

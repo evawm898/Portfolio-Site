@@ -156,6 +156,18 @@ const DIH_BAR = 180 / G0.RIM_BEAD_SEGMENTS;
    above the float floor of an angle taken from two unit normals, and well
    inside the smallest excess declared here (1.68e-4). */
 const E2_TURN_BAND_DEG = 5e-5;
+/* E7 DECLARED BY VALUE (big petals, Oct 21). `ALL MAX` asks a 150 mm petal
+   (the 100 mm maximum x its size field's 1.5) on a 6.56 mm root body under
+   every form control at once, and two side profiles at its root-blend end
+   (base row 16, u 0.2857) stop 0.0097 mm off the drawn radius against the
+   builder's 0.0096 mm bracket: the bracket is the half's ARC over 4096, and
+   the bisection's twelve halvings are in the section parameter, which this
+   section does not stretch evenly. The root taper OFF reads clean. Both
+   directions: the count exactly, the worst within E7_INSET_BAND_MM. */
+const E7_INSET_BAND_MM = 5e-5;
+const E7_INSET_XFAIL = {
+  /* REMOVED BY THE WIDTH RANGE (Oct 21, petalWidth max 30 -> 46, the same PR): 'ALL MAX' was declared at 2 profiles / 0.00971 mm (the 150 mm root-tapered petal at its root-blend end) and reads 0 once its width is 46 — a wider section stretch at the root blend puts the inset bracket back on the bead. Re-declare by value if a later change brings it back. */
+};
 /* RE-RECORDED ON a4dc836 BY THE GATE-COVERAGE SESSION, ELEVEN MERGES LATE. This
    gate ran in no workflow (D14), so the apex nib (#283, 6ebf784) moved seven of
    these rows and the row ramp (#289, 4f3d31b) two more, and nothing said so
@@ -175,6 +187,32 @@ const E2_TURN_BAND_DEG = 5e-5;
    nib, and that state reads 43.69 deg, so its entry (2.184653 at the old
    state) is OFF, not re-recorded. */
 const E2_TURN_XFAIL = {
+  /* SURFACE TEXTURE (T3, Oct 22): the LOBED leaf is DECLARED OUT of the texture
+     (refused, told), so on this row it is the one untextured rim in E2's
+     subject — and a 60 mm LOBED blade at the mum defaults turns 77.9 deg
+     past the allowance at its own tip, the lobed chevron x cup class S4
+     declared on its smoke rows; the same leaf with the texture at NONE reads
+     the identical turn at the identical site. Not the relief's. */
+  'TEXTURE: PEBBLE x a LOBED leaf (the blade declared OUT — refused, told)': { excessDeg: 32.887927, note: 'adds 77.887927 deg of turn (32.887927 over the allowance) at [-35.298, -9.989, -19.464]; face-to-face 82.39, outline 4.50 — the 60 mm LOBED leaf\'s own tip, untextured by declaration (T3)' },
+  'BIG PETALS: 100 mm (root x3.236, 3.88 mm — the 15 cm bloom at tilt 25)': { excessDeg: 8.532510, note: 'the ROOT RIM of a tapered 100 mm petal (big petals, Oct 21): the rim taper eases the thickened body (3.88 mm at the root) to the 1 mm bead within RIM_TAPER_MM, so the rim turns past the allowance at the root (radius ~11.6 mm); the same state with the root taper OFF passes E2, and the two remedies tried (the bead scaled by the root factor; the buried-end ramp lengthened by it) each moved the excess to another length (80 mm read 61.9 / 77.5). RULED Oct 21: accepted — a thick root closing on the 1 mm bead is a chamfer (docs/bloom-big-petals-outcome.md §6)' },
+  'BIG PETALS: 100 mm x cup 1.2 (the fold clamp reads each row\'s own thickness)': { excessDeg: 13.141118, note: 'the CUPPED TIP, not the taper\'s: the same state with the root taper OFF reads the identical turn at the identical site (the cupped-nib bead class main declares)' },
+  'BIG PETALS: 100 mm x stem 60 x 6 (the join floor is the thickened hub)': { excessDeg: 8.532510, note: 'the ROOT RIM of a tapered 100 mm petal (big petals, Oct 21): the rim taper eases the thickened body (3.88 mm at the root) to the 1 mm bead within RIM_TAPER_MM, so the rim turns past the allowance at the root (radius ~11.6 mm); the same state with the root taper OFF passes E2, and the two remedies tried (the bead scaled by the root factor; the buried-end ramp lengthened by it) each moved the excess to another length (80 mm read 61.9 / 77.5). RULED Oct 21: accepted — a thick root closing on the 1 mm bead is a chamfer (docs/bloom-big-petals-outcome.md §6)' },
+  /* ROOT SUPPORT (Oct 21, docs/bloom-root-support-outcome.md §6b): three smoke
+     rows of block 76 over the allowance. The two 120 mm leaves are NOT the
+     root law's: the site is the TIP (x 109 of 120 mm), and a worktree of
+     8403b47 reads 48.100062 deg at the identical point on the identical state —
+     the narrow tip flank's bead (the narrow-span clamp class), reached because
+     no matrix row carried a 120 mm leaf before. The width-46 x 40 row IS this
+     change's: the derived cap narrows the foot 10.000 -> 5.267 mm, the root
+     blend from a 46 mm blade into it steepens, and the bead there turns 45.78
+     deg at z 0.18 where the base reads 43.48 elsewhere on the petal. Declared at
+     the measured magnitude, never widened. */
+  'ROOT SUPPORT: simple leaf 120 mm x stem 60 (the petiole carries the root)':
+    { excessDeg: 3.100062, note: 'adds 48.100062 deg at [109.016, 1.052, 21.681]; face-to-face 50.66, outline 2.56 — the 120 mm leaf\'s TIP; identical on a worktree of 8403b47' },
+  'ROOT SUPPORT: simple leaf 120 mm x stem 60 x 3 mm (the stem caps the petiole \u2014 told)':
+    { excessDeg: 3.100062, note: 'adds 48.100062 deg at [107.516, 1.052, 22.898] — the same tip, identical on 8403b47' },
+  'ROOT SUPPORT: width 46 x 40 petals':
+    { excessDeg: 0.779637, note: 'adds 45.779637 deg at [21.333, 28.252, 0.176]; face-to-face 46.95, outline 1.17 — the root blend into the CAPPED foot (5.267 mm, the arc it owns at r 33.53; the base built 10.000 at r 24.72 and reads 43.483 at [25.517, 12.756, 1.638])' },
   /* CURVES-LEAVES (Oct 20, docs/bloom-curves-leaves-outcome.md): three block-73
      rows over the allowance, each measured against the SAME state on the arch
      slider and the law outline (`--rows-file`, `--dump-e2`) — none is a new
@@ -191,7 +229,7 @@ const E2_TURN_XFAIL = {
   'LEAF CURVES: the COMPOUND rose on a drawn rachis, one leaflet curve shared by every leaflet (the terminal at its own size), toothed':
     { excessDeg: 5.627818, note: 'adds 50.627818 deg — the leaflet curve on the wide cupped leaflets (the S4 bead class on wide cupped blades); the rachis drawn and the leaflets on the law read 43.686' },
   'LEAF CURVES: the LOBED blade on a drawn spine, an outline curve STORED (the lobed blade keeps its own law \u2014 the outline mode inert, told)':
-    { excessDeg: 44.060970, note: 'adds 89.060970 deg — the lobed bead class main declares on its lobed rows; the identical state on the Arch slider reads 94.200 — the drawn spine improves it' },
+    { excessDeg: 35.159030, note: 'RE-RECORDED 44.060970 -> 35.159030 by ROOT SUPPORT (Oct 21): the lobed leaf takes the root law at its own length (better, measured by CI on b6759be). Earlier: adds 89.060970 deg — the lobed bead class main declares on its lobed rows; the identical state on the Arch slider reads 94.200 — the drawn spine improves it' },
   /* SPINE-CUP-FOLD (Oct 20, docs/bloom-spine-cup-fold-outcome.md): five smoke
      rows over the allowance, every one a strongly CUPPED blade on a strongly
      CURLED spine — the cup's bead on a surface that bends hard along its
@@ -226,9 +264,9 @@ const E2_TURN_XFAIL = {
      at the 1.00 mm wall (the class already declared for narrow leaves above);
      0.000151 deg over the allowance on both, at the blade's margin, never widened. */
   'SEPAL SIZE: the WING — 120 x 5 mm, angle -10, curl +120 biased to the tip, tapers 3 / 4, tip 0.60 (the sepals three times the 35 mm petals\' length)':
-    { excessDeg: 0.000151, note: 'adds 45.000151 deg at [16.423, 5.990, -1.520] — the narrow-span bead clamp on a 5 mm blade, found by CI on 8255893' },
+    { excessDeg: 0.020093, note: 'RE-RECORDED 0.000151 -> 0.020093 by ROOT SUPPORT (Oct 21): the 120 mm sepal takes the root law at its own length (x4.134, a 4.96 mm root), so the narrow-span clamp closes a thicker body on the 5 mm blade (measured by CI on b6759be). Earlier: adds 45.000151 deg at [16.423, 5.990, -1.520] — the narrow-span bead clamp on a 5 mm blade, found by CI on 8255893' },
   'SEPAL SIZE: 120 x 5 mm asked UP at 40 — the limit drawn with the root exclusion in MILLIMETRES (pinned at or under 22; a fraction of the sepal\'s length read +24 here)':
-    { excessDeg: 0.000151, note: 'adds 45.000151 deg at [-2.550, 22.830, 5.418] — the same 5 mm blade at the other angle, the same clamp' },
+    { excessDeg: 0.020091, note: 'RE-RECORDED 0.000151 -> 0.020091 by ROOT SUPPORT (Oct 21), the same root on the same 5 mm blade. Earlier: adds 45.000151 deg at [-2.550, 22.830, 5.418] — the same 5 mm blade at the other angle, the same clamp' },
   /* LEAF/STEM BUILD S5 (the leaf nib, the tip yield, the broad-sinus fillet —
      docs/bloom-leaf-tip-broad-sinus-outcome.md): nine smoke rows newly over
      the allowance, each declared at its measured magnitude with its reason;
@@ -431,7 +469,7 @@ const E2_TURN_XFAIL = {
   "LOBED RULINGS: roundness 0.18 (the first DEAD step \u2014 SATURATED, the same leaf as 0.5; told and hatched)":
     { excessDeg: 37.320181, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 37.432361; earlier: NEW with the S4c follow-up: the first dead step, the same leaf (and the same figure) as roundness 0.5; RE-RECORDED at S5 from 37.320181 (the three arc rows of the nib re-space the stations of every leaf blade, so the bead is faceted at different rows mid-blade); RE-RECORDED at S5b from 43.466762 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
   "LOBED RULINGS: a told shoulder CORNER \u2014 the disc meets the flank (5 lobes on a 58 mm blade at lobe shape 1.5)":
-    { excessDeg: 28.347335, note: 'NEW with the S4c follow-up: a told shoulder corner on a broad-sinus blade; RE-RECORDED at S5 from 28.346182 (the three arc rows of the nib re-space the stations of every leaf blade, so the bead is faceted at different rows mid-blade); RE-RECORDED at S5b from 20.886846 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
+    { excessDeg: 4.573785, note: 'RE-RECORDED 28.347335 -> 4.573785 by ROOT SUPPORT (Oct 21): the 58 mm lobed leaf takes the root law at its own length, and the thickened body re-faces the bead at the shoulder (better, measured by CI on b6759be). Earlier: NEW with the S4c follow-up: a told shoulder corner on a broad-sinus blade; RE-RECORDED at S5 from 28.346182 (the three arc rows of the nib re-space the stations of every leaf blade, so the bead is faceted at different rows mid-blade); RE-RECORDED at S5b from 20.886846 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
 };
 
 /* THE BEAD IS NOT DRAWN ON AN INFILLED BLADE, AND THAT IS DECLARED HERE
@@ -471,6 +509,14 @@ const E2_TURN_XFAIL = {
    what is declared is the case where NOTHING is left — an empty subject,
    named as such. */
 const cutsAPattern = (part) => !!(part && part.infill && part.infill.built);
+/* SURFACE TEXTURE (T3): a relieved rim is OUT of E2 by declaration — the
+   relief runs over the bead (Q4/Q5), so the bead's body turns by the field's
+   own slope on top of the profile's, and the 45-degree allowance is a claim
+   about the UNRELIEVED profile. The same carve-out as the infill's, one
+   feature later, and declared here rather than widened: the TX family holds
+   the relieved bead to its law (TX5). */
+const isRelieved = (part) => !!(part && part.texture && !part.texture.refused && part.texture.panels && part.texture.panels.some((p) => p.displaced > 0));
+const outOfE2 = (part) => cutsAPattern(part) || isRelieved(part);
 const { DEFAULTS } = await import(pathToFileURL(path.join(HERE, 'bloom-registry.js')).href);
 const H = await import(pathToFileURL(path.join(HERE, 'tools', 'bloom-harness.mjs')).href);
 
@@ -748,8 +794,17 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
       } catch (e) { check('E0', false, `${row.label} [${exportMode ? 'export' : 'live'}]: build threw — ${e.message}`); continue; }
       const mesh = meshOf(acc.positions);
       const rim = [], rimE2 = [];
-      for (const p of (built.petalsAll || [])) if (p && p.rim) { rim.push(p.rim); if (!cutsAPattern(p)) rimE2.push(p.rim); }
-      for (const s of (built.sepals && built.sepals.built) || []) if (s && s.rim) { rim.push(s.rim); if (!cutsAPattern(s)) rimE2.push(s.rim); }
+      /* A RELIEVED PART IS OUT OF THE WHOLE FAMILY, BY DECLARATION (T3): its rim
+         record describes the UNRELIEVED profile the builder planned — the apex
+         on the outline, the inset solved on the section, the clamp locations —
+         and the relief then moves every rim vertex along its own normal by the
+         field's value, so E1 / E4 / E7 fail on it by construction and E2 reads
+         the field's slope. The TX family holds the relieved bead to its law
+         (TX5) and the T family the relieved sheet to its band; what is declared
+         here is the carve-out, counted and named when it empties the subject. */
+      let relievedOut = 0;
+      for (const p of (built.petalsAll || [])) if (p && p.rim) { if (isRelieved(p)) { relievedOut++; continue; } rim.push(p.rim); if (!outOfE2(p)) rimE2.push(p.rim); }
+      for (const s of (built.sepals && built.sepals.built) || []) if (s && s.rim) { if (isRelieved(s)) { relievedOut++; continue; } rim.push(s.rim); if (!outOfE2(s)) rimE2.push(s.rim); }
       /* LEAVES ARE IN THE SUBJECT (leaf/stem build S2): the blade goes through
          `emitPanel` and closes on the same bead, so every clause here asks of
          a leaf rim what it asks of a petal's. A leaf row whose leaves carry no
@@ -759,8 +814,10 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
       /* A COMPOUND LEAF IS MANY BLADES (leaf/stem build S3): every leaflet is a
          blade through `emitPanel` with its own rim — the free BASE beaded as
          the tip is — so each one is in the subject, not the first. */
-      for (const l of built.leavesBuilt || []) for (const b of (l && l.compound ? l.leaflets : [l])) if (b && b.rim) { rim.push(b.rim); rimE2.push(b.rim); leafApex += (b.rim.apex || []).length; }
-      if ((built.leavesBuilt || []).length) {
+      let leafRelieved = 0;
+      for (const l of built.leavesBuilt || []) for (const b of (l && l.compound ? l.leaflets : [l])) if (b && b.rim) { if (isRelieved(b)) { relievedOut++; leafRelieved++; continue; } rim.push(b.rim); rimE2.push(b.rim); leafApex += (b.rim.apex || []).length; }
+      if (relievedOut) notes.push(`E SKIPPED ${relievedOut} RELIEVED part(s) on ${row.label} [${exportMode ? 'export' : 'live'}] — a textured rim is the TX family's (declared carve-out, T3)`);
+      if ((built.leavesBuilt || []).length && !leafRelieved) {
         check('E0', leafApex > 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${built.leavesBuilt.length} leaves built and none carries a treated rim — the bead did not reach the leaves`);
         leafRows++; leafApexAll += leafApex;
       }
@@ -853,7 +910,10 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
         if (d > r.inset.tolMm + 1e-9) { insetBad++; if (!insetWorst || d > insetWorst.d) insetWorst = { d, r }; }
       }
       insetChecked += insetN;
-      check('E7', insetBad === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${insetBad} of ${insetN} side profiles stop ${insetWorst && insetWorst.d.toFixed(4)} mm off their own drawn radius ${insetWorst && insetWorst.r.inset.mm.toFixed(4)} mm (panel ${insetWorst && insetWorst.r.panel} row ${insetWorst && insetWorst.r.row} col ${insetWorst && insetWorst.r.col}) — the bead's inset was not solved on this side's own section`);
+      const e7d = E7_INSET_XFAIL[row.label];
+      if (e7d) {
+        check('E7', insetBad === e7d.profiles && insetWorst && Math.abs(insetWorst.d - e7d.worstMm) <= E7_INSET_BAND_MM, `${row.label} [${exportMode ? 'export' : 'live'}]: declared ${e7d.profiles} profile(s) off by ${e7d.worstMm} mm and reads ${insetBad}${insetWorst ? ` off by ${insetWorst.d.toFixed(5)}` : ''} — the declaration is stale (re-record or remove it)`);
+      } else check('E7', insetBad === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${insetBad} of ${insetN} side profiles stop ${insetWorst && insetWorst.d.toFixed(4)} mm off their own drawn radius ${insetWorst && insetWorst.r.inset.mm.toFixed(4)} mm (panel ${insetWorst && insetWorst.r.panel} row ${insetWorst && insetWorst.r.row} col ${insetWorst && insetWorst.r.col}) — the bead's inset was not solved on this side's own section`);
 
       /* ---- E1: the rim floor, with the clamp as a BICONDITIONAL ----
          THE BAR IS `min(RIM_FLOOR_MM, the body's own thickness)`, and that is
@@ -1064,9 +1124,12 @@ const MUTATIONS = [
   { id: 'the-leaf-rim-is-not-recorded', breaks: ['E0'],
     /* RE-ANCHORED (leaf/stem build S3): the blade's emitPanel call moved into
        `emitLeafBladeInto`, the one emitter a simple leaf and every leaflet go
-       through, so the mutation reaches both. */
-    from: "  emitPanel(acc, rows, panel, () => t, rim);",
-    to:   "  emitPanel(acc, rows, panel, () => t, null);" },
+       through, so the mutation reaches both. RE-ANCHORED AGAIN (root support):
+       the thickness is the leaf's root law per row now (`tAtRow`). */
+    /* RE-ANCHORED a THIRD time (SURFACE TEXTURE T3): the call carries the
+       leaf's texture context now. */
+    from: "  emitPanel(acc, rows, panel, tAtRow, rim, texL);",
+    to:   "  emitPanel(acc, rows, panel, tAtRow, null, texL);" },
   { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2'],
     from: 'export const RIM_FLOOR_MM = 1.0;',
     to:   'export const RIM_FLOOR_MM = 1.0; const RIM_FLOOR_APPLIED = 0.4;' },
@@ -1129,8 +1192,10 @@ const MUTATIONS = [
     from: '    const inLo = side ? rimInsetV(row.sect, vLo, vMid, aLo) : vLo;\n    const inHi = side ? rimInsetV(row.sect, vHi, vMid, aHi) : vHi;',
     to:   '    const inHi = side ? rimInsetV(row.sect, vHi, vMid, aHi) : vHi;\n    const inLo = side ? (vLo === -vHi ? -inHi : rimInsetV(row.sect, vLo, vMid, aLo)) : vLo;' },
   { id: 'the-tip-drop-is-a-threshold-on-the-emitted-width', breaks: ['E5', 'E6', 'E2'],
-    from: '  const skinTo = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;',
-    to:   '  const skinTo = tipExposed ? (() => { let i = rowTo; while (i > rowFrom && rows[i].h < RIM_BEAD_RADIUS_MM) i--; return i; })() : rowTo;' },
+    /* RE-ANCHORED (SURFACE TEXTURE T3): the skin's end is a SHIPPED-row index
+       (`skinToS`) now, mapped onto the lattice's expanded rows by `kOf`. */
+    from: '  const skinToS = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;',
+    to:   '  const skinToS = tipExposed ? (() => { let i = rowTo; while (i > rowFrom && rows[i].h < RIM_BEAD_RADIUS_MM) i--; return i; })() : rowTo;' },
 ];
 /* The floor mutation needs a second edit: the constant is exported and read
    by the gate as the BAR, so lowering the export alone would move the bar
@@ -1149,8 +1214,10 @@ const EXTRA = {
     ['  pts[APEX] = apex;', '  pts[APEX] = C;'],
   ],
   'the-rim-floor-is-lowered-to-0.4': [
-    ['    const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);',
-     '    const r = Math.min(RIM_FLOOR_APPLIED / 2, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);'],
+    /* RE-ANCHORED (SURFACE TEXTURE T3): the room is read off the lattice's
+       per-row record (`base.w`) and the radius is formed on `room`. */
+    ['    const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * room);',
+     '    const r = Math.min(RIM_FLOOR_APPLIED / 2, tBody / 2, RIM_ROOM_FRACTION * room);'],
   ],
 };
 

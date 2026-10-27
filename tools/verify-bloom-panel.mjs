@@ -520,14 +520,63 @@
          Two mutants under --negative-control (both bloom.js): the picker
          listing no strands, and every pick binding strand 1. Three edits: this
          entry, the block, the negative control's flags and banner.
+     (ao) SURFACE TEXTURE — THE LINE, THE SLIDERS, THE GREYING (T3, Oct 22 —
+         docs/bloom-surface-texture-t3-outcome.md; Eva's rulings Q9, Q13). The
+         default: no TEXTURE line, the height and size sliders hidden, nothing
+         greyed. PEBBLE on: the line carries the petal lattice's own skin count
+         against its floor and the height; the sliders show; the INFILL choice is
+         GREYED (disabled + `bl-ctrl--disabled`), still shown, its read-out
+         naming the texture — restated from the registry's own `enabledWhen` on
+         the page's state. BOTH ON: refused with the word infill, NOT BUILT
+         told, and NEITHER control greyed (a control that is ON is never greyed,
+         or a loaded design with both could never be turned off). The infill
+         alone greys the texture choice. The guard OFF with both sliders at
+         their maxima: no line, hidden and inert. Two mutants under
+         --negative-control (both bloom.js): the greying never applied, and the
+         TEXTURE line never printed. Three edits: this entry, the block, the
+         negative control's flags and banner.
+     (ap) THE UMBEL'S HEAD TOGGLE ON THE PANEL (the umbel session — docs/
+         bloom-umbel-outcome.md; Eva's ruling 2). On a 120 mm stem: under a
+         RACEME the raceme's nodes show and the umbel's two hide; under an
+         UMBEL with the head OFF (its default) the umbel's two show, the
+         raceme's hide, the head-only controls (the head's petal count, the
+         per-layer values toggle) HIDE, and the Petal section's derived label
+         SAYS its controls shape the florets — read back off the summary
+         element the page wrote; with the head ON the head-only controls are
+         back and the label is "Petal". Two mutants under --negative-control
+         (both bloom-registry.js): the label never derived, and the head's
+         petal count left visible with the head off. Three edits: this entry,
+         the block, the negative control's flags and banner.
+     (aq) THE MOPHEAD'S DEPTH ON THE PANEL (the mophead session — docs/
+         bloom-mophead-outcome.md; Eva's rulings 1 and 4). On a 120 mm stem:
+         under a RACEME the depth control hides; under an UMBEL at depth 1 the
+         depth shows and the three ray controls HIDE; at depth 2 they show, the
+         depth's read-out names the REDUCED lattice and the FLORET FLOOR, and
+         the count's read-out says how many florets were built — read against
+         the builder's own record; at the CLAMP CORNER (12 x 12 x 12 petals at
+         0.60x) the count's read-out says CLAMPED with the asked and the built
+         counts the builder's budget record holds, and the bloom exports (it
+         never refuses for this). Two mutants under --negative-control (both
+         bloom-registry.js): the rays shown at depth 1, and the clamp never
+         told. Three edits: this entry, the block, the negative control's
+         flags and banner.
+         DEPTH 2'S DEFAULTS (Eva's ruling, Oct 25 — the floor-floret mophead
+         is depth 2's default): the registry's overlay is held against the
+         ruled values restated in the block; a LOAD to depth 2 writes
+         nothing; a HAND switch (the keyboard on the select) writes every
+         overlay value still at its registry default, keeps a control the
+         route set first and tells both on the depth's read-out; the switch
+         back restores the registry defaults. Three mutants (bloom.js): the
+         switch writes nothing, a set control is overwritten, a load writes
+         the overlay. Still route (aq) — the route count does not move.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, CONTROLS, SECTIONS,
          RETIRED_IDS, DEFAULTS, evalPredicate, predicateDrivers, verifySections,
-         SPIRAL_LEGIBLE_COUNT, exportStl, settleBuild, shownModeOf, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM } from './bloom-harness.mjs';
-import { sectionLabel } from '../bloom-registry.js';
+         SPIRAL_LEGIBLE_COUNT, exportStl, settleBuild, shownModeOf, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, footCapRestated, footSpanRestated } from './bloom-harness.mjs';
+import { sectionLabel, UMBEL_DEPTH2_DEFAULTS } from '../bloom-registry.js';
 import { mirrorPartner } from '../bloom-geometry.js';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
@@ -669,6 +718,14 @@ const WITNESS = {
      At 40 the achieved count is 14, the SAME as the ruled default's, so half
      this witness would have been a number printed twice — the `leafToothCount`
      row's own finding, in the next entry but one. */
+  /* THE TEXTURE (T3) — a drop-down inside Petal, collapsed at first load;
+     witnessed by the HEIGHT through the builder's own texture record: the
+     petal organ's reliefMaxMm (the largest outward displacement the emitter
+     actually applied, which the slider cannot write — at the guard the record
+     is null) and its skin-triangle count on the lattice. The row needs the
+     guard off, hence the pre. */
+  texture: { id: 'textureHeight', value: '1.2', pre: [{ id: 'petalTexture', value: 'PEBBLE' }],
+             read: (m) => `${m.texture && m.texture.organs.petal && m.texture.organs.petal.reliefMaxMm}/${m.texture && m.texture.organs.petal && m.texture.organs.petal.skinTris}`, what: 'texture.organs.petal.reliefMaxMm/skinTris' },
   infill: { id: 'infillDensity', value: '24', pre: [{ id: 'petalInfill', value: 'VORONOI' }],
             read: (m) => `${m.infill && m.infill.achieved}/${m.infill && m.infill.passesUsed}`,
             what: 'infill.achieved/infill.passesUsed' },
@@ -4035,8 +4092,10 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     bad = await applyConfig(pg, [{ id: 'petalWidth', value: '12' }]);
     if (bad.length) p.push(`the width edit did not take: ${bad.join('; ')}`);
     const w = await snap(pg);
-    const wantFoot = Math.min(FOOT_MAX_WIDTH_MM, Math.max(FOOT_MIN_WIDTH_MM, 12 * 0.4 * Number(DEFAULTS.footDelicacy)));
     const r0 = w.rings[0], r1 = w.rings[1], r2 = w.rings[2];
+    /* (root support: the asked foot floored, capped at the arc it owns on its
+       own ring — the harness's restatement, never the record's arc) */
+    const wantFoot = r1 ? footCapRestated(Math.max(FOOT_MIN_WIDTH_MM, 12 * 0.4 * Number(DEFAULTS.footDelicacy)), r1.radius, footSpanRestated(w.ui)).width : NaN;
     if (!r1 || r1.ownWidth !== 12) p.push(`turn 2's ring reports its own width as ${r1 && r1.ownWidth}, not the 12 set`);
     if (!r1 || !Object.is(r1.width, wantFoot)) p.push(`the owned turn's foot is ${r1 && r1.width} mm across, restated ${wantFoot} — the foot did not follow its own width`);
     if (!r1 || Math.abs(r1.radius / r0.radius - 12 / Number(DEFAULTS.petalWidth)) > 1e-12) p.push(`the owned turn's ring sits at ${r1 && (r1.radius / r0.radius).toFixed(6)} of the rim, restated ${(12 / Number(DEFAULTS.petalWidth)).toFixed(6)} — the ring did not follow its own width`);
@@ -4714,6 +4773,277 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (ao) SURFACE TEXTURE — THE LINE, THE SLIDERS, THE GREYING (T3) -----
+   See the header. Every claim is read off the BUILDER's record
+   (`__bloomMetrics().texture`) and the registry's own predicates evaluated
+   on the page's read-back state — never the inputs this route set. */
+{
+  const tag = '[texture]';
+  const snap = (pg) => pg.evaluate(() => {
+    const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+    const wrap = (id) => document.getElementById(id).closest('.bl-ctrl');
+    const st = (id) => ({ hidden: wrap(id).hidden, disabled: document.getElementById(id).disabled, greyed: wrap(id).classList.contains('bl-ctrl--disabled'), said: wrap(id).querySelector('.bl-val').textContent });
+    return { T: m.texture, absent: m.textureAbsent, line: /TEXTURE ([^\n]*)/.exec(txt), notBuilt: /TEXTURE NOT BUILT — ([^\n]*)/.exec(txt),
+      tex: st('petalTexture'), inf: st('petalInfill'), h: st('textureHeight'), z: st('textureSize'), ui: window.__bloomUIState() };
+  });
+  const run = async (pg, label, sets, want) => {
+    const bad = sets.length ? await applyConfig(pg, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const r = await snap(pg);
+    const p = [];
+    const present = evalPredicate({ ref: 'texturePresent' }, r.ui), infOn = evalPredicate({ ref: 'infillPresent' }, r.ui);
+    if (!!r.T !== present) p.push(`the builder reports ${r.T ? 'a record' : 'no record'} while the registry reads the texture ${present ? 'present' : 'absent'}`);
+    if (!!r.line !== !!r.T) p.push(`the TEXTURE line is ${r.line ? 'shown' : 'absent'} while the builder reports ${r.T ? 'a record' : 'no record'}`);
+    if (r.h.hidden !== !present || r.z.hidden !== !present) p.push(`the height / size sliders are ${r.h.hidden ? 'hidden' : 'shown'} / ${r.z.hidden ? 'hidden' : 'shown'} with the texture ${present ? 'on' : 'off'}`);
+    if (r.tex.hidden || r.inf.hidden) p.push('a choice is HIDDEN — Q9 greys, never hides');
+    /* THE GREYING, both ways, restated from the registry's own predicates on
+       the page's state: a control is greyed iff its `enabledWhen` is false,
+       and a control that is ON is never greyed (both on must stay reachable) */
+    const regInf = evalPredicate(CONTROLS.find((c) => c.id === 'petalInfill').enabledWhen, r.ui), regTex = evalPredicate(CONTROLS.find((c) => c.id === 'petalTexture').enabledWhen, r.ui);
+    if (r.inf.disabled !== !regInf || r.inf.greyed !== !regInf) p.push(`the infill choice is ${r.inf.disabled ? 'disabled' : 'enabled'} / ${r.inf.greyed ? 'greyed' : 'plain'} where its own enabledWhen reads ${regInf}`);
+    if (r.tex.disabled !== !regTex || r.tex.greyed !== !regTex) p.push(`the texture choice is ${r.tex.disabled ? 'disabled' : 'enabled'} / ${r.tex.greyed ? 'greyed' : 'plain'} where its own enabledWhen reads ${regTex}`);
+    if (want.infGreyed !== undefined && !regInf !== want.infGreyed) p.push(`the registry greys the infill ${!regInf} where this route expects ${want.infGreyed}`);
+    if (want.texGreyed !== undefined && !regTex !== want.texGreyed) p.push(`the registry greys the texture ${!regTex} where this route expects ${want.texGreyed}`);
+    if (!regInf && !/texture/i.test(r.inf.said)) p.push(`the greyed infill's read-out does not name the texture: "${r.inf.said}"`);
+    if (!regTex && !/infill/i.test(r.tex.said)) p.push(`the greyed texture's read-out does not name the infill: "${r.tex.said}"`);
+    if (r.T) {
+      if ((r.T.refused || null) !== (want.refused ?? null)) p.push(`the builder says refused=${r.T.refused} and the route expects ${want.refused ?? 'nothing'}`);
+      if (r.line) {
+        if (want.refused) { if (!r.notBuilt || !/infill/i.test(r.notBuilt[1])) p.push('the read-out does not say NOT BUILT for the infill while the builder refused'); }
+        else {
+          if (r.notBuilt) p.push('the read-out says NOT BUILT while the builder relieved the sheet');
+          const o = r.T.organs && r.T.organs.petal;
+          if (!o || !new RegExp(`\\b${o.skinTris}\\b`).test(r.line[1])) p.push(`the TEXTURE line does not carry the petal lattice's own skin count ${o && o.skinTris}: "${r.line[1].slice(0, 120)}"`);
+          if (!/x its floor/.test(r.line[1])) p.push('the TEXTURE line does not state the lattice against its floor');
+          if (!new RegExp(`${r.T.heightMm}`).test(r.line[1])) p.push(`the TEXTURE line does not carry the height ${r.T.heightMm}`);
+        }
+      }
+      if (!want.refused && !/\bmm\b/.test(r.h.said)) p.push(`the height control's read-out is not in millimetres: "${r.h.said}"`);
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${r.T ? (r.T.refused ? `refused ${r.T.refused}` : `${r.T.type} H ${r.T.heightMm}`) : 'no record'}`);
+  };
+  const { browser: b1, page: p1 } = await launchPage();
+  await openBloom(p1, port);
+  if (NEGATIVE_CONTROL) {
+    await p1.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  await run(p1, 'the shipping default — no line, the sliders hidden, nothing greyed', [], { infGreyed: false, texGreyed: false });
+  await run(p1, 'PEBBLE on — the line with the lattice count and the bar, the sliders shown, the INFILL greyed and told', [{ id: 'petalTexture', value: 'PEBBLE' }], { infGreyed: true, texGreyed: false });
+  await run(p1, 'CELLULAR at the height ceiling', [{ id: 'petalTexture', value: 'CELLULAR' }, { id: 'textureHeight', value: '1.5' }], { infGreyed: true, texGreyed: false });
+  await run(p1, 'BOTH ON — refused with the word infill, NOT BUILT told, NEITHER control greyed (each stays reachable)', [{ id: 'petalInfill', value: 'VORONOI' }], { refused: 'infill', infGreyed: false, texGreyed: false });
+  await run(p1, 'the infill alone — the TEXTURE choice greyed and told, no line', [{ id: 'petalTexture', value: 'NONE' }], { infGreyed: false, texGreyed: true });
+  await run(p1, 'the guard OFF with both sliders at their maxima — no line, the sliders hidden (hidden AND inert)', [{ id: 'petalInfill', value: 'NONE' }, { id: 'textureHeight', value: '1.5' }, { id: 'textureSize', value: '12' }], { infGreyed: false, texGreyed: false });
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the greying is never applied', from: "    wrappers[c.id].classList.toggle('bl-ctrl--disabled', !on);\n    inputs[c.id].disabled = !on;\n", to: "    wrappers[c.id].classList.toggle('bl-ctrl--disabled', false);\n    inputs[c.id].disabled = false;\n" },
+      { name: 'the texture line is never printed', from: "       + textureLine(built ? built.texture : null)\n", to: "       + ''\n" },
+    ];
+    for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (appSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: appSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name}) PEBBLE on`, [{ id: 'petalTexture', value: 'PEBBLE' }], { infGreyed: true, texGreyed: false });
+      await b2.close();
+    }
+  }
+}
+
+/* ---------------- (ap) THE UMBEL'S HEAD TOGGLE ON THE PANEL (the umbel session) -----
+   See the header. Visibility is read off the wrappers the page hid (never the
+   predicates this file could evaluate itself), and the label off the summary
+   element the page wrote. */
+{
+  const tag = '[umbel head]';
+  const snap = (pg) => pg.evaluate(() => {
+    const vis = (id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return !!(w && !w.hidden); };
+    const sum = document.querySelector('#sec-petal > summary');
+    return { label: sum ? sum.textContent : null, petalCount: vis('petalCount'), scopeLayers: vis('scopeLayers'), floretNodes: vis('floretNodes'),
+      umbelFlorets: vis('umbelFlorets'), umbelHead: vis('umbelHead'), headAbsent: window.__bloomMetrics().headAbsent, infloText: (document.getElementById('inflorescence').closest('.bl-ctrl') || document.body).textContent };
+  });
+  const run = async (pg, label) => {
+    const p = [];
+    let bad = await applyConfig(pg, [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const r = await snap(pg);
+    if (!r.floretNodes || r.umbelFlorets || r.umbelHead) p.push(`under a RACEME the nodes are ${r.floretNodes ? 'shown' : 'HIDDEN'} and the umbel's count / head are ${r.umbelFlorets || r.umbelHead ? 'SHOWN' : 'hidden'}`);
+    if (r.label !== 'Petal' || !r.petalCount) p.push(`under a RACEME the Petal section reads "${r.label}" and the head's petal count is ${r.petalCount ? 'shown' : 'HIDDEN'}`);
+    bad = await applyConfig(pg, [{ id: 'inflorescence', value: 'UMBEL' }]);
+    if (bad.length) { note(`${tag} ${label}: the umbel did not take: ${bad.join('; ')}`); return; }
+    const off = await snap(pg);
+    if (off.headAbsent !== true) p.push('an UMBEL at its default head (OFF) built a head');
+    if (!off.umbelFlorets || !off.umbelHead || off.floretNodes) p.push(`under an UMBEL the count is ${off.umbelFlorets ? 'shown' : 'HIDDEN'}, the head toggle ${off.umbelHead ? 'shown' : 'HIDDEN'}, the raceme's nodes ${off.floretNodes ? 'SHOWN' : 'hidden'}`);
+    if (off.petalCount || off.scopeLayers) p.push(`with the head OFF the head-only controls show (petal count ${off.petalCount}, per-layer values ${off.scopeLayers}) — a hidden head's controls must hide`);
+    if (!/FLORETS/.test(off.label || '')) p.push(`with the head OFF the Petal section reads "${off.label}" — it must say its controls shape the florets`);
+    if (!/NO head/.test(off.infloText)) p.push('with the head OFF the inflorescence read-out does not say there is no head');
+    bad = await applyConfig(pg, [{ id: 'umbelHead', value: 'ON' }]);
+    const on = await snap(pg);
+    if (bad.length || on.headAbsent !== false) p.push(`the head ON did not build a head (${bad.join('; ')})`);
+    if (!on.petalCount || !on.scopeLayers || on.label !== 'Petal') p.push(`with the head ON the petal count is ${on.petalCount ? 'shown' : 'HIDDEN'}, per-layer values ${on.scopeLayers ? 'shown' : 'HIDDEN'}, the label "${on.label}"`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: a RACEME shows its nodes and hides the umbel's two; an UMBEL with the head OFF hides the raceme's nodes and the head-only controls and its Petal section reads "${off.label}"; the head ON brings them back under "Petal"`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'umbel head toggle');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const regSrc = fs.readFileSync(new URL('../bloom-registry.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the label is never derived', from: "    ? 'Petal — the head is off: these shape the umbel\\'s FLORETS' : 'Petal'), open: false },", to: "    ? 'Petal' : 'Petal'), open: false }," },
+      { name: 'the head petal count shows with the head off', from: "    visibleWhen: { all: [{ not: { id: 'placement', oneOf: ['FAN'] } }, { ref: 'headPresent' }] } },", to: "    visibleWhen: { not: { id: 'placement', oneOf: ['FAN'] } } }," },
+    ];
+    for (const m of MUTANTS) if (regSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom-registry.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (regSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom-registry.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: regSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
+/* ---------------- (aq) THE MOPHEAD'S DEPTH ON THE PANEL (the mophead session) -----
+   See the header. Visibility off the wrappers the page hid, the words off the
+   read-outs the page wrote, the numbers against `__bloomMetrics()`. */
+{
+  const tag = '[mophead]';
+  const snap = (pg) => pg.evaluate(() => {
+    const vis = (id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return !!(w && !w.hidden); };
+    const txt = (id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return w ? w.textContent : ''; };
+    const m = window.__bloomMetrics();
+    const cl = m.inflorescence && m.inflorescence.budgetClamp;
+    return { depth: vis('umbelDepth'), rays: vis('umbelRays'), rayLength: vis('umbelRayLength'), rayAngle: vis('umbelRayAngle'),
+      depthText: txt('umbelDepth'), countText: txt('umbelFlorets'), compound: m.umbelCompound,
+      clamp: cl ? { asked: cl.askedFlorets, built: cl.builtFlorets, clamped: cl.clamped } : null };
+  });
+  const run = async (pg, label, { corner = true } = {}) => {
+    const p = [];
+    let bad = await applyConfig(pg, [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    let r = await snap(pg);
+    if (r.depth || r.rays) p.push(`under a RACEME the depth is ${r.depth ? 'SHOWN' : 'hidden'} and the rays ${r.rays ? 'SHOWN' : 'hidden'}`);
+    bad = await applyConfig(pg, [{ id: 'inflorescence', value: 'UMBEL' }]);
+    r = await snap(pg);
+    if (bad.length || !r.depth || r.rays || r.rayLength || r.rayAngle) p.push(`under an UMBEL at depth 1 the depth is ${r.depth ? 'shown' : 'HIDDEN'} and the ray controls are ${r.rays || r.rayLength || r.rayAngle ? 'SHOWN' : 'hidden'} (${bad.join('; ')})`);
+    bad = await applyConfig(pg, [{ id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }]);
+    r = await snap(pg);
+    if (bad.length || r.compound !== true) p.push(`depth 2 did not build a compound umbel (${bad.join('; ')})`);
+    if (!r.rays || !r.rayLength || !r.rayAngle) p.push(`at depth 2 the ray controls are not all shown (rays ${r.rays}, length ${r.rayLength}, angle ${r.rayAngle})`);
+    if (!/REDUCED lattice/.test(r.depthText) || !/FLORET FLOOR/.test(r.depthText)) p.push(`at depth 2 the depth's read-out does not name the REDUCED lattice and the FLORET FLOOR: "${r.depthText.slice(0, 160)}"`);
+    if (!r.clamp || !new RegExp(`\\b${r.clamp.built} florets in all`).test(r.countText)) p.push(`at depth 2 the count's read-out does not say the ${r.clamp ? r.clamp.built : '?'} florets built: "${r.countText.slice(0, 200)}"`);
+    if (corner) {
+      bad = await applyConfig(pg, [{ id: 'umbelRays', value: '12' }, { id: 'umbelFlorets', value: '12' }, { id: 'floretPetals', value: '12' }, { id: 'floretScale', value: '0.6' }, { id: 'pedicelLength', value: '12' }, { id: 'pedicelAngle', value: '20' }]);
+      r = await snap(pg);
+      if (bad.length || !r.clamp || !r.clamp.clamped) p.push(`the clamp corner did not clamp (${bad.join('; ')}; record ${JSON.stringify(r.clamp)})`);
+      else {
+        const want = new RegExp(`CLAMPED to \\d+ a ray: ${r.clamp.asked} florets asked, ${r.clamp.built} built`);
+        if (!want.test(r.countText)) p.push(`at the clamp corner the count's read-out does not say ${r.clamp.asked} asked and ${r.clamp.built} built: "${r.countText.slice(0, 220)}"`);
+      }
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: a RACEME hides the depth; an UMBEL at depth 1 hides the rays; depth 2 shows them and names the REDUCED lattice and the FLORET FLOOR and the florets built${corner ? `; the clamp corner says CLAMPED with ${r.clamp.asked} asked and ${r.clamp.built} built` : ''}`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'mophead depth');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const regSrc = fs.readFileSync(new URL('../bloom-registry.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the rays are shown at depth 1', from: "      return `${base} · each ${(2 * p.pedicelR).toFixed(2)} mm across (the area rule off the ${(2 * p.outerR).toFixed(2)} mm stem${p.pedicelRClamped ? ', FLOORED' : ''}), rooted in a boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm).toFixed(2)} mm tall`;\n    },\n    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelCompound' } },", to: "      return `${base} · each ${(2 * p.pedicelR).toFixed(2)} mm across (the area rule off the ${(2 * p.outerR).toFixed(2)} mm stem${p.pedicelRClamped ? ', FLOORED' : ''}), rooted in a boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm).toFixed(2)} mm tall`;\n    },\n    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelPresent' } },", corner: false },
+      { name: 'the clamp is never told', from: '          + (cl && cl.clamped ? ` — CLAMPED to ${k} a ray:', to: '          + (false ? ` — CLAMPED to ${k} a ray:', corner: true },
+    ];
+    for (const m of MUTANTS) if (regSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom-registry.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (regSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom-registry.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: regSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`, { corner: m.corner });
+      await b2.close();
+    }
+  }
+}
+
+/* ---------------- (aq) DEPTH 2'S DEFAULTS ON THE HAND SWITCH (Oct 25) -----
+   Eva's ruling: the floor-floret mophead is depth 2's default. The overlay is
+   the registry's `UMBEL_DEPTH2_DEFAULTS`; the RULED values are restated here
+   and compared against it first (a moved table is a ruling, not a refactor),
+   so the expected values have an owner the page does not write. Clauses: a
+   LOAD to depth 2 (applyConfig — no isTrusted event) writes nothing; a HAND
+   switch (the keyboard on the select) writes every overlay value still at its
+   registry default, KEEPS the one this route set first (Florets 3) and tells
+   both on the depth's read-out; the hand switch back restores every registry
+   default and keeps the 3. */
+{
+  const tag = '[depth defaults]';
+  const RULED_D2 = { umbelFlorets: 12, floretPetals: 4, floretScale: 0.2, pedicelLength: 12, pedicelAngle: 20, petalTipShape: 2.0, petalCup: 0.2, petalTilt: 15 };
+  if (JSON.stringify(Object.entries(UMBEL_DEPTH2_DEFAULTS).sort()) !== JSON.stringify(Object.entries(RULED_D2).sort())) note(`${tag} the registry's UMBEL_DEPTH2_DEFAULTS ${JSON.stringify(UMBEL_DEPTH2_DEFAULTS)} is not Eva's ruled overlay ${JSON.stringify(RULED_D2)}`);
+  const settle = async (pg) => { await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await settleBuild(pg, 300000); };
+  const ids = Object.keys(RULED_D2);
+  const read = (pg) => pg.evaluate((list) => {
+    const o = Object.fromEntries(list.map((i) => [i, Number(document.getElementById(i).value)]));
+    const el = document.getElementById('umbelDepth'), w = el.closest('.bl-ctrl'), v = w && w.querySelector('.bl-val');
+    return { vals: o, depth: el.value, text: v ? v.textContent : '' };
+  }, ids);
+  const pick = async (pg, key) => { await pg.evaluate(() => { for (let d = document.getElementById('umbelDepth').closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) d.open = true; }); await pg.focus('#umbelDepth'); await pg.keyboard.press(key); await settle(pg); };
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  const run = async (pg, label) => {
+    const p = [];
+    let bad = await applyConfig(pg, [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '3' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    bad = await applyConfig(pg, [{ id: 'umbelDepth', value: '2' }], null, { settleMs: 300000 });
+    let r = await read(pg);
+    const loadWrote = ids.filter((i) => i !== 'umbelFlorets' && !near(r.vals[i], Number(DEFAULTS[i])));
+    if (bad.length || r.depth !== '2' || loadWrote.length) p.push(`a LOAD to depth 2 wrote the overlay (moved ${loadWrote.join(', ') || 'nothing'}; ${bad.join('; ')}) — only a hand switch may`);
+    bad = await applyConfig(pg, [{ id: 'umbelDepth', value: '1' }]);
+    await pick(pg, '2');
+    r = await read(pg);
+    if (r.depth !== '2') p.push(`the keyboard switch did not reach depth 2 (the select reads ${r.depth})`);
+    else {
+      const missed = ids.filter((i) => i !== 'umbelFlorets' && !near(r.vals[i], RULED_D2[i]));
+      if (missed.length) p.push(`the hand switch to depth 2 left ${missed.map((i) => `${i} ${r.vals[i]} (ruled ${RULED_D2[i]})`).join(', ')} — depth 2's defaults were not written`);
+      if (!near(r.vals.umbelFlorets, 3)) p.push(`the hand switch OVERWROTE the Florets this route set (3 -> ${r.vals.umbelFlorets}) — a control the visitor set is kept`);
+      if (!/DEPTH 2'S DEFAULTS written on the switch/.test(r.text) || !/KEPT as you set them: Florets 3\b/.test(r.text)) p.push(`the depth's read-out does not tell what was written and what was kept: ${JSON.stringify(r.text.slice(0, 260))}`);
+    }
+    await pick(pg, '1');
+    r = await read(pg);
+    const notBack = ids.filter((i) => i !== 'umbelFlorets' && !near(r.vals[i], Number(DEFAULTS[i])));
+    if (r.depth !== '1' || notBack.length || !near(r.vals.umbelFlorets, 3)) p.push(`the hand switch back to depth 1 did not restore the registry defaults (${notBack.map((i) => `${i} ${r.vals[i]}`).join(', ') || 'restored'}; Florets ${r.vals.umbelFlorets}, depth ${r.depth})`);
+    if (!/back to depth 1: the registry defaults restored/.test(r.text)) p.push(`the read-out does not tell the restore: ${JSON.stringify(r.text.slice(0, 200))}`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: a load to depth 2 writes nothing; a hand switch writes depth 2's ruled defaults, keeps the set Florets 3 and tells both; the switch back restores every registry default`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'depth 2\'s defaults');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const appSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the switch writes nothing', from: "window.addEventListener('change', onDepthSwitch, true);\n", to: '\n' },
+      { name: 'a set control is overwritten', from: '    if (sameSlider(inputs[id].value, from)) { inputs[id].value = String(to);', to: '    if (true) { inputs[id].value = String(to);' },
+      { name: 'a load writes the overlay', from: "  if (!e.isTrusted) { delete seedNotes.umbelDepth; return; }\n", to: '' },
+    ];
+    for (const m of MUTANTS) if (appSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (appSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: appSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -4748,6 +5078,8 @@ if (NEGATIVE_CONTROL) {
     const sawKeptStamens = fail.some((f) => /^\[stamens\] .*kept clause (is shown|names)/.test(f));
     const sawKeptStyle = fail.some((f) => /^\[style\] .*kept clause (is shown|names)/.test(f));
     const sawCap = fail.some((f) => /^\[stamens\] .*cap mark is absent/.test(f));
+    const sawTextureGrey = fail.some((f) => /^\[texture\] MUTANT \(the greying is never applied\).*infill choice is enabled/.test(f));
+    const sawTextureLine = fail.some((f) => /^\[texture\] MUTANT \(the texture line is never printed\).*TEXTURE line is absent while the builder reports a record/.test(f));
     const sawFlag = fail.some((f) => /^\[flag\]: .*FILAMENT AGAINST STYLE flag is absent while the owner reports a crossing/.test(f));
     /* ROUTE (w), THE STEM CHANNEL. It is REQUIRED here and not merely allowed:
        route (w)'s own biconditionals catch a line stuck on or off, but nothing
@@ -4845,14 +5177,24 @@ if (NEGATIVE_CONTROL) {
     /* ROUTE (an), THE BRAID'S STRANDS UNDER THE PICKER — one flag per mutant */
     const sawStrandList = fail.some((f) => /^\[strand picker\] MUTANT \(the picker lists no strands\).*the picker lists 0 strand/.test(f));
     const sawStrandBind = fail.some((f) => /^\[strand picker\] MUTANT \(every pick binds strand 1\).*picking strand 4 bound/.test(f));
-    if (sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    /* ROUTE (aq), THE MOPHEAD'S DEPTH — one flag per mutant */
+    const sawMopheadRays = fail.some((f) => /^\[mophead\] MUTANT \(the rays are shown at depth 1\).*ray controls are SHOWN/.test(f));
+    const sawMopheadClamp = fail.some((f) => /^\[mophead\] MUTANT \(the clamp is never told\).*does not say .* asked and .* built/.test(f));
+    const sawDepthWrites = fail.some((f) => /^\[depth defaults\] MUTANT \(the switch writes nothing\).*depth 2's defaults were not written/.test(f));
+    const sawDepthKeeps = fail.some((f) => /^\[depth defaults\] MUTANT \(a set control is overwritten\).*OVERWROTE the Florets/.test(f));
+    const sawDepthLoad = fail.some((f) => /^\[depth defaults\] MUTANT \(a load writes the overlay\).*a LOAD to depth 2 wrote the overlay/.test(f));
+    /* ROUTE (ap), THE UMBEL'S HEAD TOGGLE — one flag per mutant */
+    const sawUmbelLabel = fail.some((f) => /^\[umbel head\] MUTANT \(the label is never derived\).*it must say its controls shape the florets/.test(f));
+    const sawUmbelCount = fail.some((f) => /^\[umbel head\] MUTANT \(the head petal count shows with the head off\).*the head-only controls show/.test(f));
+    if (sawMopheadRays && sawMopheadClamp && sawDepthWrites && sawDepthKeeps && sawDepthLoad && sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-ONE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawTextureGrey && sawTextureLine
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-FOUR ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}, umbel head — the label never derived: ${sawUmbelLabel}, the petal count shown: ${sawUmbelCount}, mophead — the rays at depth 1: ${sawMopheadRays}, the clamp untold: ${sawMopheadClamp}, depth 2's defaults — never written: ${sawDepthWrites}, a set control overwritten: ${sawDepthKeeps}, a load writes: ${sawDepthLoad}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

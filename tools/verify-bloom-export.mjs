@@ -53,15 +53,15 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
+import { serveRepo, launchPage, openBloom, applyConfig, settleMsForRow, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          lobeAssertions, LOBE_SCOPE, lobeResultLine,
          fringeAssertions,
          thicknessAssertions, THICKNESS_SCOPE, apexNibAssertions, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE,
-         leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, tubeAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
+         leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, tubeAssertions, textureAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
-import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_XFAIL, SELF_INTERSECTION_TOLERANCE, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE, infloApproachAssertions } from './bloom-harness.mjs';
+import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_XFAIL, SELF_INTERSECTION_TOLERANCE, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE, infloApproachAssertions, rootTaperAssertions } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
@@ -124,7 +124,7 @@ for (const [rowIndex, row] of rows.entries()) {
   attempted.push(row.label);
   attemptedIdx.push({ index: rowIndex, label: row.label });
   await openBloom(page, port);   // fresh page per row — isolation by reload, not by a clear-list
-  const bad = await applyConfig(page, row.set);
+  const bad = await applyConfig(page, row.set, null, { settleMs: settleMsForRow(row.label) });
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
   const drift = await fullStateDrift(page, row.set);
   if (drift.length) { validity.push(`${row.label}: state is not DEFAULTS+set: ${drift.join('; ')}`); continue; }
@@ -264,6 +264,11 @@ for (const [rowIndex, row] of rows.entries()) {
      header. The fusion itself (TU2-TU6) is tools/verify-bloom-tube.mjs's. */
   const tu = await tubeAssertions(page, row);
   if (tu.length) { validity.push(`${row.label}: ${tu.join('; ')}`); continue; }
+  /* SURFACE TEXTURE (TX0-TX7) — both STL gates are blind to a relief that goes
+     inward, a bead left flat, a field sampled per organ, a lattice off the
+     surface and the exclusivity dropped; see textureAssertions()'s header. */
+  const tx = await textureAssertions(page, row);
+  if (tx.length) { validity.push(`${row.label}: ${tx.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z3). Both STL gates are structurally blind to the whole
      layer — measured on three worktrees before these assertions existed, not
      derived: the wrong role, a record that never reaches the blade, and the
@@ -301,7 +306,8 @@ for (const [rowIndex, row] of rows.entries()) {
   const ori = orientationAssertions(stlPos, row, await page.evaluate(() => {
     const m = window.__bloomMetrics(), S = m.stem;
     return {
-      sphere: m.sphereMode === true,
+      /* an UMBEL WITH ITS HEAD OFF builds no hub, so no SPHERE inner face */
+      sphere: m.sphereMode === true && m.headAbsent !== true,
       /* A SEPARATE INWARD SHELL NEEDS BOTH ENDS SHUT IN THE MESH, which is
          narrower than "the bore survives" and was corrected by measurement:
          O1 read `0 of 10 shells are wound INWARD` against a baseline of 1 on
@@ -343,6 +349,12 @@ for (const [rowIndex, row] of rows.entries()) {
     await page.evaluate(() => window.__bloomMetrics()),
     await page.evaluate(() => window.__bloomUIState()));
   if (chan.length) { validity.push(`${row.label}: ${chan.join('; ')}`); continue; }
+  /* T1/T2/T4/T5 — THE ROOT TAPER, read from THIS row's STL bytes (big petals,
+     Oct 21): the thickness at every root and on the untapered blade rows, the
+     hub against the thickest root, and the sepals left on the sheet. Both STL
+     gates are blind to a thickness by construction. See rootTaperAssertions(). */
+  const taper = rootTaperAssertions(stlPos, row, await page.evaluate(() => window.__bloomMetrics()), await page.evaluate(() => window.__bloomUIState()));
+  if (taper.length) { validity.push(`${row.label}: ${taper.join('; ')}`); continue; }
   /* ID10 (d) — THE FLORETS AGAINST EACH OTHER, read from THIS row's STL bytes
      (build 3, ruling 1): the internode floor is derived to clear it, and the
      file is the only thing that can say whether it did. */
@@ -385,7 +397,8 @@ for (const [rowIndex, row] of rows.entries()) {
      the tool's answer alone — a tool that forgot to skip would also forget
      to say `sphere`. And in the other direction: a row the app says is not a
      sphere may not be skipped as one. */
-  const isSphere = await page.evaluate(() => window.__bloomMetrics().sphereMode === true);
+  /* a headless umbel has no sphere to read (its florets are UM/ID's) */
+  const isSphere = await page.evaluate(() => window.__bloomMetrics().sphereMode === true && window.__bloomMetrics().headAbsent !== true);
   if (isSphere && (cov.r !== null || !cov.skipped || cov.sphere !== true)) { validity.push(`${row.label}: COVERAGE: a FULL-SPHERE row emitted a plan-coverage reading (${JSON.stringify(cov.r)}) — a plan raster reads a sphere as a FALSE CLEAN; SPHERE rows must be a labelled skip`); continue; }
   if (!isSphere && cov.sphere === true) { validity.push(`${row.label}: COVERAGE: the raster skipped this row as a sphere while the app reports sphereMode false`); continue; }
   if (cov.skipped && row.coverage) { validity.push(`${row.label}: this row ASSERTS coverage but the raster skipped it — ${cov.skipped}`); continue; }

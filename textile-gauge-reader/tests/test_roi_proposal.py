@@ -33,6 +33,7 @@ own natural local-contrast variation or missed the pin entirely (see
 _local_anomaly_fraction's docstring for specifics) -- so it's disclosed
 as open work, not tested here as if it were fixed.
 """
+import cv2
 import numpy as np
 import pytest
 
@@ -41,7 +42,9 @@ from analysis.gauge_analysis import (
     ROI_PROPOSAL_MAX_ANOMALY_FRACTION,
     ROI_PROPOSAL_MAX_OVERLAP_IOU,
     ROI_PROPOSAL_MIN_QUALITY,
+    ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING,
     _global_local_std_baseline,
+    _global_sharpness_baseline,
     _local_anomaly_fraction,
     _periodicity_consistency_score,
     _roi_iou,
@@ -372,3 +375,55 @@ def test_a_window_mostly_inside_the_ruler_is_gated_out():
     assert median is not None and median < 60.0  # sanity: baseline reflects fabric (~43), not the ruler (~107)
     ruler_crop = gray[1280:1280 + 200, 0:400]
     assert _local_anomaly_fraction(ruler_crop, median, mad) > ROI_PROPOSAL_MAX_ANOMALY_FRACTION
+
+
+# --- the sharpness ceiling is the photo's own ----------------------------------
+
+
+def test_sharpness_baseline_is_the_fabrics_level_and_a_ruler_cannot_move_it():
+    # The median over textured 16 px blocks: on a clean knit it reads the knit's
+    # own Laplacian variance, and a ruler band a sixth of the photo at twenty
+    # times that variance leaves it where it was (a mean would not).
+    clean = make_knit_image(height=1500, width=900)[:, :, 0]
+    with_ruler = make_knit_with_ruler_block(height=1500, width=900, ruler_y0=1250, ruler_height=250)[:, :, 0]
+    base_clean = _global_sharpness_baseline(clean)
+    base_ruler = _global_sharpness_baseline(with_ruler)
+    assert base_clean is not None and base_ruler is not None
+    window_var = float(cv2.Laplacian(clean[100:700, 100:700], cv2.CV_32F).var())
+    assert 0.8 < window_var / base_clean < 1.25, (base_clean, window_var)
+    assert abs(base_ruler / base_clean - 1.0) < 0.05, (base_clean, base_ruler)
+    ruler_var = float(cv2.Laplacian(with_ruler[1260:1460, 100:700], cv2.CV_32F).var())
+    assert ruler_var > 10 * base_ruler  # the band really is far sharper than the fabric
+
+
+def test_a_window_sharper_than_the_fabric_is_capped_and_a_softer_one_is_not():
+    img = make_knit_with_ruler_block(height=1500, width=900, ruler_y0=1250, ruler_height=250)[:, :, 0]
+    base = _global_sharpness_baseline(img)
+    clean = img[100:700, 100:700]
+    dipping = img[660:1260, 100:700]          # 10% ruler, 90% fabric
+    blurred = cv2.GaussianBlur(clean, (0, 0), 1.5)
+    _, p_clean = _roi_quality_score(clean, sharpness_ceiling=base)
+    _, p_dip = _roi_quality_score(dipping, sharpness_ceiling=base)
+    _, p_blur = _roi_quality_score(blurred, sharpness_ceiling=base)
+    assert p_clean["sharpness"] > 0.9
+    assert p_dip["sharpness"] == 1.0           # capped: sharper than fabric is not better fabric
+    assert p_blur["sharpness"] < 0.5           # softer than the fabric around it still reads low
+    # Under the fixed fallback ceiling the SAME clean window reads well under 1.0 at this
+    # (noise-free, downsampled-like) scale while the dipping one saturates -- the ranking
+    # inversion the ruler-band test caught, kept here as the must-fail of the fix.
+    _, f_clean = _roi_quality_score(clean)
+    _, f_dip = _roi_quality_score(dipping)
+    assert f_dip["sharpness"] == 1.0
+    assert f_clean["sharpness"] < 1.0 or cv2.Laplacian(clean, cv2.CV_32F).var() >= ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING
+
+
+def test_the_fallback_ceiling_is_reached_only_without_a_baseline():
+    crop = make_knit_image(height=300, width=300)[:, :, 0]
+    raw = float(cv2.Laplacian(crop, cv2.CV_32F).var())
+    _, p_default = _roi_quality_score(crop)
+    _, p_none = _roi_quality_score(crop, sharpness_ceiling=None)
+    _, p_zero = _roi_quality_score(crop, sharpness_ceiling=0.0)
+    expected = min(1.0, raw / ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING)
+    assert p_default["sharpness"] == p_none["sharpness"] == p_zero["sharpness"] == pytest.approx(expected)
+    _, p_own = _roi_quality_score(crop, sharpness_ceiling=raw)
+    assert p_own["sharpness"] == pytest.approx(1.0)

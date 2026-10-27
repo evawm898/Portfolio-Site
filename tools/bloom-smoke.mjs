@@ -1021,6 +1021,8 @@ export const SMOKE_BLOCKS = [
         path: "MUST FIX 2's row — the live sinus 0.144 mm and the export one 0.908 against the 0.50 mm bead bar; the notch decision reads both modes, so tris(live) === tris(export) here, which both STL gates assert" },
       { label: 'TUBE: k 0 x tilt 105 (the ring folds as the petal does past a right angle)',
         path: "a DECLARED fold — X1 holds it to 318 pairs / 0.3800 mm in both directions" },
+      { label: 'TUBE: 12 petals x k 6 (6 panels)',
+        path: "FC2 on a CAPPED foot: at 12 petals the cap binds (6.40 asked, 5.67 mm of arc) and every petal is a slit's edge petal whose open half is blended onto the ring curve, so a cap ON the arc puts two neighbours' margins and the tube's column on one double — the clause reads the exported file's own float32s and requires no two parts to carry one position (the foot-clearance ruling, Oct 22); X2 holds the row at 0 pairs" },
       { label: 'TUBE: GATED — the buckle (unavailable, inert)',
         path: "TU0's other arm — a ring asked where the ruling makes it unavailable: the geometry reports unavailable, no ring is built" },
     ],
@@ -1381,7 +1383,7 @@ export const SMOKE_BLOCKS = [
       { label: "SEPAL SIZE: 120 x 5 mm asked UP at 40 — the limit drawn with the root exclusion in MILLIMETRES (pinned at or under 22; a fraction of the sepal's length read +24 here)",
         path: "SP8's pin: the drawn limit on a long sepal at or under 22 degrees, and the harness's own contact test — its trial sepal keeping every blade row from the restated mm exclusion outward — finding the built angle clear and the step above clipping" },
       { label: "SEPAL SIZE: width max (30 mm — wider than the petal; the foot follows the width ratio and clamps at its ceiling, told)",
-        path: "SP3's width-ratio arm with the foot ceiling binding (clamped, told), SP5b's flat-blade EXACT width (a sepal wider than its petal, the length still the petal's x size)" },
+        path: "SP3's width-ratio arm with the foot cap binding (the arc each sepal foot owns at its ring — clamped, told), SP5b's flat-blade EXACT width (a sepal wider than its petal, the length still the petal's x size)" },
       { label: "SEPAL SIZE: under the floors (2 mm long, 1 mm wide asked — FLOORED at 5 x 3, told)",
         path: "SP5's floored arm (both flags, the floored sizes in the record and on the emitted blade)" },
       { label: "SEPAL SIZE: GATED — count 0 with both set (hidden and inert; bit-identical to the default)",
@@ -1739,6 +1741,211 @@ export const SMOKE_BLOCKS = [
         path: "JS9 the gather from roots on the dome onto the axis at the apex, JS1/JS3 the roots through the slab on the cap's normal" },
       { label: 'BRAID STRANDS: strand 4 laid wider (+1.5 mm) and strand 6 with 2 more turns',
         path: "JS9 per strand from the row's own @scopes (the strand's radius and turns restated, clamped to the registry's bounds), JS4 the strand's own station count" },
+    ],
+  },  {
+    n: 75, title: 'big petals (Oct 21)',
+    anchor: 'BIG PETALS: 60 mm (root x1.750 the sheet, 2.10 mm)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branch this block adds is the
+       ROOT TAPER — `petalRootTaper`'s factor in `thicknessProfile` (the law's
+       second factor beside the tip thinning), read by the seam, the fold
+       clamp, the roll floor and the fold limit, and the HUB following the
+       longest blade. The anchor is the block's 60 mm row; the subset adds the
+       100 mm petal, the cupped and curled blades, the stem (the join's floor
+       is the thickened hub), the sepals (pinned off) and the size field (the
+       hub's bound). --conn is REQUIRED (a thicker root and a thicker hub are a
+       new junction overlap). */
+    conn: true,
+    rows: [
+      { label: 'BIG PETALS: 100 mm (root x3.236, 3.88 mm — the 15 cm bloom at tilt 25)',
+        path: "T0 the record restated through the other integrator (the factor and the taper's end), T1 the ROOT read off the file, T2 the untapered blade rows at their own stations, T3 the hub against the thickest root, J4 the hub restated, A7 the seam on half the root" },
+      { label: 'BIG PETALS: 100 mm x cup 1.2 (the fold clamp reads each row\'s own thickness)',
+        path: "T1/T2 on a cupped blade (the locators on the cupped mid-surface), the roll and cup floors against the root, X1/X2 the census" },
+      { label: 'BIG PETALS: 100 mm x curl 360 (the fold limit at each substep\'s own thickness)',
+        path: "C5 the fold limit's half sheet at each substep's own station under the taper, restated; C1 the spine on the drawn length" },
+      { label: 'BIG PETALS: 100 mm x stem 60 x 6 (the join floor is the thickened hub)',
+        path: "ST4/ST5 the stem rooted through the THICKENED hub and the join floored at it, T3 the hub, J4 the hub restated" },
+      { label: 'BIG PETALS: 100 mm x 8 sepals (each sepal its own 60 mm root — root support lifted the pin)',
+        path: "T4 every sepal's root read off the file at the law of its own 60 mm length (root support lifted the pin), SP-family attachment on the thicker plate" },
+      { label: 'BIG PETALS: 60 mm x size variance 0.5 (the hub reads the largest factor)',
+        path: "T0 per ring on the size field's own factor, J4 the hub at the restated bound (petalLength x (1 + amount)), T3 the hub at least as thick as every root in the file" },
+      { label: 'BIG PETALS: GATED — 35 mm x sheet 2.40 x tip thinning 0.5 (at the reference the law is the identity)',
+        path: "T0 the branch identity (no ring declares a taper at the reference), J4 the hub the sheet to the bit" },
+    ],
+  },  {
+    n: 76, title: 'root support (Oct 21)',
+    anchor: 'ROOT SUPPORT: 8 sepals x 60 mm (root x1.750 at the sepal\'s own length)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       root law on the SEPAL (the pin lifted; the hub held to the longest sepal
+       root, the descriptor's foot height on the thickened root), on the LEAF
+       blade (simple, lobed, every compound leaflet at its own length) with the
+       petiole carrying the root, and the DERIVED FOOT CAP (the arc each foot
+       owns at its ring). The subset adds the 120 mm sepal on a stem (the join
+       goes inert — the rim fallback), two tiers at their own length, the
+       simple leaf on a 6 and a 3 mm stem (the petiole capped), the compound
+       leaf with long and default leaflets, and the cap binding at 40 petals.
+       --conn is REQUIRED (a thicker sepal root, a thicker petiole and a capped
+       foot are each a junction overlap of their own). */
+    conn: true,
+    rows: [
+      { label: 'ROOT SUPPORT: 8 sepals x 120 mm x stem 60 (the join goes inert — the sepals stand on the rim)',
+        path: "T4 the sepal's root off the file at the law of its own 120 mm length, T3 the hub carrying the sepal root, SP3 the attachment's rim fallback with the thicker foot, ST5 the join inert against the thickened plate" },
+      { label: 'ROOT SUPPORT: 2 sepal tiers x 60 mm x stem 120 x 12 (each tier its own length)',
+        path: "T4 per tier at the tier's own restated length, SP10-SP13 the tiers down the join, SP3 each tier's foot at its own root" },
+      { label: 'ROOT SUPPORT: simple leaf 120 mm x stem 60 (the petiole carries the root)',
+        path: "T5 the blade's untapered rows off the file at its own 120 mm length, T6 the petiole's ring off the file (CLAMPED at the stem, told), LF18 the root-floored petiole restated, ST9 the rod named at its real radius" },
+      { label: 'ROOT SUPPORT: simple leaf 120 mm x stem 60 x 3 mm (the stem caps the petiole — told)',
+        path: "T6 the petiole at the stem's own cap, LF18 the clamp told, LF4 the inset on the arch-free blade" },
+      { label: 'ROOT SUPPORT: COMPOUND 120 mm rachis x 60 mm leaflets (each leaflet its own length)',
+        path: "T5 every leaflet at its OWN length (never the rachis's), LF17 the rachis taper unchanged, LF18 the stalks the wire" },
+      { label: 'ROOT SUPPORT: COMPOUND 120 mm rachis x the default leaflets (the rachis is not the leaflet)',
+        path: "T5 entered on the rachis past the reference, every leaflet read at the sheet (the identity)" },
+      { label: 'ROOT SUPPORT: width 46 x 40 petals',
+        path: "FC1 the foot cap restated from the ring's radius x 2 pi / n and the asked foot, the told flag both ways, the emitted foot rows at the capped width; Z3 the ring's foot restated through the cap; J4 the floors" },
+    ],
+  },
+  {
+    n: 77, title: 'surface texture T3 (Oct 22)',
+    anchor: 'TEXTURE: PEBBLE at the shipped height (0.4 mm) and size (4 mm)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       lattice (sub-rows and sub-columns through the organ's own surface),
+       the outward relief on both skins and over the bead, the shared
+       world-space field on every sheet (petal, sepal, leaf, a floret), the
+       refusals (the LOBED leaf, the infill — BOTH ON), and the choice guard.
+       The subset adds the other pattern at the height ceiling (the bead
+       close-up the clearance tool measures), the whole bloom (three organs
+       under one field, the hub / stem / rods untextured), the tube (the ring
+       untextured beside textured lobes), BOTH ON and the GATED holder.
+       --conn is REQUIRED (a relieved bead is a junction overlap of its own on
+       every petal, and the tube's untextured ring meets textured lobes). */
+    conn: true,
+    rows: [
+      { label: 'TEXTURE: CELLULAR x textureHeight max (1.5)',
+        path: 'TX1 the relief at the height ceiling outward on both skins, TX2 the Worley field restated at the builder\'s samples, TX5 the bead relieved along its own w, TX4 the petal lattice under the 1.25x bar, T1/T2 the file in [w, w + 2H]' },
+      { label: 'TEXTURE: the WHOLE BLOOM — 8 sepals, a stem, a simple leaf (the hub and stem textured since T5, the rods smooth)',
+        path: 'TX2 one world field on petal, sepal and leaf samples, TX4 per organ against its own untextured twin, TX7 the three organs\' lattice counts engine-agreed, T4/T5 the sepal and leaf files in the band, ST9 the stem untextured' },
+      { label: 'TEXTURE: PEBBLE x the TUBE (6 of 8 fused — the lobes and, since T5, the ring textured)',
+        path: 'TX4 the textured lobes against the twin, TU0/TU1 the ring built untextured beside them, TX8 the representative lobe on its surface' },
+      { label: 'TEXTURE: BOTH ON — the VORONOI infill wins, the texture is REFUSED and told (Q9)',
+        path: 'TX6 refused with the word infill, nothing displaced, the read-out NOT BUILT; I0-I13 the infill built as before' },
+      { label: 'TEXTURE: GATED — the two sliders at their maxima under NONE (the choice guard holds the bytes)',
+        path: 'TX0 the two statements under the guard, no record; the byte partition holds the row' },
+      /* THE LOBED LEAF IS A SMOKE ROW BECAUSE THE EDGE GATE DRAWS FROM THIS LIST:
+         its E2_TURN_XFAIL entry (the untextured lobed leaf's own turn) is a
+         declaration nothing evaluates unless the row is here — the plain
+         gate said so, in the local preflight, before CI could. */
+      { label: 'TEXTURE: PEBBLE x a LOBED leaf (the blade declared OUT — refused, told)',
+        path: 'TX0 the leaf refused by name (lobed) and told, the petals relieved beside it; E2 the untextured lobed leaf\'s own declared turn, LF19-LF24 the chevron lattice unmoved' },
+    ],
+  },
+  {
+    n: 78, title: 'the umbel (Oct 22)',
+    anchor: 'UMBEL: 2 florets, head OFF',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       UMBEL arm of the inflorescence plan (one node, N evenly spread pedicels
+       through the whorl primitive), the derived JUNCTION KNOT the pedicels root
+       in, and the HEAD TOGGLE (OFF builds no head and the stem ends at the
+       knot; ON keeps the head and roots the umbel below it by the reach law).
+       The subset covers the count's two ends, both head states, the angle's
+       two extremes (90: every pedicel parallel, the ring's one-gap spacing is
+       what keeps them apart; -60: descending onto the stem), the sessile
+       floret on the knot, the spider lily, and the GATED umbel controls under
+       a raceme. --conn is REQUIRED: the knot is the only join here, and every
+       pedicel reaching it is the connectedness claim. */
+    conn: true,
+    rows: [
+      { label: 'UMBEL: 2 florets, head OFF',
+        path: "UM1 the knot restated from two pedicels (the area rule's own 4.24 mm, the ring one gap apart), UM2 both roots in the emitted knot at 0 and 180 deg, UM3 the knot on the stem's emitted top end, UM4 the florist's cut on the stem's FREE end with the knot clear of it, UM0 no head emitted" },
+      { label: 'UMBEL: 12 florets, head ON',
+        path: "UM1 the knot at twelve floored pedicels, UM2 twelve roots at 30 deg, UM3 the knot on the stem below the head and the florets one gap under its floor, UM0 the head built, ID1 the knot's triangles in the tally, ID9 (e) the umbel's node at the reach law's depth" },
+      { label: 'UMBEL: 12 florets at 90 deg, head OFF (twelve parallel pedicels, one gap apart)',
+        path: "UM2 twelve parallel pedicels rooted on the one-gap ring, ID10 (d) the florets of one node measured and declared, ST9 every pedicel excused by name" },
+      { label: 'UMBEL: 6 florets at -60 deg, head ON',
+        path: "UM2 descending pedicels rooted in the knot, UM3 the knot on the stem under the head, ID10 (d) florets against the stem" },
+      { label: 'UMBEL: SESSILE — pedicel 0 (the florets\' hubs on the knot)',
+        path: "UM2 every sessile floret's rooted point inside the knot, ID2 the crossing null where every node is sessile" },
+      { label: 'UMBEL: THE SPIDER LILY — 6 florets, head OFF, recurved narrow petals, buckled margin, long upturned stamens',
+        path: "UM0 the head's stamens not emitted (the florets carry them), UM1/UM2 the knot and the six roots, JS4 the head emits no stamen, X1/X2 the census on recurved buckled florets" },
+      { label: 'UMBEL: x leaves (the stem\'s OWN node law — the shared node is the raceme\'s)',
+        path: "LF0/SN0 the leaves on the stem's own node law under an umbel (the shared node is the raceme's), UM3 the knot above them" },
+      { label: 'UMBEL: GATED — the umbel controls at their extremes under a RACEME (hidden AND inert)',
+        path: "UM0 the head's two statements on a raceme (the head present), ID1 the raceme's nodes untouched by the umbel's count" },
+    ],
+  },
+  {
+    n: 79, title: 'the texture edge cap (Oct 23)',
+    anchor: 'TEXTURE CAP: PEBBLE x 40 petals x 3 whorls (1,542,832 tris at 0.40 mm — the edge coarsens to the finest rung that fits)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       budget-derived lattice edge (the bisection between the ruled 0.4 and the
+       0.5 cap on real trial builds) and the refusal past the cap. The anchor
+       is the corner the ruling is about (lands on 0.41); the subset adds the
+       state even 0.5 cannot hold (the declared refusal — XR1 and TX9 on it).
+       --conn is REQUIRED for the anchor: a 1.48 M-triangle textured head is
+       the heaviest junction the flood fill reads. */
+    conn: true,
+    rows: [
+      { label: 'TEXTURE CAP: past 0.50 mm — 40 x 3 x 40 sepals x 4 tiers x whorled leaves on a 120 mm stem (REFUSED at the cap, told)',
+        path: "TX9 the build standing at the cap with fits false against the builder's tally, the read-out saying DOES NOT FIT, XR1 the declared refusal at its count" },
+    ],
+  },
+  {
+    n: 80, title: 'surface texture T5 — the hub, the stem and the tube ring (Oct 23)',
+    anchor: 'TEXTURE T5: PEBBLE x a 60 mm stem (the hub top, the stem wall, the florist\'s cut)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       organ lattice (strip quads, re-meshed centre fans, rows), the export
+       decision twin (a thin sheet live), the tube ring refined in its own
+       coordinates, and the escape-ray visibility with its geodesic fade. The
+       anchor is the shipped stem under the shipped hub; the subset adds the
+       sphere (its cavity), the closed tube, the thin sheet and the noded stem.
+       --conn is REQUIRED: the relief must not open a gap where the hub meets
+       the stem (the buried faces stay put — TX11 — and the voxel fill is the
+       witness that the union still reads one piece). */
+    conn: true,
+    rows: [
+      { label: 'TEXTURE T5: PEBBLE x the SPHERE head x a stem (its cavity untouched)',
+        path: "TX10 the sphere hub's lattice with its inner sphere left as shipped, TX11 the cavity and the stem's root enclosed and unmoved" },
+      { label: 'TEXTURE T5: PEBBLE x a closed tube (6 petals, k 0 — the ring refined in its own coordinates)',
+        path: "TX10 the ring's own lattice and its own law's normals, TX11 the ring under the petals buried, TX2 the one field on the ring" },
+      { label: 'TEXTURE T5: PEBBLE x sheetThickness 0.60 x a stem (the counts decided on the export twin)',
+        path: "TX10 the floor taken on the export twin, TX7 the counts live = export, TX11 visibility on the thin hub" },
+      { label: "TEXTURE T5: PEBBLE x a noded stem (the flower's 0.48 on 100 x 6 mm, three leaves)",
+        path: "TX10 the noded wall's radial normal from its own axis, TX11 the petiole roots buried, ST9 the petioles excused by name" },
+      /* Eva's rulings of Oct 25 (the T5 follow-ups): the hub top under the
+         petal feet stays smooth (TX12), the fade width is derived (TX13), and
+         floret hubs are relieved in the WORLD frame, one shared layer (TX14) */
+      { label: 'TEXTURE T5: PEBBLE x a dome (headRise 0.5) x a stem',
+        path: "TX12 the cap under the feet covered and unmoved, TX13 the fade width derived from the height and the edge" },
+      { label: "TEXTURE T5: PEBBLE x an UMBEL, head ON (the florets' hubs textured, their pedicels smooth)",
+        path: "TX14 six floret hubs sampling the one world field (no two the same copy), TX12 each floret hub under its own feet covered" },
+    ],
+  },
+  {
+    n: 81, title: 'the mophead — a compound umbel, depth 2 (Oct 24)',
+    anchor: 'MOPHEAD: 2 rays x depth 2\'s ruled defaults (12 round four-petal florets a sub-umbel at the floor)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       compound arm of the inflorescence plan (rays rooted on the main boss,
+       each ending in a headless SUB-UMBEL built once and appended per ray),
+       the depth-2 floret's FLOOR (derived from the body criterion), the
+       REDUCED LATTICE (6 columns, a 2-segment bead) by branch on those florets
+       alone, and the BUDGET CLAMP (florets a ray reduced from one floret's
+       exact cost). The anchor is two rays (the count's low end); the subset adds the
+       dome at the floor, the clamp corner (asked past the budget, built under it), the head ON (the head on the full lattice beside the
+       reduced florets) and the GATED depth control under a depth-1 umbel.
+       --conn is REQUIRED: every floret roots on a sub-boss on a ray on the
+       main boss, and the voxel fill reads all of it — though UM8 is the
+       rooting's own witness (the flood fill cannot see a floret rooted in
+       nothing when the florets touch each other). */
+    conn: true,
+    rows: [
+      { label: 'MOPHEAD: THE CLAMP CORNER — 12 x 12 florets x 12 petals at 0.60x (asked 3.1 M tris, clamped to the budget, told)',
+        path: "UM7 asked 144 florets against the clamp's built count, the bloom's own triangles the record's exact prediction under the budget, the floret priced off the emitted unit, no larger count a ray would have fit; UM6 the reduced lattice on twelve-petal florets; UM8 every built floret rooted in its sub-boss" },
+      { label: 'MOPHEAD: THE MOPHEAD — 12 rays x 12 round four-petal florets at the FLORET FLOOR, 12 mm pedicels at 20 deg',
+        path: "UM6 the reduced lattice read off the emitted rim of a round four-petal floret at the floor, UM8 144 floret roots each inside its own sub-boss and twelve sub-bosses on their rays, UM9 the floored size restated, UM7 the build under the budget unclamped" },
+      { label: 'MOPHEAD: 2 rays x depth 2\'s ruled defaults (12 round four-petal florets a sub-umbel at the floor)',
+        path: "UM1 the main boss restated on two rays at their own angle, UM5 the depth's two statements and the ray's headless depth-1 sub-umbel, UM8 two sub-bosses on their rays and twelve roots, UM9 the floor restated from a probe floret's emitted rows, ID1/ID6/ID7 the rays read as the outer pedicels, ID4 the second level's floret identity" },
+      { label: 'MOPHEAD: x the head ON (the boss on the stem below it, the reach inset)',
+        path: "UM6 the head's petals on the full 10-column, 4-segment lattice while the florets carry 6 / 2, UM0 the head built, UM3 the main boss under the head" },
+      { label: 'MOPHEAD: GATED — the depth and the rays at their extremes under depth 1 (hidden AND inert)',
+        path: "UM5 the registry and the geometry agree the umbel is NOT compound, and the head petals on the full lattice" },
     ],
   },
 ];

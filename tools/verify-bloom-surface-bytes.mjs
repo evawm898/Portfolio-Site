@@ -182,6 +182,63 @@ function stateOf(row) {
 
 const ONLY = argOf('--only') ? new RegExp(argOf('--only')) : null;
 const MATRIX = harness.buildMatrix();
+/* THE ROW-DEFINITION GUARD (big petals, Oct 21 — `verify-bloom-seam-bytes`'s
+   ROW_DEF_MOVED_BY_CHANGE, ported). This tool builds BOTH trees from THIS
+   tree's rows, so a row whose definition moved between the trees is compared
+   on one state and the redefinition itself is invisible to the partition.
+   For a predicate that declares redefinitions, the BASE tree's own matrix is
+   loaded and compared row by row (label, set, capability): an undeclared
+   difference REFUSES, a declared one that did not happen REFUSES, and rows
+   past the base's length are the declared ADDED count. Keyed on THIS tree's
+   label. */
+const ROW_DEF_MOVED_BY_PRED = {
+  /* SURFACE TEXTURE (T3, Oct 22): block 77's nineteen rows; no base row is
+     redefined — the choice guard keeps every slider sweep where it was. */
+  'texture': { added: 19, rows: {} },
+  /* THE TEXTURE EDGE CAP (Oct 23): block 79's three rows; no base row is
+     redefined. */
+  'texture-edge-cap': { added: 3, rows: {} },
+  /* SURFACE TEXTURE T5 (Oct 23): block 80's thirteen rows; two block-77
+     labels are RELABELLED with their sets unchanged — they said the hub, stem
+     and ring stayed out, which T5 ends. */
+  't5-organs': {
+    added: 13,
+    rows: {
+      'TEXTURE: the WHOLE BLOOM — 8 sepals, a stem, a simple leaf (the hub and stem textured since T5, the rods smooth)': 'relabelled, the same set: the base label said the hub, stem and rods stayed out (T5 textures the hub and the stem)',
+      'TEXTURE: PEBBLE x the TUBE (6 of 8 fused — the lobes and, since T5, the ring textured)': 'relabelled, the same set: the base label said the ring stayed out (T5 textures it)',
+    },
+  },
+  'root-support': {
+    added: 21,
+    rows: {
+      "BIG PETALS: 100 mm x 8 sepals (each sepal its own 60 mm root — root support lifted the pin)": "relabelled, the same set: the base row's label said the sepals were pinned off, which root support lifts",
+    },
+  },
+  'root-taper': {
+    added: 28,
+    rows: {
+      'petalLength max (100)': "block 1 sweeps every SWEEPABLE slider to its own max; the base calls it `petalLength max (60)`",
+      'petalWidth max (46)': "the same row for the width range (Eva's ruling 2); the base calls it `petalWidth max (30)`",
+      'ALL MAX': 'one label, two states — it carries every slider max, so both ranges move it',
+    },
+  },
+};
+if (MOVERS_PRED && ROW_DEF_MOVED_BY_PRED[MOVERS_PRED] && !MERGE) {
+  const decl = ROW_DEF_MOVED_BY_PRED[MOVERS_PRED];
+  const baseHarness = await load(BASE, 'tools/bloom-harness.mjs');
+  const rowsB = baseHarness.buildMatrix();
+  const sigOf = (r) => JSON.stringify([r.label, (r.set || []).map((w) => [w.id, String(w.value)]), r.capability || null]);
+  const why = [], seen = new Set();
+  if (MATRIX.length - rowsB.length !== decl.added) why.push(`the matrix grew by ${MATRIX.length - rowsB.length} rows, declared ${decl.added}`);
+  for (let i = 0; i < Math.min(rowsB.length, MATRIX.length); i++) {
+    if (sigOf(MATRIX[i]) === sigOf(rowsB[i])) continue;
+    if (MATRIX[i].label in decl.rows) seen.add(MATRIX[i].label);
+    else why.push(`UNDECLARED ROW REDEFINITION at row ${i}: "${rowsB[i].label}" on the base is "${MATRIX[i].label}" here (or carries a different set)`);
+  }
+  for (const l of Object.keys(decl.rows)) if (!seen.has(l)) why.push(`DECLARED REDEFINITION THAT DID NOT HAPPEN: "${l}" is identical on both trees or absent`);
+  if (why.length) { console.error(`REFUSED (row definitions): ${why.join('; ')}`); process.exit(1); }
+  console.log(`row defs      : ${seen.size} declared redefinitions confirmed against the base matrix (${[...seen].join(' · ')}); ${decl.added} rows added`);
+}
 const [RFROM, RTO] = RANGE ? RANGE.split(':').map(Number) : [0, MATRIX.length];
 /* `--from K` starts at the K-th selected row (0-based), so a full-matrix run
    can be closed out in foreground chunks of `--from K --rows N` without a
@@ -239,6 +296,52 @@ function foldMoverOnBase(st, row) {
   return false;
 }
 const PREDICATE_MOVERS = {
+  /* SURFACE TEXTURE (T3, Oct 22). A row moves iff its texture choice is not
+     NONE and the infill is NONE (with the infill on the texture is REFUSED
+     and nothing moves — Q9); written from the CONTROLS, the choice guard's own
+     sentence, never from either tree's `textureIsAbsent`. The GATED row (the
+     sliders moved under NONE) and BOTH ON must HOLD. A textured row whose
+     only sheets are LOBED leaves would hold too; no such row exists. */
+  'texture': (st) => String(st.petalTexture ?? 'NONE') !== 'NONE' && String(st.petalInfill ?? 'NONE') === 'NONE',
+  /* THE TEXTURE EDGE CAP (Eva, Oct 23). A row moves iff the BASE tree's own
+     textured build (texture on, infill off) exceeds EXPORT_TRI_BUDGET at the
+     ruled 0.4 mm edge — read off the base builder's tally, never this tree's
+     cap record (the quantity under test). Every textured row under the budget
+     holds by branch (the first trial IS the old build, into the caller's own
+     accumulator); every untextured row holds untouched. On this tree no base
+     row trips it — the three capped rows are ADDED. */
+  'texture-edge-cap': (st, row) => {
+    if (String(st.petalTexture ?? 'NONE') === 'NONE' || String(st.petalInfill ?? 'NONE') !== 'NONE') return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    base.buildBloomInto(acc, { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
+    return acc.triangleCount > base.EXPORT_TRI_BUDGET;
+  },
+  /* SURFACE TEXTURE T5 (Oct 23). A row moves iff it is textured (texture on,
+     infill off — with the infill on the texture is refused, Q9) AND the BASE
+     tree's own build of it has an organ T5 relieves: a hub (any head not
+     switched off), a stem, a tube ring, or a floret (every floret carries a
+     hub). Read off the base builder's record, never this tree's organ records
+     (the quantity under test). Every untextured row holds by branch. */
+  't5-organs': (st, row) => {
+    if (String(st.petalTexture ?? 'NONE') === 'NONE' || String(st.petalInfill ?? 'NONE') !== 'NONE') return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
+    return !!((b.hubBuilt && !b.hubBuilt.absent) || (b.stem && b.stem.present) || (b.tube && b.tube.rings && b.tube.rings.length) || (b.inflorescence && b.inflorescence.present));
+  },
+  /* THE T5 RULINGS (Eva, Oct 25): coverage (the hub top under the feet smooth),
+     the derived fade width and the floret hubs in the world frame all act on
+     RELIEVED organ vertices and on nothing else. A row moves iff it is
+     textured (texture on, infill off) AND the BASE tree's own build relieved
+     some organ vertex (an organ record with `displaced > 0`) — read off the
+     base builder's record, never this tree's (the quantity under test). Every
+     untextured row holds by branch; the shipping default is untextured. */
+  't5-rulings': (st, row) => {
+    if (String(st.petalTexture ?? 'NONE') === 'NONE' || String(st.petalInfill ?? 'NONE') !== 'NONE') return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
+    const O = (b.texture && b.texture.organs) || {};
+    return ['hub', 'stem', 'tube'].some((k) => O[k] && O[k].displaced > 0) || !!(b.inflorescence && b.inflorescence.present);
+  },
   /* RULING 6 — NODES DECOUPLED FROM LEAVES (stem session 2). A row moves iff
      it asks for nodes on a BARE stem: a stem, a prominence away from 0, no
      raceme, and no leaves. Written from the CONTROLS — the ruling's own
@@ -395,6 +498,58 @@ const PREDICATE_MOVERS = {
      row — a strand record on an INDEPENDENT coil among them — and the GATED
      rows (radius 0, the braid under SPHERE, count 0) must hold to the bit in
      both modes: that is "NONE and INDEPENDENT byte-identical", measured. */
+  /* THE UMBEL (the umbel session). A row moves iff the BASE tree builds a
+     STEM on it (its own `stemPlan` record — the rachis an umbel needs) AND the
+     row asks for an UMBEL. The base tree has no UMBEL value: `baseState` hands
+     it the choice's default (NONE), so the umbel half is read off the
+     CONTROLS. Every other row — every NONE and every RACEME, the GATED rows
+     carrying the umbel's two controls at their extremes under NONE and under
+     a RACEME among them — must hold to the bit in both modes: that is
+     "UMBEL is a new choice value, so every existing row holds BY BRANCH",
+     measured. */
+  'umbel': (st) => {
+    if (String(st.inflorescence) !== 'UMBEL') return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    const fr = base.footRing(bs, acc);
+    return !!(fr.hub && base.stemPlan(bs, fr.hub, acc).present);
+  },
+  /* THE UMBEL BOSS (Eva's ruling, Oct 23 — the junction knot becomes a
+     flatter boss). A row moves iff the BASE tree BUILDS AN UMBEL on it: its
+     own `inflorescencePlan` record says umbel, on a stem its own `stemPlan`
+     builds. Read off the base's record, never the label; every other row —
+     every NONE, every RACEME, the GATED umbel rows with no stem — must hold to
+     the bit in both modes, because only the junction's emitter changed. */
+  'umbel-boss': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    if (base.umbelIsAbsent(bs)) return false;
+    const fr = base.footRing(bs, acc);
+    const sp = fr.hub && base.stemPlan(bs, fr.hub, acc);
+    if (!(sp && sp.present)) return false;
+    const P = base.inflorescencePlan(bs, sp, acc);
+    return !!(P && P.present && P.umbel);
+  },
+  /* THE MOPHEAD (Oct 24 — the compound umbel, depth 2). A row moves iff the
+     BASE tree BUILDS AN UMBEL on it (its own `inflorescencePlan` record says
+     umbel, on a stem its own `stemPlan` builds) AND the row asks umbelDepth 2.
+     The base tree has no depth control (`baseState` hands it the default), so
+     the depth half is read off the CONTROLS. Every other row — every depth-1
+     umbel, every RACEME, every NONE, the GATED rows carrying the depth and the
+     rays at their extremes under depth 1, a RACEME and NONE — must hold to the
+     bit in both modes: "the reduced lattice and the compound arm apply BY
+     BRANCH only to a depth-2 umbel", measured. */
+  'mophead': (st) => {
+    if (String(st.umbelDepth ?? '1') !== '2') return false;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    if (base.umbelIsAbsent(bs)) return false;
+    const fr = base.footRing(bs, acc);
+    const sp = fr.hub && base.stemPlan(bs, fr.hub, acc);
+    if (!(sp && sp.present)) return false;
+    const P = base.inflorescencePlan(bs, sp, acc);
+    return !!(P && P.present && P.umbel);
+  },
   'stamen-braid': (st) => {
     if (String(st.stamenCoil) !== 'BRAIDED' || !(Number(st.stamenCoilRadius) > 0)) return false;
     const fr = base.footRing(baseState(st), new base.MeshBuilder({ exportMode: true }));
@@ -510,6 +665,173 @@ const PREDICATE_MOVERS = {
     const snap = (v, L) => { const slack = (8 * Math.abs(L) * Number.EPSILON) / G; const t = v / G, n = Math.floor(t); return (t - n >= 0.5 - slack ? n + 1 : n) * G; };
     return (b.petalsAll || []).some((p) => p && p.infill && !p.infill.refused && p.infill.cells > 0
       && p.infill.mSplit >= 0 && p.profileU && (() => { const x = p.profileU[p.infill.mSplit] * p.length; return Number.isFinite(x) && !Object.is(snap(x, p.length), x); })());
+  },
+  /* BIG PETALS (Oct 21, docs/bloom-big-petals-outcome.md) — THE ROOT TAPER.
+     PREDECLARED FROM THE BASE TREE'S OWN RECORD: a row moves iff the BASE
+     builds a petal whose ASKED length (its own `askedLength`, the length the
+     law reads) passes the 35 mm reference, or a raceme whose floret asks for
+     one (head length x floretScale), or the HUB's bound passes it — the
+     longest petal the bloom can build, scopes and the size field included,
+     which this tree's `hubRootTaperLengthMm` states (the hub law is new, so
+     its bound has no base owner; it reads the coerced state, never the
+     build). Every row whose petals are all at or under 35 mm holds to the
+     bit — the law is the identity there BY BRANCH. */
+  'root-taper': (st, row) => {
+    const REF = 35;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, st, { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) });
+    if ((b.petalsAll || []).some((p) => p && Number(p.askedLength) > REF)) return true;
+    if (st.inflorescence && st.inflorescence !== 'NONE' && Number(st.petalLength) * Number(st.floretScale) > REF) return true;
+    if (mine.hubRootTaperLengthMm(st, harness.rowScopesForBuild(row)) > REF) return true;
+    /* AND THE WIDTH RANGE (Eva's ruling 2, the same PR): `petalWidth`'s max
+       went 30 -> 46. The base geometry clamps a petal's COMPOSED width (the
+       global plus its scope offset, `OVERRIDE_BOUNDS`) at the BASE's own
+       bound, so a row moves on the width alone iff the base builds a petal
+       whose composed ask passes that bound, or a raceme whose floret head asks
+       past it. The bound is read off the BASE module, never restated. A
+       top-level `petalWidth` past 30 with no offset is not clamped on the
+       base (the clamp acts on a composition, and the global alone is the
+       control's own value) — measured, `petalWidth max (46)` holds to the bit
+       — so the clause reads a petal that carries a width OFFSET. */
+    const WMAX = base.OVERRIDE_BOUNDS.get('petalWidth').max;
+    const offW = (p) => Number((p.scopeTerm && p.scopeTerm.offsets && p.scopeTerm.offsets.petalWidth) || 0);
+    if ((b.petalsAll || []).some((p) => p && offW(p) !== 0 && Number(st.petalWidth) + offW(p) > WMAX)) return true;
+    return !!(st.inflorescence && st.inflorescence !== 'NONE' && Number(st.petalWidth) * Number(st.floretScale) > WMAX);
+  },
+  /* ROOT SUPPORT (Oct 21, docs/bloom-root-support-outcome.md) — sepals and
+     leaves take the root law at their own length, and the foot clamp is the
+     ring's own arc. PREDECLARED FROM THE BASE TREE'S OWN RECORD (a ring with
+     no BUILT petal is skipped), the new laws'
+     thresholds RESTATED from the controls (the harness's restatements, never
+     this tree's builder). A row moves iff, on the base build:
+       (a) a petal ring's asked foot, floored, passes the base's 10 mm cap (the
+           ring placed by the area rule moves: it reads the uncapped asked
+           foot now) or does not fit the arc it owns at its base radius
+           (radius x the restated span) where that arc is above the 1.6 mm
+           floor — the new cap binds (an arc under the floor builds the floor
+           on both trees: the first cut of this clause called 17 such rows
+           movers and every one held to the bit);
+       (b) a built sepal tier asks a length past 35 mm, or the sepal's asked
+           foot passes the base's 10 mm cap or its own arc (the sepal foot's
+           cap is the arc too, at the SEPAL whorl's own step), or the sepals raise the hub's bound past both
+           35 mm and the base's own bound (the plate held to a sepal root);
+       (c) a built leaf blade — the simple or lobed leaf at its node's length,
+           any compound leaflet at its own — is past 35 mm;
+       (d) a raceme whose FLORET state satisfies (a)-(c) (the floret is the
+           same builder on its own state). */
+  'root-support': (st, row) => {
+    const REF = 35, FOOT_MAX_BASE = 10;
+    const scopes = harness.rowScopesForBuild(row);
+    const core = (s, sc) => {
+      const acc = new base.MeshBuilder({ exportMode: true });
+      const b = base.buildBloomInto(acc, s, { below: null, capability: row.capability ?? null, scopes: sc });
+      const span = harness.footSpanRestated(s);
+      for (const [i, r] of (b.rings || []).entries()) {
+        /* a ring none of whose petals is BUILT (the sphere stem's channel took
+           them all) moves nothing: its feet exist only as a record */
+        if (!(b.petals || [])[i]) continue;
+        /* a whorl the TUBE closes completely (k 0) emits no foot rows — the
+           tube draws its own base — so a capped foot there is a record only
+           (measured: `OUTLINE CURVE 2: TUBE — a lobe curve x petalWidth 22`
+           held to the bit with its foot 8.80 -> 8.15 mm); a slit tube's
+           feet beside the slits ARE emitted, and move */
+        const TL = b.tube && b.tube.active && b.tube.layers ? b.tube.layers[i] : null;
+        if (TL && TL.k === 0) continue;
+        const asked = Math.max(base.FOOT_MIN_WIDTH_MM, Number(r.authoredWidth));
+        /* the built foot differs iff the base clamp bound (asked past 10 mm,
+           which also moves the ring) or the new cap binds ABOVE the floor —
+           an arc under the 1.6 mm floor builds the floor on both trees */
+        if (asked > FOOT_MAX_BASE || asked > Math.max(base.FOOT_MIN_WIDTH_MM, r.radius * span)) return true;
+      }
+      const S = b.foot && b.foot.sepals;
+      if (S && S.count > 0) {
+        const tiers = harness.sepalTiersRestated(s);
+        let Ls = 0;
+        for (let k = 0; k < tiers; k++) Ls = Math.max(Ls, harness.sepalLengthRestated(s, sc, k));
+        const built = (b.sepals && b.sepals.tiers ? b.sepals.tiers : []).some((T) => T && T.present && (T.built || []).some(Boolean));
+        if (built && Ls > REF) return true;
+        const footAsked = Math.max(base.FOOT_MIN_WIDTH_MM, Number(S.footAskedMm));
+        /* the sepal foot owns ITS OWN whorl's step (2 pi / the sepal count, the
+           fan's step on a FAN) — the petal span here called two sepal rows
+           movers and both held to the bit */
+        const sepalSpan = s.placement === 'FAN' ? span : (2 * Math.PI) / S.count;
+        if (built && (footAsked > FOOT_MAX_BASE || footAsked > Math.max(base.FOOT_MIN_WIDTH_MM, S.ring.radius * sepalSpan))) return true;
+        /* EVERY TIER's foot against ITS OWN ring's arc (F1.1a): a lower tier
+           sits on a smaller ring, so the cap binds there first — the tier-1
+           check alone called `SEPAL TIERS: four tiers on a 4 mm hub` a holder
+           while tier 4's foot went 3.84 -> 3.81 mm */
+        const tierRecs = (b.foot && b.foot.sepalTiers) || [];
+        const tierBuilt = (b.sepals && b.sepals.tiers) || [];
+        for (const [k, T] of tierRecs.entries()) {
+          const TB = tierBuilt[k];
+          if (!T || !T.ring || !(TB && TB.present && (TB.built || []).some(Boolean))) continue;
+          const fa = Math.max(base.FOOT_MIN_WIDTH_MM, Number(T.footAskedMm));
+          if (fa > FOOT_MAX_BASE || fa > Math.max(base.FOOT_MIN_WIDTH_MM, T.ring.radius * sepalSpan)) return true;
+        }
+        if (Ls > REF && Ls > base.hubRootTaperLengthMm(s, sc)) return true;
+      }
+      const lp = b.leaf;
+      if (lp && lp.present && lp.built > 0) {
+        for (const B of b.leavesBuilt || []) {
+          if (!B) continue;
+          if (B.compound) { if (B.leaflets.some((lf) => Number(lf.lengthMm) > REF)) return true; continue; }
+          const L = lp.nodeLengthsMm ? Math.max(...lp.nodeLengthsMm) : Number(lp.lengthMm);
+          if (L > REF) return true;
+          /* the PETIOLE's root floor reads the ASKED length (a shared node's
+             offset needs the rod before the floret cap exists, so the rod and
+             the built petiole carry the asked blade's root — a conservative
+             upper bound): a shared-node leaf capped under 35 mm still moves
+             when its asked length is past it */
+          if (Number(lp.lengthMm) > REF) return true;
+        }
+      }
+      return b;
+    };
+    const b = core(st, scopes);
+    if (b === true) return true;
+    const ip = b.inflorescence;
+    if (ip && ip.present) return core(base.floretState(st, ip), null) === true;
+    return false;
+  },
+  /* THE FOOT CLEARANCE (Oct 22, docs/bloom-foot-clearance-outcome.md) — the
+     foot cap stands FOOT_CAP_CLEARANCE_RAD inside the arc. PREDECLARED FROM THE
+     BASE TREE'S OWN RECORD: each ring's asked foot (`widthAskedMm`), its cap
+     ring (`footCapRadiusMm`), its span (`footSpanRad`) and the width it BUILT,
+     with the clearance RESTATED (the harness's derivation, never this tree's
+     builder). A ring moves iff the width the new law restates from those
+     records differs from the base's built width — i.e. the cap binds above the
+     floor (a foot inside its cap is the asked double by branch; a foot the
+     1.6 mm floor wins holds on both trees). The same law for every BUILT sepal
+     tier on its own ring and step, and for a raceme's floret state. Skipped,
+     as `root-support` measured them: a ring with no BUILT petal (the sphere
+     stem's channel took them all) and a whorl a closed tube (k 0) draws — its
+     feet are a record and emit no row. */
+  'foot-clearance': (st, row) => {
+    const F = base.FOOT_MIN_WIDTH_MM, CL = harness.FOOT_CAP_CLEARANCE_RAD_RULED;
+    const newW = (asked, capR, span) => { const cap = capR * (span - CL); return asked > cap ? Math.max(F, cap) : asked; };
+    const core = (s, sc) => {
+      const acc = new base.MeshBuilder({ exportMode: true });
+      const b = base.buildBloomInto(acc, s, { below: null, capability: row.capability ?? null, scopes: sc });
+      for (const [i, r] of (b.rings || []).entries()) {
+        if (!(b.petals || [])[i]) continue;
+        const TL = b.tube && b.tube.active && b.tube.layers ? b.tube.layers[i] : null;
+        if (TL && TL.k === 0) continue;
+        if (newW(r.widthAskedMm, r.footCapRadiusMm, r.footSpanRad) !== r.width) return true;
+      }
+      const tierRecs = (b.foot && b.foot.sepalTiers) || [];
+      const tierBuilt = (b.sepals && b.sepals.tiers) || [];
+      for (const [k, T] of tierRecs.entries()) {
+        const TB = tierBuilt[k];
+        if (!T || !T.ring || !(TB && TB.present && (TB.built || []).some(Boolean))) continue;
+        if (newW(Math.max(F, T.footAskedMm), T.ring.radius, T.footSpanRad) !== T.footMm) return true;
+      }
+      return b;
+    };
+    const b = core(st, harness.rowScopesForBuild(row));
+    if (b === true) return true;
+    const ip = b.inflorescence;
+    if (ip && ip.present) return core(base.floretState(st, ip), null) === true;
+    return false;
   },
   'compound-taper': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
@@ -809,6 +1131,17 @@ const BASE_VALUE_IDS = new Set(base.SCOPE_VALUE_IDS || []);
    the BASE build and reported a holder as moved (curves-leaves, measured on
    block 72's two tier rows — in-process the two trees agree to the bit). */
 const BASE_TIER_VALUE_IDS = new Set(base.SEPAL_SCOPE_VALUE_IDS || []);
+/* `--list-movers <file>`: every live matrix row's prediction under the
+   declared predicate, written as JSON and nothing else built — so a predicate
+   corrected mid-partition can be compared against the one the finished chunks
+   ran, and only the rows whose prediction flipped need re-measuring. */
+if (argv.includes('--list-movers')) {
+  if (!MOVERS_PRED || !PREDICATE_MOVERS[MOVERS_PRED]) { console.error('--list-movers needs --movers-predicate <name>'); process.exit(2); }
+  const out = MATRIX.map((row) => { let v; try { v = !!PREDICATE_MOVERS[MOVERS_PRED](stateOf(row), row); } catch (e) { v = 'threw'; } return [row.label, v]; });
+  (await import('node:fs')).writeFileSync(argOf('--list-movers'), JSON.stringify(out));
+  console.log(`--list-movers: ${out.filter((x) => x[1] === true).length} movers of ${out.length} rows`);
+  process.exit(0);
+}
 /* `--frozen-sweep` (spine-cup-fold): WHICH FROZEN BASELINES' BYTES STOP
    REPRODUCING under the declared predicate — every registered frozen matrix's
    rows run through the SAME predicate the byte partition proves exact on the
@@ -830,7 +1163,13 @@ if (argv.includes('--frozen-sweep')) {
   const fo = argv.indexOf('--frozen-only');
   const names = Object.keys(harness.FROZEN_MATRICES).filter((n) => fo < 0 || new RegExp(argv[fo + 1]).test(n));
   const memo = new Map(), threwSeen = new Set();
-  let tags = 0, total = 0, movers = 0, threwAll = 0;
+  /* `--memo <file>`: the predicate's answer per distinct state, carried across
+     runs so a sweep longer than one foreground call closes in batches
+     (`--frozen-only` picks each batch). Rewritten after every baseline. */
+  const memoFile = argOf('--memo');
+  const fsM = memoFile ? await import('node:fs') : null;
+  if (memoFile && fsM.existsSync(memoFile)) for (const [k, v] of JSON.parse(fsM.readFileSync(memoFile, 'utf8'))) memo.set(k, v);
+  let tags = 0, total = 0, movers = 0, threwAll = 0, memoSavedAt = Date.now();
   for (const name of names) {
     const fr = harness.FROZEN_MATRICES[name]();
     let n = 0, threw = 0;
@@ -838,11 +1177,21 @@ if (argv.includes('--frozen-sweep')) {
       const st = lenient(row);
       const key = JSON.stringify([st, row.capability || null, harness.rowScopesForBuild(row) || null]);
       let v = memo.get(key);
-      if (v === undefined) { try { v = PREDICATE_MOVERS[MOVERS_PRED](st, row); } catch (e) { v = 'threw'; if (threwSeen.size < 12 && !threwSeen.has(row.label)) { threwSeen.add(row.label); console.log(`    threw: ${name} ${row.label} — ${String(e && e.message || e).slice(0, 160)}`); } } memo.set(key, v); }
+      if (v === undefined) {
+        try { v = PREDICATE_MOVERS[MOVERS_PRED](st, row); } catch (e) { v = 'threw'; if (threwSeen.size < 12 && !threwSeen.has(row.label)) { threwSeen.add(row.label); console.log(`    threw: ${name} ${row.label} — ${String(e && e.message || e).slice(0, 160)}`); } }
+        memo.set(key, v);
+        /* AND A CHECKPOINT INSIDE A BASELINE (the foot-clearance session): a
+           baseline of ~950 rows outlasts one foreground call, and a memo
+           written only after each baseline then never advances — measured,
+           two of four workers closed 0 phases in 570 s. Keyed on the state, so
+           a resumed run skips exactly what was answered. */
+        if (memoFile && Date.now() - memoSavedAt > 30000) { fsM.writeFileSync(memoFile, JSON.stringify([...memo])); memoSavedAt = Date.now(); }
+      }
       if (v === 'threw') threw++; else if (v) n++;
     }
     total += fr.length; movers += n; threwAll += threw; if (n) tags++;
     console.log(`  frozen/${name.padEnd(8)} ${String(n).padStart(4)} of ${String(fr.length).padStart(4)} rows move${threw ? `   (${threw} threw, counted as neither)` : ''}`);
+    if (memoFile) fsM.writeFileSync(memoFile, JSON.stringify([...memo]));
   }
   console.log(`\n  ${tags} of ${names.length} baselines carry a row whose bytes stop reproducing; ${movers} of ${total} frozen rows (${memo.size} distinct states).`);
   process.exit(threwAll ? 1 : 0);

@@ -41,7 +41,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import crypto from 'node:crypto';
 import { shardOf } from './bloom-export-shards.mjs';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, curlAssertions, stamenAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, settleMsForRow, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, curlAssertions, stamenAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions, textureAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -214,6 +214,13 @@ const STEM_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 60, stemDiameter: 
    to avoid. `builtOn` above cannot serve: it reads the PETAL's grid, and
    every quantity here is about where a SECOND HEAD stands. */
 const INFLO_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 120, inflorescence: 'RACEME', ...over });
+/* THE UMBEL'S WITNESS STATE (the umbel session): six florets, the head OFF —
+   the spider lily's own default — on the shipping 6 mm stem. */
+const UMBEL_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 120, inflorescence: 'UMBEL', umbelFlorets: 6, umbelHead: 'OFF', ...over });
+/* THE MOPHEAD (Oct 24): a small compound umbel — two rays of three florets —
+   so every mophead mutant's witness is a build of seconds */
+const MOPHEAD_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2', umbelRays: 2, umbelFlorets: 3, umbelHead: 'OFF', ...over });
+const mopheadBuild = (X, over = {}) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), MOPHEAD_STATE(over));
 function infloFacts(M, over = {}) {
   try {
     const st = INFLO_STATE(over);
@@ -740,6 +747,44 @@ const TIER_ROWS = /^SEPAL TIERS:/;
    scoped to each other for the shard cap's sake (the tier rows' own reason). */
 const SEPC_MUTANTS = /^(a-sepal-curve-read-from-the-petals|a-tier-curve-leaks-to-every-tier|the-sepal-limit-drawn-on-the-slider-spine|the-fold-limit-skipped-for-sepals)$/;
 const SEPC_ROWS = /^SEPAL CURVES:/;
+const TEX_ROWS = /^surface texture/;
+const TEX_MUTANTS = /^(the-relief-goes-inward|the-bead-is-left-flat|the-field-is-sampled-per-organ|the-lattice-leaves-the-surface|the-exclusivity-is-dropped)$/;
+/* T5 (Oct 23): the organs' four mutants and the two rows they run over */
+const T5_ROWS = /^surface texture T5/;
+const T5_MUTANTS = /^(a-buried-face-is-textured|the-hub-is-skipped|the-stem-normal-points-inward|the-stem-relief-is-applied-inward|the-tube-ring-has-its-own-field|the-hub-is-textured-under-a-foot|the-fade-width-is-typed|a-floret-hub-is-relieved-in-its-own-frame|the-coverage-reaches-every-part)$/;
+/* the organs' records as the MUTATED module builds them */
+function organFacts(G, st) {
+  try {
+    const b = G.buildBloomInto(new G.MeshBuilder({ exportMode: true }), st, {});
+    const o = (b.texture && b.texture.organs) || {};
+    return Object.fromEntries(['hub', 'stem', 'tube', 'floret hub'].map((k) => [k, o[k] && o[k].organ ? { ...o[k].organ, displaced: o[k].displaced, skin: o[k].skinSamples || [] } : null]));
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+/* THE EDGE CAP (Eva, Oct 23): its three mutants run on the `texture edge cap`
+   rows (the corner, a state past the cap) plus the shipped PEBBLE row, where
+   a typed edge moves the default. */
+const CAP_ROWS = /^texture edge cap|^TEXTURE CAP: past|^surface texture — PEBBLE at the shipped/;
+const CAP_MUTANTS = /^(the-edge-cap-is-removed|the-edge-is-typed-at-the-cap|the-edge-coarsens-past-the-cap)$/;
+/* the edge-cap facts a witness reads off a MUTATED module's own build */
+function capFacts(G, st) {
+  try {
+    const acc = new G.MeshBuilder({ exportMode: true });
+    const b = G.buildBloomInto(acc, st, {});
+    const T = b.texture; if (!T) return { none: true };
+    return { tris: acc.triangleCount, edge: T.edgeMm, cap: T.edgeCap || null, budget: G.EXPORT_TRI_BUDGET };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const CAP_CORNER = { petalCount: 40, layerCount: 3, petalTexture: 'PEBBLE' };
+const CAP_PAST = { petalCount: 40, layerCount: 3, sepalCount: 40, sepalTiers: 4, stemLength: 120, leafLength: 60, leafNodes: 8, leafPhyllotaxy: 'whorled', petalTexture: 'PEBBLE' };
+/* the texture facts a witness reads off a MUTATED module's own build */
+function texFacts(G, st) {
+  try {
+    const b = G.buildBloomInto(new G.MeshBuilder({ exportMode: true }), st, {});
+    const T = b.texture; if (!T) return { none: true };
+    const o = T.organs || {};
+    return { refused: T.refused || null, organs: Object.fromEntries(Object.entries(o).map(([k, v]) => [k, { displaced: v.displaced, min: v.reliefMinMm, max: v.reliefMaxMm, skin: v.skinSamples || [], apex: v.apexSamples || [] }])) };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
 /* THE LEAF CURVES (curves-leaves): the eight geometry mutants and the rows they
    run over, scoped to each other for the shard cap's sake (the seed's own
    mutants are the panel gate's, route (am)). */
@@ -1454,13 +1499,134 @@ const MUTANTS = [
        names. Caught by the anchor scan above before any mutant ran, which is
        exactly what that scan exists for, and fixed by giving the expression
        ONE OWNER (`rodWallRootMm`) rather than by narrowing the string. */
-    find: '  const rootR = rodWallRootMm(stem);\n  const embedMm = rodWallEmbedMm(stem);',
-    into: '  const rootR = 0;\n  const embedMm = rodWallEmbedMm(stem);', names: ['ID2'],
+    /* RE-ANCHORED by the umbel session: the line gained the umbel's arm (its
+       root is the KNOT's ring); the mutation still lands on the RACEME arm. */
+    find: '  const rootR = umbel ? ring.rho : rodWallRootMm(stem);\n  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);',
+    into: '  const rootR = umbel ? ring.rho : 0;\n  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);', names: ['ID2'],
     witness: (M, C) => {
       const [m, c] = infloPair(M, C);
       const t = bothBuilt(m, c); if (t) return t;
       return (m.rootR === 0 && c.rootR > 0) ? null
         : `the pedicel roots at r = ${m.rootR} on the mutant and ${c.rootR} on the clean tree — the root did not move to the axis`;
+    } },
+
+  /* ---- THE UMBEL (the umbel session, Oct 22) — four mutants, each witnessed
+     on the MUTATED module's own build of an umbel, scoped to the two umbel
+     rows (`rows`), the rows scoped back to them (`for`). ---- */
+  { id: 'the-umbel-pedicel-roots-off-the-junction', rows: /^an umbel/,
+    why: "the umbel's pedicels root on a ring twice the knot's own ring out and 6 mm more — every root disc OUTSIDE the junction, held to the knot by nothing but overlapping florets: watertight, and one piece wherever the florets touch",
+    find: '  const rootR = umbel ? ring.rho : rodWallRootMm(stem);',
+    into: '  const rootR = umbel ? 2 * ring.rho + 6 : rodWallRootMm(stem);', names: ['UM2'],
+    witness: (M, C) => {
+      const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); const q = b.inflorescenceBuilt.placed[0]; const K = b.inflorescenceBuilt.knot; return Math.hypot(q.root[0] - K.centre[0], q.root[1] - K.centre[1]) - K.radiusMm; };
+      const m = f(M), c = f(C);
+      return (m > 0 && c < 0) ? null : `the root stands ${m.toFixed(3)} mm past the boss's rim on the mutant and ${c.toFixed(3)} on the clean tree`;
+    } },
+  { id: 'the-head-is-built-while-toggled-off', rows: /^an umbel/,
+    why: "the head toggle is read and ignored: a spider lily asked with no head builds the whole head at the stem's top anyway — a perfectly good closed solid, watertight, one piece",
+    find: '  const headOff = umbelHeadIsAbsent(state) && !!(stemPlanned && stemPlanned.present);',
+    into: '  const headOff = false && umbelHeadIsAbsent(state) && !!(stemPlanned && stemPlanned.present);', names: ['UM0'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).petalsBuilt;
+      const m = f(M), c = f(C);
+      return (m > 0 && c === 0) ? null : `the head built ${m} petals on the mutant and ${c} on the clean tree with the head OFF`;
+    } },
+  /* RE-ANCHORED by the boss session (Eva's ruling, Oct 23): the junction is a
+     squat BOSS now, and the typed size is the boss's RIM radius. */
+  { id: 'the-boss-radius-is-typed', rows: /^an umbel/,
+    why: "the junction boss's rim is a typed 6 mm radius instead of the reach the count, the pedicel radius and the angle derive — at twelve florets the pedicels then root on a ring wider than the boss, every root disc out past its rim",
+    find: '  const radiusMm = Math.max(R0, rho + crossMinMm * ca);',
+    into: '  const radiusMm = 6;', names: ['UM1', 'UM2'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE({ umbelFlorets: 12 })).inflorescenceBuilt.knot.radiusMm;
+      const m = f(M), c = f(C);
+      return (Math.abs(m - 6) < 1e-9 && Math.abs(c - 6) > 1e-6) ? null : `the boss's rim is ${m} mm on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-boss-height-is-typed', rows: /^an umbel/,
+    why: "the junction boss's band is a typed one-feature half-height instead of the root disc's own reach at the pedicel's angle — at the shipped 35 deg a 1.5 mm pedicel's root disc reaches 1.23 mm above and below its ring, so its edge stands out through both faces of a 1 mm band: watertight, one piece, and the disc no longer rooted inside solid",
+    find: '  const halfHeightMm = Math.max(h0, crossMinMm * sa);',
+    into: '  const halfHeightMm = MIN_FEATURE_MM;', names: ['UM1', 'UM2'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescenceBuilt.knot.halfHeightMm;
+      const m = f(M), c = f(C);
+      return (Math.abs(m - 1) < 1e-9 && c > 1.2) ? null : `the boss's half-height is ${m} mm on the mutant and ${c} on the clean tree`;
+    } },
+  /* THE FLAT UNDERSIDE AND THE CROSSING'S MARGIN (Eva's rulings, Oct 24). */
+  { id: 'the-boss-underside-cones-again', rows: /^an umbel/,
+    why: "the boss's flat underside is replaced by a cone down to a point on the axis — the FDM overhang the SLS ruling removed: watertight, one piece, every root disc still held",
+    find: '    const zBot = c[2] - h;',
+    into: '    const zBot = c[2] - h - R;', names: ['UM1'],
+    witness: (M, C) => {
+      const f = (X) => { const k = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescenceBuilt.knot; return k.bottomZ - k.rimBottomZ; };
+      const m = f(M), c = f(C);
+      return (m < -1 && Math.abs(c) < 1e-9) ? null : `the boss's bottom stands ${m} mm below its rim's foot on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-boss-crossing-margin-is-dropped', rows: /^an umbel/,
+    why: "the crossing's derived margin is dropped, so a vertical pedicel crosses EXACTLY half a printable feature of boss again — ON the join check's minimum, a knife edge the float32 file can fall either side of",
+    find: '  const crossMinMm = gap / 2 + marginMm;',
+    into: '  const crossMinMm = gap / 2;', names: ['UM1'],
+    witness: (M, C) => {
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE({ pedicelAngle: 90 })).inflorescenceBuilt.knot.halfHeightMm;
+      const m = f(M), c = f(C);
+      return (m === 0.5 && c > 0.5) ? null : `the boss's half-height at 90 deg is ${m} mm on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-umbel-sits-on-the-cut-end', rows: /^an umbel/,
+    why: "the head-off umbel's node is put at the stem's TIP — the end the florist's cut is on — so the knot swallows the cut and the umbel hangs from the free end: watertight, one piece",
+    find: '  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.topZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;',
+    into: '  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.tipZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;', names: ['UM3', 'UM4'],
+    witness: (M, C) => {
+      const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); return b.inflorescenceBuilt.knot.centre[2] - b.stem.tipZ; };
+      const m = f(M), c = f(C);
+      return (Math.abs(m) < 1e-6 && c > 100) ? null : `the knot stands ${m.toFixed(3)} mm above the stem's tip on the mutant and ${c.toFixed(3)} on the clean tree`;
+    } },
+
+  /* ---- THE MOPHEAD (Oct 24, Eva's rulings on the hydrangea discovery) —
+     five mutants, each witnessed on the MUTATED module's own build of a small
+     compound umbel, scoped to the mophead rows (`rows`), the rows back to
+     them (`for`). Both STL gates and the flood fill are blind to all five. */
+  { id: 'a-sub-umbel-is-rooted-off-its-ray', rows: /^a mophead/,
+    why: "every sub-umbel's boss is put 5 mm past the end of its ray — its florets rooted in a boss joined to nothing, held to the dome only where neighbouring florets touch: watertight, and one piece wherever the florets fuse (the discovery's own finding)",
+    find: '  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.topZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;',
+    into: '  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.topZ - (umbelLevelOf(state) === 2 ? 5 : 0) : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;', names: ['UM8'],
+    witness: (M, C) => {
+      const f = (X) => { const s = mopheadBuild(X).inflorescenceBuilt.sub; return s.knot.centre[2] - s.stem.topZ; };
+      const m = f(M), c = f(C);
+      return (Math.abs(m - 5) < 1e-6 && Math.abs(c) < 1e-6) ? null : `the sub-boss stands ${m} mm above its ray's top on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'depth-3-is-allowed', rows: /^a mophead/,
+    why: "the depth cap is raised to 3, so a sub-umbel may ask a level of its own — the floret pin lifted for TWO levels where the ruling lifts it for one, refused by nothing",
+    find: 'export const UMBEL_DEPTH_MAX = 2;',
+    into: 'export const UMBEL_DEPTH_MAX = 3;', names: ['UM5'],
+    witness: (M, C) => {
+      const m = M.umbelDepthRefusal({ umbelDepth: '2', umbelLevel: 2 }), c = C.umbelDepthRefusal({ umbelDepth: '2', umbelLevel: 2 });
+      return (m === null && typeof c === 'string') ? null : `a sub-umbel asking depth 2 is ${m === null ? 'ACCEPTED' : 'refused'} on the mutant and ${c === null ? 'ACCEPTED' : 'refused'} on the clean tree`;
+    } },
+  { id: 'the-reduced-lattice-reaches-a-non-floret', rows: /^a mophead/,
+    why: "the reduced lattice's six columns become the module's own, so the HEAD petals beside the florets are built on it too — a coarser head, watertight, one piece, at a lower triangle count nobody asked for",
+    find: 'let NV = NV_FULL;',
+    into: 'let NV = 6;', names: ['UM6'],
+    witness: (M, C) => {
+      const f = (X) => { const b = mopheadBuild(X, { umbelHead: 'ON' }); const p = (b.petalsAll || []).find(Boolean); return p && p.lattice ? p.lattice.columns : null; };
+      const m = f(M), c = f(C);
+      return (m === 6 && c === 10) ? null : `a head petal is built on ${m} columns on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-clamp-counts-rows', rows: /^a mophead/,
+    why: "the budget clamp prices a floret from a ROW COUNT (petals x rows x columns x two skins x two triangles) instead of the floret it builds — the decision then sits on a number no build produced, and the bloom it predicts is not the bloom it emits",
+    find: '    const fOf = (U) => U.rec.inflorescenceBuilt ? U.rec.inflorescenceBuilt.unitTris : 0;',
+    into: '    const fOf = (U) => U.rec.inflorescenceBuilt ? plan.floretPetals * NU_BASE * NV * 4 : 0;', names: ['UM7'],
+    witness: (M, C) => {
+      const f = (X) => { const b = mopheadBuild(X); return b.inflorescence.budgetClamp.floretTris - b.inflorescenceBuilt.sub.floretUnit.tris; };
+      const m = f(M), c = f(C);
+      return (m !== 0 && c === 0) ? null : `the clamp's floret price is ${m} triangles off the emitted floret on the mutant and ${c} on the clean tree`;
+    } },
+  { id: 'the-floret-floor-is-typed', rows: /^a mophead/,
+    why: "the floret floor is a typed 12 mm petal instead of the body criterion's derivation — a floret floor that holds whatever the outline, the sheet or the rim bead does",
+    find: '  const out = { scale: Number.isFinite(best) ? best : 1, atU, rows, taperMm: T, probeLengthMm: p ? p.length : null,',
+    into: '  const out = { scale: 12 / Number(state.petalLength), atU, rows, taperMm: T, probeLengthMm: p ? p.length : null,', names: ['UM9'],
+    witness: (M, C) => {
+      const f = (X) => mopheadBuild(X, { floretScale: 0.2 }).inflorescenceBuilt.sub.plan.petalLength;
+      const m = f(M), c = f(C);
+      return (Math.abs(m - 12) < 1e-9 && Math.abs(c - 12) > 0.5) ? null : `the floor's floret petal is ${m} mm on the mutant and ${c} on the clean tree`;
     } },
 
   /* ---- THE REACH INSET (inflorescence build 3, Phase A — #355) ---- */
@@ -2196,8 +2362,8 @@ const MUTANTS = [
       const same = m.rep.lobed.rowHalfLobeMm.every((h, j) => h === c.rep.lobed.rowHalfLobeMm[j]);
       return (same && m.rep.lobed.roundBottoms.sinuses.every((r) => !r.built) && c.rep.lobed.roundBottoms.sinuses.some((r) => r.built)) ? null : `the mutant's outline is ${same ? 'the clean one' : 'MOVED'} with ${m.rep.lobed.roundBottoms.sinuses.filter((r) => r.built).length} bottoms told — the behaviour did not move`; } },
   { id: 'the-lobed-petiole-is-the-wire', why: 'the area law is computed and recorded and the rod is built at the wire anyway — the read-out says asked -> built on a petiole that was never thickened',
-    find: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : petioleR0;',
-    into: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : petioleR0;', names: ['LF26'],
+    find: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;',
+    into: '  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;', names: ['LF26'],
     witness: (M, C) => { const m = compoundFacts(M, LOB_WIT), c = compoundFacts(C, LOB_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.plan.petioleR === m.plan.lobedPetiole.wireR && c.plan.petioleR > c.plan.lobedPetiole.wireR) ? null : `the mutant builds the petiole at ${m.plan.petioleR} mm against the clean ${c.plan.petioleR} — the behaviour did not move`; } },
@@ -2532,8 +2698,8 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.limit > c.limit) ? null : `the mutant's limit is ${m.limit} against the clean tree's ${c.limit} on the 120 x 5 wing at 40 asked — the exclusion is not reading as a fraction`; } },
   { id: 'sepal-foot-floor-removed', why: 'the sepal foot is whatever breadth asks with no print floor — 0.96 mm across at breadth 0.25, under the 1.60 mm foot floor every petal ring is held to',
-    find: '    const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);',
-    into: '    const footMm = footAskedMm;', names: ['SP3'],
+    find: '    const footFlooredMm = Math.max(FOOT_MIN_WIDTH_MM, footAskedMm);',
+    into: '    const footFlooredMm = footAskedMm;', names: ['SP3'],
     witness: (M, C) => { const m = sepalFacts(M, { sepalFootBreadth: 0.25 }), c = sepalFacts(C, { sepalFootBreadth: 0.25 });
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.footH < 0.6 && c.footH >= 0.79) ? null : `the mutant's foot half-width is ${m.footH} against the clean tree's ${c.footH} at breadth 0.25 — the floor still binds`; } },
@@ -2603,8 +2769,8 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.tiers[0].curveMode === true && c.tiers[0].curveMode === false && c.tiers[1].curveMode === true) ? null : `tier 1's curve mode reads ${m.tiers[0].curveMode} on the mutant against ${c.tiers[0].curveMode} clean (tier 2 ${c.tiers[1] && c.tiers[1].curveMode})`; } },
   { id: 'the-sepal-limit-drawn-on-the-slider-spine', rows: SEPC_ROWS, why: "the angle limit's trial sepal is built with the curl mode forced to SLIDER, so an incurved drawn sepal is cleared against the petals as if it were straight — and stands through them",
-    find: "  const p = buildPetalInto(acc, sepalBladeState(state, angleDeg, unclamped), sepals.ring, slot, null, false);\n  return { lamina: laminaFromPanels(",
-    into: "  const p = buildPetalInto(acc, { ...sepalBladeState(state, angleDeg, unclamped), petalCurlMode: 'SLIDER' }, sepals.ring, slot, null, false);\n  return { lamina: laminaFromPanels(", names: ['SP8'],
+    find: "  const p = buildPetalInto(acc, sepalBladeState(state, angleDeg, unclamped), sepals.ring, slot, { noTexture: true }, false);\n  return { lamina: laminaFromPanels(",
+    into: "  const p = buildPetalInto(acc, { ...sepalBladeState(state, angleDeg, unclamped), petalCurlMode: 'SLIDER' }, sepals.ring, slot, { noTexture: true }, false);\n  return { lamina: laminaFromPanels(", names: ['SP8'],
     witness: (M, C) => { const m = sepcFacts(M, SEPC_LIMIT), c = sepcFacts(C, SEPC_LIMIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.tiers[0].limit > c.tiers[0].limit + 5) ? null : `the limit reads ${m.tiers[0].limit} on the mutant against ${c.tiers[0].limit} clean — the trial still drew the curve`; } },
@@ -2943,6 +3109,171 @@ const MUTANTS = [
      from the controls, the index and the row's @scopes against the EMITTED
      rings. Scoped to the braid rows (`rows: BRAID_ROWS`, and the rows carry
      `for: /braid|strand/`), so no shard pays for them on every row. */
+  /* BIG PETALS (Oct 21): THE PARTS' ROOT SPAN FOLLOWS THE HUB. A petal past
+     35 mm thickens the hub plate, and a stamen or the style is rooted THROUGH
+     that slab (footRing()'s `rootSpan`); a root one sheet long sits wholly
+     inside the plate and the part loses (hub - sheet)/2 of visible length.
+     JS1 / JG1 read the emitted root's span against the hub. Found in CI on
+     ALL MAX; witnessed on the mutated module's own stamen and style records.
+     It NAMES JS1 ONLY: this table runs stamenAssertions and never the
+     gynoecium family, so JG1 cannot fire here (measured: SILENT) — the same
+     `rootSpan` reaches the style, and JG1 is held by both STL gates on the
+     mum's style and stigma rows, where the root's span is what moves. */
+  /* ===================================================================
+     SURFACE TEXTURE (T3, Oct 22). Five mutants, each witnessed on the MUTATED
+     module's own texture record (never the clause it names), run on the three
+     `surface texture` rows alone (`TEX_MUTANTS` / `TEX_ROWS`).
+     =================================================================== */
+  { id: 'the-relief-goes-inward', rows: TEX_ROWS, why: "the top skin is displaced AGAINST its normal: the relief thins the sheet by up to H (ruling 2 forbids it), every scalar record still reads 0 <= s <= H, and the solid exports watertight at the identical triangle count",
+    find: "        const hT = [pT[0] + n[0] * sT, pT[1] + n[1] * sT, pT[2] + n[2] * sT];",
+    into: "        const hT = [pT[0] - n[0] * sT, pT[1] - n[1] * sT, pT[2] - n[2] * sT];", names: ['TX1'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', textureHeight: 1.5 }; const m = texFacts(M, st), c = texFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const along = (F) => { let worst = 0; for (const q of F.organs.petal.skin) if (q.side === 'top') { const a = (q.p1[0] - q.p0[0]) * q.n[0] + (q.p1[1] - q.p0[1]) * q.n[1] + (q.p1[2] - q.p0[2]) * q.n[2]; if (a < worst) worst = a; } return worst; };
+      const am = along(m), ac = along(c);
+      return (am < -0.05 && ac >= -1e-12) ? null : `the mutant's top skin moves ${am} mm along its normal at worst (clean ${ac})`; } },
+  { id: 'the-bead-is-left-flat', rows: TEX_ROWS, why: "the apex is never relieved — the bead stays on the fixed outline while both skins rise around it, a groove along every margin (Q4/Q5 says the relief runs OVER the bead); the skins' records are untouched and the solid is watertight",
+    find: "    const sA = sOf(apex);\n    pts[APEX] = [apex[0] + (wx / aLen0) * sA, apex[1] + (wy / aLen0) * sA, apex[2] + (wz / aLen0) * sA];",
+    into: "    const sA = 0;\n    pts[APEX] = apex;", names: ['TX5'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', textureHeight: 1.5 }; const m = texFacts(M, st), c = texFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const maxA = (F) => F.organs.petal.apex.reduce((x, q) => Math.max(x, q.s), 0);
+      return (maxA(m) === 0 && maxA(c) > 0.2) ? null : `the mutant's apex relief peaks at ${maxA(m)} mm (clean ${maxA(c)})`; } },
+  { id: 'the-field-is-sampled-per-organ', rows: TEX_ROWS, why: "the sepals and leaves read the field at a point 37 mm from where they stand: three organs, three fields, where ruling 1 says ONE world-space field — the petals are unchanged and every organ still exports watertight",
+    find: "  return { organ, rep, relief: { heightMm: T.heightMm, f: T.f }, lattice: { edgeMm: T.edgeMm, rowAt, firstSub, noSubRows }, panels: [] };",
+    into: "  return { organ, rep, relief: { heightMm: T.heightMm, f: organ === 'petal' ? T.f : (p) => T.f([p[0] + 37, p[1], p[2]]) }, lattice: { edgeMm: T.edgeMm, rowAt, firstSub, noSubRows }, panels: [] };", names: ['TX2'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'CELLULAR', sepalCount: 8, stemLength: 60, leafLength: 60 }; const m = texFacts(M, st), c = texFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      /* a SEPAL is the petal builder on a second ring (its context says 'petal'),
+         so the organ the mutation moves is the LEAF */
+      const sm = m.organs.leaf.skin, sc = c.organs.leaf.skin;
+      let moved = 0; for (let i = 0; i < Math.min(sm.length, sc.length); i++) if (Math.abs(sm[i].s - sc[i].s) > 1e-6) moved++;
+      const pm = m.organs.petal.skin, pc = c.organs.petal.skin; let pMoved = 0; for (let i = 0; i < Math.min(pm.length, pc.length); i++) if (pm[i].s !== pc[i].s) pMoved++;
+      return (moved > sm.length / 4 && pMoved === 0) ? null : `${moved} of ${sm.length} leaf samples changed and ${pMoved} petal samples — the field moved on the wrong organ or not at all`; } },
+  { id: 'the-lattice-leaves-the-surface', rows: TEX_ROWS, why: "a sub-row is LERPED between its two shipped neighbours instead of evaluated on the organ's own surface: the relief is drawn on a chord across a curved sheet, every count and every record unchanged, the file watertight",
+    find: "        const row = L.rowAt(u);\n        const sp = [s.sp[0] + (s2.sp[0] - s.sp[0]) * f, s.sp[1] + (s2.sp[1] - s.sp[1]) * f];",
+    into: "        const row = { ...L.rowAt(u), sect: (v) => { const a = s.row.sect(v), c = s2.row.sect(v); return { ...a, P: [a.P[0] + (c.P[0] - a.P[0]) * f, a.P[1] + (c.P[1] - a.P[1]) * f, a.P[2] + (c.P[2] - a.P[2]) * f] }; } };\n        const sp = [s.sp[0] + (s2.sp[0] - s.sp[0]) * f, s.sp[1] + (s2.sp[1] - s.sp[1]) * f];", names: ['TX8'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', petalCup: 0.6 }; const m = texFacts(M, st), c = texFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const subs = (F) => F.organs.petal.skin.filter((q) => q.sIdx < 0 && q.rep === true);
+      const sm = subs(m), sc = subs(c);
+      let worst = 0; for (let i = 0; i < Math.min(sm.length, sc.length); i++) worst = Math.max(worst, Math.hypot(sm[i].mid[0] - sc[i].mid[0], sm[i].mid[1] - sc[i].mid[1], sm[i].mid[2] - sc[i].mid[2]));
+      return (sm.length && worst > 1e-4) ? null : `${sm.length} sub-row samples, the mid-surface moved ${worst} mm at most — the lerp did not leave the surface`; } },
+  /* ===================================================================
+     SURFACE TEXTURE T5 — THE ORGANS (Oct 23). Four mutants, each witnessed on
+     the MUTATED module's own organ records (never the clause it names), run
+     on the two `surface texture T5` rows alone (`T5_MUTANTS` / `T5_ROWS`).
+     =================================================================== */
+  { id: 'a-buried-face-is-textured', rows: T5_ROWS, why: "every organ vertex reads VISIBLE: the stem's top inside the hub, the hub's underside inside the stem, the rim under the petals' roots and the ring under the petals are all relieved through the part that covers them (Q7 says buried faces stay smooth) — every count is unchanged and the union still exports watertight, as one piece",
+    find: "export function textureVertexVisible(G, q, n, delta = TEXTURE_VISIBILITY_OFFSET_MM) {\n",
+    into: "export function textureVertexVisible(G, q, n, delta = TEXTURE_VISIBILITY_OFFSET_MM) {\n  return true;\n", names: ['TX11'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      /* (Oct 25) a COVERED vertex (ruling 1) is counted buried too, and the
+         coverage test is not what this mutant breaks — so the witness is that
+         nothing is buried BEYOND what is covered */
+      return (m.stem && m.hub && m.stem.buried === m.stem.covered && m.hub.buried === m.hub.covered && c.stem.buried > c.stem.covered && c.hub.buried > c.hub.covered) ? null : `the mutant's stem buries ${m.stem && m.stem.buried} (covered ${m.stem && m.stem.covered}) and hub ${m.hub && m.hub.buried} (covered ${m.hub && m.hub.covered}); clean ${c.stem && c.stem.buried}/${c.stem && c.stem.covered} and ${c.hub && c.hub.buried}/${c.hub && c.hub.covered}`; } },
+  { id: 'the-hub-is-skipped', rows: T5_ROWS, why: "the hub is emitted as shipped and never latticed or relieved: a textured bloom stands on a smooth hub (T5 says the hub takes the field) — 0 floats move on the hub and every count is a plausible one",
+    find: "  else if (T5) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); t5Organs[t5Organs.length - 1].cover = [0, petalTriEnd]; }",
+    into: "  else if (false) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); t5Organs[t5Organs.length - 1].cover = [0, petalTriEnd]; }", names: ['TX10'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (!m.hub && c.hub && c.hub.displaced > 0 && m.stem && m.stem.displaced > 0) ? null : `the mutant's hub record ${m.hub ? 'exists' : 'is absent'} (clean ${c.hub ? `${c.hub.displaced} displaced` : 'absent'})`; } },
+  { id: 'the-stem-normal-points-inward', rows: T5_ROWS, why: "the stem wall's normal is its own axis's radial NEGATED — and the visibility test reads the same normal, so every escape ray now starts INSIDE the stem and the wall reads BURIED almost everywhere: the stem is left nearly smooth on an exposed wall and the few vertices still relieved go INTO it, while every scalar record reads 0 <= s <= H along the recorded normal (TX1/TX2 blind). Measured: it fires TX11 (the clearly exposed wall stops being relieved), not TX10, which reads too few relieved samples to meet one — the claim is what it does; TX10's normal clause has its own mutant below",
+    find: "      return L > 0 ? [dx / L, dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') return [0, 0, 1];",
+    into: "      return L > 0 ? [-dx / L, -dy / L, 0] : null;\n    }\n    if (tag === 'stem.top') return [0, 0, 1];", names: ['TX11'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const inward = (F) => F.stem.skin.filter((q) => { const r = Math.hypot(q.p0[0], q.p0[1]); return r > 2.9 && (q.p1[0] * q.p0[0] + q.p1[1] * q.p0[1]) / r < r - 0.01; }).length;
+      return (inward(m) > 0 && inward(c) === 0) ? null : `${inward(m)} of the mutant's wall samples moved toward the axis (clean ${inward(c)})`; } },
+  { id: 'the-stem-relief-is-applied-inward', rows: T5_ROWS, why: "the stem's relief is applied AGAINST its own recorded normal: the wall is pushed into the stem by up to H (ruling 2 forbids thinning) while the record still says outward along n with 0 <= s <= H, so TX1/TX2 read a correct relief — only the displacement the vertex took says otherwise",
+    find: "      const p1 = [q[0] + n[0] * s, q[1] + n[1] * s, q[2] + n[2] * s];",
+    into: "      const sg = O.organ === 'stem' ? -1 : 1; const p1 = [q[0] + sg * n[0] * s, q[1] + sg * n[1] * s, q[2] + sg * n[2] * s];", names: ['TX10'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const inward = (F) => F.stem.skin.filter((q) => { const r = Math.hypot(q.p0[0], q.p0[1]); return r > 2.9 && (q.p1[0] * q.p0[0] + q.p1[1] * q.p0[1]) / r < r - 0.01; }).length;
+      return (inward(m) > 0 && inward(c) === 0) ? null : `${inward(m)} of the mutant's wall samples moved toward the axis (clean ${inward(c)})`; } },
+  { id: 'the-tube-ring-has-its-own-field', rows: T5_ROWS, why: "the tube ring reads the field at 1.7x the feature size: a second field on one organ where ruling 1 says ONE world-space field — the petals, the hub and the stem are untouched and the ring exports watertight",
+    find: "      const s = w * (H * T.f(q));",
+    into: "      const s = w * (H * (O.organ === 'tube' ? textureField(T.type, T.sizeMm * 1.7) : T.f)(q));", names: ['TX2'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', petalCount: 6, tubeLayer1: 0 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (!m.tube || !c.tube) return 'no tube record on the witness state';
+      let moved = 0; for (let i = 0; i < Math.min(m.tube.skin.length, c.tube.skin.length); i++) if (Math.abs(m.tube.skin[i].s - c.tube.skin[i].s) > 1e-6) moved++;
+      const hubSame = m.hub.skin.every((q, i) => c.hub.skin[i] && q.s === c.hub.skin[i].s);
+      return (moved > 0 && hubSame) ? null : `${moved} tube samples changed, hub unchanged ${hubSame}`; } },
+  /* ===================================================================
+     THE T5 RULINGS (Eva, Oct 25): one mutant a ruling, each witnessed on the
+     MUTATED module's own build, run on the T5 rows.
+     =================================================================== */
+  { id: 'the-hub-is-textured-under-a-foot', rows: T5_ROWS, why: "the coverage test is dropped: the hub's top under the petal feet — coincident with each foot's top skin, so its escape ray leaves the union — is relieved through the feet again (ruling 1 says it stays smooth); every count is unchanged and the union exports watertight, as one piece",
+    find: "      if (v[i] && !(capability && capability.textureCoverageOff) && textureVertexCovered(",
+    into: "      if (false && v[i] && !(capability && capability.textureCoverageOff) && textureVertexCovered(", names: ['TX12'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.hub && c.hub && m.hub.covered === 0 && c.hub.covered > 0 && m.hub.displaced > c.hub.displaced) ? null : `the mutant's hub covers ${m.hub && m.hub.covered} and relieves ${m.hub && m.hub.displaced} (clean ${c.hub && c.hub.covered} / ${c.hub && c.hub.displaced})`; } },
+  { id: 'the-coverage-reaches-every-part', rows: T5_ROWS, why: "the coverage test counts every triangle emitted before the organ, not only the petal feet: the stem's junction ring under the hub (and a tube ring's coincident vertices on the hub's top) stop taking relief — the ruling covers the hub's top under the FEET and nothing else; every count is unchanged",
+    find: "H, O.cover)) { v[i] = 0; covered++; }",
+    into: "H, [0, O.from])) { v[i] = 0; covered++; }", names: ['TX12'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.stem && c.stem && m.stem.covered > 0 && c.stem.covered === 0) ? null : `the mutant's stem covers ${m.stem && m.stem.covered} (clean ${c.stem && c.stem.covered})`; } },
+  { id: 'the-fade-width-is-typed', rows: T5_ROWS, why: "the fade width is the typed 2H T5 shipped with, not derived from the height and the lattice edge (ruling 2): every fade is 0.05 mm longer at the floor height, every count is the same and no gate the STL reads can tell",
+    find: ": textureFadeWidthMm(H, T.edgeMm);",
+    into: ": 2 * H;", names: ['TX13'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', stemLength: 60 }; const m = organFacts(M, st), c = organFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.hub && c.hub && Math.abs(m.hub.fadeMm - 0.8) < 1e-12 && Math.abs(c.hub.fadeMm - 0.75) < 1e-12) ? null : `the mutant's fade is ${m.hub && m.hub.fadeMm} mm (clean ${c.hub && c.hub.fadeMm})`; } },
+  { id: 'a-floret-hub-is-relieved-in-its-own-frame', rows: T5_ROWS, why: "a floret build relieves its own hub in its own frame again, before it is appended: every floret is one copy of the pattern laid N times (ruling 5 says one world layer) — every count and every placement is unchanged",
+    find: "  if (built.t5 && pedicel) {",
+    into: "  if (built.t5 && false) {", names: ['TX14'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', inflorescence: 'UMBEL', umbelHead: 'ON', stemLength: 60 };
+      const same = (G) => { const acc = new G.MeshBuilder({ exportMode: true }), b = G.buildBloomInto(acc, st, {}), P = acc.positions, [a, c] = b.inflorescenceBuilt.placed; let d = 0;
+        const loc = (q, k) => { const Mx = q.M, x = P[q.at + k] - Mx[3], y = P[q.at + k + 1] - Mx[7], z = P[q.at + k + 2] - Mx[11]; return [Mx[0] * x + Mx[4] * y + Mx[8] * z, Mx[1] * x + Mx[5] * y + Mx[9] * z, Mx[2] * x + Mx[6] * y + Mx[10] * z]; };
+        for (let k = 0; k < a.tris * 9; k += 3) { const p = loc(a, k), q = loc(c, k); d = Math.max(d, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2])); } return d; };
+      let dm, dc; try { dm = same(M); dc = same(C); } catch (e) { return `the witness threw: ${e && e.message || e}`; }
+      return (dm <= 1e-6 && dc > 1e-3) ? null : `two florets differ by ${dm} mm on the mutant (clean ${dc})`; } },
+  /* ===================================================================
+     THE TEXTURE EDGE CAP (Eva's ruling of Oct 23). Three mutants, each
+     witnessed on the MUTATED module's own edge-cap record, scoped to
+     `CAP_ROWS` (the corner builds take the refused rows' settle allowance).
+     =================================================================== */
+  { id: 'the-edge-cap-is-removed', rows: CAP_ROWS, why: "the cap's switch is off: every textured build stays on the ruled 0.4 mm edge, so the 40 x 3 corner builds 1,542,832 triangles, over the export budget, and the export is refused where the ruling says the edge coarsens to the finest rung that fits (0.41 mm, 1,478,672)",
+    find: "    const capOn = true;   // the cap's own switch: the mutant table turns it off",
+    into: "    const capOn = false;   // the cap's own switch: the mutant table turns it off", names: ['TX9'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, ...CAP_CORNER }; const m = capFacts(M, st), c = capFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.edge === 0.4 && m.tris > m.budget && c.edge > 0.4 && c.tris <= c.budget) ? null : `the mutant built the corner at ${m.edge} mm / ${m.tris} tris (clean ${c.edge} mm / ${c.tris})`; } },
+  { id: 'the-edge-is-typed-at-the-cap', rows: CAP_ROWS, why: "the edge in force is TYPED at the 0.5 mm cap on every rung of the ladder, so the shipping PEBBLE default is latticed at 0.5 mm (102,512 triangles where the ruled 0.4 mm edge builds 151,792): the default moves, the record's edge and its derived rung disagree, and the read-out claims the ruled edge",
+    find: "    TEXTURE_EDGE_IN_FORCE = textureEdgeRung(k);",
+    into: "    TEXTURE_EDGE_IN_FORCE = TEXTURE_EDGE_CAP_MM;", names: ['TX9'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE' }; const m = capFacts(M, st), c = capFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.edge === 0.5 && c.edge === 0.4 && m.tris < c.tris) ? null : `the mutant built the default at ${m.edge} mm / ${m.tris} tris (clean ${c.edge} mm / ${c.tris})`; } },
+  { id: 'the-edge-coarsens-past-the-cap', rows: CAP_ROWS, why: "the ladder's top is twice the cap: a build that does not fit at 0.5 mm is coarsened on to 0.6 mm (where it fits) instead of standing at the cap and refusing the export — the ruling says never coarser than 0.5 without a ruling",
+    find: "      const topK = TEXTURE_EDGE_CAP_RUNGS;   // the ladder's top: the cap, never coarser without a ruling",
+    into: "      const topK = 2 * TEXTURE_EDGE_CAP_RUNGS;   // the ladder's top: the cap, never coarser without a ruling", names: ['TX9'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, ...CAP_PAST }; const m = capFacts(M, st), c = capFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.edge > 0.5 && m.cap && m.cap.fits && c.edge === 0.5 && c.cap && !c.cap.fits) ? null : `the mutant built the past-the-cap state at ${m.edge} mm (fits ${m.cap && m.cap.fits}; clean ${c.edge} mm, fits ${c.cap && c.cap.fits})`; } },
+  { id: 'the-exclusivity-is-dropped', rows: TEX_ROWS, why: "the refusal is dropped: with the infill on the record reports NOTHING refused and the read-out says nothing (Q9 says told, never silently picked) — measured, the infilled petal's cell panels never reach emitPanel's relief, so the sheet stays flat while the record claims a texture",
+    /* (the witness is the RECORD's word, not a displacement: on this tree an
+       infilled petal structurally carries no relief, which is exactly why a
+       dropped refusal is a silent lie rather than a visible fold) */
+    find: "  const refused = !infillIsAbsent(state) ? 'infill' : null;",
+    into: "  const refused = null;", names: ['TX6'],
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, petalTexture: 'PEBBLE', petalInfill: 'VORONOI' }; const m = texFacts(M, st), c = texFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.refused === null && c.refused === 'infill') ? null : `the mutant reports refused ${m.refused} (clean refused ${c.refused})`; } },
+  { id: 'the-part-root-spans-the-sheet', why: 'a stamen and the style are rooted one SHEET deep on a thickened hub: their roots sit inside the plate and both stand shorter than asked',
+    find: '  const rootSpan = hubThickness;',
+    into: '  const rootSpan = thickness;', names: ['JS1'], rows: /the roots span the thickened hub/,
+    witness: (M, C) => {
+      const st = { ...REGISTRY_DEFAULTS, petalLength: 100, stamenCount: 6, gynoecium: 'STYLE' };
+      const span = (G) => { const b = G.buildBloomInto(new G.MeshBuilder({ exportMode: true }), st, {}); const s0 = b.stamens[0], y0 = b.styles[0]; return [s0.outer[2] - s0.inner[2], y0.outer[2] - y0.inner[2], b.hub.thickness]; };
+      try { const [ms, my, mh] = span(M), [cs, cy] = span(C);
+        return (Math.abs(cs - mh) < 1e-9 && Math.abs(cy - mh) < 1e-9 && ms < mh - 1 && my < mh - 1) ? null : `the mutant's stamen root spans ${ms} and its style root ${my} on a ${mh} mm hub (clean ${cs} / ${cy})`;
+      } catch (e) { return `the witness threw: ${String(e && e.message || e)}`; } } },
   { id: 'the-braid-is-ignored', why: 'coilLaw never takes its braided arm: every strand coils about its OWN root as an independent coil does, on a panel that says ONE BUNDLE',
     find: "  if (coil.mode === 'BRAIDED') return braidLaw({ length, coil, frame });",
     into: "  if (false) return braidLaw({ length, coil, frame });", names: ['JS9'], rows: BRAID_ROWS,
@@ -3836,6 +4167,23 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'sheetThickness', value: '0.6' }] },
   { label: 'a raceme on 250 mm pedicels (past the head\'s own stem range — the ceiling is the pedicel\'s)',
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'pedicelLength', value: '250' }] },
+  /* THE UMBEL (the umbel session): six florets with the head OFF, and twelve
+     with the head ON — scoped to the four umbel mutants and they to these. */
+  { label: 'an umbel: six florets, the head OFF (the spider lily\'s default)', for: /umbel|head-is-built|boss-/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }] },
+  { label: 'an umbel: twelve florets, the head ON', for: /umbel|head-is-built|boss-/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '12' }, { id: 'umbelHead', value: 'ON' }] },
+  /* THE MOPHEAD (Oct 24): two rays of three florets with the head OFF, and the
+     same with the head ON (the head's petals beside the reduced florets) —
+     scoped to the five mophead mutants and they to these. */
+  { label: 'a mophead: two rays of three florets, the head OFF, at the floor', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'floretScale', value: '0.2' }] },
+  { label: 'a mophead: two rays of three florets, the head ON', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'umbelHead', value: 'ON' }] },
+  /* the 90 deg knife edge (Eva, Oct 24): the only angle at which the crossing's
+     margin binds on the band's height, so the margin mutant has a row to fire on */
+  { label: 'an umbel: six florets at 90 deg, the head OFF', for: /umbel|head-is-built|boss-/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }, { id: 'pedicelAngle', value: '90' }] },
   /* (iv) A RACEME ASKED FOR WITH NO RACHIS, and it is the ONLY state ID0 can
      speak on — measured, not reasoned. ID0 compares the geometry's guard
      against the registry's predicate, and the two agree on every state where
@@ -3869,6 +4217,8 @@ const ROWS = [
      limit binds per strand) and with two strands owning their own values
      (through `__bloomScopes`). Scoped to the braid mutants: the clean control
      still runs them. */
+  { label: 'six stamens and a style on 100 mm petals (the roots span the thickened hub)', for: /the-part-root-spans-the-sheet/,
+    set: [{ id: 'petalLength', value: '100' }, { id: 'stamenCount', value: '6' }, { id: 'gynoecium', value: 'STYLE' }] },
   { label: 'six stamens braided (one bundle, r 1.5 mm x 3 turns)', for: /braid|strand/,
     set: [{ id: 'stamenCount', value: '6' }, { id: 'stamenCoil', value: 'BRAIDED' }] },
   { label: 'six stamens braided at twelve turns (the floor clamps the twist)', for: /braid|strand/,
@@ -3945,6 +4295,26 @@ const ROWS = [
   { label: 'a scoped spine — FAN pair 2 owns the incurve on a slider fan', for: SPS_MUTANTS,
     scopes: { layers: [], petals: [{ layer: 0, slot: 2, offsets: {}, values: { petalCurlMode: 'CURVE', petalSpineCurve: SP_INCURVE } }], tiers: [] },
     set: [{ id: 'placement', value: 'FAN' }, { id: 'scopePetals', value: 'ON' }, { id: 'petalSpineCurl', value: '30' }] },
+  /* SURFACE TEXTURE (T3): three rows, scoped to the texture mutants — the
+     shipped PEBBLE, the whole bloom (a sepal and a leaf under the one field,
+     the per-organ mutant's witness) and BOTH ON (the exclusivity's). */
+  { label: 'surface texture — PEBBLE at the shipped height and size', for: /^(the-relief-goes-inward|the-bead-is-left-flat|the-field-is-sampled-per-organ|the-lattice-leaves-the-surface|the-exclusivity-is-dropped|the-edge-cap-is-removed|the-edge-is-typed-at-the-cap|the-edge-coarsens-past-the-cap)$/, set: [{ id: 'petalTexture', value: 'PEBBLE' }] },
+  { label: 'surface texture — CELLULAR x 8 sepals x a 60 mm leaf on a 60 mm stem (one field, three organs)', for: TEX_MUTANTS,
+    set: [{ id: 'petalTexture', value: 'CELLULAR' }, { id: 'sepalCount', value: '8' }, { id: 'stemLength', value: '60' }, { id: 'leafLength', value: '60' }] },
+  { label: 'surface texture — BOTH ON (the infill wins, the texture refused)', for: TEX_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalInfill', value: 'VORONOI' }] },
+  /* T5: the hub and the stem, and a closed tube — scoped to the organ mutants */
+  { label: 'surface texture T5 — PEBBLE x a 60 mm stem (the hub, the stem)', for: T5_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'stemLength', value: '60' }] },
+  { label: 'surface texture T5 — PEBBLE x a closed tube (6 petals, k 0)', for: T5_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '6' }, { id: 'tubeLayer1', value: '0' }] },
+  { label: 'surface texture T5 — PEBBLE x an UMBEL, head ON (the florets\' hubs in the world frame)', for: T5_MUTANTS, set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelHead', value: 'ON' }, { id: 'stemLength', value: '60' }] },
+  /* THE EDGE CAP (Oct 23): the corner the ruling is about and a state past
+     the cap, scoped to the cap mutants; the shipped PEBBLE row above also
+     runs under them (CAP_ROWS) for the typed-edge mutant. */
+  { label: 'texture edge cap — PEBBLE x 40 petals x 3 whorls (over the budget at 0.4 mm, lands on 0.41)', for: CAP_MUTANTS,
+    set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }] },
+  /* the past-the-cap row carries the MATRIX row's own label: TX9 asks that a
+     build which does not fit at the cap be a DECLARED refusal, by label */
+  { label: 'TEXTURE CAP: past 0.50 mm — 40 x 3 x 40 sepals x 4 tiers x whorled leaves on a 120 mm stem (REFUSED at the cap, told)', for: CAP_MUTANTS,
+    set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }, { id: 'sepalCount', value: '40' }, { id: 'sepalTiers', value: '4' }, { id: 'stemLength', value: '120' }, { id: 'leafLength', value: '60' }, { id: 'leafNodes', value: '8' }, { id: 'leafPhyllotaxy', value: 'whorled' }] },
   { label: 'an asymmetric outline curve — a LOPSIDED blade (the right half narrower)', for: ASYM_MUTANTS,
     set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
   { label: 'an asymmetric outline curve — a PINWHEEL x 5 petals', for: ASYM_MUTANTS,
@@ -4088,7 +4458,7 @@ async function famsOn(rows) {
   for (const row of rows) {
     await openBloom(page, port);
     await stillFrame(page);
-    const bad = await applyConfig(page, row.set);
+    const bad = await applyConfig(page, row.set, null, { settleMs: settleMsForRow(row.label) });
     if (bad.length) { console.log(`    (row "${row.label}" refused: ${bad[0]})`); continue; }
     /* A ROW MAY CARRY SCOPES (F1.1a): the tier offsets reach the page through
        the `__bloomScopes` hook (the scopes gate's own route) and the harness's
@@ -4155,7 +4525,7 @@ async function famsOn(rows) {
        reach the table through a call the table captures under another
        family's prefix is silent by construction. */
     for (const msg of await inflorescenceAssertions(page, row)) {
-      const mm = /^(ID\d+|NV\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(ID\d+|NV\d+|UM\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE SIZE FIELD (organic variance, build 1) — the rule once more, and the
        first family whose subject is a per-SLOT quantity: every clause is
@@ -4187,6 +4557,12 @@ async function famsOn(rows) {
        anchor, and a bare `C` would read `CA`/`CG` messages nobody pushes here. */
     for (const msg of await curlAssertions(page, row)) {
       const mm = /^(C\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+    }
+    /* SURFACE TEXTURE (T3) — the rule once more: the table never ran the TX
+       family until the texture's five mutants named it. `TX\d+` and not `T\d+`
+       (the root taper's own capture is anchored on a digit after the T). */
+    for (const msg of await textureAssertions(page, row)) {
+      const mm = /^(TX\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
   }
   return seen;

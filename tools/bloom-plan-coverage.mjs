@@ -157,6 +157,14 @@ export async function measure(page, { capability = null, wantMask = false } = {}
 
     const accFull = new mod.MeshBuilder({ exportMode: true });
     const builtFull = mod.buildBloomInto(accFull, ui, { below: null, capability, scopes });
+    /* THE TEXTURE EDGE CAP (Oct 23): the whole build may have DERIVED a lattice
+       edge coarser than the ruled 0.4 mm; every part re-emitted below must be
+       latticed on that same edge, as buildBloomInto latticed it, or R1 sums a
+       0.4 mm petal set against a 0.41 mm bloom. The edge is PINNED into the
+       parts' capability (the same hook the corner tool uses) and the
+       inflorescence's florets are built with it in force. */
+    const edgeUsed = builtFull.texture && builtFull.texture.edgeCap && !builtFull.texture.edgeCap.pinned && builtFull.texture.edgeCap.usedMm !== builtFull.texture.edgeCap.askedMm ? builtFull.texture.edgeCap.usedMm : null;
+    const capParts = edgeUsed ? { ...(capability || {}), textureEdgeMm: edgeUsed } : capability;
     const hub = builtFull.hub;
 
     const accHC = new mod.MeshBuilder({ exportMode: true });
@@ -199,7 +207,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     if (lfPlan.present) {
       for (let i = 0; i < lfPlan.azimuths.length; i++) {
         if (lfPlan.nodeLengthsMm && !(lfPlan.nodeLengthsMm[i] > 0)) continue;   // the cap left no blade (the plan says so)
-        for (const az of lfPlan.azimuths[i]) mod.buildLeafInto(accST, lfPlan, ui, i, az);
+        for (const az of lfPlan.azimuths[i]) mod.buildLeafInto(accST, lfPlan, ui, i, az, capParts);
       }
     }
     /* THE INFLORESCENCE joins the same third accumulator, and this is the
@@ -213,7 +221,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        rasterised. Crown closure is a property of the HEAD's own petals over
        the head's own disc, and a floret 20 mm out on a pedicel is no more
        "covering the crown" than a stamen over the centre is. */
-    mod.buildInflorescenceInto(accST, ui, inPlan);
+    mod.withTextureEdgeInForce(edgeUsed, () => mod.buildInflorescenceInto(accST, ui, inPlan));
 
     const fr = mod.footRing(ui, accFull, { scopes });
     /* THE SPHERE IS A LABELLED, LOUD SKIP (session 18, Eva's hard
@@ -229,6 +237,10 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        clause can be made against this tool's own answer as well as the
        app's. Decided BEFORE the split-whorl skip and before a petal is
        built, from the owner's own flag. */
+    /* (decided BEFORE the sphere's skip: a headless umbel has no sphere either)
+       AN UMBEL WITH ITS HEAD OFF — a LABELLED, LOUD SKIP: there is no head, so
+       there is no crown to cover; the florets are counted, never rasterised. */
+    if (builtFull.hubBuilt && builtFull.hubBuilt.absent) return { bad, r: null, skipped: 'UMBEL, HEAD OFF: there is no head and so no crown to cover — the florets are UM0-UM4\'s and ID\'s' };
     if (fr.sphereMode) return { bad, r: null, sphere: true, skipped: 'FULL SPHERE (hubShape SPHERE): a plan raster cannot read a sphere — the far hemisphere projects into the same disc from below and would read as a false clean; the solid-angle instrument is tools/bloom-solid-angle-coverage.mjs (session 19), NOT WIRED pending Eva\'s ruling on which rows pin it' };
     /* THE LABELLED SKIP (session 16): a split whorl is out of R3's scope —
        reported as such, loudly, before a petal is built. */
@@ -271,8 +283,8 @@ export async function measure(page, { capability = null, wantMask = false } = {}
           petalsBuilt++;
           const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
           if (scopes) { const turn = Math.floor(fr.rings[slot.index].lambda); slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: turn, slot: slot.index - turn * fr.slotCount, n: fr.slotCount, state: ui }); }
-          const p = mod.buildPetalInto(acc, ui, fr.rings[slot.index], slot, capability);
-          petalAccs.push(acc); petalSites.push({ p, ring: fr.rings[slot.index], slot, cap: capability });
+          const p = mod.buildPetalInto(acc, ui, fr.rings[slot.index], slot, capParts);
+          petalAccs.push(acc); petalSites.push({ p, ring: fr.rings[slot.index], slot, cap: capParts });
           const ref = builtFull.petals[slot.index];
           if (!ref || !near(ref.mid, p.mid, 0) || !near(ref.tip, p.tip, 0)) {
             bad.push(`coverage R3: continuous slot ${slot.index}'s captured petal does not bit-match builtFull.petals[${slot.index}]`);
@@ -302,8 +314,8 @@ export async function measure(page, { capability = null, wantMask = false } = {}
             const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
             if (scopes) slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: fr.slotCount, state: ui });
             if (mod.fanSlotMirrored(slot.index, fr.slotCount, ui)) slot.fanMirrored = true;
-            const p = mod.buildPetalInto(acc, ui, d, slot, capability);
-            petalAccs.push(acc); petalSites.push({ p, ring: d, slot, cap: capability });
+            const p = mod.buildPetalInto(acc, ui, d, slot, capParts);
+            petalAccs.push(acc); petalSites.push({ p, ring: d, slot, cap: capParts });
             if (!unsplit) {
               bad.push(`coverage R3: layer ${L} slot ${slot.index} sits in a SPLIT whorl (zygomorphy/slot roles engaged) — out of scope for this tool (RECORDED, NOT BUILT: see the header), refusing rather than guessing`);
               return;
@@ -355,11 +367,16 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        (the stem and the leaves both did). Built exactly as buildBloomInto builds
        them, against the petal sites this loop just kept, so the angle limit is
        drawn against the same laminae; the plan is asked of its one owner. */
-    if (fr.sepals) mod.buildSepalsInto(accST, ui, fr, petalSites, stPlan);
+    if (fr.sepals) mod.buildSepalsInto(accST, ui, fr, petalSites, stPlan, capParts);
 
     const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
-    if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) {
-      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
+    /* THE ORGANS' LATTICE (texture T5): the hub and the stem re-emitted here
+       are the SHIPPED parts; the whole build refined each on its own lattice,
+       and the record says by how many triangles — counted in, never hidden */
+    /* a FLORET's organs ('floret hub', ruling 5) are relieved in the parent's pass and recorded there, but their lattice is emitted inside the floret build the inflorescence appends, which the centre-only capture already counts */
+    const t5Extra = Object.entries((builtFull.texture && builtFull.texture.organs) || {}).reduce((n, [k, r]) => n + (r.organ && !k.startsWith('floret ') ? r.organ.refinedTris - r.organ.shippedTris : 0), 0);
+    if (petalTris + accHC.triangleCount + accST.triangleCount + t5Extra !== accFull.triangleCount) {
+      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) + the organs' lattice (${t5Extra}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount + t5Extra}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
     }
     /* R2 */
     if (petalsBuilt !== builtFull.petalsBuilt) {

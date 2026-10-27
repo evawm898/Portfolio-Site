@@ -60,8 +60,11 @@ test (_subrepeat_walk_score / _prefer_fundamental_seed's descent) brought
 knit_05 and knit_08 course inside the bar (-51.7 -> -6.7, -47.8 -> -2.2)
 with every other row byte-identical. knit_05 wale re-pinned 2026-10-01
 (+103.4 -> +3.3) when the wale leg-lattice climb landed, again with every
-other row byte-identical. Run this file directly to print the
-current table:
+other row byte-identical. knit_01 course re-pinned 2026-10-23 (-1.8 ->
+-46.9, now a strict xfail) when #456 stopped the course loop-center pitch
+overriding the seed by a harmonic -- the one pinned-crop row that moved,
+every other row byte-identical; see KNOWN_BEYOND_BAR for what the crop
+supports. Run this file directly to print the current table:
 
     python tests/test_ground_truth_scorecard.py
 """
@@ -132,7 +135,7 @@ BASELINE: Dict[Tuple[str, str], float] = {
     ("teal", "wale"): -12.4,
     ("teal", "course"): 2.7,
     ("knit_01", "wale"): 4.5,
-    ("knit_01", "course"): -1.8,
+    ("knit_01", "course"): -46.9,
     ("knit_02", "wale"): 120.4,
     ("knit_05", "wale"): 3.3,
     ("knit_05", "course"): -6.7,
@@ -147,6 +150,15 @@ BASELINE: Dict[Tuple[str, str], float] = {
 # Diagnosis for every row beyond the accuracy bar, so the xfail reason
 # says what the number means rather than just that it is big.
 KNOWN_BEYOND_BAR: Dict[Tuple[str, str], str] = {
+    ("knit_01", "course"): (
+        "doubled course seed, exposed by #456, future target: -46.9% confident, 110 px against the 58.4 px "
+        "row pitch on the pinned ROI. The course seed is 119 px (anti-correlated at one row, -0.15 at 59 px, "
+        "so the sub-repeat test cannot descend), v3 scores 119 over 59.5, the template walk at 59.5 reads 0.0; "
+        "the only thing in the crop that pointed at one row was a 37.0 px loop-center pitch -- 1.45x the "
+        "detector's own 25.5 px floor, 1.61x from the nearest candidate -- which the pre-#456 rule rounded to "
+        "59.5 and read -1.8%. That -1.8% was the same coin that read knit_05 at +87%, landing the other way; "
+        "#456 sets a pitch that matches no candidate aside, and this row now says what the crop supports"
+    ),
     ("knit_02", "wale"): (
         "+120%: the pinned ROI lands on the horizontal ruler crossing this photo's midsection "
         "(knit_sample_ground_truth.py says so and keeps it on purpose), and the wale reading is a "

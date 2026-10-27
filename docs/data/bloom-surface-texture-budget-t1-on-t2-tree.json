@@ -1,0 +1,307 @@
+{
+ "budget": 1500000,
+ "split": "rows",
+ "edges": [
+  0.6,
+  0.4
+ ],
+ "built": {
+  "default": {
+   "shippedTris": 24688,
+   "shippedPctBudget": 1.6,
+   "areaMm2": 7919.5,
+   "organAreaMm2": {
+    "petal": 7362.7,
+    "hub": 556.8
+   },
+   "byEdge": {
+    "0.6": {
+     "tris": 103408,
+     "pctBudget": 6.9,
+     "ideal": 43997,
+     "idealPctBudget": 2.9,
+     "byOrgan": {
+      "petal": 98800,
+      "hub": 4608
+     },
+     "idealByOrgan": {
+      "petal": 40904,
+      "hub": 3093
+     }
+    },
+    "0.4": {
+     "tris": 183168,
+     "pctBudget": 12.2,
+     "ideal": 98993,
+     "idealPctBudget": 6.6,
+     "byOrgan": {
+      "petal": 173568,
+      "hub": 9600
+     },
+     "idealByOrgan": {
+      "petal": 92034,
+      "hub": 6959
+     }
+    }
+   },
+   "ms": 1759
+  },
+  "whole": {
+   "shippedTris": 59012,
+   "shippedPctBudget": 3.9,
+   "areaMm2": 14921.5,
+   "organAreaMm2": {
+    "petal": 7362.7,
+    "hub": 563.2,
+    "stem": 1731.8,
+    "leaf": 2026.5,
+    "stamen": 1306.6,
+    "style": 183.7,
+    "sepal": 1746.8
+   },
+   "byEdge": {
+    "0.6": {
+     "tris": 204440,
+     "pctBudget": 13.6,
+     "ideal": 82897,
+     "idealPctBudget": 5.5,
+     "byOrgan": {
+      "petal": 98800,
+      "hub": 4992,
+      "stem": 20244,
+      "leaf": 33894,
+      "stamen": 15680,
+      "style": 1860,
+      "sepal": 28970
+     },
+     "idealByOrgan": {
+      "petal": 40904,
+      "hub": 3129,
+      "stem": 9621,
+      "leaf": 11258,
+      "stamen": 7259,
+      "style": 1021,
+      "sepal": 9705
+     }
+    },
+    "0.4": {
+     "tris": 355766,
+     "pctBudget": 23.7,
+     "ideal": 186519,
+     "idealPctBudget": 12.4,
+     "byOrgan": {
+      "petal": 173568,
+      "hub": 12000,
+      "stem": 30580,
+      "leaf": 59748,
+      "stamen": 24000,
+      "style": 3200,
+      "sepal": 52670
+     },
+     "idealByOrgan": {
+      "petal": 92034,
+      "hub": 7040,
+      "stem": 21648,
+      "leaf": 25332,
+      "stamen": 16333,
+      "style": 2297,
+      "sepal": 21835
+     }
+    }
+   },
+   "ms": 4290
+  },
+  "infill": {
+   "shippedTris": 108928,
+   "shippedPctBudget": 7.3,
+   "areaMm2": 6712.2,
+   "organAreaMm2": {
+    "petal": 6155.5,
+    "hub": 556.8
+   },
+   "byEdge": {
+    "0.6": {
+     "tris": 202288,
+     "pctBudget": 13.5,
+     "ideal": 37290,
+     "idealPctBudget": 2.5,
+     "byOrgan": {
+      "petal": 197680,
+      "hub": 4608
+     },
+     "idealByOrgan": {
+      "petal": 34197,
+      "hub": 3093
+     }
+    },
+    "0.4": {
+     "tris": 358096,
+     "pctBudget": 23.9,
+     "ideal": 83903,
+     "idealPctBudget": 5.6,
+     "byOrgan": {
+      "petal": 348496,
+      "hub": 9600
+     },
+     "idealByOrgan": {
+      "petal": 76943,
+      "hub": 6959
+     }
+    }
+   },
+   "ms": 7947
+  },
+  "tube": {
+   "shippedTris": 24672,
+   "shippedPctBudget": 1.6,
+   "areaMm2": 8695.3,
+   "organAreaMm2": {
+    "petal": 6352.1,
+    "hub": 556.8,
+    "tube": 1786.4
+   },
+   "byEdge": {
+    "0.6": {
+     "tris": 111210,
+     "pctBudget": 7.4,
+     "ideal": 48307,
+     "idealPctBudget": 3.2,
+     "byOrgan": {
+      "petal": 84586,
+      "hub": 4608,
+      "tube": 22016
+     },
+     "idealByOrgan": {
+      "petal": 35289,
+      "hub": 3093,
+      "tube": 9924
+     }
+    },
+    "0.4": {
+     "tris": 198500,
+     "pctBudget": 13.2,
+     "ideal": 108691,
+     "idealPctBudget": 7.2,
+     "byOrgan": {
+      "petal": 152644,
+      "hub": 9600,
+      "tube": 36256
+     },
+     "idealByOrgan": {
+      "petal": 79401,
+      "hub": 6959,
+      "tube": 22330
+     }
+    }
+   },
+   "ms": 1814
+  }
+ },
+ "corners": {
+  "INFILL: x 40 petals x 3 whorls": {
+   "shippedTris": 1035632,
+   "shippedPctBudget": 69,
+   "areaMm2": 71218.9,
+   "organAreaMm2": {
+    "petal": 65510.6,
+    "hub": 5708.3
+   },
+   "byEdge": {
+    "0.6": {
+     "tris": 1866764,
+     "pctBudget": 124.5,
+     "ideal": 395661,
+     "idealPctBudget": 26.4,
+     "byOrgan": {
+      "petal": 1829612,
+      "hub": 37152
+     },
+     "idealByOrgan": {
+      "petal": 363948,
+      "hub": 31713
+     }
+    },
+    "0.4": {
+     "tris": 3301322,
+     "pctBudget": 220.1,
+     "ideal": 890236,
+     "idealPctBudget": 59.3,
+     "byOrgan": {
+      "petal": 3222410,
+      "hub": 78912
+     },
+     "idealByOrgan": {
+      "petal": 818882,
+      "hub": 71354
+     }
+    }
+   },
+   "ms": 87819
+  },
+  "whole bloom x 40 petals x 3 whorls": {
+   "shippedTris": 401956,
+   "shippedPctBudget": 26.8,
+   "areaMm2": 85574.2,
+   "organAreaMm2": {
+    "petal": 72800.2,
+    "hub": 5711.4,
+    "stem": 1731.8,
+    "leaf": 2026.5,
+    "stamen": 1306.6,
+    "style": 183.7,
+    "sepal": 1813.9
+   },
+   "byEdge": {
+    "0.6": {
+     "tris": 1200440,
+     "pctBudget": 80,
+     "ideal": 475412,
+     "idealPctBudget": 31.7,
+     "byOrgan": {
+      "petal": 1059520,
+      "hub": 39072,
+      "stem": 20244,
+      "leaf": 33894,
+      "stamen": 15680,
+      "style": 1860,
+      "sepal": 30170
+     },
+     "idealByOrgan": {
+      "petal": 404446,
+      "hub": 31730,
+      "stem": 9621,
+      "leaf": 11258,
+      "stamen": 7259,
+      "style": 1021,
+      "sepal": 10077
+     }
+    },
+    "0.4": {
+     "tris": 2121698,
+     "pctBudget": 141.4,
+     "ideal": 1069678,
+     "idealPctBudget": 71.3,
+     "byOrgan": {
+      "petal": 1863280,
+      "hub": 87840,
+      "stem": 30580,
+      "leaf": 59748,
+      "stamen": 24000,
+      "style": 3200,
+      "sepal": 53050
+     },
+     "idealByOrgan": {
+      "petal": 910003,
+      "hub": 71393,
+      "stem": 21648,
+      "leaf": 25332,
+      "stamen": 16333,
+      "style": 2297,
+      "sepal": 22674
+     }
+    }
+   },
+   "ms": 30304
+  }
+ }
+}

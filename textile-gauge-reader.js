@@ -1449,7 +1449,8 @@
   // Automatic ruler calibration detection (see backend /detect-ruler,
   // which wraps analysis.gauge_analysis.detect_ruler_calibration). Runs
   // as soon as an image is uploaded, BEFORE the user clicks anything, and
-  // -- if it finds a plausible ruler -- pre-fills the two calibration
+  // -- if it finds a ruler whose span it can justify (the backend declines
+  // to offer anything it cannot) -- pre-fills the two calibration
   // points, known distance, and unit as a SUGGESTION only: the Confirm
   // Calibration button still requires the user's own click (same as
   // every other value on this step, auto-filled or not), and clicking
@@ -1457,7 +1458,8 @@
   // still-in-flight or already-applied auto-detection. Best-effort only
   // -- any failure here just leaves manual calibration exactly as it
   // already was, with no error shown (this is a convenience, not a
-  // required step).
+  // required step). When the backend answers but offers nothing, the
+  // Calibrate step says so and says how to calibrate by hand.
   async function detectRulerCalibration() {
     if (!CONFIG.API_BASE_URL) return;
     const forFile = state.file;
@@ -1480,7 +1482,10 @@
         clearTimeout(timer);
       }
       data = await res.json();
-      if (!res.ok || !data.success) return;
+      // A non-OK response is a failure of the request, not an answer about the
+      // photo: stay silent and leave manual calibration as it was. An OK response
+      // with success=false IS an answer -- no verified ruler -- and says so below.
+      if (!res.ok) return;
     } catch {
       return;
     } finally {
@@ -1494,6 +1499,17 @@
     // manually, since this request went out -- never overwrite either.
     if (state.file !== forFile || state.cal.points.length > 0) return;
 
+    // Nothing was pre-filled: either no ruler was found, or one was found but the
+    // distance between the marks could not be justified from its own tick pattern
+    // (backend justify_ruler_calibration). Say so, and say what to do instead.
+    if (!data.success) {
+      calAutoHint.textContent =
+        "No ruler scale could be verified in this photo, so nothing was pre-filled. " +
+        "Click two marks on your ruler, then type the distance between them.";
+      calAutoHint.hidden = false;
+      return;
+    }
+
     state.cal.points = [
       { x: data.point1_px[0], y: data.point1_px[1] },
       { x: data.point2_px[0], y: data.point2_px[1] },
@@ -1502,14 +1518,12 @@
     unitSelect.value = data.suggested_unit;
     state.calAutoDetected = true;
 
-    const confidencePct = Math.round((data.confidence || 0) * 100);
-    const spanDesc =
-      data.major_tick_count >= 2
-        ? `${data.suggested_distance} ${data.suggested_unit} between two numbered tick marks`
-        : "a short span of ruler tick marks";
+    // The backend's own plain-words statement of what the detector assumed
+    // (e.g. "Read as 1 cm between these two marks ..."). The detector's confidence
+    // is not shown: it does not separate a right pre-fill from a wrong one.
     calAutoHint.textContent =
-      `Auto-detected from a ruler in your photo (${spanDesc}, ~${confidencePct}% confidence). ` +
-      `Review the two points and known distance below, then confirm — or click "Redo Points" to mark manually.`;
+      `${data.assumption || "Pre-filled from a ruler in your photo."} ` +
+      `Review the two points and distance below, then confirm — or click "Redo Points" to mark them yourself.`;
     calAutoHint.hidden = false;
 
     updateCalibrationUI();
@@ -2950,18 +2964,20 @@
     const courseCpi = m.course.per_inch != null ? m.course.per_inch.toFixed(2) : "—";
     const d = m.loop_lattice_debug;
     const isCounted = m.wale_source === "loop_count";
-    // What actually fed the wale consensus for this region: its counted
-    // spacing (from the loop-lattice detector's own accepted columns)
-    // when trustworthy, its periodicity estimate otherwise -- see the
-    // module comment above _wale_count_candidate in gauge_analysis.py.
-    const waleUsedWpi = isCounted && d && d.wale_per_inch != null ? d.wale_per_inch.toFixed(2) : waleWpi;
+    // What fed the wale consensus for this region is always its own
+    // periodicity reading; a trustworthy loop-lattice count that AGREES
+    // with it corroborates it and supplies the vote's confidence, never
+    // the value -- see the module comments above _wale_count_candidate
+    // and _wale_count_harmonic_note in gauge_analysis.py.
+    const waleUsedWpi = waleWpi;
+    const countedWpi = d && d.wale_per_inch != null ? d.wale_per_inch.toFixed(2) : "?";
 
     roiDiagContent.innerHTML = `
       <div class="tgr-roi-diag-card">
         <div class="tgr-roi-diag-card__row"><span>Source</span><span>${m.source === "manual" ? "Manual" : "Auto-proposed"}</span></div>
         <div class="tgr-roi-diag-card__row"><span>Wale ${roiDiagTag("", waleIncluded)}</span><span>${waleUsedWpi}/in &middot; ${Math.round(m.wale.confidence * 100)}% (internal, uncalibrated)</span></div>
-        <div class="tgr-roi-diag-card__row"><span>Wale evidence used</span><span>${isCounted ? `counted (${d ? d.column_count : "?"} columns)` : "periodicity"}</span></div>
-        ${isCounted ? "" : `<div class="tgr-roi-diag-card__row"><span>Periodicity estimate</span><span>${waleWpi}/in</span></div>`}
+        <div class="tgr-roi-diag-card__row"><span>Wale evidence used</span><span>${isCounted ? `periodicity, corroborated by a count of ${d ? d.column_count : "?"} columns (${countedWpi}/in)` : "periodicity"}</span></div>
+        ${m.wale_count_note ? `<div class="tgr-roi-diag-card__row"><span>Count not used</span><span>${m.wale_count_note}</span></div>` : ""}
         <div class="tgr-roi-diag-card__row"><span>Course ${roiDiagTag("", courseIncluded)}</span><span>${courseCpi}/in &middot; ${Math.round(m.course.confidence * 100)}% (internal, uncalibrated)</span></div>
         <div class="tgr-roi-diag-card__row"><span>ROI quality</span><span>${(m.quality_score * 100).toFixed(0)}%</span></div>
         ${d ? `<div class="tgr-roi-diag-card__row"><span>Loop-lattice detections</span><span>${d.direct_center_count} direct &middot; ${d.column_count} of ${d.columns_considered != null ? d.columns_considered : "?"} candidate columns accepted</span></div>` : ""}

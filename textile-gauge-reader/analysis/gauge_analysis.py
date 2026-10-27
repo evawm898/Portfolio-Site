@@ -1323,6 +1323,11 @@ class _PeriodDecision:
     corrected: bool   # True if the final period differs from the raw autocorrelation estimate
     validated: bool    # True if independent loop-center evidence was actually available/used
     candidate_details: List[CandidateInfo] = field(default_factory=list)
+    # False when a loop-center pitch WAS offered and was set aside because it
+    # agreed with no member of the candidate family (see _reconcile_period's
+    # center_log_tolerance) -- the caller then draws positions from the 1D
+    # signal, as it does when no pitch was offered at all.
+    center_pitch_used: bool = True
 
 
 def _labeled_candidates(p0: float, min_plausible: float) -> List[Tuple[float, str]]:
@@ -1347,6 +1352,7 @@ def _reconcile_period(
     p_centers: Optional[float],
     min_plausible: float,
     signal: Optional[np.ndarray] = None,
+    center_log_tolerance: Optional[float] = None,
 ) -> _PeriodDecision:
     """
     Decide the final period for one direction, given:
@@ -1361,6 +1367,20 @@ def _reconcile_period(
         Passed only for the wale axis (see `analyze_gauge`) — course
         periodicity doesn't have the V-leg-symmetry failure mode this
         targets, and this keeps course detection byte-for-byte unchanged.
+
+      - center_log_tolerance: when given, the loop-center pitch may only
+        CORROBORATE a member of the 0.5x/1x/2x family -- pick the one it
+        agrees with within this log-ratio -- and never pull the pick to a
+        harmonic it does not itself match. A pitch further than this from
+        EVERY candidate is not evidence about this family at all (noise
+        from an over-dense detection, or the detector's own minimum-
+        separation floor: see the course note in analyze_gauge) and is set
+        aside, exactly as if none had been offered; the decision says so
+        and reports center_pitch_used=False. `_analyze_direction` passes
+        HARMONIC_MATCH_LOG_TOLERANCE, the same ~1.4x the v3 scorer's
+        _center_pitch_agreement uses for the wale axis. None keeps the
+        original contract (nearest candidate on a log scale, whatever the
+        distance), which the unit tests pin.
 
     Rather than trusting p0's strongest autocorrelation peak outright,
     explicitly evaluate 0.5x / 1x / 2x of it and prefer whichever
@@ -1391,6 +1411,27 @@ def _reconcile_period(
         fold_scores = {c: _fold_consistency(signal, c, min_plausible) for c in candidates}
 
     p0_key = min(candidates, key=lambda c: abs(c - round(p0, 3)))
+
+    # Agreement gate (see the docstring): a loop-center pitch that matches
+    # none of the family within center_log_tolerance is set aside here, so
+    # the branch below sees exactly what it sees when no pitch was offered.
+    center_pitch_note: Optional[str] = None
+    if (
+        center_log_tolerance is not None
+        and p_centers is not None
+        and p_centers >= min_plausible
+    ):
+        nearest = min(candidates, key=lambda c: abs(math.log(c / p_centers)))
+        gap = abs(math.log(nearest / p_centers))
+        if gap > center_log_tolerance:
+            center_pitch_note = (
+                f"loop-center spacing ({p_centers:.1f}px) matched none of the 0.5x/1x/2x candidates "
+                f"({', '.join(f'{c:.1f}' for c in candidates)}px) -- the nearest, {nearest:.1f}px, is "
+                f"{math.exp(gap):.2f}x away against a {math.exp(center_log_tolerance):.2f}x agreement "
+                f"tolerance -- so it is not evidence about this family and was not used; the "
+                f"autocorrelation period ({p0:.1f}px) stands as-is (may be a harmonic — treat with caution)"
+            )
+            p_centers = None
 
     # The single most fold-consistent candidate (a genuine complete-loop
     # repeat should reproduce nearly the same waveform shape every period;
@@ -1435,15 +1476,20 @@ def _reconcile_period(
                 f"candidate whose repeats actually look like each other"
             )
             corrected = abs(math.log(fold_override / p0)) > 0.05
-            return _PeriodDecision(fold_override, candidates, reason, corrected, True, _details(fold_override))
+            return _PeriodDecision(
+                fold_override, candidates, reason, corrected, True, _details(fold_override),
+                center_pitch_used=False,
+            )
         return _PeriodDecision(
             p0,
             candidates,
-            "no independent loop-center evidence available; used the autocorrelation period as-is "
+            center_pitch_note
+            or "no independent loop-center evidence available; used the autocorrelation period as-is "
             "(may be a harmonic — treat with caution)",
             False,
             False,
             _details(p0_key),
+            center_pitch_used=False,
         )
 
     # Pick whichever harmonic candidate is closest to the loop-center
@@ -1728,10 +1774,17 @@ def _analyze_direction(
     loop_centers: np.ndarray,
     center_axis_index: int,
     use_fold_consistency: bool = False,
+    center_log_tolerance: Optional[float] = HARMONIC_MATCH_LOG_TOLERANCE,
 ) -> AxisResult:
     decision = _reconcile_period(
-        p0, p_centers, MIN_PLAUSIBLE_SPACING_PX, signal=signal if use_fold_consistency else None
+        p0, p_centers, MIN_PLAUSIBLE_SPACING_PX, signal=signal if use_fold_consistency else None,
+        center_log_tolerance=center_log_tolerance,
     )
+    # A loop-center pitch the reconciliation set aside (it agreed with no
+    # candidate) is set aside for the overlay positions too: one decision
+    # about that evidence, not two.
+    if not decision.center_pitch_used:
+        p_centers = None
 
     if decision.period is None:
         return AxisResult(
@@ -4061,12 +4114,20 @@ def _brightness_score(mean_brightness: float) -> float:
     return float(np.clip((255.0 - mean_brightness) / (255.0 - hi), 0.0, 1.0))
 
 
-def _roi_quality_score(crop_gray: np.ndarray) -> Tuple[float, dict]:
+def _roi_quality_score(crop_gray: np.ndarray, sharpness_ceiling: Optional[float] = None) -> Tuple[float, dict]:
     """
     Generic image-quality score for an automatically-proposed measurement
     area candidate -- NOT the final gauge-detection confidence (that's
     computed per-approved-ROI, later, by analyze_gauge). Used only to
     rank and select candidate regions before the user ever sees them.
+
+    `sharpness_ceiling` is the Laplacian variance at which a window's
+    sharpness term saturates at 1.0. propose_measurement_rois passes the
+    PHOTO'S OWN clean-fabric level (_global_sharpness_baseline) -- see
+    ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING for why a fixed number cannot
+    do this job; the fixed number is the fallback for a caller that has
+    no photo to measure (the unit tests score single crops) and for a
+    photo with too little textured area to establish a baseline.
     """
     if crop_gray.size == 0:
         parts = dict(
@@ -4078,11 +4139,20 @@ def _roi_quality_score(crop_gray: np.ndarray) -> Tuple[float, dict]:
     crop_f = crop_gray.astype(np.float32)
 
     # Sharpness: variance of the Laplacian -- low for blur, high for
-    # crisp edges. Normalized against a generous ceiling (empirically,
-    # very sharp textile close-ups rarely exceed this) so no single
-    # outlier crop dominates relative ranking.
+    # crisp edges -- against a ceiling so no single outlier crop can
+    # dominate the ranking on this term. The ceiling is the photo's own
+    # clean-fabric level wherever the caller could measure one: a window
+    # AT that level is as sharp as this fabric gets (1.0), a window under
+    # it is softer than the fabric around it (defocus, motion, a curled
+    # edge), and a window ABOVE it is sharper than fabric can be -- a
+    # ruler's print, a label -- which is capped, never rewarded.
+    ceiling = (
+        float(sharpness_ceiling)
+        if sharpness_ceiling is not None and sharpness_ceiling > 1e-6
+        else ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING
+    )
     sharpness_raw = float(cv2.Laplacian(crop_gray, cv2.CV_32F).var())
-    sharpness = float(np.clip(sharpness_raw / 500.0, 0.0, 1.0))
+    sharpness = float(np.clip(sharpness_raw / ceiling, 0.0, 1.0))
 
     # Local contrast: plain std-dev of intensity. Flat background or a
     # blown-out region both score low here.
@@ -4116,6 +4186,56 @@ def _roi_quality_score(crop_gray: np.ndarray) -> Tuple[float, dict]:
     return float(np.clip(score, 0.0, 1.0)), parts
 
 
+# The sharpness term's ceiling when no photo baseline is available (a
+# unit test scoring one crop; a photo with under five textured blocks).
+# It is NOT the production ceiling, and the reason is a measurement, not
+# a preference. "Variance of the Laplacian" carries no fixed-pixel
+# meaning across scales: on a textile photo it is dominated by sensor
+# noise, JPEG blocking and in-camera sharpening, which no resampling law
+# predicts. Measured on the eight real fixtures' KNOWN-CLEAN pinned
+# crops, native scale -> the proposer's 180 px/in working copy (INTER_
+# AREA): knit_09 1019 -> 453 at a resample factor of 0.963, knit_05
+# 193 -> 96, knit_01 1445 -> 1099, knit_08 1016 -> 715, knit_06 879 ->
+# 1355 (UP), knit_02 144 -> 608 (up 4.2x at a factor of 0.152) -- against
+# the s^4 a smooth texture would follow (0.001 .. 0.86 over the same
+# rows). Clean fabric at the working scale spans 96 .. 1355, so there is
+# no single value at 180 px/in that is "the level sharp fabric reaches":
+# whichever number is typed here, some clean photo sits well under it,
+# and on THAT photo any window that borrows a strip of a ruler (whose
+# print reads 5,000-7,000 at the working scale, above fabric at every
+# scale) wins the sharpness term outright. This is how the ruler-band
+# regression entered at 180 px/in: the synthetic fabric's 711 at native
+# was pixel noise (sigma 6 white noise through the 3x3 Laplacian is 720
+# by arithmetic) that INTER_AREA averaged down to 265, under this
+# ceiling, while the ruler strip's hard edges stayed over it. So the
+# production ceiling is the photo's OWN clean-fabric level, measured at
+# the scale the proposer runs at (_global_sharpness_baseline -- the same
+# construction as the anomaly gate's _global_local_std_baseline), and
+# this constant is reached only where that cannot be measured.
+ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING = 500.0
+
+# Fixed-PIXEL constants of the proposer, audited at the working scale
+# (ROI_PROPOSAL_WORKING_PX_PER_INCH, 180 px/in, 7.09 px/mm -- the finest
+# image the proposer ever sees; a coarser photo runs at its own scale,
+# as it always did):
+#   * the 16 px fabric / anomaly block is 2.26 mm. The anomaly fraction's
+#     0.5 gate, its 4-MAD multiplier and the 10-grey-level fabric floor
+#     were swept on the two real fixtures at THEIR native scales -- the
+#     jersey at 166 px/in (16 px = 2.45 mm) and the teal at 273 px/in
+#     (1.49 mm) -- so the working scale sits inside the span those
+#     thresholds were set over. Unchanged.
+#   * the minimum sizes: _periodicity_consistency_score's 20 px half-
+#     crop (a 40 px crop, 5.6 mm), _local_anomaly_fraction's four blocks
+#     (64 px, 9.0 mm), MIN_ROI_DIM_PX * 2 (80 px, 11.3 mm) are each well
+#     under the smallest window tried, 0.75 in = 135 px. Unchanged.
+#   * the kernels are the analyser's own primitives, reused: the 3x3
+#     Gaussian and Sobel in _enhance_texture, SMOOTHING_WINDOW_PX = 3 and
+#     MIN_PLAUSIBLE_SPACING_PX = 3 in _project / _autocorrelation_spacing
+#     -- 3 px is 0.42 mm, 60 repeats per inch, finer than any knit; the
+#     CLAHE 8x8 tile grid and the texture-consistency 4x4 grid are counts.
+#     Unchanged.
+#   * the sharpness ceiling: the one constant with no consistent value at
+#     any scale -- replaced by the photo's own baseline, above.
 ROI_PROPOSAL_BACKGROUND_BLOCK_PX = 16       # block size for the coarse fabric-vs-background variance map
 ROI_PROPOSAL_BACKGROUND_STD_THRESHOLD = 10.0  # blocks with local std-dev below this count as "background"
 ROI_PROPOSAL_MIN_FABRIC_FRACTION = 0.97       # a candidate window must be at least this "fabric" to be considered at all
@@ -4234,6 +4354,37 @@ def _global_local_std_baseline(gray_full: np.ndarray, block: int = ROI_PROPOSAL_
     return median, mad
 
 
+def _global_sharpness_baseline(gray_full: np.ndarray, block: int = ROI_PROPOSAL_ANOMALY_BLOCK_PX) -> Optional[float]:
+    """
+    The photo's own clean-fabric sharpness: the MEDIAN per-block variance
+    of the Laplacian across the whole image, over blocks that already
+    read as textured by _fabric_mask's floor, computed ONCE per proposal
+    run and handed to every candidate's _roi_quality_score as its
+    sharpness ceiling (see ROI_PROPOSAL_SHARPNESS_FALLBACK_CEILING for
+    why the ceiling has to come from the photo). A median, like the
+    anomaly baseline's: a ruler band that is a sixth of the photo at
+    twenty times fabric's Laplacian variance cannot move it, where a mean
+    would be dragged to a level no fabric window reaches. Returns None
+    where fewer than five textured blocks exist -- callers fall back to
+    the fixed ceiling and the proposal still runs.
+    """
+    gray_f = gray_full.astype(np.float32)
+    k = (block, block)
+    mean = cv2.boxFilter(gray_f, ddepth=-1, ksize=k, normalize=True)
+    mean_sq = cv2.boxFilter(gray_f * gray_f, ddepth=-1, ksize=k, normalize=True)
+    local_std = np.sqrt(np.clip(mean_sq - mean * mean, 0.0, None))
+    lap = cv2.Laplacian(gray_f, cv2.CV_32F)
+    lap_mean = cv2.boxFilter(lap, ddepth=-1, ksize=k, normalize=True)
+    lap_mean_sq = cv2.boxFilter(lap * lap, ddepth=-1, ksize=k, normalize=True)
+    lap_var = np.clip(lap_mean_sq - lap_mean * lap_mean, 0.0, None)
+    sampled_std = local_std[block // 2 :: block, block // 2 :: block]
+    sampled_var = lap_var[block // 2 :: block, block // 2 :: block]
+    textured = sampled_var[sampled_std >= ROI_PROPOSAL_BACKGROUND_STD_THRESHOLD]
+    if textured.size < 5:
+        return None
+    return float(np.median(textured))
+
+
 def _local_anomaly_fraction(
     crop_gray: np.ndarray,
     global_median_std: Optional[float],
@@ -4312,7 +4463,75 @@ def _local_anomaly_fraction(
     return float(np.mean(anomaly))
 
 
+# The proposer runs at ONE working resolution, whatever the photo's own.
+# Every gate and score below carries fixed-PIXEL constants that were
+# tuned on ~170-350 px/in photos: _fabric_mask's and the anomaly
+# baseline's 16 px blocks with an absolute std-dev floor, MIN_PLAUSIBLE_
+# SPACING_PX, the quadrant split's 20 px minimum (each audited at the
+# working scale beside ROI_PROPOSAL_BACKGROUND_BLOCK_PX), and the
+# Laplacian sharpness ceiling, which turned out to have no consistent
+# value at any scale and now comes from the photo itself
+# (_global_sharpness_baseline). On a phone-resolution photo (knit_sample_02 is 1187 px/in) a
+# 16 px block sits INSIDE a single smooth yarn strand, so its local
+# std-dev falls under the floor and real fabric reads as "background":
+# knit_02's windows scored 31-53% fabric against the 97% gate and every
+# candidate at every size was rejected before it was scored (likewise
+# knit_05 at 320 px/in, 17-95%; and any photo upscaled 2x). So a photo
+# finer than this is downsampled (INTER_AREA) for proposal only, the
+# windows are chosen there, and their coordinates are mapped back to the
+# full-resolution image -- which is what analysis then reads, untouched.
+# Never upsampled: a coarser photo has nothing finer to recover.
+# 180 px/in: the synthetic fixtures' own scale, the coarsest at which
+# every ground-truth fixture is proposed at 0.5x / 1x / 2x of its own
+# resolution, and above it the 2x-upscaled synthetic garter loses its
+# proposals again (README, "Measurement-area proposal at one working
+# resolution").
+ROI_PROPOSAL_WORKING_PX_PER_INCH = 180.0
+
+
 def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> RoiProposalResult:
+    """
+    Resolution-normalised front door onto _propose_measurement_rois_at_scale
+    (see ROI_PROPOSAL_WORKING_PX_PER_INCH for why): proposes on a copy
+    downsampled to the working resolution when the photo is finer, and
+    returns the areas in the ORIGINAL image's pixel coordinates.
+    """
+    if image_bgr is None or image_bgr.size == 0:
+        return RoiProposalResult(success=False, message="No image data to propose areas from.")
+    if pixels_per_mm is None or pixels_per_mm <= 0:
+        return RoiProposalResult(success=False, message="Invalid calibration scale.")
+
+    working_ppm = ROI_PROPOSAL_WORKING_PX_PER_INCH / 25.4
+    if pixels_per_mm <= working_ppm:
+        return _propose_measurement_rois_at_scale(image_bgr, pixels_per_mm)
+
+    img_h, img_w = image_bgr.shape[:2]
+    factor = working_ppm / pixels_per_mm
+    small_w = max(1, int(round(img_w * factor)))
+    small_h = max(1, int(round(img_h * factor)))
+    small = cv2.resize(image_bgr, (small_w, small_h), interpolation=cv2.INTER_AREA)
+    # The scale actually applied per axis (rounding moves it off `factor`
+    # by under a pixel's worth); the proposer is told the small image's
+    # own px/mm so its inch-sized windows stay the requested inches.
+    sx, sy = small_w / img_w, small_h / img_h
+    result = _propose_measurement_rois_at_scale(small, pixels_per_mm * (sx + sy) / 2.0)
+    if not result.rois:
+        return result
+
+    def _back(v: float, s: float) -> int:
+        return int(round(v / s))
+
+    rois = []
+    for r in result.rois:
+        side = min(_back(r.width, (sx + sy) / 2.0), img_w, img_h)
+        x = min(max(0, _back(r.x, sx)), img_w - side)
+        y = min(max(0, _back(r.y, sy)), img_h - side)
+        rois.append(replace(r, x=x, y=y, width=side, height=side))
+    window = min(_back(result.window_size_px, (sx + sy) / 2.0), img_w, img_h) if result.window_size_px else None
+    return RoiProposalResult(success=result.success, message=result.message, rois=rois, window_size_px=window)
+
+
+def _propose_measurement_rois_at_scale(image_bgr: np.ndarray, pixels_per_mm: float) -> RoiProposalResult:
     """
     Propose a FEW (ROI_PROPOSAL_MIN_REGIONS..ROI_PROPOSAL_MAX_REGIONS)
     candidate measurement areas for the user to review/edit/approve
@@ -4388,6 +4607,7 @@ def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> Roi
     gray_full = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
     fabric_mask = _fabric_mask(gray_full)
     anomaly_baseline_median, anomaly_baseline_mad = _global_local_std_baseline(gray_full)
+    sharpness_ceiling = _global_sharpness_baseline(gray_full)
 
     best_size_selection: Optional[List[dict]] = None  # best candidate SET seen at any size, as a last-resort fallback
     best_size_window_px: Optional[int] = None
@@ -4432,7 +4652,7 @@ def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> Roi
                 anomaly_fraction = _local_anomaly_fraction(crop_gray, anomaly_baseline_median, anomaly_baseline_mad)
                 if anomaly_fraction > ROI_PROPOSAL_MAX_ANOMALY_FRACTION:
                     continue
-                score, parts = _roi_quality_score(crop_gray)
+                score, parts = _roi_quality_score(crop_gray, sharpness_ceiling=sharpness_ceiling)
                 # Third hard gate: periodicity_consistency is only 20% of
                 # the weighted score above, so a window that's mostly
                 # clean but grazes a curled/distorted/wrinkled band (or
@@ -4639,6 +4859,77 @@ def _wale_count_candidate(lattice: Optional["LoopLatticeResult"]) -> Tuple[Optio
     return lattice.wale_spacing_px, confidence
 
 
+# A region's COUNTED spacing may CORROBORATE its own periodicity reading --
+# raising the confidence the region votes with -- and never REPLACES it,
+# neither across a harmonic nor within the agreement tolerance (the value
+# fed to the consensus is always the region's own reading; see
+# wale_candidates in analyze_multi_roi). Measured on the app-path
+# scorecard (tests/app_path_scorecard.py, every fixture, the exact scale and
+# +-0.5/1/2% jitter -- 70 runs, ~200 regions): wherever the two disagreed,
+# the count was the wrong one, every time -- usually the stitch-LEG lattice
+# at half the true period (every clean fabric: synth_jersey, synth_garter,
+# jersey, knit_09, teal all read the leg spacing on most regions) and
+# sometimes a 2x/3x of it where columns were missed. Not once was the
+# periodicity reading a harmonic of the truth while the count was right.
+# The reason is structural: analyze_loop_lattice_experiment picks its scale
+# among the periodicity's own 0.5x/1x/2x family by lattice REGULARITY
+# alone, and on regular fabric the leg lattice is exactly as regular as the
+# loop lattice (on the synthetic fabrics both read 1.000 and the tie goes
+# to the finer candidate), whereas the periodicity scorer decided among the
+# same three candidates with the 2D template walk, phase consistency, fold
+# consistency and the leg-lattice climb. So a count that lands on a
+# different member of that family than the scorer did is the count
+# repeating the harmonic error the scorer already rejected, with less
+# evidence. The tolerance is the consensus's own "agrees" tolerance
+# (CONSENSUS_INLIER_LOG_TOLERANCE), so "the count agrees with the region's
+# own reading" means the same thing here as "two regions agree" does there.
+# A region with no periodicity reading at all has nothing to corroborate
+# and nothing to vote with.
+#
+# Why the count supplies confidence and not the value, even when it agrees
+# (Eva's ruling on the same scorecard): a count of 4-6 columns on a 250 px
+# window (the real jersey) agrees with the reading to within 1.25x while
+# sitting 12-22% high (a missed column leaves the median interval long),
+# and its confidence -- regularity and row support, which a missed column
+# barely dents -- outweighed the region's own, so the result swung with the
+# calibration scale (4.19 / 4.34 / 3.85 against a true 5.00 at three of
+# seven jitter scales). Fed the reading instead, jersey holds 4.66-4.83 at
+# every scale. The cost, accepted by ruling: teal, whose own periodicity is
+# 12% low on every area at every scale, reads -11.0% instead of the -6.6% a
+# corroborating count's value gave it (pinned as a known confident-and-
+# wrong row; the next mechanism is the count's precision on small windows).
+WALE_COUNT_AGREEMENT_LOG_TOLERANCE = CONSENSUS_INLIER_LOG_TOLERANCE
+
+
+def _wale_count_harmonic_note(count_px: Optional[float], periodicity_px: Optional[float]) -> Optional[str]:
+    """
+    None when a region's counted spacing agrees with its own periodicity
+    reading (within WALE_COUNT_AGREEMENT_LOG_TOLERANCE in log-ratio), or
+    when there is no periodicity reading to compare against -- the count
+    may then corroborate the reading (supplying the candidate's
+    confidence). Otherwise a human-readable reason naming the disagreement
+    (and the harmonic it is consistent with, when it is one), and the
+    count is NOT used: the region votes with its own periodicity
+    confidence. The VALUE the region contributes is its own periodicity
+    reading either way. See the comment above.
+    """
+    if count_px is None or periodicity_px is None or count_px <= 0 or periodicity_px <= 0:
+        return None
+    ratio = count_px / periodicity_px
+    if abs(math.log(ratio)) <= WALE_COUNT_AGREEMENT_LOG_TOLERANCE:
+        return None
+    if abs(math.log(ratio * 2.0)) <= CONSENSUS_HARMONIC_LOG_TOLERANCE:
+        harmonic = " -- consistent with the stitch-leg half-period, not a loop count"
+    elif abs(math.log(ratio / 2.0)) <= CONSENSUS_HARMONIC_LOG_TOLERANCE:
+        harmonic = " -- consistent with a doubled repeat (missed columns), not a loop count"
+    else:
+        harmonic = ""
+    return (
+        f"Counted spacing {count_px:.1f}px disagrees with this region's own periodicity reading "
+        f"{periodicity_px:.1f}px ({ratio:.2f}x){harmonic}; the periodicity reading was used instead."
+    )
+
+
 @dataclass
 class OutlierInfo:
     """
@@ -4709,16 +5000,24 @@ class RoiMeasurement:
     loop_centers_px: List[Tuple[float, float]] = field(default_factory=list)
     rotation_deg: float = 0.0
     loop_lattice: Optional["LoopLatticeResult"] = None
-    # Which evidence the WALE consensus candidate below actually came
-    # from: "loop_count" when this region's own loop-lattice detector
-    # found enough well-supported columns to COUNT a spacing directly
-    # (median interval between real, position-verified stitch columns);
-    # "periodicity" when it fell back to the autocorrelation-based
-    # estimate (analyze_gauge's own wale.spacing_px) because loop-lattice
-    # didn't produce a trustworthy result for this region. See
-    # _wale_count_candidate.
+    # Which evidence backs this region's WALE consensus candidate:
+    # "loop_count" when this region's own loop-lattice detector found
+    # enough well-supported columns to COUNT a spacing directly (median
+    # interval between real, position-verified stitch columns) AND that
+    # count agrees with the region's own periodicity reading -- the count
+    # then CORROBORATES the reading and supplies the candidate's
+    # confidence; "periodicity" when there was no trustworthy count, or
+    # the count disagreed across a harmonic (see wale_count_note). The
+    # candidate's VALUE is the region's own wale.spacing_px on both paths
+    # (see wale_candidates in analyze_multi_roi and the comment above
+    # _wale_count_harmonic_note).
     wale_source: str = "periodicity"
     wale_count_confidence: float = 0.0
+    # Set when this region's loop-lattice count was trustworthy on its own
+    # terms but DISAGREED with the region's own periodicity reading across
+    # a harmonic, so it was not used (wale_source is then "periodicity" and
+    # wale_count_confidence 0.0) -- see _wale_count_harmonic_note.
+    wale_count_note: Optional[str] = None
 
 
 @dataclass
@@ -5011,6 +5310,12 @@ def analyze_multi_roi(
             loop_lattice = None
 
         count_spacing, count_confidence = _wale_count_candidate(loop_lattice)
+        # The count may corroborate the region's own periodicity reading,
+        # never replace it across a harmonic -- see the comment above
+        # _wale_count_harmonic_note for the measurement behind this.
+        count_note = _wale_count_harmonic_note(count_spacing, result.wale.spacing_px)
+        if count_note is not None:
+            count_spacing, count_confidence = None, 0.0
         wale_source = "loop_count" if count_spacing is not None else "periodicity"
 
         per_roi.append(RoiMeasurement(
@@ -5022,6 +5327,7 @@ def analyze_multi_roi(
             loop_centers_px=result.loop_centers_px,
             rotation_deg=result.rotation_deg, loop_lattice=loop_lattice,
             wale_source=wale_source, wale_count_confidence=count_confidence,
+            wale_count_note=count_note,
         ))
 
     # --- Per-region plausibility gates, applied BEFORE cross-region
@@ -5068,7 +5374,12 @@ def analyze_multi_roi(
     ratio_excluded_labels = set()
     density_excluded_labels = set()
     for idx, m in enumerate(per_roi):
-        wale_px = m.loop_lattice.wale_spacing_px if (m.wale_source == "loop_count" and m.loop_lattice) else m.wale.spacing_px
+        # The value that enters the vote is the region's own periodicity
+        # reading on every path now (see wale_candidates below); a
+        # corroborating count agrees with it within
+        # WALE_COUNT_AGREEMENT_LOG_TOLERANCE, so its implied density is
+        # the same density to within that tolerance.
+        wale_px = m.wale.spacing_px
         course_px = m.course.spacing_px
         reasons = []
 
@@ -5113,14 +5424,16 @@ def analyze_multi_roi(
     course_no_measurement_labels: List[str] = []
 
     def wale_candidates() -> List[dict]:
-        # Prefer each region's COUNTED spacing (median interval between
-        # real, position-verified loop columns) over its periodicity
-        # estimate whenever the count is trustworthy enough -- see the
-        # module comment above _wale_count_candidate for why wale
-        # specifically. Falls back to periodicity when loop-lattice
-        # didn't produce a trustworthy result for that region, so a
-        # region is never dropped just because the experimental detector
-        # came up empty on it.
+        # Each region votes with its own periodicity reading; a trustworthy
+        # COUNT (median interval between real, position-verified loop
+        # columns) that agrees with that reading corroborates it and
+        # supplies the vote's confidence -- see the module comment above
+        # _wale_count_candidate for why wale specifically, and the one
+        # above _wale_count_harmonic_note for why the count never supplies
+        # the value. A region with no trustworthy count, or a count that
+        # disagrees across a harmonic, votes with its periodicity
+        # confidence, so a region is never dropped just because the
+        # experimental detector came up empty on it.
         #
         # With exactly ONE approved region, cross-region consensus isn't
         # possible at all -- confidence instead comes from whether this
@@ -5131,12 +5444,17 @@ def analyze_multi_roi(
         for idx, m in enumerate(per_roi):
             if m.label in ratio_excluded_labels or m.label in density_excluded_labels:
                 continue
-            if m.wale_source == "loop_count":
-                spacing_px = m.loop_lattice.wale_spacing_px
-                base_confidence = m.wale_count_confidence
-            else:
-                spacing_px = m.wale.spacing_px
-                base_confidence = m.wale.confidence
+            # The VALUE is always the region's own periodicity reading. A
+            # trustworthy count that AGREES with it (wale_source
+            # "loop_count") corroborates it and supplies the confidence;
+            # it never supplies the value -- see the comment above
+            # _wale_count_harmonic_note (Eva's ruling on the app-path
+            # scorecard: a 4-6 column count on a small window is 12-22%
+            # off on the real jersey while still "agreeing", and letting
+            # it stand in for the reading made the result swing with the
+            # calibration scale).
+            spacing_px = m.wale.spacing_px
+            base_confidence = m.wale_count_confidence if m.wale_source == "loop_count" else m.wale.confidence
             if spacing_px is None:
                 wale_no_measurement_labels.append(m.label)
                 if m.wale.status != "uncertain":
@@ -5306,6 +5624,16 @@ RULER_MAJOR_TICK_LENGTH_RATIO = 2.0  # a tick reaching at least this many times 
 RULER_MIN_MAJOR_TICKS = 2           # need at least 2 major ticks to suggest a major-tick-spaced calibration
 RULER_MAX_MAJOR_FRACTION = 0.35     # majors must stay a sparse minority of all ticks (real rulers number every 4th-16th tick, never anywhere close to half) -- if more than this fraction of ticks look "long", the length signal is unreliable (e.g. picked up fabric texture, not a real ruler), so treat it as no major/minor split found at all rather than trust it
 RULER_REACH_EXTENSION_MULTIPLIER = 3.0  # how many multiples of the tight tick-band's own height to extend into, when measuring how far ticks reach (see _build_reach_strip)
+# Minor ticks per major tick that read as imperial (fractions of an inch) or
+# metric (millimetres in a centimetre) -- ONE owner, read by the detector's unit
+# hint and by justify_ruler_calibration below, so the two cannot drift apart.
+RULER_IMPERIAL_SUBDIVISIONS = (4, 8, 16)
+RULER_METRIC_SUBDIVISIONS = (5, 10)
+# Tick positions are whole pixels, so two of them are only known to +-0.5 px each.
+RULER_POSITION_QUANT_PX = 1.0
+# How close to the span's half-way point a tick must sit to count as "half-way",
+# in minor-tick pitches (on top of the pixel quantisation above).
+RULER_HALF_WAY_PITCHES = 0.25
 
 
 @dataclass
@@ -5326,6 +5654,30 @@ class RulerCalibrationResult:
     minor_tick_spacing_px: Optional[float] = None
     major_tick_count: int = 0
     confidence: float = 0.0
+    # The tick evidence the suggestion was read from, kept so the suggestion can be
+    # CHECKED (justify_ruler_calibration) instead of trusted. Recorded, never used to
+    # decide anything inside detect_ruler_calibration.
+    evidence: Optional["RulerTickEvidence"] = field(default=None, repr=False, compare=False)
+
+
+@dataclass(frozen=True)
+class RulerTickEvidence:
+    """
+    The ticks behind a RulerCalibrationResult, along the ruler's own length.
+
+    `axis` is which image coordinate runs along the ruler (0 = x, a horizontal
+    ruler; 1 = y, a vertical one). `ticks` is every tick found as
+    (position along that axis in px, reach 0..1), ascending by position -- reach
+    being how far the tick's dark mark extends, normalised to the longest tick
+    (see _measure_tick_reach). `major_positions` are the ticks the detector's own
+    length test called major. `minor_spacing_px` is the median gap between
+    adjacent ticks.
+    """
+
+    axis: int
+    ticks: Tuple[Tuple[float, float], ...]
+    major_positions: Tuple[float, ...]
+    minor_spacing_px: float
 
 
 def _ruler_band_score(band_gray: np.ndarray) -> Tuple[float, float, float]:
@@ -5644,8 +5996,8 @@ def detect_ruler_calibration(image_bgr: np.ndarray) -> RulerCalibrationResult:
     # the unit.
     suggested_unit: Literal["mm", "cm", "in"] = "cm"
     if minor_count_per_major is not None:
-        imperial_candidates = (4, 8, 16)
-        metric_candidates = (5, 10)
+        imperial_candidates = RULER_IMPERIAL_SUBDIVISIONS
+        metric_candidates = RULER_METRIC_SUBDIVISIONS
         nearest_imperial = min(imperial_candidates, key=lambda n: abs(n - minor_count_per_major))
         nearest_metric = min(metric_candidates, key=lambda n: abs(n - minor_count_per_major))
         if abs(nearest_imperial - minor_count_per_major) < abs(nearest_metric - minor_count_per_major):
@@ -5671,4 +6023,152 @@ def detect_ruler_calibration(image_bgr: np.ndarray) -> RulerCalibrationResult:
         minor_tick_spacing_px=round(minor_spacing, 3),
         major_tick_count=len(majors),
         confidence=round(confidence, 4),
+        evidence=RulerTickEvidence(
+            axis=0 if horizontal else 1,
+            ticks=tuple(sorted((float(p), float(r)) for p, r in ticks)),
+            major_positions=tuple(float(m) for m in majors),
+            minor_spacing_px=float(minor_spacing),
+        ),
+    )
+
+
+# --- Checking a ruler suggestion before it is offered ---------------------
+#
+# detect_ruler_calibration answers "where do the marks of a ruler-like pattern
+# sit?". It does not answer "is the distance between the two marks I picked
+# really one centimetre / one inch?", and every number it reports with it
+# (confidence included) is about the first question. Measured on the app-path
+# scorecard, the answer to the second was no on 6 of 8 photos with a ruler, on
+# all three drawn without one, and on 151 of 184 images with no ruler at all --
+# while the confidence of the wrong ones (0.61-0.98) overlapped the right ones
+# (0.73, 0.85), so no confidence cut separates them. A user confirms whatever is
+# pre-filled, so a wrong pre-fill is a confident wrong scale.
+#
+# What does separate them is structure. A real ruler is a COMB: a unit mark
+# repeats at one pitch, the same number of smaller ticks sits between any two
+# neighbouring unit marks, and a unit mark is longer than anything between two
+# unit marks. justify_ruler_calibration checks that the span being offered is ONE
+# PERIOD of that comb, using only the ticks the detector already found:
+#
+#   1. a tick hierarchy was found (the detector's fallback -- a run of five
+#      minor ticks labelled "1 unit" -- never knows how long its span is);
+#   2. the span holds a whole, standard number of minor ticks (4/5/8/10/16, the
+#      detector's own unit vocabulary) to within pixel quantisation: the tick
+#      intervals agree with the claimed spacing;
+#   3. that number gives the same unit the detector suggested;
+#   4. the two marks are the SAME tick class, and strictly longer than every tick
+#      between them -- two neighbouring half-inch marks, or a half-inch and an
+#      inch mark, are not a unit;
+#   5. no tick as long as the end marks sits half-way along the span -- if one
+#      does, the real unit is half the span (two inches read as one).
+#
+# Each check was added because removing it let a wrong span through on real tick
+# evidence (docs: README "Calibration guardrail"). A refusal costs the user the
+# manual two-click calibration they could always do; a wrong pre-fill costs them a
+# silently wrong gauge, so every doubt resolves to refusing.
+
+
+@dataclass(frozen=True)
+class RulerJustification:
+    """
+    Whether a ruler suggestion may be pre-filled. `reason` is the technical
+    finding (for logs and tests); `assumption` is the plain-words statement the
+    user sees beside the pre-filled points, empty when refused.
+    """
+
+    ok: bool
+    reason: str = ""
+    assumption: str = ""
+    minors_per_unit: Optional[int] = None
+
+
+_RULER_UNIT_WORDS = {"cm": "cm", "in": "inch", "mm": "mm"}
+
+
+def justify_ruler_calibration(result: RulerCalibrationResult) -> RulerJustification:
+    """
+    Decide whether `result`'s two points may be offered as a pre-filled
+    calibration of "1 <suggested_unit>" -- see the section comment above for the
+    five checks. Pure: reads only `result`.
+    """
+    if not result.success or result.point1_px is None or result.point2_px is None:
+        return RulerJustification(False, "the detector found no ruler")
+    ev = result.evidence
+    if ev is None or len(ev.ticks) < 2 or ev.minor_spacing_px <= 0:
+        return RulerJustification(False, "no tick evidence to check the span against")
+
+    # 1. A hierarchy: the span between two MAJOR ticks, never the minor-tick fallback.
+    if result.major_tick_count < RULER_MIN_MAJOR_TICKS:
+        return RulerJustification(
+            False, "no major/minor tick hierarchy was found, so nothing says how long the span is"
+        )
+
+    a, b = sorted((result.point1_px[ev.axis], result.point2_px[ev.axis]))
+    span = b - a
+    if span <= 0:
+        return RulerJustification(False, "the two points coincide along the ruler")
+    pitch = ev.minor_spacing_px
+
+    # 2. A whole, standard number of minor ticks fits in the span.
+    per_unit = int(round(span / pitch))
+    standard = {n: "in" for n in RULER_IMPERIAL_SUBDIVISIONS}
+    standard.update({n: "cm" for n in RULER_METRIC_SUBDIVISIONS})
+    if per_unit not in standard:
+        return RulerJustification(
+            False,
+            f"the span holds {span / pitch:.2f} minor ticks, not a standard {sorted(standard)} per unit",
+        )
+    tolerance_px = RULER_POSITION_QUANT_PX + 0.5 * per_unit  # two ends, and the pitch is a median of integers
+    if abs(span - per_unit * pitch) > tolerance_px:
+        return RulerJustification(
+            False,
+            f"the span ({span:.1f} px) is not {per_unit} minor ticks of {pitch:.1f} px "
+            f"(off by {abs(span - per_unit * pitch):.1f} px, quantisation allows {tolerance_px:.1f})",
+        )
+
+    # 3. That subdivision names the unit the detector suggested.
+    if standard[per_unit] != result.suggested_unit:
+        return RulerJustification(
+            False,
+            f"{per_unit} minor ticks per span reads as {standard[per_unit]}, "
+            f"but the detector suggested {result.suggested_unit}",
+        )
+
+    # 4. The end marks are one tick class, longer than everything between them.
+    positions = [p for p, _ in ev.ticks]
+    reach = [r for _, r in ev.ticks]
+    i1 = min(range(len(positions)), key=lambda i: abs(positions[i] - a))
+    i2 = min(range(len(positions)), key=lambda i: abs(positions[i] - b))
+    r_lo, r_hi = sorted((reach[i1], reach[i2]))
+    interior = [reach[i] for i in range(min(i1, i2) + 1, max(i1, i2))]
+    interior_max = max(interior, default=0.0)
+    if not (r_hi - r_lo < r_lo - interior_max):
+        return RulerJustification(
+            False,
+            f"the end marks (reach {reach[i1]:.2f} and {reach[i2]:.2f}) are not one tick class clearly longer "
+            f"than the ticks between them (up to {interior_max:.2f})",
+        )
+
+    # 5. Nothing as long as the end marks sits half-way along the span.
+    half_tolerance_px = RULER_POSITION_QUANT_PX + RULER_HALF_WAY_PITCHES * pitch
+    for pos, rch in zip(positions, reach):
+        phase = ((pos - a) / span) % 1.0
+        if abs(phase - 0.5) * span <= half_tolerance_px and rch >= r_lo:
+            return RulerJustification(
+                False,
+                f"a tick as long as the end marks (reach {rch:.2f}) sits half-way along the span, "
+                f"so the span is probably two units",
+            )
+
+    unit_word = _RULER_UNIT_WORDS[result.suggested_unit]
+    return RulerJustification(
+        True,
+        f"{per_unit} minor ticks between two {r_lo:.2f}+ reach marks, the same class, nothing as long half-way",
+        (
+            f"Read as 1 {unit_word} between these two marks. The detector counted {per_unit} small ticks "
+            f"between them, which is how 1 {unit_word} looks on "
+            f"{'a metric' if standard[per_unit] == 'cm' else 'an imperial'} ruler. It cannot read the ruler's "
+            f"numbers, so check that both points sit on marks exactly 1 {unit_word} apart."
+        ),
+        per_unit,
     )

@@ -191,9 +191,12 @@ async function nodeClauses(G, F, R, rec) {
   /* SO0 — the census, restated from the registry */
   {
     const p = [];
-    if (JSON.stringify([...G.SCOPE_UNSCOPED]) !== JSON.stringify(['sheetThickness'])) p.push(`SCOPE_UNSCOPED is ${JSON.stringify(G.SCOPE_UNSCOPED)}`);
+    /* the material (Q3.6) and, since T3, the texture's two sliders — ONE
+       world-space field over the whole bloom, never a layer's or a pair's */
+    const UNSCOPED_RESTATED = ['sheetThickness', 'textureHeight', 'textureSize'];
+    if (JSON.stringify([...G.SCOPE_UNSCOPED]) !== JSON.stringify(UNSCOPED_RESTATED)) p.push(`SCOPE_UNSCOPED is ${JSON.stringify(G.SCOPE_UNSCOPED)}`);
     const whorl = ['petalCount', 'footDelicacy', 'tubeLayer1', 'tubeLayer2', 'tubeLayer3', 'tubeLayer4', 'tubeLayer5', 'tubeLayer6', 'tubeHeight', 'tubeBlend'];
-    const want = REG.CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && c.id !== 'sheetThickness' && !whorl.includes(c.id)).map((c) => c.id);
+    const want = REG.CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && !UNSCOPED_RESTATED.includes(c.id) && !whorl.includes(c.id)).map((c) => c.id);
     if (JSON.stringify([...F.SCOPEABLE_IDS]) !== JSON.stringify(want)) p.push(`SCOPEABLE_IDS (${F.SCOPEABLE_IDS.length}) differ from the restated census (${want.length}): ${want.filter((x) => !F.SCOPEABLE_IDS.includes(x)).concat(F.SCOPEABLE_IDS.filter((x) => !want.includes(x))).join(', ')}`);
     if (F.SCOPEABLE_IDS.includes('sheetThickness')) p.push('sheetThickness is scopeable');
     /* THE ROLE TABLE IS RETIRED (Q3.4): the 47 ids, written down here rather
@@ -459,7 +462,10 @@ async function nodeClauses(G, F, R, rec) {
   {
     const p = [];
     const said = [];
-    const clampW = (w) => Math.min(G.FOOT_MAX_WIDTH_MM, Math.max(G.FOOT_MIN_WIDTH_MM, w));
+    /* (root support, Oct 21: the asked foot is FLOORED here and the area rule
+       sums the asked feet; the CAP — the arc each foot owns at its ring — is
+       applied once the ring is placed, below) */
+    const clampW = (w) => Math.max(G.FOOT_MIN_WIDTH_MM, w);
     for (const placement of ['RADIAL', 'SPIRAL']) {
       /* layer 1 owns a narrower width (its foot only — its ring IS the rim),
          layer 2 owns a width (foot AND ring), layer 3 owns length and tilt
@@ -488,6 +494,7 @@ async function nodeClauses(G, F, R, rec) {
         want.push({ width, factor: w === null ? scale : L === 0 ? 1 : w / Number(st.petalWidth), owned: w !== null });
       }
       const R0 = Math.sqrt(sumSq) * Number(st.spread);
+      for (let L = 0; L < 4; L++) want[L].width = H.footCapRestated(want[L].width, R0 * want[L].factor, (2 * Math.PI) / Math.round(Number(st.petalCount))).width;
       for (let L = 0; L < 4; L++) {
         const r = rings[L], w = want[L];
         if (!Object.is(r.width, w.width)) p.push(`${placement} layer ${L + 1}: foot width ${r.width}, restated ${w.width}`);
@@ -508,16 +515,38 @@ async function nodeClauses(G, F, R, rec) {
       if (Object.is(rings[1].radius, R0 * Math.pow(Number(st.layerSize), 1))) p.push(`${placement}: layer 2's ring sits where the ramp would put it — ownership would be vacuous`);
       /* AN OWNED LENGTH OR TILT MOVES NO FOOT AND NO RING: the same state with
          layer 3's entry removed builds every ring and every emitted foot row of
-         layer 3 to the bit */
+         layer 3 to the bit — asked at TWO owned lengths since big petals (Oct
+         21): over the root taper's 35 mm reference (35 + 5 = 40 mm, where the
+         foot thickens by the restated root factor and nothing else moves) and
+         under it (35 - 10 = 25 mm, where not one foot value moves). */
+      for (const lenOff of [5, -10]) {
+      const recL = { layers: rec0.layers.map((e) => (e.layer === 2 ? { layer: 2, offsets: { petalLength: lenOff, petalTilt: 8 } } : e)) };
+      const sc = build(G, F, st, withBounds(F, recL), { lamina: false });
       const sc2 = build(G, F, st, withBounds(F, { layers: rec0.layers.filter((e) => e.layer !== 2) }), { lamina: false });
-      for (const k of ['radius', 'width', 'overhang']) if (!Object.is(sc.built.foot.rings[2][k], sc2.built.foot.rings[2][k])) p.push(`${placement} layer 3: an owned length/tilt moved the ring's ${k} ${sc2.built.foot.rings[2][k]} -> ${sc.built.foot.rings[2][k]}`);
+      for (const k of ['radius', 'width', 'overhang']) if (!Object.is(sc.built.foot.rings[2][k], sc2.built.foot.rings[2][k])) p.push(`${placement} layer 3 (owned length ${35 + lenOff} mm): an owned length/tilt moved the ring's ${k} ${sc2.built.foot.rings[2][k]} -> ${sc.built.foot.rings[2][k]}`);
       const fa = sc.petals.filter((q) => Math.round(q.whorl) === 2), fb = sc2.petals.filter((q) => Math.round(q.whorl) === 2);
-      const flat = (qs) => qs.flatMap((q) => q.footFrames.flatMap((f) => [...f.C, ...f.N, ...f.T, f.h, f.t]));
-      if (!sameNumbers(flat(fa), flat(fb))) p.push(`${placement} layer 3: an owned length/tilt moved an emitted foot row`);
+      /* EXCEPT ITS THICKNESS, BY THE ROOT TAPER (big petals, Oct 21): a layer
+         owning a length past the 35 mm reference stands its foot on a root
+         `rootFactor` sheets thick — the law's own root, restated from the
+         owned asked length through the harness's other integrator, never
+         read from the build. At or under the reference: the same bits as
+         before. Position, frame and half-width move nothing either way. */
+      const flat = (qs) => qs.flatMap((q) => q.footFrames.flatMap((f) => [...f.C, ...f.N, ...f.T, f.h]));
+      if (!sameNumbers(flat(fa), flat(fb))) p.push(`${placement} layer 3 (owned length ${35 + lenOff} mm): an owned length/tilt moved an emitted foot row (position, frame or half-width)`);
+      for (const [qa, qb] of fa.map((q, i) => [q, fb[i]])) {
+        const f = H.rootFactorRestated(qa.askedLength);
+        for (const [i, fra] of qa.footFrames.entries()) {
+          const t0 = qb.footFrames[i].t, want = f === null ? t0 : t0 * f;
+          if (f === null ? !Object.is(fra.t, t0) : !(Math.abs(fra.t - want) <= 1e-9 * want)) p.push(`${placement} layer 3 slot ${qa.slot.index}: the foot row is ${fra.t} mm thick, restated ${want} (the ${qa.askedLength} mm owned length's root${f === null ? ' — the identity' : ` x ${f.toFixed(6)}`})`);
+        }
+      }
       if (sameNumbers(fa.map((q) => q.askedLength), fb.map((q) => q.askedLength))) p.push(`${placement} layer 3: the owned length did not reach the blade — the length/tilt half would be vacuous`);
+      const taperSeen = fa.some((q) => H.rootFactorRestated(q.askedLength) !== null);
+      if (taperSeen !== (lenOff > 0)) p.push(`${placement} layer 3: an owned length of ${35 + lenOff} mm ${taperSeen ? 'tapers' : 'does not taper'} — the two arms (over and under the reference) are not both exercised`);
+      }
       said.push(`${placement}: rings ${rings.map((r) => r.radius.toFixed(3)).join(' / ')} mm on R0 ${R0.toFixed(3)}, feet ${rings.map((r) => r.width.toFixed(3)).join(' / ')} mm`);
     }
-    rec('SO13', p, `an owned width drives the foot and the ring, restated from the controls, on footRing()'s rings and the emitted feet (${said.join('; ')}); layer 1's ring is the rim unless an over-wide layer grows the hub to its own ring (told); an owned length / tilt moves no foot row and no ring`);
+    rec('SO13', p, `an owned width drives the foot and the ring, restated from the controls, on footRing()'s rings and the emitted feet (${said.join('; ')}); layer 1's ring is the rim unless an over-wide layer grows the hub to its own ring (told); an owned length / tilt moves no foot row and no ring (but the root taper's thickness, restated)`);
   }
   /* SO7 — THE MIGRATION LANDS ON THE OLD COMPOSITION. A written-down state
      carrying retired role ids is migrated by the registry's `migrateRoles`
@@ -963,9 +992,12 @@ const MUTANTS = [
     to: '    { const so = scopeTerm !== null && base in scopeTerm.offsets ? scopeTerm.offsets[base] : 0; out[base] = clamp(composed - so, b.min, b.max) + so; }\n    /* WHICH BASES THE CLAMP ACTUALLY BIT',
     witness: (G) => G.resolvePetalTerms({ ...REG.DEFAULTS }, null, null, null, { offsets: { petalCup: 5 }, bounds: {} }).petalCup > 1.2 },
   { id: 'thickness-is-scoped', breaks: ['SO0', 'SO5'],
-    from: "export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness']);",
-    to: 'export const SCOPE_UNSCOPED = Object.freeze([]);',
-    witness: (G) => G.SCOPE_UNSCOPED.length === 0 },
+    /* RE-ANCHORED (SURFACE TEXTURE T3): the list carries the texture's two
+       sliders beside the sheet now, so the mutation drops the SHEET alone —
+       the thing Q3.6 is about — and the witness reads its absence. */
+    from: "export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness',",
+    to: "export const SCOPE_UNSCOPED = Object.freeze([",
+    witness: (G) => !G.SCOPE_UNSCOPED.includes('sheetThickness') },
   /* ---- Scoping-b: the toggles ---- */
   /* (SO7 came off this claim with the retirement: it carried the RADIAL
      petal entry that must stay inert, and the migration clause that replaced
@@ -987,7 +1019,12 @@ const MUTANTS = [
     from: '  const tiltExtra = owns && owns.petalTilt ? 0 : slot.tiltExtra;',
     to: '  const tiltExtra = slot.tiltExtra;',
     witness: (G) => Q35_PROBE(G).tiltDeg !== 35 },
-  { id: 'an-owned-length-keeps-the-ramp', breaks: ['SO6'],
+  /* SO13 too since big petals (Oct 21): SO13's planted state has layer 3 OWN a
+     40 mm length, which must take the root law (the over-reference arm). Keep
+     the ramp on an owned length and that layer builds under 35 mm and does not
+     taper — the arm the clause requires is not exercised, which is true of
+     this mutation, not collateral. Measured: reddens SO6 and SO13. */
+  { id: 'an-owned-length-keeps-the-ramp', breaks: ['SO6', 'SO13'],
     from: '  const lengthScale = owns && owns.petalLength ? (slot.sizeFactor ?? 1) : slot.scale;',
     to: '  const lengthScale = slot.scale;',
     witness: (G) => Q35_PROBE(G).asked !== 35 },
@@ -1035,6 +1072,15 @@ const MUTANTS = [
     from: '  if (radial || spiral) {\n    for (let k = 1; k < L; k++) { const o = entryFor(k, 0); if (o) layers.push({ layer: k, offsets: o }); }',
     to: '  if (radial) {\n    for (let k = 1; k < L; k++) { const o = entryFor(k, 0); if (o) layers.push({ layer: k, offsets: o }); }',
     witness: (G, R) => R.migrateRoles({ ...REG.DEFAULTS, placement: 'SPIRAL', layerCount: 2, ['innerCup']: 0.4 }).scopes === null },
+  /* BIG PETALS (Oct 21, Eva's ruling 3): SO13's original condition planted on
+     the new geometry — an owned LENGTH moving the foot in half-width and ring
+     (here: the foot widened as if the owned length scaled it). The restated
+     clause must still see it at an owned length both over the root taper's
+     reference and under it. */
+  { id: 'an-owned-length-moves-the-foot', breaks: ['SO13', 'SO12'],
+    from: "    const ownWidth = own && 'petalWidth' in own ? own.petalWidth : null;",
+    to: "    const ownWidth = own && 'petalWidth' in own ? own.petalWidth : own && 'petalLength' in own ? state.petalWidth * own.petalLength / state.petalLength : null;",
+    witness: (G) => { const st = { ...REG.DEFAULTS, layerCount: 3, scopeLayers: 'ON' }; const ring = (rec) => G.footRing(st, new G.MeshBuilder({ exportMode: false }), { scopes: rec }).rings[2].width; return ring({ layers: [{ layer: 2, offsets: { petalLength: -10 } }], petals: [], tiers: [] }) !== ring({ layers: [], petals: [], tiers: [] }); } },
   { id: 'the-tube-ignores-per-layer', breaks: ['SO11'],
     from: '  if (scopeLayersLive(state)) return false;\n  if (sphereMode(state)) return false;',
     to: '  if (sphereMode(state)) return false;',
