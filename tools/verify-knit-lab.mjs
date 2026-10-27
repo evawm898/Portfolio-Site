@@ -62,12 +62,18 @@ const MUTANTS = {
   'friction-cap-accumulates': { file: 'knit-lab-sim.js', from: 'this.lamC.fill(0, 0, this.nPairs); this.lamT.fill(0, 0, this.nPairs);', to: 'this.lamT.fill(0, 0, this.nPairs);' },
   'decrease-head-not-moved': { file: 'knit-lab-sim.js', from: '+ headShift.get(id) * ramp(u, K.s0, K.s1)', to: '+ 0' },
   'purl-drawn-knitwise': { file: 'knit-lab-sim.js', from: "if (l.kind === 'purl') return -1;", to: "if (l.kind === 'purl') return 1;" },
+  // the phase-3b course fixture's other half: the gripped points keep the velocities they had while the width was
+  // free, and the driven side jaw carries none (with COURSE_TOP 'needle' this is the phase-3b fixture exactly)
+  'jaw-velocity-stale': { file: 'knit-lab-sim.js', from: 'for (let i = 0; i < this.n; i++) if (this.w[i] === 0) this.v[3 * i] = this.v[3 * i + 1] = this.v[3 * i + 2] = 0;', to: '', also: [['v[3 * i] = sideV; v[3 * i + 1] = v[3 * i + 2] = 0;', '']] },
 };
 async function loadSim(mutant) {
   if (!mutant) return import(pathToFileURL(path.join(ROOT, 'knit-lab-sim.js')).href);
   const m = MUTANTS[mutant]; let src = fs.readFileSync(path.join(ROOT, m.file), 'utf8');
-  if (src.split(m.from).length !== 2) throw new Error(`mutant ${mutant}: anchor not found exactly once`);
-  src = src.replace(m.from, m.to).replace(/from '\.\//g, `from '${pathToFileURL(ROOT).href}/`);
+  for (const [from, to] of [[m.from, m.to], ...(m.also || [])]) {
+    if (src.split(from).length !== 2) throw new Error(`mutant ${mutant}: anchor not found exactly once`);
+    src = src.replace(from, to);
+  }
+  src = src.replace(/from '\.\//g, `from '${pathToFileURL(ROOT).href}/`);
   const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'knit-mut-')), 'sim.mjs');
   fs.writeFileSync(f, src);
   return import(pathToFileURL(f).href);
@@ -150,24 +156,31 @@ const fmt = (v, k = 0) => (Number.isFinite(v) ? v.toFixed(k) : String(v));
 
 // The phase-2 test, as it was: a continuous pull, the phase-2 friction, settled with friction on.
 const PHASE2 = { PROTOCOL: 'continuous', FRICTION_MODE: 'substep', SETTLE_FRICTION: null, PULL_DAMPING: 1 };
+// SEEDS: this model's stepped cycle is chaotic at the 10% level (a replica with the preload moved by one part in
+// 1e9 read 44.2% lost against 31.3%: docs/knit-lab-spike.md, phase 3b), so every μ 0.25 and μ 0 test that a
+// step-size or monotonicity check reads runs three times — the preload moved by 0, 1 and 2 parts in 1e9 — and the
+// checks judge the MEDIAN. The spread is reported.
+const SEEDS = [0, 1, 2];
+const seeded = (base, extra = {}) => SEEDS.map(k => ({ ...base, name: base.name + (k ? `-s${k}` : ''), ...extra, params: { ...(base.params || {}), ...(k ? { PRELOAD: 1500 * (1 + k * 1e-9) } : {}) }, ...(k ? { audit: undefined, peakHold: undefined } : {}) })).map(o => JSON.parse(JSON.stringify(o)));
 const SPECS = [   // the longest first, so four at a time finishes soonest
-  { name: 'rib-course', swatch: 'rib', dir: 'course', audit: true },
-  { name: 'rib-course-step0.5', swatch: 'rib', dir: 'course', params: { STEP_EXT: 0.005 } },
-  { name: 'plain-course', swatch: 'plain', dir: 'course' },
-  { name: 'plain-course-step0.5', swatch: 'plain', dir: 'course', params: { STEP_EXT: 0.005 } },
+  ...seeded({ name: 'rib-course-step0.5', swatch: 'rib', dir: 'course', params: { STEP_EXT: 0.005 } }),
+  ...seeded({ name: 'plain-course-step0.5', swatch: 'plain', dir: 'course', params: { STEP_EXT: 0.005 } }),
+  ...seeded({ name: 'rib-course', swatch: 'rib', dir: 'course', audit: true }),
+  ...seeded({ name: 'plain-course', swatch: 'plain', dir: 'course' }),
   { name: 'plain-course-mu0', swatch: 'plain', dir: 'course', params: { FRICTION: 0 } },
+  // the phase-3b course fixture (the live loops on the needle's pins, the gripped points' velocities stale): held
+  // still its side jaws never agree. Capped at 5%: every step runs to the hold cap unconverged.
+  { name: 'mf-course-phase3b', swatch: 'plain', dir: 'course', mutant: 'jaw-velocity-stale', params: { COURSE_TOP: 'needle', PULL_MAX_EXTENSION: 0.05 } },
   // the clamp fixture holds every point of the last course, so an untied end cannot unravel there: the
   // must-fail is the comb fixture (phases 1-3) with the end left free
-  // capped at 60%: unravelling, it never reaches the load limit and would otherwise walk to 300% (hours)
+  // capped at 60%: unravelling, it never reaches the jam and would otherwise walk to 300% (hours)
   { name: 'mf-tail-untied', swatch: 'plain', params: { FIXTURE: 'comb', PLATE_HALF_GAP: 1.6, TAIL_TIED: 0, PULL_MAX_EXTENSION: 0.6 } },
-  { name: 'plain', swatch: 'plain', audit: true, peakHold: 600 },
-  { name: 'plain-step0.5', swatch: 'plain', params: { STEP_EXT: 0.005 } },
-  { name: 'rib', swatch: 'rib', audit: true },
-  { name: 'rib-step0.5', swatch: 'rib', params: { STEP_EXT: 0.005 } },
-  // a replica: the plain test again, the preload moved by one part in 1e9 — not gated; it measures the
-  // run-to-run scatter of the stepped test at FIXED settings, which the step-size spread is read against
-  { name: 'plain-rep1', swatch: 'plain', params: { PRELOAD: 1500 * (1 + 1e-9) } },
-  { name: 'plain-mu0', swatch: 'plain', params: { FRICTION: 0 } },
+  ...seeded({ name: 'plain-step0.5', swatch: 'plain', params: { STEP_EXT: 0.005 } }),
+  ...seeded({ name: 'rib-step0.5', swatch: 'rib', params: { STEP_EXT: 0.005 } }),
+  ...seeded({ name: 'plain', swatch: 'plain', audit: true, peakHold: 600 }),
+  ...seeded({ name: 'rib', swatch: 'rib', audit: true }),
+  ...seeded({ name: 'plain-mu0', swatch: 'plain', params: { FRICTION: 0 } }),
+  ...seeded({ name: 'rib-mu0', swatch: 'rib', params: { FRICTION: 0 } }),
   { name: 'eyelet', swatch: 'eyelet', audit: true },
   { name: 'eyelet-ssk', swatch: 'eyelet-ssk' },
   { name: 'mf-phase2-fast', swatch: 'plain', params: { ...PHASE2 } },
@@ -180,10 +193,10 @@ const SPECS = [   // the longest first, so four at a time finishes soonest
   { name: 'mf-compliant-yarn', swatch: 'plain', params: { STRETCH_COMPLIANCE: 2e-6 } },
 ];
 const ONLY = opt('--only', null);
-// The course-direction runs are left out unless asked for (--course): on the clamp fixture they do not
-// converge — held still, the two side jaws disagree by ~10% indefinitely (docs/knit-lab-spike.md, phase 3b).
-const BASE = flag('--course') ? SPECS : SPECS.filter(s => s.dir !== 'course');
-const RUN = ONLY ? SPECS.filter(s => ONLY.split(',').includes(s.name)) : BASE;
+// The course-direction runs are in the gate again (Oct 27): on the rails fixture they converge. --no-course
+// leaves them out (iteration only).
+const BASE = flag('--no-course') ? SPECS.filter(s => s.dir !== 'course') : SPECS;
+const RUN = ONLY ? SPECS.filter(s => ONLY.split(',').some(o => s.name === o || (o.endsWith('*') && s.name.startsWith(o.slice(0, -1))))) : BASE;
 
 function runChild(spec) {
   return new Promise((resolve, reject) => {
@@ -212,7 +225,6 @@ function quasiStatic(ms) {
   const L = ms.map(m => m.cyc.lossFraction), S = ms.map(m => m.cyc.set);
   return V(spread(L) < 0.10 && spread(S) < 0.10 && S.every(s => s > 0), `loss ${L.map(v => pct(v)).join(' / ')} (spread ${pct(spread(L))}), set ${S.map(v => pct(v, 2)).join(' / ')} (spread ${pct(spread(S))})`);
 }
-function frictionlessNoLoss(m) { return V(m.cyc.lossFraction < 0.02, `${pct(m.cyc.lossFraction)} of the loading work lost (set ${pct(m.cyc.set, 2)})`); }
 function holdsStill(r) { const h = r.peakHold; if (!h) return V(false, 'no peak hold recorded'); const d = h.end / h.start - 1; return V(Math.abs(d) < 0.02 && h.max / h.start < 1.05, `${h.frames} frames at the peak: load ${fmt(h.start)} -> ${fmt(h.end)} (${d >= 0 ? '+' : ''}${pct(d)}), highest ${fmt(h.max)}`); }
 function topologyOK(start) { return V(start.bad.length === 0 && start.undetermined === 0, start.bad.length ? `${start.bad.length} loop(s) wrong, e.g. ${start.bad[0]}` : start.undetermined ? `${start.undetermined} pairs undetermined` : 'every leg passes through its parents, the right way'); }
 function orderOK(o, lean) { return V(o.rows.length > 0 && o.bad.length === 0 && o.rows.every(q => q.leans === lean), o.rows.length ? `${o.rows.length} decreases, top head in front by ${o.rows.map(q => fmt(q.dz, 2)).join(', ')} d; leaning ${[...new Set(o.rows.map(q => q.leans))].join('/')}${o.bad.length ? '; ' + o.bad[0] : ''}` : 'no decreases'); }
@@ -231,7 +243,6 @@ function noCollapse(m) {
   for (const p of b) { run = Math.max(run, p.load); const f = p.load / run; if (f < worst) { worst = f; at = p.ext; } }
   return V(b.length > 0 && worst >= 0.9, b.length ? `past the jam the load never fell below ${pct(worst, 0)} of its running peak${worst < 1 ? ` (at ${pct(at, 0)})` : ''}` : 'no jam found');
 }
-function endedOnLoad(r) { return V(r.pull.loadEnd === 'load' && !r.pull.strainStopped, `loading ended on: ${r.pull.loadEnd}${r.pull.strainStopped ? ' (the 5% strain stop)' : ''}`); }
 function frictionAddsLoop(mu, zero) { const d = mu.cyc.lossFraction - zero.cyc.lossFraction; return V(d >= 0.03 && mu.cyc.set >= zero.cyc.set, `loss ${pct(mu.cyc.lossFraction)} against ${pct(zero.cyc.lossFraction)} frictionless (+${fmt(d * 100, 1)} points); set ${pct(mu.cyc.set, 2)} against ${pct(zero.cyc.set, 2)}`); }
 function eyeletsOpen(r) { const a = r.holesSettled, b = r.holesMid; return V(!!a && a.open >= 4 && !!b && b.open >= 4, `openings >= ${HOLE_R} d in the eyelet course: ${a ? a.open : '—'} settled (r ${a ? a.band.slice(0, 5).join(', ') : '—'}), ${b ? b.open : '—'} at +${pct(MID, 0)} (r ${b ? b.band.slice(0, 5).join(', ') : '—'})`); }
 function jamDiffers(e, p) { const d = e.jam.ext - p.jam.ext; return V(Math.abs(d) >= 0.05, `jam ${pct(e.jam.ext, 0)} against ${pct(p.jam.ext, 0)} (${d >= 0 ? '+' : ''}${fmt(d * 100, 0)} points)`); }
@@ -240,26 +251,74 @@ function ribVsJersey(rc, jc, rr, jr) { const k = rc.jam.ext / jc.jam.ext, wr = r
 function safe(r) { return V(r.settle.deep === 0 && r.pull.deep === 0 && r.settle.certFail === 0 && r.pull.certFail === 0, `deep overlaps ${r.settle.deep}/${r.pull.deep}; certificate ${r.settle.certSteps - r.settle.certFail}/${r.settle.certSteps} settling, ${r.pull.certSteps - r.pull.certFail}/${r.pull.certSteps} testing; closest ${fmt(Math.min(r.settle.closest, r.pull.closest), 3)} d`); }
 const gate = (v, msg) => check(v.ok, `${msg}: ${v.why}`);
 
+// ---- seeds: medians ---------------------------------------------------------------------------
+const med = a => { const b = a.filter(Number.isFinite).sort((p, q) => p - q); if (!b.length) return NaN; const m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
+const seedsOf = k => SEEDS.map(i => k + (i ? `-s${i}` : '')).filter(n => runs[n]);
+// the median reading of a seeded test: loss, set, jam, soft region, released width, each the median over its seeds
+function M3(k) {
+  const ks = seedsOf(k); if (!ks.length) return null;
+  const L = ks.map(n => R[n].cyc.lossFraction), S = ks.map(n => R[n].cyc.set), J = ks.map(n => R[n].jam.ext);
+  return { keys: ks, n: ks.length, L, S, J, cyc: { lossFraction: med(L), set: med(S) }, jam: { ext: med(J), soft: med(ks.map(n => R[n].jam.soft)) }, soft: med(ks.map(n => R[n].soft)), softW: med(ks.map(n => R[n].softW)), freeSpan: med(ks.map(n => runs[n].free ? runs[n].free.span : NaN)) };
+}
+const sp = a => { const b = a.filter(Number.isFinite); return b.length > 1 ? `${pct(Math.min(...b))}–${pct(Math.max(...b))}` : '—'; };
+// a pointwise-median curve of a seeded stepped test: loading steps aligned by index (all seeds share the
+// step grid until the jam), unloading steps by extension; only the points every seed has
+function medianRun(k) {
+  const ks = seedsOf(k); if (!ks.length) return null;
+  const rs = ks.map(n => runs[n]);
+  const ups = rs.map(r => r.pull.rows.filter(q => q.phase === 'pulling')), dns = rs.map(r => r.pull.rows.filter(q => q.phase !== 'pulling'));
+  const up = [];
+  for (let i = 0; i < Math.min(...ups.map(u => u.length)); i++) { const e = ups.map(u => u[i].ext); if (Math.max(...e) - Math.min(...e) > 1e-6) break; up.push({ ext: e[0], load: med(ups.map(u => u[i].load)), phase: 'pulling', converged: ups.every(u => u[i].converged) }); }
+  const key = e => Math.round(e * 1e5);
+  const dn = dns[0].filter(q => dns.every(d => d.some(p => key(p.ext) === key(q.ext)))).map(q => { const ps = dns.map(d => d.find(p => key(p.ext) === key(q.ext))); return { ext: q.ext, load: med(ps.map(p => p.load)), phase: 'unloading', converged: ps.every(p => p.converged) }; });
+  return { spec: rs[0].spec, pull: { rows: [...up, ...dn], loadEnd: rs.every(r => r.pull.loadEnd === rs[0].pull.loadEnd) ? rs[0].pull.loadEnd : rs.map(r => r.pull.loadEnd).join('/') } };
+}
+
+// ---- K: the course fixture reaches equilibrium ----------------------------------------------------
+// Held still at every step the two side jaws read the same load: nothing else pulls along x (both course
+// edges ride rails free along x), so jaws that disagree mean a swatch still moving. Every step converged
+// (the hold's own STEP_TOL, 0.2%) and the two jaws within 2% at every recorded step.
+function courseHolds(r) {
+  const rows = r.pull.rows, un = rows.filter(q => !q.converged).length;
+  let worst = 0, at = NaN; for (const q of rows) { const d = Math.abs(q.top - q.load) / Math.max(Math.abs(q.load), 1500); if (d > worst) { worst = d; at = q.ext; } }
+  return V(rows.length > 2 && un === 0 && worst <= 0.02, `${rows.length} steps, ${un} unconverged; side jaws disagree by at most ${pct(worst, 2)}${Number.isFinite(at) ? ` (at ${pct(at, 1)})` : ''}; ${fmt(mean(rows.map(q => q.frames)), 0)} frames a hold`);
+}
+{ const ck = SPECS.filter(x => x.dir === 'course' && !x.name.startsWith('mf') && runs[x.name]).map(x => x.name);
+  if (ck.length) {
+    console.log('\n== K. across the courses: held still, the side jaws agree');
+    for (const k of ck) gate(courseHolds(runs[k]), k);
+    if (runs['mf-course-phase3b']) mustFail(courseHolds(runs['mf-course-phase3b']), 'the phase-3b course fixture (live loops on free pins, the gripped points\' velocities stale)');
+  } }
+
 // ---- Q: quasi-static --------------------------------------------------------------------------
+// Oct 27: (1) the frictionless loss is no longer gated against 2%: it is a property of contact between
+// straight segments (phase 3b §2b: the corrugation acts like μ ≈ 0.26), present before the jam, and the
+// decision was to keep that contact. It is RECORDED as the model's baseline, and friction's loss and set are
+// reported as the excess over it. (2) The step-size agreement is judged on the median of three seeds, not one
+// run each: one run's cycle is chaotic at the 10% level. The bar (10% relative) is unchanged.
 const PAIRS = [['plain', 'plain-step0.5'], ['rib', 'rib-step0.5'], ['plain-course', 'plain-course-step0.5'], ['rib-course', 'rib-course-step0.5']];
+const BASELINE = { plain: M3('plain-mu0'), rib: M3('rib-mu0'), 'plain-course': runs['plain-course-mu0'] ? { cyc: R['plain-course-mu0'].cyc, L: [R['plain-course-mu0'].cyc.lossFraction], S: [R['plain-course-mu0'].cyc.set] } : null };
+BASELINE['plain-step0.5'] = BASELINE.plain; BASELINE['rib-step0.5'] = BASELINE.rib; BASELINE['plain-course-step0.5'] = BASELINE['plain-course'];
 if (has('plain', 'plain-mu0', 'mf-phase2-fast', 'mf-phase2-slow', 'mf-phase2-mu0')) {
   console.log('\n== Q. the stepped test is quasi-static');
-  for (const k of [...PAIRS.flat(), 'plain-rep1', 'plain-mu0', 'plain-course-mu0', 'mf-phase2-fast', 'mf-phase2-slow', 'mf-phase2-mu0'].filter(k => runs[k])) {
-    const c = R[k].cyc, r = runs[k]; console.log(`  ${k.padEnd(24)} ${r.pull.stepped ? `${r.pull.rows.length} steps, ${r.pull.unconverged} unconverged, ${fmt(mean(r.pull.rows.map(q => q.frames)), 0)} frames a hold` : 'continuous'}: ${pct(c.lossFraction)} lost, set ${pct(c.set, 2)}, jam ${pct(R[k].jam.ext, 0)}, peak ${fmt(r.pull.peak.load)} at ${pct(r.pull.peak.ext, 0)}`);
+  for (const k of [...PAIRS.flat(), 'plain-mu0', 'rib-mu0', 'plain-course-mu0'].filter(k => runs[k])) {
+    const m = M3(k) || { cyc: R[k].cyc, jam: R[k].jam, L: [R[k].cyc.lossFraction], S: [R[k].cyc.set], J: [R[k].jam.ext], n: 1 }, r = runs[k], B = BASELINE[k];
+    const ex = B && !/mu0/.test(k) ? `; over the frictionless baseline: loss +${fmt((m.cyc.lossFraction - B.cyc.lossFraction) * 100, 1)} points, set +${fmt((m.cyc.set - B.cyc.set) * 100, 2)} points` : '';
+    console.log(`  ${k.padEnd(22)} median of ${m.n}: ${pct(m.cyc.lossFraction)} lost (seeds ${sp(m.L)}), set ${pct(m.cyc.set, 2)} (${sp(m.S)}), jam ${pct(m.jam.ext, 0)} (${sp(m.J)}); ${r.pull.rows.length} steps, ${r.pull.unconverged} unconverged, ${fmt(mean(r.pull.rows.map(q => q.frames)), 0)} frames a hold${ex}`);
   }
-  if (runs['plain-rep1']) { const L = ['plain', 'plain-rep1'].map(k => R[k].cyc.lossFraction), S = ['plain', 'plain-rep1'].map(k => R[k].cyc.set); console.log(`  replica at FIXED settings (preload +0 / 1e-9): loss ${L.map(v => pct(v)).join(' / ')} (spread ${pct(spread(L))}), set ${S.map(v => pct(v, 2)).join(' / ')} (spread ${pct(spread(S))}) — not gated`); }
-  for (const [a, b] of PAIRS) if (has(a, b)) gate(quasiStatic([R[a], R[b]]), `μ 0.25, ${a}: loss and set agree across 1% / 0.5% steps`);
+  for (const k of ['mf-phase2-fast', 'mf-phase2-slow', 'mf-phase2-mu0']) { const c = R[k].cyc; console.log(`  ${k.padEnd(22)} continuous: ${pct(c.lossFraction)} lost, set ${pct(c.set, 2)}, jam ${pct(R[k].jam.ext, 0)}`); }
+  for (const [a, b] of PAIRS) if (has(a, b)) gate(quasiStatic([M3(a), M3(b)]), `μ 0.25, ${a}: the median loss and set agree across 1% / 0.5% steps`);
+  for (const [a, b] of PAIRS) if (has(a, b)) { const A0 = M3(a), B0 = M3(b); if (A0.n > 1) console.log(`  (single seeds, ${a} / ${b}: loss ${A0.L.map(v => pct(v)).join(' ')} / ${B0.L.map(v => pct(v)).join(' ')}; set ${A0.S.map(v => pct(v, 2)).join(' ')} / ${B0.S.map(v => pct(v, 2)).join(' ')})`); }
   mustFail(quasiStatic([R['mf-phase2-fast'], R['mf-phase2-slow']]), 'the phase-2 test at 1.5 and 0.5 d/s');
-  gate(frictionlessNoLoss(R['plain-mu0']), 'μ 0, along the wales: the stepped cycle loses under 2%');
-  if (runs['plain-course-mu0']) gate(frictionlessNoLoss(R['plain-course-mu0']), 'μ 0, along the courses: the stepped cycle loses under 2%');
-  mustFail(frictionlessNoLoss(R.plain), 'the same test with friction (μ 0.25)');
+  for (const [k, lab] of [['plain', 'along the wales, jersey'], ['rib', 'along the wales, rib'], ['plain-course', 'along the courses, jersey']]) { const B = BASELINE[k]; if (B) console.log(`  RECORDED (not gated): μ 0, ${lab}: the frictionless baseline loses ${pct(B.cyc.lossFraction)} (seeds ${sp(B.L)}), set ${pct(B.cyc.set, 2)} — straight-segment contact`); }
   console.log(`  (the phase-2 continuous test, frictionless: ${pct(R['mf-phase2-mu0'].cyc.lossFraction)} lost)`);
 }
 
 // ---- M: monotonic loading, a clean closed unloading branch ------------------------------------
 // Every step converged; each settled loading step at least the one before (within the hold's own
 // tolerance), each unloading step at most the one before it, and the unloading branch never above the
-// loading curve at the same extension.
+// loading curve at the same extension. Oct 27: judged on the pointwise median of the three seeds (see Q);
+// each seed's own verdict is printed beside it.
 function monotoneClosed(r) {
   const P = r.spec.params || {}, tol = P.STEP_TOL ?? 0.002, floor = 1500, rows = r.pull.rows;
   const up = rows.filter(q => q.phase === 'pulling'), dn = rows.filter(q => q.phase !== 'pulling');
@@ -270,19 +329,22 @@ function monotoneClosed(r) {
   const loadAt = e => { for (let i = 1; i < up.length; i++) if (up[i].ext >= e) { const f = (e - up[i - 1].ext) / Math.max(1e-12, up[i].ext - up[i - 1].ext); return up[i - 1].load + f * (up[i].load - up[i - 1].load); } return up.at(-1).load; };
   for (const q of dn) { const l = loadAt(q.ext); if (q.load > l + slack(q)) { above++; worstAbove = Math.max(worstAbove, q.load / l - 1); } }
   const unconv = rows.filter(q => !q.converged).length;
-  return V(up.length > 2 && dn.length > 2 && upBad === 0 && dnBad === 0 && above === 0 && unconv === 0 && r.pull.loadEnd === 'load',
+  return V(up.length > 2 && dn.length > 2 && upBad === 0 && dnBad === 0 && above === 0 && unconv === 0 && (r.pull.loadEnd === 'jam' || r.pull.loadEnd === 'load'),
     `${up.length} loading / ${dn.length} unloading steps, ${unconv} unconverged; loading steps that fell ${upBad}${upBad ? ` (worst ${pct(worstUp)})` : ''}; unloading steps that rose ${dnBad}; unloading above loading ${above}${above ? ` (worst ${pct(worstAbove)})` : ''}; ended on ${r.pull.loadEnd}`);
 }
 if (has('plain')) {
-  console.log('\n== M. μ 0.25: monotonic loading through the jam, a clean closed unloading branch');
-  for (const k of PAIRS.flat().filter(k => runs[k])) gate(monotoneClosed(runs[k]), k);
+  console.log('\n== M. μ 0.25: monotonic loading to the jam, a clean closed unloading branch');
+  for (const k of PAIRS.flat().filter(k => runs[k])) {
+    gate(monotoneClosed(medianRun(k)), `${k} (median of ${seedsOf(k).length})`);
+    for (const n of seedsOf(k)) console.log(`    seed ${n}: ${monotoneClosed(runs[n]).ok ? 'pass' : 'FAIL'} — ${monotoneClosed(runs[n]).why}`);
+  }
   if (runs['mf-friction-substep']) mustFail(monotoneClosed(runs['mf-friction-substep']), 'the phase-2 friction (each substep\'s slip only): it ratchets, the way back runs above the way out');
-  if (runs['mf-no-contact-velocity']) console.log(`  (not gated) the solver before this round, no velocity pass, 32 substeps: ${monotoneClosed(runs['mf-no-contact-velocity']).why}`);
+  if (runs['mf-no-contact-velocity']) console.log(`  (not gated) the solver before phase 3b, no velocity pass, 32 substeps: ${monotoneClosed(runs['mf-no-contact-velocity']).why}`);
 }
 
 // ---- H: hold ----------------------------------------------------------------------------------
 if (has('plain', 'mf-friction-substep')) {
-  console.log('\n== H. held in the jam, the load stays put');
+  console.log('\n== H. held at the peak (just past the jam), the load stays put');
   gate(holdsStill(runs.plain), 'μ 0.25, FRICTION_MODE memory');
   mustFail(holdsStill(runs['mf-friction-substep']), 'the phase-2 friction (each substep\'s slip only)');
 }
@@ -315,31 +377,39 @@ if (has('eyelet', 'eyelet-ssk')) {
 
 // ---- F: friction ---------------------------------------------------------------------------
 if (has('plain', 'plain-mu0', 'mf-friction-accumulates')) {
-  console.log('\n== F. friction: μ 0.25 still rearranges before the jam');
-  console.log(`  soft region (0-10%), load per d of jaw travel: μ 0 ${fmt(R['plain-mu0'].soft)}, μ 0.25 ${fmt(R.plain.soft)}; jam ${pct(R['plain-mu0'].jam.ext, 0)} / ${pct(R.plain.jam.ext, 0)}`);
-  gate(softRegion(R.plain, R['plain-mu0']), 'μ 0.25 has a soft region before the jam');
-  mustFail(softRegion(R['mf-friction-accumulates'], R['plain-mu0']), `friction capped by a normal multiplier accumulated across substeps (largest strain ${pct(Math.max(...R['mf-friction-accumulates'].rows.map(r => r.strain)), 0)})`);
+  console.log('\n== F. friction: μ 0.25 still rearranges before the jam (medians of three seeds)');
+  const mu = M3('plain'), zero = M3('plain-mu0');
+  console.log(`  soft region (0-10%), load per d of jaw travel: μ 0 ${fmt(zero.soft)}, μ 0.25 ${fmt(mu.soft)}; jam ${pct(zero.jam.ext, 0)} / ${pct(mu.jam.ext, 0)}`);
+  gate(softRegion(mu, zero), 'μ 0.25 has a soft region before the jam');
+  mustFail(softRegion(R['mf-friction-accumulates'], zero), `friction capped by a normal multiplier accumulated across substeps (largest strain ${pct(Math.max(...R['mf-friction-accumulates'].rows.map(r => r.strain)), 0)})`);
 }
 
 // ---- I: inextensible --------------------------------------------------------------------------
+// Oct 27: every test stops at the jam (STOP_AT 'jam'), so "the test, not the strain safety, ends the loading"
+// reads 'jam' where it read 'load' (the LOAD_LIMIT stop), and "no collapse past the jam" covers the step or
+// two recorded past it.
+function endedOnJam(r) { return V(r.pull.loadEnd === 'jam' && !r.pull.strainStopped, `loading ended on: ${r.pull.loadEnd}${r.pull.strainStopped ? ' (the 5% strain stop)' : ''}`); }
 if (has('plain', 'eyelet', 'mf-compliant-yarn', 'mf-gauss-seidel-stretch', 'mf-tail-untied')) {
   console.log('\n== I. the yarn stays inextensible up to the jam, and the load does not collapse past it');
   for (const k of ['plain', 'rib', 'eyelet', 'eyelet-ssk', 'plain-course', 'rib-course'].filter(k => runs[k])) {
     gate(strainBeforeJam(R[k]), `${k}: strain < 1% before the jam`);
     gate(noCollapse(R[k]), `${k}: no collapse past the jam`);
-    gate(endedOnLoad(runs[k]), `${k}: the test, not the strain safety, ends the loading (peak ${fmt(runs[k].pull.peak.load)} at ${pct(runs[k].pull.peak.ext)}; largest strain anywhere ${pct(Math.max(...R[k].rows.map(r => Math.abs(r.strain))), 3)})`);
+    gate(endedOnJam(runs[k]), `${k}: the jam, not the strain safety, ends the loading (peak ${fmt(runs[k].pull.peak.load)} at ${pct(runs[k].pull.peak.ext)}; largest strain anywhere ${pct(Math.max(...R[k].rows.map(r => Math.abs(r.strain))), 3)})`);
   }
   mustFail(strainBeforeJam(R['mf-compliant-yarn']), 'a yarn 2,000x more compliant (STRETCH_COMPLIANCE 2e-6)');
-  mustFail(endedOnLoad(runs['mf-gauss-seidel-stretch']), `the one-sweep Gauss-Seidel stretch solve at 32 substeps, the first version (${strainBeforeJam(R['mf-gauss-seidel-stretch']).why})`);
+  { const gs = R['mf-gauss-seidel-stretch'], a = strainBeforeJam(gs), b = endedOnJam(runs['mf-gauss-seidel-stretch']);
+    mustFail(V(a.ok && b.ok, `${a.why}; ${b.why}`), 'the one-sweep Gauss-Seidel stretch solve at 32 substeps, the first version (strain before the jam, and the stop)'); }
   mustFail(noCollapse(R['mf-tail-untied']), 'the comb fixture with the yarn\'s end left free (it unravels from the tail under load)');
 }
 
 // ---- C: cycle ---------------------------------------------------------------------------------
 if (has('plain', 'plain-mu0')) {
-  console.log('\n== C. load-unload: friction makes the loop');
-  for (const k of ['plain', 'plain-mu0', 'rib', 'eyelet', 'eyelet-ssk', 'plain-course', 'rib-course'].filter(k => runs[k])) { const c = R[k].cyc; console.log(`  ${k.padEnd(13)} loading work ${fmt(c.workLoad)}, given back ${fmt(c.workUnload)}: ${pct(c.lossFraction)} lost; set ${pct(c.set, 2)} (at load ${fmt(c.setLoad)}: ${pct(c.setAtLoading, 1)} up, ${pct(c.setAtUnloading, 1)} down)`); }
-  gate(frictionAddsLoop(R.plain, R['plain-mu0']), 'μ 0.25 against μ 0');
-  mustFail(frictionAddsLoop(R['plain-mu0'], R['plain-mu0']), 'μ 0 against itself');
+  console.log('\n== C. load-unload: friction makes the loop (medians of three seeds)');
+  for (const k of ['plain', 'plain-mu0', 'rib', 'rib-mu0', 'eyelet', 'eyelet-ssk', 'plain-course', 'plain-course-mu0', 'rib-course'].filter(k => runs[k])) { const c = R[k].cyc; console.log(`  ${k.padEnd(16)} loading work ${fmt(c.workLoad)}, given back ${fmt(c.workUnload)}: ${pct(c.lossFraction)} lost; set ${pct(c.set, 2)} (at load ${fmt(c.setLoad)}: ${pct(c.setAtLoading, 1)} up, ${pct(c.setAtUnloading, 1)} down)`); }
+  gate(frictionAddsLoop(M3('plain'), M3('plain-mu0')), 'μ 0.25 against μ 0, jersey along the wales');
+  if (has('rib', 'rib-mu0')) gate(frictionAddsLoop(M3('rib'), M3('rib-mu0')), 'μ 0.25 against μ 0, rib along the wales');
+  if (has('plain-course', 'plain-course-mu0')) gate(frictionAddsLoop(M3('plain-course'), R['plain-course-mu0']), 'μ 0.25 against μ 0, jersey along the courses');
+  mustFail(frictionAddsLoop(M3('plain-mu0'), M3('plain-mu0')), 'μ 0 against itself');
 }
 
 // ---- E: eyelet --------------------------------------------------------------------------------
@@ -348,25 +418,26 @@ if (has('plain', 'eyelet', 'eyelet-ssk')) {
   gate(eyeletsOpen(runs.eyelet), 'the yo, k2tog row opens into holes');
   gate(eyeletsOpen(runs['eyelet-ssk']), 'the ssk, yo row opens into holes');
   mustFail(eyeletsOpen({ holesSettled: runs.plain.holesSettled || { open: 0, band: [] }, holesMid: runs.plain.holesMid || { open: 0, band: [] } }), 'the plain swatch (no eyelet course: no openings measured)');
-  gate(jamDiffers(R.eyelet, R.plain), 'the k2tog eyelet swatch jams at a different extension');
-  gate(jamDiffers(R['eyelet-ssk'], R.plain), 'the ssk eyelet swatch jams at a different extension');
+  gate(jamDiffers(R.eyelet, M3('plain')), 'the k2tog eyelet swatch jams at a different extension');
+  gate(jamDiffers(R['eyelet-ssk'], M3('plain')), 'the ssk eyelet swatch jams at a different extension');
   mustFail(jamDiffers(R.plain, R.plain), 'plain against itself');
-  console.log(`  soft region per d: eyelet ${fmt(R.eyelet.soft)}, ssk ${fmt(R['eyelet-ssk'].soft)}, plain ${fmt(R.plain.soft)}`);
+  console.log(`  soft region per d: eyelet ${fmt(R.eyelet.soft)}, ssk ${fmt(R['eyelet-ssk'].soft)}, plain ${fmt(M3('plain').soft)}`);
 }
 
 // ---- D: direction -----------------------------------------------------------------------------
 if (has('plain', 'plain-course')) {
-  console.log('\n== D. jersey along the courses against along the wales');
-  for (const k of ['plain', 'plain-course', 'rib-course'].filter(k => runs[k])) { const r = runs[k]; console.log(`  ${k.padEnd(13)} gauge ${fmt(r.pull.restHeight, 1)} d (${r.spec.dir === 'course' ? `side jaws ${r.pull.side.left} + ${r.pull.side.right} points; width released ${fmt(r.free.span, 1)} d after ${r.free.frames} frames` : 'comb to cast-on'}); soft region ${fmt(R[k].jam.soft)} per unit strain = ${fmt(R[k].softW)} per d across; jam ${pct(R[k].jam.ext, 0)}; peak ${fmt(r.pull.peak.load)} at ${pct(r.pull.peak.ext, 0)}`); }
-  gate(courseVsWale(R['plain-course'], R.plain), 'jersey is softer and jams later along the courses');
+  console.log('\n== D. jersey along the courses against along the wales (medians of three seeds)');
+  for (const k of ['plain', 'plain-course', 'rib-course'].filter(k => runs[k])) { const r = runs[k], m = M3(k); console.log(`  ${k.padEnd(13)} gauge ${fmt(r.pull.restHeight, 1)} d (${r.spec.dir === 'course' ? `side jaws ${r.pull.side.left} + ${r.pull.side.right} points; width released ${fmt(m.freeSpan, 1)} d after ${r.free.frames} frames` : 'comb to cast-on'}); soft region ${fmt(m.jam.soft)} per unit strain = ${fmt(m.softW)} per d across; jam ${pct(m.jam.ext, 0)} (seeds ${sp(m.J)}); peak ${fmt(r.pull.peak.load)} at ${pct(r.pull.peak.ext, 0)}`); }
+  gate(courseVsWale(M3('plain-course'), M3('plain')), 'jersey is softer and jams later along the courses');
   mustFail(courseVsWale(R.plain, R.plain), 'wale against wale');
 }
 
 // ---- R: rib -----------------------------------------------------------------------------------
 if (has('plain-course', 'rib-course')) {
-  console.log('\n== R. 1x1 rib against jersey, along the courses');
-  gate(ribVsJersey(R['rib-course'], R['plain-course'], runs['rib-course'], runs['plain-course']), 'rib jams much later and draws in at rest');
-  mustFail(ribVsJersey(R['plain-course'], R['plain-course'], runs['plain-course'], runs['plain-course']), 'jersey against itself');
+  console.log('\n== R. 1x1 rib against jersey, along the courses (medians of three seeds)');
+  const rc = M3('rib-course'), jc = M3('plain-course');
+  gate(ribVsJersey(rc, jc, { free: { span: rc.freeSpan } }, { free: { span: jc.freeSpan } }), 'rib jams much later and draws in at rest');
+  mustFail(ribVsJersey(jc, jc, { free: { span: jc.freeSpan } }, { free: { span: jc.freeSpan } }), 'jersey against itself');
 }
 
 // ---- S: safety -------------------------------------------------------------------------------

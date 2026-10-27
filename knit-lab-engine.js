@@ -4,7 +4,7 @@
 // what tools/verify-knit-lab.mjs --browser measures against.
 //
 // In:  { type: 'start', swatch: 'plain' | 'eyelet' | 'eyelet-ssk' | 'rib', params, wales, courses }
-//      { type: 'test', direction }           load to LOAD_LIMIT, unload (the automatic test), along
+//      { type: 'test', direction }           load to the jam, unload (the automatic test), along
 //                                            the wales (the comb) or the courses (the side jaws)
 //      { type: 'grab' } / { type: 'drag', target } / { type: 'release' }   pulling by hand
 //      { type: 'pause', value }
@@ -69,7 +69,7 @@ export function createEngine(post, budgetMs = 30) {
       dir: sim.dir, sideOffset: sim.sideOffset, pinX: sim.pins.map(p => p.x), grip: sim.dir === 'course' ? new Uint8Array(sim.grip) : null, testLoad: sim.testLoad(),
       step: sim.step ? { moving: sim.step.moving, hold: sim.step.hold, n: sim.steps.length } : null, freeAt: sim.freeAt || null, waleSpan: sim.waleSpan(),
       strainStopped: !!sim.strainStopped, nPairs: sim.nPairs, overlaps: ov.pairs, worstDeep, closest: ov.min,
-      stats: { rmsSpeed: sim.stats.rmsSpeed, loadBottom: sim.stats.loadBottom, loadTop: sim.stats.loadTop },
+      stats: { rmsSpeed: sim.stats.rmsSpeed, loadBottom: sim.stats.loadBottom, loadTop: sim.stats.loadTop, loadLeft: sim.stats.loadLeft, loadRight: sim.stats.loadRight },
       timing: { frameMs: sim.timing.frameMs, msPerSubstep: sim.timing.steps ? sim.timing.totalMs / sim.timing.steps : 0 },
     }, [x.buffer]);
   }

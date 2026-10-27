@@ -51,6 +51,7 @@
 
 import { loopPoint, SHAPE, JERSEY_REST } from './textile-knit-loops.js';
 import { courseDirection } from './knit-lab-topology.js';
+import { findJam } from './knit-lab-analysis.js';
 
 // ---- Every tunable, in one place -------------------------------------------------------------
 export const PARAMS = {
@@ -104,9 +105,15 @@ export const PARAMS = {
                                // stockinette swatch keep rolling (measured: RMS speed floors at
                                // ~0.2 d/s while the jaw gap is still), so that test never passes.
   PULL_SPEED: 1.5,             // comb speed while loading and unloading, d per simulated second.
-  LOAD_LIMIT: 1.0e6,           // the automatic test LOADS until the bottom jaw (the load cell) reads
-                               // this — several times the load at the jam — the way a tensile tester
-                               // stops at a set force, then UNLOADS the comb back to where it started.
+  STOP_AT: 'jam',              // 'jam' (Oct 27, Eva's decision): every automatic test LOADS until findJam() —
+                               // the analysis's own jam, the tangent stiffness first 10x the soft region's —
+                               // finds the jam on the points recorded so far, then UNLOADS back to where it
+                               // started. Past the jam the load is carried by contacts between straight
+                               // segments and the yarn's own length, which this model does not get right.
+                               // 'limit': phases 2-3b, loading on to LOAD_LIMIT.
+  LOAD_LIMIT: 1.0e6,           // ...a SAFETY under 'jam' (the test never gets near it); under 'limit' the test
+                               // LOADS until the bottom jaw (the load cell) reads this — several times the
+                               // load at the jam — the way a tensile tester stops at a set force.
                                // Past the jam an inextensible yarn cannot extend, so an extension
                                // target there is a request for broken yarn.
   PULL_MAX_EXTENSION: 3.0,     // ...or at +300%, whichever first (the course direction jams far out).
@@ -144,6 +151,14 @@ export const PARAMS = {
                                // so a loop keeps its own depth and the edges are free to curl. Along z only:
                                // it never reaches a jaw's load (read along x or y). 300: at 100 or below the
                                // swatch crumples while it settles (jaw gap 33 -> 21 d), from 150 up it holds.
+  COURSE_TOP: 'rail',          // Oct 27: in a course test the LIVE course rides a rail too, exactly as the cast-on
+                               // does (each point's y and z kept, free along x), the swatch's height held where
+                               // the wale settle left it (at the preload). 'needle' (phase 3b): the live loops on
+                               // the comb's pins, each pin free along x and running z = ±PIN_HALF_LENGTH, the
+                               // needle force-controlled to COURSE_EDGE_LOAD while the width is released. On the
+                               // needle the live loop beside the right jaw slid along its pin toward the jaw and
+                               // climbed it out of the plane (z 7 d) over the clamped edge loop, ~0.12 d/s,
+                               // without end; held still the side jaws never agreed (docs/knit-lab-spike.md, Oct 27).
   COURSE_BOTTOM: 'rail',       // in a course test the cast-on rides a RAIL (its y and z kept, free along x) and
   COURSE_EDGE_LOAD: 1500,      // the live loops a NEEDLE (the pins, each free along x) force-controlled to this
                                // load: a small pretension across the pull, the wale test's own preload. 'free' /
@@ -845,7 +860,8 @@ export class KnitSim {
       x[3 * i] = this.tieBase[3 * i]; x[3 * i + 1] = this.tieBase[3 * i + 1] + this.pullOffset; x[3 * i + 2] = this.tieBase[3 * i + 2];
     } else if (g[i] === 4) {                             // the right side jaw is driven along x
       x[3 * i] = this.tieBase[3 * i] + this.sideOffset; x[3 * i + 1] = this.tieBase[3 * i + 1]; x[3 * i + 2] = this.tieBase[3 * i + 2];
-    }
+      v[3 * i] = sideV; v[3 * i + 1] = v[3 * i + 2] = 0;  // ...and carries the jaw's velocity: the contacts' velocity
+    }                                                    // pass reads it (a gripped point's v is never derived)
     const K = P.OUT_OF_PLANE_K, lo = this.loopOf, LZ = this.loopZ;
     if (K) { LZ.fill(0); for (let i = 0; i < n; i++) { const l = lo[i]; if (l >= 0 && this.interior[l]) LZ[l] += x[3 * i + 2]; }
       for (let l = 0; l < LZ.length; l++) if (this.interior[l]) LZ[l] = -K * (LZ[l] / this.loopCount[l]) / this.loopCount[l] * dt; }   // dv_z per point
@@ -974,12 +990,17 @@ export class KnitSim {
     const P = this.P;
     if (P.PROTOCOL === 'stepped' && this.step && ((this.phase === 'pulling' && this.pullAuto) || this.phase === 'unloading')) return this.advanceStep();
     if (this.phase === 'pulling' && this.pullAuto) {
-      const why = this.strainStopped ? 'strain' : this.loadSmooth >= P.LOAD_LIMIT ? 'load' : this.pullOffset >= this.pullTarget - 1e-9 ? 'extension' : null;
+      (this.trace ||= []).push({ ext: this.extension(), load: this.testLoad(), phase: 'pulling' });
+      const jam = this.trace.length % 30 === 0 && this.jamReached(this.trace);
+      const why = this.strainStopped ? 'strain' : this.loadSmooth >= P.LOAD_LIMIT ? 'load' : jam ? 'jam' : this.pullOffset >= this.pullTarget - 1e-9 ? 'extension' : null;
       if (why) { this.loadEnd = why; this.peak = { ext: this.extension(), load: this.loadSmooth }; this.phase = this.cycle ? 'unloading' : 'held'; }
     } else if (this.phase === 'unloading' && this.pullOffset <= this.restOffset + 1e-9) { this.phase = 'returned'; this.returnFrames = 0; }
     else if (this.phase === 'returned' && ++this.returnFrames >= P.RETURN_HOLD) this.phase = 'done';
   }
   relaxing() { return this.phase === 'settling' || this.phase === 'freeing'; }
+  // STOP_AT 'jam': has the loading reached the jam? The analysis's own findJam on the points so far, so the
+  // test and every gate read one definition.
+  jamReached(rows) { return this.P.STOP_AT === 'jam' && Number.isFinite(findJam(rows).ext); }
   get testing() { return ['pulling', 'unloading', 'returned', 'held', 'done'].includes(this.phase); }
 
   // The driven jaw: the comb in a wale test, the right side jaw in a course test.
@@ -1034,7 +1055,7 @@ export class KnitSim {
     const size = P.STEP_EXT * this.restHeight;
     if (loading) {
       if (Math.abs(rec.strain) > P.STRAIN_STOP) this.strainStopped = true;
-      const why = this.strainStopped ? 'strain' : st.capped || a >= P.LOAD_LIMIT * (1 - P.LOAD_LIMIT_TOL) ? 'load' : this.drive >= this.pullTarget - 1e-9 ? 'extension' : null;
+      const why = this.strainStopped ? 'strain' : st.capped || a >= P.LOAD_LIMIT * (1 - P.LOAD_LIMIT_TOL) ? 'load' : this.jamReached(this.steps) ? 'jam' : this.drive >= this.pullTarget - 1e-9 ? 'extension' : null;
       if (why) { this.loadEnd = why; this.peak = { ext: rec.ext, load: a }; if (!this.cycle) { this.phase = 'held'; return; } this.phase = 'unloading'; st.target = Math.max(this.restOffset, this.drive - size); }
       else st.target = Math.min(this.pullTarget, this.drive + this.approachStep(size));
     } else {
@@ -1067,7 +1088,7 @@ export class KnitSim {
     if (!this.restHeight) this.clampJaws();
     this.phase = 'pulling'; this.pullAuto = auto; this.cycle = cycle; this.strainStopped = false; this.loadEnd = null; this.peak = null;
     if (auto) this.pullTarget = this.restOffset + this.P.PULL_MAX_EXTENSION * this.restHeight;
-    this.steps = []; this.stepCount = 0; this.unconverged = 0;
+    this.steps = []; this.stepCount = 0; this.unconverged = 0; this.trace = [];
     // the stepped test starts with a hold at the clamped position: its first point is the rest load
     this.step = auto && this.P.PROTOCOL === 'stepped' ? { target: this.drive, moving: false, hold: 0, win: [], top: [] } : null;
   }
@@ -1089,18 +1110,18 @@ export class KnitSim {
   // FIXTURE 'clamp': the cast-on is let go entirely and the top jaw opens onto a NEEDLE (the pins,
   // each free along x, the needle force-controlled to COURSE_EDGE_LOAD): top and bottom edges free.
   releaseWidth() {
-    this.dir = 'course'; this.pinsFree = true;
+    this.dir = 'course'; this.pinsFree = this.P.COURSE_TOP !== 'rail';
+    const topRail = this.clampTop && this.P.COURSE_TOP === 'rail';
     if (this.clampTop) {
-      for (let i = 0; i < this.n; i++) if (this.grip[i] === 2 && i < this.tailFrom) { this.grip[i] = 0; this.w[i] = 1; }
+      for (let i = 0; i < this.n; i++) if (this.grip[i] === 2 && i < this.tailFrom) { this.grip[i] = topRail ? 6 : 0; this.w[i] = 1; }
       if (this.P.COURSE_BOTTOM === 'free') {
         for (let i = 0; i < this.n; i++) if (this.grip[i] === 1) { this.grip[i] = 0; this.w[i] = 1; }
-        this.v.fill(0); this.builtAt = null;
-        this.phase = 'freeing'; this.freeFrames = 0; this.spanHist = []; this.freeDrift = Infinity;
-        return;
+        if (!topRail) { this.v.fill(0); this.builtAt = null; this.phase = 'freeing'; this.freeFrames = 0; this.spanHist = []; this.freeDrift = Infinity; return; }
       }
     }
     this.railY = new Float64Array(this.n); this.railZ = new Float64Array(this.n);
-    for (let i = 0; i < this.n; i++) if (this.grip[i] === 1) { this.grip[i] = 5; this.w[i] = 1; this.railY[i] = this.x[3 * i + 1]; this.railZ[i] = this.x[3 * i + 2]; }
+    for (let i = 0; i < this.n; i++) if (this.grip[i] === 1 || this.grip[i] === 6) { this.grip[i] = 5; this.w[i] = 1; this.railY[i] = this.x[3 * i + 1]; this.railZ[i] = this.x[3 * i + 2]; }
+    if (topRail) this.combFixed = true;              // the live course's rail holds the height where the wale settle left it
     this.v.fill(0); this.builtAt = null;
     this.phase = 'freeing'; this.freeFrames = 0; this.spanHist = []; this.freeDrift = Infinity;
   }
@@ -1124,6 +1145,10 @@ export class KnitSim {
       if (side === 3) { sl += this.x[3 * i]; nl++; } else { sr += this.x[3 * i]; nr++; }
     }
     this.jawL = sl / nl; this.jawR0 = sr / nr; this.sideOffset = 0; this.sideGrip = { left: nl, right: nr };
+    // A gripped point's velocity is never derived again (w = 0), but the contacts' velocity pass READS it: left
+    // at whatever it had while the width was free, it pushed every free yarn touching a jaw by the same stale
+    // amount every substep, and the jaws then disagreed at rest by that force (4.5% held at +3%, Oct 27).
+    for (let i = 0; i < this.n; i++) if (this.w[i] === 0) this.v[3 * i] = this.v[3 * i + 1] = this.v[3 * i + 2] = 0;
     if (this.clampTop) this.combFixed = true;      // the needle found its height at the pretension while the width was free; from here it is held (a biaxial grip), so nothing moves but the driven jaw
     this.restHeight = this.jawGap(); this.restOffset = 0;
   }

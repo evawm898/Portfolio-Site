@@ -167,7 +167,7 @@ const rgb = (c, k) => `rgb(${Math.round(c[0] * k)},${Math.round(c[1] * k)},${Mat
 
 // ---- the load-unload plot: loading in petrol, unloading in ink; the other swatch's last test
 // faint behind; a tick at each jam. Load on a LOG axis: the curve climbs three decades from the
-// soft region to the limit, and on a linear axis everything below the jam is one flat line.
+// soft region to the jam, and on a linear axis the soft region is one flat line.
 function drawChart() {
   const dpr = window.devicePixelRatio || 1, W = chart.width, H = chart.height;
   cctx.setTransform(1, 0, 0, 1, 0, 0); cctx.fillStyle = BLACK; cctx.fillRect(0, 0, W, H);
@@ -176,7 +176,7 @@ function drawChart() {
   const other = lastKey && lastKey !== key() ? results[lastKey] : null;
   const all = [...log, ...(other ? other.rows : [])];
   const xmax = Math.max(0.2, ...all.map(p => p.ext)) * 1.05;
-  const lo = 1e3, ymax = Math.max(P.LOAD_LIMIT, ...all.map(p => p.load)) * 1.3, span = Math.log10(ymax / lo);
+  const lo = 1e3, ymax = Math.max(P.STOP_AT === 'jam' ? 1e5 : P.LOAD_LIMIT, ...all.map(p => p.load)) * 1.3, span = Math.log10(ymax / lo);
   const X = e => L + (w - L - R) * Math.max(0, e) / xmax, Y = v => T + (h - T - B) * (1 - Math.log10(Math.max(lo, v) / lo) / span);
   cctx.strokeStyle = LINE; cctx.lineWidth = 1;
   cctx.strokeRect(L + 0.5, T + 0.5, w - L - R, h - T - B);
@@ -204,7 +204,7 @@ function readouts() {
   const pct = v => Number.isFinite(v) ? `${(v * 100).toFixed(1)}%` : '—';
   const rows = [
     ['swatch', init.label],
-    ['test', `${st.dir === 'course' ? 'along the courses (side jaws; does not settle on this model)' : 'along the wales (top jaw)'} · ${P.PROTOCOL === 'stepped' ? `stepped, ${(P.STEP_EXT * 100).toFixed(1)}% a step, held to ${(P.STEP_TOL * 100).toFixed(2)}%` : `continuous at ${P.PULL_SPEED} d/s`}`],
+    ['test', `${st.dir === 'course' ? 'along the courses (side jaws)' : 'along the wales (top jaw)'} · ${P.PROTOCOL === 'stepped' ? `stepped, ${(P.STEP_EXT * 100).toFixed(1)}% a step, held to ${(P.STEP_TOL * 100).toFixed(2)}%` : `continuous at ${P.PULL_SPEED} d/s`}`],
     ['phase', st.phase + (st.loadEnd && st.phase !== 'pulling' ? ` (loading ended on ${st.loadEnd})` : '')],
     ['simulation thread', USE_WORKER ? 'Web Worker' : 'this page (#WORKER=0)'],
     ['points / contact pairs', `${init.n} / ${st.nPairs}`],
@@ -219,7 +219,7 @@ function readouts() {
     ['overlaps > ½ d now / worst', `${st.overlaps} / ${st.worstDeep}`, st.worstDeep > 0],
     ['largest yarn strain', `${(st.maxStrain * 100).toFixed(3)}%`, st.maxStrain > 0.01],
     ['extension', st.restHeight ? pct(st.extension) : '—'],
-    [st.dir === 'course' ? 'load: left jaw (load cell) / needle' : 'load: bottom jaw / top jaw', `${st.testLoad.toFixed(0)} / ${st.stats.loadTop.toFixed(0)}`],
+    [st.dir === 'course' ? 'load: left jaw (load cell) / right jaw' : 'load: bottom jaw / top jaw', `${st.testLoad.toFixed(0)} / ${(st.dir === 'course' ? st.stats.loadRight : st.stats.loadTop).toFixed(0)}`],
     ['steps recorded', st.step ? `${st.step.n}${st.step.moving ? ' · moving' : ` · holding ${st.step.hold} frames`}` : '—'],
     ['jam (stiffness ×10 the soft region)', r ? `${pct(r.jam.ext)} at load ${Math.round(r.jam.load)}` : '—'],
     ['hysteresis (loading work lost)', r ? pct(r.cycle.lossFraction) : '—'],
@@ -229,11 +229,11 @@ function readouts() {
   $('klRo').innerHTML = rows.map(([k, v, bad]) => `<dt>${k}</dt><dd${bad ? ' class="is-bad"' : ''}>${v}</dd>`).join('');
   $('klProgress').style.width = `${(st.settleProgress * 100).toFixed(1)}%`;
   $('klStatus').textContent = st.phase === 'settling' ? `settling — ${Math.round(st.settleProgress * 100)}%`
-    : st.phase === 'freeing' ? 'releasing the width: the cast-on on a rail, the live stitches on a needle, the swatch settling at its own width…'
+    : st.phase === 'freeing' ? 'releasing the width: the cast-on and the live course on rails, the swatch settling at its own width…'
     : st.phase === 'free' ? 'settled at its own width.'
     : st.step && (st.phase === 'pulling' || st.phase === 'unloading') ? `${st.phase === 'pulling' ? 'loading' : 'unloading'} in steps: ${st.step.n} recorded, ${st.step.moving ? 'moving the jaw' : `holding (${st.step.hold} frames)`}…`
     : st.phase === 'settled' ? 'settled. Run the test, or drag above the top course.'
-    : st.phase === 'pulling' ? (st.pullAuto ? `loading at constant speed, until the bottom jaw reads ${P.LOAD_LIMIT.toExponential(1)}…` : 'pulling by hand')
+    : st.phase === 'pulling' ? (st.pullAuto ? (P.STOP_AT === 'jam' ? 'loading at constant speed, until the jam…' : `loading at constant speed, until the bottom jaw reads ${P.LOAD_LIMIT.toExponential(1)}…`) : 'pulling by hand')
     : st.phase === 'unloading' ? 'unloading: the driven jaw going back to where it started…'
     : st.phase === 'returned' ? 'back at the start, holding…'
     : st.phase === 'done' ? `test done: ${r ? `jam at ${pct(r.jam.ext)}, ${pct(r.cycle.lossFraction)} of the loading work lost, set ${pct(r.cycle.set)}` : ''}` : st.phase;
