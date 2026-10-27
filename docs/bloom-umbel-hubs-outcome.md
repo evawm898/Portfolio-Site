@@ -191,7 +191,28 @@ or a section-modulus auto (which reads inert on every umbel today, measured).
 
 ## 4. Gates run on this tree (local)
 
-(filled in below as they complete)
+Every run on this box, `CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium`, block 82 through `--only '^(STEM TOP|UMBEL HUB)'`:
+
+- **Export gate**: 17 of 17 rows reached the results, 17 watertight, `tris(live) === tris(export)` on every one; 1,716 s.
+  One declared self-intersector, held by X1 at its magnitude: `STEM TOP: rise 1 x a 12 mm stem` reads **248 / 0.4262**,
+  which is `headRise max (1)`'s own hemisphere fold to the digit (the stem and the join touch no petal) — declared with
+  that cause, not the fix's. **The first run dropped eleven rows and none was geometry**: the ten umbel rows by ID10 (d)
+  (every umbel's florets stand 0.0000 mm apart by construction and are declared in `INFLO_APPROACH_XFAIL`; the junction
+  moves no floret, so block 82's rows carry the same declaration), and that fold.
+- **Connectedness gate**: 17 of 17 one connected piece; 1,326 s.
+- **Panel gate**: PASS (the three Hub controls' junction words, the umbel head toggle, the mophead depth defaults).
+- **Smoke census** (`node tools/bloom-smoke.mjs --check`): 343 smoke rows over 78 blocks of 1,605 rows, every family
+  claimed both ways; ST13 and the junction rows claimed by block 82's six smoke rows (`--conn`).
+- **Apex mutant table**, 260 anchors matching exactly once. Run: `the-junction-ignores-the-hub-controls` (UM1, UM8),
+  `a-root-disc-on-the-junctions-face` (UM1, UM2), `the-ray-junction-reads-the-stems-radius` (UM8, and ID2 / ID9 / UM2
+  as collateral), `the-boss-underside-cones-again` (re-witnessed on amount 0), `hairline-root`, `the-stem-normal-points-inward`
+  (re-anchored), `the-stem-top-is-laid-at-the-apex` (ST10) and `the-join-reach-floor-is-dropped` (ST4, ST5, and ST11) — each
+  firing what it names, silent on the clean tree. **ST13 cannot fire in that table**: it reads the EXPORTED file by the
+  builder's own stream ranges and the table calls `stemAssertions` only (ST9's precedent). Its witness is
+  `node tools/verify-bloom-stem-channel.mjs`, section 2b: the two stem-top mutations run by id in Node on Eva's state and
+  the 12 mm × amount 0 state, ST13 silent on the clean tree and firing on both (0.3076 / 1.2724 mm over the skin under the
+  apex-laid top, 0.0724 under the dropped floor); `--control` (the replacement is the find-string) stays silent on it.
+- Not run locally: the full matrix on either STL gate (CI's), the other 252 mutants (a subset says so in its banner).
 
 ## 5. Bytes
 
