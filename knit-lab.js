@@ -157,7 +157,7 @@ function draw(b) {
   }
   if (!pinsDrawn && pinsShown()) drawPins(s, cx, cy);
 }
-const pinsShown = () => P.FIXTURE !== 'clamp' || st.dir === 'course';
+const pinsShown = () => P.FIXTURE !== 'clamp' || (st.dir === 'course' && P.COURSE_TOP !== 'rail');   // on rails the needle's pins are not used
 function drawPins(s, cx, cy) {   // the comb, seen end on: the pins run straight into the screen
   const r = P.PIN_RADIUS * s;
   ctx.fillStyle = '#34393a'; ctx.strokeStyle = PETROL; ctx.lineWidth = 1;
