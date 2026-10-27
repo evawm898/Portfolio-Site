@@ -31,8 +31,9 @@ import { render, writePng, text, blit } from './bloom-soft-render.mjs';
 const argv = process.argv.slice(2);
 const OUT = argv.find((a) => !a.startsWith('--') && argv[argv.indexOf(a) - 1] !== '--base');
 const baseDir = argv.includes('--base') ? path.resolve(argv[argv.indexOf('--base') + 1]) : null;
-if (!OUT || !baseDir) { console.error('usage: node tools/shot-bloom-umbel-hubs.mjs <out.png> --base <worktree>'); process.exit(2); }
-const BASE = await import(pathToFileURL(path.join(baseDir, 'bloom-geometry.js')).href);
+const RAY_COMPARE = argv.includes('--ray-compare');   // one head-only row, no base worktree needed
+if (!OUT || (!baseDir && !RAY_COMPARE)) { console.error('usage: node tools/shot-bloom-umbel-hubs.mjs <out.png> --base <worktree> | <out.png> --ray-compare'); process.exit(2); }
+const BASE = baseDir ? await import(pathToFileURL(path.join(baseDir, 'bloom-geometry.js')).href) : null;
 
 const CW = 360, CH = 360, CAP = 72, PAD = 10, LABELW = 230;
 const COL = { knot: [214, 111, 154], stem: [150, 160, 150], floret: [226, 214, 190], hub: [110, 180, 170], petal: [226, 214, 190] };
@@ -88,6 +89,10 @@ for (const [tag, set] of [['THE SPIDER LILY: 6 FLORETS, HEAD OFF', LILY], ['THE 
 /* section 3 — each style at the defaults, three columns */
 rows.push({ sec: 3, tag: 'EACH HUB STYLE AT THE DEFAULTS - THE SPIDER LILY', set: LILY, view: 'close', styles: true });
 rows.push({ sec: 3, tag: 'EACH HUB STYLE AT THE DEFAULTS - A MOPHEAD RAY TIP', set: MOP, view: 'close', styles: true });
+/* `--ray-compare`: ONE row for Eva's ruling — a mophead ray tip at GOBLET 1.00 beside CURVED and
+   ANGLED at a shallower 0.50, all at AUTO reach, so the 7.74 mm trumpet stands next to something
+   less deep. Captions carry the flare depth and the band in mm. */
+if (RAY_COMPARE) { rows.length = 0; rows.push({ sec: 3, tag: 'RAY TIP JUNCTION ALONE, SIDE-ON (FLORETS AND RAY DROPPED)', set: MOP, view: 'close', styles: true, cells: [['GOBLET', 1], ['CURVED', 0.5], ['ANGLED', 0.5]] }); }
 const ncol = 3;
 const SW = ncol * (CW + PAD) + PAD + LABELW, SH = rows.length * (CH + CAP + PAD) + PAD;
 const sheet = Buffer.alloc(SW * SH * 3, 18);
@@ -100,7 +105,7 @@ rows.forEach((row, ri) => {
   text(sheet, SW, SH, PAD + ncol * (CW + PAD), y + 30, row.tag, [210, 210, 204], 1);
   text(sheet, SW, SH, PAD + ncol * (CW + PAD), y + 46, { above: 'FROM ABOVE', cut: 'CUTAWAY (NEAR HALF REMOVED)', lowside: 'LOW SIDE ANGLE', side: 'SIDE-ON', below: 'FROM BELOW', close: 'CLOSE-UP OF THE JUNCTION' }[row.view], [210, 210, 204], 1);
   const cells = row.styles
-    ? ['GOBLET', 'ANGLED', 'CURVED'].map((s) => ({ b: cached({ ...row.set, hubStyle: s }, G), head: s }))
+    ? (row.cells || [['GOBLET'], ['ANGLED'], ['CURVED']]).map(([s, a]) => ({ b: cached({ ...row.set, hubStyle: s, ...(a != null ? { hubShapeAmount: a } : {}) }, G), head: a != null ? `${s} ${a.toFixed(2)}` : s }))
     : [{ b: cached(row.set, BASE), head: 'BEFORE' }, { b: cached(row.set, G), head: 'AFTER' }];
   cells.forEach(({ b, head }, i) => {
     const x = PAD + i * (CW + PAD);
@@ -108,15 +113,23 @@ rows.forEach((row, ri) => {
     if (row.sec === 1) { c = [0, 0, b.stem.topZ]; r = b.hub.radius * (row.view === 'above' ? 1.3 : 0.9); if (row.view === 'cut') P = cutaway(P); }
     else { const K = b.IB.knot; const tip = row.set.umbelDepth === '2' && row.view === 'close' ? rayTip(b) : null; c = tip || K.centre; r = (tip ? b.IB.sub.knot.radiusMm : K.radiusMm) * (row.view === 'close' ? 2.2 : 4.5);
       /* the ray tip close-up draws ONE ray's sub-umbel alone (its own stream range), or its junction is buried in the neighbours' florets */
-      if (tip) { const p0 = b.IB.placed[0]; P = b.P.slice(p0.at, p0.at + p0.tris * 9); } }
-    const img = render(P, CW, CH, VIEW[row.view === 'close' ? 'lowside' : row.view](c, r), { colorOf: b.colorOf, bg: [30, 30, 34] });
+      if (tip) { const p0 = b.IB.placed[0]; P = b.P.slice(p0.at, p0.at + p0.tris * 9);
+        /* the compare row: side-on in the ray's own plane, the florets on the near side of the
+           band removed, framed on the band plus the flare below it, so the trumpet reads in profile */
+        if (row.cells) { const M = p0.M, sub = b.IB.sub.knot, F = sub.flare; const ax = [M[2], M[6], M[10]];   // the ray's axis in the world (local +z)
+          /* the florets are dropped — only the sub-boss (its own stream range) and the ray that feeds it
+             are drawn, so the flare is not hidden behind the florets hanging off the band */
+          const kr = sub.triRange, Q = [], cols = []; for (let t = 0; t < P.length / 9; t++) { if (t >= kr[0] && t < kr[1]) { for (let k = 0; k < 9; k++) Q.push(P[t * 9 + k]); cols.push(COL.knot); continue; } let ray = true; for (let k = 0; k < 9 && ray; k += 3) { const d = [P[t * 9 + k] - tip[0], P[t * 9 + k + 1] - tip[1], P[t * 9 + k + 2] - tip[2]]; const along = d[0] * ax[0] + d[1] * ax[1] + d[2] * ax[2]; const rad = Math.hypot(d[0] - along * ax[0], d[1] - along * ax[1], d[2] - along * ax[2]); if (!(along < -sub.halfHeightMm + 1e-6 && rad < sub.radiusMm)) ray = false; } if (ray) { for (let k = 0; k < 9; k++) Q.push(P[t * 9 + k]); cols.push(COL.stem); } }
+          b = { ...b, colorOf: (t) => cols[t] };
+          P = Float64Array.from(Q); const depth = (F ? F.swellMm : 0) + sub.halfHeightMm; c = [tip[0] - ax[0] * depth * 0.45, tip[1] - ax[1] * depth * 0.45, tip[2] - ax[2] * depth * 0.45]; r = Math.max(sub.radiusMm, depth) * 1.25; row.rayView = { dir: [0, -1, 0], up: ax, center: c, halfHeight: r }; } } }
+    const img = render(P, CW, CH, row.rayView || VIEW[row.view === 'close' ? 'lowside' : row.view](c, r), { colorOf: b.colorOf, bg: [30, 30, 34] });
     blit(sheet, SW, SH, img, CW, CH, x, y);
     const K = row.sec === 1 ? null : (row.set.umbelDepth === '2' && (row.view === 'close') ? b.IB.sub.knot : b.IB.knot);
     const dims = row.sec === 1 ? stemDims(b).label : knotDims(K);
     text(sheet, SW, SH, x, y + CH + 6, head + (row.sec === 1 ? (head === 'BEFORE' ? ' - MAIN' : ' - THE FIX') : head === 'BEFORE' ? ' - THE COIN' : head === 'AFTER' ? ' - THE HUB' : ''), [250, 250, 248], 2);
     text(sheet, SW, SH, x, y + CH + 24, dims.slice(0, 58), [210, 210, 204], 1);
     if (dims.length > 58) text(sheet, SW, SH, x, y + CH + 36, dims.slice(58, 116), [210, 210, 204], 1);
-    text(sheet, SW, SH, x, y + CH + 52, `${b.tris} TRIS IN ALL`, [190, 200, 190], 2);
+    text(sheet, SW, SH, x, y + CH + 52, row.cells ? `${(b.IB.sub.knot.flare ? b.IB.sub.knot.flare.swellMm : 0).toFixed(2)} MM DEEP UNDER A ${(2 * b.IB.sub.knot.halfHeightMm).toFixed(2)} MM BAND` : `${b.tris} TRIS IN ALL`, [190, 200, 190], 2);
     if (i === 0 || row.styles) report.push(`${row.tag.padEnd(58)} ${row.view.padEnd(8)} ${head.padEnd(7)} ${dims} | ${b.tris} tris`);
     if (!row.styles && i === 1) report.push(`${''.padEnd(58)} ${''.padEnd(8)} ${head.padEnd(7)} ${dims} | ${b.tris} tris`);
   });
