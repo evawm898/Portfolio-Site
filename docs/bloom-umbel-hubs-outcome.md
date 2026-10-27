@@ -216,4 +216,23 @@ Every run on this box, `CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium`, block 82
 
 ## 5. Bytes
 
-(filled in once the partition closes)
+`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 4beac00> --movers-predicate umbel-hubs`, the whole
+1,605-row live matrix in both modes, in three `--range` chunks merged (`--merge`):
+
+- **69 movers / 1,536 holders — PASS: 0 floats moved on any holder, positionally under `Object.is`, every predeclared
+  mover moved**, over 1,992,525,660 export floats (221,391,740 triangles) and 82,702,544 captured-grid values.
+- The predicate is read off the BASE tree's own records: a row moves iff the base builds a stem rooted through an open
+  cap wider than it with the head present (`stem-top` — the cap's sagitta at the stem's radius is never 0, so every such
+  row moves), OR the base builds an umbel knot AND the junction's flare is built there by `umbelBoss`'s own branch (Hub
+  amount > 0, a flare width, room under the band for a swell). **The first predicate named every umbel row a mover and the
+  run refused it**: `UMBEL HUB: amount 0 — the band alone` holds to the bit in both modes, which is the Oct 24 coin by
+  branch and is what the row exists to measure. The predicate reads the branch now.
+- The movers outside block 82 (block 82 adds 17 rows): `ALL MAX` (a 120 mm stem on a domed head), the two `STEM: x a
+  domed head / hemisphere` rows, the sepal-height and sepal-tier dome rows, the sessile domed floret head, the hemisphere
+  reach-inset row, and every `UMBEL:` / `MOPHEAD:` row that builds a flare — the umbel knot has a GOBLET flare at the
+  shipping Hub defaults on all of them.
+- A frozen phase IS owed (1,588 → 1,605, block 82): `frozen/phase89` at the merge base, registered after Eva's ruling.
+  Every one of the 88 older baselines' DEFINITIONS reproduces; the bytes of every baseline carrying a domed head with a
+  stem, or an umbel, stop reproducing on those rows (the stem-top sagitta and the flare), named here rather than owed as
+  a phase.
+

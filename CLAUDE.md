@@ -6878,10 +6878,16 @@ from the deploy preview — read `docs/bloom-umbel-hubs-outcome.md` before touch
   made without a ruling**: the head's section-modulus auto floors at the plate and a band two
   discs tall asks for nothing, so it would leave every umbel a coin. The foot meets the rod half a
   gap inside its wall; the depth is CLAMPED to the rod's mode-free room, told. 960 tris a junction.
+- **Byte partition (`--movers-predicate umbel-hubs`, the base tree's own records): 69 movers / 1,536
+  holders, 0 floats on any holder**, both modes — a row moves iff the base builds a stem on an open cap
+  wider than it with the head present, or an umbel whose flare is BUILT (amount 0 holds, by branch; the
+  first predicate named it and the run refused it). Local gates on block 82: export 17/17 (one declared
+  fold, `headRise max (1)`'s own 248 / 0.4262 under a 12 mm stem), connectedness 17/17, panel PASS, the
+  ten umbel rows declared in `INFLO_APPROACH_XFAIL` (the junction moves no floret). **ST13 is a
+  FILE-side clause and the apex table cannot fire it** — its witness is `verify-bloom-stem-channel.mjs`
+  §2b (ST9's precedent), where both stem-top mutations fire it.
 - **WAITING ON EVA (the sheet `docs/img/umbel-hubs.png`): the default style / amount / length.**
-  After the ruling: the byte partition closes (`--movers-predicate umbel-hubs`: a row moves iff
-  the base builds an umbel or a stem on a cap wider than it), and `frozen/phase89` is owed
-  (1,588 → 1,605, block 82).
+  After the ruling: `frozen/phase89` is owed (1,588 → 1,605, block 82).
 
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of
