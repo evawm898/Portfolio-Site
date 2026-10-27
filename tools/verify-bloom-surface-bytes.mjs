@@ -90,6 +90,14 @@ const MOVERS = argOf('--movers') ? new RegExp(argOf('--movers')) : null;
    foreground chunks that survive this container (CLAUDE.md: background work
    does not outlive a turn); `--merge f1,f2,...` closes the chunks into one
    verdict and REFUSES a set of chunks that does not tile the matrix. */
+/* `--defer` (the page profile, Oct 27): THIS tree's builds are made with
+   `deferReports: true` — the held-slider build, which skips the report-only
+   instruments a drag does not need — while the BASE tree builds as it always
+   has. So a PASS says the deferred build emits the base tree's full build to
+   the float, positionally, in both modes, on every row: deferring a report
+   moves no byte. Run it beside the plain run (which says the rest build moved
+   nothing); together they are the whole claim. */
+const DEFER = argv.includes('--defer');
 const MOVERS_PRED = argOf('--movers-predicate');
 const RANGE = argOf('--range');
 const JSON_OUT = argOf('--json');
@@ -104,7 +112,7 @@ if (MERGE) {
     if (p.matrixRows !== total) bad.push(`chunk ${p.from}:${p.to} was taken over a ${p.matrixRows}-row matrix, not ${total}`);
     if (p.from !== at) bad.push(`the chunks do not tile the matrix: expected a chunk from row ${at}, got ${p.from}`);
     at = p.to;
-    if (p.predicate !== parts[0].predicate || p.base !== parts[0].base) bad.push(`chunk ${p.from}:${p.to} ran a different predicate or base`);
+    if (p.predicate !== parts[0].predicate || p.base !== parts[0].base || !!p.defer !== !!parts[0].defer) bad.push(`chunk ${p.from}:${p.to} ran a different predicate, base or --defer`);
   }
   if (at !== total) bad.push(`the chunks end at row ${at} of ${total}`);
   /* EACH CHUNK MUST HAVE COMPARED WHAT IT CLAIMS (the review's finding: a chunk's
@@ -126,7 +134,7 @@ if (MERGE) {
   const sum = (k) => parts.reduce((n, p) => n + p[k], 0);
   if (!sum('rowsDone') || !sum('floats') || !sum('gridFloats')) bad.push(`VACUOUS: the chunks compared ${sum('rowsDone')} rows, ${sum('floats')} floats, ${sum('gridFloats')} grid values`);
   const fails = [...bad, ...parts.flatMap((p) => p.fails)];
-  console.log(`MERGED ${parts.length} chunks over ${total} rows x 2 modes, predicate ${parts[0].predicate}, base ${parts[0].base}${subset ? ` — a SUBSET: ${sum('rowsDone')} rows selected by ${parts[0].only ? `--only ${parts[0].only}` : ''}${parts[0].limit ? ` --rows ${parts[0].limit}` : ''}` : ''}`);
+  console.log(`MERGED ${parts.length} chunks over ${total} rows x 2 modes, predicate ${parts[0].predicate}, base ${parts[0].base}${parts[0].defer ? ', --defer (this tree deferred, the base full)' : ''}${subset ? ` — a SUBSET: ${sum('rowsDone')} rows selected by ${parts[0].only ? `--only ${parts[0].only}` : ''}${parts[0].limit ? ` --rows ${parts[0].limit}` : ''}` : ''}`);
   console.log(`partition     : ${sum('moversMoved')} of ${sum('moversSeen')} predeclared movers MOVED (every one must), ${sum('holdersSeen')} holders compared to the bit`);
   console.log(`export stream : ${sum('floats').toLocaleString()} floats over ${sum('tris').toLocaleString()} triangles`);
   console.log(`captured grid : ${sum('gridFloats').toLocaleString()} values over ${sum('panels').toLocaleString()} panels (live)`);
@@ -1267,8 +1275,8 @@ function baseScopes(sc) {
 let moversSeen = 0, moversMoved = 0, holdersSeen = 0;
 for (const row of rows) {
   const st = stateOf(row);
-  const opts = { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row) };
-  const optsBase = { ...opts, scopes: baseScopes(opts.scopes) };
+  const opts = { below: null, capability: row.capability ?? null, scopes: harness.rowScopesForBuild(row), ...(DEFER ? { deferReports: true } : {}) };
+  const optsBase = { below: null, capability: opts.capability, scopes: baseScopes(opts.scopes) };
   const mover = MOVERS ? MOVERS.test(row.label) : MOVERS_PRED ? PREDICATE_MOVERS[MOVERS_PRED](st, row) : false;
   if (mover) moversSeen++; else holdersSeen++;
   const rowFails = [];
@@ -1323,7 +1331,7 @@ for (const row of rows) {
 const fails = allFails;
 if (JSON_OUT) {
   const fs = await import('node:fs');
-  fs.writeFileSync(JSON_OUT, JSON.stringify({ from: RFROM, to: Math.min(RTO, MATRIX.length), matrixRows: MATRIX.length, predicate: MOVERS_PRED || (MOVERS ? String(MOVERS) : null), base: BASE,
+  fs.writeFileSync(JSON_OUT, JSON.stringify({ from: RFROM, to: Math.min(RTO, MATRIX.length), matrixRows: MATRIX.length, predicate: MOVERS_PRED || (MOVERS ? String(MOVERS) : null), base: BASE, defer: DEFER,
     only: ONLY ? String(ONLY) : null, limit: Number.isFinite(LIMIT) ? LIMIT : null, skip: FROM || null,
     moversSeen, moversMoved, holdersSeen, floats, tris, gridFloats, panels, rowsDone, fails: allFails.slice() }));
 }
@@ -1341,6 +1349,7 @@ if (CONTROL && fails.filter((f) => !f.startsWith('VACUOUS')).length !== 2) {
 }
 
 if (MOVERS || MOVERS_PRED) console.log(`\npartition     : ${moversMoved} of ${moversSeen} rows named by --movers MOVED (every one must), ${holdersSeen} holders compared to the bit`);
+if (DEFER) console.log('\nmode          : --defer — this tree built with deferReports (the held-slider build), the base tree built in full');
 console.log(`${MOVERS ? '' : '\n'}export stream : ${floats.toLocaleString()} floats over ${tris.toLocaleString()} triangles, ${rowsDone} rows x 2 modes${MOVERS ? ' (movers counted in the floats only where their lengths agree)' : ''}`);
 console.log(`captured grid : ${gridFloats.toLocaleString()} values over ${panels.toLocaleString()} panels (live)`);
 if (CONTROL) console.log('positive control: one coordinate perturbed by 1e-9 — the run MUST fail below');
