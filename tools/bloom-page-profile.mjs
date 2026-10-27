@@ -55,7 +55,11 @@ const SIZES = [
   { key: 'head240', label: 'a 240-petal head (40 petals x 6 whorls)', sets: set({ petalCount: 40, layerCount: 6 }), slider: 'petalCup' },
   { key: 'spider', label: 'the spider-lily umbel (block 78 row: 6 florets, head OFF)', sets: set({ stemLength: 120, inflorescence: 'UMBEL', umbelFlorets: 6, pedicelLength: 40, pedicelAngle: 40, floretPetals: 6, floretScale: 1, petalLength: 45, petalWidth: 8, petalSpineCurl: -180, buckleAmp: 0.4, buckleFreq: 5, stamenCount: 6, stamenLength: 70, stamenCurl: 60 }), slider: 'pedicelAngle' },
   { key: 'mophead', label: 'the mophead default (12 rays x 12 florets, depth 2)', sets: set({ stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2', ...UMBEL_DEPTH2_DEFAULTS }), slider: 'pedicelAngle' },
-].filter((s) => !ONLY || new RegExp(ONLY).test(s.key));
+  /* OPT-IN (named by --only, never in the default four): the mophead at 2
+     florets a ray — the shape #466 proposed a held slider shrink to, re-costed
+     against the page as it now stands */
+  { key: 'mophead-2', extra: true, label: 'the mophead at 2 florets a ray (12 rays x 2, #466\'s proposed drag build)', sets: set({ stemLength: 120, inflorescence: 'UMBEL', umbelDepth: '2', ...UMBEL_DEPTH2_DEFAULTS, umbelFlorets: 2 }), slider: 'pedicelAngle' },
+].filter((s) => (ONLY ? new RegExp(ONLY).test(s.key) : !s.extra));
 
 /* THE INSTRUMENTATION — anchored edits. `P(name)` closes the span since the
    last mark and opens the next; the render loop records each frame's render
