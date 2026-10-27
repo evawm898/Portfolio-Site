@@ -1540,7 +1540,9 @@ const MUTANTS = [
   { id: 'the-stem-top-is-laid-at-the-apex', rows: /^a domed head/,
     why: "the stem's top ring goes back to the cap's APEX — Eva's Oct 27 defect: a flat disc at the stem's radius stands above the cap's skin by its sagitta there (0.31 mm on her state, 2.15 at rise 1 with a 12 mm stem), a ring showing through the head at its centre; watertight, one piece, the same triangle count",
     find: '  const zs = [plan.domedTop ? plan.stemTopZ : plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];',
-    into: '  const zs = [plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];', names: ['ST13', 'ST10'],
+    into: '  const zs = [plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];', names: ['ST10'],
+    /* ST13 reads the EXPORTED FILE (stemChannelAssertions), which this table never calls — the ST9 precedent;
+       its witness is `node tools/verify-bloom-stem-channel.mjs`, which runs this mutation by id in Node. */
     witness: (M, C) => {
       const f = (X) => { const acc = new X.MeshBuilder({ exportMode: true }); const b = X.buildBloomInto(acc, { ...REGISTRY_DEFAULTS, petalCount: 8, spread: 2, headRise: 0.35, hubStyle: 'CURVED', hubShapeAmount: 1.6, stemLength: 60 });
         const d = b.hub.dome, t = b.stem.hubT, P = acc.positions; let worst = -Infinity;
@@ -1552,7 +1554,7 @@ const MUTANTS = [
   { id: 'the-join-reach-floor-is-dropped', rows: /^a domed head with a WIDE/,
     why: "the join's reach floor on a domed top is removed, so under a thin join and a wide stem the stem's ROOT ring (its first station, at the join's underside on the axis) stands above the rim ring and through the cap's skin — the second half of the Oct 27 defect, independent of the top disc",
     find: '  const capReachMin = domedTop ? stemTopSagMm + hubT / 2 : 0;',
-    into: '  const capReachMin = 0;', names: ['ST13', 'ST5'],
+    into: '  const capReachMin = 0;', names: ['ST4', 'ST5'],   // ST13 (the file-side clause) is witnessed by verify-bloom-stem-channel.mjs
     witness: (M, C) => {
       const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), { ...REGISTRY_DEFAULTS, headRise: 0.35, stemDiameter: 12, hubShapeAmount: 0, stemLength: 60 }).stem;
       const m = f(M), c = f(C);

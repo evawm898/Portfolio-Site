@@ -16729,7 +16729,7 @@ export function stemPlan(state, ring, acc) {
      the join's reach still read `topZ`, the apex: the join's depth is the
      head's, not the stem's end. The clause is ST13 (the harness), read off the
      EMITTED mesh against the hub builder's own emitted dome. */
-  const domedTop = !!dome && !sphere && hubR > outerR;
+  const domedTop = !!dome && !sphere && hubR > outerR && !umbelHeadIsAbsent(state);   // a headless umbel has no cap for the stem to meet: its top end is the junction's (UM3)
   const stemTopZ = domedTop ? dome.centreZ + Math.sqrt(dome.Rd * dome.Rd - outerR * outerR) : topZ;
   const stemTopInnerZ = domedTop ? dome.centreZ + Math.sqrt(dome.Rd * dome.Rd - boreR * boreR) : topZ;
   const stemTopSagMm = topZ - stemTopZ;
