@@ -36,6 +36,14 @@
          build at all
      D8  "Get grid" follows print preview: at load it exports the EXPORT grid
      D9  the print-preview box is checked and hidden at load
+     D10 (the page profile, Oct 27) a design with an INFLORESCENCE sheds its
+         REPORTS while a slider is held: mid-drag the build is light, its
+         deferred reports read null (the umbel's pitch floor, the placement
+         flags) and its bytes are STILL the full build's — read against the
+         geometry module's own full build in the page, a different owner from
+         bloom.js's routing; after pointerup the screen is the exported STL
+         and EVERY deferred report is back, a number. A report that never
+         runs at rest, and a held slider that defers nothing, both redden it.
 
    `--negative-control` serves deliberately broken copies of bloom.js through
    the gate's own page route and requires every mutant to redden exactly the
@@ -88,6 +96,32 @@ const lightRef = (page) => page.evaluate(async () => {
   for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 0x01000193) >>> 0; }
   return { tris: f.length / 9, fnv: h };
 });
+/* the FULL reference, the same way: the geometry module, in the page, export
+   mode, no override and no deferral — so a deferred drag build is compared
+   against an owner that defers nothing (D10) */
+const fullModRef = (page) => page.evaluate(async () => {
+  const mod = await import('/bloom-geometry.js');
+  const acc = new mod.MeshBuilder({ exportMode: true });
+  mod.buildBloomInto(acc, window.__bloomUIState(), { below: null, capability: null });
+  const f = new Float32Array(acc.positions.length);
+  for (let i = 0; i < f.length; i++) { const x = Math.fround(acc.positions[i]); f[i] = x === 0 ? 0 : x; }
+  const b = new Uint8Array(f.buffer);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 0x01000193) >>> 0; }
+  return { tris: f.length / 9, fnv: h };
+});
+/* the deferred reports as the page's own metrics hook carries them */
+const infloReports = (page) => page.evaluate(() => {
+  const m = window.__bloomMetrics().inflorescence || {};
+  const b = window.__bloomMetrics().inflorescenceBuilt || {};
+  return { pitchFloorMm: m.pitchFloorMm ?? null, sameNodeMayTouch: m.sameNodeMayTouch ?? null, placementResidual: b.placementResidual ?? null, rachisApproachMm: b.rachisApproachMm ?? null };
+});
+const reportsAll = (r) => Number.isFinite(r.pitchFloorMm) && typeof r.sameNodeMayTouch === 'boolean' && Number.isFinite(r.placementResidual) && Number.isFinite(r.rachisApproachMm);
+const reportsNone = (r) => r.pitchFloorMm === null && r.sameNodeMayTouch === null && r.placementResidual === null && r.rachisApproachMm === null;
+/* an umbel with every report live: the shipped umbel on a 120 mm stem at
+   -60 deg, where a floret body comes near its own rachis so the flag is a
+   number (the knot's florets), and nothing else moved */
+const UMBEL = [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }];
 const same = (a, b) => !!a && !!b && a.tris === b.tris && a.fnv === b.fnv;
 const fmtD = (d) => (d ? `${d.tris} tris #${d.fnv.toString(16)}` : 'none');
 
@@ -120,7 +154,7 @@ async function sliderBox(page) {
 }
 
 /* ---------------- one full run of the clauses ---------------- */
-async function runClauses(port, bloomJsOverride = null) {
+async function runClauses(port, bloomJsOverride = null, file = 'bloom.js') {
   const results = [];
   const rec = (id, ok, detail) => results.push({ id, ok, detail });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-drag-'));
@@ -129,7 +163,7 @@ async function runClauses(port, bloomJsOverride = null) {
     page.setDefaultTimeout(120000);
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e)));
-    if (bloomJsOverride) await page.route('**/bloom.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: bloomJsOverride }));
+    if (bloomJsOverride) await page.route(`**/${file}`, (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: bloomJsOverride }));
     await openBloom(page, port, { asShipped: true });
     if (sets.length) {
       const bad = await applyConfig(page, sets);
@@ -286,6 +320,29 @@ async function runClauses(port, bloomJsOverride = null) {
     await browser.close();
   }, ['D7']);
 
+  /* D10 — an inflorescence's reports are deferred while held, and back at rest */
+  await guard(async () => {
+    const { browser, page } = await fresh(UMBEL);
+    const rest0 = await infloReports(page);
+    const b = await sliderBox(page);
+    await page.mouse.move(b.x + b.width * 0.3, b.y + b.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width * 0.55, b.y + b.height / 2, { steps: 4 });
+    await settleBuild(page, 120000);
+    const st = await drag(page), mid = await infloReports(page), on = await shown(page), fref = await fullModRef(page);
+    const first = await page.evaluate(() => document.getElementById('readout').textContent.split('\n')[0]);
+    await page.mouse.up();
+    const after = await restIsFull(page, 'D10', `at load the reports read ${JSON.stringify(rest0)}; mid-drag light on screen ${st.lightOnScreen}, reports ${JSON.stringify(mid)}, on screen ${fmtD(on)} vs the module's full build ${fmtD(fref)}; after release: `);
+    const back = await infloReports(page);
+    if (!reportsAll(rest0)) rec('D10', false, `at rest before any drag a report is missing: ${JSON.stringify(rest0)} — a deferred report that does not run at rest`);
+    if (!(st.dragging && st.lightOnScreen && reportsNone(mid))) rec('D10', false, `mid-drag the reports were not deferred (dragging ${st.dragging}, light on screen ${st.lightOnScreen}, reports ${JSON.stringify(mid)}) — the clause measured nothing`);
+    if (!same(on, fref)) rec('D10', false, `mid-drag the deferred build is ${fmtD(on)} where the full build is ${fmtD(fref)} — deferring a REPORT moved bytes`);
+    if (!/while dragging/.test(first)) rec('D10', false, `mid-drag the read-out did not say a light build is on screen: "${first}"`);
+    if (!reportsAll(back)) rec('D10', false, `after release a deferred report did not come back: ${JSON.stringify(back)} — it never runs at rest`);
+    if (!(after.lightBuilds > 0)) rec('D10', false, `no light build was made (${after.lightBuilds})`);
+    await browser.close();
+  }, ['D10']);
+
   fs.rmSync(tmp, { recursive: true, force: true });
   /* a clause reported twice is the worse reading */
   const by = new Map();
@@ -299,8 +356,8 @@ const MUTANTS = [
     edits: [['  if (lightOnScreen || regenQueued) scheduleRegen();\n}', '}']] },
   { id: 'change-does-not-end-drag', breaks: ['D3'],
     edits: [["document.addEventListener('change', (e) => { if (isSlider(e.target)) endDrag(); }, true);", '']] },
-  { id: 'every-input-builds-light', breaks: ['D0', 'D2', 'D3', 'D4', 'D5', 'D6'],
-    edits: [['function dragLight() { const ui = readUI(); return dragActive && (!infillIsAbsent(ui) || !textureIsAbsent(ui)); }', 'function dragLight() { const ui = readUI(); return (!infillIsAbsent(ui) || !textureIsAbsent(ui)); }']] },
+  { id: 'every-input-builds-light', breaks: ['D0', 'D2', 'D3', 'D4', 'D5', 'D6', 'D10'],
+    edits: [['function dragLight() { const ui = readUI(); return dragActive && (!infillIsAbsent(ui) || !textureIsAbsent(ui) || !inflorescenceIsAbsent(ui)); }', 'function dragLight() { const ui = readUI(); return (!infillIsAbsent(ui) || !textureIsAbsent(ui) || !inflorescenceIsAbsent(ui)); }']] },
   /* A STREAM OF INPUT EVENTS IS NOT A DRAG — the realistic wrong design, and
      the only one that can strand a keyboard nudge or a typed value on light
      geometry. Two narrower mutants were tried first and are EQUIVALENT, so
@@ -322,7 +379,39 @@ const MUTANTS = [
     ] },
   { id: 'the-light-build-is-the-full-build', breaks: ['D1'],
     edits: [['override: light ? DRAG_LIGHT_OVERRIDE : null', 'override: null']] },
+  /* THE PAGE PROFILE'S DEFERRAL (Oct 27). Two of bloom.js's own — the held
+     build defers nothing, and every build defers (so the reports never run at
+     rest) — and one per deferred instrument in the GEOMETRY, served through
+     the same route with `file`, each a report that never runs at rest. Each
+     geometry mutant is WITNESSED in Node on the mutated module before the
+     clauses run: its rest build of the D10 umbel must read that report null
+     where the clean module reads a number (witnessOf below). */
+  { id: 'the-held-build-defers-nothing', breaks: ['D10'],
+    edits: [['override: light ? DRAG_LIGHT_OVERRIDE : null, deferReports: light', 'override: light ? DRAG_LIGHT_OVERRIDE : null, deferReports: false']] },
+  { id: 'the-reports-never-run-at-rest', breaks: ['D10'],
+    edits: [['override: light ? DRAG_LIGHT_OVERRIDE : null, deferReports: light', 'override: light ? DRAG_LIGHT_OVERRIDE : null, deferReports: true']] },
+  { id: 'the-umbel-pitch-floor-never-runs-at-rest', breaks: ['D10'], file: 'bloom-geometry.js', witness: 'pitchFloorMm',
+    edits: [['  const pitchDeferred = umbel && !!deferReports && !(compound || reducedFlorets);', '  const pitchDeferred = umbel && !(compound || reducedFlorets);']] },
+  { id: 'the-placement-flags-never-run-at-rest', breaks: ['D10'], file: 'bloom-geometry.js', witness: 'rachisApproachMm',
+    edits: [['      if (!plan.reportsDeferred) for (let k = 0; k < src.length; k += 3) {', '      if (false) for (let k = 0; k < src.length; k += 3) {']] },
 ];
+
+/* A GEOMETRY MUTANT'S WITNESS: the mutated module, imported in Node from a
+   copy beside the original (its relative imports resolve), builds the D10
+   umbel AT REST — no deferral asked — and reads the report the mutant names. */
+async function witnessOf(m) {
+  const { DEFAULTS } = await import(path.join(ROOT, 'bloom-registry.js'));
+  const state = { ...DEFAULTS, ...Object.fromEntries(UMBEL.map((x) => [x.id, x.value])) };
+  const read = async (file) => {
+    const G = await import(`${file}?w=${Date.now()}`);
+    const b = G.buildBloomInto(new G.MeshBuilder({ exportMode: true }), state, { below: null });
+    const v = m.witness === 'pitchFloorMm' ? b.inflorescence.pitchFloorMm : b.inflorescenceBuilt.rachisApproachMm;
+    return v ?? null;
+  };
+  const tmpFile = path.join(ROOT, `.__drag-witness-${process.pid}.js`);
+  fs.writeFileSync(tmpFile, mutate(fs.readFileSync(path.join(ROOT, m.file), 'utf8'), m));
+  try { return { clean: await read(path.join(ROOT, m.file)), mutant: await read(tmpFile) }; } finally { fs.rmSync(tmpFile, { force: true }); }
+}
 
 function mutate(src, m) {
   let out = src;
@@ -341,20 +430,25 @@ try {
   if (!NEGATIVE) {
     const res = await runClauses(port);
     for (const r of res) console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${r.id}: ${r.detail}`);
-    const want = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9'];
+    const want = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10'];
     const missing = want.filter((id) => !res.some((r) => r.id === id));
     if (missing.length) { console.log(`FAIL: clauses that never reported: ${missing.join(', ')}`); failed = true; }
     if (res.some((r) => !r.ok)) failed = true;
-    console.log(failed ? '\nDRAG PREVIEW: FAILED' : `\nDRAG PREVIEW: PASS — ${res.length} clauses; what is on screen at rest is the full print geometry after a pointerup, a change, a typed value and the keyboard`);
+    console.log(failed ? '\nDRAG PREVIEW: FAILED' : `\nDRAG PREVIEW: PASS — ${res.length} clauses; what is on screen at rest is the full print geometry after a pointerup, a change, a typed value and the keyboard, and an inflorescence's deferred reports run at rest`);
   } else {
-    const src = fs.readFileSync(path.join(ROOT, 'bloom.js'), 'utf8');
-    for (const m of MUTANTS) mutate(src, m);   // every anchor, before any mutant runs
+    const srcOf = (m) => fs.readFileSync(path.join(ROOT, m.file || 'bloom.js'), 'utf8');
+    for (const m of MUTANTS) mutate(srcOf(m), m);   // every anchor, before any mutant runs
     console.log(`anchors: all ${MUTANTS.length} mutants match exactly once`);
     const base = await runClauses(port);
     if (base.some((r) => !r.ok)) { for (const r of base.filter((x) => !x.ok)) console.log(`BASE FAIL ${r.id}: ${r.detail}`); throw new Error('the clean tree does not pass — the negative control means nothing'); }
     const run = ONLY.length ? MUTANTS.filter((m) => ONLY.includes(m.id)) : MUTANTS;
     for (const m of run) {
-      const res = await runClauses(port, mutate(src, m));
+      if (m.witness) {
+        const w = await witnessOf(m);
+        console.log(`     witness ${m.id}: the D10 umbel at rest reads ${m.witness} ${w.clean} on the clean module and ${w.mutant} on the mutated one`);
+        if (!(Number.isFinite(w.clean) && w.mutant === null)) { failed = true; console.log(`BAD  ${m.id}: the witness says the mutation did not stop the report at rest`); continue; }
+      }
+      const res = await runClauses(port, mutate(srcOf(m), m), m.file || 'bloom.js');
       const red = res.filter((r) => !r.ok).map((r) => r.id);
       const missed = m.breaks.filter((id) => !red.includes(id));
       const unclaimed = red.filter((id) => !m.breaks.includes(id));
