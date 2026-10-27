@@ -245,8 +245,11 @@ function noCollapse(m) {
 }
 function frictionAddsLoop(mu, zero) { const d = mu.cyc.lossFraction - zero.cyc.lossFraction; return V(d >= 0.03 && mu.cyc.set >= zero.cyc.set, `loss ${pct(mu.cyc.lossFraction)} against ${pct(zero.cyc.lossFraction)} frictionless (+${fmt(d * 100, 1)} points); set ${pct(mu.cyc.set, 2)} against ${pct(zero.cyc.set, 2)}`); }
 function eyeletsOpen(r) { const a = r.holesSettled, b = r.holesMid; return V(!!a && a.open >= 4 && !!b && b.open >= 4, `openings >= ${HOLE_R} d in the eyelet course: ${a ? a.open : '—'} settled (r ${a ? a.band.slice(0, 5).join(', ') : '—'}), ${b ? b.open : '—'} at +${pct(MID, 0)} (r ${b ? b.band.slice(0, 5).join(', ') : '—'})`); }
-function jamDiffers(e, p) { const d = e.jam.ext - p.jam.ext; return V(Math.abs(d) >= 0.05, `jam ${pct(e.jam.ext, 0)} against ${pct(p.jam.ext, 0)} (${d >= 0 ? '+' : ''}${fmt(d * 100, 0)} points)`); }
-function courseVsWale(c, w) { return V(c.jam.ext >= w.jam.ext + 0.05 && c.softW < w.softW, `jam ${pct(c.jam.ext, 0)} across against ${pct(w.jam.ext, 0)} along the wales; soft region per unit strain per d across the pull ${fmt(c.softW)} against ${fmt(w.softW)} (${fmt(c.softW / w.softW, 2)}x)`); }
+function jamDiffers(e, p) { const d = e.jam.ext - p.jam.ext; return V(Math.abs(d) >= 0.05 - GRID, `jam ${pct(e.jam.ext, 0)} against ${pct(p.jam.ext, 0)} (${d >= 0 ? '+' : ''}${fmt(d * 100, 0)} points)`); }
+// GRID: the jam is read on 1% bins (A.bin), so two jams 5 points apart differ by exactly 0.05 on the grid; 1e-9
+// keeps 0.17 + 0.05 = 0.22000000000000003 from reading a 5-point difference as under the 5-point bar (Oct 27).
+const GRID = 1e-9;
+function courseVsWale(c, w) { return V(c.jam.ext >= w.jam.ext + 0.05 - GRID && c.softW < w.softW, `jam ${pct(c.jam.ext, 0)} across against ${pct(w.jam.ext, 0)} along the wales; soft region per unit strain per d across the pull ${fmt(c.softW)} against ${fmt(w.softW)} (${fmt(c.softW / w.softW, 2)}x)`); }
 function ribVsJersey(rc, jc, rr, jr) { const k = rc.jam.ext / jc.jam.ext, wr = rr.free.span / jr.free.span; return V(k >= 1.25 && wr <= 0.95, `jam along the courses ${pct(rc.jam.ext, 0)} against jersey's ${pct(jc.jam.ext, 0)} (${fmt(k, 2)}x); width at rest, released: ${fmt(rr.free.span, 1)} d against ${fmt(jr.free.span, 1)} d (${fmt(wr, 3)}x)`); }
 function safe(r) { return V(r.settle.deep === 0 && r.pull.deep === 0 && r.settle.certFail === 0 && r.pull.certFail === 0, `deep overlaps ${r.settle.deep}/${r.pull.deep}; certificate ${r.settle.certSteps - r.settle.certFail}/${r.settle.certSteps} settling, ${r.pull.certSteps - r.pull.certFail}/${r.pull.certSteps} testing; closest ${fmt(Math.min(r.settle.closest, r.pull.closest), 3)} d`); }
 const gate = (v, msg) => check(v.ok, `${msg}: ${v.why}`);
@@ -276,12 +279,13 @@ function medianRun(k) {
 
 // ---- K: the course fixture reaches equilibrium ----------------------------------------------------
 // Held still at every step the two side jaws read the same load: nothing else pulls along x (both course
-// edges ride rails free along x), so jaws that disagree mean a swatch still moving. Every step converged
-// (the hold's own STEP_TOL, 0.2%) and the two jaws within 2% at every recorded step.
+// edges ride rails free along x), so jaws that disagree mean a swatch still moving. The bar is the two jaws
+// within 2% at every recorded step (Eva's gate, Oct 27). Steps that ran to the hold cap are reported here
+// and judged by M (a μ 0.25 run with any is not monotone-clean).
 function courseHolds(r) {
   const rows = r.pull.rows, un = rows.filter(q => !q.converged).length;
   let worst = 0, at = NaN; for (const q of rows) { const d = Math.abs(q.top - q.load) / Math.max(Math.abs(q.load), 1500); if (d > worst) { worst = d; at = q.ext; } }
-  return V(rows.length > 2 && un === 0 && worst <= 0.02, `${rows.length} steps, ${un} unconverged; side jaws disagree by at most ${pct(worst, 2)}${Number.isFinite(at) ? ` (at ${pct(at, 1)})` : ''}; ${fmt(mean(rows.map(q => q.frames)), 0)} frames a hold`);
+  return V(rows.length > 2 && worst <= 0.02, `${rows.length} steps, ${un} unconverged; side jaws disagree by at most ${pct(worst, 2)}${Number.isFinite(at) ? ` (at ${pct(at, 1)})` : ''}; ${fmt(mean(rows.map(q => q.frames)), 0)} frames a hold`);
 }
 { const ck = SPECS.filter(x => x.dir === 'course' && !x.name.startsWith('mf') && runs[x.name]).map(x => x.name);
   if (ck.length) {
