@@ -16,7 +16,7 @@ record is kept below the next; where a later phase overturned an earlier one, it
 **State:** the course-direction test works; every test stops at the jam; every step-size and monotonicity
 check reads the median of three seeds. 1×1 rib jams at **34% across the courses against jersey's 22% (1.55×)**
 and draws in to **0.846×** jersey's width at rest, from the topology alone (gate R, PASS). The gate fails on
-seven checks, every one a known limitation stated on the page (Phase 4 §6).
+seven checks (M rib across ×2, O ×3, F, E ssk), every one a known limitation stated on the page (Phase 4 §6). Every must-fail is rejected.
 
 **Re-run:**
 - **Gate:** `node tools/verify-knit-lab.mjs --out <dir>`: 43 simulations, about 8–23 min each, roughly 9 CPU-hours.
@@ -135,7 +135,7 @@ pull (14,677 against 16,900 per unit strain per d, 0.87×). PASS.
 | O decreases' order | **FAIL 3** | k2tog after the test −0.14 d; ssk settled −0.15 / −1.26 d, after −0.00 / −0.69 d (§6) |
 | F soft region ≤ 2× frictionless | **FAIL** | 2.46× (18,651 against 7,576 per d) |
 | I strain, collapse, ended on the jam | PASS ×18 | worst strain before the jam 0.062% (rib across) |
-| I must-fails | rejected ×3 | the untied tail: see below |
+| I must-fails | rejected ×3 | compliant yarn 6.86% strain; Gauss-Seidel 2.00% strain before the jam; untied tail (loaded to the old limit) fell to 36% of its peak at 57% |
 | C friction adds the loop | PASS ×3 | +43.2 / +38.7 / +28.2 points |
 | E eyelets open | PASS / **FAIL** | k2tog 4 settled, 5 at +20%; ssk 2 settled, 4 at +20% |
 | E jam elsewhere | PASS ×2 | 39% and 34% against 17% |
