@@ -1517,6 +1517,23 @@ rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dr
   arrows). `--negative-control` runs six mutants of bloom.js, every anchor checked first.
   It rides in `bloom-panel.yml`.
 
+**THE PAGE'S TIME IS THE GEOMETRY AND (ON THIS BOX) THE SOFTWARE-GL FRAME — THE READ-OUTS ARE ≤ 10 ms;
+A HELD SLIDER DEFERS THE INFLORESCENCE'S REPORTS** (the page profile, Oct 27 — Eva's ruling of Oct 26;
+read `docs/bloom-page-profile-outcome.md` before touching `deferReports`, `reportsDeferred` /
+`pitchDeferred`, `dragLight()`'s inflorescence term, `regenerate()`'s `captureNormals` or D10).
+- `node tools/bloom-page-profile.mjs` is the instrument. It times every phase of one rebuild (an
+  instrumented `bloom.js`, anchors refused on a miss) plus a CDP CPU profile, at four sizes, EXPORT
+  (as shipped) and `--live`. Name the mode: a visitor sees EXPORT, the gates measure LIVE.
+- **#466's 11–17 s mophead held step does not reproduce in either mode** (EXPORT 2.3–3.5 s, LIVE
+  4.4–5.3 s here). LIVE's extra is `toCreasedNormals` (2.0 s at 1.24 M tris). The idle frame interval
+  (~0.8 s at 1.24 M) is SwiftShader, not the page.
+- **`deferReports`** (the held-slider build only): the umbel's pitch floor and the placement pass's
+  flags are report-only and read null. Bytes are identical, by `verify-bloom-surface-bytes --defer`
+  and D10. Spider-lily held step 1.08 → 0.44 s, mophead 3.1 → 1.9 s.
+- **Normals once:** a LIVE build no longer asks the builder for normals `toCreasedNormals` discards.
+- D10 has four new mutants (two geometry, witnessed). The 2-florets-a-ray drag build is re-costed in
+  §5 for Eva and not built.
+
 **DEPTH IS SIX, WITHOUT A CLAMP** (Eva, Sep 3). The ring-versus-foot-floor
 formula the brief expected to cap depth does not hold (ring₀ grows with depth
 through the area rule) and the collision it names is not a buildability limit
