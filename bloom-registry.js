@@ -62,6 +62,11 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY, LEAF_DIVERGENCE_RANGE, LEAF_DIVERGENCE_DEFAULT,
          LEAF_ARCH_RANGE, LEAF_ARCH_STEP, LEAF_CUP, LEAF_CUP_RANGE } from './bloom-geometry.js';
+/* WHERE THE NODES GO AND LEAF SIZE ALONG THE STEM (Bloom P1) — every range and
+   default IMPORTED, never restated: the run's defaults ARE the old law's
+   `LEAF_NODE_TOP` / `LEAF_NODE_BOTTOM`. */
+import { LEAF_NODE_TOP, LEAF_NODE_BOTTOM, LEAF_NODE_START_RANGE, LEAF_NODE_END_RANGE, LEAF_NODE_SPACING_RANGE,
+         LEAF_NODE_SPACING_GAIN, LEAF_SIZE_TAPER_RANGE } from './bloom-geometry.js';
 /* THE COMPOUND LEAF (leaf/stem build S3) — its type values and every range
    and default IMPORTED (Q6), never restated: the geometry's
    `compoundLeafLayout` is the one owner of what each value means. */
@@ -964,6 +969,17 @@ export const PREDICATES = {
      shared node takes the pedicels' count). So: a stem, and no raceme. The
      ARRANGEMENT keeps `leafNodesOwn` — it also needs leaves. */
   leafNodeCountLive: { all: [{ ref: 'stemPresent' }, { not: { ref: 'racemePresent' } }] },
+  /* WHERE THE NODES GO (Bloom P1, Eva's rulings of Oct 28). The START, END and
+     SPACING reach something exactly where a node does: a stem that is not a
+     raceme's rachis (the pedicels own those nodes — dead there, hidden), and
+     something AT the nodes — leaves, or the stem's own swelling or kink. The
+     geometry's half is `leafNodeRunLive`; NS0 compares the two per row.
+     SPACING needs a third node: two nodes stand on the span's two ends at any
+     spacing. THE SIZE TAPER needs the leaves' own nodes (`leafNodesOwn` — a
+     raceme's leaves are sized by their florets' cap) and a second node. */
+  leafNodeRunLive: { all: [{ ref: 'leafNodeCountLive' }, { any: [{ ref: 'leafPresent' }, { ref: 'stemNodesPresent' }] }] },
+  leafNodeSpacingLive: { all: [{ ref: 'leafNodeRunLive' }, { id: 'leafNodes', min: 3 }] },
+  leafSizeTaperLive: { all: [{ ref: 'leafNodesOwn' }, { id: 'leafNodes', min: 2 }] },
   /* THE GRADIENT IS A RAMP AND THE CORYMB A SOLVE OVER THE SAME LENGTHS, so
      with the corymb ON the gradient is hidden and inert — one owner of the
      lengths at a time. */
@@ -4309,6 +4325,30 @@ export const CONTROLS = [
         : d === 120 ? 'three ranks' : d === 144 ? 'two-fifths — five ranks' : d === 135 ? 'three-eighths — eight ranks' : d === 90 ? 'four ranks' : 'a spiral';
       return `${d.toFixed(1)}° between one node's leaf and the next · ${name}`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafDivergenceLive' } },
+  /* WHERE THE NODES GO (Bloom P1, Eva's rulings of Oct 28): the run's START
+     and END as fractions of the stem MEASURED FROM THE HEAD, and its SPACING
+     — `leafNodeLayout` is the one owner, these the one reader of what is
+     asked. Each read-out prints what the build made of it: the depths in mm,
+     the inset clamp (a start the top leaf cannot clear is RAISED, the slider
+     keeps its value), the count the pitch floor gave, a start past the end
+     (TOLD — the span is empty, never swapped), and the spacing's own clamp (a
+     crowd that would merge two node swellings). Defaults are the old law, so
+     every stored design builds to the bit. */
+  { id: 'leafNodeStart', section: 'stem', kind: 'slider',
+    min: LEAF_NODE_START_RANGE[0], max: LEAF_NODE_START_RANGE[1], step: 0.01, default: LEAF_NODE_TOP,
+    label: 'Nodes start',
+    fmt: (v, ui, shown) => nodeRunFmt('start', v, ui, shown),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodeRunLive' } },
+  { id: 'leafNodeEnd', section: 'stem', kind: 'slider',
+    min: LEAF_NODE_END_RANGE[0], max: LEAF_NODE_END_RANGE[1], step: 0.01, default: LEAF_NODE_BOTTOM,
+    label: 'Nodes end',
+    fmt: (v, ui, shown) => nodeRunFmt('end', v, ui, shown),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodeRunLive' } },
+  { id: 'leafNodeSpacing', section: 'stem', kind: 'slider',
+    min: LEAF_NODE_SPACING_RANGE[0], max: LEAF_NODE_SPACING_RANGE[1], step: 0.05, default: 0,
+    label: 'Node spacing',
+    fmt: (v, ui, shown) => nodeRunFmt('spacing', v, ui, shown),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafNodeSpacingLive' } },
 
   /* ===================================================================
      THE HUB — Eva's word for the head-to-stem connector, the code's hub-to-stem
@@ -4411,6 +4451,17 @@ export const CONTROLS = [
     fmt: (v) => { const a = Number(v), over = 90 - Math.abs(a);
       return `${a} deg from horizontal (${a < 0 ? 'drooping' : a === 0 ? 'level' : 'rising'}) · ${over} deg overhang from vertical${over > 45 ? ' — PAST the classic 45, supports likely' : ''}`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  /* LEAF SIZE ALONG THE STEM (Bloom P1, Eva's ruling of Oct 28): each node's
+     WHOLE leaf scaled by its place in the run — blade length and width, a
+     compound leaf's whole tree, a lobed leaf's envelope — never its counts.
+     Positive is SMALLER TOWARD THE TOP; the largest leaf is always the asked
+     one, so no slider's maximum is exceeded. The read-out says each node's
+     size and which ones a floor or a yield acted on. */
+  { id: 'leafSizeTaper', section: 'leaves', kind: 'slider',
+    min: LEAF_SIZE_TAPER_RANGE[0], max: LEAF_SIZE_TAPER_RANGE[1], step: 0.05, default: 0,
+    label: 'Size along the stem',
+    fmt: (v, ui, shown) => leafTaperFmt(v, ui, shown),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafSizeTaperLive' } },
   /* THE POSE (Eva's ruling, Oct 6 — leaf/stem build S2): the leaf ARCHES along
      its length and its CUP is a control. Each is the petal's own law on the
      LEAF's own value (`leafBladeState` maps them, the serration split's rule),
@@ -5424,3 +5475,51 @@ for (const [id, v] of Object.entries(UMBEL_DEPTH2_DEFAULTS)) {
 /* Run the relation check at module load — see verifySections() above. */
 verifySections();
 
+
+/* ===================================================================
+   THE NODE RUN'S AND THE SIZE TAPER'S READ-OUTS (Bloom P1). Every number is
+   the BUILD's own (`shown.nodes`, set by the app from the leaf plan or, on a
+   bare noded stem, the stem's node law); with no record the line says only
+   what the slider means. Declared as functions so the rows above can read
+   them before this point in the file.
+   =================================================================== */
+function nodeRunFmt(which, v, ui, shown) {
+  const x = Number(v);
+  const N = shown && shown.nodes;
+  const mm = (q) => `${q.toFixed(1)} mm`;
+  if (which === 'spacing') {
+    const head = x === 0 ? 'even — every internode the same'
+      : `${x.toFixed(2)} — the nodes crowd toward the ${x > 0 ? 'BASE' : 'TOP'} (a linear internode law: the end internodes ${((1 + Math.abs(x) * LEAF_NODE_SPACING_GAIN) / (1 - Math.abs(x) * LEAF_NODE_SPACING_GAIN)).toFixed(1)} : 1)`;
+    if (!N) return head;
+    const d = N.depthsMm;
+    if (d.length < 3) return `${head} · INERT on this build — ${d.length} node${d.length === 1 ? '' : 's'} stand on the span's ends at any spacing`;
+    const gaps = d.slice(1).map((q, i) => q - d[i]);
+    const said = x === 0 ? ` · every internode ${mm(gaps[0])}`
+      : ` · the lowest internode ${mm(gaps[gaps.length - 1])}, the highest ${mm(gaps[0])}`;
+    const cl = N.run.spacingClamped
+      ? ` · CLAMPED to ${N.run.spacingBuilt.toFixed(3)}: a closer crowd would put two node SWELLINGS under ${N.run.mergeGapMm.toFixed(2)} mm apart (sqrt(2) spindles, where two read as one)${N.run.spacingBuilt === 0 ? ' — evenly spaced they are already that close' : ''}; the slider keeps ${x.toFixed(2)} (told)`
+      : '';
+    return head + said + cl;
+  }
+  const L = N ? N.stemLengthMm : Number(ui.stemLength);
+  const head = `${x.toFixed(2)} of the stem from the head${L > 0 ? ` — ${mm(x * L)} on this ${L} mm stem` : ''}`;
+  if (!N) return head;
+  const d = N.depthsMm;
+  if (N.run.inverted) return `${head} · START PAST END (${N.run.start.toFixed(2)} > ${N.run.end.toFixed(2)}): the span is EMPTY, so the nodes collapse to ONE at the end, ${mm(d[d.length - 1])} (told, never swapped — the sliders keep their values)`;
+  if (which === 'start') {
+    if (N.insetClamped) return `${head} · RAISED to ${mm(N.insetMm)}: the TOP leaf${N.topScale !== 1 ? ` (${(100 * N.topScale).toFixed(0)}% of the asked size)` : ''} rises ${mm(N.insetNeededMm)} and must clear the head (the slider keeps ${x.toFixed(2)})`;
+    return `${head} · the top node at ${mm(d[0])}`;
+  }
+  return `${head} · the lowest node at ${mm(d[d.length - 1])}${N.nodesBuilt < N.nodesAsked ? ` · ${N.nodesBuilt} of ${N.nodesAsked} nodes fit — the pitch floor gives the COUNT (told)` : ''}`;
+}
+function leafTaperFmt(v, ui, shown) {
+  const x = Number(v);
+  if (x === 0) return 'none — every leaf the asked size';
+  const head = `${x.toFixed(2)} — ${x > 0 ? 'SMALLER' : 'LARGER'} toward the top: the ${x > 0 ? 'top' : 'lowest'} leaf ${(100 * (1 - Math.abs(x))).toFixed(0)}% of the asked one, the ${x > 0 ? 'lowest' : 'top'} the asked size`;
+  const N = shown && shown.nodes;
+  if (!N) return head;
+  if (!N.scales) return `${head} · INERT on this build — ${N.depthsMm.length === 1 ? 'one node: a single leaf has nothing to taper between, and is the asked leaf' : 'no node leaves'}`;
+  const fl = N.scales.filter((q) => q.floored);
+  return `${head} · by node, top to bottom: ${N.scales.map((q) => `${(100 * q.scale).toFixed(0)}%`).join(' / ')}`
+    + (fl.length ? ` · FLOORED on ${fl.length} node${fl.length === 1 ? '' : 's'} at ${(100 * fl[0].scale).toFixed(0)}%: a size reached its own slider's minimum, so that leaf stays the same SHAPE at the smallest it can be (told)` : '');
+}
