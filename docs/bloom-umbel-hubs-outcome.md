@@ -545,3 +545,29 @@ side-on and from below; dimensions in every caption.
 - **Frozen phase**: `frozen/phase89` is OWED — block 82 took the matrix 1,588 → 1,605 — and
   is NOT registered yet: it waits on Eva's ruling on the sheet, with CI and the merge.
 
+
+## 8. The junction is PARKED, the swelling ships INTERIM (Oct 28, Eva's third ruling, on §7's sheet)
+
+Eva judged the swelling sheet against two hydrangea references and ruled that the umbel
+junction is **PARKED**: the swelling stays as built and is recorded as **INTERIM — parked
+Oct 28; the hydrangea's branching session replaces umbel junctions with forks.** No further
+junction work is scheduled on the umbel; what replaces it is a branching model, which is its own
+session.
+
+What ships from this branch, finished:
+
+- **The stem through the head** (ruling 1): the stem's top on a cap is the cap's mid-surface rim,
+  the join's reach floored under it, ST13 on the exported file (§1).
+- **The head's hub-to-stem default CURVED 0.50** (ruling 2): 394 movers / 1,194 holders by the
+  defaults-bytes instrument, every holder at 0 floats (§7e).
+- **The swelling, as is, INTERIM** (§7): the law, the FORCED width, the deeper roots and the
+  rise fallback are unchanged. Its one open finding — two pedicels (or two mophead rays)
+  converging and their rods overlapping just above the flat top, the 0.000 cells in
+  `umbel-florets-x-angle @ 2 x 35` and `mophead-rays-x-florets @ 2 x 2` / `@ 2 x 6` — **stays
+  declared by value** in `COMBINATION_XFAIL` / `COMBINATION_INERT` under this ruling; neither
+  the raised top nor the accepted-look alternative is taken, because the junction itself is
+  what the branching session replaces.
+
+Bookkeeping that follows: `main` merged in (#468's page profile and the two /frame merges),
+`frozen/phase89` registered as the 1,588 rows at the merged base, the PR opened and merged on
+green CI, `bloom-frozen-tags` dispatched from `main` and read back.

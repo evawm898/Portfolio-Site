@@ -6926,9 +6926,13 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
   ten umbel rows declared in `INFLO_APPROACH_XFAIL` (the junction moves no floret). **ST13 is a
   FILE-side clause and the apex table cannot fire it** — its witness is `verify-bloom-stem-channel.mjs`
   §2b (ST9's precedent), where both stem-top mutations fire it.
-- **WAITING ON EVA (the sheet `docs/img/umbel-hubs.png`, BAND | KNOT | SWELLING, and the head join at
-  GOBLET 1.00 beside CURVED 0.50):** the swelling as drawn. After the ruling: CI, the byte partition and
-  the re-records of ruling 2, `frozen/phase89` (1,588 → 1,605, block 82), merge `main` in, the PR.
+- **RULED Oct 28 (3), on that sheet against two hydrangea references: THE UMBEL JUNCTION IS PARKED.
+  The swelling ships as built, INTERIM — parked Oct 28; the hydrangea's branching session replaces umbel
+  junctions with forks.** The two finished pieces ship: the stem through the head (ST13, the cap's
+  mid-surface rim) and the head's hub-to-stem default CURVED 0.50 (394 / 1,194). The two-pedicel
+  overlap above the flat top stays DECLARED BY VALUE; do not raise the top or re-tune the swelling —
+  the junction is the branching session's to replace. §8 of `docs/bloom-umbel-hubs-outcome.md`.
+  `frozen/phase89` is the 1,588 rows at the merged base (block 82 takes the matrix to 1,605).
 
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of
