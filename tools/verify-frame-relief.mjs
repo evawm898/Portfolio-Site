@@ -63,6 +63,10 @@
                        served through copies in the repo root and required to
                        redden exactly what it names; every anchor checked
                        before any mutant runs.
+   --shard=k/n         with --negative-control: only the mutants whose index
+                       is k mod n (CI runs n = 3 jobs; changing n is two
+                       edits in frame.yml, the matrix list and the n).
+                       Every anchor is still checked first.
 
    NOT COVERED: free ends (a relief attached at one end only is connected and
    a print hazard — none exists in this skeleton); sub-cell gaps under 0.2
@@ -604,8 +608,20 @@ async function negativeControl() {
   // --only=<id>[,...] re-verifies a subset (reported as one; every anchor
   // above was still checked)
   const only = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
-  const RUN = only.length ? MUTANTS.filter((m) => only.includes(m.id)) : MUTANTS;
+  // --shard=k/n runs the mutants whose INDEX in MUTANTS is k mod n (CI runs
+  // n jobs, k = 0..n-1, so every mutant is in exactly one shard by
+  // construction; a mutant added anywhere in the list lands in some shard)
+  const shardArg = (process.argv.find((a) => a.startsWith('--shard=')) || '').slice(8);
+  let shard = null;
+  if (shardArg) {
+    const mm = /^(\d+)\/(\d+)$/.exec(shardArg);
+    if (!mm || +mm[2] < 1 || +mm[1] >= +mm[2]) { console.log(`FAIL --shard=${shardArg}: want k/n with 0 <= k < n`); process.exit(1); }
+    if (only.length) { console.log('FAIL --shard and --only together'); process.exit(1); }
+    shard = { k: +mm[1], n: +mm[2] };
+  }
+  const RUN = only.length ? MUTANTS.filter((m) => only.includes(m.id)) : shard ? MUTANTS.filter((_, i) => i % shard.n === shard.k) : MUTANTS;
   if (only.length && RUN.length !== only.length) { console.log(`FAIL --only names a mutant that does not exist: ${only.filter((id) => !MUTANTS.some((m) => m.id === id)).join(', ')}`); process.exit(1); }
+  if (shard) console.log(`shard ${shard.k}/${shard.n}: ${RUN.length} of ${MUTANTS.length} mutants — ${RUN.map((m) => m.id).join(', ')}`);
   for (const m of RUN) {
     const gPath = path.join(ROOT, `_frame-geometry-mutant-${m.id}.js`), rPath = path.join(ROOT, `_frame-relief-mutant-${m.id}.js`);
     fs.writeFileSync(gPath, m.file === 'geometry' ? srcG.replace(m.from, m.to) : srcG);
@@ -623,7 +639,7 @@ async function negativeControl() {
     if (!ok) bad++;
     console.log(`${ok ? ' ok ' : 'FAIL'} mutant ${m.id}: fired ${red.join(',') || 'nothing'}${missed.length ? ' MISSED ' + missed.join(',') : ''}${unclaimed.length ? ' UNCLAIMED ' + unclaimed.join(',') : ''}`);
   }
-  console.log(`\n${RUN.length - bad} of ${RUN.length} mutants behave${only.length ? ` (a SUBSET — ${MUTANTS.length - RUN.length} of ${MUTANTS.length} not run)` : ''}.`);
+  console.log(`\n${RUN.length - bad} of ${RUN.length} mutants behave${only.length ? ` (a SUBSET — ${MUTANTS.length - RUN.length} of ${MUTANTS.length} not run)` : shard ? ` (shard ${shard.k}/${shard.n} — the other shards run the rest)` : ''}.`);
   process.exit(bad ? 1 : 0);
 }
 
