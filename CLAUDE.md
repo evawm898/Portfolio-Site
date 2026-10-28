@@ -6853,31 +6853,46 @@ rulings on the hydrangea discovery; read `docs/bloom-mophead-outcome.md` before 
     and `--redefined`, and reads `@scopes` rows now.
 
 **THE STEM'S TOP ON A CAP IS THE CAP'S MID-SURFACE, THE JOIN'S REACH IS FLOORED UNDER IT, AND
-EVERY UMBEL JUNCTION IS A HUB — THE HUB-TO-STEM JOIN RUN IN REVERSE** (Oct 27, Eva's two rulings
-from the deploy preview — read `docs/bloom-umbel-hubs-outcome.md` before touching `stemPlan`'s
-`domedTop` / `stemTopZ` / `capReachMin`, `buildStemInto`'s top ring, `umbelBoss`'s `flare`,
-`umbelFlareDepthAt`, `UMBEL_FLARE_RINGS`, `umbelJunctionNote`, ST13, `umbelFlareExpected` /
-`umbelFlareClauses` or block 82).
-- **THE DEFECT, REPRODUCED FIRST:** a ring showing through a domed head at its centre. The stem's
-  flat top disc was laid at the cap's APEX, so its rim stood above the skin by the cap's sagitta at
-  the stem's radius — 0.31 mm on Eva's state (8 petals, spread 2, rise 0.35, a 6 mm stem), 2.15 at
-  rise 1 with a 12 mm stem, 0 on a flat hub; **hub style, amount and length move none of it**. A
-  second half, independent of the disc: the ROOT ring (station 0, at the join's underside on the
-  axis) pokes too where the join is thinner than the cap's curvature over the stem's radius.
+EVERY UMBEL JUNCTION IS A CONVERGING KNOT — THE PEDICELS ROOT NEAR THE AXIS, THE KNOT IS A DOME
+SIZED FROM THE ROD, THE HUB FLARE UNDER IT** (Oct 27, Eva's three rulings — the stem through the
+head from the deploy preview, the junction as a hub, then the hub's band REPLACED by the knot from
+the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §6 before touching
+`stemPlan`'s `domedTop` / `stemTopZ` / `capReachMin`, `buildStemInto`'s top ring, `umbelRootLaw`,
+`umbelKnot`, `umbelKnotInside`, `umbelFlareDepthAt`, `UMBEL_DOME_RINGS` / `UMBEL_FLARE_RINGS` /
+`UMBEL_KNOT_RIM_SAMPLES`, `floretUnitMemo`'s `rootExtendMm`, `pedicelPlacement`'s stagger,
+`HUB_STYLE_DEFAULT` / `HUB_SHAPE_AMOUNT_DEFAULT`, ST13, `umbelKnotExpected` / `umbelKnotClauses` /
+`umbelRootClauses` or block 82).
 - **The fix at its owner (`stemPlan`):** on a cap wider than its stem with the head present, the
   top rim ring sits ON the cap's MID-surface at the stem's radius and the bore opens at the
   mid-surface at the bore's; the join's reach is floored at that sag plus half a sheet (told
   FLOORED). Flat hub, sphere and a head not wider than its stem are byte-identical by branch.
   **ST13** reads the exported file by the builder's own stream ranges against the HUB BUILDER's
   emitted dome and the control's radius; ST4 keeps the slab; ST10's band restated on a domed top.
-- **The junction:** the BAND (the disc-holding law, the 90° margin) stands; under it a FLARE from
-  the band's rim to the incoming rod — stem, or the RAY at a mophead's ray tip, at its own radius —
-  driven by the three Hub controls (one owner; told on the controls that they shape the junctions
-  while the head is off). GOBLET constant-stress, ANGLED cone, CURVED smoothstep; amount 0 the
-  Oct 24 coin BY BRANCH. **The AUTO reach is GEOMETRIC — as deep as it is wide — the one placement
-  made without a ruling**: the head's section-modulus auto floors at the plate and a band two
-  discs tall asks for nothing, so it would leave every umbel a coin. The foot meets the rod half a
-  gap inside its wall; the depth is CLAMPED to the rod's mode-free room, told. 960 tris a junction.
+- **The junction (RULED Oct 27, superseding the band): a CONVERGING KNOT.** Each pedicel's line
+  crosses the base plane at `rhoB` (the pedicel's own radius head off; one gap off the stem head on)
+  and continues straight inward, at its own angle, to its line's point nearest the centre
+  (`extendMm = rhoB cos a` — the rod is built that much longer, the floret stays put). The roots
+  OVERLAP (the export contract) and SHARE NO VERTEX: the i-th is staggered along its own line by
+  `(i − (n−1)/2 + 1/4)` steps of `2π rP / UMBEL_BOSS_SECTORS` (the pedicel's radius on the knot's lattice —
+  a mirror pair's rings are mirror images with vertices ON the plane, exactly shared otherwise). **The
+  quarter step is measured, not chosen** (`UMBEL_ROOT_STAGGER_OFFSET`): symmetric about the nearest
+  point, roots `i + j = n − 1` sit at mirror distances, and at 0° an opposite pair shares one line —
+  `(1, 4)` of six rooted on ONE point and `MOPHEAD: rays at 0 deg` read 1,652 welded pairs, found by
+  the census sweep and not by UM2 (two coincident rod ends ARE distinct ends to the bit). The
+  knot is a DOME of radius `Rk` about a centre `lift` under the base plane: every root-disc rim point
+  not ROD-HELD (half a gap inside the rod's wall) must be half a gap above the equator (`lift`) and
+  half a gap inside the dome (`Rk`), and the rod's own end rim too — closed form, the count only
+  through the stagger's span; `the-knot-is-sized-from-the-floret-count` restores the ring. The Hub
+  FLARE runs from the equator to the rod (`rodR = outerR − gap/2`), auto reach as deep as wide,
+  **default CURVED 0.50** — and since the three controls are ONE owner, the head's join default too
+  (353 stemmed rows move with it, flagged for Eva). CURVED and ANGLED meet the dome with their own
+  shoulder, GOBLET tangent (said, not smoothed). **The hold's first cut put the lowest root point
+  EXACTLY on the equator — on the flat underside at amount 0 — and the Node run of UM2 caught it
+  before any gate; the half gap above is the fix.** Measured: the lily's knot 7.7–10.0 mm on a 6 mm
+  stem (1.28–1.67×) over 2 / 6 / 12 florets × −60 / 35 / 90°; a mophead ray tip 8.67 mm on a 3 mm ray
+  (2.89× — floor pedicels as thick as the ray) against the band's 17.48; 1,920 tris a knot.
+- **The junction before the knot (Oct 27 morning, §2 of the doc, the BAND): kept as the record the
+  ruling was made on.** The band stood; a flare ran from its rim to the rod; auto reach geometric.
 - **Byte partition (`--movers-predicate umbel-hubs`, the base tree's own records): 69 movers / 1,536
   holders, 0 floats on any holder**, both modes — a row moves iff the base builds a stem on an open cap
   wider than it with the head present, or an umbel whose flare is BUILT (amount 0 holds, by branch; the
@@ -6886,8 +6901,11 @@ from the deploy preview — read `docs/bloom-umbel-hubs-outcome.md` before touch
   ten umbel rows declared in `INFLO_APPROACH_XFAIL` (the junction moves no floret). **ST13 is a
   FILE-side clause and the apex table cannot fire it** — its witness is `verify-bloom-stem-channel.mjs`
   §2b (ST9's precedent), where both stem-top mutations fire it.
-- **WAITING ON EVA (the sheet `docs/img/umbel-hubs.png`): the default style / amount / length.**
-  After the ruling: `frozen/phase89` is owed (1,588 → 1,605, block 82).
+- **WAITING ON EVA (the sheet `docs/img/umbel-hubs.png`, BEFORE the band / AFTER the knot):** the
+  knot as drawn, and whether CURVED 0.50 is the HEAD's join default too (one owner) or the
+  junction's alone. After the ruling: UM-gates and the two knot mutants in CI, connectedness on every
+  umbel row, the byte partition (`--movers-predicate umbel-knot`), `frozen/phase89`
+  (1,588 → 1,605, block 82), merge `main` in, the PR.
 
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of

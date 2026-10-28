@@ -234,7 +234,10 @@ export function measureInfloApproachMm(G, state, measure) {
     if (!K) return false;
     const r = Math.hypot(p[0] - K.centre[0], p[1] - K.centre[1]), z = p[2];
     if (z >= K.topZ || z <= K.bottomZ) return false;
-    return r < K.radiusMinMm;
+    /* the knot is a DOME over its equator (Oct 27) and the flare under it, read
+       as the full radius down to its foot — a conservative region */
+    const eq = K.equatorZ === undefined ? K.centre[2] : K.equatorZ;
+    return z >= eq ? Math.hypot(r, z - eq) < K.radiusMinMm : r < K.radiusMinMm;
   };
   const outsideRachis = (p) => G.freeStemDistanceMm(rachis, p[0], p[1], p[2]) > 0 && !insideKnot(p);
   const blocks = B.placed.map((q, k) => ({ lo: q.at, hi: q.at + q.tris * 9, owner: `floret${k}`, q }));
@@ -293,7 +296,7 @@ export function measureInfloApproachMm(G, state, measure) {
     if (!S || !Array.isArray(S.placed) || S.placed.length < 2) return { mm: Infinity, why: S ? 'one floret a sub-umbel — there is no other floret to approach' : 'no sub-umbel is built (the umbel is not compound)' };
     const ray = B.placed[0], M = ray.M, SK = S.knot;
     const local = (p) => { const d = [p[0] - M[3], p[1] - M[7], p[2] - M[11]]; return [M[0] * d[0] + M[4] * d[1] + M[8] * d[2], M[1] * d[0] + M[5] * d[1] + M[9] * d[2], M[2] * d[0] + M[6] * d[1] + M[10] * d[2]]; };
-    const insideSub = (p) => { if (!SK) return false; const q = local(p); if (q[2] >= SK.topZ || q[2] <= SK.bottomZ) return false; return Math.hypot(q[0] - SK.centre[0], q[1] - SK.centre[1]) < SK.radiusMinMm; };
+    const insideSub = (p) => { if (!SK) return false; const q = local(p); if (q[2] >= SK.topZ || q[2] <= SK.bottomZ) return false; const eq = SK.equatorZ === undefined ? SK.centre[2] : SK.equatorZ; const r = Math.hypot(q[0] - SK.centre[0], q[1] - SK.centre[1]); return q[2] >= eq ? Math.hypot(r, q[2] - eq) < SK.radiusMinMm : r < SK.radiusMinMm; };
     const fb = S.placed.map((f, k) => ({ lo: ray.at + f.at, hi: ray.at + f.at + f.tris * 9, owner: `f${k}`, f }));
     const grid = triGrid(P, fb.map(({ lo, hi, owner }) => ({ lo, hi, owner })));
     const keep = (p) => !insideSub(p);

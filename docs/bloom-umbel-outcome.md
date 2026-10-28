@@ -409,3 +409,17 @@ second to fire on; `the-boss-radius-is-typed` and `the-boss-height-is-typed`
 re-anchored onto the grown `max`; the two `rootR` mutants re-anchored onto
 `ring.rho` (the ring is computed before the boss now, which is placed once its
 centre depth is known).
+
+## 11. The converging knot (Oct 27, Eva's second ruling of the day)
+
+**RULED Oct 27: the umbel junction is a converging knot sized from the incoming rod; the
+band and the root-disc ring are retired; Hub controls default CURVED 0.50.**
+
+Eva's ruling, from the ray-tip comparison sheet (`docs/img/umbel-hubs-ray-compare.png`):
+*"the band is replaced by a CONVERGING KNOT, as real umbels do it. Spider lily, agapanthus
+and allium: the pedicels leave a small swollen point barely wider than the stem, bases
+crowded and merged. No disc, no flat top, no 90° edge."* The law is in `umbelKnot`'s header
+in `bloom-geometry.js`; the outcome is `docs/bloom-umbel-hubs-outcome.md` §6, with the knot's
+size at 2 / 6 / 12 florets and at −60 / 35 / 90°. §9 (the boss) and §10 (the flat underside,
+the crossing's margin) describe the junction as it was between Oct 23 and Oct 27 and are kept
+as the record of what was measured on it.

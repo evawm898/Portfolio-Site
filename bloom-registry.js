@@ -57,7 +57,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
          LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
          STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius, STEM_NODE_SWELLING_RANGE, STEM_NODE_KINK_RANGE, STEM_NODE_SWELL, STEM_NODE_SLOPE, STEM_CUT_VALUES, STEM_CUT_DEG,
-         HUB_STYLES, HUB_SHAPE_AMOUNT_RANGE, HUB_SHAPE_AMOUNT_DEFAULT, HUB_LENGTH_RANGE,
+         HUB_STYLES, HUB_STYLE_DEFAULT, HUB_SHAPE_AMOUNT_RANGE, HUB_SHAPE_AMOUNT_DEFAULT, HUB_LENGTH_RANGE,
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY, LEAF_DIVERGENCE_RANGE, LEAF_DIVERGENCE_DEFAULT,
@@ -2001,7 +2001,7 @@ export function umbelJunctionNote(ui) {
   if (!ui || String(ui.inflorescence) !== 'UMBEL' || !(Number(ui.stemLength) >= 1)) return '';
   const headOff = String(ui.umbelHead ?? 'OFF') !== 'ON';
   const mop = String(ui.umbelDepth ?? '1') === '2';
-  return ` · shapes the UMBEL JUNCTION${mop ? 'S (the stem-top knot and every ray tip)' : ' (the stem-top knot)'}${headOff ? ' — the head is OFF, so that is all it shapes' : ' as well as the head\'s own hub'}`;
+  return ` · shapes the flare under the UMBEL KNOT${mop ? 'S (the stem-top knot and every ray tip)' : ' (the stem-top knot)'}${headOff ? ' — the head is OFF, so that is all it shapes' : ' as well as the head\'s own hub'}`;
 }
 export const CONTROLS = [
   { id: 'petalCount', section: 'arrangement', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
@@ -4329,19 +4329,22 @@ export const CONTROLS = [
      is the join's pronouncedness; the two are flagged in the PR as adjacent
      names Eva may want to separate on the preview.
      =================================================================== */
-  { id: 'hubStyle', section: 'hub', kind: 'choice', default: 'GOBLET',
+  /* RULED Oct 27: CURVED at 0.50, auto — the umbel junction's flare, and the
+     head's own join with it (one owner, one default; GOBLET 1.00 is the slider
+     position that reproduces the pre-hub-shape head join, no longer the default). */
+  { id: 'hubStyle', section: 'hub', kind: 'choice', default: HUB_STYLE_DEFAULT,
     /* see `umbelJunctionNote` (module scope, below the row table's helpers) */
     options: [
-      { value: 'GOBLET', label: 'Goblet (rounded flare — ships today)' },
+      { value: 'GOBLET', label: 'Goblet (rounded flare; 1.00 is the pre-Oct-27 head join)' },
       { value: 'ANGLED', label: 'Angled (straight cone, hard shoulders)' },
-      { value: 'CURVED', label: 'Curved (smooth into the stem, no shoulder)' },
+      { value: 'CURVED', label: 'Curved (smooth into the stem, no shoulder — the default)' },
     ],
     label: 'Hub style',
     /* ON AN UMBEL (Oct 27, Eva's ruling) the three Hub controls shape the UMBEL
        JUNCTIONS too — the stem-top knot and every ray tip on a mophead — the
        hub-to-stem join run in reverse; with the head OFF that is all they shape,
        and the read-out says so rather than reading inert. */
-    fmt: (v, ui) => (v === 'ANGLED' ? 'a straight conical taper' : v === 'CURVED' ? 'a smooth continuous curve into the stem' : 'the rounded flare (today\'s shape at amount 1)') + umbelJunctionNote(ui),
+    fmt: (v, ui) => (v === 'ANGLED' ? 'a straight conical taper' : v === 'CURVED' ? 'a smooth continuous curve into the stem (the default)' : 'the rounded flare (the pre-Oct-27 head join at amount 1)') + umbelJunctionNote(ui),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
   { id: 'hubShapeAmount', section: 'hub', kind: 'slider',
     min: HUB_SHAPE_AMOUNT_RANGE[0], max: HUB_SHAPE_AMOUNT_RANGE[1], step: 0.05, default: HUB_SHAPE_AMOUNT_DEFAULT,
@@ -4350,7 +4353,7 @@ export const CONTROLS = [
        on today's shape at one slider value, and GOBLET does — at exactly 1.00,
        where `x * 1 === x` reproduces today. 0 is a straight join (no flare) for
        all three styles; above 1 exaggerates. One-sided by ruling — no waist. */
-    fmt: (v, ui) => (Number(v) === 0 ? 'straight — no flare' : Number(v) === 1 ? '1.00x — today\'s shape (GOBLET)' : `${Number(v).toFixed(2)}x pronounced`) + umbelJunctionNote(ui),
+    fmt: (v, ui) => (Number(v) === 0 ? 'straight — no flare' : Number(v) === HUB_SHAPE_AMOUNT_DEFAULT ? `${Number(v).toFixed(2)}x — the default (RULED Oct 27)` : Number(v) === 1 ? '1.00x (GOBLET 1.00 is the pre-Oct-27 head join)' : `${Number(v).toFixed(2)}x pronounced`) + umbelJunctionNote(ui),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
   { id: 'hubLength', section: 'hub', kind: 'slider',
     min: HUB_LENGTH_RANGE[0], max: HUB_LENGTH_RANGE[1], step: 0.5, default: 0,
@@ -4843,11 +4846,11 @@ export const CONTROLS = [
       const per = p.perNode;
       if (p.compound) {
         const sb = b && b.sub, cl = p.budgetClamp;
-        return `a COMPOUND umbel (depth 2) · ${p.umbelCount} rays from one boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across, each ending in a sub-umbel of ${p.floretsPerRay} floret${p.floretsPerRay === 1 ? '' : 's'} = ${p.umbelCount * p.floretsPerRay} florets`
+        return `a COMPOUND umbel (depth 2) · ${p.umbelCount} rays converging in one knot ${(2 * p.knot.radiusMm).toFixed(2)} mm across, each ending in a sub-umbel of ${p.floretsPerRay} floret${p.floretsPerRay === 1 ? '' : 's'} = ${p.umbelCount * p.floretsPerRay} florets`
           + (cl && cl.clamped ? ` — CLAMPED from ${cl.askedFlorets} asked (${cl.askedTotal.toLocaleString('en-US')} tris) to fit the ${cl.budget.toLocaleString('en-US')}-triangle export budget` : '')
           + (sb ? ` · ${sb.floretUnit.tris.toLocaleString('en-US')} tris a floret (the reduced lattice), ${b.unitTris.toLocaleString('en-US')} a sub-umbel, ${b.tris.toLocaleString('en-US')} in all` : '');
       }
-      if (p.umbel) return `an umbel · ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'} from one boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm).toFixed(2)} mm tall, flat beneath, ${p.headOff ? 'with NO head — the stem ends in the boss' : `${p.nodeDepthsMm[0].toFixed(1)} mm below the head`}`
+      if (p.umbel) return `an umbel · ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'} converging in one knot ${(2 * p.knot.radiusMm).toFixed(2)} mm across (a dome ${(p.knot.radiusMm / p.outerR).toFixed(2)}x the ${(2 * p.outerR).toFixed(2)} mm stem, flaring into it below), ${p.headOff ? 'with NO head — the stem ends in the knot' : `${p.nodeDepthsMm[0].toFixed(1)} mm below the head`}`
         + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris a floret, ${b.tris.toLocaleString('en-US')} in all` : '');
       return `a raceme · ${p.nodes} node${p.nodes === 1 ? '' : 's'} x ${per} = ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'}`
         + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris ${b.units && b.units.length > 1 ? `at the top node (${b.units.length} floret builds, one per distinct pedicel length)` : 'each'}, ${b.tris.toLocaleString('en-US')} in all` : '');
@@ -4873,11 +4876,11 @@ export const CONTROLS = [
         const k = p.floretsPerRay;
         return `${n} florets a sub-umbel, on pedicels from its own boss at the end of each ray`
           + (cl && cl.clamped ? ` — CLAMPED to ${k} a ray: ${cl.askedFlorets} florets asked, ${cl.builtFlorets} built — one floret is ${cl.floretTris.toLocaleString('en-US')} tris (measured), so ${cl.askedFlorets} would be ${cl.askedTotal.toLocaleString('en-US')} against the ${cl.budget.toLocaleString('en-US')} budget; the export never refuses for this` : ` · ${cl ? cl.builtFlorets : n * p.umbelCount} florets in all, ${cl ? cl.predictedTotal.toLocaleString('en-US') : '?'} tris against the ${cl ? cl.budget.toLocaleString('en-US') : ''} budget`)
-          + (sb && sb.knot ? ` · each sub-boss ${(2 * sb.knot.radiusMm).toFixed(2)} mm across` : '');
+          + (sb && sb.knot ? ` · each ray-tip knot ${(2 * sb.knot.radiusMm).toFixed(2)} mm across` : '');
       }
       const base = `${n} pedicels from one point, ${(360 / n).toFixed(1)} deg apart`;
       if (!p || !p.present || !p.knot) return base;
-      return `${base} · rooted on a ring ${(2 * p.knot.rho).toFixed(2)} mm across that holds them one ${p.knot.gapMm.toFixed(2)} mm gap apart, inside a boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across with a ${(2 * p.knot.halfHeightMm).toFixed(2)} mm band (derived from the count, the ${(2 * p.pedicelR).toFixed(2)} mm pedicel and its angle), flat above and beneath`
+      return `${base} · each rod continues ${p.knot.extendMm.toFixed(2)} mm inward past where it leaves the knot's base plane (${(2 * p.knot.rhoB).toFixed(2)} mm round the axis), its root buried nearest the axis and staggered ${p.knot.staggerMm.toFixed(3)} mm from its neighbours' along its own line (the roots overlap — overlapping closed shells — and share no vertex); the knot a dome ${(2 * p.knot.radiusMm).toFixed(2)} mm across ${p.knot.rodBinds ? 'sized by the stem\'s own end' : 'sized by what holds the roots'}, never by the count`
         + (p.sameNodeMayTouch ? ' · neighbouring florets may touch (measured, declared — two florets fusing is over-connection, never clamped)' : '');
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelPresent' } },
@@ -4927,7 +4930,7 @@ export const CONTROLS = [
       const p = shown && shown.inflorescence;
       const base = `${n} rays from one boss, ${(360 / n).toFixed(1)} deg apart`;
       if (!p || !p.present || !p.compound || !p.knot) return base;
-      return `${base} · each ${(2 * p.pedicelR).toFixed(2)} mm across (the area rule off the ${(2 * p.outerR).toFixed(2)} mm stem${p.pedicelRClamped ? ', FLOORED' : ''}), rooted in a boss ${(2 * p.knot.radiusMm).toFixed(2)} mm across and ${(2 * p.knot.halfHeightMm).toFixed(2)} mm tall`;
+      return `${base} · each ${(2 * p.pedicelR).toFixed(2)} mm across (the area rule off the ${(2 * p.outerR).toFixed(2)} mm stem${p.pedicelRClamped ? ', FLOORED' : ''}), converging in a knot ${(2 * p.knot.radiusMm).toFixed(2)} mm across`;
     },
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'umbelCompound' } },
   { id: 'umbelRayLength', section: 'inflorescence', kind: 'slider',

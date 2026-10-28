@@ -8865,8 +8865,8 @@ export async function stemAssertions(page, row) {
   const E = stemJoinExpected(hubR, hubT, R, m.sphereMode === true);
   const capRd = m.hubBuilt && m.hubBuilt.dome && !m.hubBuilt.dome.closed ? m.hubBuilt.dome.Rd : 0;
   const H = hubShapeExpected(hubR, hubT, R, m.sphereMode === true,
-    ui.hubStyle || 'GOBLET',
-    ui.hubShapeAmount === undefined ? 1 : Number(ui.hubShapeAmount),
+    ui.hubStyle || GEOMETRY.HUB_STYLE_DEFAULT,
+    ui.hubShapeAmount === undefined ? GEOMETRY.HUB_SHAPE_AMOUNT_DEFAULT : Number(ui.hubShapeAmount),
     ui.hubLength === undefined ? 0 : Number(ui.hubLength), E.joinT, capRd);
   if (m.hubJoinActive !== H.swellActive) bad.push(`ST5: the hub reports the join ${m.hubJoinActive ? 'ACTIVE' : 'INERT'} while style ${ui.hubStyle} amount ${ui.hubShapeAmount} length ${Number(ui.hubLength) > 0 ? ui.hubLength : 'auto'} on a ${hubR} mm hub under a ${R} mm stem asks for ${H.swellActive ? 'ACTIVE' : 'INERT'}`);
   if (Math.abs(m.hubJoinThickness - E.joinT) > 1e-9) bad.push(`ST5: the hub declares a join thickness of ${m.hubJoinThickness}; the stem's own section asks for ${E.joinT} — thickness stays DERIVED whatever the shape controls do`);
@@ -12117,7 +12117,7 @@ export async function sepalAssertions(page, row) {
       const D = m.hubBuilt && m.hubBuilt.dome;
       const R = Number(ui.stemDiameter) / 2;
       const Ej = stemJoinExpected(m.hubRadius, hubT, R, false);
-      const Hl = hubShapeExpected(m.hubRadius, hubT, R, false, ui.hubStyle || 'GOBLET', ui.hubShapeAmount === undefined ? 1 : Number(ui.hubShapeAmount), ui.hubLength === undefined ? 0 : Number(ui.hubLength), Ej.joinT, D && !D.closed ? D.Rd : 0);
+      const Hl = hubShapeExpected(m.hubRadius, hubT, R, false, ui.hubStyle || GEOMETRY.HUB_STYLE_DEFAULT, ui.hubShapeAmount === undefined ? GEOMETRY.HUB_SHAPE_AMOUNT_DEFAULT : Number(ui.hubShapeAmount), ui.hubLength === undefined ? 0 : Number(ui.hubLength), Ej.joinT, D && !D.closed ? D.Rd : 0);
       let zLaw;
       if (!D) zLaw = m.hubTopFaceZ - Hl.at(A.rAttach);
       else {
@@ -12794,52 +12794,142 @@ export function pedicelPinClauses(F, U) {
    UM4 THE CUT IS ON THE FREE END: the stem's emitted cut (when made) sits at
        its TIP, a stem length away from the knot, and the knot holds none of
        it — the florist's cut never reaches the top. */
-/* ===================================================================
-   THE JUNCTION'S FLARE, RESTATED FROM THE CONTROLS (Oct 27 — the umbel
-   junction as a hub, the hub-to-stem join run in reverse). `R` and `h` are the
-   band this harness has already restated from the count, the pedicel and the
-   angle; the rod's radius is the CONTROL's (the stem's diameter, or the ray's
-   derived radius on a mophead); the room is the rod's own length below the
-   band from the asked stem length and the plan's mode-free inset. The reach
-   law is written again here rather than imported from `umbelBoss`: auto = as
-   deep as it is wide; `hubLength` above 0 the total height, floored at the
-   band; amount folded once; GOBLET the constant-stress `sqrt(ln(R/r)/ln(R/
-   rodR))`, ANGLED `x`, CURVED the smoothstep, x from the band's rim to the
-   rod. Returns the swell and a profile `depthAt(r)` for the emitted rings. */
-export function umbelFlareExpected({ style, amount, lengthAsked, R, h, outerR, roomMm }) {
-  const gap = MIN_FEATURE_MM;
-  const st = ['GOBLET', 'ANGLED', 'CURVED'].includes(style) ? style : 'GOBLET';
-  const rodR = outerR - gap / 2, widthMm = R - rodR, bandMm = 2 * h;
+/* THE CONVERGING KNOT, RESTATED (Eva's ruling, Oct 27 — the band and the
+   root-disc ring are retired). Every length is written again HERE from the
+   CONTROLS, the stem plan's radii and the project's one gap and one lattice,
+   never imported from `umbelKnot`, so a defect in the geometry's expression
+   does not move this side with it:
+     rhoB      = head ON ? outerR + rP + gap : rP      (where each rod's line crosses the base plane)
+     extendMm  = rhoB cos a                             (inward to the line's point nearest the centre)
+     staggerMm = 2 pi rP / UMBEL_BOSS_SECTORS           (the i-th root (i - (n-1)/2 + 1/4) steps along its line —
+                                                          the quarter restated as a LITERAL: symmetric, an opposite
+                                                          pair at 0 deg roots on one point)
+     a root disc's rim point is ROD-HELD half a gap inside the wall (and, head
+       off, half a gap under the rod's end); every other point sets
+     liftMm    = max(gap/2, gap/2 - z of every unheld point)   (the centre under the base plane: every unheld point half a gap above the equator)
+     Rk        = max(rod end rim + gap/2, every unheld point's distance from the centre + gap/2)
+     the flare: rodR = outerR - gap/2, width = Rk - rodR, auto reach as deep
+       as wide, amount folded once, swell clamped to the room below the centre;
+       GOBLET sqrt(ln(Rk/r)/ln(Rk/rodR)), ANGLED x, CURVED the smoothstep.
+   Returns the expected knot with `inside(rho, z, margin)` on the union of the
+   dome, the flare and the rod — UM2's hold test — in the CENTRE's frame. */
+export function umbelKnotExpected({ n, rP, aDeg, outerR, boreR, headOn, style, amount, lengthAsked, roomMm }) {
+  const gap = MIN_FEATURE_MM, a = (aDeg * Math.PI) / 180, ca = Math.cos(a), sa = Math.sin(a);
+  const rhoB = headOn ? outerR + rP + gap : rP;
+  const extendMm = rhoB * ca;
+  const staggerMm = (2 * Math.PI * rP) / GEOMETRY.UMBEL_BOSS_SECTORS;
+  const roots = Array.from({ length: n }, (_, i) => { const s = extendMm + (i - (n - 1) / 2 + 0.25) * staggerMm; return { i, s, rMm: rhoB - s * ca, zMm: -s * sa }; });
+  const S = 720;
+  const held = (rho, z) => rho + gap / 2 <= outerR && (boreR <= 0 || rho - gap / 2 >= boreR) && (headOn || z + gap / 2 <= 0);
+  const free = [];
+  for (const q of roots) for (let k = 0; k < S; k++) {
+    const ph = (k * 2 * Math.PI) / S, cp = Math.cos(ph), sp = Math.sin(ph);
+    const rho = Math.hypot(q.rMm - rP * cp * sa, rP * sp), z = q.zMm + rP * cp * ca;
+    if (!held(rho, z)) free.push([rho, z]);
+  }
+  let liftMm = gap / 2;
+  for (const [, z] of free) if (-z + gap / 2 > liftMm) liftMm = -z + gap / 2;
+  let Rk = (headOn ? outerR : Math.hypot(outerR, liftMm)) + gap / 2;
+  for (const [rho, z] of free) { const d = Math.hypot(rho, z + liftMm) + gap / 2; if (d > Rk) Rk = d; }
+  const st = ['GOBLET', 'ANGLED', 'CURVED'].includes(style) ? style : GEOMETRY.HUB_STYLE_DEFAULT;
+  const rodR = outerR - gap / 2, widthMm = Rk - rodR;
   const auto = !(lengthAsked > 0);
-  const reachMm = auto ? bandMm + widthMm : Math.max(bandMm, lengthAsked);
-  const swellAskedMm = amount === 1 ? reachMm - bandMm : amount * (reachMm - bandMm);
-  const swellMm = Math.min(swellAskedMm, Math.max(0, roomMm - h));
+  const reachMm = auto ? Rk + widthMm : Math.max(Rk, lengthAsked);
+  const swellAskedMm = amount === 1 ? reachMm - Rk : amount * (reachMm - Rk);
+  const swellMm = Math.min(swellAskedMm, Math.max(0, roomMm - liftMm));
   const built = rodR > 0 && widthMm > 0 && swellMm > 0;
   const depthAt = (r) => {
     if (!built) return 0;
-    const x = Math.min(1, Math.max(0, (R - r) / widthMm));
-    const f = st === 'ANGLED' ? x : st === 'CURVED' ? x * x * (3 - 2 * x)
-      : Math.sqrt(Math.max(0, Math.log(R / Math.max(r, rodR)) / Math.log(R / rodR)));
+    const x = Math.min(1, Math.max(0, (Rk - r) / widthMm));
+    const f = st === 'ANGLED' ? x : st === 'CURVED' ? x * x * (3 - 2 * x) : Math.sqrt(Math.max(0, Math.log(Rk / Math.max(r, rodR)) / Math.log(Rk / rodR)));
     return swellMm * Math.min(1, Math.max(0, f));
   };
-  return { style: st, rodR, widthMm, swellMm, swellAskedMm, built, clamped: swellAskedMm > swellMm + 1e-9, depthAt, rings: built ? GEOMETRY.UMBEL_FLARE_RINGS : 0 };
+  const radiusAtDepth = (d) => { if (!(d > 0)) return Rk; if (d >= swellMm) return rodR; let lo = rodR, hi = Rk; for (let k = 0; k < 64; k++) { const m = (lo + hi) / 2; if (depthAt(m) > d) lo = m; else hi = m; } return (lo + hi) / 2; };
+  const inside = (rho, z, margin = 0) => {
+    if (z >= margin && Math.hypot(rho, z) + margin <= Rk) return true;
+    if (z < 0 && built && z >= -swellMm && rho + margin <= radiusAtDepth(-z)) return true;
+    const inWall = rho + margin <= outerR && (boreR <= 0 || rho - margin >= boreR);
+    return inWall && (headOn || z + margin <= liftMm);
+  };
+  return { rhoB, extendMm, staggerMm, roots, liftMm, Rk, rodR, widthMm, style: st, swellMm, swellAskedMm, built, clamped: swellAskedMm > swellMm + 1e-9, depthAt, radiusAtDepth, inside, ca, sa,
+    domeRings: GEOMETRY.UMBEL_DOME_RINGS, flareRings: built ? GEOMETRY.UMBEL_FLARE_RINGS : 0 };
 }
-/* the clauses on one emitted junction (`K`) against one restated flare (`F`):
-   the band's foot is the rim's foot, the bottom is the band's foot less the
-   swell, every emitted flare ring is on the styled profile, and the ring count
-   is the drawing's own. `tag` names the family (UM1 for the stem-top knot,
-   UM8 for a ray tip). */
-export function umbelFlareClauses(tag, K, F, wantBot, tolR, who) {
+/* the clauses on one EMITTED knot `K` (its record, in the frame it was built
+   in) against the restated `E`: the centre `lift` under the base plane, the
+   equator at Rk, every dome ring on the sphere, every flare ring on the
+   styled profile and the first at the rod, the ring counts the drawing's own,
+   the poles at the top and at the flare's foot. `tag` names the family (UM1
+   for the stem-top knot, UM8 for a ray tip). */
+export function umbelKnotClauses(tag, K, E, baseZ, tolR, who) {
   const bad = [];
-  if (Math.abs(K.rimBottomZ - wantBot) > tolR) bad.push(`${tag}: ${who}'s band foot is at z ${K.rimBottomZ.toFixed(6)} mm; the band restated from the root discs puts it at ${wantBot.toFixed(6)}`);
-  const wantLow = wantBot - F.swellMm;
-  if (Math.abs(K.bottomZ - wantLow) > tolR) bad.push(`${tag}: ${who} reaches down to z ${K.bottomZ.toFixed(6)} mm; the flare restated from the Hub controls (${F.style} ${F.swellMm.toFixed(4)} mm of swell${F.clamped ? ', CLAMPED to the rod' : ''}) ends at ${wantLow.toFixed(6)}`);
+  if (!Number.isFinite(K.equatorZ) || !Array.isArray(K.domeEmitted)) { bad.push(`${tag}: ${who} reports no equator or dome rings — it is not the converging knot`); return bad; }
+  if (Math.hypot(K.centre[0], K.centre[1]) > tolR) bad.push(`${tag}: ${who}'s emitted axis stands ${Math.hypot(K.centre[0], K.centre[1]).toExponential(3)} mm off the rod's axis`);
+  if (Math.abs(K.equatorZ - (baseZ - E.liftMm)) > tolR) bad.push(`${tag}: ${who}'s equator is at z ${K.equatorZ.toFixed(6)} mm; the centre restated from the roots sits ${E.liftMm.toFixed(6)} mm under the base plane at ${baseZ.toFixed(6)}, i.e. ${(baseZ - E.liftMm).toFixed(6)}`);
+  if (Math.abs(K.radiusMm - E.Rk) > tolR || Math.abs(K.radiusMinMm - E.Rk) > tolR) bad.push(`${tag}: ${who}'s equator was emitted at radius ${K.radiusMinMm.toFixed(6)}..${K.radiusMm.toFixed(6)} mm; restated from the rod's end and what holds the converging roots half a gap inside solid it is ${E.Rk.toFixed(6)} mm`);
+  if (K.domeEmitted.length !== E.domeRings) bad.push(`${tag}: ${who} emitted ${K.domeEmitted.length} dome ring(s); the drawing's own count is ${E.domeRings}`);
+  let worstD = 0;
+  for (const g of K.domeEmitted) { const d = Math.abs(Math.hypot(g.r, g.z - K.equatorZ) - E.Rk); if (d > worstD) worstD = d; if (g.z < K.equatorZ - tolR) bad.push(`${tag}: ${who} has a dome ring under its equator`); }
+  if (worstD > tolR) bad.push(`${tag}: ${who}'s dome rings leave the sphere of radius ${E.Rk.toFixed(6)} by up to ${worstD.toExponential(3)} mm`);
+  if (Math.abs(K.topZ - (K.equatorZ + E.Rk)) > tolR) bad.push(`${tag}: ${who}'s top is at z ${K.topZ.toFixed(6)} mm; a dome of ${E.Rk.toFixed(6)} mm over its equator at ${K.equatorZ.toFixed(6)} tops at ${(K.equatorZ + E.Rk).toFixed(6)}`);
   const rings = Array.isArray(K.flareEmitted) ? K.flareEmitted : [];
-  if (rings.length !== F.rings) bad.push(`${tag}: ${who} emitted ${rings.length} flare ring(s); the drawing's own count for a ${F.built ? 'built' : 'coin (no)'} flare is ${F.rings}`);
-  let worst = 0;
-  for (const g of rings) { const d = Math.abs(g.z - (wantBot - F.depthAt(g.r))); if (d > worst) worst = d; }
-  if (worst > tolR) bad.push(`${tag}: ${who}'s flare rings leave the ${F.style} profile restated from the controls by up to ${worst.toExponential(3)} mm`);
-  if (rings.length && Math.abs(rings[0].r - F.rodR) > tolR) bad.push(`${tag}: ${who}'s flare meets the rod at r ${rings[0].r.toFixed(6)} mm; half a gap inside the ${(2 * (F.rodR + MIN_FEATURE_MM / 2)).toFixed(4)} mm rod's wall is ${F.rodR.toFixed(6)}`);
+  if (rings.length !== E.flareRings) bad.push(`${tag}: ${who} emitted ${rings.length} flare ring(s); the drawing's own count for a ${E.built ? 'built' : 'flat (no)'} flare is ${E.flareRings}`);
+  let worstF = 0;
+  for (const g of rings) { const d = Math.abs(g.z - (K.equatorZ - E.depthAt(g.r))); if (d > worstF) worstF = d; }
+  if (worstF > tolR) bad.push(`${tag}: ${who}'s flare rings leave the ${E.style} profile restated from the Hub controls by up to ${worstF.toExponential(3)} mm`);
+  if (rings.length && Math.abs(rings[0].r - E.rodR) > tolR) bad.push(`${tag}: ${who}'s flare meets the rod at r ${rings[0].r.toFixed(6)} mm; half a gap inside the ${(2 * (E.rodR + MIN_FEATURE_MM / 2)).toFixed(4)} mm rod's wall is ${E.rodR.toFixed(6)}`);
+  if (Math.abs(K.bottomZ - (K.equatorZ - E.swellMm)) > tolR) bad.push(`${tag}: ${who} reaches down to z ${K.bottomZ.toFixed(6)} mm; the flare restated from the Hub controls (${E.style} ${E.swellMm.toFixed(4)} mm of swell${E.clamped ? ', CLAMPED to the rod' : ''}) ends at ${(K.equatorZ - E.swellMm).toFixed(6)}`);
+  return bad;
+}
+/* the root clauses for one pedicel (local frame of the knot, z = 0 at the
+   CENTRE): its emitted end is the i-th restated root, and its root disc —
+   the emitted radius, at the emitted direction — lies half a gap inside the
+   union of the knot and the rod; `endLocal` and `dirLocal` the rod's emitted
+   end and unit direction (root -> floret) in the knot's frame */
+/* THE HOLD IS TESTED AGAINST THE EMITTED KNOT, never the restated one (the
+   fourth durable rule's measured side): a dome of the emitted equator radius
+   over the emitted equator, the flare as the chords between the emitted flare
+   rings, and the rod's wall from the stem plan. A knot emitted half a gap too
+   high leaves a root disc ON its underside, and a test against the restated
+   knot would not see it (measured: `a-root-disc-on-the-junctions-face` fired
+   UM1 and left UM2 silent until this was the emitted one). */
+export function umbelKnotEmittedInside(K, outerR, boreR, headOn, liftMm) {
+  const eq = K.equatorZ, Rk = K.radiusMinMm;
+  const rings = (Array.isArray(K.flareEmitted) ? K.flareEmitted : []).map((g) => ({ d: eq - g.z, r: g.r })).sort((a, b) => a.d - b.d);
+  const radiusAtDepth = (d) => {
+    if (!rings.length) return null;
+    let prev = { d: 0, r: Rk };
+    for (const g of rings) { if (d <= g.d) { const t = (d - prev.d) / Math.max(1e-300, g.d - prev.d); return prev.r + t * (g.r - prev.r); } prev = g; }
+    return null;
+  };
+  return (rho, z, margin = 0) => {
+    const zc = z - eq;
+    if (zc >= margin && Math.hypot(rho, zc) + margin <= Rk) return true;
+    if (zc < 0) { const r = radiusAtDepth(-zc); if (r !== null && rho + margin <= r) return true; }
+    const inWall = rho + margin <= outerR && (boreR <= 0 || rho - margin >= boreR);
+    return inWall && (headOn || zc + margin <= liftMm);
+  };
+}
+export function umbelRootClauses(tag, i, n, az, endLocal, dirLocal, rad, E, baseZ, who, insideEmitted = null) {
+  const bad = [];
+  const inside = insideEmitted || ((rho, z, margin) => E.inside(rho, z - (baseZ - E.liftMm), margin));
+  const q = E.roots[i];
+  const R = [Math.cos(az), Math.sin(az)];
+  const want = [q.rMm * R[0], q.rMm * R[1], baseZ + q.zMm];
+  const off = Math.hypot(endLocal[0] - want[0], endLocal[1] - want[1], endLocal[2] - want[2]);
+  if (off > 1e-6) bad.push(`${tag}: ${who} ${i} ends its rod at (${endLocal.map((x) => x.toFixed(4)).join(', ')}); the i-th converging root (${E.rhoB.toFixed(4)} mm out on the base plane, ${q.s.toFixed(4)} mm inward along its own line — ${E.extendMm.toFixed(4)} to the point nearest the centre and ${(q.s - E.extendMm).toFixed(4)} of stagger) is (${want.map((x) => x.toFixed(4)).join(', ')}), ${off.toExponential(3)} mm away`);
+  if (rad > 0) {
+    /* the disc: two unit vectors normal to the rod's direction */
+    const d = dirLocal, u0 = Math.abs(d[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+    const U0 = v3cross(d, u0), ul = Math.hypot(...U0), U = U0.map((x) => x / ul), V = v3cross(d, U);
+    let worst = Infinity, at = null;
+    for (let k = 0; k < 720; k++) {
+      const ph = (k * 2 * Math.PI) / 720, cp = Math.cos(ph), sp = Math.sin(ph);
+      const p = [endLocal[0] + rad * (U[0] * cp + V[0] * sp), endLocal[1] + rad * (U[1] * cp + V[1] * sp), endLocal[2] + rad * (U[2] * cp + V[2] * sp)];
+      const rho = Math.hypot(p[0], p[1]);
+      if (!inside(rho, p[2], MIN_FEATURE_MM / 2 - 1e-9)) { worst = 0; at = p; break; }
+    }
+    if (at) bad.push(`${tag}: ${who} ${i}'s root disc (r ${rad.toFixed(4)} mm) reaches (${at.map((x) => x.toFixed(4)).join(', ')}), which is not half a gap inside the EMITTED knot's dome, its emitted flare or the rod's wall — it is not rooted inside solid`);
+  }
   return bad;
 }
 
@@ -12866,101 +12956,61 @@ export function umbelClauses(m, ui) {
   const P = m.inflorescence, B = m.inflorescenceBuilt, S = m.stem;
   if (!P || !B || !S) { bad.push('UM1: an umbel is asked and the hook reports no plan, no placements or no stem'); return bad; }
   if (!B.knot) { bad.push('UM1: an umbel is asked and the builder emitted no junction knot — every pedicel roots in nothing'); return bad; }
-  /* UM1 — the BOSS restated from OTHER owners: the controls and the stem plan.
-     (Eva's ruling, Oct 23: the junction is a squat boss, not a sphere.) Every
-     length is written again HERE rather than imported from `umbelBoss`, so a
-     defect in the geometry's expression does not move this side with it. */
-  /* A COMPOUND UMBEL (the mophead) roots its RAYS on the main boss: the
-     same law, read on the rays' own count and angle (UM5-UM9 below carry the
-     sub-umbels) */
+  /* UM1 — THE KNOT restated from OTHER owners (Eva's ruling, Oct 27: a
+     converging knot, a dome sized from the rod and from what holds the roots,
+     the Hub flare under it): the controls, the stem plan's two radii and the
+     one gap. Every length is written again HERE (`umbelKnotExpected`), never
+     imported from `umbelKnot`. A COMPOUND UMBEL (the mophead) converges its
+     RAYS in the main knot: the same law on the rays' own count and angle
+     (UM5-UM9 below carry the sub-umbels). */
   const compoundAsked = String(ui.umbelDepth ?? '1') === '2';
   const n = Math.round(Number(compoundAsked ? ui.umbelRays : ui.umbelFlorets));
   const rP = Math.max(STEM_DIAMETER_RANGE[0] / 2, S.outerR / Math.sqrt(n));
-  const aDeg = Number(compoundAsked ? ui.umbelRayAngle : ui.pedicelAngle), aRad = (aDeg * Math.PI) / 180;
+  const aDeg = Number(compoundAsked ? ui.umbelRayAngle : ui.pedicelAngle);
   const gap = MIN_FEATURE_MM;
-  /* the ring: one gap between neighbours, and — head ON, where the stem runs on
-     past the boss — one gap off the stem's own surface (a pedicel at 90 deg
-     rises beside it) */
-  const rho = Math.max((rP + gap / 2) / Math.sin(Math.PI / n), headOffAsked ? 0 : S.outerR + rP + gap);
-  /* a disc of radius r normal to a direction `a` from horizontal, centred at
-     radius `q` from the axis: its farthest point from the axis, by brute
-     maximisation over the rim at 1/8 degree then refined — a second route to
-     the geometry's closed form, never the same expression */
-  const discReach = (q, r, a) => {
-    const sa = Math.sin(a), f = (ph) => Math.hypot(q - r * Math.sin(ph) * sa, r * Math.cos(ph));
-    let best = 0, at = 0;
-    for (let k = 0; k < 2880; k++) { const ph = (k * 2 * Math.PI) / 2880; const v = f(ph); if (v > best) { best = v; at = ph; } }
-    let lo = at - (2 * Math.PI) / 2880, hi = at + (2 * Math.PI) / 2880;
-    for (let k = 0; k < 80; k++) { const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3; if (f(m1) < f(m2)) lo = m1; else hi = m2; }
-    return Math.max(best, f((lo + hi) / 2));
-  };
   const K = B.knot;
-  const R0 = discReach(rho, rP, aRad) + gap / 2;         // the root discs half a gap inside, never on the rim
-  const h0 = rP * Math.abs(Math.cos(aRad)) + gap / 2;    // and half a gap under the top and over the bottom
-  /* THE CROSSING'S MARGIN (Eva, Oct 24) — restated here: eight float32 steps
-     (2^-23 relative each) of the boss's coordinate magnitude, the magnitude
-     read off the EMITTED centre, never off the plan's margin. The band grows
-     only where the crossing through it would be shorter than half a printable
-     feature plus that margin: the top/bottom faces at `h / |sin a|`, the rim
-     at `(R - rho) / cos a`. The underside is FLAT (Eva, Oct 24 — SLS needs no
-     overhang cone). */
-  const M = Math.max(R0, Math.abs(K.centre[2]) + h0) + gap;
-  const crossMin = gap / 2 + 8 * 2 ** -23 * M;
-  const h = Math.max(h0, crossMin * Math.abs(Math.sin(aRad)));
-  const R = Math.max(R0, rho + crossMin * Math.cos(aRad));
-  /* the vertices are on the boss to its own few ulp: bounded in ULP of the
-     build's coordinate scale, never typed; the reach's search agrees with the
-     closed form to 1e-12 */
-  const tolR = 64 * Number.EPSILON * Math.max(1, Math.abs(K.centre[2]) + R) + 1e-9;
-  if (!(Number.isFinite(K.halfHeightMm) && Number.isFinite(K.bottomZ))) bad.push('UM1: the emitted junction reports no half-height or bottom — it is not the boss (a sphere carries neither)');
-  else {
-    if (Math.abs(K.radiusMm - R) > tolR || Math.abs(K.radiusMinMm - R) > tolR) bad.push(`UM1: the boss's rim was emitted at radius ${K.radiusMinMm.toFixed(6)}..${K.radiusMm.toFixed(6)} mm; restated from ${n} pedicels of ${rP.toFixed(4)} mm at ${aDeg} deg off a ${(2 * S.outerR).toFixed(3)} mm stem it is ${R.toFixed(6)} mm (a ring ${rho.toFixed(4)} mm holding them one ${gap} mm gap apart, the root disc's reach and half a gap, or the crossing's ${crossMin.toFixed(9)} mm through the rim, whichever is larger)`);
-    if (Math.abs(K.halfHeightMm - h) > tolR) bad.push(`UM1: the boss's band was emitted ${(2 * K.halfHeightMm).toFixed(9)} mm tall; the root disc at ${aDeg} deg reaches ${(rP * Math.abs(Math.cos(aRad))).toFixed(4)} mm above and below its ring (half a gap more each way), and a pedicel must cross ${crossMin.toFixed(9)} mm of it — so it is ${(2 * h).toFixed(9)} mm`);
-    const wantBot = K.centre[2] - h;
-    /* THE FLARE UNDER THE BAND (Oct 27, the junction as a hub) — restated from
-       the three Hub controls, the stem's own radius and the rod's room below
-       the band (the asked stem length less the plan's mode-free inset, a gap
-       and the cut's span); the Oct 24 flat-underside clause stood here. */
-    const roomMm = Number(ui.stemLength) - (headOffAsked ? 0 : Math.min(P.insetNeededMm, GEOMETRY.LEAF_NODE_BOTTOM * Number(ui.stemLength))) - gap - (S.cut && S.cut.made ? S.cut.spanMm : 0);
-    const FL = umbelFlareExpected({ style: ui.hubStyle || 'GOBLET', amount: ui.hubShapeAmount === undefined ? 1 : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), R, h, outerR: S.outerR, roomMm });
-    bad.push(...umbelFlareClauses('UM1', K, FL, wantBot, tolR, 'the stem-top junction'));
-    /* (the Oct 24 flat-underside clause stood here; the flare clauses above replace it) */
-    /* the crossing itself, through the EMITTED boss along the pedicel's own
-       direction from the restated ring: it clears half a feature by the margin */
-    const sn = Math.sin(aRad), cs = Math.cos(aRad);
-    let cross = Infinity;
-    if (Math.abs(sn) > 0) cross = Math.min(cross, K.halfHeightMm / Math.abs(sn));
-    if (cs > 0) cross = Math.min(cross, (K.radiusMinMm - rho) / cs);
-    if (!(cross + tolR >= crossMin)) bad.push(`UM1: a pedicel at ${aDeg} deg crosses ${cross.toFixed(9)} mm of the emitted boss; half a printable feature plus eight float32 steps of the boss's own scale is ${crossMin.toFixed(9)} mm`);
-  }
-  if (Math.hypot(K.centre[0], K.centre[1]) > tolR) bad.push(`UM1: the boss's emitted axis stands ${Math.hypot(K.centre[0], K.centre[1]).toExponential(3)} mm off the stem's axis`);
+  /* the base plane: head OFF the stem's own emitted top end; head ON the
+     plan's own inset depth below the stem's root (UM3 holds the inset) */
+  const baseZ = headOffAsked ? Number(S.emittedTopZ) : S.rootZ - P.nodeDepthsMm[0];
+  const roomMm = Number(ui.stemLength) - (headOffAsked ? 0 : Math.min(P.insetNeededMm, GEOMETRY.LEAF_NODE_BOTTOM * Number(ui.stemLength))) - gap - (S.cut && S.cut.made ? S.cut.spanMm : 0);
+  const E = umbelKnotExpected({ n, rP, aDeg, outerR: S.outerR, boreR: S.boreR, headOn: !headOffAsked, style: ui.hubStyle || GEOMETRY.HUB_STYLE_DEFAULT, amount: ui.hubShapeAmount === undefined ? GEOMETRY.HUB_SHAPE_AMOUNT_DEFAULT : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), roomMm });
+  /* the vertices are on the knot to its own few ulp: bounded in ULP of the
+     build's coordinate scale, never typed */
+  const tolR = 64 * Number.EPSILON * Math.max(1, Math.abs(baseZ) + E.Rk) + 1e-9;
+  bad.push(...umbelKnotClauses('UM1', K, E, baseZ, tolR, 'the stem-top knot'));
   if (Math.abs(P.pedicelR - rP) > 1e-9) bad.push(`UM1: the plan's pedicel is ${(2 * P.pedicelR).toFixed(4)} mm; the area rule from the ${n} ASKED gives ${(2 * rP).toFixed(4)} mm`);
-  /* UM2 — every pedicel roots at the boss, at the whorl law's azimuth, its
-     WHOLE root disc strictly inside: half a gap off the rim and off both faces
-     of the band, read off the floret builder's own emitted rod end and radius */
+  /* the knot is sized from the ROD, never the count: the restated radius
+     reads the same at the count's two neighbours but for the stagger's step */
+  if (!(E.Rk < 10 * S.outerR)) bad.push(`UM1: the knot restated at ${(2 * E.Rk).toFixed(3)} mm is ten times the ${(2 * S.outerR).toFixed(3)} mm rod — not "barely wider than the stem"`);
+  /* the crossing the plan reports: from a root along its rod to where it
+     leaves the solid, restated on the harness's own union */
+  if (!(P.crossesSolidMm + 1e-6 >= gap / 2)) bad.push(`UM1: the plan's pedicel crossing is ${P.crossesSolidMm} mm, under half a printable feature`);
+  /* UM2 — every pedicel CONVERGES: its emitted rod END is the i-th restated
+     root (the base point `rhoB` out at the whorl law's azimuth, `extendMm`
+     plus its own stagger inward along its own line), its WHOLE root disc half
+     a gap inside the knot's dome, its flare or the rod's wall, read off the
+     floret builder's own emitted rod end and radius; and no two roots share
+     a vertex, which the stagger restated above is the witness for (equal
+     ends would be one ring twice). */
   if (B.count !== n) bad.push(`UM2: ${n} florets asked and ${B.count} placed`);
   const red = (x) => { let w = x % (2 * Math.PI); if (w < 0) w += 2 * Math.PI; return w; };
+  const ends = [];
   (B.placed || []).forEach((q, i) => {
     const wantAz = (i * 2 * Math.PI) / n;
     if (Math.abs(red(q.az) - red(wantAz)) > 1e-9 && Math.abs(Math.abs(red(q.az) - red(wantAz)) - 2 * Math.PI) > 1e-9) bad.push(`UM2: floret ${i} stands at ${(q.az * 180 / Math.PI).toFixed(6)} deg; the i-th of ${n} evenly spread is ${(wantAz * 180 / Math.PI).toFixed(6)} deg`);
-    /* the emitted rod end, or for a SESSILE floret the hub's own rooted point */
     const ax = q.pedicelAxis;
-    const end = ax ? ax.outer : q.root;
-    const rad = ax ? ax.radiusMm : 0;
-    let tilt = 0;
-    if (ax) { const d = [ax.inner[0] - ax.outer[0], ax.inner[1] - ax.outer[1], ax.inner[2] - ax.outer[2]], L = Math.hypot(...d); tilt = Math.asin(Math.max(-1, Math.min(1, d[2] / L))); }
-    const ringR = Math.hypot(end[0] - K.centre[0], end[1] - K.centre[1]);
-    const reach = rad > 0 ? discReach(ringR, rad, tilt) : ringR;
-    const zExt = Math.abs(end[2] - K.centre[2]) + rad * Math.abs(Math.cos(tilt));
-    if (Number.isFinite(K.halfHeightMm) && (reach + gap / 2 > K.radiusMm + 1e-6 || zExt + gap / 2 > K.halfHeightMm + 1e-6)) bad.push(`UM2: floret ${i}'s root disc (r ${rad.toFixed(4)} mm at ${(tilt * 180 / Math.PI).toFixed(2)} deg) reaches ${reach.toFixed(4)} mm from the axis and ${zExt.toFixed(4)} mm off the band's mid-plane — the emitted boss is ${K.radiusMm.toFixed(4)} mm in radius and ${K.halfHeightMm.toFixed(4)} mm in half-height: it is not rooted half a gap inside the junction`);
-    if (Math.abs(ringR - rho) > 1e-6 || Math.abs(end[2] - K.centre[2]) > 1e-6) bad.push(`UM2: floret ${i}'s pedicel ends at r ${ringR.toFixed(4)} mm, ${(end[2] - K.centre[2]).toFixed(4)} mm above the boss's mid-plane; the restated root ring is r ${rho.toFixed(4)} mm in that plane`);
+    if (!ax) { bad.push(`UM2: floret ${i} reports no emitted pedicel axis — its root cannot be shown to converge`); return; }
+    const d0 = v3sub(ax.inner, ax.outer), L = v3len(d0), d = d0.map((x) => x / L);
+    bad.push(...umbelRootClauses('UM2', i, n, q.az, ax.outer, d, ax.radiusMm, E, baseZ, 'floret', Number.isFinite(K.equatorZ) ? umbelKnotEmittedInside(K, S.outerR, S.boreR, !headOffAsked, E.liftMm) : null));
+    ends.push(ax.outer);
   });
+  for (let i = 0; i < ends.length; i++) for (let j = i + 1; j < ends.length; j++) if (v3len(v3sub(ends[i], ends[j])) < 1e-9) bad.push(`UM2: florets ${i} and ${j} root their rods at the same point — their root rings share every vertex (the weld class)`);
   /* UM3 — where the knot is */
   if (headOffAsked) {
     const top = S.emittedTopZ;
-    if (!(Math.abs(K.centre[2] - top) <= tolR)) bad.push(`UM3: the head is OFF and the knot's centre stands at z ${K.centre[2].toFixed(4)} mm; the stem's own emitted top end is at ${Number(top).toFixed(4)} mm — the stem must END at the umbel`);
+    if (!(Math.abs(K.equatorZ + E.liftMm - top) <= tolR)) bad.push(`UM3: the head is OFF and the knot's base plane (its equator ${K.equatorZ.toFixed(4)} mm plus the restated lift ${E.liftMm.toFixed(4)}) stands at z ${(K.equatorZ + E.liftMm).toFixed(4)} mm; the stem's own emitted top end is at ${Number(top).toFixed(4)} mm — the stem must END at the umbel`);
   } else {
-    if (!(K.centre[2] <= S.rootZ && K.centre[2] >= S.tip[2])) bad.push(`UM3: the head is ON and the knot's centre z ${K.centre[2].toFixed(4)} mm is off the stem [${S.tip[2].toFixed(3)}, ${S.rootZ.toFixed(3)}]`);
+    if (!(K.equatorZ <= S.rootZ && K.equatorZ >= S.tip[2])) bad.push(`UM3: the head is ON and the knot's centre z ${K.equatorZ.toFixed(4)} mm is off the stem [${S.tip[2].toFixed(3)}, ${S.rootZ.toFixed(3)}]`);
     if (P.insetSatisfied && Number.isFinite(B.floretsMaxZ) && Number.isFinite(P.headFloorZ) && B.floretsMaxZ > P.headFloorZ - MIN_FEATURE_MM + 1e-6) bad.push(`UM3: the head is ON and a floret reaches z ${B.floretsMaxZ.toFixed(4)} mm, inside the ${MIN_FEATURE_MM} mm gap under the head's lowest material at ${P.headFloorZ.toFixed(4)} mm`);
   }
   /* UM4 — the cut is on the free end */
@@ -12972,7 +13022,7 @@ export function umbelClauses(m, ui) {
     const hi = Math.max(...S.emittedCut.ring.map((v) => v[2]));
     if (hi > tipZ + (S.cut ? S.cut.spanMm : 0) + 1e-6) bad.push(`UM4: the emitted cut face reaches z ${hi.toFixed(4)} mm, above the tip's own cut span`);
   }
-  bad.push(...mopheadClauses(m, ui, { discReach, gap }));
+  bad.push(...mopheadClauses(m, ui, { gap }));
   return bad;
 }
 
@@ -13064,7 +13114,7 @@ function restatedFloretFloor(subState) {
   floorRestatedMemo.set(key, out);
   return out;
 }
-export function mopheadClauses(m, ui, { discReach, gap }) {
+export function mopheadClauses(m, ui, { gap }) {
   const bad = [];
   const umbelAsked = Number(ui.stemLength) >= 1 && String(ui.inflorescence) === 'UMBEL';
   const compoundAsked = umbelAsked && String(ui.umbelDepth ?? '1') === '2';
@@ -13146,55 +13196,50 @@ export function mopheadClauses(m, ui, { discReach, gap }) {
     if (!textured && rest !== null && k < kAsked && kNextSamePedicel && rest + B.knot.tris + raysAsked * (Sfix + (k + 1) * F) <= CL.budget) bad.push(`UM7: ${k + 1} florets a ray would have fitted the ${CL.budget} budget (rest ${rest} + boss ${B.knot.tris} + ${raysAsked} x (${Sfix} + ${k + 1} x ${F})) and ${k} were built — the clamp took more than it had to`);
   }
 
-  /* UM8 — the roots, per floret: every sub-boss on its ray, every floret's root
-     disc inside its own sub-boss, in the WORLD frame */
+  /* UM8 — the roots, per floret (Oct 27, the converging knot): every ray-tip
+     knot on its ray, restated from the sub-umbel's count, pedicel, angle and
+     its RAY's own radius (the rod — a ray is a stem of the area rule's
+     diameter, hollow past Eva's wall), and every floret's rod end the i-th
+     converging root, its root disc inside solid — in the SUB-UMBEL's own frame */
   const SK = sub.knot;
-  if (!SK) bad.push('UM8: the sub-umbel emitted no boss — every floret roots in nothing');
+  if (!SK) bad.push('UM8: the sub-umbel emitted no knot — every floret roots in nothing');
   else {
     const kSub = sub.count;
     const rayR = Math.max(STEM_DIAMETER_RANGE[0] / 2, S.outerR / Math.sqrt(raysAsked));
+    const rayBore = Math.max(0, rayR - GEOMETRY.STEM_MIN_WALL_MM);
     const rPs = Math.max(STEM_DIAMETER_RANGE[0] / 2, rayR / Math.sqrt(kSub));
-    const aS = (Number(ui.pedicelAngle) * Math.PI) / 180;
-    const rhoS = (rPs + gap / 2) / Math.sin(Math.PI / kSub);
-    const R0 = discReach(rhoS, rPs, aS) + gap / 2, h0 = rPs * Math.abs(Math.cos(aS)) + gap / 2;
-    const Mmag = Math.max(R0, Math.abs(SK.centre[2]) + h0) + gap, crossMin = gap / 2 + 8 * 2 ** -23 * Mmag;
-    const hS = Math.max(h0, crossMin * Math.abs(Math.sin(aS))), RS = Math.max(R0, rhoS + crossMin * Math.cos(aS));
-    const tolR = 64 * Number.EPSILON * Math.max(1, Math.abs(SK.centre[2]) + RS) + 1e-9;
-    if (Math.abs(SK.radiusMm - RS) > tolR || Math.abs(SK.halfHeightMm - hS) > tolR) bad.push(`UM8: the sub-boss was emitted ${(2 * SK.radiusMm).toFixed(6)} mm across and ${(2 * SK.halfHeightMm).toFixed(6)} mm tall; restated from ${kSub} pedicels of ${rPs.toFixed(4)} mm at ${ui.pedicelAngle} deg off a ${(2 * rayR).toFixed(4)} mm ray it is ${(2 * RS).toFixed(6)} x ${(2 * hS).toFixed(6)} mm`);
-    /* THE RAY TIP'S FLARE scales with ITS RAY (Oct 27): the rod is the ray at
-       the area rule's own radius, the room the ray's own length below the band
-       (a pedicel carries no cut), the controls the same three */
-    const FS = umbelFlareExpected({ style: ui.hubStyle || 'GOBLET', amount: ui.hubShapeAmount === undefined ? 1 : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), R: RS, h: hS, outerR: rayR, roomMm: Number(ui.umbelRayLength) - gap });
-    bad.push(...umbelFlareClauses('UM8', SK, FS, SK.centre[2] - hS, tolR, 'the ray tip junction'));
+    const ES = umbelKnotExpected({ n: kSub, rP: rPs, aDeg: Number(ui.pedicelAngle), outerR: rayR, boreR: rayBore, headOn: false, style: ui.hubStyle || GEOMETRY.HUB_STYLE_DEFAULT, amount: ui.hubShapeAmount === undefined ? GEOMETRY.HUB_SHAPE_AMOUNT_DEFAULT : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), roomMm: Number(ui.umbelRayLength) - gap });
+    const baseS = Number(sub.stemBuilt && sub.stemBuilt.emittedTopZ);
+    const tolR = 64 * Number.EPSILON * Math.max(1, Math.abs(baseS) + ES.Rk) + 1e-9;
+    if (!Number.isFinite(baseS)) bad.push('UM8: the sub-umbel reports no emitted ray top — the base plane of its knot is then nowhere');
+    else bad.push(...umbelKnotClauses('UM8', SK, ES, baseS, tolR, 'the ray tip knot'));
     if (Math.abs(sub.plan.pedicelR - rPs) > 1e-9) bad.push(`UM8: the sub-umbel's pedicel is ${(2 * sub.plan.pedicelR).toFixed(4)} mm; the area rule off the ${(2 * rayR).toFixed(4)} mm ray for ${kSub} florets gives ${(2 * rPs).toFixed(4)} mm`);
-    let worst = null, n = 0;
+    if (sub.plan.boreR !== undefined && Math.abs(sub.plan.boreR - rayBore) > 1e-9) bad.push(`UM8: the sub-umbel reads its ray's bore as ${sub.plan.boreR}; Eva's ${GEOMETRY.STEM_MIN_WALL_MM} mm wall on a ${(2 * rayR).toFixed(4)} mm ray gives ${rayBore.toFixed(4)}`);
+    let n = 0;
     for (const ray of B.placed || []) {
       const M = ray.M, ax = ray.pedicelAxis;
       const cW = mApply(M, SK.centre), zW = mDir(M, [0, 0, 1]);
-      if (!ax) { bad.push(`UM8: ray at ${(ray.az * 180 / Math.PI).toFixed(2)} deg reports no emitted axis — its sub-boss cannot be shown to sit on it`); continue; }
+      if (!ax) { bad.push(`UM8: ray at ${(ray.az * 180 / Math.PI).toFixed(2)} deg reports no emitted axis — its knot cannot be shown to sit on it`); continue; }
       const d0 = v3sub(ax.inner, ax.outer), Lr = v3len(d0), d = d0.map((x) => x / Lr);
       const off = v3sub(cW, ax.inner);
       const lateral = v3len(v3sub(off, d.map((x) => x * v3dot(off, d))));
       const tolW = 1e-6;
-      if (lateral > tolW || Math.abs(v3dot(off, d)) > tolW) bad.push(`UM8: the sub-boss of the ray at ${(ray.az * 180 / Math.PI).toFixed(2)} deg stands ${lateral.toExponential(3)} mm off its ray's emitted axis and ${v3dot(off, d).toFixed(6)} mm along it from the ray's inner end — a sub-umbel sits ON its ray, at its end`);
-      if (1 - v3dot(zW, d) > 1e-9) bad.push(`UM8: the sub-boss of the ray at ${(ray.az * 180 / Math.PI).toFixed(2)} deg faces ${(Math.acos(Math.min(1, v3dot(zW, d))) * 180 / Math.PI).toFixed(4)} deg off its ray`);
-      for (const [j, f] of (sub.placed || []).entries()) {
-        const fax = f.pedicelAxis;
-        const endL = fax ? fax.outer : f.root, rad = fax ? fax.radiusMm : 0;
-        const endW = mApply(M, endL);
-        const rel = v3sub(endW, cW), zOff = v3dot(rel, zW);
-        const ringR = v3len(v3sub(rel, zW.map((x) => x * zOff)));
-        let tilt = 0;
-        if (fax) { const dd = mDir(M, v3sub(fax.inner, fax.outer)), L = v3len(dd); tilt = Math.asin(Math.max(-1, Math.min(1, v3dot(dd, zW) / L))); }
-        const reach = rad > 0 ? discReach(ringR, rad, tilt) : ringR;
-        const zExt = Math.abs(zOff) + rad * Math.abs(Math.cos(tilt));
-        n++;
-        const slack = Math.min(SK.radiusMm - (reach + gap / 2), SK.halfHeightMm - (zExt + gap / 2));
-        if (!worst || slack < worst.slack) worst = { slack, ray: ray.az, j };
-        if (slack < -1e-6) bad.push(`UM8: floret ${j} of the ray at ${(ray.az * 180 / Math.PI).toFixed(2)} deg roots a disc (r ${rad.toFixed(4)} mm at ${(tilt * 180 / Math.PI).toFixed(2)} deg) reaching ${reach.toFixed(4)} mm from its sub-boss's axis and ${zExt.toFixed(4)} mm off its mid-plane; the emitted sub-boss is ${SK.radiusMm.toFixed(4)} x ${SK.halfHeightMm.toFixed(4)} mm — not half a gap inside`);
-      }
+      /* the knot's CENTRE sits `lift` down the ray from its inner end (the base plane) */
+      if (lateral > tolW || Math.abs(v3dot(off, d) + ES.liftMm) > tolW) bad.push(`UM8: the knot of the ray at ${(ray.az * 180 / Math.PI).toFixed(2)} deg stands ${lateral.toExponential(3)} mm off its ray's emitted axis and ${v3dot(off, d).toFixed(6)} mm along it from the ray's inner end — a sub-umbel's knot sits ON its ray, its centre ${ES.liftMm.toFixed(6)} mm under the ray's end`);
+      if (1 - v3dot(zW, d) > 1e-9) bad.push(`UM8: the knot of the ray at ${(ray.az * 180 / Math.PI).toFixed(2)} deg faces ${(Math.acos(Math.min(1, v3dot(zW, d))) * 180 / Math.PI).toFixed(4)} deg off its ray`);
     }
-    if (n !== (B.placed || []).length * kSub) bad.push(`UM8: ${n} floret root discs checked of ${(B.placed || []).length} rays x ${kSub}`);
+    /* the florets, once, in the sub-umbel's own frame (every ray appends the same unit) */
+    const endsS = [];
+    for (const [j, f] of (sub.placed || []).entries()) {
+      const fax = f.pedicelAxis;
+      if (!fax) { bad.push(`UM8: floret ${j} of the sub-umbel reports no emitted pedicel axis`); continue; }
+      const d0 = v3sub(fax.inner, fax.outer), L = v3len(d0), d = d0.map((x) => x / L);
+      bad.push(...umbelRootClauses('UM8', j, kSub, f.az, fax.outer, d, fax.radiusMm, ES, baseS, 'sub-umbel floret', Number.isFinite(SK.equatorZ) ? umbelKnotEmittedInside(SK, rayR, rayBore, false, ES.liftMm) : null));
+      endsS.push(fax.outer);
+      n++;
+    }
+    for (let i = 0; i < endsS.length; i++) for (let j = i + 1; j < endsS.length; j++) if (v3len(v3sub(endsS[i], endsS[j])) < 1e-9) bad.push(`UM8: sub-umbel florets ${i} and ${j} root their rods at the same point — their root rings share every vertex`);
+    if (n !== kSub) bad.push(`UM8: ${n} floret root discs checked of ${kSub}`);
   }
 
   /* UM9 — the floret floor */
@@ -13243,6 +13288,34 @@ export async function inflorescenceAssertions(page, row) {
      has no gradient and no corymb (an umbel has one node), so they are read
      at their identities. */
   const compound = isUmbel && String(ui.umbelDepth ?? '1') === '2';
+  /* AN UMBEL'S ROD IS BUILT `extendMm` LONGER THAN THE ASKED PEDICEL (the
+     converging root, Eva's Oct 27 ruling): the rod continues inward from the
+     base circle to its line's point nearest the centre, `rhoB cos a`, and the
+     floret stands where the asked length puts it. Restated from the controls
+     and the stem's radius (UM1/UM2 own the knot; this is the one length the
+     ID family's "the pedicel IS the floret's stem" clauses must add). */
+  const rootLawRestated = (rodR, n, angleDeg, headOn) => {
+    const rP = Math.max(STEM_DIAMETER_RANGE[0] / 2, rodR / Math.sqrt(n));
+    const a = (angleDeg * Math.PI) / 180;
+    const rhoB = headOn ? rodR + rP + MIN_FEATURE_MM : rP;
+    /* the i-th root's stagger along its own line: `(i - (n-1)/2 + 1/4)` steps
+       of the pedicel's own circumference over the knot's lattice (`umbelRootLaw`) */
+    const staggerMm = (2 * Math.PI * rP) / GEOMETRY.UMBEL_BOSS_SECTORS;
+    return { rP, rhoB, extendMm: rhoB * Math.cos(a), staggerAt: (i) => (i - (n - 1) / 2 + 0.25) * staggerMm };
+  };
+  const rodExtendMm = (() => {
+    if (!isUmbel || !m.stem) return 0;
+    return rootLawRestated(m.stem.outerR, Math.round(Number(compound ? ui.umbelRays : ui.umbelFlorets)), Number(compound ? ui.umbelRayAngle : ui.pedicelAngle), String(ui.umbelHead) === 'ON').extendMm;
+  })();
+  /* a MOPHEAD's floret roots in its SUB-UMBEL's knot: the ray is its rod
+     (`outerR / sqrt(rays)`, floored), its count the florets per ray, its
+     angle the pedicel's, no head — restated from the controls as above */
+  const subRootExtendMm = (() => {
+    if (!isUmbel || !compound || !m.stem) return 0;
+    const rays = Math.round(Number(ui.umbelRays));
+    const rayR = Math.max(STEM_DIAMETER_RANGE[0] / 2, m.stem.outerR / Math.sqrt(rays));
+    return rootLawRestated(rayR, Math.round(Number(ui.umbelFlorets)), Number(ui.pedicelAngle), false).extendMm;
+  })();
   const uiTop = ui;
   if (compound) ui = { ...ui, umbelFlorets: ui.umbelRays, pedicelLength: ui.umbelRayLength, pedicelAngle: ui.umbelRayAngle, pedicelGradient: 1, pedicelCorymb: 'OFF', nodeVariance: 0 };
 
@@ -13466,7 +13539,8 @@ export async function inflorescenceAssertions(page, row) {
     if (F.petalCount !== PF.floretPetals) bad.push(`ID4: the floret was built with ${F.petalCount} petals and the plan declares ${PF.floretPetals}`);
     if (PF.floretPetals !== Math.round(Number(ui.floretPetals))) bad.push(`ID4: the plan declares ${PF.floretPetals} floret petals, the page's floretPetals reads ${ui.floretPetals}`);
     if (!Object.is(F.petalLength, PF.petalLength) || !Object.is(F.petalWidth, PF.petalWidth)) bad.push(`ID4: the floret was built at ${F.petalLength} x ${F.petalWidth} mm and the plan declares ${PF.petalLength} x ${PF.petalWidth}`);
-    if (!Object.is(F.stemLength, PF.pedicelLenMm)) bad.push(`ID4: the floret's stem is ${F.stemLength} mm and the pedicel is ${PF.pedicelLenMm} mm — the pedicel IS the floret's stem`);
+    const fExtend = compound ? subRootExtendMm : rodExtendMm;
+    if (Math.abs(F.stemLength - (PF.pedicelLenMm + fExtend)) > 1e-9) bad.push(`ID4: the floret's stem is ${F.stemLength} mm and the pedicel is ${PF.pedicelLenMm} mm${fExtend ? ` plus the converging root's ${fExtend.toFixed(6)} mm` : ''} — the pedicel IS the floret's stem`);
     if (!Object.is(F.stemDiameter, 2 * PF.pedicelR)) bad.push(`ID4: the floret's stem is ${F.stemDiameter} mm across and the derived pedicel is ${2 * PF.pedicelR}`);
     /* THE TOPMOST UNIT CARRIES A STEM EXACTLY WHEN ITS PEDICEL HAS A LENGTH
        (ruling 7: sessile is a TOPOLOGY, not a short rod). A floret with no
@@ -13686,7 +13760,7 @@ export async function inflorescenceAssertions(page, row) {
       const U = Array.isArray(B.units) ? B.units : [];
       for (const q of B.placed || []) {
         const u = U[q.unit];
-        if (!u || !Object.is(u.lengthMm, P.pedicelLensMm[q.nodeIndex]) || !u.floretState || !Object.is(u.floretState.stemLength, P.pedicelLensMm[q.nodeIndex])) {
+        if (!u || !Object.is(u.lengthMm, P.pedicelLensMm[q.nodeIndex]) || !u.floretState || Math.abs(u.floretState.stemLength - (P.pedicelLensMm[q.nodeIndex] + rodExtendMm)) > 1e-9) {
           bad.push(`ID7: the floret at node ${q.nodeIndex} was appended from a unit built at ${u && u.floretState ? u.floretState.stemLength : '(none)'} mm where its node's pedicel is ${P.pedicelLensMm[q.nodeIndex]} mm`);
           break;
         }
@@ -13782,7 +13856,7 @@ export async function inflorescenceAssertions(page, row) {
       const key = `${exportMode ? 'E' : 'L'}|${o ? JSON.stringify(o) : ''}`;
       if (unitCache.has(key)) return unitCache.get(key);
       const sub = new GEOMETRY.MeshBuilder({ exportMode });
-      const fs = GEOMETRY.floretState({ ...(compound ? uiTop : ui) }, prePlan, topL, az);
+      const fs = GEOMETRY.floretState({ ...(compound ? uiTop : ui) }, prePlan, topL + rodExtendMm, az);
       /* `pedicel: true`: a floret's own stem IS its pedicel, a rod, and rods
          take no relief (Q12 — deferred pending BONE); the unit is built as
          the plan builds it, so a textured raceme's floor is the same body's */
@@ -13794,7 +13868,11 @@ export async function inflorescenceAssertions(page, row) {
       unitCache.set(key, U);
       return U;
     };
-    const placeAt = (az, tipZ) => GEOMETRY.pedicelPlacement({ angleDeg: Number(ui.pedicelAngle), rootZ: 0, nodeDepthsMm: [0], rootR: P.rootR, embedMm: P.embedMm }, 0, az, tipZ, sessileTop).M;
+    /* an UMBEL's i-th root is staggered along its line (restated, never the
+       plan's own `rootStaggerMm`), so the i-th azimuth's unit sits that much
+       deeper or shallower in the knot and reaches that much less or more */
+    const topLaw = isUmbel && m.stem ? rootLawRestated(m.stem.outerR, Math.round(Number(ui.umbelFlorets)), Number(ui.pedicelAngle), String(ui.umbelHead) === 'ON') : null;
+    const placeAt = (az, tipZ, i = 0) => GEOMETRY.pedicelPlacement({ angleDeg: Number(ui.pedicelAngle), rootZ: 0, nodeDepthsMm: [0], rootR: P.rootR, embedMm: P.embedMm + (topLaw ? topLaw.staggerAt(i) : 0) }, 0, az, tipZ, sessileTop).M;
     /* over every azimuth the phyllotaxy puts on any asked node — restated
        from the CONTROLS through `leafAzimuths`, never the plan's own list */
     const nAsked = isUmbel ? 1 : Math.max(1, Math.round(Number(ui.floretNodes)));
@@ -13804,10 +13882,10 @@ export async function inflorescenceAssertions(page, row) {
       : [...new Set(Array.from({ length: nAsked }, (_, i) => GEOMETRY.leafAzimuths(String(ui.floretPhyllotaxy), i, restatedPhylloTurn('alternate', 180))).flat())];
     const reachIn = (exportMode) => {
       let top = -Infinity;
-      for (const az of azsAll) {
+      for (const [i, az] of azsAll.entries()) {
         const U = unitAt(exportMode, az);
         const src = U.sub.positions;
-        const M = placeAt(az, U.tipZ);
+        const M = placeAt(az, U.tipZ, i);
         for (let k = 0; k < src.length; k += 3) { const z = M[8] * src[k] + M[9] * src[k + 1] + M[10] * src[k + 2] + M[11]; if (z > top) top = z; }
       }
       return top;
@@ -13959,9 +14037,9 @@ export async function inflorescenceAssertions(page, row) {
       const rodFloor = 2 * P.pedicelR;
       const extentIn = (exportMode) => {
         let lo = Infinity, hi = -Infinity;
-        for (const az of azsAll) {
+        for (const [i, az] of azsAll.entries()) {
           const U = unitAt(exportMode, az);
-          const M = placeAt(az, U.tipZ);
+          const M = placeAt(az, U.tipZ, i);
           for (let k = 0; k < U.sub.positions.length; k += 3) { const z = M[8] * U.sub.positions[k] + M[9] * U.sub.positions[k + 1] + M[10] * U.sub.positions[k + 2] + M[11]; if (z > hi) hi = z; if (z < lo) lo = z; }
         }
         return hi - lo;
@@ -13970,7 +14048,7 @@ export async function inflorescenceAssertions(page, row) {
       const dMax = Math.max(1, Math.ceil((extent + MIN_FEATURE_MM) / rodFloor));
       /* an UMBEL's pairs are its one node's, restated: every two of N */
       const pairs = isUmbel ? azsAll.flatMap((a, p) => azsAll.slice(p + 1).map((b) => ({ a, b, d: 0 }))) : GEOMETRY.floretPairClasses(phyllo, n, dMax);
-      const bodyOf = (exportMode) => (az) => { const U = unitAt(exportMode, az); return { positions: U.sub.positions, M: placeAt(az, U.tipZ) }; };
+      const bodyOf = (exportMode) => (az) => { const U = unitAt(exportMode, az); return { positions: U.sub.positions, M: placeAt(az, U.tipZ, azsAll.indexOf(az)) }; };
       const fL = GEOMETRY.floretPitchFloorMm(bodyOf(false), pairs, MIN_FEATURE_MM);
       const fE = GEOMETRY.floretPitchFloorMm(bodyOf(true), pairs, MIN_FEATURE_MM);
       const raw = Math.max(fL.floorMm, fE.floorMm);

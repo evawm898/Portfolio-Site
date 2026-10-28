@@ -561,6 +561,24 @@ const PREDICATE_MOVERS = {
     const roomMm = K.centre[2] - P.stemTipZ - gap - (sp.cut && sp.cut.made ? sp.cut.spanMm : 0);
     return widthMm > 0 && roomMm - K.halfHeightMm > 0;
   },
+  /* THE CONVERGING KNOT (Oct 27, Eva's second ruling): every row the BASE
+     builds an umbel knot on moves (the band is the knot now, and every
+     pedicel's root converges), plus every `stem-top` mover, plus — because the
+     ruling moves the HUB CONTROLS' DEFAULTS to CURVED 0.50 — every row whose
+     BASE builds a head's hub-to-stem join that is ACTIVE at the base's own
+     default (GOBLET 1.00) with the row not naming the two controls itself. */
+  'umbel-knot': (st) => {
+    if (PREDICATE_MOVERS['stem-top'](st)) return true;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    const fr = base.footRing(bs, acc);
+    const sp = fr.hub && base.stemPlan(bs, fr.hub, acc);
+    if (!(sp && sp.present)) return false;
+    if (!base.umbelIsAbsent(bs)) { const P = base.inflorescencePlan(bs, sp, acc); if (P && P.present && P.umbel && P.knot) return true; }
+    /* the head's join under the moved default: active on the base at its own default, and neither control named */
+    if (st.hubStyle === undefined && st.hubShapeAmount === undefined && sp.hubJoinActive !== false && Number(base.HUB_SHAPE_AMOUNT_DEFAULT) === 1) return !!(sp.swellActive ?? sp.joinActive ?? true);
+    return false;
+  },
   'umbel-boss': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const bs = baseState(st);

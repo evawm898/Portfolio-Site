@@ -16248,7 +16248,13 @@ export function hubThicknessAt(r, { hubR, hubT, outerR, joinT }) {
    =================================================================== */
 export const HUB_STYLES = Object.freeze(['GOBLET', 'ANGLED', 'CURVED']);
 export const HUB_SHAPE_AMOUNT_RANGE = Object.freeze([0, 2]);
-export const HUB_SHAPE_AMOUNT_DEFAULT = 1;
+/* RULED Oct 27 (Eva, from the ray-tip comparison): the Hub controls default
+   CURVED at 0.50, auto reach — the umbel junction's flare and, since the three
+   controls are one owner, the head's own hub-to-stem join too (GOBLET 1.00 is
+   still the value at which the head's join reproduces the pre-hub-shape
+   bytes; it is a slider position now, not the default). */
+export const HUB_STYLE_DEFAULT = 'CURVED';
+export const HUB_SHAPE_AMOUNT_DEFAULT = 0.5;
 export const HUB_LENGTH_RANGE = Object.freeze([0, 40]);   // 0 = auto (the derived joinT)
 
 /* THE STYLED JOIN PROFILE — the hub's total thickness at plan radius r, the
@@ -16685,7 +16691,7 @@ export function stemPlan(state, ring, acc) {
      the sheet. On a SPHERE the join is inert by declaration (a shell carries a
      root hole in membrane, not a plate's swell), so the reach stays `joinT` and
      the controls are TOLD inert rather than applied. */
-  const hubStyle = HUB_STYLES.includes(state.hubStyle) ? state.hubStyle : 'GOBLET';
+  const hubStyle = HUB_STYLES.includes(state.hubStyle) ? state.hubStyle : HUB_STYLE_DEFAULT;
   const hubAmount = state.hubShapeAmount === undefined ? HUB_SHAPE_AMOUNT_DEFAULT : Number(state.hubShapeAmount);
   const hubLengthAsked = state.hubLength === undefined ? 0 : Number(state.hubLength);
   /* `refReach` is the reach the flare has AT amount 1 — the derived `joinT`
@@ -23086,157 +23092,122 @@ export function umbelDepthRefusal(state) {
 export function umbelIsCompound(state) {
   return !umbelIsAbsent(state) && String(state.umbelDepth ?? UMBEL_DEPTH_VALUES[0]) === '2' && umbelLevelOf(state) === 1;
 }
-/* THE JUNCTION KNOT — derived from the count `n`, the pedicel radius `rP`,
-   the pedicel angle and the stem's own radius, and nothing else typed but the
-   project's one printable gap. Built as a squat BOSS about the stem's axis
-   (Eva's ruling, Oct 23 — the least SPHERE that shipped first read as a ball:
-   12 mm across at six florets and 19.5 mm at twelve on a 6 mm stem).
-
-   THE ROOT RING. The pedicels root on a horizontal ring of radius `rho`
-   about the boss's centre, at their own evenly spread azimuths. `rho` is the
-   least radius on which `n` rods of radius `rP` stand ONE PRINTABLE GAP
-   apart: adjacent roots are `2 rho sin(pi/n)` apart, so
-       rho = (rP + MIN_FEATURE_MM / 2) / sin(pi / n).
-   That is the case the gap is for: at `pedicelAngle` 90 every pedicel is
-   VERTICAL and parallel to its neighbours along its whole length (measured on
-   paper first: at n = 2 a ring of exactly `rP` puts rod A's vertex at angle
-   pi and rod B's at angle 0 on the SAME double, an edge of four triangles).
-   At any lower angle the rods diverge from the ring, so the gap only grows.
-
-   THE BOSS is a solid of revolution whose profile, in (r, z) about the
-   centre, is
-       (0, +h) — (R, +h) — (R, -h) — (0, -h)
-   — a flat-topped, FLAT-BOTTOMED band (a disc) of radius `R` and half-height
-   `h`. Each length is DERIVED:
-     * `h` holds the ROOT DISC at its own angle: a pedicel at `a` from
-       horizontal has a root disc of radius `rP` normal to it, whose points
-       reach `rP |cos a|` above and below the ring's plane — and every pedicel
-       of an umbel stands at the one `pedicelAngle`, so that one disc IS the
-       steepest. Plus half a gap.
-     * `R` holds the same disc across: its farthest point from the axis is
-       `max over phi of sqrt((rho - rP sin(phi) sin a)^2 + rP^2 cos^2(phi))`,
-       in closed form (`umbelRootDiscReachMm`). Plus half a gap.
-     * HALF A GAP, NEVER ZERO, on both: a disc whose rim lies ON the boss's
-       surface is an exact tangency where the two emitted surfaces can share a
-       double and weld into one shell — measured on the sphere this replaces,
-       749 within-shell pairs on `UMBEL: 6 florets at 90 deg, head ON`, every
-       one at that point; half a gap in, 0.
-     * THE UNDERSIDE IS FLAT (Eva's ruling, Oct 24: the 45 deg cone that
-       carried the band into the stem was the FDM overhang rule, and the first
-       print is SLS PA12, which needs no supports). The cone held no disc:
-       the band alone already holds every root disc half a gap in on all four
-       faces (UM2, unchanged), so the cone is gone and nothing it held is
-       lost; at twelve florets it was 7 of the boss's 10 mm of height.
-     * THE CROSSING CLEARS ITS FLOOR BY A DERIVED MARGIN (Oct 24). A pedicel
-       crosses the boss from its root on the ring out along its own direction;
-       ID2's floor is half a printable feature. At 90 deg the root disc lies
-       flat on the ring, so `h` above gave EXACTLY that floor — a vertical
-       pedicel crossed 0.500 mm, ON the check's minimum. So the band grows
-       where the crossing is shortest, and only there: the crossing through
-       the top/bottom face is `h / |sin a|` and through the rim
-       `(R - rho) / cos a`, so the band takes
-           h = max(disc + gap/2, Cmin |sin a|),
-           R = max(reach + gap/2, rho + Cmin cos a),
-       with `Cmin = gap/2 + margin`. THE MARGIN IS THE CHECK'S OWN
-       CONDITIONING, CARRIED TO THE ARTEFACT: the band's faces and the pedicel
-       root are written to the STL as float32, each coordinate rounded by at
-       most one float32 step, and a float32 step at magnitude `M` is at most
-       `M 2^-23`. The margin is EIGHT such steps (X0's own 8, and the foot
-       clearance's 8 — `FOOT_CAP_CLEARANCE_RAD`) of the boss's own coordinate
-       magnitude, `M = max(R0, |cz| + h0) + gap` (an upper bound on every
-       vertex the boss emits, since the growth is under a gap):
-           margin = M 2^-20   (`UMBEL_CROSSING_MARGIN_REL`).
-       It is CONTINUOUS in M (never rounded to a power of two), so the gate's
-       restatement from the emitted centre agrees with it to the ulp. On the
-       spider lily it is ~1e-5 mm: invisible, and the crossing the file
-       carries can no longer read under the floor. The print-floor reading (a
-       whole MIN_FEATURE_MM crossing) is the costed alternative, not built —
-       the outcome doc §10.
-   With the head OFF the boss's centre is the stem's own top end, and the
-   stem's top face lies inside the band (`R > rho > outerR`), `h` deep — never
-   less than `Cmin`, the same crossing. With the head ON the stem runs on
-   through the boss to the head. One expression, read by the plan, the builder
-   and UM1's restatement's owner-independent twin in the harness. */
-export const UMBEL_CROSSING_MARGIN_REL = 2 ** -20;
-export function umbelRootDiscReachMm(rho, rP, angleDeg) {
-  const th = (angleDeg * Math.PI) / 180, sa = Math.abs(Math.sin(th)), ca = Math.cos(th);
-  /* f(s) = (rho + rP s sa)^2 + rP^2 (1 - s^2), s = -sin(phi) in [-1, 1]: a
-     downward parabola in s whose vertex is at s = rho sa / (rP ca^2) — inside
-     the interval only when that is at most 1, else the maximum is at s = 1. */
-  return rho * sa <= rP * ca * ca
-    ? Math.sqrt(rho * rho + rP * rP + (rho * sa) * (rho * sa) / (ca * ca))
-    : rho + rP * sa;
-}
-export function umbelRingRho(n, rP, outerR, headOn = false) {
-  const gap = MIN_FEATURE_MM;
-  const ringRho = (rP + gap / 2) / Math.sin(Math.PI / n);
-  /* WITH THE HEAD ON the stem runs ON past the boss to the head, so a pedicel
-     at 90 deg rises PARALLEL TO THE STEM: its ring must stand one printable
-     gap off the stem's own surface too, `outerR + rP + gap` (measured before
-     it was derived: 623 within-shell pairs, the six pedicels inside the stem
-     wall above a 6 mm stem's junction, on `UMBEL: 6 florets at 90 deg, head
-     ON`). With the head OFF the stem ENDS at the boss — nothing runs beside
-     the pedicels to clear. A floor taken by `max`, so the ring is the count's
-     own wherever that already clears the stem. */
-  const stemRho = headOn ? outerR + rP + gap : 0;
-  return { rho: Math.max(ringRho, stemRho), ringRho, stemRho };
-}
 /* ===================================================================
-   THE UMBEL JUNCTION IS A HUB — THE HUB-TO-STEM JOIN RUN IN REVERSE (Eva's
-   ruling, Oct 27, from the deploy preview: the flat coin bosses read as
-   unnatural, "the disk is just everywhere"; every umbel junction becomes a
-   hub, and the flat-underside ruling of Oct 24 is superseded by the hub's own
-   flare).
+   THE JUNCTION KNOT IS A CONVERGING KNOT (Eva's ruling, Oct 27, from the
+   ray-tip comparison sheet — "the band is replaced by a CONVERGING KNOT, as
+   real umbels do it. Spider lily, agapanthus and allium: the pedicels leave a
+   small swollen point barely wider than the stem, bases crowded and merged.
+   No disc, no flat top, no 90° edge"). The Oct 23 boss, the Oct 24 flat
+   underside and the Oct 27 band-plus-flare are RETIRED; the root-disc ring
+   (`(rP + gap/2) / sin(pi/n)`, which forced 17.48 mm at a mophead ray tip)
+   is retired for umbels. What follows is the whole law; nothing of it is
+   typed but the project's one printable gap and its one lattice.
 
-   WHAT STAYS: the BAND. Its half-height `h` and rim `R` are the root-disc law
-   (every pedicel's root disc half a gap inside all four faces) with the 90°
-   crossing margin — unchanged, UM1/UM2's subject. The band's flat top is the
-   shallow cap the pedicels leave from.
+   1. THE PEDICELS CONVERGE. Each pedicel's rod is one straight line at its
+      own `pedicelAngle` `a` (from horizontal) at its own azimuth; the line
+      crosses the BASE PLANE (the rod's end with the head off, the umbel's
+      depth on the stem with it on) at radial `rhoB` — sized from the
+      INCOMING ROD and the pedicel, never the count:
+          head OFF: rhoB = rP          (the pedicel's own radius: the rods
+                                        leave from one pedicel-width round
+                                        the axis — "bases crowded and merged")
+          head ON:  rhoB = outerR + rP + gap   (the stem runs ON past the
+                                        knot, and at 90 deg a pedicel rises
+                                        PARALLEL to it: one gap off its wall,
+                                        the Oct 22 `stemRho`, kept)
+      and CONTINUES STRAIGHT INWARD along its own line until its root is
+      buried near the axis: the root centre is the point of the line NEAREST
+      the base plane's centre, `extendMm = rhoB cos a` inward of the base
+      point — at 0 deg the very centre, at 90 deg the base point itself (a
+      vertical rod has no nearer point), continuous between. The rod is built
+      `extendMm` longer than the asked pedicel length, so the FLORET stands
+      where the asked length puts it and the extension is all root.
 
-   WHAT IS NEW: the FLARE under it, from the band's rim down to the INCOMING
-   ROD — the stem with the head off, the stem passing through with it on, the
-   RAY at a mophead's ray tip — at the rod's own radius. It is the head's
-   hub-to-stem join with the two ends swapped: there the plate is on top and
-   the flare runs from the plate's underside out at the blend radius IN to the
-   stem; here the band is the plate and the flare runs from the band's rim
-   down to the rod. The SAME three controls drive it (`hubStyle`,
-   `hubShapeAmount`, `hubLength` — one owner, no longer inert on an umbel), the
-   same style curves map the normalised radial coordinate x (0 at the band's
-   rim, 1 at the rod) to the depth: GOBLET the constant-stress law
-   `sqrt(ln(R/r) / ln(R/rodR))` (today's hub at its default, term for term,
-   with the band for the plate), ANGLED a cone `x`, CURVED the smoothstep.
-   Amount is folded ONCE into the reach exactly as `stemPlan` folds it into
-   `axisDepth`; amount 0 is the band alone — the Oct 24 coin — by BRANCH.
+   2. THE ROOTS OVERLAP AND SHARE NO VERTEX. Overlapping closed shells are the
+      export contract. What they may not do is share a vertex or land ON the
+      knot's surface — the weld class (the petiole half-step, the foot cap):
+      the vertex weld is exact equality on the STL's floats, and two root
+      rings centred on the SAME point (every rod at 0 deg; every mirror pair
+      at any angle, whose rings are mirror images with vertices ON the mirror
+      plane) share a vertex exactly. So the roots are STAGGERED along their
+      own lines by a DERIVED step: the i-th of n is `(i - (n-1)/2 + 1/4)` steps of
+          staggerMm = 2 pi rP / UMBEL_BOSS_SECTORS
+      — one lattice step of a ring of the PEDICEL's own radius on the KNOT's
+      own sector count (the knot's lattice at the pedicel's size), centred on
+      the nearest point A QUARTER STEP OFF. Not symmetric, by measurement: a
+      stagger symmetric about the nearest point puts roots i and j at mirror
+      distances whenever `i + j = n - 1`, and at 0 deg an OPPOSITE pair
+      (`j = i + n/2`) lies on ONE line through the centre, so the pair that is
+      both — `(1, 4)` of six — rooted on the SAME point and its rings welded
+      (`MOPHEAD: rays at 0 deg`, 1,652 within-shell pairs on the first cut).
+      With the quarter step `i + j = n - 1 - 1/2` has no integer solution, so
+      no two roots are ever mirror images, at any count or angle. Two rings
+      on one line a step apart, or on crossing lines with centres a step
+      apart, share nothing; the stagger shifts a rod along itself, so its
+      floret moves by under a step and the one unit serves every pedicel.
 
-   THE REACH, AUTO: the head's join derives its reach from the stem's section
-   modulus against the PLATE, and that law floors at the plate's own thickness
-   — on a band two root discs tall it asks for NOTHING, so a section-modulus
-   auto would leave every umbel a coin at the default (measured: 3.82 mm of
-   band against 0.87 mm of rod at the mophead's ray tips). The auto reach here
-   is therefore GEOMETRIC: the flare is as deep as it is wide (`R - rodR`), a
-   mean slope of 45° — a length from a length, never typed, and the one
-   placement in this block made WITHOUT a ruling (the sheet is for Eva).
-   `hubLength` above 0 replaces it with that many millimetres of total height,
-   floored at the band.
+   3. THE KNOT IS A DOME, SIZED FROM THE ROD AND FROM WHAT HOLDS THE ROOTS.
+      A hemisphere of radius `Rk` about a centre `lift` below the base plane,
+      and under its equator the Hub FLARE (4). Every root disc must lie
+      strictly inside SOLID — the dome, or the rod's own wall — by half a gap
+      (UM2 restated for converging roots), and the rod's own end (its top
+      rim, head off) too:
+        * a rim point of a root disc (the disc sampled at
+          `UMBEL_KNOT_RIM_SAMPLES` round, a bound on the rod's 48 emitted
+          vertices wherever its ring is phased) is ROD-HELD when it sits
+          half a gap inside the rod's wall: `boreR + gap/2 <= rho <= outerR -
+          gap/2`, and (head off) half a gap under the rod's end;
+        * `lift` is the least drop of the centre that puts every point NOT
+          rod-held HALF A GAP above the equator — inside the dome's own half,
+          and half a gap inside the flat underside a flare of amount 0 leaves
+          at the equator (a point ON that plane is the weld class, and a
+          point decided against it by its last bit is the knife-edge class) —
+          floored at half a gap so the underside is never coplanar with the
+          rod's end;
+        * `Rk` is the least radius holding every such point half a gap inside
+          the dome, and the rod's end rim (head off: `hypot(outerR, lift)`;
+          head on: `outerR`, the stem passing through) half a gap inside too.
+      Closed form over the sampled rim, no bisection, no count in it: the
+      count enters only through the stagger (a few tenths of a millimetre),
+      and the mutant `the-knot-is-sized-from-the-floret-count` restores the
+      ring. On a 6 mm stem the knot is 7.0 mm across at every count and
+      angle (the rod's own end binds); at a mophead ray tip — 1.5 mm
+      pedicels off a 1.5 mm ray — the roots bind and it is wider (the §
+      table in the outcome doc).
 
-   THE FOOT IS INSIDE THE ROD: the flare meets the rod at `rodR = outerR -
-   gap/2`, half a gap inside its wall (Eva's 1.5 mm wall on a stem; a ray is
-   solid), never ON its cylinder — the coned boss's own `rF`, for the weld's
-   own reason. It closes on a flat disc across the rod there. The ROOM: the
-   flare may not reach the rod's far end — the stem's cut with the head off,
-   the ray's end at a ray tip — so its depth is CLAMPED at the rod's own
-   length less the band, the cut's span and a gap, TOLD (`clamped`), and from
-   MODE-FREE lengths only (the asked stem length, the plan's own inset), so
-   whether a flare EXISTS is the same in both modes by construction.
+   4. THE FLARE IS THE HUB'S, FROM THE EQUATOR INTO THE ROD. The three Hub
+      controls (`hubStyle`, `hubShapeAmount`, `hubLength`; RULED Oct 27:
+      default CURVED, 0.50, auto reach) drive the profile from the dome's
+      equator (`Rk`) down to the incoming rod at `rodR = outerR - gap/2`,
+      half a gap inside its wall: GOBLET the constant-stress law (a vertical
+      tangent at the equator, the onion), ANGLED a cone, CURVED the
+      smoothstep (the head's own shoulder at the equator and its own tangent
+      landing on the rod). Amount folded once; AUTO reach is as deep as it is
+      wide (`Rk - rodR`); `hubLength` above 0 the total height below the
+      equator, floored at the dome's own radius; amount 0 a flat underside at
+      the equator — a dome on its rod — BY BRANCH. The depth is CLAMPED at
+      the rod's own room below the knot's centre (its length less the asked
+      inset, a gap and the cut's span — mode-free lengths), told.
 
-   THE RAY TIP SCALES WITH ITS RAY: a sub-umbel's rod is its ray (its
-   `stemDiameter` is `2 x pedicelR` of the head's plan), so `outerR` here IS
-   the ray's radius and nothing of the stem's reaches it.
+   5. THE CROSSING is measured, not argued: from each root centre out along
+      its own line to where it leaves the union of the knot and the rod
+      (`umbelKnotInside`), marched then bisected; the plan reports the least
+      (ID2's floor, half a printable feature, holds it).
 
-   THE LATTICE: `UMBEL_FLARE_RINGS` rings at equal steps of x between the
-   band's foot and the rod — a constant of the drawing, so the triangle count
-   is `2N(2 + K)` with a flare and the coin's `4N` without, mode-free. */
+   THE LATTICE: `UMBEL_DOME_RINGS` rings over the dome (a quarter of the
+   sector count: the same angular step over as round), `UMBEL_FLARE_RINGS`
+   down the flare, two poles — `2 N (dome + flare)` triangles, mode-free.
+   `umbelKnot` is the ONE owner; the plan, the builder, the read-out and the
+   byte tool read its record, and the harness restates it from the controls
+   (UM1/UM8) — never this function. */
+export const UMBEL_BOSS_SECTORS = HUB_SECTORS;
+export const UMBEL_DOME_RINGS = UMBEL_BOSS_SECTORS / 4;
 export const UMBEL_FLARE_RINGS = 8;
+/* the roots' stagger is centred a QUARTER STEP off the nearest point (see
+   `umbelRootLaw`'s header: a symmetric stagger roots an opposite pair on one
+   point at 0 deg) */
+export const UMBEL_ROOT_STAGGER_OFFSET = 1 / 4;
+export const UMBEL_KNOT_RIM_SAMPLES = 720;
 export function umbelFlareDepthFrac(style, x) {
   if (!(x > 0)) return 0;
   if (x >= 1) return 1;
@@ -23250,48 +23221,98 @@ export function umbelFlareDepthAt(r, F) {
   if (f === null) f = Math.sqrt(Math.max(0, Math.log(F.radiusMm / Math.max(r, F.rodR)) / Math.log(F.radiusMm / F.rodR)));
   return F.swellMm * Math.min(1, Math.max(0, f));
 }
-export function umbelBoss(n, rP, angleDeg, outerR, headOn = false, centreZ = 0, hub = null) {
+/* the flare's radius at a depth `d` below the equator — the inverse of the
+   depth law, which is monotone in r (bisected to the double) */
+export function umbelFlareRadiusAtDepth(d, F) {
+  if (!(d > 0)) return F.radiusMm;
+  if (d >= F.swellMm) return F.rodR;
+  let lo = F.rodR, hi = F.radiusMm;
+  for (let k = 0; k < 64; k++) { const mid = (lo + hi) / 2; if (umbelFlareDepthAt(mid, F) > d) lo = mid; else hi = mid; }
+  return (lo + hi) / 2;
+}
+/* THE ROOT LAW (1 and 2): where every pedicel's line crosses the base plane,
+   how far inward its root is, and the i-th stagger. In the (radial, z) half
+   plane of each pedicel's azimuth, z = 0 the base plane. */
+export function umbelRootLaw(n, rP, angleDeg, outerR, headOn = false) {
   const gap = MIN_FEATURE_MM;
-  const { rho, ringRho, stemRho } = umbelRingRho(n, rP, outerR, headOn);
-  const th = (angleDeg * Math.PI) / 180, sa = Math.abs(Math.sin(th)), ca = Math.cos(th);
-  const h0 = rP * Math.abs(ca) + gap / 2;
-  const R0 = umbelRootDiscReachMm(rho, rP, angleDeg) + gap / 2;
-  const marginMm = (Math.max(R0, Math.abs(centreZ) + h0) + gap) * UMBEL_CROSSING_MARGIN_REL;
-  const crossMinMm = gap / 2 + marginMm;
-  const halfHeightMm = Math.max(h0, crossMinMm * sa);
-  const radiusMm = Math.max(R0, rho + crossMinMm * ca);
-  /* THE FLARE (the hub, reversed) — see the block above */
+  const th = (angleDeg * Math.PI) / 180, ca = Math.cos(th), sa = Math.sin(th);
+  const rhoB = headOn ? outerR + rP + gap : rP;
+  const extendMm = rhoB * ca;
+  const staggerMm = (2 * Math.PI * rP) / UMBEL_BOSS_SECTORS;
+  const roots = Array.from({ length: n }, (_, i) => {
+    const steps = i - (n - 1) / 2 + UMBEL_ROOT_STAGGER_OFFSET;
+    const s = extendMm + steps * staggerMm;      // inward along the rod's own line from the base point
+    return { index: i, s, rMm: rhoB - s * ca, zMm: -s * sa, staggerMm: steps * staggerMm };
+  });
+  return { rhoB, extendMm, staggerMm, ca, sa, roots, headOn, gapMm: gap };
+}
+/* inside the knot (dome + flare) or the rod, in the knot's own (radial, z)
+   with z = 0 at the CENTRE; `strict` the half-gap margin for a hold test */
+export function umbelKnotInside(K, rho, z, margin = 0) {
+  const Rk = K.radiusMm, F = K.flare;
+  if (z >= margin) { if (Math.hypot(rho, z) + margin <= Rk) return true; }
+  else if (z < 0 && F && F.built) { if (z >= -F.swellMm && rho + margin <= umbelFlareRadiusAtDepth(-z, F)) return true; }
+  /* the rod: its wall, and (head off) only below its end */
+  const inWall = rho + margin <= K.outerR && (K.boreR <= 0 || rho - margin >= K.boreR);
+  if (inWall && (K.headOn || z + margin <= K.liftMm)) return true;
+  return false;
+}
+export function umbelKnot(n, rP, angleDeg, outerR, boreR, headOn = false, basePlaneZ = 0, hub = null) {
+  const gap = MIN_FEATURE_MM;
+  const RL = umbelRootLaw(n, rP, angleDeg, outerR, headOn);
+  const { ca, sa } = RL;
+  /* (3) the hold: every root disc's sampled rim, in the base plane's frame */
+  const S = UMBEL_KNOT_RIM_SAMPLES;
+  const held = (rho, z) => rho + gap / 2 <= outerR && (boreR <= 0 || rho - gap / 2 >= boreR) && (headOn || z + gap / 2 <= 0);
+  const free = [];                                           // [rho, z] of every point the rod does not hold
+  let heldCount = 0, total = 0;
+  for (const q of RL.roots) for (let k = 0; k < S; k++) {
+    const ph = (k * 2 * Math.PI) / S, cp = Math.cos(ph), sp = Math.sin(ph);
+    /* the disc is normal to the rod: in-plane perpendicular U = (-sa, ca), out of plane V */
+    const rIn = q.rMm - rP * cp * sa, zz = q.zMm + rP * cp * ca, out = rP * sp;
+    const rho = Math.hypot(rIn, out);
+    total++;
+    if (held(rho, zz)) heldCount++; else free.push([rho, zz]);
+  }
+  let liftMm = gap / 2;
+  for (const [, z] of free) if (-z + gap / 2 > liftMm) liftMm = -z + gap / 2;
+  const radiusFromRodMm = (headOn ? outerR : Math.hypot(outerR, liftMm)) + gap / 2;
+  let radiusFromRootsMm = 0;
+  for (const [rho, z] of free) { const d = Math.hypot(rho, z + liftMm) + gap / 2; if (d > radiusFromRootsMm) radiusFromRootsMm = d; }
+  const radiusMm = Math.max(radiusFromRodMm, radiusFromRootsMm);
+  /* (4) the flare */
   let flare = null;
   if (hub) {
-    const style = HUB_STYLES.includes(hub.style) ? hub.style : 'GOBLET';
+    const style = HUB_STYLES.includes(hub.style) ? hub.style : HUB_STYLE_DEFAULT;
     const amount = hub.amount === undefined ? HUB_SHAPE_AMOUNT_DEFAULT : Number(hub.amount);
     const lengthAsked = hub.lengthMm === undefined ? 0 : Number(hub.lengthMm);
     const rodR = outerR - gap / 2;
     const widthMm = radiusMm - rodR;
-    const bandMm = 2 * halfHeightMm;
     const auto = !(lengthAsked > 0);
-    const reachMm = auto ? bandMm + widthMm : Math.max(bandMm, lengthAsked);
-    const swellAskedMm = amount === 1 ? reachMm - bandMm : amount * (reachMm - bandMm);
-    const roomMm = Number.isFinite(hub.roomMm) ? hub.roomMm : Infinity;
-    const swellMm = Math.min(swellAskedMm, Math.max(0, roomMm - halfHeightMm));   // the room is below the band's CENTRE; the band's own half takes the first h of it
+    const reachMm = auto ? radiusMm + widthMm : Math.max(radiusMm, lengthAsked);
+    const swellAskedMm = amount === 1 ? reachMm - radiusMm : amount * (reachMm - radiusMm);
+    const roomMm = Number.isFinite(hub.roomMm) ? hub.roomMm : Infinity;     // below the BASE plane
+    const swellMm = Math.min(swellAskedMm, Math.max(0, roomMm - liftMm));
     const clamped = swellAskedMm > swellMm + 1e-9;
     const built = rodR > 0 && widthMm > 0 && swellMm > 0;
-    flare = { style, amount, auto, lengthAsked, rodR, widthMm, bandMm, reachMm, swellAskedMm, swellMm, roomMm, clamped, built,
+    flare = { style, amount, auto, lengthAsked, rodR, widthMm, reachMm, swellAskedMm, swellMm, roomMm, clamped, built,
       noRoom: !built && swellAskedMm > 0 && !(swellMm > 0), rings: built ? UMBEL_FLARE_RINGS : 0, radiusMm };
   }
-  return { rho, radiusMm, halfHeightMm, gapMm: gap, ringRho, stemRho, stemBound: stemRho > ringRho,
-    marginMm, crossMinMm, heightGrown: halfHeightMm > h0, radiusGrown: radiusMm > R0, discHalfHeightMm: h0, discRadiusMm: R0, flare };
-}
-/* THE BOSS'S LATTICE — the stem's own sector count round. A constant of the
-   boss's DRAWING, not of its size. */
-export const UMBEL_BOSS_SECTORS = HUB_SECTORS;
-export function umbelBossCrossingMm(B, angleDeg) {
-  const th = (angleDeg * Math.PI) / 180, c = Math.cos(th), sn = Math.sin(th);
-  let best = Infinity;
-  if (sn > 0) best = Math.min(best, B.halfHeightMm / sn);                       // the top
-  if (c > 0) best = Math.min(best, (B.radiusMm - B.rho) / c);                   // the rim
-  if (sn < 0) best = Math.min(best, B.halfHeightMm / -sn);                      // the flat bottom (a convex profile: the exit is the least crossing of an edge it leaves through)
-  return best;
+  const K = { rhoB: RL.rhoB, extendMm: RL.extendMm, staggerMm: RL.staggerMm, roots: RL.roots, headOn, outerR, boreR,
+    liftMm, radiusMm, radiusFromRodMm, radiusFromRootsMm, rodBinds: radiusFromRodMm >= radiusFromRootsMm,
+    rimSamples: S, rimPointsHeldByRod: heldCount, rimPoints: total, gapMm: gap, domeRings: UMBEL_DOME_RINGS, flare,
+    basePlaneZ, centre: [0, 0, basePlaneZ - liftMm] };
+  /* (5) the crossing, from each root centre out along its line to where it leaves the solid */
+  let crossMm = Infinity;
+  for (const q of RL.roots) {
+    const at = (s) => [q.rMm + s * ca, q.zMm + s * sa + liftMm];              // relative to the CENTRE
+    let s0 = 0, s1 = gap / 16;
+    while (umbelKnotInside(K, ...at(s1)) && s1 < 1e4) { s0 = s1; s1 *= 1.5; }
+    for (let k = 0; k < 60; k++) { const m = (s0 + s1) / 2; if (umbelKnotInside(K, ...at(m))) s0 = m; else s1 = m; }
+    if (s0 < crossMm) crossMm = s0;
+  }
+  K.crossMm = crossMm;
+  return K;
 }
 /* THE ABSENT HUB'S RECORD — what `buildBloomBody` reports in place of
    `buildHubInto`'s record when an umbel's head is OFF. Every field says
@@ -23754,12 +23775,18 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {
      above about 75 degrees because its escape length runs away as
      `outerR / cos(th)`, while a rod rooted at mid-thickness gets MORE embedded
      as the angle steepens. Measured there, reused here unchanged. */
-  /* UNDER AN UMBEL the pedicels root on the KNOT's ring, not in the wall: the
-     root point IS the ring point (the root disc lies inside the knot by the
-     knot's own construction, so no embed along the pedicel is needed — 0). */
-  const ring = umbel ? umbelRingRho(umbelCount, pedicelR, stem.outerR, !headOff) : null;
-  const rootR = umbel ? ring.rho : rodWallRootMm(stem);
-  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);
+  /* UNDER AN UMBEL the pedicels CONVERGE (Eva, Oct 27 — `umbelRootLaw`): each
+     rod's line crosses the base plane at `rhoB` (the pedicel's own radius with
+     the head off; one gap off the stem with it on) and continues inward by
+     `extendMm` to the point nearest the centre, staggered per pedicel by a
+     derived lattice step; the unit is built `extendMm` longer so the floret
+     stands where the asked length puts it. The root disc lies inside the knot
+     or the rod by the knot's own construction (UM2). */
+  const rootLaw = umbel ? umbelRootLaw(umbelCount, pedicelR, angleDeg, stem.outerR, !headOff) : null;
+  const rootR = umbel ? rootLaw.rhoB : rodWallRootMm(stem);
+  const embedMm = umbel ? rootLaw.extendMm : rodWallEmbedMm(stem);
+  const rootExtendMm = umbel ? rootLaw.extendMm : 0;
+  const rootStaggerMm = umbel ? rootLaw.roots.map((q) => q.staggerMm) : null;
   /* THE FLORET'S OWN PETAL SIZE — a MULTIPLIER on the head's two, clamped into
      each base control's OWN range and TOLD (the `labellumSize` precedent:
      "SIZE x SATURATES, AND IT IS TOLD"). Size comes from PARAMETERS and never
@@ -23848,8 +23875,8 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {
      one, or the budget clamp's (`umbelBudgetClamp`, which re-plans with it). */
   const perRay = compound ? (floretsPerRay === null ? Math.round(Number(state.umbelFlorets)) : floretsPerRay) : null;
   const pre = { floretPetals: Math.round(Number(state.floretPetals)), petalLength, petalWidth,
-    pedicelR, pedicelLenMm, angleDeg, rootR, embedMm, rootZ: 0, nodeDepthsMm: [0],
-    compound, floretsPerRay: perRay, reducedFlorets };
+    pedicelR, pedicelLenMm, angleDeg, rootR, embedMm, rootExtendMm, rootStaggerMm, rootZ: 0, nodeDepthsMm: [0],
+    azimuths: umbel ? [umbelAz.slice()] : null, compound, floretsPerRay: perRay, reducedFlorets };
   const unitMemo = floretUnitMemo(state, pre);
   const sessileTop = pedicelLenMm === 0;
   /* OVER EVERY AZIMUTH THE PHYLLOTAXY PRODUCES ON ANY ASKED NODE — found by
@@ -24038,17 +24065,16 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {
      export (the asked stem length, the plan's own mode-free inset, the cut's
      span from the tip radius). */
   const knotRoomMm = umbel ? stem.lengthMm - (headOff ? 0 : umbelDepthMm) - MIN_FEATURE_MM - (stem.cut && stem.cut.made ? stem.cut.spanMm : 0) : null;
-  const knot = umbel ? umbelBoss(umbelCount, pedicelR, angleDeg, stem.outerR, !headOff, stem.rootZ - umbelDepthMm,
+  const knot = umbel ? umbelKnot(umbelCount, pedicelR, angleDeg, stem.outerR, stem.boreR, !headOff, stem.rootZ - umbelDepthMm,
     { style: stem.hubStyle, amount: stem.hubAmount, lengthMm: stem.hubLengthAsked, roomMm: knotRoomMm === null ? Infinity : knotRoomMm }) : null;
-  const knotCrossMm = umbel ? umbelBossCrossingMm(knot, angleDeg) : null;
+  const knotCrossMm = umbel ? knot.crossMm : null;
   const crossings = pedicelLensMm.map((L) => (L > 0
     ? (umbel ? Math.min(knotCrossMm, L) : rodWallCrossingMm({ boreR: stem.boreR, outerR: stem.outerR, rootR }, (angleDeg * Math.PI) / 180, L, embedMm))
     : null));
   const stalked = crossings.filter((c) => c !== null);
   const crossesSolidMm = stalked.length ? Math.min(...stalked) : null;
 
-  const knotRec = umbel ? { rho: knot.rho, radiusMm: knot.radiusMm, halfHeightMm: knot.halfHeightMm,
-    gapMm: knot.gapMm, marginMm: knot.marginMm, crossMinMm: knot.crossMinMm, heightGrown: knot.heightGrown, radiusGrown: knot.radiusGrown, centre: [0, 0, stem.rootZ - umbelDepthMm], crossMm: knotCrossMm,
+  const knotRec = umbel ? { ...knot, roots: knot.roots.map((q) => ({ ...q })), centre: knot.centre.slice(),
     flare: knot.flare ? { ...knot.flare } : null, roomMm: knotRoomMm } : null;
   return {
     present: true, type, umbel, headOff, umbelCount: umbel ? umbelCount : null, knot: knotRec, phyllotaxy: phyllo, perNode,
@@ -24060,7 +24086,7 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {
     bodyFloor, scaleBuilt,
     nodes: nodeDepthsMm.length, nodesAsked, nodesBuilt: nodeDepthsMm.length, nodesClamped,
     nodeDepthsMm, azimuths, angleDeg, pedicelLenMm, pedicelR, pedicelRClamped, areaRuleR, pedicelRFloor,
-    rootR, embedMm, crossesSolidMm, crossings,
+    rootR, embedMm, rootExtendMm, rootStaggerMm, crossesSolidMm, crossings,
     gradient, gradientAsked, gradientMax, gradientClamped, corymbAsked, corymb, corymbInert, graded, pedicelLensMm, pedicelLensAskedMm,
     pitchFloorMm, pitchFloorRodMm, pitchFloretMm, pitchFloretRawMm, pitchFloorIsFlorets, pitchFloorAt, sameNodeMayTouch, unitExtentMm: extentMm, pairClasses,
     lengthsClamped, lenCeilMm, sessileNodes,
@@ -24338,7 +24364,7 @@ export function floretBodyFloor(state) {
    every compound build, clamped or not, so UM7 asserts the prediction
    against the built count both ways. `the-clamp-reads-a-row-count` is its
    mutant. =================================================================== */
-export function umbelBossTris(flare = null) { return flare && flare.built ? 2 * UMBEL_BOSS_SECTORS * (2 + flare.rings) : 4 * UMBEL_BOSS_SECTORS; }
+export function umbelKnotTris(flare = null) { return 2 * UMBEL_BOSS_SECTORS * (UMBEL_DOME_RINGS + (flare && flare.built ? flare.rings : 0)); }
 export function umbelBudgetClamp(state, stem, acc, plan, restTris) {
   if (!plan || !plan.compound) return plan;
   const rays = plan.umbelCount, kAsked = plan.floretsPerRayAsked, L = plan.pedicelLenMm;
@@ -24350,7 +24376,7 @@ export function umbelBudgetClamp(state, stem, acc, plan, restTris) {
   };
   const asked = unitOf(plan.unitMemo);
   const S = asked.U - kAsked * asked.F;
-  const bossTris = umbelBossTris(plan.knot && plan.knot.flare);
+  const bossTris = umbelKnotTris(plan.knot && plan.knot.flare);
   const rP = (k) => Math.max(STEM_DIAMETER_RANGE[0] / 2, plan.pedicelR / Math.sqrt(k));
   const fCache = new Map([[rP(kAsked), asked.F]]);
   const F = (k) => {
@@ -24391,7 +24417,7 @@ function subUmbelSummary(rec) {
     placed: B.placed.map((q) => ({ az: q.az, root: q.root, headAt: q.headAt, pedicelAxis: q.pedicelAxis, M: q.M, at: q.at, tris: q.tris })),
     plan: { umbelCount: P.umbelCount, pedicelR: P.pedicelR, pedicelLenMm: P.pedicelLenMm, angleDeg: P.angleDeg, rho: P.knot && P.knot.rho, knot: P.knot ? { ...P.knot, centre: P.knot.centre.slice() } : null, level: P.level, depth: P.depth,
       reducedFlorets: P.reducedFlorets, petalLength: P.petalLength, petalWidth: P.petalWidth, lengthAsked: P.lengthAsked, widthAsked: P.widthAsked, scale: P.scale, scaleBuilt: P.scaleBuilt,
-      sizeClamped: P.sizeClamped, bodyFloor: P.bodyFloor, floretPetals: P.floretPetals, outerR: P.outerR, rootZ: P.rootZ },
+      sizeClamped: P.sizeClamped, bodyFloor: P.bodyFloor, floretPetals: P.floretPetals, outerR: P.outerR, boreR: P.boreR, rootZ: P.rootZ },
     stem: rec.stem ? { outerR: rec.stem.outerR, tipZ: rec.stem.tipZ, rootZ: rec.stem.rootZ, topZ: rec.stem.topZ } : null,
     stemBuilt: rec.stemBuilt ? { emittedTopZ: rec.stemBuilt.emittedTopZ, emittedTipZ: rec.stemBuilt.emittedTipZ, emittedMaxR: rec.stemBuilt.emittedMaxR } : null,
     floretState: B.floretState, floretUnit: B.units && B.units[0] ? { tris: B.units[0].tris, lattice: B.units[0].lattice, positions: B.units[0].positions, petalsBuilt: B.units[0].petalsBuilt } : null,
@@ -24449,9 +24475,13 @@ export function pedicelPlacement(plan, nodeIndex, az, tipZLocal, sessile = false
      the discovery's own wording). On a solid rachis `boreR` is 0 and the hub
      is rooted to the axis. A BRANCH on the sessile flag, so every stalked
      floret's root is the expression it always was. */
+  /* AN UMBEL'S i-TH ROOT IS STAGGERED along its own line by the knot's derived
+     step (`umbelRootLaw`), so no two root rings share a vertex */
+  const stagger = plan.rootStaggerMm ? plan.rootStaggerMm[plan.azimuths[nodeIndex].indexOf(az)] || 0 : 0;
+  const embed = plan.embedMm + stagger;
   const root = sessile
     ? [base[0] - R[0] * plan.embedMm, base[1] - R[1] * plan.embedMm, base[2]]
-    : [base[0] - D[0] * plan.embedMm, base[1] - D[1] * plan.embedMm, base[2] - D[2] * plan.embedMm];
+    : [base[0] - D[0] * embed, base[1] - D[1] * embed, base[2] - D[2] * embed];
   const kx = -D[1], ky = D[0], kz = 0;                 // z x D
   const kl = Math.hypot(kx, ky, kz);
   const k = kl === 0 ? [1, 0, 0] : [kx / kl, ky / kl, kz / kl];
@@ -24509,7 +24539,10 @@ export function floretUnitMemo(state, plan) {
          captured (a capture moves no byte) so UM6 can read the columns and the
          bead off the emitted rim; every other unit is built as it was. */
       const sub = new MeshBuilder({ exportMode, captureRim: !!plan.reducedFlorets });
-      const fs = floretState(state, plan, L, az);
+      /* AN UMBEL'S ROD IS BUILT `rootExtendMm` LONGER than the asked length (the
+         converging root, Oct 27): the floret stands where the asked length
+         puts it and the extension is all root. The key stays the asked length. */
+      const fs = floretState(state, plan, L + (plan.rootExtendMm || 0), az);
       const rec = plan.reducedFlorets
         ? withReducedFloretLattice(() => buildBloomInto(sub, fs, { below: null, pedicel: true }))
         : buildBloomInto(sub, fs, { below: null, pedicel: true });
@@ -24560,48 +24593,43 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
     return units.length - 1;
   };
   for (let i = 0; i < plan.nodes; i++) for (const az of plan.azimuths[i]) unitFor(plan.pedicelLensMm[i], az);
-  /* THE UMBEL'S JUNCTION — emitted FIRST, one closed BOSS about the plan's
-     own centre at the plan's own derived radius, half-height and underside
-     (`umbelBoss`), through the pill's emitter (`revolveInto`, explicit apex
-     fans at both poles — the flat bottom and the flat top): two rings,
-     `UMBEL_BOSS_SECTORS` round, 4 x 48 = 192 triangles (the coned boss of
-     Oct 23 was 288, the sphere it replaced 2,208). Its MEASURED side — the axis, the rim's radius and the band's
-     two faces read back off the vertices it emitted — is what UM1 holds
-     against the controls and UM2 holds every pedicel's root disc against, so
-     a boss emitted somewhere other than where the plan says is visible. */
+  /* THE UMBEL'S JUNCTION — emitted FIRST, one closed KNOT about the plan's own
+     centre (`umbelKnot`, Eva's Oct 27 ruling: a converging knot — a DOME of
+     the derived radius over the equator, the Hub FLARE under it down to the
+     rod), through the pill's emitter (`revolveInto`, explicit apex fans at
+     both poles): `UMBEL_DOME_RINGS` rings over the dome, `UMBEL_FLARE_RINGS`
+     down the flare, `UMBEL_BOSS_SECTORS` round. Its MEASURED side — the
+     axis, the equator's radius, every dome and flare ring read back off the
+     vertices it emitted — is what UM1 holds against the controls and UM2
+     holds every pedicel's root disc against, so a knot emitted somewhere
+     other than where the plan says is visible. */
   let knotBuilt = null;
   if (plan.umbel && plan.knot) {
-    const K = plan.knot, c = K.centre, R = K.radiusMm, h = K.halfHeightMm;
+    const K = plan.knot, c = K.centre, R = K.radiusMm;
     const t0 = acc.triangleCount;
     const ringAt = (z, r) => ({ C: [c[0], c[1], z], e1: [1, 0, 0], e2: [0, 1, 0], r });
-    /* THE FLARE (Oct 27, the junction as a hub): `K.flare.rings` rings from
-       the band's foot down the styled profile to the rod, bottom first (the
-       revolve's own order), then the band's two rings; the south pole sits at
-       the flare's foot, inside the rod. With no flare the two rings and the
-       pole at the band's foot are the Oct 24 coin, by branch. */
     const F = K.flare && K.flare.built ? K.flare : null;
-    const zBot = F ? c[2] - h - F.swellMm : c[2] - h;
+    const zBot = F ? c[2] - F.swellMm : c[2];
+    /* bottom first (the revolve's own order): the flare's rings from the rod
+       up to just under the equator, then the dome from the equator up to the
+       last ring under the pole */
     const flareRings = [];
-    if (F) for (let j = F.rings; j >= 1; j--) { const x = j / F.rings, r = R - x * F.widthMm; flareRings.push(ringAt(c[2] - h - umbelFlareDepthAt(r, F), r)); }
-    const rings = [...flareRings, ringAt(c[2] - h, R), ringAt(c[2] + h, R)];
-    const pts = revolveInto(acc, rings, [c[0], c[1], zBot], [c[0], c[1], c[2] + h], new Array(UMBEL_BOSS_SECTORS).fill(1));
-    const rim = pts.slice(pts.length - 2);
-    /* the flare as it came out: each emitted ring's radius about the centre
-       and its z — UM1's measured side for the styled profile */
-    const flareEmitted = pts.slice(0, pts.length - 2).map((ring) => { let rr = 0, zz = 0; for (const q of ring) { rr += Math.hypot(q[0] - c[0], q[1] - c[1]); zz += q[2]; } return { r: rr / ring.length, z: zz / ring.length }; });
-    let ax = 0, ay = 0, n = 0, rMax = 0, rMin = Infinity, zTop = -Infinity, zRimLo = Infinity, zLo = Infinity;
-    for (const ring of rim) for (const q of ring) { ax += q[0]; ay += q[1]; n++; const r = Math.hypot(q[0] - c[0], q[1] - c[1]); if (r > rMax) rMax = r; if (r < rMin) rMin = r; }
-    for (const q of rim[1]) if (q[2] > zTop) zTop = q[2];
-    for (const q of rim[0]) if (q[2] < zRimLo) zRimLo = q[2];
+    if (F) for (let j = F.rings; j >= 1; j--) { const x = j / F.rings, r = R - x * F.widthMm; flareRings.push(ringAt(c[2] - umbelFlareDepthAt(r, F), r)); }
+    const domeRings = [];
+    for (let k = K.domeRings; k >= 1; k--) { const th = (Math.PI / 2) * (k / K.domeRings); domeRings.push(ringAt(c[2] + R * Math.cos(th), R * Math.sin(th))); }
+    const rings = [...flareRings, ...domeRings];
+    const pts = revolveInto(acc, rings, [c[0], c[1], zBot], [c[0], c[1], c[2] + R], new Array(UMBEL_BOSS_SECTORS).fill(1));
+    const meanOf = (ring) => { let rr = 0, zz = 0, ax = 0, ay = 0; for (const q of ring) { rr += Math.hypot(q[0] - c[0], q[1] - c[1]); zz += q[2]; ax += q[0]; ay += q[1]; } return { r: rr / ring.length, z: zz / ring.length, ax: ax / ring.length, ay: ay / ring.length }; };
+    const flareEmitted = pts.slice(0, flareRings.length).map(meanOf).map(({ r, z }) => ({ r, z }));
+    const domeEmitted = pts.slice(flareRings.length).map(meanOf).map(({ r, z }) => ({ r, z }));
+    const eq = pts[flareRings.length];                    // the equator ring
+    let rMax = 0, rMin = Infinity, zLo = zBot, zTop = c[2] + R;
+    for (const q of eq) { const r = Math.hypot(q[0] - c[0], q[1] - c[1]); if (r > rMax) rMax = r; if (r < rMin) rMin = r; }
     for (const ring of pts) for (const q of ring) if (q[2] < zLo) zLo = q[2];
-    /* the two POLES are emitted vertices too (the apex fans' centres): the
-       bottom is the lower of the rings and the south pole, so an underside
-       drawn down to a point (a cone) is visible here — UM1's flat-underside
-       clause reads it */
-    if (zBot < zLo) zLo = zBot;
-    if (c[2] + h > zTop) zTop = c[2] + h;
-    knotBuilt = { centre: [ax / n, ay / n, (zTop + zRimLo) / 2], radiusMm: rMax, radiusMinMm: rMin, halfHeightMm: (zTop - zRimLo) / 2,
-      topZ: zTop, rimBottomZ: zRimLo, bottomZ: zLo, rings: pts.length, flareEmitted, flare: F ? { ...F } : null,
+    const eqM = meanOf(eq);
+    knotBuilt = { centre: [eqM.ax, eqM.ay, eqM.z], radiusMm: rMax, radiusMinMm: rMin, equatorZ: eqM.z,
+      topZ: zTop, bottomZ: zLo, rings: pts.length, domeRings: domeRings.length, domeEmitted, flareEmitted, flare: F ? { ...F } : null,
+      liftMm: K.liftMm, basePlaneZ: K.basePlaneZ, outerR: K.outerR, boreR: K.boreR, headOn: K.headOn,
       tris: acc.triangleCount - t0, triRange: [t0, acc.triangleCount] };
   }
   const sub = units[0].sub, fs = units[0].fs, unit = units[0].rec;

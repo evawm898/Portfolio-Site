@@ -3062,17 +3062,17 @@ function overtopLine(plan, builtInflo) {
 function junctionLine(knot, builtKnot, what) {
   if (!knot) return '';
   const F = knot.flare;
-  const band = `band ${(2 * knot.halfHeightMm).toFixed(2)} mm tall x ${(2 * knot.radiusMm).toFixed(2)} mm across (the root discs' own)`;
+  const band = `a converging KNOT ${(2 * knot.radiusMm).toFixed(2)} mm across (a dome ${(knot.radiusMm / knot.outerR).toFixed(2)}x the ${(2 * knot.outerR).toFixed(2)} mm rod, ${knot.rodBinds ? 'sized by the rod\'s own end' : 'sized by what holds the roots'}, its centre ${knot.liftMm.toFixed(2)} mm under the rods' base plane) · ${knot.roots.length} roots converging ${knot.extendMm.toFixed(2)} mm inward of a ${(2 * knot.rhoB).toFixed(2)} mm circle, staggered ${knot.staggerMm.toFixed(3)} mm (overlapping, no vertex shared) · crossing ${knot.crossMm.toFixed(2)} mm of solid`;
   if (!F) return `\n     ${what} JUNCTION ${band} — a coin (no hub record)`;
   const flare = F.built
-    ? `FLARE ${F.style} ${F.amount.toFixed(2)}x, ${F.swellMm.toFixed(2)} mm from the band's foot down to the ${(2 * F.rodR + knot.gapMm).toFixed(2)} mm rod (meeting it ${(knot.gapMm / 2).toFixed(2)} mm inside its wall)`
+    ? `FLARE ${F.style} ${F.amount.toFixed(2)}x, ${F.swellMm.toFixed(2)} mm from the knot's equator down to the ${(2 * F.rodR + knot.gapMm).toFixed(2)} mm rod (meeting it ${(knot.gapMm / 2).toFixed(2)} mm inside its wall)`
       + (F.auto ? ` — auto: as deep as it is wide (${F.widthMm.toFixed(2)} mm), the one placement made without a ruling` : ` — Hub length ${F.lengthAsked.toFixed(1)} mm in all`)
-      + (F.clamped ? ` — CLAMPED from ${F.swellAskedMm.toFixed(2)} mm: the rod below the band is only ${Math.max(0, F.roomMm - knot.halfHeightMm).toFixed(2)} mm long before its end (told, not refused)` : '')
+      + (F.clamped ? ` — CLAMPED from ${F.swellAskedMm.toFixed(2)} mm: the rod below the knot's centre is only ${Math.max(0, F.roomMm - knot.liftMm).toFixed(2)} mm long before its end (told, not refused)` : '')
       + (builtKnot && builtKnot.tris ? ` · ${builtKnot.tris} tris` : '')
     : F.noRoom ? `NO FLARE — amount ${F.amount.toFixed(2)}x asked ${F.swellAskedMm.toFixed(2)} mm and the rod below the band has no room for it (told)`
     : F.amount === 0 ? 'STRAIGHT — amount 0, the band alone (the Oct 24 coin, by branch)'
     : 'NO FLARE — the band is no wider than the rod';
-  return `\n     ${what} JUNCTION a HUB · ${band} · ${flare} · the Hub controls shape this junction (the head is ${what === 'UMBEL' ? 'off or on the stem above it' : 'the ray\'s'})`;
+  return `\n     ${what} JUNCTION a CONVERGING KNOT · ${band} · ${flare} · the Hub controls shape the flare (the head is ${what === 'UMBEL' ? 'off or on the stem above it' : 'the ray\'s'})`;
 }
 
 function infloLine(plan, builtInflo) {
@@ -3081,14 +3081,14 @@ function infloLine(plan, builtInflo) {
   if (plan.compound) {
     const sb = builtInflo && builtInflo.sub, cl = plan.budgetClamp, F = sb && sb.plan, bf = F && F.bodyFloor;
     const lat = sb && sb.floretUnit && sb.floretUnit.lattice && sb.floretUnit.lattice[0];
-    return `\n     INFLORESCENCE a COMPOUND UMBEL (depth 2) · ${plan.umbelCount} rays of ${plan.pedicelLenMm.toFixed(0)} mm at ${plan.angleDeg} deg, ${(2 * plan.pedicelR).toFixed(2)} mm across, from a boss ${(2 * plan.knot.radiusMm).toFixed(2)} mm across`
+    return `\n     INFLORESCENCE a COMPOUND UMBEL (depth 2) · ${plan.umbelCount} rays of ${plan.pedicelLenMm.toFixed(0)} mm at ${plan.angleDeg} deg, ${(2 * plan.pedicelR).toFixed(2)} mm across, converging in a knot ${(2 * plan.knot.radiusMm).toFixed(2)} mm across`
       + `\n     FLORETS ${cl ? `${cl.builtFlorets} built of ${cl.askedFlorets} asked (${cl.floretsPerRay} a ray of ${cl.floretsPerRayAsked})` : `${plan.umbelCount * plan.floretsPerRay}`}`
       + (cl && cl.clamped ? ` — BUDGET CLAMPED: one floret is ${cl.floretTris.toLocaleString('en-US')} tris (measured), so the asked ${cl.askedFlorets} would be ${cl.askedTotal.toLocaleString('en-US')}; ${cl.predictedTotal.toLocaleString('en-US')} built against the ${cl.budget.toLocaleString('en-US')} budget (the export never refuses for this)` : cl ? ` · ${cl.predictedTotal.toLocaleString('en-US')} tris predicted against the ${cl.budget.toLocaleString('en-US')} budget` : '')
       + (F ? `\n     FLORET ${F.floretPetals} petals at ${F.petalLength.toFixed(2)} x ${F.petalWidth.toFixed(2)} mm (${F.scaleBuilt.toFixed(3)}x the head's own)` : '')
       + (bf ? ` · FLORET FLOOR ${bf.lengthMm.toFixed(2)} x ${bf.widthMm.toFixed(2)} mm (${bf.scale.toFixed(3)}x — the least scale at which a petal still keeps its full sheet body ${bf.taperMm.toFixed(1)} mm in from both margins and the drawn tip, past the root blend)${F.sizeClamped ? ' — FLOORED' : ''}` : '')
       + (lat && lat.lattice ? ` · the REDUCED lattice: ${lat.lattice.columns} columns, a ${lat.lattice.beadCap}-segment bead (a declared exception to the edge profile's four, florets of a depth-2 umbel only)` : '')
       + (sb ? ` · ${sb.floretUnit.tris.toLocaleString('en-US')} tris a floret, ${builtInflo.unitTris.toLocaleString('en-US')} a sub-umbel, ${builtInflo.tris.toLocaleString('en-US')} in all` : '')
-      + (F ? `\n     SUB-UMBEL ${sb.count} florets on ${F.pedicelLenMm.toFixed(0)} mm pedicels at ${F.angleDeg} deg off each ray, ${(2 * F.pedicelR).toFixed(2)} mm across, rooted in a boss ${(2 * sb.knot.radiusMm).toFixed(2)} mm across at the ray's end` : '')
+      + (F ? `\n     SUB-UMBEL ${sb.count} florets on ${F.pedicelLenMm.toFixed(0)} mm pedicels at ${F.angleDeg} deg off each ray, ${(2 * F.pedicelR).toFixed(2)} mm across, converging in a knot ${(2 * sb.knot.radiusMm).toFixed(2)} mm across at the ray's end` : '')
       + junctionLine(plan.knot, builtInflo && builtInflo.knot, 'UMBEL')
       + (F && sb.plan && sb.plan.knot ? junctionLine(sb.plan.knot, sb.knot, 'RAY TIP') : '');
   }

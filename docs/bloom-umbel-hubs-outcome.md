@@ -236,3 +236,120 @@ Every run on this box, `CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium`, block 82
   stem, or an umbel, stop reproducing on those rows (the stem-top sagitta and the flare), named here rather than owed as
   a phase.
 
+
+## 6. The converging knot (Oct 27, Eva's ruling on §3's sheet) — SUPERSEDES §2's band
+
+**RULED Oct 27: the umbel junction is a converging knot sized from the incoming rod; the
+band and the root-disc ring are retired; Hub controls default CURVED 0.50.**
+
+Eva, from the ray-tip comparison: the band is replaced by a CONVERGING KNOT, as real umbels
+do it — spider lily, agapanthus, allium: the pedicels leave a small swollen point barely wider
+than the stem, bases crowded and merged; no disc, no flat top, no 90° edge. Four parts, every
+length derived (`umbelKnot` and `umbelRootLaw` in `bloom-geometry.js`; the header carries the
+law in full):
+
+1. **The pedicels converge.** Each rod's line crosses the BASE PLANE (the rod's end with the
+   head off, the umbel's depth with it on) at `rhoB` — the pedicel's own radius head off, one
+   gap off the stem's wall head on (a 90° pedicel rises parallel to a stem that runs on) —
+   and continues straight inward, at its own angle, to the point of its line nearest the
+   centre: `extendMm = rhoB cos a`. The rod is built that much longer than the asked pedicel,
+   so the floret stands where the asked length puts it (the memo's key stays the asked
+   length; the ID family's "the pedicel IS the floret's stem" clauses add the extension,
+   restated from the controls).
+2. **The roots overlap and share no vertex.** Overlapping closed shells are the export
+   contract. Two root rings centred on one point — every rod at 0°, every mirror pair at any
+   angle — share vertices exactly (the weld class), so the i-th root is staggered along its own
+   line by `(i − (n−1)/2 + 1/4)` steps of **`2π rP / UMBEL_BOSS_SECTORS`** — one lattice step of a
+   ring of the PEDICEL's radius on the KNOT's sector count. 0.196 mm on a 1.5 mm pedicel; a floret
+   moves by under a step. **The quarter step is a measurement, not a choice**
+   (`UMBEL_ROOT_STAGGER_OFFSET`): the first cut staggered symmetrically about the nearest point,
+   which puts roots `i` and `j` at mirror distances whenever `i + j = n − 1` — and at 0° an
+   OPPOSITE pair (`j = i + n/2`) lies on one line through the centre, so the pair that is both
+   (`(1, 4)` of six) rooted on the SAME point and the vertex weld read its two rings as one shell:
+   **`MOPHEAD: rays at 0 deg` read 1,652 within-shell pairs, worst 0.196 mm (the stagger's own
+   step), 0 on the base tree**, found by the umbel census sweep and not by UM2, whose
+   distinct-ends clause asked the rod ENDS and these two ends coincide to the bit. A quarter
+   step off centre makes `i + j = n − 3/2` unsolvable in integers, so no two roots are mirror
+   images at any count or angle; the row reads 0, and UM2's distinct-ends clause has its witness
+   in `the-roots-share-a-vertex` (probed at 0°, where the stagger is the only thing between the
+   roots and one point).
+3. **The knot is a dome, sized from the rod and from what holds the roots.** A hemisphere of
+   radius `Rk` about a centre `lift` under the base plane. Every root disc's rim (sampled at
+   720) is either ROD-HELD (half a gap inside the rod's wall — a 6 mm stem is hollow, so its
+   wall is the 1.5 mm annulus) or must be half a gap above the equator and half a gap inside
+   the dome: `lift` is the least drop that does the first, `Rk` the least radius that does the
+   second AND holds the rod's own end rim (`hypot(outerR, lift)` head off, `outerR` head on)
+   half a gap inside. No bisection, no count in it (the count enters only through the
+   stagger's span). **The first cut put the lowest root point EXACTLY on the equator plane —
+   on the flat underside at amount 0, and against the dome by its last bit at any amount —
+   and the Node run of UM2 caught it before any gate** (one point 49 nm under the equator,
+   not inside anything); the half gap above the equator is the fix.
+4. **The flare is the Hub's, from the equator into the rod**, the three controls as §2 had
+   them, from `Rk` down to `rodR = outerR − gap/2`, auto reach as deep as wide, clamped to the
+   rod's room below the centre. **Default CURVED 0.50, auto** (`HUB_STYLE_DEFAULT`,
+   `HUB_SHAPE_AMOUNT_DEFAULT`).
+
+**The crossing** is marched then bisected from each root centre along its own line to where
+it leaves the union of the dome, the flare and the rod (`umbelKnotInside`), and the plan
+reports the least (ID2's half-feature floor holds it).
+
+### 6a. Measured (EXPORT, this tree with the quarter-step stagger, the ruled defaults; `knot` is the dome's diameter)
+
+| state | rod | knot | × rod | lift | binds | flare CURVED 0.50 | crossing |
+|---|---|---|---|---|---|---|---|
+| spider lily 6 @ 35° (the default) | 6.00 | 9.13 | 1.52 | 2.74 | the rod's end | 1.03 | 2.33 |
+| 2 @ −60° | 6.00 | 9.77 | 1.63 | 0.70 | the roots | 1.19 | 2.96 |
+| 2 @ 35° | 6.00 | 10.00 | 1.67 | 3.35 | the rod's end | 1.25 | 2.77 |
+| 2 @ 90° | 6.00 | 9.63 | 1.60 | 0.71 | the roots | 1.16 | 3.54 |
+| 6 @ −60° | 6.00 | 8.15 | 1.36 | 0.98 | the roots | 0.79 | 3.31 |
+| 6 @ 90° | 6.00 | 7.69 | 1.28 | 1.04 | the roots | 0.67 | 2.06 |
+| 12 @ −60° | 6.00 | 9.59 | 1.60 | 1.49 | the roots | 1.15 | 2.72 |
+| 12 @ 35° | 6.00 | 9.60 | 1.60 | 3.08 | the rod's end | 1.15 | 1.71 |
+| 12 @ 90° | 6.00 | 9.02 | 1.50 | 1.63 | the roots | 1.01 | 1.59 |
+| 6 @ 35°, head ON | 6.00 | 8.09 | 1.35 | 4.40 | the roots | 0.77 | 1.06 |
+| 6 @ 35° on a 12 mm stem | 12.00 | 15.61 | 1.30 | 4.16 | the rod's end | 1.15 | 4.43 |
+| mophead, the stem-top knot (12 rays @ 50°) | 6.00 | 9.58 | 1.60 | 3.07 | the rod's end | 1.15 | 1.34 |
+| mophead, a ray tip (12 florets @ 20° on a 3 mm ray) | 3.00 | 8.67 | **2.89** | 2.50 | the roots | 1.67 | 2.04 |
+
+Eva expected 1.3–1.5× the rod: the lily reads 1.28–1.66 across the whole grid, the count
+moving it by at most the stagger's span. **The two-floret rows read LARGER than the twelve
+(10.0 against 9.6 at 35°) and that is the stagger, not the count**: with two roots the
+stagger is ±half a step (less the quarter) about the nearest point, with twelve ±5.5 — but the
+two-floret lily is the one where the lift binds through the rod's end (`hypot(3, 3.35)`),
+because two rods at 35° off a 1.5 mm circle carry their root discs' 1.23 mm vertical extent
+lower. **The mophead ray tip is 2.88× its ray** because the floor pedicel (1.5 mm) is as thick
+as the ray it leaves (1.5 mm) and twelve of them root in it; the 17.48 mm ring is gone (8.67).
+The band's "FLARE 7.74 trumpet" the comparison sheet was about reads 1.66 mm at the ruled
+0.50.
+
+**The shoulder.** The dome's equator is vertical and the CURVED smoothstep leaves it
+HORIZONTAL (and ANGLED a cone's slope), so both meet the dome with the head's own shoulder;
+GOBLET's constant-stress law has a vertical tangent at the rim and leaves the dome tangent —
+the onion. At the ruled 0.50 all three draw a shallow dish under the dome (the sheet's last
+row). Said here, not smoothed: a tangent CURVED is a different style law.
+
+**The Hub defaults.** Ruling 3 names the Hub controls' default and the three controls are
+ONE owner for the head's join and the umbel's knot, so CURVED 0.50 is the head's join default
+too: on the 1,605-row matrix **353 stemmed rows** build a head join active at the old default
+with neither control named (every `STEM:` row, `stemLength max`, `ALL MAX` among them) and
+move with the default — a partition the knot alone would not have. Flagged on the sheet for
+Eva's confirmation before the PR; GOBLET 1.00 stays the slider position that reproduces the
+pre-Oct-27 head join.
+
+**Gates.** UM1 restates the whole knot from the controls (`umbelKnotExpected`: the base
+circle, the extension, the stagger, the hold, the lift, the radius, the flare profile) and
+holds the EMITTED knot to it (the equator's radius, every dome ring on the sphere, every
+flare ring on the profile, the two poles); UM2 holds every pedicel's emitted rod END to its
+own converging root and its root disc half a gap inside the union of the dome, the flare and
+the rod, and refuses two roots at one point; UM3 reads the base plane as the equator plus the
+restated lift; UM8 is UM1+UM2 on the ray tip in the sub-umbel's frame, off the ray's own
+radius and bore. Mutants (the apex table): `the-roots-share-a-vertex` (the stagger dropped —
+witnessed on the EMITTED stream: florets 0 and 3 share vertex positions),
+`the-knot-is-sized-from-the-floret-count` (the ring restored: 6 → 12 florets grows the knot),
+`a-root-disc-on-the-junctions-face` (the hold's half gap dropped — witnessed on the EMITTED knot:
+UM2's hold test reads the emitted equator, radius and flare rings, never the restatement, since
+a knot emitted half a gap too high leaves a disc ON its underside that a restated knot would
+hold; `umbelKnotEmittedInside`), `the-knot-radius-is-typed`,
+and `the-umbel-pedicel-roots-off-the-junction` / `the-junction-ignores-the-hub-controls` /
+`the-ray-junction-reads-the-stems-radius` re-anchored. §4 and §5 above describe the BAND tree
+(`7c9d33d`); the knot's own gates and bytes follow Eva's ruling on the sheet.
