@@ -1633,7 +1633,8 @@ const MUTANTS = [
     find: "  let swell = pick ? pick.k : UMBEL_SWELL_WIDTH_MAX, held = pick ? pick.v : { deepenMm: 0, riseMm: 0, heldBy: 'unheld' };",
     into: "  let swell = swellAsked, held = pick ? pick.v : { deepenMm: 0, riseMm: 0, heldBy: 'unheld' };", names: ['UM8'],
     witness: (M, C) => {
-      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), MOPHEAD_STATE()).inflorescenceBuilt.sub.plan.knot;
+      /* at depth 2's ruled defaults (12 florets a ray) the ray tip's width is FORCED past 1.2x on the clean tree; the table's three-floret ray holds at the asked width and cannot see this mutation (measured Oct 28) */
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), MOPHEAD_STATE({ umbelFlorets: 12 })).inflorescenceBuilt.sub.plan.knot;
       const m = f(M), c = f(C);
       return (!m.widthForced && c.widthForced && c.swell > m.swell + 0.1) ? null : `the ray tip's width is ${m.swell} (forced ${m.widthForced}) on the mutant and ${c.swell} (forced ${c.widthForced}) on the clean tree`;
     } },
@@ -2128,7 +2129,8 @@ const MUTANTS = [
        (#242) is ST11's `the hub declares the join blending out at ...`, and ST11
        is exactly what fired. The claim was stale; the check was right. */
     into: '  return hubT + joinT * Math.sqrt(Math.log(hubR / rr) / denom);', names: ['ST11'],
-    witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
+    /* the law this edits is the GOBLET arm at amount 1 — main's default until Eva's Oct 28 ruling made CURVED 0.50 the default, so the witness asks for it by name */
+    witness: (M, C) => { const m = stemFacts(M, { ...STEM_STATE(), hubStyle: 'GOBLET', hubShapeAmount: 1 }), c = stemFacts(C, { ...STEM_STATE(), hubStyle: 'GOBLET', hubShapeAmount: 1 });
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const mu = m.hub.underside, cu = c.hub.underside;
       if (!mu || !cu || mu.length !== cu.length) return 'the two undersides are not comparable';
