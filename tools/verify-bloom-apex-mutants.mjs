@@ -2120,7 +2120,7 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.abs(m.plan.joinT - c.plan.joinT) > 0.1) ? null : `the join thickness is ${m.plan.joinT} against ${c.plan.joinT} — it did not move`; } },
 
-  { id: 'join-reaches-past-where-it-says-it-stops', why: 'the profile drops its floor at the hub\'s own thickness, so the thickening runs all the way to the rim instead of blending out at the radius the owner declares',
+  { id: 'join-reaches-past-where-it-says-it-stops', rows: /^a GOBLET head join/, why: 'the profile drops its floor at the hub\'s own thickness, so the thickening runs all the way to the rim instead of blending out at the radius the owner declares',
     find: '  return Math.max(hubT, joinT * Math.sqrt(Math.log(hubR / rr) / denom));',
     /* NAMES ST11, NOT ST5 (corrected by the stem-nodes session): this claim was
        SILENT on `main` at 21ddbbd, measured on a worktree of it. ST5 asserts the
@@ -4247,6 +4247,12 @@ const ROWS = [
      above). */
   { label: 'a domed head with a stem: 8 petals, spread 2, rise 0.35, CURVED 1.60, a 60 mm stem (Eva\'s Oct 27 state)', for: /stem-top|the-join-reach-floor/,
     set: [{ id: 'petalCount', value: '8' }, { id: 'spread', value: '2' }, { id: 'headRise', value: '0.35' }, { id: 'hubStyle', value: 'CURVED' }, { id: 'hubShapeAmount', value: '1.6' }, { id: 'stemLength', value: '60' }] },
+  /* THE GOBLET ARM AT AMOUNT 1 (main's hub-to-stem default until Eva's Oct 28 ruling made CURVED 0.50 the
+     default): the row `join-reaches-past-where-it-says-it-stops` edits that arm's own expression, and under the new
+     default no row of the table reached it — the mutant's witness moved while ST11 fired NOTHING. A row that states
+     the old default by name is what keeps the mutant observable. */
+  { label: "a GOBLET head join at amount 1 on a 60 mm stem (main's default until Oct 28)", for: /join-reaches-past/,
+    set: [{ id: 'hubStyle', value: 'GOBLET' }, { id: 'hubShapeAmount', value: '1' }, { id: 'stemLength', value: '60' }] },
   { label: 'a domed head with a WIDE stem and a THIN join: rise 0.35, a 12 mm stem, amount 0 (the root ring poked on main)', for: /stem-top|the-join-reach-floor/,
     set: [{ id: 'headRise', value: '0.35' }, { id: 'stemDiameter', value: '12' }, { id: 'hubShapeAmount', value: '0' }, { id: 'stemLength', value: '60' }] },
   { label: 'an umbel: six florets, the head OFF (the spider lily\'s default)', for: /umbel|head-is-built|boss-|junction|roots-|knot-|swelling-/,
