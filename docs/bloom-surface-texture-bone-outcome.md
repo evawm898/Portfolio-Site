@@ -204,8 +204,8 @@ its arms, so it rides in CI with no workflow edit.
 
 **Matrix and smoke:**
 - **Block 82 is 20 rows** (1,588 → 1,608).
-- **Smoke block 82 is 7 rows**, claiming TXB0/1/2/3/5/6/7, TX12, TX7, TX10, TX14, TX6, TX0 and TX2.
-- **`frozen/phase89` is the 1,588 rows at `a2b968c`**, registered in both maps.
+- **Smoke block 82 is 8 rows** (the closed tube among them, as the clearance's witness), claiming TXB0/1/2/3/5/6/7, TX12, TX7, TX10, TX14, TX6, TX0 and TX2.
+- **`frozen/phase89` is the 1,588 rows at `a43bf23`** — `a2b968c`'s rows, row for row (#469 merged meanwhile and touched no bloom file; a tag at `a2b968c` would be refused on `frame.yml`, which #469 edited) — registered in both maps.
 
 ## 8. The byte partition
 

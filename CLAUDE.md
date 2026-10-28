@@ -1538,7 +1538,7 @@ follow-ups of Oct 26; read `docs/bloom-surface-texture-bone-outcome.md` before t
   - TXB0–TXB7 in both STL gates (the field and patch restated in the harness).
   - `tools/verify-bloom-bone.mjs`, with six witnessed mutants, spawned by the defaults bar in both arms.
   - Panel route (ao) for the BONE controls.
-  - Block 82 (20 rows, 1,608) and smoke block 82 (7). `frozen/phase89` is the 1,588 rows at `a2b968c`.
+  - Block 82 (20 rows, 1,608) and smoke block 82 (8). `frozen/phase89` is the 1,588 rows at `a43bf23` (a2b968c's, re-based off #469's frame.yml edit).
   - Byte partition: `--movers-predicate bone`.
   - Sheet: `node tools/shot-bloom-texture-bone.mjs docs/img/bloom-texture-bone-shipped.png`.
 
