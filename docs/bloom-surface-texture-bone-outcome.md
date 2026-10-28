@@ -212,7 +212,19 @@ its arms, so it rides in CI with no workflow edit.
 `verify-bloom-surface-bytes --movers-predicate bone`, predeclared from the BASE record: a row moves iff it asks
 for BONE without infill. Infill refuses the texture, so infill + BONE holds.
 
-{{BYTES}}
+**PASS over the whole 1,608-row matrix in both modes, against a worktree of `a2b968c`.**
+- **17 of 17 predeclared movers moved:** block 82's 20 rows, less the infill refusal and the two GATED rows,
+  which hold as predicted.
+- **1,591 holders, 0 floats moved**, positionally under `Object.is`, over 2,274,168,348 export floats and
+  82,833,794 captured-grid values. That includes:
+  - the shipping default;
+  - all 34 rows that load the hidden PEBBLE / CELLULAR, which hold to the bit.
+- Run in three chunks and closed by `--merge`. `--control` perturbs one coordinate by 1e-9 and fails both
+  clauses (the export stream and the captured grid).
+- **The chunks ran on the tree before the clearance (§3.4) landed.** That change runs only inside the BONE pass,
+  so it cannot reach a holder, and the 20 BONE rows were re-measured after it by the browser export gate.
+- **No frozen row names BONE**, so no frozen tag's bytes stop reproducing.
+- `frozen/phase89` is owed because the matrix grew by block 82.
 
 ## 9. Cost
 
