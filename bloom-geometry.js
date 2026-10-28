@@ -23093,147 +23093,95 @@ export function umbelIsCompound(state) {
   return !umbelIsAbsent(state) && String(state.umbelDepth ?? UMBEL_DEPTH_VALUES[0]) === '2' && umbelLevelOf(state) === 1;
 }
 /* ===================================================================
-   THE JUNCTION KNOT IS A CONVERGING KNOT (Eva's ruling, Oct 27, from the
-   ray-tip comparison sheet — "the band is replaced by a CONVERGING KNOT, as
-   real umbels do it. Spider lily, agapanthus and allium: the pedicels leave a
-   small swollen point barely wider than the stem, bases crowded and merged.
-   No disc, no flat top, no 90° edge"). The Oct 23 boss, the Oct 24 flat
-   underside and the Oct 27 band-plus-flare are RETIRED; the root-disc ring
-   (`(rP + gap/2) / sin(pi/n)`, which forced 17.48 mm at a mophead ray tip)
-   is retired for umbels. What follows is the whole law; nothing of it is
-   typed but the project's one printable gap and its one lattice.
+   THE UMBEL JUNCTION IS A GENTLE SWELLING (Eva's ruling, Oct 28, from the
+   knot sheet — "the knot is still too much": the incoming rod widens slowly
+   over about 10–20 mm to about 1.2x its width and the pedicels leave its
+   top; a TAPER, not a dome; no equator edge anywhere). The Oct 27 dome-plus-
+   flare knot is RETIRED; the Oct 23 boss, the Oct 24 underside and the Oct 27
+   band before it stay retired. What follows is the whole law; nothing of it
+   is typed but the project's one printable gap, its one lattice and the stem
+   node's own spindle.
 
-   1. THE PEDICELS CONVERGE. Each pedicel's rod is one straight line at its
-      own `pedicelAngle` `a` (from horizontal) at its own azimuth; the line
-      crosses the BASE PLANE (the rod's end with the head off, the umbel's
-      depth on the stem with it on) at radial `rhoB` — sized from the
-      INCOMING ROD and the pedicel, never the count:
-          head OFF: rhoB = rP          (the pedicel's own radius: the rods
-                                        leave from one pedicel-width round
-                                        the axis — "bases crowded and merged")
-          head ON:  rhoB = outerR + rP + gap   (the stem runs ON past the
-                                        knot, and at 90 deg a pedicel rises
-                                        PARALLEL to it: one gap off its wall,
-                                        the Oct 22 `stemRho`, kept)
-      and CONTINUES STRAIGHT INWARD along its own line until its root is
-      buried near the axis: the root centre is the point of the line NEAREST
-      the base plane's centre, `extendMm = rhoB cos a` inward of the base
-      point — at 0 deg the very centre, at 90 deg the base point itself (a
-      vertical rod has no nearer point), continuous between. The rod is built
-      `extendMm` longer than the asked pedicel length, so the FLORET stands
-      where the asked length puts it and the extension is all root.
+   1. ONE SWELLING LAW. The profile is the STEM NODE's spindle — `stemNodeRadiusMm`,
+      a Gaussian in stem radii of half-width `STEM_NODE_SPREAD_RADII x outerR`
+      (3.2738 radii, the flower's own) — with ONE node AT THE BASE PLANE: the
+      rod's radius is `outerR (1 + k exp(-(z/w)^2))`, `z` the signed height
+      above the base plane. Head OFF the rod ENDS there, so the body is the
+      spindle's lower half closed on a flat top (the pedicels leave its top,
+      the top rim the rod's own cut edge, no edge anywhere below it); head ON
+      the stem runs through and the body is the whole spindle. The spindle is
+      drawn to `UMBEL_SWELL_END_SPREADS` (2) half-widths — e^-4, 0.4 % of the
+      swell — and then steps INSIDE the rod's wall on a 45-degree chamfer to
+      `rodR = outerR - gap/2`, so no face of it lies on the wall. The Hub
+      controls shape it: `hubShapeAmount` is the WIDTH (`k = UMBEL_SWELL_PER_AMOUNT
+      x amount`: 0.50 -> 1.20x, the ruled default), `hubLength` the REACH (0 =
+      auto, the spindle's own `2 w`; above 0 that length, `w = length / 2`);
+      `hubStyle` is INERT on a Gaussian and is HIDDEN with the head off (the
+      registry's `hubStyleLive`), told on the read-out with the head on.
 
-   2. THE ROOTS OVERLAP AND SHARE NO VERTEX. Overlapping closed shells are the
-      export contract. What they may not do is share a vertex or land ON the
-      knot's surface — the weld class (the petiole half-step, the foot cap):
-      the vertex weld is exact equality on the STL's floats, and two root
-      rings centred on the SAME point (every rod at 0 deg; every mirror pair
-      at any angle, whose rings are mirror images with vertices ON the mirror
-      plane) share a vertex exactly. So the roots are STAGGERED along their
-      own lines by a DERIVED step: the i-th of n is `(i - (n-1)/2 + 1/4)` steps of
-          staggerMm = 2 pi rP / UMBEL_BOSS_SECTORS
-      — one lattice step of a ring of the PEDICEL's own radius on the KNOT's
-      own sector count (the knot's lattice at the pedicel's size), centred on
-      the nearest point A QUARTER STEP OFF. Not symmetric, by measurement: a
-      stagger symmetric about the nearest point puts roots i and j at mirror
-      distances whenever `i + j = n - 1`, and at 0 deg an OPPOSITE pair
-      (`j = i + n/2`) lies on ONE line through the centre, so the pair that is
-      both — `(1, 4)` of six — rooted on the SAME point and its rings welded
-      (`MOPHEAD: rays at 0 deg`, 1,652 within-shell pairs on the first cut).
-      With the quarter step `i + j = n - 1 - 1/2` has no integer solution, so
-      no two roots are ever mirror images, at any count or angle. Two rings
-      on one line a step apart, or on crossing lines with centres a step
-      apart, share nothing; the stagger shifts a rod along itself, so its
-      floret moves by under a step and the one unit serves every pedicel.
+   2. THE PEDICELS CONVERGE AND THE ROOTS GO DEEPER. Each rod's line crosses
+      the base plane at `rhoB` (head OFF `rP`, head ON `outerR + rP + gap` —
+      the Oct 27 law, kept) and continues inward to its line's nearest point
+      (`extendMm = rhoB cos a`) and then `deepenMm` FURTHER along its own line,
+      the least depth on a `UMBEL_SWELL_GRID_MM` grid that buries every root
+      disc half a gap inside the swelling, the rod's wall, and (head off) half
+      a gap under the top face. The roots are STAGGERED by the quarter-step
+      lattice step (`umbelRootLaw`'s header below, kept verbatim: an opposite
+      pair at 0 deg rooted on one point welded `MOPHEAD: rays at 0 deg`).
+      Where no depth buries them (a pedicel at or below horizontal goes UP
+      along its line, and a near-horizontal one leaves the swelling on the far
+      side before it is deep enough) the head-off body is TALLER instead:
+      `riseMm`, the least height of the top face above the base plane that
+      puts every rim point half a gap under it (`heldBy: 'rise'`); with the
+      head on the spindle already stands above the plane and the search runs
+      the line's own way.
 
-   3. THE KNOT IS A DOME, SIZED FROM THE ROD AND FROM WHAT HOLDS THE ROOTS.
-      A hemisphere of radius `Rk` about a centre `lift` below the base plane,
-      and under its equator the Hub FLARE (4). Every root disc must lie
-      strictly inside SOLID — the dome, or the rod's own wall — by half a gap
-      (UM2 restated for converging roots), and the rod's own end (its top
-      rim, head off) too:
-        * a rim point of a root disc (the disc sampled at
-          `UMBEL_KNOT_RIM_SAMPLES` round, a bound on the rod's 48 emitted
-          vertices wherever its ring is phased) is ROD-HELD when it sits
-          half a gap inside the rod's wall: `boreR + gap/2 <= rho <= outerR -
-          gap/2`, and (head off) half a gap under the rod's end;
-        * `lift` is the least drop of the centre that puts every point NOT
-          rod-held HALF A GAP above the equator — inside the dome's own half,
-          and half a gap inside the flat underside a flare of amount 0 leaves
-          at the equator (a point ON that plane is the weld class, and a
-          point decided against it by its last bit is the knife-edge class) —
-          floored at half a gap so the underside is never coplanar with the
-          rod's end;
-        * `Rk` is the least radius holding every such point half a gap inside
-          the dome, and the rod's end rim (head off: `hypot(outerR, lift)`;
-          head on: `outerR`, the stem passing through) half a gap inside too.
-      Closed form over the sampled rim, no bisection, no count in it: the
-      count enters only through the stagger (a few tenths of a millimetre),
-      and the mutant `the-knot-is-sized-from-the-floret-count` restores the
-      ring. On a 6 mm stem the knot is 7.0 mm across at every count and
-      angle (the rod's own end binds); at a mophead ray tip — 1.5 mm
-      pedicels off a 1.5 mm ray — the roots bind and it is wider (the §
-      table in the outcome doc).
+   3. THE WIDTH IS DERIVED WHERE THE ASKED ONE CANNOT HOLD THE ROOTS. `k` is
+      the asked width, raised by bisection to the least width (on
+      `UMBEL_SWELL_WIDTH_GRID`) at which some depth or rise holds — a pedicel
+      as thick as its rod (a mophead ray tip: 1.5 mm pedicels off a 1.5 mm
+      ray) needs more than 1.2x and GETS what it needs, reported as
+      `widthForced` with the asked and reached widths; Eva's ruling: report
+      the width it reaches and stop, do not force it to 1.2x.
 
-   4. THE FLARE IS THE HUB'S, FROM THE EQUATOR INTO THE ROD. The three Hub
-      controls (`hubStyle`, `hubShapeAmount`, `hubLength`; RULED Oct 27:
-      default CURVED, 0.50, auto reach) drive the profile from the dome's
-      equator (`Rk`) down to the incoming rod at `rodR = outerR - gap/2`,
-      half a gap inside its wall: GOBLET the constant-stress law (a vertical
-      tangent at the equator, the onion), ANGLED a cone, CURVED the
-      smoothstep (the head's own shoulder at the equator and its own tangent
-      landing on the rod). Amount folded once; AUTO reach is as deep as it is
-      wide (`Rk - rodR`); `hubLength` above 0 the total height below the
-      equator, floored at the dome's own radius; amount 0 a flat underside at
-      the equator — a dome on its rod — BY BRANCH. The depth is CLAMPED at
-      the rod's own room below the knot's centre (its length less the asked
-      inset, a gap and the cut's span — mode-free lengths), told.
+   4. THE CROSSING is measured as before: from each root centre out along its
+      own line to where it leaves the union of the swelling and the rod
+      (`umbelSwellingInside`), marched then bisected; the plan reports the
+      least (ID2's floor, half a printable feature, holds it).
 
-   5. THE CROSSING is measured, not argued: from each root centre out along
-      its own line to where it leaves the union of the knot and the rod
-      (`umbelKnotInside`), marched then bisected; the plan reports the least
-      (ID2's floor, half a printable feature, holds it).
-
-   THE LATTICE: `UMBEL_DOME_RINGS` rings over the dome (a quarter of the
-   sector count: the same angular step over as round), `UMBEL_FLARE_RINGS`
-   down the flare, two poles — `2 N (dome + flare)` triangles, mode-free.
-   `umbelKnot` is the ONE owner; the plan, the builder, the read-out and the
-   byte tool read its record, and the harness restates it from the controls
-   (UM1/UM8) — never this function. */
+   THE LATTICE: `UMBEL_SWELL_RINGS_PER_SPREAD` rings per half-width down the
+   spindle (one ring every `w/8`), plus the rise's rings above the plane at
+   the same pitch, one chamfer ring per end inside the rod, `UMBEL_BOSS_SECTORS`
+   round, an explicit fan at each pole — `2 N x rings` triangles, mode-free
+   (every length is a plan length). `umbelSwelling` is the ONE owner; the
+   plan, the builder, the read-out and the byte tool read its record, and the
+   harness restates it from the controls (UM1/UM8) — never this function. */
 export const UMBEL_BOSS_SECTORS = HUB_SECTORS;
-export const UMBEL_DOME_RINGS = UMBEL_BOSS_SECTORS / 4;
-export const UMBEL_FLARE_RINGS = 8;
+export const UMBEL_SWELL_PER_AMOUNT = 0.4;             // Hub amount 0.50 -> a 1.20x swelling
+export const UMBEL_SWELL_END_SPREADS = 2;              // the spindle is drawn to e^-4 of its swell
+export const UMBEL_SWELL_RINGS_PER_SPREAD = 8;
+export const UMBEL_SWELL_GRID_MM = 2 ** -8;            // the depth and the rise land on this grid (exact doubles)
+export const UMBEL_SWELL_WIDTH_GRID = 2 ** -8;         // a forced width lands on this grid
+export const UMBEL_SWELL_WIDTH_MAX = 4;                // the width search's ceiling (a 5x rod), never reached on a shipped row
 /* the roots' stagger is centred a QUARTER STEP off the nearest point (see
    `umbelRootLaw`'s header: a symmetric stagger roots an opposite pair on one
    point at 0 deg) */
 export const UMBEL_ROOT_STAGGER_OFFSET = 1 / 4;
 export const UMBEL_KNOT_RIM_SAMPLES = 720;
-export function umbelFlareDepthFrac(style, x) {
-  if (!(x > 0)) return 0;
-  if (x >= 1) return 1;
-  if (style === 'ANGLED') return x;
-  if (style === 'CURVED') return x * x * (3 - 2 * x);
-  return null;                                           // GOBLET reads the radii, below
-}
-export function umbelFlareDepthAt(r, F) {
-  const x = (F.radiusMm - r) / F.widthMm;
-  let f = umbelFlareDepthFrac(F.style, x);
-  if (f === null) f = Math.sqrt(Math.max(0, Math.log(F.radiusMm / Math.max(r, F.rodR)) / Math.log(F.radiusMm / F.rodR)));
-  return F.swellMm * Math.min(1, Math.max(0, f));
-}
-/* the flare's radius at a depth `d` below the equator — the inverse of the
-   depth law, which is monotone in r (bisected to the double) */
-export function umbelFlareRadiusAtDepth(d, F) {
-  if (!(d > 0)) return F.radiusMm;
-  if (d >= F.swellMm) return F.rodR;
-  let lo = F.rodR, hi = F.radiusMm;
-  for (let k = 0; k < 64; k++) { const mid = (lo + hi) / 2; if (umbelFlareDepthAt(mid, F) > d) lo = mid; else hi = mid; }
-  return (lo + hi) / 2;
-}
-/* THE ROOT LAW (1 and 2): where every pedicel's line crosses the base plane,
-   how far inward its root is, and the i-th stagger. In the (radial, z) half
-   plane of each pedicel's azimuth, z = 0 the base plane. */
-export function umbelRootLaw(n, rP, angleDeg, outerR, headOn = false) {
+/* THE ROOT LAW (2): where every pedicel's line crosses the base plane, how far
+   inward its root is (the nearest point plus the derived deepening), and the
+   i-th stagger. In the (radial, z) half plane of each pedicel's azimuth,
+   z = 0 the base plane, z UP. THE STAGGER (Oct 27, kept): the i-th of n is
+   `(i - (n-1)/2 + 1/4)` steps of `2 pi rP / UMBEL_BOSS_SECTORS` — one lattice
+   step of a ring of the pedicel's own radius on the junction's own sector
+   count. Not symmetric, by measurement: a stagger symmetric about the nearest
+   point puts roots i and j at mirror distances whenever `i + j = n - 1`, and
+   at 0 deg an OPPOSITE pair (`j = i + n/2`) lies on ONE line through the
+   centre, so the pair that is both — `(1, 4)` of six — rooted on the SAME
+   point and its rings welded (`MOPHEAD: rays at 0 deg`, 1,652 within-shell
+   pairs). With the quarter step `i + j = n - 1 - 1/2` has no integer
+   solution, so no two roots are ever mirror images, at any count or angle. */
+export function umbelRootLaw(n, rP, angleDeg, outerR, headOn = false, deepenMm = 0) {
   const gap = MIN_FEATURE_MM;
   const th = (angleDeg * Math.PI) / 180, ca = Math.cos(th), sa = Math.sin(th);
   const rhoB = headOn ? outerR + rP + gap : rP;
@@ -23241,78 +23189,178 @@ export function umbelRootLaw(n, rP, angleDeg, outerR, headOn = false) {
   const staggerMm = (2 * Math.PI * rP) / UMBEL_BOSS_SECTORS;
   const roots = Array.from({ length: n }, (_, i) => {
     const steps = i - (n - 1) / 2 + UMBEL_ROOT_STAGGER_OFFSET;
-    const s = extendMm + steps * staggerMm;      // inward along the rod's own line from the base point
+    const s = extendMm + deepenMm + steps * staggerMm;      // inward along the rod's own line from the base point
     return { index: i, s, rMm: rhoB - s * ca, zMm: -s * sa, staggerMm: steps * staggerMm };
   });
-  return { rhoB, extendMm, staggerMm, ca, sa, roots, headOn, gapMm: gap };
+  return { rhoB, extendMm, deepenMm, staggerMm, ca, sa, roots, headOn, gapMm: gap };
 }
-/* inside the knot (dome + flare) or the rod, in the knot's own (radial, z)
-   with z = 0 at the CENTRE; `strict` the half-gap margin for a hold test */
-export function umbelKnotInside(K, rho, z, margin = 0) {
-  const Rk = K.radiusMm, F = K.flare;
-  if (z >= margin) { if (Math.hypot(rho, z) + margin <= Rk) return true; }
-  else if (z < 0 && F && F.built) { if (z >= -F.swellMm && rho + margin <= umbelFlareRadiusAtDepth(-z, F)) return true; }
+/* THE PROFILE (1): the stem node's own spindle with its node at the base plane */
+export function umbelSwellRadiusMm(k, spreadMm, outerR, z) {
+  return stemNodeRadiusMm({ nodes: [{ s: 0 }], spreadMm, swell: k, outerR }, z);
+}
+/* inside the swelling or the rod, in the base plane's own (radial, z), z UP
+   from the base plane; `margin` the half-gap of a hold test */
+export function umbelSwellingInside(K, rho, z, margin = 0) {
+  const inBody = z >= -K.endMm && (K.headOn ? z <= K.endMm : z <= K.riseMm - margin)
+    && rho + margin <= umbelSwellRadiusMm(K.swell, K.spreadMm, K.outerR, z);
+  if (inBody) return true;
   /* the rod: its wall, and (head off) only below its end */
   const inWall = rho + margin <= K.outerR && (K.boreR <= 0 || rho - margin >= K.boreR);
-  if (inWall && (K.headOn || z + margin <= K.liftMm)) return true;
-  return false;
+  return inWall && (K.headOn || z + margin <= 0);
 }
-export function umbelKnot(n, rP, angleDeg, outerR, boreR, headOn = false, basePlaneZ = 0, hub = null) {
+/* THE BODY: the rings, the chamfers and the reach clamp, from a law record —
+   `roomMm` the rod's own length below the base plane (mode-free: the asked
+   stem length less the inset, a gap and the cut's span); the spindle is cut
+   where the room runs out (`reachClamped`, told), the chamfer then as steep
+   as the room leaves. Re-run by the plan once the base plane is known
+   (`umbelSwellingPlaced`), so the hold above never reads the room. */
+export function umbelSwellBody(L, roomMm = Infinity) {
+  const { swell, spreadMm, outerR, headOn, riseMm, rodR } = L;
   const gap = MIN_FEATURE_MM;
-  const RL = umbelRootLaw(n, rP, angleDeg, outerR, headOn);
-  const { ca, sa } = RL;
-  /* (3) the hold: every root disc's sampled rim, in the base plane's frame */
+  let endMm = L.endAskedMm;
+  const reachClamped = Number.isFinite(roomMm) && endMm > roomMm - gap;
+  if (reachClamped) endMm = Math.max(gap, roomMm - gap);
+  let chamferMm = umbelSwellRadiusMm(swell, spreadMm, outerR, endMm) - rodR;
+  if (Number.isFinite(roomMm) && endMm + chamferMm > roomMm) chamferMm = Math.max(0, roomMm - endMm);
+  /* the rings, bottom to top: a chamfer ring inside the rod, the spindle's
+     rings a `w/8` apart up to the plane (and on to the rise, head off; to the
+     far end and a chamfer, head on) */
+  const pitch = spreadMm / UMBEL_SWELL_RINGS_PER_SPREAD;
+  const nBelow = Math.max(1, Math.ceil(endMm / pitch));
+  const zs = [];
+  for (let j = nBelow; j >= 0; j--) zs.push(-endMm * j / nBelow);
+  if (headOn) for (let j = 1; j <= nBelow; j++) zs.push(endMm * j / nBelow);
+  else if (riseMm > 0) { const m = Math.max(1, Math.ceil(riseMm / pitch)); for (let j = 1; j <= m; j++) zs.push(riseMm * j / m); }
+  const profileRings = zs.map((z) => ({ z, r: umbelSwellRadiusMm(swell, spreadMm, outerR, z) }));
+  /* AT WIDTH 0 THE ROD ALONE HOLDS THE ROOTS AND NO BODY IS BUILT (by branch:
+     a body of the rod's own radius would lie ON its wall — the weld class);
+     where the asked 0 cannot hold them the width search above has already
+     raised it, so a built body is always proud of the wall) */
+  const built = swell > 0;
+  const rings = built ? [{ z: -endMm - chamferMm, r: rodR }, ...profileRings, ...(headOn ? [{ z: endMm + chamferMm, r: rodR }] : [])] : [];
+  return { ...L, built, endMm, lengthMm: endMm, reachClamped, roomMm, chamferMm, pitchMm: pitch, rings: rings.length, ringProfile: rings,
+    topZ: headOn ? endMm + chamferMm : riseMm, bottomZ: -endMm - chamferMm };
+}
+export function umbelSwellingPlaced(K, basePlaneZ, roomMm) {
+  const P = umbelSwellBody({ ...K, basePlaneZ, centre: [0, 0, basePlaneZ] }, roomMm);
+  P.crossMm = umbelSwellCrossMm(P);
+  return P;
+}
+export function umbelSwelling(n, rP, angleDeg, outerR, boreR, headOn = false, basePlaneZ = 0, hub = null) {
+  const gap = MIN_FEATURE_MM;
+  const style = hub && HUB_STYLES.includes(hub.style) ? hub.style : HUB_STYLE_DEFAULT;
+  const amount = !hub || hub.amount === undefined ? HUB_SHAPE_AMOUNT_DEFAULT : Number(hub.amount);
+  const lengthAsked = !hub || hub.lengthMm === undefined ? 0 : Number(hub.lengthMm);
+  const auto = !(lengthAsked > 0);
+  const spreadMm = auto ? STEM_NODE_SPREAD_RADII * outerR : lengthAsked / UMBEL_SWELL_END_SPREADS;
+  const endMm = UMBEL_SWELL_END_SPREADS * spreadMm;
+  const swellAsked = Math.max(0, UMBEL_SWELL_PER_AMOUNT * amount);
+  const rodR = outerR - gap / 2;
+  const G = UMBEL_SWELL_GRID_MM, ceilG = (x) => Math.ceil(x / G) * G;
+  const th = (angleDeg * Math.PI) / 180, ca = Math.cos(th), sa = Math.sin(th);
   const S = UMBEL_KNOT_RIM_SAMPLES;
-  const held = (rho, z) => rho + gap / 2 <= outerR && (boreR <= 0 || rho - gap / 2 >= boreR) && (headOn || z + gap / 2 <= 0);
-  const free = [];                                           // [rho, z] of every point the rod does not hold
-  let heldCount = 0, total = 0;
-  for (const q of RL.roots) for (let k = 0; k < S; k++) {
+  /* the rim of every root disc (the disc normal to the rod, sampled round)
+     at deepening 0, in three flat arrays; a deepening `d` moves every point
+     rigidly along the line, `(rIn - d ca, z - d sa)`, so the hold is one pass
+     with no allocation (the first cut rebuilt the arrays at every step and
+     took nine seconds on a forced mophead tip) */
+  const RL0 = umbelRootLaw(n, rP, angleDeg, outerR, headOn, 0);
+  const N = RL0.roots.length * S;
+  const RIN = new Float64Array(N), OUT = new Float64Array(N), Z0 = new Float64Array(N);
+  { let i = 0; for (const q of RL0.roots) for (let k = 0; k < S; k++, i++) {
     const ph = (k * 2 * Math.PI) / S, cp = Math.cos(ph), sp = Math.sin(ph);
-    /* the disc is normal to the rod: in-plane perpendicular U = (-sa, ca), out of plane V */
-    const rIn = q.rMm - rP * cp * sa, zz = q.zMm + rP * cp * ca, out = rP * sp;
-    const rho = Math.hypot(rIn, out);
-    total++;
-    if (held(rho, zz)) heldCount++; else free.push([rho, zz]);
+    RIN[i] = q.rMm - rP * cp * sa; Z0[i] = q.zMm + rP * cp * ca; OUT[i] = rP * sp;
+  } }
+  const m = gap / 2;
+  const holds = (k, d, riseMm) => {
+    for (let i = 0; i < N; i++) {
+      const rho = Math.hypot(RIN[i] - d * ca, OUT[i]), z = Z0[i] - d * sa;
+      /* the body exists only at a width above 0 (a width-0 body would lie ON the rod's wall and is not built) */
+      if (k > 0 && z >= -endMm && (headOn ? z <= endMm : z <= riseMm - m)) { const u = z / spreadMm; if (rho + m <= outerR * (1 + k * Math.exp(-u * u))) continue; }
+      if (rho + m <= outerR && (boreR <= 0 || rho - m >= boreR) && (headOn || z + m <= 0)) continue;
+      return false;
+    }
+    return true;
+  };
+  /* the least depth on the grid that buries the roots at width k, or null;
+     the top-face half of the hold is closed form in the depth (`z - d sa`),
+     the radial half is scanned a gap-eighth at a time from there and the first
+     hold refined down onto the grid */
+  const deepenFor = (k) => {
+    if (!(headOn || sa > 0)) return null;
+    let d0 = 0;
+    if (!headOn) for (let i = 0; i < N; i++) d0 = Math.max(d0, (Z0[i] + m) / sa);
+    d0 = ceilG(Math.max(0, d0));
+    const dMax = (endMm + rP) / Math.max(Math.abs(sa), 1e-9) + 2 * (endMm + rP);
+    const ok = (d) => holds(k, d, 0);
+    const step = gap / 8;
+    let d = d0;
+    while (d <= dMax && !ok(d)) d += step;
+    if (d > dMax) return null;
+    if (d === d0) return d0;
+    let lo = d - step, hi = d;
+    while (hi - lo > G) { const mid = ceilG((lo + hi) / 2); if (mid >= hi) break; if (ok(mid)) hi = mid; else lo = mid; }
+    return ceilG(hi);
+  };
+  /* the rise: the least top-face height over the base plane, on the grid,
+     that puts every rim point half a gap under it with no deepening */
+  const riseFor = (k) => {
+    if (headOn) return null;
+    let r = 0;
+    for (let i = 0; i < N; i++) r = Math.max(r, Z0[i] + m);
+    r = ceilG(r);
+    return holds(k, 0, r) ? r : null;
+  };
+  /* (3) the width and the depth, in Eva's order: DEEPER first — the asked width
+     if some depth buries the roots in it, else the least width on the grid
+     that some depth does (bisected: a wider body holds whatever a narrower one
+     did); only where NO width up to the ceiling buries them by depth (a pedicel
+     at or below horizontal goes up along its line) does the top RISE instead,
+     at the least width that holds it that way */
+  const W = UMBEL_SWELL_WIDTH_GRID, ceilW = (x) => Math.ceil(x / W) * W;
+  const leastWidth = (solve) => {
+    let lo = swellAsked, hi = UMBEL_SWELL_WIDTH_MAX, hiHeld = solve(hi);
+    if (hiHeld === null) return null;
+    while (hi - lo > W) { const m = ceilW((lo + hi) / 2); if (m >= hi) break; const h = solve(m); if (h !== null) { hi = m; hiHeld = h; } else lo = m; }
+    return { k: ceilW(hi), v: hiHeld };
+  };
+  let swell = swellAsked, held = null, widthForced = false;
+  const d0 = deepenFor(swell);
+  if (d0 !== null) held = { deepenMm: d0, riseMm: 0, heldBy: 'deepen' };
+  else {
+    const wd = leastWidth(deepenFor);
+    if (wd) { swell = wd.k; held = { deepenMm: wd.v, riseMm: 0, heldBy: 'deepen' }; }
+    else {
+      const r0 = riseFor(swell);
+      if (r0 !== null) held = { deepenMm: 0, riseMm: r0, heldBy: 'rise' };
+      else { const wr = leastWidth(riseFor); if (wr) { swell = wr.k; held = { deepenMm: 0, riseMm: wr.v, heldBy: 'rise' }; } else { swell = UMBEL_SWELL_WIDTH_MAX; held = { deepenMm: 0, riseMm: 0, heldBy: 'unheld' }; } }
+    }
+    widthForced = swell !== swellAsked;
   }
-  let liftMm = gap / 2;
-  for (const [, z] of free) if (-z + gap / 2 > liftMm) liftMm = -z + gap / 2;
-  const radiusFromRodMm = (headOn ? outerR : Math.hypot(outerR, liftMm)) + gap / 2;
-  let radiusFromRootsMm = 0;
-  for (const [rho, z] of free) { const d = Math.hypot(rho, z + liftMm) + gap / 2; if (d > radiusFromRootsMm) radiusFromRootsMm = d; }
-  const radiusMm = Math.max(radiusFromRodMm, radiusFromRootsMm);
-  /* (4) the flare */
-  let flare = null;
-  if (hub) {
-    const style = HUB_STYLES.includes(hub.style) ? hub.style : HUB_STYLE_DEFAULT;
-    const amount = hub.amount === undefined ? HUB_SHAPE_AMOUNT_DEFAULT : Number(hub.amount);
-    const lengthAsked = hub.lengthMm === undefined ? 0 : Number(hub.lengthMm);
-    const rodR = outerR - gap / 2;
-    const widthMm = radiusMm - rodR;
-    const auto = !(lengthAsked > 0);
-    const reachMm = auto ? radiusMm + widthMm : Math.max(radiusMm, lengthAsked);
-    const swellAskedMm = amount === 1 ? reachMm - radiusMm : amount * (reachMm - radiusMm);
-    const roomMm = Number.isFinite(hub.roomMm) ? hub.roomMm : Infinity;     // below the BASE plane
-    const swellMm = Math.min(swellAskedMm, Math.max(0, roomMm - liftMm));
-    const clamped = swellAskedMm > swellMm + 1e-9;
-    const built = rodR > 0 && widthMm > 0 && swellMm > 0;
-    flare = { style, amount, auto, lengthAsked, rodR, widthMm, reachMm, swellAskedMm, swellMm, roomMm, clamped, built,
-      noRoom: !built && swellAskedMm > 0 && !(swellMm > 0), rings: built ? UMBEL_FLARE_RINGS : 0, radiusMm };
-  }
-  const K = { rhoB: RL.rhoB, extendMm: RL.extendMm, staggerMm: RL.staggerMm, roots: RL.roots, headOn, outerR, boreR,
-    liftMm, radiusMm, radiusFromRodMm, radiusFromRootsMm, rodBinds: radiusFromRodMm >= radiusFromRootsMm,
-    rimSamples: S, rimPointsHeldByRod: heldCount, rimPoints: total, gapMm: gap, domeRings: UMBEL_DOME_RINGS, flare,
-    basePlaneZ, centre: [0, 0, basePlaneZ - liftMm] };
-  /* (5) the crossing, from each root centre out along its line to where it leaves the solid */
+  const RL = umbelRootLaw(n, rP, angleDeg, outerR, headOn, held.deepenMm);
+  const riseMm = held.riseMm;
+  const peakR = outerR * (1 + swell);
+  const K = umbelSwellBody({ n, rP, angleDeg, style, styleInert: true, amount, lengthAsked, auto, swellAsked, swell, widthForced,
+    widthAskedMm: 2 * outerR * (1 + swellAsked), widthMm: 2 * peakR, peakR, spreadMm, endAskedMm: endMm, rodR,
+    rhoB: RL.rhoB, extendMm: RL.extendMm, deepenMm: RL.deepenMm, riseMm, heldBy: held.heldBy, staggerMm: RL.staggerMm, roots: RL.roots,
+    headOn, outerR, boreR, gapMm: gap, rimSamples: S, basePlaneZ, centre: [0, 0, basePlaneZ] }, hub && Number.isFinite(hub.roomMm) ? hub.roomMm : Infinity);
+  K.crossMm = umbelSwellCrossMm(K);
+  return K;
+}
+/* (4) the crossing, from each root centre out along its line to where it
+   leaves the solid, marched then bisected; the least over the roots */
+export function umbelSwellCrossMm(K) {
+  const gap = MIN_FEATURE_MM;
+  const th = (K.angleDeg * Math.PI) / 180, ca = Math.cos(th), sa = Math.sin(th);
   let crossMm = Infinity;
-  for (const q of RL.roots) {
-    const at = (s) => [q.rMm + s * ca, q.zMm + s * sa + liftMm];              // relative to the CENTRE
+  for (const q of K.roots) {
+    const at = (s) => [q.rMm + s * ca, q.zMm + s * sa];
     let s0 = 0, s1 = gap / 16;
-    while (umbelKnotInside(K, ...at(s1)) && s1 < 1e4) { s0 = s1; s1 *= 1.5; }
-    for (let k = 0; k < 60; k++) { const m = (s0 + s1) / 2; if (umbelKnotInside(K, ...at(m))) s0 = m; else s1 = m; }
+    while (umbelSwellingInside(K, ...at(s1)) && s1 < 1e4) { s0 = s1; s1 *= 1.5; }
+    for (let k = 0; k < 60; k++) { const m = (s0 + s1) / 2; if (umbelSwellingInside(K, ...at(m))) s0 = m; else s1 = m; }
     if (s0 < crossMm) crossMm = s0;
   }
-  K.crossMm = crossMm;
-  return K;
+  return crossMm;
 }
 /* THE ABSENT HUB'S RECORD — what `buildBloomBody` reports in place of
    `buildHubInto`'s record when an umbel's head is OFF. Every field says
@@ -23782,10 +23830,15 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {
      derived lattice step; the unit is built `extendMm` longer so the floret
      stands where the asked length puts it. The root disc lies inside the knot
      or the rod by the knot's own construction (UM2). */
-  const rootLaw = umbel ? umbelRootLaw(umbelCount, pedicelR, angleDeg, stem.outerR, !headOff) : null;
+  /* THE SWELLING (Oct 28): the roots' depth is the swelling's own derivation,
+     so the law runs here, before the unit is built `rootExtendMm` longer; the
+     base plane and the room are stamped on it once they are known (below). */
+  const swellLaw = umbel ? umbelSwelling(umbelCount, pedicelR, angleDeg, stem.outerR, stem.boreR, !headOff, 0,
+    { style: stem.hubStyle, amount: stem.hubAmount, lengthMm: stem.hubLengthAsked }) : null;
+  const rootLaw = swellLaw;
   const rootR = umbel ? rootLaw.rhoB : rodWallRootMm(stem);
-  const embedMm = umbel ? rootLaw.extendMm : rodWallEmbedMm(stem);
-  const rootExtendMm = umbel ? rootLaw.extendMm : 0;
+  const embedMm = umbel ? rootLaw.extendMm + rootLaw.deepenMm : rodWallEmbedMm(stem);
+  const rootExtendMm = umbel ? rootLaw.extendMm + rootLaw.deepenMm : 0;
   const rootStaggerMm = umbel ? rootLaw.roots.map((q) => q.staggerMm) : null;
   /* THE FLORET'S OWN PETAL SIZE — a MULTIPLIER on the head's two, clamped into
      each base control's OWN range and TOLD (the `labellumSize` precedent:
@@ -24065,8 +24118,7 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {
      export (the asked stem length, the plan's own mode-free inset, the cut's
      span from the tip radius). */
   const knotRoomMm = umbel ? stem.lengthMm - (headOff ? 0 : umbelDepthMm) - MIN_FEATURE_MM - (stem.cut && stem.cut.made ? stem.cut.spanMm : 0) : null;
-  const knot = umbel ? umbelKnot(umbelCount, pedicelR, angleDeg, stem.outerR, stem.boreR, !headOff, stem.rootZ - umbelDepthMm,
-    { style: stem.hubStyle, amount: stem.hubAmount, lengthMm: stem.hubLengthAsked, roomMm: knotRoomMm === null ? Infinity : knotRoomMm }) : null;
+  const knot = umbel ? umbelSwellingPlaced(swellLaw, stem.rootZ - umbelDepthMm, knotRoomMm === null ? Infinity : knotRoomMm) : null;
   const knotCrossMm = umbel ? knot.crossMm : null;
   const crossings = pedicelLensMm.map((L) => (L > 0
     ? (umbel ? Math.min(knotCrossMm, L) : rodWallCrossingMm({ boreR: stem.boreR, outerR: stem.outerR, rootR }, (angleDeg * Math.PI) / 180, L, embedMm))
@@ -24364,7 +24416,8 @@ export function floretBodyFloor(state) {
    every compound build, clamped or not, so UM7 asserts the prediction
    against the built count both ways. `the-clamp-reads-a-row-count` is its
    mutant. =================================================================== */
-export function umbelKnotTris(flare = null) { return 2 * UMBEL_BOSS_SECTORS * (UMBEL_DOME_RINGS + (flare && flare.built ? flare.rings : 0)); }
+/* the swelling's own count: a band between every two rings and a fan at each pole — `2 N x rings` */
+export function umbelKnotTris(K = null) { return K ? 2 * UMBEL_BOSS_SECTORS * K.rings : 0; }
 export function umbelBudgetClamp(state, stem, acc, plan, restTris) {
   if (!plan || !plan.compound) return plan;
   const rays = plan.umbelCount, kAsked = plan.floretsPerRayAsked, L = plan.pedicelLenMm;
@@ -24376,7 +24429,7 @@ export function umbelBudgetClamp(state, stem, acc, plan, restTris) {
   };
   const asked = unitOf(plan.unitMemo);
   const S = asked.U - kAsked * asked.F;
-  const bossTris = umbelKnotTris(plan.knot && plan.knot.flare);
+  const bossTris = umbelKnotTris(plan.knot);
   const rP = (k) => Math.max(STEM_DIAMETER_RANGE[0] / 2, plan.pedicelR / Math.sqrt(k));
   const fCache = new Map([[rP(kAsked), asked.F]]);
   const F = (k) => {
@@ -24593,43 +24646,34 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
     return units.length - 1;
   };
   for (let i = 0; i < plan.nodes; i++) for (const az of plan.azimuths[i]) unitFor(plan.pedicelLensMm[i], az);
-  /* THE UMBEL'S JUNCTION — emitted FIRST, one closed KNOT about the plan's own
-     centre (`umbelKnot`, Eva's Oct 27 ruling: a converging knot — a DOME of
-     the derived radius over the equator, the Hub FLARE under it down to the
-     rod), through the pill's emitter (`revolveInto`, explicit apex fans at
-     both poles): `UMBEL_DOME_RINGS` rings over the dome, `UMBEL_FLARE_RINGS`
-     down the flare, `UMBEL_BOSS_SECTORS` round. Its MEASURED side — the
-     axis, the equator's radius, every dome and flare ring read back off the
-     vertices it emitted — is what UM1 holds against the controls and UM2
-     holds every pedicel's root disc against, so a knot emitted somewhere
-     other than where the plan says is visible. */
+  /* THE UMBEL'S JUNCTION — emitted FIRST, one closed SWELLING about the plan's
+     own centre (`umbelSwelling`, Eva's Oct 28 ruling: the stem node's spindle
+     with its node on the base plane, the roots deepened into it), through the
+     pill's emitter (`revolveInto`, explicit apex fans at both poles): the
+     chamfer ring inside the rod, the spindle's rings a `w/8` apart, (head on)
+     the chamfer at the far end, `UMBEL_BOSS_SECTORS` round. Its MEASURED side —
+     the axis, every ring's radius and height read back off the vertices it
+     emitted, the top and the bottom — is what UM1 holds against the controls
+     and UM2 holds every pedicel's root disc against, so a swelling emitted
+     somewhere other than where the plan says is visible. */
   let knotBuilt = null;
-  if (plan.umbel && plan.knot) {
-    const K = plan.knot, c = K.centre, R = K.radiusMm;
+  if (plan.umbel && plan.knot && plan.knot.built) {
+    const K = plan.knot, c = K.centre;
     const t0 = acc.triangleCount;
-    const ringAt = (z, r) => ({ C: [c[0], c[1], z], e1: [1, 0, 0], e2: [0, 1, 0], r });
-    const F = K.flare && K.flare.built ? K.flare : null;
-    const zBot = F ? c[2] - F.swellMm : c[2];
-    /* bottom first (the revolve's own order): the flare's rings from the rod
-       up to just under the equator, then the dome from the equator up to the
-       last ring under the pole */
-    const flareRings = [];
-    if (F) for (let j = F.rings; j >= 1; j--) { const x = j / F.rings, r = R - x * F.widthMm; flareRings.push(ringAt(c[2] - umbelFlareDepthAt(r, F), r)); }
-    const domeRings = [];
-    for (let k = K.domeRings; k >= 1; k--) { const th = (Math.PI / 2) * (k / K.domeRings); domeRings.push(ringAt(c[2] + R * Math.cos(th), R * Math.sin(th))); }
-    const rings = [...flareRings, ...domeRings];
-    const pts = revolveInto(acc, rings, [c[0], c[1], zBot], [c[0], c[1], c[2] + R], new Array(UMBEL_BOSS_SECTORS).fill(1));
-    const meanOf = (ring) => { let rr = 0, zz = 0, ax = 0, ay = 0; for (const q of ring) { rr += Math.hypot(q[0] - c[0], q[1] - c[1]); zz += q[2]; ax += q[0]; ay += q[1]; } return { r: rr / ring.length, z: zz / ring.length, ax: ax / ring.length, ay: ay / ring.length }; };
-    const flareEmitted = pts.slice(0, flareRings.length).map(meanOf).map(({ r, z }) => ({ r, z }));
-    const domeEmitted = pts.slice(flareRings.length).map(meanOf).map(({ r, z }) => ({ r, z }));
-    const eq = pts[flareRings.length];                    // the equator ring
-    let rMax = 0, rMin = Infinity, zLo = zBot, zTop = c[2] + R;
-    for (const q of eq) { const r = Math.hypot(q[0] - c[0], q[1] - c[1]); if (r > rMax) rMax = r; if (r < rMin) rMin = r; }
-    for (const ring of pts) for (const q of ring) if (q[2] < zLo) zLo = q[2];
-    const eqM = meanOf(eq);
-    knotBuilt = { centre: [eqM.ax, eqM.ay, eqM.z], radiusMm: rMax, radiusMinMm: rMin, equatorZ: eqM.z,
-      topZ: zTop, bottomZ: zLo, rings: pts.length, domeRings: domeRings.length, domeEmitted, flareEmitted, flare: F ? { ...F } : null,
-      liftMm: K.liftMm, basePlaneZ: K.basePlaneZ, outerR: K.outerR, boreR: K.boreR, headOn: K.headOn,
+    const ringAt = (z, r) => ({ C: [c[0], c[1], c[2] + z], e1: [1, 0, 0], e2: [0, 1, 0], r });
+    const rings = K.ringProfile.map((g) => ringAt(g.z, g.r));
+    const pts = revolveInto(acc, rings, [c[0], c[1], c[2] + K.bottomZ], [c[0], c[1], c[2] + K.topZ], new Array(UMBEL_BOSS_SECTORS).fill(1));
+    const meanOf = (ring) => { let rr = 0, zz = 0, ax = 0, ay = 0, rMax = 0, rMin = Infinity; for (const q of ring) { const r = Math.hypot(q[0] - c[0], q[1] - c[1]); rr += r; zz += q[2]; ax += q[0]; ay += q[1]; if (r > rMax) rMax = r; if (r < rMin) rMin = r; } return { r: rr / ring.length, z: zz / ring.length, ax: ax / ring.length, ay: ay / ring.length, rMax, rMin }; };
+    const emitted = pts.map(meanOf);
+    let zLo = Infinity, zHi = -Infinity, peak = 0, peakMin = Infinity;
+    for (const g of emitted) { if (g.z < zLo) zLo = g.z; if (g.z > zHi) zHi = g.z; if (g.rMax > peak) peak = g.rMax; }
+    for (const g of emitted) if (g.rMax === peak) peakMin = Math.min(peakMin, g.rMin);
+    let ax = 0, ay = 0; for (const g of emitted) { ax += g.ax; ay += g.ay; }
+    knotBuilt = { centre: [ax / emitted.length, ay / emitted.length, c[2]], basePlaneZ: c[2], peakR: peak, peakRMin: peakMin,
+      radiusMm: peak, topZ: c[2] + K.topZ, bottomZ: c[2] + K.bottomZ, emittedTopZ: zHi, emittedBottomZ: zLo,
+      rings: pts.length, ringsEmitted: emitted.map(({ r, z }) => ({ r, z })),
+      swell: K.swell, spreadMm: K.spreadMm, endMm: K.endMm, riseMm: K.riseMm, deepenMm: K.deepenMm, heldBy: K.heldBy, widthForced: K.widthForced,
+      rodR: K.rodR, outerR: K.outerR, boreR: K.boreR, headOn: K.headOn,
       tris: acc.triangleCount - t0, triRange: [t0, acc.triangleCount] };
   }
   const sub = units[0].sub, fs = units[0].fs, unit = units[0].rec;

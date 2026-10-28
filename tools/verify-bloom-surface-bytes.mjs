@@ -579,6 +579,13 @@ const PREDICATE_MOVERS = {
     if (st.hubStyle === undefined && st.hubShapeAmount === undefined && sp.hubJoinActive !== false && Number(base.HUB_SHAPE_AMOUNT_DEFAULT) === 1) return !!(sp.swellActive ?? sp.joinActive ?? true);
     return false;
   },
+  /* THE GENTLE SWELLING (Oct 28, Eva's rulings): every row the BASE builds an
+     umbel junction on moves (the knot is the swelling now, every root is
+     deepened), plus every `stem-top` mover, plus — ruling 2, the head's hub
+     default moved to CURVED 0.50 — every row whose BASE builds a head's
+     hub-to-stem join ACTIVE at the base's own default (GOBLET 1.00) with the
+     row not naming the two controls itself. Against a worktree of `main`. */
+  'umbel-swelling': (st) => PREDICATE_MOVERS['umbel-knot'](st),
   'umbel-boss': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const bs = baseState(st);

@@ -353,3 +353,122 @@ hold; `umbelKnotEmittedInside`), `the-knot-radius-is-typed`,
 and `the-umbel-pedicel-roots-off-the-junction` / `the-junction-ignores-the-hub-controls` /
 `the-ray-junction-reads-the-stems-radius` re-anchored. §4 and §5 above describe the BAND tree
 (`7c9d33d`); the knot's own gates and bytes follow Eva's ruling on the sheet.
+
+## 7. The gentle swelling (Oct 28, Eva's ruling on §6's sheet) — SUPERSEDES §6's knot
+
+**RULED Oct 28 (1): the knot is "still too much". The umbel junction is a GENTLE SWELLING:
+the incoming rod (the stem, or a ray on a mophead) widens slowly over about 10–20 mm to about
+1.2× its width and the pedicels leave its top — a taper, not a dome; no equator edge
+anywhere. The stem node's swelling law is REUSED for the profile. The pedicels still converge,
+their roots buried strictly inside solid with the quarter-step stagger; the roots go DEEPER,
+and the length and width that hold them are derived.**
+
+**RULED Oct 28 (2): CURVED 0.50 is the head's hub-to-stem default TOO — one owner, one
+default.** (It had been set so in §6 with the question flagged; the ruling closes it. The
+~353 stemmed rows it moves, `ALL MAX` included, are predeclared from the BASE tree's record
+through `verify-bloom-surface-bytes --movers-predicate umbel-swelling` against a worktree of
+`main`; the census and combination magnitudes are re-recorded by value and the defaults bar's
+pins updated — §8 below carries that partition's state.)
+
+### 7a. One swelling law — the stem node's spindle, reused
+
+`umbelSwelling` / `umbelRootLaw` / `umbelSwellBody` in `bloom-geometry.js` (the header carries
+the law in full); the dome, the flare, `umbelFlareDepthAt`, `umbelKnotInside` and the
+`UMBEL_DOME_RINGS` / `UMBEL_FLARE_RINGS` lattice are gone.
+
+1. **The profile IS `stemNodeRadiusMm`** — the stem node's Gaussian spindle, a half-width of
+   `STEM_NODE_SPREAD_RADII × outerR` (3.2738 radii, the flower's own) — with ONE node AT THE
+   BASE PLANE: `R(z) = outerR (1 + k exp(−(z/w)²))`. It fits exactly: a node at the rod's end
+   is the spindle's lower half, and on a 6 mm stem `w` is 9.82 mm, so the body is drawn to
+   `2w` = **19.64 mm** — inside Eva's 10–20 (9.82 mm on a 3 mm ray). It is called, not copied
+   (`umbelSwellRadiusMm` hands the node law a one-node record), so there is one swelling law.
+   Head OFF the rod ENDS at the base plane and the body closes on a FLAT TOP (the pedicels
+   leave its top; the top rim is the rod's own cut edge, and there is no edge below it); head
+   ON the stem runs through and the body is the whole spindle, both ways. Below `2w` (e⁻⁴,
+   0.4 % of the swell) the body steps INSIDE the rod's wall on a 45° chamfer to
+   `rodR = outerR − gap/2`, so no face lies on the wall.
+2. **The Hub controls shape it.** `hubShapeAmount` is the WIDTH: `k = UMBEL_SWELL_PER_AMOUNT
+   (0.4) × amount`, so the ruled 0.50 is **1.20×**. `hubLength` is the REACH: 0 = auto (the
+   spindle's own `2w`), above 0 that length (`w = length/2`). **`hubStyle` is INERT on a
+   Gaussian** and is HIDDEN with the head off (`hubStyleLive` in the registry: `stemPresent
+   ∧ headPresent`); with the head on it still shapes the head's own join and the control's
+   read-out says the swelling does not read it. UM1 asserts the hide.
+3. **The roots go deeper.** Each rod's line crosses the base plane at `rhoB` (head off `rP`,
+   head on `outerR + rP + gap` — §6's law, kept), continues inward to the nearest point
+   (`extendMm = rhoB cos a`) and then **`deepenMm` further along its own line** — the least
+   depth on a 2⁻⁸ mm grid that buries every root disc (720 rim samples) half a gap inside the
+   body, the rod's wall, and (head off) under the top face. The quarter-step stagger is kept
+   verbatim (an opposite pair at 0° rooted on one point welded `MOPHEAD: rays at 0 deg`).
+4. **The width is derived where the asked one cannot hold the roots** — raised by bisection
+   to the least width (2⁻⁸ grid) at which some depth buries them; reported as FORCED with the
+   asked and reached widths (the mophead ray tip, §7b).
+5. **Where NO width up to the ceiling buries them by depth the top RISES instead** (a
+   decision made without a ruling, the only one here): a pedicel at or below horizontal goes
+   UP along its line, so with the head off its roots sit above the base plane and the body is
+   taller by `riseMm`, the least top height under which every rim point sits half a gap
+   (`heldBy: 'rise'`, told). At every angle above horizontal the shipped rows deepen.
+6. **The crossing** is measured as before, root to surface along the rod's line.
+
+### 7b. Measured (EXPORT, the ruled defaults; width is the spindle's peak diameter, length its reach below the base plane)
+
+| state | rod | pedicel | width | × rod | length | roots | crossing |
+|---|---|---|---|---|---|---|---|
+| spider lily 6 @ 35° (the default) | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | 2.23 deeper | 3.02 |
+| 2 @ −60° | 6.00 | 4.24 | 8.02 | **1.336, forced** | 19.64 | top raised 2.66 | 4.57 |
+| 2 @ 35° | 6.00 | 4.24 | 7.20 | 1.200 | 19.64 | 2.23 deeper | 3.90 |
+| 2 @ 90° | 6.00 | 4.24 | 9.52 | **1.586, forced** | 19.64 | 0.57 deeper | 0.50 |
+| 6 @ −60° | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | top raised 2.37 | 4.36 |
+| 6 @ 90° | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | 0.95 deeper | 0.50 |
+| 12 @ −60° | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | top raised 2.88 | 3.78 |
+| 12 @ 35° | 6.00 | 3.00 | 8.27 | **1.379, forced** | 19.64 | 2.82 deeper | 3.01 |
+| 12 @ 90° | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | 1.53 deeper | 0.50 |
+| 6 @ 35°, head ON | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 either side | 0.01 deeper | 1.74 |
+| 6 @ 35°, amount 0 | 6.00 | 3.00 | 6.28 | **1.047, forced** from 1.00 | 19.64 | 2.23 deeper | 3.02 |
+| 6 @ 35°, Hub length 10 | 6.00 | 3.00 | 7.20 | 1.200 | 10.00 | 2.23 deeper | 3.02 |
+| mophead, the stem top (12 rays @ 50°) | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | 1.98 deeper | 1.91 |
+| mophead ray tip, 12 @ 20° (the default) | 3.00 | 3.00 | 4.90 | **1.633, forced** | 9.82 | top raised 1.78 | 1.38 |
+| ray tip 2 @ −60° / 35° / 90° | 3.00 | 3.00 | 6.13 / 5.20 / 7.09 | 2.04 / 1.73 / 2.36, forced | 9.82 | raised 2.03 / 1.84 deeper / 0.55 deeper | 3.26 / 3.02 / 0.50 |
+| ray tip 6 @ −60° / 35° / 90° | 3.00 | 3.00 | 6.45 / 6.52 / 7.39 | 2.15 / 2.17 / 2.47, forced | 9.82 | raised 2.37 / 2.23 deeper / 0.95 deeper | 3.04 / 3.02 / 0.50 |
+| ray tip 12 @ −60° / 35° / 90° | 3.00 | 3.00 | 6.93 / 9.15 / 8.37 | 2.31 / 3.05 / 2.79, forced | 9.82 | raised 2.88 / 2.82 deeper / 1.53 deeper | 2.70 / 3.01 / 0.50 |
+
+**The lily reaches 1.20× over 19.6 mm at the default and at six of the nine grid cells.** Three
+are forced: two florets at 90° (the area rule gives two pedicels of 4.24 mm, and a horizontal
+root disc of that radius spans 8.5 mm across the axis: 1.59×); two at −60° (the same thick
+discs, risen: 1.34×); twelve at 35° (the stagger's 2.4 mm span along the line runs the deepest
+roots out through the far side before the shallowest is under the top, so the body widens to
+1.38× and they all deepen 2.82). **A mophead ray tip cannot get near 1.2×, as Eva allowed for:
+a 1.5 mm pedicel off a 1.5 mm ray needs 1.63× at the default (12 florets at 20°, risen 1.78
+mm because at 20° a disc 1.5 mm wide cannot be buried under a 3 mm rod's top by depth) and
+2.0–3.1× across the grid; it gets what holds the roots and the read-out and the sheet say
+FORCED.** The knot read 2.89× on the same tip (8.67 mm); the default tip is 4.90 mm now.
+
+Cost: 1,728 tris a stem-top swelling (18 rings × 48 × 2) against the knot's 1,920 and the
+band's 960; 2,016 a ray tip; the lily 106,806 in all (knot 106,998), the mophead 1,265,418.
+The hold is allocation-free (three flat arrays, a rigid shift per depth); a plan costs what
+the knot's did (the first cut rebuilt the rim per step and took nine seconds on a forced tip).
+
+### 7c. Gates
+
+UM1/UM8 restate the spindle from the controls (`umbelSwellingExpected` in the harness: the law
+written again — the Gaussian on `STEM_NODE_SPREAD_RADII`, the 0.4 per amount and the 2 w as
+literals, the same depth/width/rise search), every emitted ring against it at its own height,
+the top, the bottom, the chamfer at `rodR`, the forced flag both ways, the style hidden with
+the head off; UM2/UM8 hold every root disc half a gap inside the EMITTED body (the chords
+between the emitted rings, the emitted top) and the rod's wall, the rod ends at the restated
+root (nearest point + deepening + stagger); UM3 the base plane on the stem's emitted top (head
+off) or on the stem (head on); UM4 the body's emitted bottom clear of the cut. ID4/ID9/ID10
+restate the extension through the same expectation. Mutants re-pointed: the roots off the
+junction (the extension dropped — the mean root depth 0), the swelling ignoring Hub amount,
+the roots unstaggered, `the-roots-are-not-deepened` (the depth search gone — every head-off
+umbel rises instead), the half gap dropped from the hold, the ray tip reading the stem's
+radius, `the-swelling-width-is-typed` (the width search gone — the ray tip's roots stand out
+through the skin), the umbel on the cut end. The byte predicate is `umbel-swelling` (= the
+knot's: every base umbel row, every stem-top mover, every head join active at the base's own
+GOBLET 1.00 default).
+
+### 7d. The sheet (`docs/img/umbel-hubs.png`, `node tools/shot-bloom-umbel-hubs.mjs <png> --base <band worktree 7c9d33d> --knot <knot worktree d08153e>`)
+
+Three columns — BAND (Oct 27 am) | KNOT (Oct 27 pm) | SWELLING (Oct 28) — for the spider lily
+and the mophead side-on, from below and at the junction, a mophead ray tip alone side-on, and
+the head-only bloom on a 60 mm stem at GOBLET 1.00 beside CURVED 0.50 (the new head default)
+side-on and from below; dimensions in every caption.

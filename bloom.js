@@ -3055,24 +3055,21 @@ function overtopLine(plan, builtInflo) {
   return ` — A LOWER FLORET OVERTOPS THE HEAD: node ${worst + 1}'s (${plan.pedicelLensMm[worst].toFixed(1)} mm pedicel, ${(plan.pedicelLensMm[worst] / Math.max(1e-9, plan.pedicelLensMm[0])).toFixed(2)}x the top's) stands ${intr.toFixed(2)} mm into the gap under the head${over > 1 ? ` (${over} of ${by.length - 1} lower nodes do)` : ''} — the inset is the TOP floret's reach and a longer lower pedicel outreaches it (told, never clamped)`;
 }
 
-/* THE UMBEL JUNCTION AS A HUB (Oct 27, Eva's ruling): the band (the disc-holding
-   law, unchanged) and the FLARE under it — the hub-to-stem join run in reverse,
-   driven by the three Hub controls. Asked against built, the clamp and the
-   no-room case told, the auto reach named for what it is. */
+/* THE UMBEL JUNCTION IS A GENTLE SWELLING (Oct 28, Eva's ruling): the stem
+   node's spindle with its node on the base plane, Hub amount its width (0.50
+   -> 1.20x), Hub length its reach (0 = the spindle's own), the roots deepened
+   into it (or the top raised where no depth buries them); a width the asked
+   one could not hold is told as FORCED, the style told as inert. */
 function junctionLine(knot, builtKnot, what) {
   if (!knot) return '';
-  const F = knot.flare;
-  const band = `a converging KNOT ${(2 * knot.radiusMm).toFixed(2)} mm across (a dome ${(knot.radiusMm / knot.outerR).toFixed(2)}x the ${(2 * knot.outerR).toFixed(2)} mm rod, ${knot.rodBinds ? 'sized by the rod\'s own end' : 'sized by what holds the roots'}, its centre ${knot.liftMm.toFixed(2)} mm under the rods' base plane) · ${knot.roots.length} roots converging ${knot.extendMm.toFixed(2)} mm inward of a ${(2 * knot.rhoB).toFixed(2)} mm circle, staggered ${knot.staggerMm.toFixed(3)} mm (overlapping, no vertex shared) · crossing ${knot.crossMm.toFixed(2)} mm of solid`;
-  if (!F) return `\n     ${what} JUNCTION ${band} — a coin (no hub record)`;
-  const flare = F.built
-    ? `FLARE ${F.style} ${F.amount.toFixed(2)}x, ${F.swellMm.toFixed(2)} mm from the knot's equator down to the ${(2 * F.rodR + knot.gapMm).toFixed(2)} mm rod (meeting it ${(knot.gapMm / 2).toFixed(2)} mm inside its wall)`
-      + (F.auto ? ` — auto: as deep as it is wide (${F.widthMm.toFixed(2)} mm), the one placement made without a ruling` : ` — Hub length ${F.lengthAsked.toFixed(1)} mm in all`)
-      + (F.clamped ? ` — CLAMPED from ${F.swellAskedMm.toFixed(2)} mm: the rod below the knot's centre is only ${Math.max(0, F.roomMm - knot.liftMm).toFixed(2)} mm long before its end (told, not refused)` : '')
-      + (builtKnot && builtKnot.tris ? ` · ${builtKnot.tris} tris` : '')
-    : F.noRoom ? `NO FLARE — amount ${F.amount.toFixed(2)}x asked ${F.swellAskedMm.toFixed(2)} mm and the rod below the band has no room for it (told)`
-    : F.amount === 0 ? 'STRAIGHT — amount 0, the band alone (the Oct 24 coin, by branch)'
-    : 'NO FLARE — the band is no wider than the rod';
-  return `\n     ${what} JUNCTION a CONVERGING KNOT · ${band} · ${flare} · the Hub controls shape the flare (the head is ${what === 'UMBEL' ? 'off or on the stem above it' : 'the ray\'s'})`;
+  const K = knot;
+  const rod = (2 * K.outerR).toFixed(2);
+  const width = `${K.widthMm.toFixed(2)} mm across (${(K.widthMm / (2 * K.outerR)).toFixed(2)}x the ${rod} mm rod` + (K.widthForced ? `, FORCED from the asked ${(K.widthAskedMm / (2 * K.outerR)).toFixed(2)}x: the pedicels' roots need the width (told, not clamped)` : `, Hub amount ${K.amount.toFixed(2)}`) + ')';
+  const reach = `over ${K.lengthMm.toFixed(2)} mm ${K.headOn ? 'either side of' : 'below'} the base plane` + (K.auto ? ' (auto: the stem node spindle\'s own two half-widths)' : ` (Hub length ${K.lengthAsked.toFixed(1)} mm)`) + (K.reachClamped ? ` — CLAMPED to the rod's ${K.roomMm.toFixed(2)} mm of room (told, not refused)` : '');
+  const held = K.heldBy === 'deepen' ? `the roots go ${K.deepenMm.toFixed(2)} mm deeper than the nearest point to bury them`
+    : K.heldBy === 'rise' ? `no depth buries the roots (${K.angleDeg <= 0 ? 'a pedicel at or below horizontal goes UP along its line' : 'the staggered roots leave the far side first'}), so the top stands ${K.riseMm.toFixed(2)} mm above the base plane instead`
+    : 'NO WIDTH HOLDS THE ROOTS (a finding — the width search reached its ceiling)';
+  return `\n     ${what} JUNCTION a gentle SWELLING ${width} ${reach} · ${K.roots.length} roots converging ${K.extendMm.toFixed(2)} mm inward of a ${(2 * K.rhoB).toFixed(2)} mm circle, staggered ${K.staggerMm.toFixed(3)} mm (overlapping, no vertex shared) · ${held} · crossing ${K.crossMm.toFixed(2)} mm of solid` + (builtKnot && builtKnot.tris ? ` · ${builtKnot.tris} tris` : '') + ` · Hub style is INERT on a spindle (${K.headOn ? 'it shapes the head\'s own join above' : 'hidden with the head off'})`;
 }
 
 function infloLine(plan, builtInflo) {
@@ -3081,14 +3078,14 @@ function infloLine(plan, builtInflo) {
   if (plan.compound) {
     const sb = builtInflo && builtInflo.sub, cl = plan.budgetClamp, F = sb && sb.plan, bf = F && F.bodyFloor;
     const lat = sb && sb.floretUnit && sb.floretUnit.lattice && sb.floretUnit.lattice[0];
-    return `\n     INFLORESCENCE a COMPOUND UMBEL (depth 2) · ${plan.umbelCount} rays of ${plan.pedicelLenMm.toFixed(0)} mm at ${plan.angleDeg} deg, ${(2 * plan.pedicelR).toFixed(2)} mm across, converging in a knot ${(2 * plan.knot.radiusMm).toFixed(2)} mm across`
+    return `\n     INFLORESCENCE a COMPOUND UMBEL (depth 2) · ${plan.umbelCount} rays of ${plan.pedicelLenMm.toFixed(0)} mm at ${plan.angleDeg} deg, ${(2 * plan.pedicelR).toFixed(2)} mm across, converging in a swelling ${plan.knot.widthMm.toFixed(2)} mm across`
       + `\n     FLORETS ${cl ? `${cl.builtFlorets} built of ${cl.askedFlorets} asked (${cl.floretsPerRay} a ray of ${cl.floretsPerRayAsked})` : `${plan.umbelCount * plan.floretsPerRay}`}`
       + (cl && cl.clamped ? ` — BUDGET CLAMPED: one floret is ${cl.floretTris.toLocaleString('en-US')} tris (measured), so the asked ${cl.askedFlorets} would be ${cl.askedTotal.toLocaleString('en-US')}; ${cl.predictedTotal.toLocaleString('en-US')} built against the ${cl.budget.toLocaleString('en-US')} budget (the export never refuses for this)` : cl ? ` · ${cl.predictedTotal.toLocaleString('en-US')} tris predicted against the ${cl.budget.toLocaleString('en-US')} budget` : '')
       + (F ? `\n     FLORET ${F.floretPetals} petals at ${F.petalLength.toFixed(2)} x ${F.petalWidth.toFixed(2)} mm (${F.scaleBuilt.toFixed(3)}x the head's own)` : '')
       + (bf ? ` · FLORET FLOOR ${bf.lengthMm.toFixed(2)} x ${bf.widthMm.toFixed(2)} mm (${bf.scale.toFixed(3)}x — the least scale at which a petal still keeps its full sheet body ${bf.taperMm.toFixed(1)} mm in from both margins and the drawn tip, past the root blend)${F.sizeClamped ? ' — FLOORED' : ''}` : '')
       + (lat && lat.lattice ? ` · the REDUCED lattice: ${lat.lattice.columns} columns, a ${lat.lattice.beadCap}-segment bead (a declared exception to the edge profile's four, florets of a depth-2 umbel only)` : '')
       + (sb ? ` · ${sb.floretUnit.tris.toLocaleString('en-US')} tris a floret, ${builtInflo.unitTris.toLocaleString('en-US')} a sub-umbel, ${builtInflo.tris.toLocaleString('en-US')} in all` : '')
-      + (F ? `\n     SUB-UMBEL ${sb.count} florets on ${F.pedicelLenMm.toFixed(0)} mm pedicels at ${F.angleDeg} deg off each ray, ${(2 * F.pedicelR).toFixed(2)} mm across, converging in a knot ${(2 * sb.knot.radiusMm).toFixed(2)} mm across at the ray's end` : '')
+      + (F ? `\n     SUB-UMBEL ${sb.count} florets on ${F.pedicelLenMm.toFixed(0)} mm pedicels at ${F.angleDeg} deg off each ray, ${(2 * F.pedicelR).toFixed(2)} mm across, converging in a swelling ${sb.plan.knot.widthMm.toFixed(2)} mm across at the ray's end` : '')
       + junctionLine(plan.knot, builtInflo && builtInflo.knot, 'UMBEL')
       + (F && sb.plan && sb.plan.knot ? junctionLine(sb.plan.knot, sb.knot, 'RAY TIP') : '');
   }

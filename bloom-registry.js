@@ -57,7 +57,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
          LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
          STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius, STEM_NODE_SWELLING_RANGE, STEM_NODE_KINK_RANGE, STEM_NODE_SWELL, STEM_NODE_SLOPE, STEM_CUT_VALUES, STEM_CUT_DEG,
-         HUB_STYLES, HUB_STYLE_DEFAULT, HUB_SHAPE_AMOUNT_RANGE, HUB_SHAPE_AMOUNT_DEFAULT, HUB_LENGTH_RANGE,
+         HUB_STYLES, HUB_STYLE_DEFAULT, UMBEL_SWELL_PER_AMOUNT, HUB_SHAPE_AMOUNT_RANGE, HUB_SHAPE_AMOUNT_DEFAULT, HUB_LENGTH_RANGE,
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY, LEAF_DIVERGENCE_RANGE, LEAF_DIVERGENCE_DEFAULT,
@@ -824,6 +824,8 @@ export const PREDICATES = {
      UMBEL, whose one node carries `umbelFlorets` evenly spread pedicels. */
   racemePresent: { all: [{ ref: 'inflorescencePresent' }, { id: 'inflorescence', oneOf: ['RACEME'] }] },
   umbelPresent: { all: [{ ref: 'inflorescencePresent' }, { id: 'inflorescence', oneOf: ['UMBEL'] }] },
+  /* the Hub STYLE is inert on an umbel swelling (a spindle); with the head OFF nothing else reads it (RULED Oct 28) */
+  hubStyleLive: { all: [{ ref: 'stemPresent' }, { ref: 'headPresent' }] },
   /* THE COMPOUND UMBEL (the mophead): an umbel asking depth 2. The rays'
      three controls show here and nowhere else; the geometry's twin is
      `umbelIsCompound`. */
@@ -2001,7 +2003,7 @@ export function umbelJunctionNote(ui) {
   if (!ui || String(ui.inflorescence) !== 'UMBEL' || !(Number(ui.stemLength) >= 1)) return '';
   const headOff = String(ui.umbelHead ?? 'OFF') !== 'ON';
   const mop = String(ui.umbelDepth ?? '1') === '2';
-  return ` · shapes the flare under the UMBEL KNOT${mop ? 'S (the stem-top knot and every ray tip)' : ' (the stem-top knot)'}${headOff ? ' — the head is OFF, so that is all it shapes' : ' as well as the head\'s own hub'}`;
+  return ` · shapes the UMBEL SWELLING${mop ? 'S (the stem top and every ray tip)' : ' (the stem top)'}${headOff ? ' — the head is OFF, so that is all it shapes' : ' as well as the head\'s own hub'}`;
 }
 export const CONTROLS = [
   { id: 'petalCount', section: 'arrangement', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
@@ -4344,8 +4346,12 @@ export const CONTROLS = [
        JUNCTIONS too — the stem-top knot and every ray tip on a mophead — the
        hub-to-stem join run in reverse; with the head OFF that is all they shape,
        and the read-out says so rather than reading inert. */
-    fmt: (v, ui) => (v === 'ANGLED' ? 'a straight conical taper' : v === 'CURVED' ? 'a smooth continuous curve into the stem (the default)' : 'the rounded flare (the pre-Oct-27 head join at amount 1)') + umbelJunctionNote(ui),
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+    /* RULED Oct 28: the umbel junction is the stem node's SPINDLE, a Gaussian,
+       so the style is INERT on it — hidden where it is all there is (an umbel
+       with the head OFF: `hubStyleLive`), told where the head's own join still
+       reads it. Amount and length stay live: the swelling's WIDTH and REACH. */
+    fmt: (v, ui) => (v === 'ANGLED' ? 'a straight conical taper' : v === 'CURVED' ? 'a smooth continuous curve into the stem (the default)' : 'the rounded flare (the pre-Oct-27 head join at amount 1)') + (umbelJunctionNote(ui) ? ' · the UMBEL SWELLING is the stem node\'s own spindle, on which the style is inert (RULED Oct 28)' : ''),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'hubStyleLive' } },
   { id: 'hubShapeAmount', section: 'hub', kind: 'slider',
     min: HUB_SHAPE_AMOUNT_RANGE[0], max: HUB_SHAPE_AMOUNT_RANGE[1], step: 0.05, default: HUB_SHAPE_AMOUNT_DEFAULT,
     label: 'Hub amount',
@@ -4353,7 +4359,7 @@ export const CONTROLS = [
        on today's shape at one slider value, and GOBLET does — at exactly 1.00,
        where `x * 1 === x` reproduces today. 0 is a straight join (no flare) for
        all three styles; above 1 exaggerates. One-sided by ruling — no waist. */
-    fmt: (v, ui) => (Number(v) === 0 ? 'straight — no flare' : Number(v) === HUB_SHAPE_AMOUNT_DEFAULT ? `${Number(v).toFixed(2)}x — the default (RULED Oct 27)` : Number(v) === 1 ? '1.00x (GOBLET 1.00 is the pre-Oct-27 head join)' : `${Number(v).toFixed(2)}x pronounced`) + umbelJunctionNote(ui),
+    fmt: (v, ui) => (Number(v) === 0 ? 'straight — no flare' : Number(v) === HUB_SHAPE_AMOUNT_DEFAULT ? `${Number(v).toFixed(2)}x — the default (RULED Oct 27; the head's own default too, RULED Oct 28)` : Number(v) === 1 ? '1.00x (GOBLET 1.00 is the pre-Oct-27 head join)' : `${Number(v).toFixed(2)}x pronounced`) + (umbelJunctionNote(ui) ? umbelJunctionNote(ui) + ` — its WIDTH, ${(1 + UMBEL_SWELL_PER_AMOUNT * Number(v)).toFixed(2)}x the rod` : ''),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
   { id: 'hubLength', section: 'hub', kind: 'slider',
     min: HUB_LENGTH_RANGE[0], max: HUB_LENGTH_RANGE[1], step: 0.5, default: 0,
@@ -4363,7 +4369,7 @@ export const CONTROLS = [
        reproduce today on every state. Above 0 it is that reach in millimetres,
        floored at the sheet. hubLength ADDS to the object's height; the read-out
        states the total (Eva's ruling). */
-    fmt: (v, ui) => (Number(v) === 0 ? 'auto — the derived reach (the read-out says the mm)' : `${Number(v).toFixed(1)} mm below the head`) + umbelJunctionNote(ui),
+    fmt: (v, ui) => (Number(v) === 0 ? 'auto — the derived reach (the read-out says the mm)' : `${Number(v).toFixed(1)} mm below the head`) + (umbelJunctionNote(ui) ? umbelJunctionNote(ui) + ' — its REACH below the base plane' : ''),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
 
   /* ===================================================================

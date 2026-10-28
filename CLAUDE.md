@@ -6868,6 +6868,22 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
   FLOORED). Flat hub, sphere and a head not wider than its stem are byte-identical by branch.
   **ST13** reads the exported file by the builder's own stream ranges against the HUB BUILDER's
   emitted dome and the control's radius; ST4 keeps the slab; ST10's band restated on a domed top.
+- **[Oct 28: THE KNOT IS SUPERSEDED BY THE GENTLE SWELLING — Eva's ruling on the knot sheet ("still
+  too much"). The junction is the STEM NODE's spindle (`stemNodeRadiusMm`, one node ON the base plane,
+  half-width 3.2738 rod radii, drawn to 2 w and chamfered inside the rod): the rod widens to
+  `1 + 0.4 × Hub amount` (0.50 → **1.20×**) over `2 w` (**19.64 mm** on a 6 mm stem, 9.82 on a 3 mm ray;
+  Hub length is the reach), the pedicels leave its FLAT TOP (head off) or it runs through (head on), and
+  the roots go DEEPER — `extendMm + deepenMm`, the least depth on a 2⁻⁸ grid burying every disc half a gap
+  inside, the quarter-step stagger kept. Where the asked width cannot hold them it is raised to the least
+  that does and told FORCED (the mophead ray tip 1.63× at the default, 2.0–3.1× over the grid — Eva's
+  "report the width it reaches"); where no depth buries them (a pedicel at or below horizontal) the head-off
+  top RISES instead (my placement). **Hub style is INERT on a spindle and HIDDEN with the head off**
+  (`hubStyleLive`). `umbelSwelling` / `umbelSwellBody` / `umbelRootLaw`; UM1/UM2/UM8 restated through
+  `umbelSwellingExpected`; eight mutants re-pointed; `--movers-predicate umbel-swelling`.
+  **RULED Oct 28 (2): CURVED 0.50 is the head's hub-to-stem default too** — ~353 stemmed rows
+  predeclared from the BASE record, census and combination magnitudes re-recorded by value, the defaults
+  bar's pins updated. Read `docs/bloom-umbel-hubs-outcome.md` §7 before touching any of it. The knot
+  paragraph below is kept as the record the ruling was made on.]**
 - **The junction (RULED Oct 27, superseding the band): a CONVERGING KNOT.** Each pedicel's line
   crosses the base plane at `rhoB` (the pedicel's own radius head off; one gap off the stem head on)
   and continues straight inward, at its own angle, to its line's point nearest the centre
@@ -6901,11 +6917,9 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
   ten umbel rows declared in `INFLO_APPROACH_XFAIL` (the junction moves no floret). **ST13 is a
   FILE-side clause and the apex table cannot fire it** — its witness is `verify-bloom-stem-channel.mjs`
   §2b (ST9's precedent), where both stem-top mutations fire it.
-- **WAITING ON EVA (the sheet `docs/img/umbel-hubs.png`, BEFORE the band / AFTER the knot):** the
-  knot as drawn, and whether CURVED 0.50 is the HEAD's join default too (one owner) or the
-  junction's alone. After the ruling: UM-gates and the two knot mutants in CI, connectedness on every
-  umbel row, the byte partition (`--movers-predicate umbel-knot`), `frozen/phase89`
-  (1,588 → 1,605, block 82), merge `main` in, the PR.
+- **WAITING ON EVA (the sheet `docs/img/umbel-hubs.png`, BAND | KNOT | SWELLING, and the head join at
+  GOBLET 1.00 beside CURVED 0.50):** the swelling as drawn. After the ruling: CI, the byte partition and
+  the re-records of ruling 2, `frozen/phase89` (1,588 → 1,605, block 82), merge `main` in, the PR.
 
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of

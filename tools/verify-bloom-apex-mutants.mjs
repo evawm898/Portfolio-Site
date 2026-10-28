@@ -1521,18 +1521,18 @@ const MUTANTS = [
      at `rhoB`, its disc straddling the knot's equator half out of solid. */
   { id: 'the-umbel-pedicel-roots-off-the-junction', rows: /^an umbel/,
     why: "the umbel's pedicels stop converging: each roots where its line crosses the base plane, with no inward extension, so the root disc is not held half a gap inside the dome, the flare or the rod — watertight, and one piece wherever the rods overlap the knot",
-    find: '  const embedMm = umbel ? rootLaw.extendMm : rodWallEmbedMm(stem);\n  const rootExtendMm = umbel ? rootLaw.extendMm : 0;',
+    find: '  const embedMm = umbel ? rootLaw.extendMm + rootLaw.deepenMm : rodWallEmbedMm(stem);\n  const rootExtendMm = umbel ? rootLaw.extendMm + rootLaw.deepenMm : 0;',
     into: '  const embedMm = umbel ? 0 : rodWallEmbedMm(stem);\n  const rootExtendMm = 0;', names: ['UM2'],
     witness: (M, C) => {
-      /* the MEAN radial offset of the emitted roots from the base circle (the
-         stagger is symmetric about the nearest point, so the mean is the extension's own) */
-      const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); const pl = b.inflorescenceBuilt.placed; return pl.reduce((a, q) => a + Math.hypot(q.root[0], q.root[1]), 0) / pl.length - b.inflorescence.knot.rhoB; };
+      /* the MEAN depth of the emitted roots under the base plane: 0 with no
+         extension, the deepened roots' own on the clean tree */
+      const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); const pl = b.inflorescenceBuilt.placed; return b.inflorescence.knot.centre[2] - pl.reduce((a, q) => a + q.root[2], 0) / pl.length; };
       f.step = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); return b.inflorescence.knot.staggerMm; };
       const m = f(M), c = f(C);
       /* the mean sits a QUARTER STEP inward (the stagger is centred a quarter
          step off the nearest point), so the bar is half a step, never zero */
       const half = f.step(M) / 2;
-      return (Math.abs(m) < half && c < -0.5) ? null : `the roots stand ${m.toFixed(3)} mm off the base circle on average on the mutant (bar half a stagger step, ${half.toFixed(3)}) and ${c.toFixed(3)} on the clean tree`;
+      return (Math.abs(m) < half && c > 0.5) ? null : `the roots sit ${m.toFixed(3)} mm under the base plane on average on the mutant (bar half a stagger step, ${half.toFixed(3)}) and ${c.toFixed(3)} on the clean tree`;
     } },
   { id: 'the-head-is-built-while-toggled-off', rows: /^an umbel/,
     why: "the head toggle is read and ignored: a spider lily asked with no head builds the whole head at the stem's top anyway — a perfectly good closed solid, watertight, one piece",
@@ -1573,13 +1573,13 @@ const MUTANTS = [
       return (!m.hubReachFloored && c.hubReachFloored && m.axisDepth < c.axisDepth - 0.5) ? null : `the reach is ${m.axisDepth} (floored ${m.hubReachFloored}) on the mutant and ${c.axisDepth} (floored ${c.hubReachFloored}) on the clean tree`;
     } },
   { id: 'the-junction-ignores-the-hub-controls', rows: /^an umbel|^a mophead/,
-    why: 'the umbel junction never reads the three Hub controls, so every knot is a dome on a flat underside whatever style, amount and length ask — watertight, one piece, 1,152 triangles a knot',
-    find: '  let flare = null;\n  if (hub) {',
-    into: '  let flare = null;\n  if (false) {', names: ['UM1', 'UM8'],
+    why: 'the umbel swelling never reads the Hub amount, so its width is the default 1.20x whatever the control asks — watertight, one piece, the roots still held (the search widens from the default)',
+    find: '  const amount = !hub || hub.amount === undefined ? HUB_SHAPE_AMOUNT_DEFAULT : Number(hub.amount);\n  const lengthAsked = !hub || hub.lengthMm === undefined ? 0 : Number(hub.lengthMm);',
+    into: '  const amount = HUB_SHAPE_AMOUNT_DEFAULT;\n  const lengthAsked = !hub || hub.lengthMm === undefined ? 0 : Number(hub.lengthMm);', names: ['UM1', 'UM8'],
     witness: (M, C) => {
-      const f = (X) => { const k = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescenceBuilt.knot; return k.bottomZ - k.equatorZ; };
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE({ hubShapeAmount: 2 })).inflorescenceBuilt.knot.peakR;
       const m = f(M), c = f(C);
-      return (Math.abs(m) < 1e-9 && c < -0.5) ? null : `the knot's foot stands ${m} mm under its equator on the mutant and ${c} on the clean tree`;
+      return (c > m + 1) ? null : `at Hub amount 2 the swelling's peak radius is ${m} mm on the mutant and ${c} on the clean tree`;
     } },
   /* THE CONVERGING KNOT (Eva's ruling, Oct 27). Four mutants on the law:
      the roots unstaggered (every mirror pair's root rings share their
@@ -1600,48 +1600,49 @@ const MUTANTS = [
       const m = f(M), c = f(C);
       return (m > 0 && c === 0) ? null : `florets 0 and 3 share ${m} vertex position(s) on the mutant and ${c} on the clean tree`;
     } },
-  { id: 'the-knot-is-sized-from-the-floret-count', rows: /^an umbel/,
-    why: "the base circle is the retired root-disc RING again, `(rP + gap/2) / sin(pi/n)`, so the knot grows with the floret count — 9.1 mm at six florets, 17.5 mm at twelve on a 6 mm stem — instead of the rod's own size; watertight, one piece, every root held",
-    find: '  const rhoB = headOn ? outerR + rP + gap : rP;\n  const extendMm = rhoB * ca;',
-    into: '  const rhoB = Math.max(headOn ? outerR + rP + gap : rP, (rP + gap / 2) / Math.sin(Math.PI / n));\n  const extendMm = rhoB * ca;', names: ['UM1', 'UM2'],
+  { id: 'the-roots-are-not-deepened', rows: /^an umbel/,
+    why: "the depth search is gone, so no root goes deeper than its line's nearest point and every head-off umbel buries its roots by RAISING the top instead (a taller body, the pedicels leaving its side) — watertight, one piece, every root held",
+    find: '  const solveAt = (k) => { const d = deepenFor(k);',
+    into: '  const solveAt = (k) => { const d = null;', names: ['UM1', 'UM2'],
     witness: (M, C) => {
-      const f = (X) => [6, 12].map((n) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE({ umbelFlorets: n })).inflorescenceBuilt.knot.radiusMm);
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescence.knot;
       const m = f(M), c = f(C);
-      return (m[1] - m[0] > 1.5 && Math.abs(c[1] - c[0]) < 0.5) ? null : `the knot's radius goes ${m[0].toFixed(3)} -> ${m[1].toFixed(3)} mm from 6 to 12 florets on the mutant and ${c[0].toFixed(3)} -> ${c[1].toFixed(3)} on the clean tree`;
+      return (m.deepenMm === 0 && m.riseMm > 0 && c.deepenMm > 0.5 && c.riseMm === 0) ? null : `the mutant deepens ${m.deepenMm} and rises ${m.riseMm}; the clean tree deepens ${c.deepenMm} and rises ${c.riseMm}`;
     } },
   { id: 'a-root-disc-on-the-junctions-face', rows: /^an umbel/,
-    why: "the hold drops its half gap: the lowest unheld root point lands EXACTLY on the knot's equator plane — ON the flat underside at amount 0, and decided by its last bit against the dome at any amount — the tangency that welds (749 pairs on the Oct 23 sphere); watertight, one piece",
-    find: '  for (const [, z] of free) if (-z + gap / 2 > liftMm) liftMm = -z + gap / 2;\n  const radiusFromRodMm',
-    into: '  for (const [, z] of free) if (-z > liftMm) liftMm = -z;\n  const radiusFromRodMm', names: ['UM1', 'UM2'],
+    why: "the hold drops its half gap: a root disc's rim lands EXACTLY on the top face or the spindle's skin, decided by its last bit — the tangency that welds (749 pairs on the Oct 23 sphere); watertight, one piece",
+    find: '  const m = gap / 2;\n  const holds = (k, d, riseMm) => {',
+    into: '  const m = 0;\n  const holds = (k, d, riseMm) => {', names: ['UM1', 'UM2'],
     witness: (M, C) => {
-      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescence.knot.liftMm;
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescence.knot.deepenMm;
       const m = f(M), c = f(C);
-      return (c - m > 0.49 && c - m < 0.51) ? null : `the knot's lift is ${m} on the mutant and ${c} on the clean tree`;
+      /* half a gap of depth along the line at 35 deg is 0.5 / sin 35 = 0.87 mm */
+      return (c - m > 0.6) ? null : `the roots are deepened ${m} mm on the mutant and ${c} on the clean tree`;
     } },
   { id: 'the-ray-junction-reads-the-stems-radius', rows: /^a mophead/,
     why: "a sub-umbel keeps the HEAD's stem diameter instead of its own ray's, so every ray tip's rod — and the knot flared onto it — is sized from the stem; watertight, one piece",
     find: '    umbelFlorets: plan.floretsPerRay,\n    stemLength: lengthMm,\n    stemDiameter: 2 * plan.pedicelR,\n  };',
     into: '    umbelFlorets: plan.floretsPerRay,\n    stemLength: lengthMm,\n  };', names: ['UM8'],
     witness: (M, C) => {
-      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), MOPHEAD_STATE()).inflorescenceBuilt.sub.knot.flare.rodR;
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), MOPHEAD_STATE()).inflorescenceBuilt.sub.knot.rodR;
       const m = f(M), c = f(C);
       return (m > c + 0.5) ? null : `the ray tip's rod is ${m} mm on the mutant and ${c} on the clean tree`;
     } },
-  { id: 'the-knot-radius-is-typed', rows: /^an umbel/,
-    why: "the knot's dome is a typed 6 mm radius instead of the rod's end and the converging roots' hold — on a 6 mm stem the dome is then 12 mm across whatever the roots need, and at a 12 mm stem the stem's own end stands out through it",
-    find: '  const radiusMm = Math.max(radiusFromRodMm, radiusFromRootsMm);',
-    into: '  const radiusMm = 6;', names: ['UM1'],
+  { id: 'the-swelling-width-is-typed', rows: /^a mophead/,
+    why: "the width search is gone: the swelling is the asked 1.20x whether or not that holds the roots — on a mophead ray tip (1.5 mm pedicels off a 1.5 mm ray) the roots then stand out through the skin; watertight, one piece",
+    find: "  let swell = swellAsked, held = solveAt(swell), widthForced = false;\n  if (!held) {",
+    into: "  let swell = swellAsked, held = solveAt(swell) || { deepenMm: 0, riseMm: 0, heldBy: 'typed' }, widthForced = false;\n  if (false) {", names: ['UM8'],
     witness: (M, C) => {
-      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescenceBuilt.knot.radiusMm;
+      const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), MOPHEAD_STATE()).inflorescenceBuilt.sub.plan.knot;
       const m = f(M), c = f(C);
-      return (Math.abs(m - 6) < 1e-9 && Math.abs(c - 6) > 1e-3) ? null : `the knot's radius is ${m} mm on the mutant and ${c} on the clean tree`;
+      return (!m.widthForced && c.widthForced && c.swell > m.swell + 0.1) ? null : `the ray tip's width is ${m.swell} (forced ${m.widthForced}) on the mutant and ${c.swell} (forced ${c.widthForced}) on the clean tree`;
     } },
   { id: 'the-umbel-sits-on-the-cut-end', rows: /^an umbel/,
     why: "the head-off umbel's node is put at the stem's TIP — the end the florist's cut is on — so the knot swallows the cut and the umbel hangs from the free end: watertight, one piece",
     find: '  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.topZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;',
     into: '  const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.tipZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;', names: ['UM3', 'UM4'],
     witness: (M, C) => {
-      const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); return b.inflorescenceBuilt.knot.centre[2] - b.stem.tipZ; };
+      const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); return b.inflorescence.knot.centre[2] - b.stem.tipZ; };
       const m = f(M), c = f(C);
       return (Math.abs(m) < 1e-6 && c > 100) ? null : `the knot stands ${m.toFixed(3)} mm above the stem's tip on the mutant and ${c.toFixed(3)} on the clean tree`;
     } },
@@ -4246,20 +4247,20 @@ const ROWS = [
     set: [{ id: 'petalCount', value: '8' }, { id: 'spread', value: '2' }, { id: 'headRise', value: '0.35' }, { id: 'hubStyle', value: 'CURVED' }, { id: 'hubShapeAmount', value: '1.6' }, { id: 'stemLength', value: '60' }] },
   { label: 'a domed head with a WIDE stem and a THIN join: rise 0.35, a 12 mm stem, amount 0 (the root ring poked on main)', for: /stem-top|the-join-reach-floor/,
     set: [{ id: 'headRise', value: '0.35' }, { id: 'stemDiameter', value: '12' }, { id: 'hubShapeAmount', value: '0' }, { id: 'stemLength', value: '60' }] },
-  { label: 'an umbel: six florets, the head OFF (the spider lily\'s default)', for: /umbel|head-is-built|boss-|junction|roots-|knot-/,
+  { label: 'an umbel: six florets, the head OFF (the spider lily\'s default)', for: /umbel|head-is-built|boss-|junction|roots-|knot-|swelling-/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }] },
-  { label: 'an umbel: twelve florets, the head ON', for: /umbel|head-is-built|boss-|junction|roots-|knot-/,
+  { label: 'an umbel: twelve florets, the head ON', for: /umbel|head-is-built|boss-|junction|roots-|knot-|swelling-/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '12' }, { id: 'umbelHead', value: 'ON' }] },
   /* THE MOPHEAD (Oct 24): two rays of three florets with the head OFF, and the
      same with the head ON (the head's petals beside the reduced florets) —
      scoped to the five mophead mutants and they to these. */
-  { label: 'a mophead: two rays of three florets, the head OFF, at the floor', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor|junction/,
+  { label: 'a mophead: two rays of three florets, the head OFF, at the floor', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor|junction|swelling-width/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'floretScale', value: '0.2' }] },
-  { label: 'a mophead: two rays of three florets, the head ON', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor|junction/,
+  { label: 'a mophead: two rays of three florets, the head ON', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor|junction|swelling-width/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'umbelHead', value: 'ON' }] },
   /* the 90 deg knife edge (Eva, Oct 24): the only angle at which the crossing's
      margin binds on the band's height, so the margin mutant has a row to fire on */
-  { label: 'an umbel: six florets at 90 deg, the head OFF', for: /umbel|head-is-built|boss-|roots-|knot-/,
+  { label: 'an umbel: six florets at 90 deg, the head OFF', for: /umbel|head-is-built|boss-|roots-|knot-|swelling-/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }, { id: 'pedicelAngle', value: '90' }] },
   /* (iv) A RACEME ASKED FOR WITH NO RACHIS, and it is the ONLY state ID0 can
      speak on — measured, not reasoned. ID0 compares the geometry's guard
