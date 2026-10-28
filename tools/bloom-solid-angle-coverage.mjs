@@ -541,7 +541,8 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     /* THE ORGANS' LATTICE (texture T5): the re-emitted hub and stem are the
        SHIPPED parts; the record says how many triangles each lattice added */
     /* a FLORET's organs ('floret hub', ruling 5) are relieved in the parent's pass and recorded there, but their lattice is emitted inside the floret build the inflorescence appends, which the centre-only capture already counts */
-    const t5Extra = Object.entries((builtFull.texture && builtFull.texture.organs) || {}).reduce((n, [k, r]) => n + (r.organ && !k.startsWith('floret ') ? r.organ.refinedTris - r.organ.shippedTris : 0), 0);
+    const t5Extra = Object.entries((builtFull.texture && builtFull.texture.organs) || {}).reduce((n, [k, r]) => n + (k.startsWith('floret ') ? 0 : r.organ ? r.organ.refinedTris - r.organ.shippedTris : r.rod ? r.rod.refinedTris - r.rod.shippedTris : 0), 0);
+    /* (BONE latticing a rod — a petiole, a stamen at a high curvature threshold — adds its own refined triangles, read off the rod's record beside the organs') */
     if (petalTris + accHC.triangleCount + accST.triangleCount + t5Extra !== accFull.triangleCount) bad.push(`solid R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) + the organs' lattice (${t5Extra}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount + t5Extra}, but a whole-bloom build has ${accFull.triangleCount}`);
     if (petalsBuilt !== builtFull.petalsBuilt) bad.push(`solid R2: captured ${petalsBuilt} petals but builtFull.petalsBuilt is ${builtFull.petalsBuilt}`);
     if (bad.length) return { bad };

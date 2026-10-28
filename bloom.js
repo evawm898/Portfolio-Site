@@ -188,6 +188,9 @@ function makeInput(c) {
     for (const o of c.options) {
       const opt = document.createElement('option');
       opt.value = o.value; opt.textContent = o.label;
+      /* a RETIRED value (BONE replaced PEBBLE and CELLULAR, Oct 28) is kept
+         so a saved design that names it still loads, and is not offered */
+      if (o.hidden) opt.hidden = true;
       sel.append(opt);
     }
     return sel;
@@ -2722,7 +2725,8 @@ function lobeLine(petals) {
    silence. Null at the guard. */
 function textureLine(T) {
   if (!T) return '';
-  const word = T.type === 'PEBBLE' ? 'PEBBLE' : 'CELLULAR';
+  if (T.type === 'BONE') return boneLine(T);
+  const word = T.type === 'PEBBLE' ? 'PEBBLE (retired)' : 'CELLULAR (retired)';
   if (T.refused === 'infill') return `TEXTURE NOT BUILT — ${word} asked while the petals are INFILLED: texture and infill are exclusive (Q9); told, not picked. Set one of them to None.\n`;
   const organs = Object.entries(T.organs || {});
   if (!organs.length) return `TEXTURE ${word} ${T.heightMm.toFixed(2)} mm — no sheet carries it on this build\n`;
@@ -2747,7 +2751,32 @@ function textureLine(T) {
     : C && C.usedMm !== C.askedMm
       ? `on a ${C.usedMm.toFixed(2)} mm lattice — COARSENED from the ruled ${C.askedMm.toFixed(2)} mm to fit the ${fmtTris(C.budget)} export budget (${C.trials.map((t) => `${t.edgeMm.toFixed(2)} mm: ${fmtTris(t.tris)}`).join(', ')}; the finest edge that fits, never past ${C.capMm.toFixed(2)})${C.fits ? '' : ` — EVEN ${C.capMm.toFixed(2)} mm DOES NOT FIT (${fmtTris(C.trials[C.trials.length - 1].tris)} tris): the export will be REFUSED`}`
       : `on a ${T.edgeMm.toFixed(1)} mm lattice`;
-  return `TEXTURE ${word}: ${T.heightMm.toFixed(2)} mm peak to valley, ${T.sizeMm.toFixed(1)} mm features, outward only over the bead, ${edgeWords}${clamp} — ${parts.join(' · ')}. Buried faces stay smooth (Q7); the rods (filaments, the style, anthers, pedicels, petioles) stay smooth, pending the BONE sheet (Q12).\n`;
+  return `TEXTURE ${word}: ${T.heightMm.toFixed(2)} mm peak to valley, ${T.sizeMm.toFixed(1)} mm features, outward only over the bead, ${edgeWords}${clamp} — ${parts.join(' · ')}. Buried faces stay smooth (Q7); the rods (filaments, the style, anthers, pedicels, petioles) stay smooth under this retired pattern — BONE textures them where the curvature allows (Q12).\n`;
+}
+/* THE BONE LINE (Oct 28): every organ's count of raised vertices, why the
+   rest are smooth (buried or covered by a foot, a ridge, outside a patch, a
+   pore's floor), the rods the curvature mask leaves smooth, the pore floor
+   and the lattice. A refusal is a word, never a silence. */
+function boneLine(T) {
+  if (T.refused === 'infill') return 'TEXTURE NOT BUILT — BONE asked while the petals are INFILLED: texture and infill are exclusive (Q9); told, not picked. Set one of them to None.\n';
+  const B = T.bone || {};
+  const fmtTris = (n) => Number(n).toLocaleString('en-US');
+  const organs = Object.entries(T.organs || {}).filter(([, q]) => q.bone);
+  const parts = organs.map(([k, q]) => {
+    const b = q.bone;
+    const lat = q.organ ? `${fmtTris(q.organ.shippedTris)} -> ${fmtTris(q.organ.refinedTris)} tris, ` : q.rod ? `rod, ${fmtTris(q.rod.shippedTris)} -> ${fmtTris(q.rod.refinedTris)} tris, ` : '';
+    const hidden = b.sheet ? '' : `, ${b.buried} buried${b.covered ? `, ${b.covered} covered by a foot` : ''}`;
+    return `${k}: ${lat}${b.displaced} of ${b.vertices} vertices raised (${b.ridgeOff} on a ridge, ${b.patchOff} outside a patch, ${b.poreFloor} on a pore floor${hidden}), up to ${q.reliefMaxMm.toFixed(3)} mm`;
+  });
+  const sm = B.smoothRods || [];
+  const smWords = sm.length ? ` · ${sm.length} rod${sm.length === 1 ? '' : 's'} SMOOTH by the curvature mask (${[...new Set(sm.map((r) => r.organ))].join(', ')}; tightest radius ${(1 / Math.max(...sm.map((r) => r.kappaMin))).toFixed(2)} mm against the ${(1 / B.curvature).toFixed(2)} mm the mask allows)` : '';
+  const C = T.edgeCap;
+  const edgeWords = C && C.pinned ? `on a ${T.edgeMm.toFixed(2)} mm lattice (PINNED by a capability hook — the budget cap is off)`
+    : C && C.usedMm !== C.askedMm
+      ? `on a ${C.usedMm.toFixed(2)} mm lattice — COARSENED from the ruled ${C.askedMm.toFixed(2)} mm to fit the ${fmtTris(C.budget)} export budget (${C.trials.map((t) => `${t.edgeMm.toFixed(2)} mm: ${fmtTris(t.tris)}`).join(', ')}; the finest edge that fits, never past ${C.capMm.toFixed(2)})${C.fits ? '' : ` — EVEN ${C.capMm.toFixed(2)} mm DOES NOT FIT (${fmtTris(C.trials[C.trials.length - 1].tris)} tris): the export will be REFUSED`}`
+      : `on a ${T.edgeMm.toFixed(2)} mm lattice`;
+  const clamp = (T.heightClamped ? ' · height CLAMPED to its range' : '') + (B.clamped && B.clamped.length ? ` · ${B.clamped.join(', ')} CLAMPED to range` : '');
+  return `TEXTURE BONE: ${T.heightMm.toFixed(2)} mm peak to valley, pores ${Number(B.poreMm).toFixed(2)} and ${Number(B.largePoreMm).toFixed(2)} mm (the floor ${Number(B.floorMm).toFixed(2)} mm, unvalidated; a pore reads round from ${Number(B.readsAtEdgeMm).toFixed(2)} mm on this lattice${Number(B.poreMm) < Number(B.readsAtEdgeMm) - 1e-9 ? ' — the fine pores are UNDER it here and draw faceted' : ''}), ${edgeWords}${clamp}, outward only, pore floors on the sheet — ${parts.join(' · ') || 'no organ carries it'}${smWords}. Smooth where the surface curves tighter than ${(1 / B.curvature).toFixed(2)} mm and outside the patches; the relief fades in over ${Number(B.fadeMm).toFixed(2)} mm.\n`;
 }
 function infillLine(petals) {
   const F = petals && petals[0] && petals[0].infill;

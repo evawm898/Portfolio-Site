@@ -44,6 +44,8 @@ import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WA
   INFILL_RELAX_RANGE, INFILL_RELAX_DEFAULT, INFILL_LAW_RANGE, INFILL_LAW_STEP, INFILL_LAW_DEFAULT,
   INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT,
   INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
+import { BONE_PORE_RANGE, BONE_PORE_STEP, BONE_PORE_DEFAULT, BONE_PORE_FLOOR_MM, BONE_DENSITY_RANGE, BONE_DENSITY_STEP, BONE_DENSITY_DEFAULT, BONE_RATIO_RANGE, BONE_RATIO_STEP, BONE_RATIO_DEFAULT,
+  BONE_COVERAGE_RANGE, BONE_COVERAGE_STEP, BONE_COVERAGE_DEFAULT, BONE_CURVATURE_RANGE, BONE_CURVATURE_STEP, BONE_CURVATURE_DEFAULT, TEXTURE_TYPES_HIDDEN, bonePoreReadsMm } from './bloom-geometry.js';
 import { TEXTURE_TYPES, TEXTURE_HEIGHT_RANGE, TEXTURE_HEIGHT_STEP, TEXTURE_HEIGHT_DEFAULT, TEXTURE_SIZE_RANGE, TEXTURE_SIZE_STEP, TEXTURE_SIZE_DEFAULT, TEXTURE_EDGE_MM, TEXTURE_LATTICE_BAR } from './bloom-geometry.js';
 import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE, STAMEN_COIL_RADIUS_RANGE, STAMEN_COIL_TURNS_RANGE, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_TURNS_DEFAULT } from './bloom-geometry.js';
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, sepalOutlineWidthScale, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE, SEPAL_TIER_RANGE, SEPAL_TIER_DEFAULT } from './bloom-geometry.js';
@@ -850,7 +852,10 @@ export const PREDICATES = {
      `textureIsAbsent`, checked against it at harness load (the infill's
      relation). ONE TERM: the guard is a CHOICE whose off value is NONE, so
      the blanket sweep never reaches it and `ALL MAX` stays untextured. */
-  texturePresent: { all: [{ id: 'petalTexture', oneOf: ['PEBBLE', 'CELLULAR'] }] },
+  texturePresent: { all: [{ id: 'petalTexture', oneOf: ['BONE', 'PEBBLE', 'CELLULAR'] }] },
+  /* BONE (Oct 28) and the two it REPLACED in the dropdown, kept for saved designs */
+  textureBone: { all: [{ id: 'petalTexture', oneOf: ['BONE'] }] },
+  textureLegacy: { all: [{ id: 'petalTexture', oneOf: ['PEBBLE', 'CELLULAR'] }] },
 
   /* THE STEM'S ONE STATEMENT (session 43, narrowed by the sphere-stem session).
      This is the twin of the geometry's `stemIsAbsent`: the registry HIDES the
@@ -2630,10 +2635,16 @@ export const CONTROLS = [
      is on (Q9), and this one greys the infill out.
      =================================================================== */
   { id: 'petalTexture', section: 'texture', kind: 'choice', default: 'NONE',
+    /* BONE REPLACES PEBBLE AND CELLULAR IN THE DROPDOWN (Eva, Oct 23). Their
+       values are KEPT and HIDDEN (`hidden`): a saved design that names one
+       loads and builds exactly as before — no migration, no silent swap — and
+       the select shows it while it is the value; it is simply not offered.
+       The option ORDER is the geometry's `TEXTURE_TYPES` (the harness checks). */
     options: [
       { value: 'NONE', label: 'None (a smooth sheet)' },
-      { value: 'PEBBLE', label: 'Pebble' },
-      { value: 'CELLULAR', label: 'Cellular' },
+      { value: 'BONE', label: 'Bone' },
+      { value: 'PEBBLE', label: 'Pebble (retired — kept for saved designs)', hidden: true },
+      { value: 'CELLULAR', label: 'Cellular (retired — kept for saved designs)', hidden: true },
     ],
     label: 'Texture',
     enabledWhen: { any: [{ not: { ref: 'infillPresent' } }, { ref: 'texturePresent' }] },   // never greyed while ON (see petalInfill)
@@ -2641,7 +2652,15 @@ export const CONTROLS = [
     fmt: (v, ui, shown) => {
       if (String(v) === 'NONE') return 'a smooth sheet — no relief';
       const T = shown && shown.texture;
-      const word = String(v) === 'PEBBLE' ? 'pebble' : 'cellular';
+      if (String(v) === 'BONE') {
+        if (!T) return 'bone relief — not built on this bloom';
+        if (T.refused === 'infill') return 'bone — NOT BUILT: the petals are infilled, and texture and infill are exclusive (Q9); told, not picked';
+        const o = T.organs || {}, B = T.bone || {};
+        const parts = Object.entries(o).filter(([, q]) => q.bone).map(([k, q]) => `${k} ${q.bone.displaced}`);
+        const sm = (B.smoothRods || []).length;
+        return `bone over ${parts.join(', ') || 'nothing'} (vertices raised) — outward only, pore floors on the sheet, ${T.heightMm.toFixed(2)} mm peak to valley on a ${T.edgeMm.toFixed(2)} mm lattice; smooth where the surface curves past ${B.curvature !== undefined ? B.curvature.toFixed(2) : '—'}/mm and outside the patches${sm ? ` · ${sm} rod${sm === 1 ? '' : 's'} left smooth by the curvature mask` : ''}`;
+      }
+      const word = String(v) === 'PEBBLE' ? 'pebble (retired)' : 'cellular (retired)';
       if (!T) return `${word} relief over the petals, sepals and leaves — not built on this blade`;
       if (T.refused === 'infill') return `${word} — NOT BUILT: the petals are infilled, and texture and infill are exclusive (Q9); told, not picked`;
       const o = T.organs || {};
@@ -2672,7 +2691,41 @@ export const CONTROLS = [
     /* the lattice edge is the SHOWN build's (the budget cap may coarsen it,
        Eva's Oct 23 ruling), the ruled constant where no build is shown */
     fmt: (v, ui, shown) => { const e = (shown && shown.texture && shown.texture.edgeMm) || TEXTURE_EDGE_MM; return `${Number(v).toFixed(1)} mm features on a ${e.toFixed(2)} mm lattice (${(Number(v) / e).toFixed(1)} edges across one)${e !== TEXTURE_EDGE_MM ? ' — the edge is COARSENED to fit the export budget, see the read-out' : ''}`; },
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'texturePresent' } },
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureLegacy' } },
+  /* BONE'S FIVE (Oct 28). Every range IMPORTED (the geometry owns them);
+     every DEFAULT is the prototype's and PROVISIONAL (the outcome doc). The
+     pore size's MINIMUM is the proposed, UNVALIDATED pore-diameter floor:
+     the smallest pore whose floor still holds a lattice vertex at the
+     coarsest edge the budget may use (0.5 mm). */
+  { id: 'bonePoreSize', section: 'texture', kind: 'slider',
+    min: BONE_PORE_RANGE[0], max: BONE_PORE_RANGE[1], step: BONE_PORE_STEP, default: BONE_PORE_DEFAULT,
+    label: 'Pore size',
+    fmt: (v, ui, shown) => {
+      const e = (shown && shown.texture && shown.texture.edgeMm) || TEXTURE_EDGE_MM;
+      const floor = Number(v) <= BONE_PORE_FLOOR_MM + 1e-9 ? ` — the floor (${BONE_PORE_FLOOR_MM.toFixed(2)} mm), unvalidated` : '';
+      return `${Number(v).toFixed(2)} mm fine pores${floor} · on this ${e.toFixed(2)} mm lattice a pore reads from ${bonePoreReadsMm(e).toFixed(2)} mm`;
+    },
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureBone' } },
+  { id: 'bonePoreDensity', section: 'texture', kind: 'slider',
+    min: BONE_DENSITY_RANGE[0], max: BONE_DENSITY_RANGE[1], step: BONE_DENSITY_STEP, default: BONE_DENSITY_DEFAULT,
+    label: 'Pore density',
+    fmt: (v) => `${Math.round(Number(v) * 100)}% of the fine cells hold a pore (the craters ${Math.round(Number(v) * 45)}%)`,
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureBone' } },
+  { id: 'boneBandRatio', section: 'texture', kind: 'slider',
+    min: BONE_RATIO_RANGE[0], max: BONE_RATIO_RANGE[1], step: BONE_RATIO_STEP, default: BONE_RATIO_DEFAULT,
+    label: 'Crater size',
+    fmt: (v, ui) => `the craters ${Number(v).toFixed(1)}x the fine pores (${(Number(v) * Number(ui && ui.bonePoreSize || BONE_PORE_DEFAULT)).toFixed(2)} mm)`,
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureBone' } },
+  { id: 'bonePatchCoverage', section: 'texture', kind: 'slider',
+    min: BONE_COVERAGE_RANGE[0], max: BONE_COVERAGE_RANGE[1], step: BONE_COVERAGE_STEP, default: BONE_COVERAGE_DEFAULT,
+    label: 'Patch coverage',
+    fmt: (v) => Number(v) >= 1 ? 'porous everywhere the curvature allows — no patches' : `${Math.round(Number(v) * 100)}% of the surface in porous patches`,
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureBone' } },
+  { id: 'boneCurvature', section: 'texture', kind: 'slider',
+    min: BONE_CURVATURE_RANGE[0], max: BONE_CURVATURE_RANGE[1], step: BONE_CURVATURE_STEP, default: BONE_CURVATURE_DEFAULT,
+    label: 'Smooth past curvature',
+    fmt: (v) => `smooth where the surface curves tighter than ${(1 / Number(v)).toFixed(2)} mm radius (${Number(v).toFixed(2)}/mm) — rims, beads and thin rods`,
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureBone' } },
 
   /* THE TUBE — one slider per whorl (Eva's ruling: per layer), stepped over
      0 (the full TUBE), the divisors of the petal count, and the count itself

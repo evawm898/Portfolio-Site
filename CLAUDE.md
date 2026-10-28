@@ -1495,6 +1495,53 @@ before touching `textureVertexCovered`, an organ's `cover`, `organReliefPass`'s 
   florets of one unit differ in their own frame; the withheld rebuild the control); four witnessed apex mutants;
   two block-80 smoke rows. No row added, no phase owed; triangle counts unmoved on every row.
 
+**BONE SHIPS: ONE WORLD FIELD OF MERGED PORES RAISED OUTWARD, CURVATURE x PATCH COVERAGE, ONE DEFERRED PASS OVER
+EVERY PART — AND PEBBLE AND CELLULAR ARE HIDDEN, NOT RETIRED** (Oct 28 — Eva's BONE rulings of Oct 23 and the T5
+follow-ups of Oct 26; read `docs/bloom-surface-texture-bone-outcome.md` before touching `boneReliefPass`,
+`boneField`, `bonePatchField`, `boneConvexCurvature`, `boneRodGroup`, `boneSheetBegin/End`, `boneFinish` /
+`boneApply` / `boneRunPending`, `textureVertexCoveredAny`, `BONE_*`, TXB0–TXB7 or block 82).
+- **The dropdown is NONE / BONE.** PEBBLE and CELLULAR keep their ids as `hidden: true` options, and a loaded
+  design keeps and builds them **byte-identically** (T3/T5's path, by branch). 34 live rows and 125 frozen rows
+  over 5 phases use them; their long-term loading is open.
+- **The law is `s = w0 · mc · mp · H · f`:**
+  - **f** is two pore bands (D and `ratio × D`), merged by a smooth minimum with rounded rims. It is exactly 0 on
+    a pore floor, so the floor sits ON the sheet: outward only.
+  - **mp** is quantile-thresholded world noise (coverage IS the area fraction).
+  - **mc** smooths a ridge (convex curvature ≥ `boneCurvature`), faded geodesically over `max(H × 15/8, e)`.
+  - **w0** is T3's ramp on a sheet, and T5's visibility × not-covered × fade on an organ.
+  - Both masks are derived and there is no per-organ list. The bead and the nib are smooth by curvature.
+- **Five controls, every look default PROVISIONAL:**
+  - pore size, 2.0–4 mm. **The floor is DERIVED** — it reads round at the 0.4 mm edge, `4e/0.8`; UNVALIDATED —
+    so the default is 2.0, not the spec's 1.6. At a capped 0.5 mm edge it no longer reads round, and the read-out
+    says so.
+  - density, band ratio, patch coverage and curvature.
+  - `textureSize` shows under the retired two only.
+- **Under BONE only** (the retired patterns build as before):
+  - **The hub is smooth wherever a PETAL or SEPAL foot covers it, top and underside.** The cover is a list of
+    emitted ranges. Found: the shipped `sepalHeight` 0.75 on a 6 mm stem covers nothing.
+  - **Floret sheets, organs and nested floret organs defer to the parent pass** (one world layer).
+  - **The derived owner, keyed on the STL's float32s:** a shared position is relieved only if every copy would be
+    and their normals agree, and takes the min (order-free). The copies of DIFFERENT closed organs then part by
+    k × 2^-20 × the position's magnitude in a canonical organ order (name, vertex count, first vertex), unless an
+    organ leaves that edge open (one surface).
+    - Without the clearance, BONE's s = 0 outside a patch welded the closed tube's hub to its ring in the file
+      (10,208 false within-shell pairs), as well as the stamens at the curvature maximum and the braid.
+    - Witnesses: the two-sheet fixture for the order, the tube row's X2 for the clearance, and TXB1 restating it.
+- **Rods take the field under the same mask (Q12):** a rod whose every vertex is a ridge stays smooth and is
+  told, and the decision is made on the export twin.
+  - At the default 1/mm, the stamens, the style, the braid and the leaflet stalks are SMOOTH (tightest 1.04/mm and
+    1.67/mm).
+  - The compound petiole and the pedicels are porous. The umbel's boss is smooth (not an organ).
+- **The edge-cap trials skip the relief (`bonePending`)** and `boneRunPending` relieves the picked build. The
+  40 × 3 row is ~60 s a build and carries the 120 s settle by its label.
+- **Gates:**
+  - TXB0–TXB7 in both STL gates (the field and patch restated in the harness).
+  - `tools/verify-bloom-bone.mjs`, with six witnessed mutants, spawned by the defaults bar in both arms.
+  - Panel route (ao) for the BONE controls.
+  - Block 82 (20 rows, 1,608) and smoke block 82 (8). `frozen/phase89` is the 1,588 rows at `a43bf23` (a2b968c's, re-based off #469's frame.yml edit).
+  - Byte partition: `--movers-predicate bone`.
+  - Sheet: `node tools/shot-bloom-texture-bone.mjs docs/img/bloom-texture-bone-shipped.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
@@ -6878,7 +6925,7 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
 `umbelKnot`, `umbelKnotInside`, `umbelFlareDepthAt`, `UMBEL_DOME_RINGS` / `UMBEL_FLARE_RINGS` /
 `UMBEL_KNOT_RIM_SAMPLES`, `floretUnitMemo`'s `rootExtendMm`, `pedicelPlacement`'s stagger,
 `HUB_STYLE_DEFAULT` / `HUB_SHAPE_AMOUNT_DEFAULT`, ST13, `umbelKnotExpected` / `umbelKnotClauses` /
-`umbelRootClauses` or block 82).
+`umbelRootClauses` or block 83).
 - **The fix at its owner (`stemPlan`):** on a cap wider than its stem with the head present, the
   top rim ring sits ON the cap's MID-surface at the stem's radius and the bore opens at the
   mid-surface at the bore's; the join's reach is floored at that sag plus half a sheet (told
@@ -6938,7 +6985,7 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
 - **Byte partition (`--movers-predicate umbel-hubs`, the base tree's own records): 69 movers / 1,536
   holders, 0 floats on any holder**, both modes — a row moves iff the base builds a stem on an open cap
   wider than it with the head present, or an umbel whose flare is BUILT (amount 0 holds, by branch; the
-  first predicate named it and the run refused it). Local gates on block 82: export 17/17 (one declared
+  first predicate named it and the run refused it). Local gates on block 83 (block 82 while in flight — BONE, #470, took 82 and phase89 at the same base; §8b of the doc): export 17/17 (one declared
   fold, `headRise max (1)`'s own 248 / 0.4262 under a 12 mm stem), connectedness 17/17, panel PASS, the
   ten umbel rows declared in `INFLO_APPROACH_XFAIL` (the junction moves no floret). **ST13 is a
   FILE-side clause and the apex table cannot fire it** — its witness is `verify-bloom-stem-channel.mjs`
@@ -6949,8 +6996,8 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
   mid-surface rim) and the head's hub-to-stem default CURVED 0.50 (394 / 1,194). The two-pedicel
   overlap above the flat top stays DECLARED BY VALUE; do not raise the top or re-tune the swelling —
   the junction is the branching session's to replace. §8 of `docs/bloom-umbel-hubs-outcome.md`.
-  `frozen/phase89` is the 1,588 rows at the merged base (block 82 takes the matrix to 1,605).
-  **The first full CI run found six classes on rows outside block 82 (§8a of the doc), all fixed at
+  `frozen/phase90` is BONE's 1,608 rows at `77ae7f9` (block 83 takes the matrix to 1,625).
+  **The first full CI run found six classes on rows outside block 83 (§8a of the doc), all fixed at
   their owner:** ST13 locates a NODED stem's rim between the control's radius and the node law's
   widest, reads the EXPORT's floored slab, allows the stem's own relief on a textured row and skips
   the relieved hub by name; T6's bar carries eight float32 ulp of the rooted end's magnitude; a
@@ -11954,6 +12001,16 @@ sides), seats each in the molding by the embed (no graze), mirrors to the bit, a
 bands to the SVG and wire solids to the STL; filigree off returns the model itself (77 of 77
 rows byte-identical to `e4ce6eb`). The FRAME's box sets the print scale (`frameBox`). Read §10 of
 the charter.
+**Phase 3c (Oct 28): THE CARVED PRIMITIVES** (charter §13, Eva's picks P3/P4/P5 from the critique sheet).
+The default wire style is CARVED: width = min(0.1 L, max(F, 0.7 × the local radius of curvature)), so a
+scroll thins as it curls and cannot fold; the default section is the ARRIS (a spine with a hollow either
+side); every group's lead carries two LEAVES (curvature ∝ s^2.2, a 2.2 rad turn, a lobed notched blade
+under 1.6 ρ, floored at F) as separate shells LIFTED onto the host's crown, a joint with the host and a
+crossing (overlap ≥ F/2) or a feature's clearance with every other wire. `FRAME_TRI_BUDGET` 1.5 M is
+priced per group before building and a group past it gives way, told (no reachable state measured
+reaches it). Gates CV1–CV5, AR1, LF1–LF4, CL1, TB1–TB2, nine mutants. The default 23 mm carved lead
+spans only 0.50–0.53 turns, and one of each group's two leaves does not fit (told) — length is phase
+3d's (the running chains). Carved and leaf crowns are floored at F.
 **Phase 4 (Oct 23): TEXTURE WAS BUILT, RENDERED AND NOT SHIPPED** (charter §12) — stone grain,
 weathering, cracks and hammered metal as real displacement of the molding along its TRUE normal (smoothed or
 wall-held directions fold, measured). Eva picked **none** from `docs/img/frame-texture-vocabulary.png`, so the

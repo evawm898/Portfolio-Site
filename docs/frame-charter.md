@@ -815,3 +815,109 @@ V1/V2's texture rows and `tools/shot-frame-texture.mjs` — by restoring each fi
 the identity is the files themselves rather than a measurement. The SVG options for texture that
 step 2 was to ask about are moot. Re-opening texture is a new ruling, not a re-run of step 2.
 
+
+## 13. Phase 3c — the carved primitives: the self-similar stroke, the arris, the leaf, the cluster, the budget
+
+### 13.0 Rulings (Eva, Oct 28, on the filigree critique sheet)
+
+- **P3 (the arris), P4 (the leaf) and P5 (a scroll with lapping leaves) are the direction.** No further
+  look at the primitive stage.
+- **The width law is 1B, self-similar**: width = k × the local radius of curvature, floored at 1 mm,
+  capped as prototyped.
+- **Undercut is (b), stacked overlapping shells** (as P5) — the height field is kept.
+- **The pairs read as floating, not incorporated: the ornament must FOLLOW THE FRAME.** That is
+  phase 3d (seating on the molding, running chains), not this section; target (b), refs 2 and 3.
+- **A triangle budget per frame** (the bloom's 1.5 M), measured and enforced.
+
+### 13.1 The self-similar stroke (the CARVED wire style, now the default)
+
+`carvedWidth(ρ, cap) = min(cap, max(F, 0.7 ρ))` (`CARVED_K` 0.7, `cap = max(F, 0.1 L)`, F =
+`MIN_FEATURE_MM`). The width follows the curve, so a scroll is fat through its body and thins as it
+curls into its eye, the way a carved C-scroll is — the constant and tapered wires stay as the other
+two values of Wire style. Two properties are by construction and both are gated:
+
+- **It cannot fold**: the half width is at most 0.35 ρ, under the radius of curvature everywhere.
+- **The eye is the floor**: a carved scroll's eye is built for a stroke of F, so the tightness range is
+  fitted for the carved law (its own key in the fit memo) and keeps phase 3b's no-dead-travel ruling.
+
+The wire-thickness slider is hidden under the carved style (it would move nothing): the stroke's
+width is the curve's.
+
+### 13.2 The arris section (P3, now the default carved section)
+
+A crisp spine down the stroke's middle with a shallow hollow either side:
+u = |2x − 1|, z = (1 − u)^0.55 · (0.72 + 0.28 cos²(1.6 π u)) · dome^0.25, 16 samples across so the
+spine is a vertex. Ornament section offers arris / half-round / round.
+
+### 13.3 The leaf (P4)
+
+A short spine whose curvature rises toward the tip, κ(s) = ±θ (p + 1)/L · (s/L)^p (θ 2.2 rad, p 2.2),
+so the whole leaf turns exactly θ and the tip curls over. Its width is a lobed, notched envelope
+(4 lobes, `LEAF_ASPECT` 0.38 of its length) held under 1.6 ρ (the leaf's own fold guard, wider than
+the stroke's because a leaf is a flat blade, not a coil) and floored at F. Section: a raised midrib on
+a flat blade with turned-up edges.
+
+### 13.4 The cluster (P5): leaves lapping a scroll's root, as stacked shells
+
+Each group's lead scroll carries two leaves at its root (`LEAF_LAYOUT`, swept over 256 layouts for
+the longest mean leaf: +0.3 rad at 0.42 L, π + 0.2 rad at 0.35 L). A leaf is its own closed shell,
+LIFTED by its host's crown at the root (`leafLift`), so it laps OVER the scroll as an undercut in
+relief while the height field stands. Two contact rules:
+
+- with its HOST, a joint: every approach an overlap of the embed (EMBED_MM);
+- with any OTHER wire, clear by a feature, or a CROSSING whose every approach under a feature reaches
+  an overlap of F/2 (`LEAF_CROSS`) — a leaf lying over a child is held there, never a near miss.
+
+A leaf that fits neither way is shortened by 15 % up to seven times, then dropped; both are told.
+
+### 13.5 The triangle budget
+
+`FRAME_TRI_BUDGET` 1,500,000 (the bloom's). `ornamentFor` prices each group by `solidTriBound` before
+building it, in the groups' priority order, and a group that would pass the budget gives way whole and
+is told. Measured, no reachable state reaches it: at the sliders' ceiling (density 5, scale 6, leaves
+0.6, tightness 1, every group) on a 600 mm print the relief is 831,272 (rect) / 1,152,588 (arch) /
+876,744 (oval) triangles — crowding gives groups way first. TB2 therefore exercises the give-way by
+handing the shipped `ornamentFor` a budget the ceiling rectangle passes.
+
+### 13.6 Measured (relief gate)
+
+| row | triangles | boundary | regions |
+|---|---|---|---|
+| arch, default (carved, arris, leaves) | 163,772 | 0 | 1 |
+| arch, density 5, every group | 406,828 | 0 | 1 |
+| rectangle, default | 146,336 | 0 | 1 |
+| oval, default | 95,296 | 0 | 1 |
+| the most in the gate's rows | 517,952 | 0 | 1 |
+
+The tapered and constant rows are unchanged (115,420 / 68,912 / 69,488). Carved strokes: width within
+2.3 % of 0.7 × the emitted circumradius, thinnest exactly F, half width at most 0.497 ρ, least coil gap
+exactly F; leaves: width within 2.1 % of the restated envelope, half width at most 0.56 ρ, thinnest F;
+98 leaves on the gate's rows, every one lapping its host by at least 0.57 mm.
+
+**A finding, not fixed here: a carved scroll needs LENGTH to curl.** Its body is fat (0.1 L), so its
+eye has less room than a thin wire's: at the default 23 mm lead the tightness slider spans only
+0.50–0.53 turns (C) / 0.50–0.63 (S) — no dead step (CV5), but little travel — and one of each group's
+two leaves does not fit (told). At 46 mm it spans 0.50–0.70 / 0.82, at 80 mm 0.50–0.89 / 1.11. Phase
+3d's running chains are sized to the run between anchors, which is what gives the scrolls their length;
+V1 probes the slider on a 46 mm lead (scale 5) meanwhile.
+
+**The carved and leaf crowns are floored at F** (`withOrnament`): at the defaults a 14 mm child's cap
+(1.39 mm) gives an arris crown of 0.87 mm and a leaf's blade 0.83 mm, and the default must not open on
+an under-floor note. The tapered and constant wires keep their own floor, by branch — and **main's
+tapered default already reads "ornament crown 0.77 mm high"** (a tapered child's thinned crown),
+pre-existing and unchanged here.
+
+### 13.7 Gate (CV / AR / LF / CL / TB) and mutants
+
+CV1–CV5 (closed, the width law restated off the emitted circumradius — compared IN CURVATURE, within
+1 rad per scroll length, because near an S's inflection a 3-point circumradius has an unbounded relative
+error on a correct curve; the floor and cap rows exact — no fold, the coil gap, no dead
+travel and the top exactly the most that prints on the restated width), AR1 (the arris formula
+restated, exact), LF1–LF4 (closed, the width law, floor and fold, the 2.2 rad turn against the law's
+own polygon — a polygon misses the curvature in its first and last half steps, which at the tip is
+κ(L)·ds/2 ≈ 0.07 rad; the leaf's 1.6 ρ fold guard NEVER BINDS at the shipped 2.2 rad curl, which is
+not a control, so a written-down witness leaf curled 6 rad — where it binds on 26 of 76 rows — is the
+one row that can see it; the fold-guard mutant fired nothing until that row existed), CL1 (every leaf's top over its host's crown), TB1 (every row within budget and
+its own bound), TB2 (the give-way, exercised). Nine new mutants: the carved width ignoring curvature,
+its floor removed, the arris swapped for a half-round, the leaf unfloored, its fold guard removed, its
+curl halved, its lift removed, the leaf crossing rule removed, the budget give-way removed.
