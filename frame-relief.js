@@ -58,14 +58,15 @@ export function embedSpine(spine, e = EMBED_MM) {
   if (!start && !end) return { spine, start: false, end: false };
   const pts = spine.pts.slice(), nrm = spine.nrm.slice();
   const unit = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy); return [dx / l, dy / l]; };
-  const ws = spine.widthScale ? spine.widthScale.slice() : null, zs = spine.depthScale ? spine.depthScale.slice() : null;
+  const ws = spine.widthScale ? spine.widthScale.slice() : null, zs = spine.depthScale ? spine.depthScale.slice() : null, ls = spine.baseLift ? spine.baseLift.slice() : null;
   const ext = (a, at) => { if (a) { if (at) a.unshift(a[0]); else a.push(a[a.length - 1]); } };
-  if (start) { const t = unit(pts[0], pts[1]); pts.unshift([pts[0][0] - t[0] * e, pts[0][1] - t[1] * e]); nrm.unshift(nrm[0]); ext(ws, true); ext(zs, true); }
-  if (end) { const n = pts.length - 1, t = unit(pts[n - 1], pts[n]); pts.push([pts[n][0] + t[0] * e, pts[n][1] + t[1] * e]); nrm.push(nrm[n]); ext(ws, false); ext(zs, false); }
+  if (start) { const t = unit(pts[0], pts[1]); pts.unshift([pts[0][0] - t[0] * e, pts[0][1] - t[1] * e]); nrm.unshift(nrm[0]); ext(ws, true); ext(zs, true); ext(ls, true); }
+  if (end) { const n = pts.length - 1, t = unit(pts[n - 1], pts[n]); pts.push([pts[n][0] + t[0] * e, pts[n][1] + t[1] * e]); nrm.push(nrm[n]); ext(ws, false); ext(zs, false); ext(ls, false); }
   const joins = (spine.joins || []).map((j) => j + (start ? 1 : 0));
   const out = { ...spine, pts, nrm, joins };
   if (ws) out.widthScale = ws;
   if (zs) out.depthScale = zs;
+  if (ls) out.baseLift = ls;
   return { spine: out, start, end };
 }
 
@@ -134,7 +135,12 @@ export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embed
   // a tapered wire declares depthScale[v]: its crown at vertex v is
   // reliefDepth · depthScale[v] (absent: the old expression, by branch)
   const dz = S.depthScale;
-  if (dz) for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth * dz[v]);
+  // an ornament SEATED on a molding (phase 3d) declares baseLift[v]: row v's
+  // crown stands on the molding's height there (its base stays at 0, so the
+  // two shells overlap all the way down); absent, the old expressions
+  const lz = S.baseLift;
+  if (lz) for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + lz[v] + zs[c] * reliefDepth * (dz ? dz[v] : 1));
+  else if (dz) for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth * dz[v]);
   else for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth);
   for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, 0);
   const T = (v, c) => base + v * C + c, B = (v, c) => base + V * C + v * C + c;
