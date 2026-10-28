@@ -542,8 +542,9 @@ side-on and from below; dimensions in every caption.
   modes, four shards; the 17 block-82 head rows have no base partner and are listed. Eva's
   "~353" was the stemmed-row estimate; the 394 are those plus the 48 umbel and mophead rows and
   the stem-top movers.
-- **Frozen phase**: `frozen/phase89` is OWED — block 82 took the matrix 1,588 → 1,605 — and
-  is NOT registered yet: it waits on Eva's ruling on the sheet, with CI and the merge.
+- **Frozen phase**: `frozen/phase89` is OWED — block 82 took the matrix 1,588 → 1,605 — and is
+  REGISTERED (§8): the 1,588 rows at `a43bf23`, main's head after #468 / #459 / #469, proved
+  deep-equal by `--verify-frozen --phase89` against a worktree of that commit.
 
 
 ## 8. The junction is PARKED, the swelling ships INTERIM (Oct 28, Eva's third ruling, on §7's sheet)
