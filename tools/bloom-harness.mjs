@@ -13596,7 +13596,8 @@ export async function inflorescenceAssertions(page, row) {
     if (F.petalCount !== PF.floretPetals) bad.push(`ID4: the floret was built with ${F.petalCount} petals and the plan declares ${PF.floretPetals}`);
     if (PF.floretPetals !== Math.round(Number(ui.floretPetals))) bad.push(`ID4: the plan declares ${PF.floretPetals} floret petals, the page's floretPetals reads ${ui.floretPetals}`);
     if (!Object.is(F.petalLength, PF.petalLength) || !Object.is(F.petalWidth, PF.petalWidth)) bad.push(`ID4: the floret was built at ${F.petalLength} x ${F.petalWidth} mm and the plan declares ${PF.petalLength} x ${PF.petalWidth}`);
-    const fExtend = compound ? subRootExtendMm : rodExtendMm;
+    /* a SESSILE floret has no rod to lengthen (its hub is placed on the converging root), so its unit is built at 0 */
+    const fExtend = PF.pedicelLenMm > 0 ? (compound ? subRootExtendMm : rodExtendMm) : 0;
     if (Math.abs(F.stemLength - (PF.pedicelLenMm + fExtend)) > 1e-9) bad.push(`ID4: the floret's stem is ${F.stemLength} mm and the pedicel is ${PF.pedicelLenMm} mm${fExtend ? ` plus the converging root's ${fExtend.toFixed(6)} mm` : ''} — the pedicel IS the floret's stem`);
     if (!Object.is(F.stemDiameter, 2 * PF.pedicelR)) bad.push(`ID4: the floret's stem is ${F.stemDiameter} mm across and the derived pedicel is ${2 * PF.pedicelR}`);
     /* THE TOPMOST UNIT CARRIES A STEM EXACTLY WHEN ITS PEDICEL HAS A LENGTH
@@ -13817,7 +13818,7 @@ export async function inflorescenceAssertions(page, row) {
       const U = Array.isArray(B.units) ? B.units : [];
       for (const q of B.placed || []) {
         const u = U[q.unit];
-        if (!u || !Object.is(u.lengthMm, P.pedicelLensMm[q.nodeIndex]) || !u.floretState || Math.abs(u.floretState.stemLength - (P.pedicelLensMm[q.nodeIndex] + rodExtendMm)) > 1e-9) {
+        if (!u || !Object.is(u.lengthMm, P.pedicelLensMm[q.nodeIndex]) || !u.floretState || Math.abs(u.floretState.stemLength - (P.pedicelLensMm[q.nodeIndex] + (P.pedicelLensMm[q.nodeIndex] > 0 ? rodExtendMm : 0))) > 1e-9) {
           bad.push(`ID7: the floret at node ${q.nodeIndex} was appended from a unit built at ${u && u.floretState ? u.floretState.stemLength : '(none)'} mm where its node's pedicel is ${P.pedicelLensMm[q.nodeIndex]} mm`);
           break;
         }
@@ -13913,7 +13914,7 @@ export async function inflorescenceAssertions(page, row) {
       const key = `${exportMode ? 'E' : 'L'}|${o ? JSON.stringify(o) : ''}`;
       if (unitCache.has(key)) return unitCache.get(key);
       const sub = new GEOMETRY.MeshBuilder({ exportMode });
-      const fs = GEOMETRY.floretState({ ...(compound ? uiTop : ui) }, prePlan, topL + rodExtendMm, az);
+      const fs = GEOMETRY.floretState({ ...(compound ? uiTop : ui) }, prePlan, topL + (topL > 0 ? rodExtendMm : 0), az);
       /* `pedicel: true`: a floret's own stem IS its pedicel, a rod, and rods
          take no relief (Q12 — deferred pending BONE); the unit is built as
          the plan builds it, so a textured raceme's floor is the same body's */
@@ -13929,7 +13930,7 @@ export async function inflorescenceAssertions(page, row) {
        plan's own `rootStaggerMm`), so the i-th azimuth's unit sits that much
        deeper or shallower in the knot and reaches that much less or more */
     const topLaw = isUmbel && m.stem ? rootLawRestated(m.stem.outerR, Math.round(Number(ui.umbelFlorets)), Number(ui.pedicelAngle), String(ui.umbelHead) === 'ON', m.stem.boreR) : null;
-    const placeAt = (az, tipZ, i = 0) => GEOMETRY.pedicelPlacement({ angleDeg: Number(ui.pedicelAngle), rootZ: 0, nodeDepthsMm: [0], rootR: P.rootR, embedMm: P.embedMm + (topLaw ? topLaw.staggerAt(i) : 0) }, 0, az, tipZ, sessileTop).M;
+    const placeAt = (az, tipZ, i = 0) => GEOMETRY.pedicelPlacement({ angleDeg: Number(ui.pedicelAngle), rootZ: 0, nodeDepthsMm: [0], rootR: P.rootR, embedMm: P.embedMm + (topLaw ? topLaw.staggerAt(i) : 0), umbel: !!P.umbel }, 0, az, tipZ, sessileTop).M;
     /* over every azimuth the phyllotaxy puts on any asked node — restated
        from the CONTROLS through `leafAzimuths`, never the plan's own list */
     const nAsked = isUmbel ? 1 : Math.max(1, Math.round(Number(ui.floretNodes)));
