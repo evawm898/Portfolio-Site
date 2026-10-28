@@ -5889,7 +5889,12 @@ export function boneRecordClauses(ui, T, readout = null, rec = null) {
       /* TXB2 — the law, restated */
       if (!(q.w0 >= 0 && q.w0 <= 1 + 1e-12)) { once('w0' + name, `TXB2: ${name}: a weight w0 of ${q.w0}`); continue; }
       if (!(q.w0 > 0)) continue;
-      const mc = q.ridgeDistMm >= lam ? 1 : TX_EASE(q.ridgeDistMm / lam), mp = P(q.p0);
+      /* `ridgeDistMm` is Infinity where no ridge is within reach (the geometry's own
+         geodesic answer), and the page's record reaches this clause through JSON, which
+         writes Infinity as null — so null IS "no ridge within reach", and reading it as 0
+         would make every such vertex a ridge (the browser gate caught that on all 17 relieved rows; every Node run passed). */
+      const ridgeD = q.ridgeDistMm == null ? Infinity : q.ridgeDistMm;
+      const mc = ridgeD >= lam ? 1 : TX_EASE(ridgeD / lam), mp = P(q.p0);
       const want = q.w0 * (mc * (mp * (C.H * fR)));
       nLaw++;
       if (!(Math.abs(q.s - want) <= 1e-9)) once('law' + name, `TXB2: ${name}: at ${q.p0.map((x) => x.toFixed(4)).join(',')} the builder raised ${q.s} mm where the law restated here — w0 ${q.w0} x mc ${mc} (ridge ${q.ridgeDistMm} mm off) x mp ${mp} x H ${C.H} x f ${fR} — says ${want}`);

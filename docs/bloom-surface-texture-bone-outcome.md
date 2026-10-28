@@ -262,6 +262,13 @@ EXPORT triangles, the edge the cap used, PEBBLE against BONE:
 
 ## 11. Found
 
+- **TXB2 dropped all 17 relieved BONE rows in the browser and passed every Node run.** A vertex with no ridge within
+  reach carries `ridgeDistMm: Infinity`, and the page's record reaches the gate through JSON, which writes Infinity
+  as `null`; the clause read `null` as a distance of 0 and so called every such vertex a ridge. It now reads
+  `null` as "no ridge within reach". No geometry changed — the record was right and the reading was wrong. A
+  record field that can be non-finite is a JSON hazard on every gate that reads the page; TX13 already skipped a
+  non-finite fade distance for this reason.
+
 - **At the shipped `sepalHeight` 0.75 on a 6 mm stem, the sepal feet cover no hub vertex** (§3.2).
 - **The mophead (depth 2) under the retired PEBBLE:** under PEBBLE a sub-umbel's OWN floret organs are never deferred to the top pass (`t5Finish` defers a
 pedicel build's organs but not its florets'). So at depth 2 the inner florets' hubs and pedicels and the rays are
