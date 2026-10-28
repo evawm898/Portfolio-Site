@@ -92,13 +92,22 @@ export const PARAM_SPEC = [
   R('ornScale', 'ornament', 'Scale (× molding width)', 1, 6, 0.05, 2.5, '', ornOn),
   R('ornTightness', 'ornament', 'Tightness', 0, 1, 0.01, 0.5, '', ornOn),
   // the wire, in PRINT mm (a print feature: floored at MIN_FEATURE_MM)
-  R('ornWire', 'ornament', 'Wire (print)', 1, 3.2, 0.05, 1.6, 'mm', ornOn),
+  // (a CARVED stroke's width is its own length's, so the wire control is
+  // hidden and inert there)
+  R('ornWire', 'ornament', 'Wire (print)', 1, 3.2, 0.05, 1.6, 'mm', (p) => ornOn(p) && p.ornWireStyle !== 'carved'),
   // the wire's style (phase 3b, Eva's ruling 1): CONSTANT along the scroll,
   // or TAPERED — full width through the body, thinning over each volute to
   // half of it at the eye, floored at MIN_FEATURE_MM (the thinnest point)
-  // default TAPERED (Eva, phase 3b, from the sheet)
-  { id: 'ornWireStyle', section: 'ornament', label: 'Wire style', kind: 'choice', default: 'tapered', visibleWhen: ornOn,
-    options: [['constant', 'Constant'], ['tapered', 'Tapered — thins toward the volute']] },
+  // default TAPERED (Eva, phase 3b, from the sheet); phase 3c adds CARVED —
+  // the self-similar stroke, width = 0.7 × the local radius of curvature,
+  // capped at a tenth of the scroll's length, floored at MIN_FEATURE_MM —
+  // and makes it the default (Eva's ruling 1B on the critique)
+  { id: 'ornWireStyle', section: 'ornament', label: 'Wire style', kind: 'choice', default: 'carved', visibleWhen: ornOn,
+    options: [['carved', 'Carved — fat body, thinning as it curls'], ['tapered', 'Tapered — thins toward the volute'], ['constant', 'Constant']] },
+  // the CLUSTER (phase 3c, Eva's pick P5): two leaves lapping each group's
+  // lead scroll at its root, as stacked shells; their size × the lead's length
+  { id: 'ornLeaves', section: 'ornament', label: 'Leaves', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },
+  R('ornLeafSize', 'ornament', 'Leaf size (× scroll)', 0.2, 0.6, 0.01, 0.42, '', (p) => ornOn(p) && p.ornLeaves === 'on'),
   { id: 'ornCrest', section: 'ornament', label: 'Crest (top centre)', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },
   { id: 'ornCorners', section: 'ornament', label: 'Corners / springings', kind: 'choice', default: 'on', visibleWhen: (p) => ornOn(p) && !isOval(p), options: ON_OFF },
   { id: 'ornSides', section: 'ornament', label: 'Sides', kind: 'choice', default: 'off', visibleWhen: ornOn, options: ON_OFF },
@@ -121,8 +130,10 @@ export const PARAM_SPEC = [
     options: [['pierced', 'Open — pierced'], ['backed', 'Backed — a plate behind'], ['recessed', 'Recessed — a thin plate, set deep']] },
   // the ornament's relief: reach the STL and never the SVG (the drawing
   // shows a half-round wire's true section whatever is printed)
-  { id: 'ornShape', section: 'print', label: 'Ornament wire', kind: 'choice', default: 'half-round', visibleWhen: ornOn,
-    options: [['half-round', 'Half-round — flat back'], ['round', 'Round — on a wall']] },
+  // (phase 3c: ARRIS — a crisp spine with a hollow either side, Eva's pick
+  // P3 — is the default carved section)
+  { id: 'ornShape', section: 'print', label: 'Ornament section', kind: 'choice', default: 'arris', visibleWhen: ornOn,
+    options: [['arris', 'Arris — a crisp spine, hollow either side'], ['half-round', 'Half-round — flat back'], ['round', 'Round — on a wall']] },
   R('ornProjection', 'print', 'Ornament relief (× wire)', 0.5, 3, 0.05, 1.25, '', ornOn),   // 1.25 (Eva, phase 3b): the default 1.6 mm half-round crown is 1.0 mm, on the floor
 ];
 

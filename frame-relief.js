@@ -233,6 +233,14 @@ function plateSolid(mesh, outline, { scale, plateT }) {
 /* The relief                                                          */
 /* ------------------------------------------------------------------ */
 
+/* THE TRIANGLE BUDGET (phase 3c, the bloom's 1.5 M precedent): the ornament
+   gives way, group by group, before the relief passes it (frame-filigree's
+   ornamentFor), and buildRelief tells if a relief ever does. The bound is an
+   open band solid's own count — top and bottom grids, two walls, two caps —
+   which the degenerate drops only lower. */
+export const FRAME_TRI_BUDGET = 1500000;
+export const solidTriBound = (V, C) => 4 * (V - 1) * (C - 1) + 4 * (V - 1) + 4 * (C - 1);
+
 /* The floor as ASSUMED: everything below reads MIN_FEATURE_MM and says so. */
 export const FLOOR_NOTE = `${MIN_FEATURE_MM.toFixed(1)} mm assumed minimum feature (print process undecided)`;
 
@@ -259,7 +267,7 @@ export function buildRelief(model) {
   // closed solid standing on the plate thickness, overlapping its molding by
   // the embed it was seated with (frame-filigree.js)
   if (model.ornament) {
-    for (const o of model.ornament.solids) bandSolid(mesh, o.spine, o.prof, { scale: 1, plateT, reliefDepth: o.depth });
+    for (const o of model.ornament.solids) bandSolid(mesh, o.spine, o.prof, { scale: 1, plateT: plateT + (o.lift || 0), reliefDepth: o.depth });
     const crown = Math.min(...model.ornament.solids.map((o) => o.depth * (o.spine.depthScale ? Math.min(...o.spine.depthScale) : 1)));
     if (model.ornament.solids.length && crown < MIN_FEATURE_MM) underFloor.push(`ornament crown ${crown.toFixed(2)} mm high`);
   }
@@ -271,6 +279,7 @@ export function buildRelief(model) {
     if (p.lights === 'recessed' && plateT <= MIN_FEATURE_MM) told.push(`recessed reads as backed: the plate is already at the ${FLOOR_NOTE} floor`);
     plate = plateOutline(model); plateSolid(mesh, plate, { scale, plateT: panelT });
   }
+  if (mesh.idx.length / 3 > FRAME_TRI_BUDGET) told.push(`the relief is ${(mesh.idx.length / 3).toLocaleString('en-US')} triangles, past the ${FRAME_TRI_BUDGET.toLocaleString('en-US')} budget`);
   const positions = Float64Array.from(mesh.pos), indices = Uint32Array.from(mesh.idx);
   let z1 = 0; for (let i = 2; i < positions.length; i += 3) if (positions[i] > z1) z1 = positions[i];
   return {
