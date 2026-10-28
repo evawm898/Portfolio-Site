@@ -12815,7 +12815,7 @@ export function pedicelPinClauses(F, U) {
                                                           restated as a LITERAL: symmetric, an opposite pair at 0 deg roots on one point)
    Returns the expected swelling with `inside(rho, z, margin)` on the union of
    the body and the rod — UM2's hold test — with z = 0 at the BASE PLANE. */
-export function umbelSwellingExpected({ n, rP, aDeg, outerR, boreR, headOn, amount, lengthAsked, roomMm }) {
+export function umbelSwellingExpected({ n, rP, aDeg, outerR, boreR, headOn, amount, lengthAsked, roomMm, roomDrawMm = roomMm }) {
   const gap = MIN_FEATURE_MM, a = (aDeg * Math.PI) / 180, ca = Math.cos(a), sa = Math.sin(a), m = gap / 2;
   const w = lengthAsked > 0 ? lengthAsked / 2 : GEOMETRY.STEM_NODE_SPREAD_RADII * outerR;
   const endAskedW = 2 * w, rodR = outerR - gap / 2;
@@ -12877,11 +12877,13 @@ export function umbelSwellingExpected({ n, rP, aDeg, outerR, boreR, headOn, amou
   const byRise = (() => { if (byDepth && byDepth.k === kAsked) return null; const r = riseFor(kAsked); if (r !== null) return { k: kAsked, v: { ...r, heldBy: 'rise' } }; const w = leastWidth(riseFor); return w ? { k: w.k, v: { ...w.v, heldBy: 'rise' } } : null; })();
   const pick = byDepth && byRise ? (byRise.k < byDepth.k ? byRise : byDepth) : (byDepth || byRise);
   const k = pick ? pick.k : 4, held = pick ? pick.v : { deepenMm: 0, riseMm: 0, heldBy: 'unheld' }, widthForced = k !== kAsked;
-  /* the body: the reach clamped to the rod's room, the chamfer as steep as the room leaves */
-  const endMm = endAsked;
-  const reachClamped = endAsked !== endAskedW;
+  /* the body: the reach clamped to the rod's EXACT room (head on, the placed
+     body knows the inset depth the search did not), the chamfer as steep as
+     that room leaves */
+  const endMm = Number.isFinite(roomDrawMm) && endAskedW > roomDrawMm - gap ? Math.max(gap, roomDrawMm - gap) : endAskedW;
+  const reachClamped = endMm !== endAskedW;
   let chamferMm = Rof(k, endMm) - rodR;
-  if (Number.isFinite(roomMm) && endMm + chamferMm > roomMm) chamferMm = Math.max(0, roomMm - endMm);
+  if (Number.isFinite(roomDrawMm) && endMm + chamferMm > roomDrawMm) chamferMm = Math.max(0, roomDrawMm - endMm);
   const pitch = w / 8, nBelow = Math.max(1, Math.ceil(endMm / pitch));
   const zs = [];
   for (let j = nBelow; j >= 0; j--) zs.push(-endMm * j / nBelow);
@@ -13003,7 +13005,7 @@ export function umbelClauses(m, ui) {
      UM2 holds the roots against what was emitted) */
   const roomMm = Number(ui.stemLength) - gap - (S.cut && S.cut.made ? S.cut.spanMm : 0);
   const roomExactMm = roomMm - (headOffAsked ? 0 : Math.min(P.insetNeededMm, GEOMETRY.LEAF_NODE_BOTTOM * Number(ui.stemLength)));
-  const E = umbelSwellingExpected({ n, rP, aDeg, outerR: S.outerR, boreR: S.boreR, headOn: !headOffAsked, amount: ui.hubShapeAmount === undefined ? GEOMETRY.HUB_SHAPE_AMOUNT_DEFAULT : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), roomMm });
+  const E = umbelSwellingExpected({ n, rP, aDeg, outerR: S.outerR, boreR: S.boreR, headOn: !headOffAsked, amount: ui.hubShapeAmount === undefined ? GEOMETRY.HUB_SHAPE_AMOUNT_DEFAULT : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), roomMm, roomDrawMm: roomExactMm });
   /* the vertices are on the swelling to its own few ulp: bounded in ULP of the
      build's coordinate scale, never typed */
   const tolR = 64 * Number.EPSILON * Math.max(1, Math.abs(baseZ) + E.widthMm) + 1e-9;
