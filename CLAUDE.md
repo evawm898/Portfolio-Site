@@ -1495,6 +1495,53 @@ before touching `textureVertexCovered`, an organ's `cover`, `organReliefPass`'s 
   florets of one unit differ in their own frame; the withheld rebuild the control); four witnessed apex mutants;
   two block-80 smoke rows. No row added, no phase owed; triangle counts unmoved on every row.
 
+**BONE SHIPS: ONE WORLD FIELD OF MERGED PORES RAISED OUTWARD, CURVATURE x PATCH COVERAGE, ONE DEFERRED PASS OVER
+EVERY PART — AND PEBBLE AND CELLULAR ARE HIDDEN, NOT RETIRED** (Oct 28 — Eva's BONE rulings of Oct 23 and the T5
+follow-ups of Oct 26; read `docs/bloom-surface-texture-bone-outcome.md` before touching `boneReliefPass`,
+`boneField`, `bonePatchField`, `boneConvexCurvature`, `boneRodGroup`, `boneSheetBegin/End`, `boneFinish` /
+`boneApply` / `boneRunPending`, `textureVertexCoveredAny`, `BONE_*`, TXB0–TXB7 or block 82).
+- **The dropdown is NONE / BONE.** PEBBLE and CELLULAR keep their ids as `hidden: true` options, and a loaded
+  design keeps and builds them **byte-identically** (T3/T5's path, by branch). 34 live rows and 125 frozen rows
+  over 5 phases use them; their long-term loading is open.
+- **The law is `s = w0 · mc · mp · H · f`:**
+  - **f** is two pore bands (D and `ratio × D`), merged by a smooth minimum with rounded rims. It is exactly 0 on
+    a pore floor, so the floor sits ON the sheet: outward only.
+  - **mp** is quantile-thresholded world noise (coverage IS the area fraction).
+  - **mc** smooths a ridge (convex curvature ≥ `boneCurvature`), faded geodesically over `max(H × 15/8, e)`.
+  - **w0** is T3's ramp on a sheet, and T5's visibility × not-covered × fade on an organ.
+  - Both masks are derived and there is no per-organ list. The bead and the nib are smooth by curvature.
+- **Five controls, every look default PROVISIONAL:**
+  - pore size, 2.0–4 mm. **The floor is DERIVED** — it reads round at the 0.4 mm edge, `4e/0.8`; UNVALIDATED —
+    so the default is 2.0, not the spec's 1.6. At a capped 0.5 mm edge it no longer reads round, and the read-out
+    says so.
+  - density, band ratio, patch coverage and curvature.
+  - `textureSize` shows under the retired two only.
+- **Under BONE only** (the retired patterns build as before):
+  - **The hub is smooth wherever a PETAL or SEPAL foot covers it, top and underside.** The cover is a list of
+    emitted ranges. Found: the shipped `sepalHeight` 0.75 on a 6 mm stem covers nothing.
+  - **Floret sheets, organs and nested floret organs defer to the parent pass** (one world layer).
+  - **The derived owner, keyed on the STL's float32s:** a shared position is relieved only if every copy would be
+    and their normals agree, and takes the min (order-free). The copies of DIFFERENT closed organs then part by
+    k × 2^-20 × the position's magnitude in a canonical organ order (name, vertex count, first vertex), unless an
+    organ leaves that edge open (one surface).
+    - Without the clearance, BONE's s = 0 outside a patch welded the closed tube's hub to its ring in the file
+      (10,208 false within-shell pairs), as well as the stamens at the curvature maximum and the braid.
+    - Witnesses: the two-sheet fixture for the order, the tube row's X2 for the clearance, and TXB1 restating it.
+- **Rods take the field under the same mask (Q12):** a rod whose every vertex is a ridge stays smooth and is
+  told, and the decision is made on the export twin.
+  - At the default 1/mm, the stamens, the style, the braid and the leaflet stalks are SMOOTH (tightest 1.04/mm and
+    1.67/mm).
+  - The compound petiole and the pedicels are porous. The umbel's boss is smooth (not an organ).
+- **The edge-cap trials skip the relief (`bonePending`)** and `boneRunPending` relieves the picked build. The
+  40 × 3 row is ~60 s a build and carries the 120 s settle by its label.
+- **Gates:**
+  - TXB0–TXB7 in both STL gates (the field and patch restated in the harness).
+  - `tools/verify-bloom-bone.mjs`, with six witnessed mutants, spawned by the defaults bar in both arms.
+  - Panel route (ao) for the BONE controls.
+  - Block 82 (20 rows, 1,608) and smoke block 82 (8). `frozen/phase89` is the 1,588 rows at `a43bf23` (a2b968c's, re-based off #469's frame.yml edit).
+  - Byte partition: `--movers-predicate bone`.
+  - Sheet: `node tools/shot-bloom-texture-bone.mjs docs/img/bloom-texture-bone-shipped.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

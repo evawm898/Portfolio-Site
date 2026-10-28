@@ -216,6 +216,7 @@ const ROW_DEF_MOVED_BY_PRED = {
       'TEXTURE: PEBBLE x the TUBE (6 of 8 fused — the lobes and, since T5, the ring textured)': 'relabelled, the same set: the base label said the ring stayed out (T5 textures it)',
     },
   },
+  bone: { added: 20, rows: {} },
   'root-support': {
     added: 21,
     rows: {
@@ -328,6 +329,13 @@ const PREDICATE_MOVERS = {
     const R0 = harness.restatedNodeLayout({ ...st, leafNodeStart: 0.16, leafNodeEnd: 0.86, leafNodeSpacing: 0, leafSizeTaper: 0 });
     return R.depths.length !== R0.depths.length || R.depths.some((d, i) => !Object.is(d, R0.depths[i]));
   },
+  /* THE BONE TEXTURE (Oct 28). A row moves iff its texture choice is BONE —
+     the base tree does not know the value and builds it untextured — and the
+     infill is NONE (both on, the texture is REFUSED and nothing moves, Q9).
+     Every base row holds to the bit: no base row names BONE, and the retired
+     PEBBLE / CELLULAR take their shipped expressions by branch. Written from
+     the CONTROLS, never from either tree's guard. */
+  bone: (st) => String(st.petalTexture) === 'BONE' && String(st.petalInfill ?? 'NONE') === 'NONE',
   /* SURFACE TEXTURE (T3, Oct 22). A row moves iff its texture choice is not
      NONE and the infill is NONE (with the infill on the texture is REFUSED
      and nothing moves — Q9); written from the CONTROLS, the choice guard's own

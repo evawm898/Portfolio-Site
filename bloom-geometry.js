@@ -1845,7 +1845,9 @@ export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness',
      or a pair's to own — a per-scope texture would be a second field. A
      placement made without a ruling; lifting it is one entry here and the
      builder reading `ps` for the two (it reads `textureFor(ps)` already). */
-  'textureHeight', 'textureSize'])
+  'textureHeight', 'textureSize',
+  /* BONE's five (Oct 28), for the same reason: one world field */
+  'bonePoreSize', 'bonePoreDensity', 'boneBandRatio', 'bonePatchCoverage', 'boneCurvature'])
 /* ===================================================================
    SCOPED VALUES — what a scope OWNS OUTRIGHT rather than offsets (F6-scope,
    Oct 18; read docs/bloom-outline-curve-scope-outcome.md). A curve is not a
@@ -10567,11 +10569,14 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
      THE EDGE CAP beside `textureFor`. */
   const texR = textureFor(ps, cap);
   const tex = texR && !texR.refused && !(cap && cap.noTexture) ? textureContext(texR, 'petal', surface.rowAt, footS.length, form && form.buckle !== null ? 'buckle' : null, isRep) : null;
+  /* (BONE) the blade's triangles, normals and ramp, captured for the deferred pass */
+  const boneCap = tex && tex.bone ? boneSheetBegin(acc) : null;
   for (const panel of panels) {
     const useInfill = infill && !infill.refused && panel === panels[0];
     const g = useInfill ? emitInfillPanel(acc, rows, panel, tAt, rim, infill, cap) : emitPanel(acc, rows, panel, tAt, rim, tex);
     if (capturedPanels) capturedPanels.push({ label: panel.label, rowFrom: panel.rowFrom, rowTo: panel.rowTo, rows: g });
   }
+  const boneSheet = boneCap ? boneSheetEnd(acc, boneCap, tex.organ || 'petal') : null;
 
   /* THE THICKNESS GUARD'S OWN CHECK. On uniform (shipped-default) builds
      only, and for slot 0 only, the full profile law is evaluated at every
@@ -11211,6 +11216,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        panel (sub-rows, column factor, the skin's lattice count against its
        conforming floor, the relief's extremes, the samples TX restates). */
     texture: textureRecord(texR, tex),
+    ...(boneSheet ? { boneSheet } : {}),
     /* THE SAME PANELS UNDER THE BUILDER'S OWN NAME (organic variance, build 1):
        `grid` keeps meaning "captured iff the accumulator was asked to capture a
        grid" — verify-bloom-grid's clause 1b, the .glb export's contract — and
@@ -11844,7 +11850,7 @@ function rimProfile(acc, K, C, n, b, apex, topP, botP, sOf = null, TR = null, gR
     ns[K] = [-n[0], -n[1], -n[2]];
     ns[APEX] = [wx / aLen, wy / aLen, wz / aLen];
     /* the bead's closed-form normals, handed to the organ relief (T5) */
-    if (acc.normalSink) for (let m = 0; m <= K; m++) acc.normalSink(pts[m], ns[m]);
+    if (acc.normalSink) for (let m = 0; m <= K; m++) acc.normalSink(pts[m], ns[m], gRim === null ? undefined : gRim);
   }
   return { pts, ns: acc.captureNormals ? ns : null };
 }
@@ -11992,6 +11998,8 @@ function emitPanel(acc, rows, panel, tAt, rim, tex = null) {
   const latOK = tex && !per && !panel.thinAt && panel.nv === undefined;
   const L = latOK && tex.lattice ? tex.lattice : null;
   const RL = latOK && tex.relief ? tex.relief : null;
+  const BN = !!(latOK && tex.bone);
+  let latTick = 0;
   const e = L ? L.edgeMm : 0;
   /* THE COUNT LAW: ceil(L / e) on L snapped to 2^-20 mm (Q16) */
   const nOf = (len) => { const Ls = Math.round(len * 1048576) / 1048576; return Math.max(1, Math.ceil(Ls / e)); };
@@ -12222,7 +12230,9 @@ function emitPanel(acc, rows, panel, tAt, rim, tex = null) {
        the same closure so the bead's first profile point agrees with the top
        skin's displaced point to the double. */
     const sOf = RL && g > 0 ? (p) => g * (RL.heightMm * RL.f(p)) : null;
-    skinS.push(sOf); skinG.push(sOf ? g : 0);
+    /* under BONE the ramp rides to the deferred pass with every point (the
+       sink's third argument), and the bead's profile points take it too */
+    skinS.push(sOf); skinG.push(sOf ? g : BN ? g : 0);
     /* each half's distance from ITS edge, and each column's radius its own
        half's (one radius, `a` and `r`, on every one-sided row and on equal
        halves — the old expressions term for term) */
@@ -12244,7 +12254,9 @@ function emitPanel(acc, rows, panel, tAt, rim, tex = null) {
         hb.push([P[0] - n[0] * b, P[1] - n[1] * b, P[2] - n[2] * b]);
         /* THE RING'S OWN NORMAL AT EACH SKIN VERTEX, handed to the organ relief
            (T5) when it asks — null on every other build, so nothing is pushed */
-        if (acc.normalSink) { acc.normalSink(ht[ht.length - 1], n); acc.normalSink(hb[hb.length - 1], [-n[0], -n[1], -n[2]]); }
+        if (acc.normalSink) { acc.normalSink(ht[ht.length - 1], n, g); acc.normalSink(hb[hb.length - 1], [-n[0], -n[1], -n[2]], g); }
+        /* (BONE) a bounded set of the lattice's own mid-surface points, for TX8 */
+        if (BN && g > 0 && latTick++ % 97 === 0 && tex.latticeSamples.length < 64) tex.latticeSamples.push({ mid: [P[0], P[1], P[2]], u: row.u, v: vs[j], sIdx: X[k].sIdx, rep: tex.rep ?? null });
       } else {
         /* OUTWARD, ON EACH SKIN'S OWN SIDE: the field at the undisplaced skin
            point, the displacement added to the offset — never subtracted */
@@ -12385,7 +12397,7 @@ function emitPanel(acc, rows, panel, tAt, rim, tex = null) {
     tex.panels.push({ label: panel.label, organ: tex.organ, shippedRows: rowTo - rowFrom + 1, subRows, cfMax: L ? Math.max(...Array.from(cfOf)) : 1,
       noSubRows: L ? (L.noSubRows || null) : 'no lattice', skinTris, floorTris, rimTris: acc.triangleCount - rimTris0,
       reliefMaxMm: TR ? TR.reliefMaxMm : 0, reliefMinMm: TR && TR.displaced ? TR.reliefMinMm : 0, displaced: TR ? TR.displaced : 0,
-      skinSamples: TR ? TR.skinSamples : [], apexSamples: TR ? TR.apexSamples : [] });
+      skinSamples: TR ? TR.skinSamples : [], apexSamples: TR ? TR.apexSamples : [], ...(BN ? { latticeSamples: tex.latticeSamples.splice(0) } : {}) });
   };
   /* A PERIODIC PANEL'S RIM IS TWO CLOSED LOOPS, one per free edge: the base
      row ascending and the top row descending, so both are wound with the
@@ -12790,7 +12802,17 @@ export function infillIsAbsent(state) { return String(state.petalInfill ?? 'NONE
    replace (TX4). The floor is computed in `emitPanel` on the undisplaced
    skins at the shipped rows and columns.
    =================================================================== */
-export const TEXTURE_TYPES = Object.freeze(['NONE', 'PEBBLE', 'CELLULAR']);
+/* BONE (Oct 28, Eva's rulings of Oct 23) REPLACES PEBBLE AND CELLULAR IN THE
+   DROPDOWN: the panel shows NONE / BONE, and the two older values are KEPT as
+   valid, HIDDEN options — a saved design or a matrix row naming one builds
+   exactly as before (no migration, no silent swap; their path below is T3's
+   and T5's, untouched). `TEXTURE_TYPES` is every value a state may carry;
+   `TEXTURE_TYPES_SHOWN` is what the dropdown offers. Read the BONE block
+   after `organT5For` and docs/bloom-surface-texture-bone-outcome.md. */
+export const TEXTURE_TYPES = Object.freeze(['NONE', 'BONE', 'PEBBLE', 'CELLULAR']);
+export const TEXTURE_TYPES_SHOWN = Object.freeze(['NONE', 'BONE']);
+export const TEXTURE_TYPES_HIDDEN = Object.freeze(['PEBBLE', 'CELLULAR']);
+export function textureIsBone(state) { return String(state.petalTexture ?? 'NONE') === 'BONE'; }
 /* THE HEIGHT'S FLOOR IS EVA'S 0.4 mm (Q13) — UNVALIDATED: nothing in this
    project has been printed, and 0.4 is the edge-profile ruling's own guess at
    SLS Nylon 12 White's resolvable detail. It is the slider's MINIMUM, so 0 is
@@ -12867,6 +12889,11 @@ export function textureFor(state, cap = null) {
   const hAsked = Number(state.textureHeight ?? TEXTURE_HEIGHT_DEFAULT), sAsked = Number(state.textureSize ?? TEXTURE_SIZE_DEFAULT);
   const heightMm = clampTo(hAsked, TEXTURE_HEIGHT_RANGE), sizeMm = clampTo(sAsked, TEXTURE_SIZE_RANGE);
   const refused = !infillIsAbsent(state) ? 'infill' : null;
+  /* BONE reads its own five controls (the BONE block after `organT5For`); its
+     `sizeMm` is the SMALLEST pore's diameter, and `f` is the network, the
+     patch mask beside it (`mp`). Every other type is T3's expression below,
+     term for term. */
+  if (type === 'BONE') return boneTextureFor(state, cap, heightMm, hAsked, refused);
   return { type, heightMm, sizeMm, edgeMm: textureEdgeInForce(cap), heightClamped: heightMm !== hAsked, sizeClamped: sizeMm !== sAsked, refused, f: refused ? null : textureField(type, sizeMm) };
 }
 /* ===================================================================
@@ -12921,6 +12948,10 @@ export function withTextureEdgeInForce(edgeMm, fn) {
 /* the per-blade context `emitPanel` reads: the relief closure, the lattice's
    row law and what it may not refine, and the panel records it appends */
 function textureContext(T, organ, rowAt, firstSub, noSubRows, rep = null) {
+  /* BONE relieves nothing here: the sheet is latticed exactly as T3 lattices
+     it and emitted UNDISPLACED, handing its normals and ramp to the deferred
+     pass (`bone` set, `relief` null — see the BONE block) */
+  if (T.type === 'BONE') return { organ, rep, bone: true, relief: null, lattice: { edgeMm: T.edgeMm, rowAt, firstSub, noSubRows }, panels: [], latticeSamples: [] };
   return { organ, rep, relief: { heightMm: T.heightMm, f: T.f }, lattice: { edgeMm: T.edgeMm, rowAt, firstSub, noSubRows }, panels: [] };
 }
 /* the record a blade carries — the controls, the refusal, and its panels */
@@ -12945,6 +12976,8 @@ function textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, cap = null) 
          the field at `p0`; TX5 the apex along its own `w`) */
       for (const q of p.skinSamples) if (o.skinSamples.length < 96) o.skinSamples.push(q);
       for (const q of p.apexSamples) if (o.apexSamples.length < 64) o.apexSamples.push(q);
+      /* (BONE) the lattice's own mid-surface samples, undisplaced — TX8's subject */
+      if (p.latticeSamples) { if (!o.latticeSamples) o.latticeSamples = []; for (const q of p.latticeSamples) if (o.latticeSamples.length < 96) o.latticeSamples.push(q); }
       o.skinTris += p.skinTris; o.floorTris += p.floorTris || 0; o.rimTris += p.rimTris;
       if (p.reliefMaxMm > o.reliefMaxMm) o.reliefMaxMm = p.reliefMaxMm;
       if (p.displaced && p.reliefMinMm < o.reliefMinMm) o.reliefMinMm = p.reliefMinMm;
@@ -13498,7 +13531,7 @@ function t5HitsWithin(G, o, d, tStop, from, to, only = null) {
     for (let r = start[c]; r < start[c + 1]; r++) {
       const t = items[r];
       if (t >= from && t < to) continue;
-      if (only && (t < only[0] || t >= only[1])) continue;
+      if (only && (typeof only[0] === 'number' ? (t < only[0] || t >= only[1]) : !only.some((r) => t >= r[0] && t < r[1]))) continue;
       if (stamp[t] === id) continue;
       stamp[t] = id;
       const b = t * 9;
@@ -13653,6 +13686,550 @@ function organReliefPass(acc, T, organs, capability = null) {
 function organT5For(state, capability) {
   const T = textureFor(state, capability || null);
   return T && !T.refused ? T : null;
+}
+
+/* ===================================================================
+   THE BONE TEXTURE (Oct 28 — Eva's rulings of Oct 23 on BONE and of Oct 26
+   on T5's follow-ups; read docs/bloom-surface-texture-bone-outcome.md).
+   "Bubbly calcified bone": a RAISED, ROUNDED NETWORK with pores SUNK into
+   it at two size bands (fine pitting and larger craters), the pores merging
+   where they meet, the rims rounded; PATCHY — porous on broad faces and in
+   hollows, smooth on ridges, rims and edges.
+
+   ONE FIELD, OUTWARD ONLY, PORE FLOORS AT THE ORIGINAL SHEET. The network is
+   `f(p)` in [0, 1] of WORLD position (attachment B): 1 on the network, 0 on a
+   pore's floor — so a floor is displaced by exactly 0 and sits on the sheet
+   the build would have emitted, never below it (TXB1 holds `s === 0` there).
+   Each pore is a SPHERE of the world (a jittered cell lattice per band, one
+   pore per occupied cell), so a surface meets it in a disc whose size varies
+   with where the surface cuts it: the fine pitting a slice reads is a range
+   of sizes by construction, and the asked size is the LARGEST disc a pore of
+   the smaller band can show. The union of the spheres is a polynomial SMOOTH
+   MINIMUM of their signed distances, so two pores that meet merge with a
+   rounded saddle, and the rim is the quintic ease over the last `w` of the
+   signed distance (`w = BONE_RIM_FRAC x` the fine pore's radius, one width
+   for both bands, so a crater has a wide floor and a pit a narrow one). The
+   27-cell search is EXACT: the largest pore plus the merge radius is inside
+   one cell, asserted when the field is built.
+
+   THE COVERAGE IS BLENDED: a CURVATURE mask times a low-frequency PATCH
+   field, both derived from geometry, never a per-organ list (Eva):
+     - the PATCH field is gradient noise at `BONE_PATCH_SCALE_K` times the
+       larger pore's diameter, thresholded at the quantile the coverage asks
+       for (the quantile table is the noise's own distribution, sampled once
+       at module load on a fixed low-discrepancy set — products and `%`
+       only), eased over `BONE_PATCH_BAND`; coverage 1 is the identity by
+       branch.
+     - the CURVATURE mask is read off the EMITTED organ, per vertex: the
+       largest CONVEX normal curvature to any lattice neighbour,
+       `(n_i - n_j) . (p_i - p_j) / |p_i - p_j|^2` (positive on a convex
+       surface — 1/R on a sphere or a cylinder's girth, exactly, on the
+       emitter's own normals — negative in a hollow). A vertex at or past
+       the threshold is a RIDGE and takes nothing; the relief eases in from
+       the nearest ridge over a geodesic `textureFadeWidthMm(H, e)` — T5's
+       derived fade, ruling 2, so no second width exists. The bead's
+       half-round, a rod's girth, the hub's rim edge and the stem's end edge
+       are ridges by their own curvature; a hollow (the hub-to-stem join) is
+       porous. EDGES: CURVATURE DECIDES — there is no bead mask.
+   `s = w0 . mc . mp . H . f`: `w0` is the sheet's own buried-end ramp `g`
+   (T3's) on a sheet and the visibility fade (T5's, Q7) on an organ.
+
+   THE RELIEF IS DEFERRED, FOR EVERY ORGAN, TO ONE PASS AT THE END OF THE
+   BUILD (`boneReliefPass`): the curvature needs the organ's own mesh, the
+   floret PETALS take the world frame (the T5 follow-up ruling: one shared
+   layer, so no two florets carry the same copy — a floret build defers its
+   sheets as it defers its hub, and the inflorescence append carries them
+   through each placement's matrix), and the OWNER of a vertex two organs
+   both emit must not depend on emission order (below). The sheets are still
+   latticed where T3 lattices them (`emitPanel`, the same counts), emitted
+   UNDISPLACED, and hand their own normals and ramp to the pass through
+   `acc.normalSink` as they emit them.
+
+   THE DERIVED OWNER (the T5 follow-up ruling: replaces "texture once, on
+   whichever part was emitted first"). A position two parts both emit is a
+   junction of the union. It is relieved only where EVERY copy would relieve
+   it and every copy's normal is the same direction — then all copies move to
+   the one point the LEAST relief puts them at; otherwise no copy moves. A
+   rule over the SET of copies, so no emission order can move a float, and
+   the pass is run in reverse order by a capability hook to prove it (TXB6).
+
+   THE HUB IS SMOOTH ANYWHERE A FOOT COVERS IT, TOP AND UNDERSIDE, AND A
+   SEPAL'S FOOT COUNTS AS A PETAL'S (the T5 follow-up rulings): the coverage
+   test is T5's segment test along the vertex's own normal, whichever way it
+   points, against the triangles of every PETAL and every SEPAL the builders
+   emitted (`cover` is a list of ranges).
+
+   THE RODS TAKE THE FIELD UNDER THE SAME MASK (Q12, deferred until now).
+   Filaments, anthers, the style and its stigma, petioles, the rachis and
+   the stalks are captured as they are emitted (`boneRodGroup`); a rod whose
+   every vertex is a ridge on the EXPORT decision mesh is left unrefined and
+   smooth BY ITS OWN CURVATURE and told (`smoothByCurvature`, with its least
+   convex curvature) — never by name; any other is latticed and relieved like
+   an organ. A floret's PEDICEL is its stem organ and takes the stem's rule.
+   The umbel's boss stays smooth (T5's ruling 5).
+
+   PEBBLE AND CELLULAR ARE UNTOUCHED: none of this runs unless the type is
+   BONE, and every shared expression the BONE path reads is a branch.
+   =================================================================== */
+/* THE LOOK'S CONSTANTS — PROVISIONAL, every one Eva's to rule from the live
+   page (the outcome doc lists them); none decides a count. */
+export const BONE_RIM_FRAC = 0.8;        // the rim's width, a fraction of the fine pore's radius
+export const BONE_CELL_K = 1;            // a band's cell, in its own pore diameters
+export const BONE_JITTER = 0.35;         // a pore's radius is D/2 x [1, 1 + J]: never under the asked size
+export const BONE_LARGE_OCC = 0.45;      // the craters' occupancy, a fraction of the asked density
+export const BONE_MERGE_K = 0.6;         // the smooth-minimum radius, a fraction of the rim's width
+export const BONE_SEED = 11;
+export const BONE_PATCH_SCALE_K = 4;     // the patch field's scale, in the larger pore's diameters
+export const BONE_PATCH_BAND = 0.08;     // the patch edge's soft band, in noise units
+/* THE PORE-DIAMETER FLOOR, DERIVED (and UNVALIDATED — nothing has been
+   printed). Two questions, two answers, and the floor is the stricter.
+   (a) A PIT EXISTS: some lattice vertex lies at least half way down every
+   pore wherever it lands — every triangle's edges are at most `e`, so a point
+   is within `e / sqrt 2` of a vertex, and the rim reaches half depth `w / 2`
+   inside the rim, `w = RIM_FRAC x D/2`: `D >= (e / sqrt 2) / (1/2 - RIM_FRAC / 4)`
+   — 0.94 mm at the ruled 0.4 mm edge, 1.18 mm at the 0.5 mm cap.
+   (b) A PORE READS ROUND: its rim, the rounded wall the eye reads as a crater,
+   spans at least TWO lattice edges, `w >= 2e`, so `D >= 4e / RIM_FRAC` — 2.0 mm
+   at 0.4, 2.5 mm at 0.5. MEASURED, not argued: at the 0.4 mm edge the
+   prototype's 1.6 mm pore draws as a faceted notch (its rim is 1.6 edges) and
+   2.4 mm draws round (docs/bloom-surface-texture-bone-outcome.md §4).
+   The floor is (b) at the RULED edge, rounded up to the slider's step; a build
+   the budget coarsens past it is told on the read-out (2.5 mm reads round at
+   the cap). It sits five times over the SLS resolvable detail the edge-profile
+   ruling quotes (~0.35-0.4 mm). */
+export const BONE_PORE_STEP = 0.05;
+export function bonePoreFloorVertexMm(edgeMm) { return (Math.SQRT1_2 * edgeMm) / (0.5 - BONE_RIM_FRAC / 4); }
+export function bonePoreReadsMm(edgeMm) { return (4 * edgeMm) / BONE_RIM_FRAC; }
+export const BONE_PORE_FLOOR_MM = Math.round(Math.ceil(bonePoreReadsMm(TEXTURE_EDGE_MM) / BONE_PORE_STEP - 1e-9) * BONE_PORE_STEP * 100) / 100;
+export const BONE_PORE_RANGE = Object.freeze([BONE_PORE_FLOOR_MM, 4]);
+/* PROVISIONAL: the prototype's 1.6 mm lifted to the floor (it does not read
+   round at the ruled edge — a question for Eva) */
+export const BONE_PORE_DEFAULT = BONE_PORE_FLOOR_MM;
+export const BONE_DENSITY_RANGE = Object.freeze([0.2, 1]);
+export const BONE_DENSITY_STEP = 0.05;
+export const BONE_DENSITY_DEFAULT = 0.95;
+export const BONE_RATIO_RANGE = Object.freeze([1.5, 4]);
+export const BONE_RATIO_STEP = 0.1;
+export const BONE_RATIO_DEFAULT = 2.5;
+export const BONE_COVERAGE_RANGE = Object.freeze([0.1, 1]);
+export const BONE_COVERAGE_STEP = 0.05;
+export const BONE_COVERAGE_DEFAULT = 0.6;
+/* the curvature threshold, in 1/mm: a surface curving tighter than 1/k mm
+   of radius is a RIDGE. 1.0 (a 1 mm radius) leaves a 1.2 mm rod (0.6 mm
+   radius, 1.67 / mm) and the bead's half-round smooth, and a 1.5 mm pedicel
+   (0.67 / mm) and a 6 mm stem (0.33 / mm) porous. */
+export const BONE_CURVATURE_RANGE = Object.freeze([0.2, 4]);
+export const BONE_CURVATURE_STEP = 0.05;
+export const BONE_CURVATURE_DEFAULT = 1;
+export const BONE_CONTROL_IDS = Object.freeze(['bonePoreSize', 'bonePoreDensity', 'boneBandRatio', 'bonePatchCoverage', 'boneCurvature']);
+
+/* the polynomial smooth minimum — `min`, `abs` and products, engine-exact */
+function boneSmin(a, b, k) {
+  const m = a < b ? a : b;
+  const h = k - (a > b ? a - b : b - a);
+  return h > 0 ? m - (h * h) / (4 * k) : m;
+}
+/* THE NETWORK: f(p) in [0, 1], 1 on the network, 0 on a pore's floor */
+export function boneField(poreMm, ratio, density, seed = BONE_SEED) {
+  const w = BONE_RIM_FRAC * (poreMm / 2), k = BONE_MERGE_K * w;
+  const bands = [{ D: poreMm, occ: density, s: seed }, { D: poreMm * ratio, occ: density * BONE_LARGE_OCC, s: seed + 101 }]
+    .map((b) => ({ ...b, cell: b.D * BONE_CELL_K, occK: Math.floor(b.occ * 1024) }));
+  /* the 27-cell search is exact: the largest pore and the merge reach inside one cell */
+  for (const b of bands) if (!((b.D / 2) * (1 + BONE_JITTER) + k < b.cell)) throw new Error(`boneField: a pore of ${b.D} mm reaches past its ${b.cell} mm cell — the 27-cell search would miss it`);
+  return (p) => {
+    let SD = Infinity;
+    for (const b of bands) {
+      const c = b.cell;
+      const xi = Math.floor(p[0] / c), yi = Math.floor(p[1] / c), zi = Math.floor(p[2] / c);
+      for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const cx = xi + dx, cy = yi + dy, cz = zi + dz;
+        const h = texHash3(cx, cy, cz, b.s);
+        if ((h & 1023) >= b.occK) continue;
+        const h2 = texHash3(cx, cy, cz, b.s + 7);
+        const px = (cx + (h2 & 1023) / 1023) * c - p[0], py = (cy + ((h2 >>> 10) & 1023) / 1023) * c - p[1], pz = (cz + ((h2 >>> 20) & 1023) / 1023) * c - p[2];
+        const R = (b.D / 2) * (1 + BONE_JITTER * (((h >>> 10) & 1023) / 1023));
+        const d = Math.sqrt(px * px + py * py + pz * pz) - R;
+        SD = boneSmin(SD, d, k);
+      }
+    }
+    if (SD >= 0) return 1;
+    if (SD <= -w) return 0;
+    const t = (SD + w) / w;
+    return t * t * t * (t * (t * 6 - 15) + 10);
+  };
+}
+/* THE PATCH FIELD: the noise in noise units, its quantile table, the mask */
+function bonePatchNoise(x, y, z, seed) { return texGradNoise(x, y, z, seed) + 0.5 * texGradNoise(2 * x, 2 * y, 2 * z, seed + 1); }
+export const BONE_PATCH_SAMPLES = 4096;
+export const BONE_PATCH_QUANTILES = (() => {
+  const a1 = 0.8191725133961645, a2 = 0.6710436067037893, a3 = 0.5497004779019703;
+  const v = new Float64Array(BONE_PATCH_SAMPLES);
+  for (let i = 0; i < BONE_PATCH_SAMPLES; i++) v[i] = bonePatchNoise(((0.5 + a1 * i) % 1) * 64, ((0.5 + a2 * i) % 1) * 64, ((0.5 + a3 * i) % 1) * 64, BONE_SEED + 50);
+  v.sort();
+  return Object.freeze(Array.from(v));
+})();
+export function bonePatchThreshold(coverage) { return BONE_PATCH_QUANTILES[Math.min(BONE_PATCH_SAMPLES - 1, Math.max(0, Math.floor((1 - coverage) * BONE_PATCH_SAMPLES)))]; }
+export function bonePatchScaleMm(poreMm, ratio) { return BONE_PATCH_SCALE_K * poreMm * ratio; }
+export function bonePatchField(coverage, scaleMm) {
+  if (coverage >= 1) return () => 1;
+  const thr = bonePatchThreshold(coverage), k = 1 / scaleMm;
+  return (p) => {
+    const t = (bonePatchNoise(p[0] * k, p[1] * k, p[2] * k, BONE_SEED + 50) - thr) / BONE_PATCH_BAND + 0.5;
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    return t * t * t * (t * (t * 6 - 15) + 10);
+  };
+}
+/* THE CONTROLS AS READ (BONE's arm of `textureFor`), clamped and said */
+function boneTextureFor(state, cap, heightMm, hAsked, refused) {
+  const clampTo = (x, r) => (x < r[0] ? r[0] : x > r[1] ? r[1] : x);
+  const ask = (id, def) => Number(state[id] ?? def);
+  const a = { pore: ask('bonePoreSize', BONE_PORE_DEFAULT), density: ask('bonePoreDensity', BONE_DENSITY_DEFAULT), ratio: ask('boneBandRatio', BONE_RATIO_DEFAULT), coverage: ask('bonePatchCoverage', BONE_COVERAGE_DEFAULT), curvature: ask('boneCurvature', BONE_CURVATURE_DEFAULT) };
+  const b = { pore: clampTo(a.pore, BONE_PORE_RANGE), density: clampTo(a.density, BONE_DENSITY_RANGE), ratio: clampTo(a.ratio, BONE_RATIO_RANGE), coverage: clampTo(a.coverage, BONE_COVERAGE_RANGE), curvature: clampTo(a.curvature, BONE_CURVATURE_RANGE) };
+  const patchScaleMm = bonePatchScaleMm(b.pore, b.ratio);
+  const edgeMm = textureEdgeInForce(cap);
+  const bone = { poreMm: b.pore, largePoreMm: b.pore * b.ratio, density: b.density, ratio: b.ratio, coverage: b.coverage, curvature: b.curvature, patchScaleMm, rimMm: BONE_RIM_FRAC * (b.pore / 2),
+    floorMm: BONE_PORE_FLOOR_MM, readsAtEdgeMm: bonePoreReadsMm(edgeMm), fadeMm: textureFadeWidthMm(heightMm, edgeMm),
+    clamped: Object.keys(a).filter((key) => a[key] !== b[key]) };
+  return { type: 'BONE', heightMm, sizeMm: b.pore, edgeMm, heightClamped: heightMm !== hAsked, sizeClamped: a.pore !== b.pore, refused, bone,
+    f: refused ? null : boneField(b.pore, b.ratio, b.density), mp: refused ? null : bonePatchField(b.coverage, patchScaleMm) };
+}
+
+/* THE SHEET'S CAPTURE (a petal, a sepal, a leaf or a leaflet under BONE): its
+   triangle range, welded, with the normal and the ramp `g` emitPanel handed
+   to `acc.normalSink` at every skin and bead point it emitted. A point the
+   emitter handed no normal (a buried wall's collapsed profile) is not
+   relievable. */
+function boneSheetBegin(acc) {
+  const prev = acc.normalSink;
+  const sink = new Map();
+  acc.normalSink = (P, n, g) => { const k = `${P[0]}|${P[1]}|${P[2]}`; if (n && !sink.has(k)) sink.set(k, { n, g: g === undefined ? 1 : g }); };
+  return { prev, sink, from: acc.triangleCount };
+}
+function boneSheetEnd(acc, cap, organ) {
+  acc.normalSink = cap.prev;
+  const W = t5Weld(acc.positions, cap.from, acc.triangleCount);
+  const nV = W.P.length / 3, N = new Float64Array(nV * 3), wt = new Float64Array(nV), relievable = new Uint8Array(nV);
+  let normalFallback = 0;
+  for (let v = 0; v < nV; v++) {
+    const q = cap.sink.get(`${W.P[v * 3]}|${W.P[v * 3 + 1]}|${W.P[v * 3 + 2]}`);
+    if (!q) { normalFallback++; continue; }
+    const L = Math.hypot(q.n[0], q.n[1], q.n[2]);
+    if (!(L > 0)) { normalFallback++; continue; }
+    N[v * 3] = q.n[0] / L; N[v * 3 + 1] = q.n[1] / L; N[v * 3 + 2] = q.n[2] / L;
+    wt[v] = q.g; relievable[v] = q.g > 0 ? 1 : 0;
+  }
+  const rec = { organ, sheet: true, from: cap.from, to: acc.triangleCount, shippedTris: acc.triangleCount - cap.from, refinedTris: acc.triangleCount - cap.from, cavityTris: 0, tri: W.tri, P: W.P, N, wt, relievable, normalFallback };
+  if (acc.boneSheets) acc.boneSheets.push(rec);
+  return rec;
+}
+/* THE RODS' CAPTURE. On the untextured EXPORT decision twin (`boneRodLog`)
+   every group's range and the normals its emitters handed over are logged in
+   emission order; on a BONE build (`boneRods`) each group is decided on the
+   twin's copy when there is one (a live build whose sheet the export floor
+   raises — the rods' radius follows the sheet) and on itself otherwise: a
+   group with any vertex under the curvature threshold is latticed on its own
+   shipped mesh like an organ, a group that is ridge at every vertex is left
+   as shipped and told. Mode-free by construction, as T5's organs are. */
+function boneRodGroup(acc, organ, fn) {
+  if (!acc.boneRods && !acc.boneRodLog) return fn();
+  const prev = acc.normalSink;
+  const sink = new Map();
+  acc.normalSink = (P, n) => { const k = `${P[0]}|${P[1]}|${P[2]}`; if (n && !sink.has(k)) sink.set(k, n); };
+  const from = acc.triangleCount;
+  let out;
+  try { out = fn(); } finally { acc.normalSink = prev; }
+  if (acc.boneRodLog) { acc.boneRodLog.push({ from, to: acc.triangleCount, sink }); return out; }
+  const R = acc.boneRods;
+  const idx = R.index++;
+  const twin = R.decide && R.decide[idx] ? R.decide[idx] : null;
+  const dPos = twin ? R.decidePositions : acc.positions, dFrom = twin ? twin.from : from, dTo = twin ? twin.to : acc.triangleCount, dSink = twin ? twin.sink : sink;
+  /* the decision: the least convex curvature on the decision mesh, on its own normals */
+  const D = t5Weld(dPos, dFrom, dTo);
+  const nD = D.P.length / 3, ND = new Float64Array(nD * 3), hasN = new Uint8Array(nD);
+  for (let v = 0; v < nD; v++) { const n = dSink.get(`${D.P[v * 3]}|${D.P[v * 3 + 1]}|${D.P[v * 3 + 2]}`); if (n) { const L = Math.hypot(n[0], n[1], n[2]); if (L > 0) { ND[v * 3] = n[0] / L; ND[v * 3 + 1] = n[1] / L; ND[v * 3 + 2] = n[2] / L; hasN[v] = 1; } } }
+  const kap = boneConvexCurvature(D.P, ND, hasN, D.tri, nD);
+  let kMin = Infinity; for (let v = 0; v < nD; v++) if (hasN[v] && kap[v] < kMin) kMin = kap[v];
+  const smooth = !(kMin < R.curvature);
+  if (smooth) { R.smooth.push({ organ, from, to: acc.triangleCount, tris: acc.triangleCount - from, kappaMin: kMin }); return out; }
+  const tags = new Array(acc.triangleCount - from).fill('rod');
+  const dd = twin ? { positions: dPos, from: dFrom, to: dTo } : null;
+  const O = organLatticeInto(acc, from, { tags, normalOf: null }, { organ, edgeMm: R.edgeMm, decide: dd, sink });
+  O.rod = true; O.kappaMin = kMin;
+  R.organs.push(O);
+  return out;
+}
+/* the largest CONVEX normal curvature at every vertex, to its lattice neighbours */
+function boneConvexCurvature(P, N, hasN, tri, nV) {
+  const k = new Float64Array(nV).fill(-Infinity);
+  for (let t = 0; t < tri.length; t += 3) for (let c = 0; c < 3; c++) {
+    const a = tri[t + c], b = tri[t + (c + 1) % 3];
+    if (!hasN[a] || !hasN[b]) continue;
+    const dx = P[a * 3] - P[b * 3], dy = P[a * 3 + 1] - P[b * 3 + 1], dz = P[a * 3 + 2] - P[b * 3 + 2];
+    const L2 = dx * dx + dy * dy + dz * dz;
+    if (!(L2 > 0)) continue;
+    const kk = ((N[a * 3] - N[b * 3]) * dx + (N[a * 3 + 1] - N[b * 3 + 1]) * dy + (N[a * 3 + 2] - N[b * 3 + 2]) * dz) / L2;
+    if (kk > k[a]) k[a] = kk;
+    if (kk > k[b]) k[b] = kk;
+  }
+  return k;
+}
+/* a geodesic distance from a seed set, over the organ's own edges, cut at `cut` */
+function boneGeodesic(P, adj, seed, nV, cut) {
+  const dist = new Float64Array(nV).fill(Infinity);
+  const heap = [];
+  const push = (d, i) => { heap.push([d, i]); let q = heap.length - 1; while (q > 0) { const p = (q - 1) >> 1; if (heap[p][0] <= heap[q][0]) break; [heap[p], heap[q]] = [heap[q], heap[p]]; q = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let q = 0; for (;;) { const l = 2 * q + 1, r = l + 1; let m = q; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === q) break; [heap[m], heap[q]] = [heap[q], heap[m]]; q = m; } } return top; };
+  for (let i = 0; i < nV; i++) if (seed[i]) { dist[i] = 0; push(0, i); }
+  while (heap.length) {
+    const [d, i] = pop();
+    if (d > dist[i] || d >= cut) continue;
+    for (const j of adj[i]) {
+      const dx = P[j * 3] - P[i * 3], dy = P[j * 3 + 1] - P[i * 3 + 1], dz = P[j * 3 + 2] - P[i * 3 + 2];
+      const nd = d + Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (nd < dist[j]) { dist[j] = nd; push(nd, j); }
+    }
+  }
+  return dist;
+}
+function boneAdjacency(tri, nV) {
+  const adj = Array.from({ length: nV }, () => []);
+  for (let t = 0; t < tri.length; t += 3) for (let c = 0; c < 3; c++) { const a = tri[t + c], b = tri[t + (c + 1) % 3]; if (!adj[a].includes(b)) adj[a].push(b); if (!adj[b].includes(a)) adj[b].push(a); }
+  return adj;
+}
+/* THE BONE RELIEF PASS — once every part exists. Returns one record per
+   organ name (sheets fold into the summary's own records by the caller). */
+export const BONE_SHARED_NORMAL_DOT = 1 - 1e-9;   // two copies' normals are "the same direction"
+export const BONE_SHARED_CLEARANCE_REL = 2 ** -20;  // eight float32 steps of a coordinate's own magnitude
+/* the canonical order of organs at a shared position: a property of the organs,
+   never of the order the builders emitted them in */
+function boneOrganKeyCmp(A, B) {
+  if (A.O.organ !== B.O.organ) return A.O.organ < B.O.organ ? -1 : 1;
+  if (A.nV !== B.nV) return A.nV - B.nV;
+  for (let k = 0; k < 3; k++) if (A.O.P[k] !== B.O.P[k]) return A.O.P[k] - B.O.P[k];
+  return 0;
+}
+function boneReliefPass(acc, T, organs, capability = null) {
+  const off = !!(capability && capability.organReliefOff);
+  if (!organs.length) return {};
+  /* (a gate-only lever, reached by no control: the pass run over the organs
+     in reverse order — TXB6 requires the bytes not to move) */
+  const list = capability && capability.boneOrganOrder === 'reversed' ? organs.slice().reverse() : organs;
+  const B = T.bone, H = T.heightMm;
+  const Lam = capability && capability.textureFadeWidthMm > 0 ? capability.textureFadeWidthMm : textureFadeWidthMm(T.heightMm, T.edgeMm);
+  const G = list.some((O) => !O.sheet) ? t5Grid(acc.positions) : null;
+  /* ---- per organ: its weight w0, its curvature mask, its relief ---- */
+  const per = list.map((O) => {
+    const nV = O.P.length / 3;
+    const adj = boneAdjacency(O.tri, nV);
+    const w0 = new Float64Array(nV);
+    let visible = 0, buried = 0, covered = 0, coveredUnder = 0;
+    let visDist = null;
+    if (O.sheet) {
+      for (let i = 0; i < nV; i++) if (O.relievable[i]) { w0[i] = O.wt[i]; visible++; }
+    } else {
+      const vis = new Uint8Array(nV);
+      for (let i = 0; i < nV; i++) if (O.relievable[i]) {
+        const q = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]], n = [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]];
+        vis[i] = textureVertexVisible(G, q, n) ? 1 : 0;
+        /* COVERED (top and underside, petal and sepal feet): the segment the
+           relief would occupy along the vertex's OWN normal meets a foot */
+        if (vis[i] && !(capability && capability.textureCoverageOff) && O.cover && textureVertexCoveredAny(G, q, n, H, O.cover)) { vis[i] = 0; covered++; if (n[2] < 0) coveredUnder++; }
+      }
+      const seed = new Uint8Array(nV);
+      for (let i = 0; i < nV; i++) {
+        if (!O.vTags[i]) continue;
+        if (O.relievable[i] && vis[i]) { visible++; continue; }
+        if (O.relievable[i]) buried++;
+        seed[i] = 1;
+      }
+      visDist = boneGeodesic(O.P, adj, seed, nV, Lam);
+      for (let i = 0; i < nV; i++) if (O.relievable[i] && vis[i]) w0[i] = visDist[i] >= Lam ? 1 : rimEase(visDist[i] / Lam);
+    }
+    /* the curvature mask: ridges off the organ's own mesh and normals */
+    const hasN = O.sheet ? O.relievable : O.relievable;
+    const kap = boneConvexCurvature(O.P, O.N, hasN, O.tri, nV);
+    const ridge = new Uint8Array(nV);
+    let ridges = 0;
+    for (let i = 0; i < nV; i++) if (hasN[i] && kap[i] >= B.curvature) { ridge[i] = 1; ridges++; }
+    const ridgeDist = ridges ? boneGeodesic(O.P, adj, ridge, nV, Lam) : null;
+    const mc = new Float64Array(nV);
+    for (let i = 0; i < nV; i++) { const d = ridgeDist ? ridgeDist[i] : Infinity; mc[i] = d >= Lam ? 1 : rimEase(d / Lam); }
+    /* the relief per copy, before the owner rule */
+    const s = new Float64Array(nV), fv = new Float64Array(nV).fill(-1), mpv = new Float64Array(nV).fill(-1);
+    for (let i = 0; i < nV; i++) {
+      if (!(w0[i] > 0) || !(mc[i] > 0)) continue;
+      const q = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]];
+      const mp = T.mp(q);
+      mpv[i] = mp;
+      if (!(mp > 0)) continue;
+      const f = T.f(q);
+      fv[i] = f;
+      s[i] = w0[i] * (mc[i] * (mp * (H * f)));
+    }
+    return { O, nV, adj, w0, mc, s, fv, mpv, kap, ridge, ridges, visible, buried, covered, coveredUnder, visDist, ridgeDist };
+  });
+  /* ---- THE DERIVED OWNER: a position several organs emit ---- */
+  const where = new Map();
+  /* keyed on the STL's own float32s: copies the file would weld are one position
+     here even where their doubles differ in the last bits (the closed tube's ring
+     meets the hub at two such points) */
+  const f32 = Math.fround;
+  per.forEach((X, oi) => { for (let i = 0; i < X.nV; i++) { const k = `${f32(X.O.P[i * 3])}|${f32(X.O.P[i * 3 + 1])}|${f32(X.O.P[i * 3 + 2])}`; const l = where.get(k); if (l) l.push(oi, i); else where.set(k, [oi, i]); } });
+  let sharedPositions = 0, sharedRelieved = 0, sharedAcross = 0, sharedCleared = 0;
+  for (const X of per) X.clr = new Float64Array(X.nV);
+  const sharedOf = per.map(() => 0);
+  for (const l of where.values()) {
+    if (l.length <= 2) continue;
+    sharedPositions++;
+    /* a position two ORGANS emit (the hub and a foot, the hub and the tube);
+       the rest are one organ's own lattice landing a point twice — the same
+       rule makes those copies one double too, so the lattice cannot crack */
+    for (let c = 2; c < l.length; c += 2) if (l[c] !== l[0]) { sharedAcross++; break; }
+    let ok = true, sMin = Infinity;
+    const X0 = per[l[0]], i0 = l[1];
+    for (let c = 0; c < l.length; c += 2) sharedOf[l[c]]++;
+    for (let c = 0; c < l.length; c += 2) {
+      const X = per[l[c]], i = l[c + 1];
+      if (!(X.s[i] > 0)) { ok = false; break; }
+      const d = X.O.N[i * 3] * X0.O.N[i0 * 3] + X.O.N[i * 3 + 1] * X0.O.N[i0 * 3 + 1] + X.O.N[i * 3 + 2] * X0.O.N[i0 * 3 + 2];
+      if (!(d >= BONE_SHARED_NORMAL_DOT)) { ok = false; break; }
+      if (X.s[i] < sMin) sMin = X.s[i];
+    }
+    for (let c = 0; c < l.length; c += 2) per[l[c]].s[l[c + 1]] = ok ? sMin : 0;
+    if (ok) sharedRelieved++;
+    /* THE CLEARANCE. Every copy now carries one displacement, so copies of
+       DIFFERENT organs land on one double and the STL's float32s weld two closed
+       shells the untextured mesh keeps apart — and their by-design overlap then
+       reads as a within-shell fold (measured: the closed tube's hub against its
+       ring, 10,208 pairs, every one hub x tube). T5's first-emitter rule hid this
+       only because PEBBLE relieves every vertex; BONE leaves 40% of the surface
+       at s = 0, where no rule on s can part two copies. So the organs a position
+       spans are put in a CANONICAL order (name, vertex count, first vertex) —
+       never the emission order — and the k-th takes k clearance steps outward:
+       BONE_SHARED_CLEARANCE_REL of the position's own magnitude, eight float32
+       steps (X0's 8, the foot clearance's), so the file cannot merge them. All
+       of one organ's copies move together, so no organ cracks. */
+    const orgs = [];
+    for (let c = 0; c < l.length; c += 2) if (!orgs.includes(l[c])) orgs.push(l[c]);
+    /* ...but never where the position lies on an edge one of the organs leaves
+       OPEN (one face) and another carries: then they are ONE surface split
+       across two records, and parting their copies would crack it. Every
+       shipped organ is a closed solid (two faces on every edge of its own), so
+       two of them touching — even along an edge, four faces in all — are two
+       shells, and the clearance parts them. */
+    let oneSurface = false;
+    if (orgs.length > 1) for (const oi of orgs) {
+      const X = per[oi];
+      if (!X.edgeFaces) { X.edgeFaces = new Map(); const T3 = X.O.tri; for (let t = 0; t < T3.length; t += 3) for (let k = 0; k < 3; k++) { const a = T3[t + k], b = T3[t + (k + 1) % 3], e = a < b ? a * X.nV + b : b * X.nV + a; X.edgeFaces.set(e, (X.edgeFaces.get(e) || 0) + 1); } }
+      for (let c = 0; c < l.length && !oneSurface; c += 2) if (l[c] === oi) { const i = l[c + 1]; for (const j of X.adj[i]) if (X.edgeFaces.get(i < j ? i * X.nV + j : j * X.nV + i) === 1) { oneSurface = true; break; } }
+      if (oneSurface) break;
+    }
+    if (orgs.length > 1 && !oneSurface) {
+      sharedCleared++;
+      orgs.sort((a, b) => boneOrganKeyCmp(per[a], per[b]));
+      const X0 = per[l[0]], i0 = l[1];
+      const mag = Math.max(1, Math.abs(X0.O.P[i0 * 3]), Math.abs(X0.O.P[i0 * 3 + 1]), Math.abs(X0.O.P[i0 * 3 + 2]));
+      for (let c = 0; c < l.length; c += 2) per[l[c]].clr[l[c + 1]] = orgs.indexOf(l[c]) * BONE_SHARED_CLEARANCE_REL * mag;
+    }
+  }
+  /* ---- write, and the records ---- */
+  const recs = {};
+  const SAMPLE_EVERY = 97;
+  per.forEach((X, oi) => {
+    const { O, nV } = X;
+    const rec = { blades: 1, refused: {}, panels: 0, subRows: 0, cfMax: 1, skinTris: O.sheet ? 0 : O.refinedTris - O.cavityTris, floorTris: 0, rimTris: 0, reliefMaxMm: 0, reliefMinMm: Infinity, displaced: 0, skinSamples: [], apexSamples: [], edgeMismatch: O.edgeMm === undefined || O.edgeMm === T.edgeMm ? 0 : 1 };
+    const bs = { vertices: nV, relievable: O.relievable.reduce((n, x) => n + x, 0), visible: X.visible, buried: X.buried, covered: X.covered, coveredUnder: X.coveredUnder, ridges: X.ridges, displaced: 0, shared: sharedOf[oi], sharedPositions, sharedRelieved, sharedAcross, sharedCleared, cleared: 0, clearSamples: [], poreFloor: 0, patchOff: 0, ridgeOff: 0, fadeMm: Lam, triRange: [O.from, O.to], sheet: !!O.sheet, rod: !!O.rod, samples: [], ridgeSamples: [], floorSamples: [] };
+    const disp = new Float64Array(nV * 3);
+    let tick = 0;
+    for (let i = 0; i < nV; i++) {
+      const q = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]], n = [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]];
+      const si = X.s[i], ci = X.clr[i], di = si + ci;
+      const p1 = di > 0 ? [q[0] + n[0] * di, q[1] + n[1] * di, q[2] + n[2] * di] : q;
+      disp[i * 3] = p1[0]; disp[i * 3 + 1] = p1[1]; disp[i * 3 + 2] = p1[2];
+      if (X.w0[i] > 0) {
+        if (X.ridge[i]) bs.ridgeOff++;
+        else if (X.mpv[i] === 0) bs.patchOff++;
+        else if (X.fv[i] === 0) bs.poreFloor++;
+      }
+      if (ci > 0) bs.cleared++;
+      if (si > 0) { bs.displaced++; rec.displaced++; if (si > rec.reliefMaxMm) rec.reliefMaxMm = si; if (si < rec.reliefMinMm) rec.reliefMinMm = si; }
+      const smp = () => ({ organ: O.organ, p0: q, p1, n, s: si, f: X.fv[i], mp: X.mpv[i], mc: X.mc[i], w0: X.w0[i], g: X.w0[i], kappa: X.kap[i], ridge: !!X.ridge[i], ridgeDistMm: X.ridgeDist ? X.ridgeDist[i] : Infinity, fadeDistMm: X.visDist ? X.visDist[i] : undefined, sheet: !!O.sheet, clearMm: ci });
+      if (ci > 0 && bs.clearSamples.length < 16) bs.clearSamples.push(smp());
+      if (X.ridge[i] && bs.ridgeSamples.length < 32 && (bs.ridgeSamples.length === 0 || (tick % 7) === 0)) bs.ridgeSamples.push(smp());
+      else if (X.fv[i] === 0 && X.w0[i] > 0 && X.mc[i] > 0 && bs.floorSamples.length < 16) bs.floorSamples.push(smp());
+      if (X.w0[i] > 0 && (tick++ % SAMPLE_EVERY) === 0 && bs.samples.length < 64) bs.samples.push(smp());
+    }
+    if (!Number.isFinite(rec.reliefMinMm)) rec.reliefMinMm = 0;
+    /* each COPY's signature — a digest of its whole relief in its own vertex
+       order: two florets of one unit share the order, so florets relieved in
+       their own frame read equal signatures (TXB5) */
+    let sigSum = 0, sigN = 0; for (let i = 0; i < nV; i++) if (X.s[i] > 0) { sigSum += X.s[i] * (1 + (i % 97)); sigN++; }
+    bs.sigs = [{ vertices: nV, relieved: sigN, sum: sigSum }];
+    /* the relieved vertices of a covered organ, for TXB4's restated coverage
+       (Node only: non-enumerable, so the metrics hook does not clone it) */
+    if (O.cover) { const R = []; for (let i = 0; i < nV; i++) if (X.s[i] > 0) R.push(O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2], O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]); Object.defineProperty(bs, 'relieved', { value: R, enumerable: false, configurable: true }); }
+    rec.bone = bs;
+    /* a sheet's own relief, on the record its PART carries (`p.boneSheet`): the part's
+       per-panel texture record is T3's and reads 0 under BONE, whose relief is this
+       one deferred pass — so an instrument asking "was this part relieved" asks here */
+    if (O.sheet) O.boneOut = { displaced: rec.displaced, cleared: bs.cleared };
+    /* the organ records TX10-TX13 read (T5's shape) for the hub, the stem, the tube */
+    if (!O.sheet && !O.rod) {
+      rec.organ = { shippedTris: O.shippedTris, refinedTris: O.refinedTris, cavityTris: O.cavityTris, vertices: nV, relievable: bs.relievable, visible: X.visible, buried: X.buried, covered: X.covered, shared: sharedOf[oi], fadeMm: Lam, fans: O.fans, pairs: O.pairs, normalFallback: O.normalFallback, twin: O.twin, twinMismatch: O.twinMismatch, triRange: [O.from, O.to], buriedSamples: [] };
+      for (let i = 0, k = 0; i < nV && rec.organ.buriedSamples.length < 32; i++) if (O.relievable[i] && !(X.w0[i] > 0) && (k++ % 13 === 0)) rec.organ.buriedSamples.push({ p: [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]], n: [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]] });
+      for (const q of bs.samples) if (q.s > 0 && rec.skinSamples.length < 64) rec.skinSamples.push(q);
+    }
+    if (O.rod) rec.rod = { shippedTris: O.shippedTris, refinedTris: O.refinedTris, kappaMin: O.kappaMin, triRange: [O.from, O.to] };
+    const pos = acc.positions;
+    if (off) rec.bone.reliefOff = true;
+    else for (let t = 0; t < O.tri.length / 3; t++) for (let c = 0; c < 3; c++) {
+      const v = O.tri[t * 3 + c], o = (O.from + t) * 9 + c * 3;
+      pos[o] = disp[v * 3]; pos[o + 1] = disp[v * 3 + 1]; pos[o + 2] = disp[v * 3 + 2];
+      for (let k = 0; k < 3; k++) { const x = pos[o + k]; if (x < acc.lo[k]) acc.lo[k] = x; if (x > acc.hi[k]) acc.hi[k] = x; }
+    }
+    if (acc.normals && !off) for (let t = O.from; t < O.to; t++) {
+      const b = t * 9;
+      const ux = pos[b + 3] - pos[b], uy = pos[b + 4] - pos[b + 1], uz = pos[b + 5] - pos[b + 2], vx = pos[b + 6] - pos[b], vy = pos[b + 7] - pos[b + 1], vz = pos[b + 8] - pos[b + 2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
+      for (let c = 0; c < 3; c++) { acc.normals[b + c * 3] = nx; acc.normals[b + c * 3 + 1] = ny; acc.normals[b + c * 3 + 2] = nz; }
+    }
+    /* (a sheet-only lever, reached by no control: the masks per triangle
+       corner, so a contact sheet can draw them; null on every build) */
+    const MO = capability && capability.boneMaskOut;
+    if (MO) for (let t = 0; t < O.tri.length / 3; t++) for (let c = 0; c < 3; c++) {
+      const v = O.tri[t * 3 + c], o = ((O.from + t) * 3 + c) * 4;
+      if (o + 3 < MO.length) { MO[o] = X.mc[v]; MO[o + 1] = X.mpv[v] < 0 ? (X.w0[v] > 0 ? T.mp([O.P[v * 3], O.P[v * 3 + 1], O.P[v * 3 + 2]]) : 0) : X.mpv[v]; MO[o + 2] = X.w0[v]; MO[o + 3] = X.s[v] / H; }
+    }
+    const key = O.organ;
+    if (!recs[key]) { rec.bone.triRanges = [rec.bone.triRange]; if (rec.organ) rec.organ.triRanges = [rec.organ.triRange]; recs[key] = rec; return; }
+    const r = recs[key];
+    r.blades++; r.skinTris += rec.skinTris; r.displaced += rec.displaced; r.reliefMaxMm = Math.max(r.reliefMaxMm, rec.reliefMaxMm); r.reliefMinMm = Math.min(r.reliefMinMm, rec.reliefMinMm); r.edgeMismatch += rec.edgeMismatch;
+    for (const kk of ['vertices', 'relievable', 'visible', 'buried', 'covered', 'coveredUnder', 'ridges', 'displaced', 'shared', 'poreFloor', 'patchOff', 'ridgeOff']) r.bone[kk] += rec.bone[kk];
+    r.bone.triRanges.push(rec.bone.triRange);
+    if (r.bone.sigs.length < 64) r.bone.sigs.push(...rec.bone.sigs);
+    if (rec.bone.relieved) Object.defineProperty(r.bone, 'relieved', { value: [...(r.bone.relieved || []), ...rec.bone.relieved], enumerable: false, configurable: true });
+    for (const kk of ['samples', 'ridgeSamples', 'floorSamples']) for (const q of rec.bone[kk]) if (r.bone[kk].length < (kk === 'samples' ? 160 : 64)) r.bone[kk].push(q);
+    if (rec.organ && r.organ) {
+      for (const kk of ['shippedTris', 'refinedTris', 'cavityTris', 'vertices', 'relievable', 'visible', 'buried', 'covered', 'shared', 'fans', 'pairs', 'normalFallback']) r.organ[kk] += rec.organ[kk];
+      r.organ.twinMismatch = r.organ.twinMismatch || rec.organ.twinMismatch;
+      r.organ.triRanges.push(rec.organ.triRange);
+      for (const q of rec.organ.buriedSamples) if (r.organ.buriedSamples.length < 48) r.organ.buriedSamples.push(q);
+      for (const q of rec.skinSamples) if (r.skinSamples.length < 96) r.skinSamples.push(q);
+    }
+    if (rec.rod && r.rod) { r.rod.shippedTris += rec.rod.shippedTris; r.rod.refinedTris += rec.rod.refinedTris; r.rod.kappaMin = Math.min(r.rod.kappaMin, rec.rod.kappaMin); }
+  });
+  return recs;
+}
+/* the pass itself, for the gate's hardest-case fixture (TXB6): no shipped
+   row carries a RELIEVED position two organs share, so the owner rule is
+   proved on two sheets written down for the purpose */
+export { boneReliefPass as boneReliefPassForGate };
+/* COVERED, against a LIST of ranges (petal and sepal feet) — T5's test */
+export function textureVertexCoveredAny(G, q, n, reachMm, ranges, delta = TEXTURE_VISIBILITY_OFFSET_MM) {
+  if (!ranges || !ranges.length) return false;
+  const o = [q[0] - n[0] * delta, q[1] - n[1] * delta, q[2] - n[2] * delta];
+  return t5HitsWithin(G, o, n, reachMm + delta, -1, -1, ranges);
 }
 
 
@@ -19565,12 +20142,16 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
   const lobedSt = lobedRow0 ? lobedStations(S.chevron, nu, S.profE.apex) : null;
   const lobedEmbedMm = lobedRow0 ? lobedRow0.h * Math.sin(lobedRow0.tau) + lobedSt[1] * Lmm : 0;
   const PA = pring(-plan.embedMm), PB = pring(pLen + lobedEmbedMm), PM = lobedRow0 ? pring(pLen) : null;
+  boneRodGroup(acc, 'petiole', () => {
   if (PM) {
     for (let i = 0; i < sides; i++) { const j = (i + 1) % sides; acc.quad(PA[i], PA[j], PM[j], PM[i]); acc.quad(PM[i], PM[j], PB[j], PB[i]); }
   } else {
   for (let i = 0; i < sides; i++) { const j = (i + 1) % sides; acc.quad(PA[i], PA[j], PB[j], PB[i]); }
   }
   for (let i = 1; i < sides - 1; i++) { acc.tri(PA[0], PA[i + 1], PA[i]); acc.tri(PB[0], PB[i], PB[i + 1]); }
+  /* (BONE) the petiole's radial normals, from its own axis */
+  if (acc.normalSink) for (const [ring, sv] of [[PA, -plan.embedMm], [PB, pLen + lobedEmbedMm], ...(PM ? [[PM, pLen]] : [])]) { const C = [base[0] + D0[0] * sv, base[1] + D0[1] * sv, base[2] + D0[2] * sv]; for (const q of ring) { const d = [q[0] - C[0], q[1] - C[1], q[2] - C[2]], L = Math.hypot(d[0], d[1], d[2]); if (L > 0) acc.normalSink(q, [d[0] / L, d[1] / L, d[2] / L]); } }
+  });
   /* THE SOLID THE PETIOLE ACTUALLY CROSSES — LF3's measured side, computed
      from this builder's OWN axis rather than from the plan beside it. The rod's
      axis stands at radius `rootR + s*cos(th)`, so the span inside the wall is
@@ -19590,7 +20171,9 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
   const texR = textureFor(state, cap);
   const texRefused = texR && !texR.refused && lobedRow0 ? { ...texR, refused: 'lobed' } : texR;
   const texC = texRefused && !texRefused.refused ? textureContext(texRefused, 'leaf', S.rowAt, 0, null) : null;
+  const boneCapL = texC && texC.bone ? boneSheetBegin(acc) : null;
   const B = emitLeafBladeInto(acc, S.rowAt, nu, t, prof, Lmm, plan.widthMm, 'leaf', false, { ...(lobedRow0 ? { tipProf: S.profE, wantSkin: true, stations: lobedSt, ...rootT } : leafSt ? { stations: leafSt, ...rootT } : rootT), texture: texC });
+  const boneSheetL = boneCapL ? boneSheetEnd(acc, boneCapL, 'leaf') : null;
   const { rowHalfBaseMm, rowHalfMm, rowCentre, rowNormal, rowMarginLiftMm, rim } = B;
   /* HOW FAR ALONG ITS OWN AXIS THE EMITTED BLADE REACHES from the leaf's root
      — read off the triangles this builder EMITTED (the bead included), never
@@ -19659,6 +20242,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
     directedMismatch, emittedReachMm,
     /* (T3) the texture as built on this blade — null at the guard */
     texture: textureRecord(texRefused, texC),
+    ...(boneSheetL ? { boneSheet: boneSheetL } : {}),
     /* THE HALF-WIDTHS THE BLADE WAS BUILT FROM, row by row, the BASE outline
        before any cut — the value handed to the cross-section as `hb`. LF9
        reads the tip exponent back off these, so a plan reporting one exponent
@@ -21785,6 +22369,8 @@ function rodPolylineInto(acc, centres, Ts, Ns, radii, phase = 0.5) {
   }
   const PA = rings[0], PB = rings[rings.length - 1];
   for (let i = 1; i < sides - 1; i++) { acc.tri(PA[0], PA[i + 1], PA[i]); acc.tri(PB[0], PB[i], PB[i + 1]); }
+  /* (BONE) radial normals to the deferred pass, as revolveInto's */
+  if (acc.normalSink) rings.forEach((ring, k) => { const C = centres[k]; for (const q of ring) { const d = [q[0] - C[0], q[1] - C[1], q[2] - C[2]], L = Math.hypot(d[0], d[1], d[2]); if (L > 0) acc.normalSink(q, [d[0] / L, d[1] / L, d[2] / L]); } });
   return rings;
 }
 const ringMid = (ring) => {
@@ -21870,7 +22456,7 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
   if (radii[iTip] !== cp.stalkR) push(tipC, FE.N, cp.stalkR);
   const termEnd = cp.terminalStalkMm + term.embedMm;
   push([tipC[0] + FE.D[0] * termEnd, tipC[1] + FE.D[1] * termEnd, tipC[2] + FE.D[2] * termEnd], FE.N, cp.stalkR);
-  const axisRings = rodPolylineInto(acc, centres, Ts, Ns, radii);
+  const axisRings = boneRodGroup(acc, 'petiole', () => rodPolylineInto(acc, centres, Ts, Ns, radii));
   /* the petiole's two ends: its rooted end and the RACHIS BASE (past the
      cone, where there is one) — the record every consumer reads as "the
      petiole runs from here to there" */
@@ -21912,7 +22498,7 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
        a third face, 40 shells -> 34). The petiole's own remedy: the left
        side's ring takes the other half step, so its vertices sit between the
        right side's at every angle and no vertex is shared. */
-    const rings = rodPolylineInto(acc, [F.root, [F.root[0] + F.D[0] * len, F.root[1] + F.D[1] * len, F.root[2] + F.D[2] * len]], [F.T, F.T], [F.N, F.N], [cp.stalkR, cp.stalkR], sp.side < 0 ? 0 : 0.5);
+    const rings = boneRodGroup(acc, 'stalk', () => rodPolylineInto(acc, [F.root, [F.root[0] + F.D[0] * len, F.root[1] + F.D[1] * len, F.root[2] + F.D[2] * len]], [F.T, F.T], [F.N, F.N], [cp.stalkR, cp.stalkR], sp.side < 0 ? 0 : 0.5));
     stalkRings.push(rings);
     rodAxes.push({ inner: ringMid(rings[0]), outer: ringMid(rings[1]), innerR: cp.stalkR, outerR: cp.stalkR, radiusMm: cp.stalkR, part: `stalk ${i}` });
   });
@@ -21935,9 +22521,12 @@ function buildCompoundLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
        through its own `rowAt`; the free base is relieved to its edge (g is 1) */
     const texR = textureFor(state, cap);
     const texC = texR && !texR.refused ? textureContext(texR, 'leaf', rowAt, 0, null) : null;
+    const boneCapF = texC && texC.bone ? boneSheetBegin(acc) : null;
     const Bl = emitLeafBladeInto(acc, rowAt, nu, t, prof, sp.L, sp.W, sp.role === 'terminal' ? 'leaflet T' : `leaflet ${sp.side > 0 ? 'L' : 'R'}${sp.k + 1}`, true, { ...(lSt ? { stations: lSt, ...lfT } : lfT), texture: texC });
+    const boneSheetF = boneCapF ? boneSheetEnd(acc, boneCapF, 'leaf') : null;
     return {
       texture: textureRecord(texR, texC),
+      ...(boneSheetF ? { boneSheet: boneSheetF } : {}),
       role: sp.role, k: sp.k, side: sp.side, lengthMm: sp.L, widthMm: sp.W, embedMm: sp.embedMm,
       root: F.root, base: B0, D: F.D, T: F.T, N: F.N,
       /* which rod holds it: the axis rod for the terminal, its own stalk else */
@@ -22266,6 +22855,17 @@ function revolveInto(acc, rings, south, north, outline = null) {
   for (let k = 0; k < pts.length - 1; k++) for (let j = 0; j < NS; j++) { const j2 = (j + 1) % NS; acc.quad(pts[k][j], pts[k][j2], pts[k + 1][j2], pts[k + 1][j]); }
   const last = pts[pts.length - 1];
   for (let j = 0; j < NS; j++) { const j2 = (j + 1) % NS; acc.tri(north, last[j], last[j2]); }
+  /* (BONE) THE ROD'S OWN NORMALS, to the deferred pass only while a rod group
+     is being captured (`boneRodGroup`; null on every other build): radial from
+     the ring's own centre in its own plane, and the two poles along the axis
+     (`e1 x e2`, the ring frame's own third direction) */
+  if (acc.normalSink) {
+    const ax = (R) => { const a = R.e1, b = R.e2, c = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], L = Math.hypot(c[0], c[1], c[2]); return L > 0 ? [c[0] / L, c[1] / L, c[2] / L] : null; };
+    const a0 = ax(rings[0]), a1 = ax(rings[rings.length - 1]);
+    if (a0) acc.normalSink(south, [-a0[0], -a0[1], -a0[2]]);
+    if (a1) acc.normalSink(north, a1);
+    rings.forEach((R, k) => { for (const q of pts[k]) { const d = [q[0] - R.C[0], q[1] - R.C[1], q[2] - R.C[2]], L = Math.hypot(d[0], d[1], d[2]); if (L > 0) acc.normalSink(q, [d[0] / L, d[1] / L, d[2] / L]); } });
+  }
   return pts;
 }
 
@@ -24900,7 +25500,12 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
           N2[v * 3 + 1] = M[4] * a + M[5] * b + M[6] * c;
           N2[v * 3 + 2] = M[8] * a + M[9] * b + M[10] * c;
         }
-        t5FloretOrgans.push({ ...O, organ: `floret ${O.organ}`, from: O.from + off, to: O.to + off, cover: O.cover ? [O.cover[0] + off, O.cover[1] + off] : null, P: P2, N: N2, T: U.rec.t5Deferred.T });
+        const cov = !O.cover ? null : typeof O.cover[0] === 'number' ? [O.cover[0] + off, O.cover[1] + off] : O.cover.map((r) => [r[0] + off, r[1] + off]);
+        t5FloretOrgans.push({ ...O, organ: O.organ.startsWith('floret ') ? O.organ : `floret ${O.organ}`, from: O.from + off, to: O.to + off, cover: cov, P: P2, N: N2, T: U.rec.t5Deferred.T });
+      }
+      if (U.rec.t5Deferred && U.rec.t5Deferred.smoothRods && U.rec.t5Deferred.smoothRods.length && t5FloretOrgans.length) {
+        const off = at / 9, last = t5FloretOrgans[t5FloretOrgans.length - 1];
+        last.smoothRodsCarried = [...(last.smoothRodsCarried || []), ...U.rec.t5Deferred.smoothRods.map((r) => ({ ...r, organ: r.organ.startsWith('floret ') ? r.organ : `floret ${r.organ}`, from: r.from + off, to: r.to + off }))];
       }
       /* THE SESSILE EMBED'S MEASURED SIDE — how far into the rachis the
          floret's OWN emitted vertices reach: the least cylindrical radius of
@@ -25426,6 +26031,7 @@ function buildSepalTierInto(acc, state, fr, sepals, sites, stemPlanned, cap, unc
       slots[slot.index] = slot;
       /* a sepal reads the texture edge PIN and nothing else of the row's capability (the petal hooks are the petals') */
       const p = buildPetalInto(acc, bs, sepals.ring, slot, cap && cap.textureEdgeMm > 0 ? { textureEdgeMm: cap.textureEdgeMm } : null, built.length === 0);
+      if (p && p.boneSheet) p.boneSheet.organ = 'sepal';   // (BONE) the sheet's record names its organ
       /* THE STATE THIS BLADE WAS BUILT FROM, keyed by the petal name the law
          reads — SP6 compares it against the page's own sepal* read-back, an
          owner the builder does not write. */
@@ -26010,8 +26616,10 @@ function buildBloomCore(acc, state, opts = {}) {
      so the twin cuts nothing itself) — mode-free by construction */
   if (!opts.t5Decide && !acc.exportMode && Number(state.sheetThickness) < MIN_FEATURE_MM && organT5For(state, opts.capability || null)) {
     const tw = new MeshBuilder({ exportMode: true });
+    if (textureIsBone(state)) tw.boneRodLog = [];
     const tb = buildBloomCore(tw, { ...state, petalTexture: 'NONE' }, { ...opts, t5Decide: 'twin' });
-    const dec = { positions: tw.positions, hub: [tb.petalTriEnd, tb.hubTriEnd], stem: [tb.hubTriEnd, tb.stemTriEnd], tube: (tb.tube && tb.tube.rings || []).map((r) => [r.triFrom, r.triTo]) };
+    const dec = { positions: tw.positions, hub: [tb.petalTriEnd, tb.hubTriEnd], stem: [tb.hubTriEnd, tb.stemTriEnd], tube: (tb.tube && tb.tube.rings || []).map((r) => [r.triFrom, r.triTo]), rods: tw.boneRodLog || null };
+    tw.boneRodLog = null;
     return buildBloomCore(acc, state, { ...opts, t5Decide: dec });
   }
   const layerCount = Math.round(Number(state.layerCount) || 1);
@@ -26068,6 +26676,7 @@ function t5Finish(acc, built, extra, capability = null, pedicel = false) {
      florets carry the same copy of the pattern — `buildInflorescenceInto`
      carries each placed floret's organs into the parent's pass) */
   const floretOrgans = built.inflorescenceBuilt && built.inflorescenceBuilt.t5FloretOrgans ? built.inflorescenceBuilt.t5FloretOrgans : [];
+  if (built.boneCapture) return boneFinish(acc, built, extra, floretOrgans, capability, pedicel);
   if (!built.t5 && !floretOrgans.length) return built;
   if (built.t5 && pedicel) {
     built.t5Deferred = { T: built.t5, organs: [...(built.t5Organs || []), ...extra] };
@@ -26082,6 +26691,57 @@ function t5Finish(acc, built, extra, capability = null, pedicel = false) {
   delete built.t5Organs;
   built.t5 = { organs: organs.map((O) => O.organ) };
   if (built.inflorescenceBuilt) delete built.inflorescenceBuilt.t5FloretOrgans;
+  return built;
+}
+
+/* (BONE) the one deferred pass over every part of this build — sheets, the
+   hub, the stem, the tube, the rods and every floret's carried organs — or,
+   on a floret build, the whole set DEFERRED to the bloom it is appended into
+   (the floret PETALS too, Eva's Oct 26 ruling: one shared world layer) */
+function boneFinish(acc, built, extra, floretOrgans, capability, pedicel) {
+  const C = built.boneCapture;
+  const T = built.t5;
+  const organs = [...C.sheets, ...(built.t5Organs || []), ...extra, ...C.rods, ...floretOrgans];
+  delete built.t5Organs;
+  if (built.inflorescenceBuilt) delete built.inflorescenceBuilt.t5FloretOrgans;
+  const smoothRods = [...C.smoothRods, ...floretOrgans.flatMap((O) => O.smoothRodsCarried || [])];
+  if (pedicel) {
+    built.t5Deferred = { T, organs, smoothRods };
+    built.t5 = { organs: organs.map((O) => O.organ), deferred: true };
+    delete built.boneCapture;
+    return built;
+  }
+  /* THE EDGE CAP'S TRIALS ARE DECIDED ON COUNTS ALONE, and the relief moves no
+     count: while the cap is deciding, the pass is held on the build and run
+     ONCE, on the build the cap picks (`boneRunPending`) — never on a trial it
+     throws away. Mode-free and byte-identical by construction (the same pass
+     on the same mesh, later). */
+  if (TEXTURE_CAP_ACTIVE) {
+    built.bonePending = { T, organs, smoothRods, capability };
+    built.t5 = { organs: organs.map((O) => O.organ), pending: true };
+    delete built.boneCapture;
+    return built;
+  }
+  return boneApply(acc, built, T, organs, smoothRods, capability);
+}
+function boneRunPending(acc, built) {
+  if (!built || !built.bonePending) return built;
+  const { T, organs, smoothRods, capability } = built.bonePending;
+  delete built.bonePending;
+  return boneApply(acc, built, T, organs, smoothRods, capability);
+}
+function boneApply(acc, built, T, organs, smoothRods, capability) {
+  const recs = boneReliefPass(acc, T, organs, capability);
+  if (built.texture) {
+    for (const [k, r] of Object.entries(recs)) {
+      const o = built.texture.organs[k];
+      if (o && r.bone.sheet) { o.bone = r.bone; o.displaced = r.displaced; o.reliefMaxMm = r.reliefMaxMm; o.reliefMinMm = r.reliefMinMm; o.skinSamples = r.bone.samples.filter((q) => q.s > 0).slice(0, 96); }
+      else built.texture.organs[k] = r;
+    }
+    built.texture.bone = { ...T.bone, smoothRods: smoothRods.map((r) => ({ organ: r.organ, tris: r.tris, kappaMin: r.kappaMin, triRange: [r.from, r.to] })) };
+  }
+  built.t5 = { organs: organs.map((O) => O.organ) };
+  delete built.boneCapture;
   return built;
 }
 
@@ -26130,6 +26790,8 @@ export function buildBloomInto(acc, state, opts = {}) {
       }
       copyAccInto(acc, pick.acc);
     }
+    /* (BONE) the one relief pass, on the picked build only */
+    boneRunPending(acc, pick.built);
     trials.sort((a, b) => a.edgeMm - b.edgeMm);
     if (pick.built.texture) pick.built.texture.edgeCap = { askedMm: TEXTURE_EDGE_MM, usedMm: textureEdgeRung(pick.k), capMm: TEXTURE_EDGE_CAP_MM, gridMm: TEXTURE_EDGE_GRID_MM, budget: EXPORT_TRI_BUDGET, pinned: false, trials, fits: pick.tris <= EXPORT_TRI_BUDGET };
     return pick.built;
@@ -26232,6 +26894,12 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   /* where this bloom's own triangles start in the accumulator — the mophead's
      budget clamp reads the rest of the bloom as an exact count */
   const bodyTris0 = acc.triangleCount;
+  /* (BONE) the build's own capture lists: every sheet and every rod group
+     hands its mesh to the ONE deferred relief pass (`boneReliefPass`); null
+     on every other build, by branch */
+  const boneT = tube && tube.collect ? null : (textureIsBone(state) ? organT5For(state, capability) : null);
+  acc.boneSheets = boneT ? [] : null;
+  acc.boneRods = null;
 
   const fr = footRing(state, acc, { scopes });
   /* ONE WHORL PER LAYER — layers are instances of the arrangement primitive,
@@ -26512,7 +27180,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      underside is; it is emitted HERE, after the hub, where it always was. */
   /* a floret's stem is its PEDICEL, a rod: deferred to BONE (Q12) */
   let stemBuilt;
-  if (T5 && !pedicel && stemPlanned.present) { const c = organCapture(acc, () => buildStemInto(acc, stemPlanned)); stemBuilt = c.out; t5Cut('stem', hubTriEnd, c); stemBuilt = { ...stemBuilt, latticeTris: acc.positions.length / 9 - hubTriEnd }; }
+  if (T5 && (!pedicel || boneT) && stemPlanned.present) { const c = organCapture(acc, () => buildStemInto(acc, stemPlanned)); stemBuilt = c.out; t5Cut('stem', hubTriEnd, c); stemBuilt = { ...stemBuilt, latticeTris: acc.positions.length / 9 - hubTriEnd }; }
   else stemBuilt = buildStemInto(acc, stemPlanned);
   const stemTriEnd = acc.positions.length / 9;
   /* LEAVES ON THE STEM. Built AFTER the stem because they read its plan for
@@ -26532,6 +27200,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      a noded stem a leafless rebuild turns the nodes BARE, which moves the stem
      too, and a prefix read off it lands in the wrong place). */
   const leafTris0 = acc.triangleCount;
+  if (boneT) acc.boneRods = { index: 0, decide: t5Decide && t5Decide !== 'twin' && t5Decide.rods ? t5Decide.rods : null, decidePositions: t5Decide && t5Decide !== 'twin' ? t5Decide.positions : null, curvature: boneT.bone.curvature, edgeMm: boneT.edgeMm, smooth: [], organs: [] };
   if (leafPlanned.present) {
     for (let i = 0; i < leafPlanned.azimuths.length; i++) {
       /* A NODE WHOSE CAP LEAVES NO BLADE BUILDS NO LEAF (told by the plan). */
@@ -26558,7 +27227,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
       angleRamp: () => 0,
       phase: 0,
       placement: A.layout === 'DISC' ? 'SPIRAL' : 'RADIAL',
-      blade: (slot) => { stamens.push(buildStamenInto(acc, A, A.stamens[slot.index], slot)); freeEnds++; },
+      blade: (slot) => { stamens.push(boneRodGroup(acc, 'stamen', () => buildStamenInto(acc, A, A.stamens[slot.index], slot))); freeEnds++; },
     });
   }
   /* THE TWO DISTANCE FLAGS (Q8, flags never gates): the nearest pair of ROOTS
@@ -26573,12 +27242,16 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      and inert). Its free end is its own census (JG4), never folded into the
      androecium's. */
   const styles = [];
-  if (fr.gynoecium && !headOff) styles.push(buildStyleInto(acc, fr.gynoecium));
+  if (fr.gynoecium && !headOff) styles.push(boneRodGroup(acc, 'style', () => buildStyleInto(acc, fr.gynoecium)));
   /* THE SEPALS (sepals, part 1) — the petal builder a second time, on the
      hub's rim, at the angle the drawn limit allows, EMITTED LAST so the
      stream of a bloom without them is a prefix of the stream with them.
      Null by branch at sepalCount 0 and under SPHERE. */
+  const sepalTris0 = acc.triangleCount;
   const sepalsBuilt = headOff ? null : buildSepalsInto(acc, state, fr, sites, stemPlanned, capability);
+  /* (BONE, Eva's Oct 26 ruling) the hub is covered by the SEPAL feet as by the
+     petal feet — derived from the emitted feet, top and underside alike */
+  if (boneT && t5Organs) { const hubO = t5Organs.find((O) => O.organ === 'hub'); if (hubO) hubO.cover = [[0, petalTriEnd], ...(acc.triangleCount > sepalTris0 ? [[sepalTris0, acc.triangleCount]] : [])]; }
   /* THE INFLORESCENCE (this session) — N copies of ONE floret unit, each a
      whole bloom with its own pedicel built at the origin by this very
      function, appended under a rigid transform. EMITTED LAST, after the
@@ -26708,7 +27381,9 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      organ's lattice count against its conforming floor, the relief's extremes
      and the refusals — what the TX family and the read-out read. */
   const texture = textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, capability);
-  return { petalTriEnd, hubTriEnd, stemTriEnd, t5Organs, t5: T5, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt, texture,
+  const boneCapture = boneT ? { sheets: acc.boneSheets || [], rods: acc.boneRods ? acc.boneRods.organs : [], smoothRods: acc.boneRods ? acc.boneRods.smooth : [] } : null;
+  acc.boneSheets = null; acc.boneRods = null;
+  return { petalTriEnd, hubTriEnd, stemTriEnd, t5Organs, t5: T5, boneCapture, ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, scopes: scopesBuilt, texture,
     /* THE SIZE FIELD'S OWN RECORD (organic variance, build 1) — null at amount
        0, which is the guard every consumer of it branches on. The closure is
        left off (a function does not survive the metrics hook's clone); what a

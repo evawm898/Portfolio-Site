@@ -1949,7 +1949,41 @@ export const SMOKE_BLOCKS = [
     ],
   },
   {
-    n: 82, title: 'where the nodes go and leaf size along the stem (Bloom P1, Oct 28)',
+    n: 82, title: 'the BONE texture — the one world field under a curvature and a patch mask (Oct 28)',
+    anchor: 'BONE: the ruled defaults (the provisional look: 2.0 mm pores, craters 2.5x, 60% in patches, smooth past 1/mm)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       deferred pass over every part (`boneReliefPass`), the sheets' capture,
+       the rods' capture and their curvature decision (on the export twin when
+       the floor binds), the hub's cover over the petal AND sepal feet, the
+       floret sheets carried into the parent's pass, and the derived owner. The
+       anchor is the ruled defaults (the sheets and the hub, the underside
+       under the coplanar feet covered); the subset adds the sepals at the
+       join's top, the rods relieved at the curvature maximum, the thin sheet
+       (the rods decided on the twin), the umbel's florets, the infill refusal
+       and a GATED row. --conn is REQUIRED: the relief must not open a gap at
+       any join, and the voxel fill is that witness. */
+    conn: true,
+    rows: [
+      { label: 'BONE: x 8 sepals at the join\'s top (their feet cover the hub: the Oct 26 ruling)',
+        path: "TX12 the hub under the SEPAL feet as under the petal feet covered and unmoved, TXB2 the law on the sepal sheets, TXB0 the controls" },
+      { label: 'BONE: x 12 stamens and the style x boneCurvature max (the rods take the field)',
+        path: "TXB7 every rod latticed below the curvature control and none left smooth, TXB2 the one law on the rods, TXB1 outward with the pore floors on the rod's own surface" },
+      { label: 'BONE: x 12 stamens and the style (1.2 mm rods: smooth by the curvature mask)',
+        path: "TXB7 the rods ridge at every vertex left as shipped and told on the read-out, TXB3 the bead and rims as ridges" },
+      { label: 'BONE: x sheetThickness 0.60 x a stem x stamens (every count, the rods\' included, decided on the export twin)',
+        path: "TX7 the counts live = export with the rods decided on the export twin, TX10 the organs' floor on the twin" },
+      { label: 'BONE: x an UMBEL, head ON (floret petals and hubs in the world frame, the pedicels porous)',
+        path: "TXB5 no two florets carry the same relief and the floret petals reach the parent's one pass, TX14 the floret hubs in the world frame, TXB6 the pass reversed the same bloom" },
+      { label: 'BONE: x a closed tube (6 petals, k 0)',
+        path: "TXB1 the clearance at the hub and the tube ring's shared positions restated (the two shells kept apart in the file — X2 is the witness), TX10 the tube ring's lattice" },
+      { label: 'BONE: x the VORONOI infill (refused with the word infill, told)',
+        path: "TX6 the texture refused with the word infill and told on the read-out" },
+      { label: 'BONE: GATED — the five at their extremes under the retired PEBBLE (hidden AND inert; a saved PEBBLE design builds as before)',
+        path: "TX0 the registry and the guard agree, TX2 the retired field restated (BONE's five reach nothing)" },
+    ],
+  },
+  {
+    n: 83, title: 'where the nodes go and leaf size along the stem (Bloom P1, Oct 28)',
     anchor: 'NODE RUN: the widest run, 0.05 .. 0.95, under a DROOPING leaf (-30 deg: the start is not raised)',
     /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
        run's own law (a start / end other than the defaults, and the solo
