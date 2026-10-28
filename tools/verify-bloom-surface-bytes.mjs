@@ -304,6 +304,30 @@ function foldMoverOnBase(st, row) {
   return false;
 }
 const PREDICATE_MOVERS = {
+  /* WHERE THE NODES GO AND LEAF SIZE ALONG THE STEM (Bloom P1, Oct 28). A row
+     moves iff the node depths RESTATED from its controls (the harness's
+     `restatedNodeLayout` — the run, the spacing, the merge clamp, the top
+     leaf's rise) differ under `Object.is` from the same restatement with the
+     four controls at their defaults, or the restated taper gives some node a
+     scale other than 1. Neither side reads this tree's geometry. (It does not
+     compare against the BASE tree's plan: the restated rise of a DRAWN spine
+     needs the builder's own spine record, which a predicate has no page for —
+     LF4's and NS1's restatements take it — so the comparison is between two
+     restatements that share it.) Under a RACEME the four are dead and the row holds;
+     a stem with nothing at its nodes holds. At the defaults the restated
+     layout IS the old law's doubles (NS2), so every stored row holds — which
+     is the zero-mover predeclaration the ruling asks for. */
+  'node-run': (st) => {
+    if (!(Number(st.stemLength) >= 1)) return false;
+    const R = harness.restatedNodeLayout(st);
+    if (R.run.raceme) return false;
+    const leafed = Number(st.leafLength) >= 1;
+    const noded = (Number(st.stemNodeSwelling) || 0) > 0 || (Number(st.stemNodeKink) || 0) > 0;
+    if (!leafed && !noded) return false;
+    if (leafed && R.scales && R.scales.some((q) => q.scale !== 1)) return true;
+    const R0 = harness.restatedNodeLayout({ ...st, leafNodeStart: 0.16, leafNodeEnd: 0.86, leafNodeSpacing: 0, leafSizeTaper: 0 });
+    return R.depths.length !== R0.depths.length || R.depths.some((d, i) => !Object.is(d, R0.depths[i]));
+  },
   /* SURFACE TEXTURE (T3, Oct 22). A row moves iff its texture choice is not
      NONE and the infill is NONE (with the infill on the texture is REFUSED
      and nothing moves — Q9); written from the CONTROLS, the choice guard's own
