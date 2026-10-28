@@ -46,7 +46,7 @@
    The wire thickness is floored at it and told. */
 
 import { offsetCurve, outerEdge, innerEdge, sweepSpine } from './frame-geometry.js';
-import { bandSolid, Mesh, EMBED_MM } from './frame-relief.js';
+import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound } from './frame-relief.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
 
 export const SCROLL_STEP_DEG = 3;
@@ -64,6 +64,20 @@ export const SCROLL_BODY = { C: 0.42, S: 0.6 };
    no room to taper (told). Every gap and clamp reads the LOCAL width. */
 export const TAPER_TIP = 0.5;
 export const taperTip = (t) => Math.max(MIN_FEATURE_MM, TAPER_TIP * t);
+/* THE CARVED STROKE (phase 3c, Eva's ruling on the critique: 1B). A carved
+   scroll's width follows its own curvature — SELF-SIMILAR: w = CARVED_K · ρ
+   (ρ the local radius of curvature), capped at CARVED_CAP of the scroll's
+   length and floored at MIN_FEATURE_MM. So the body (ρ large) is the cap and
+   the stroke thins in proportion as it curls into the volute — the coils of a
+   spiral whose radius shrinks by a fixed ratio a turn keep a fixed ratio of
+   room, which is what lets a fat stroke curl at all (on the shipped curve a
+   stroke fat everywhere crosses its own coil, measured in the critique
+   session). k < 2 is the fold limit (the inner edge reverses where the half
+   width passes ρ); 0.7 is the look, from the critique's prototype P1–P3. */
+export const CARVED_K = 0.7;
+export const CARVED_CAP = 0.1;
+export const carvedCap = (L) => Math.max(MIN_FEATURE_MM, CARVED_CAP * L);
+export const carvedWidth = (rho, cap) => Math.min(cap, Math.max(MIN_FEATURE_MM, CARVED_K * rho));
 /* the wire's profile samples across its width */
 export const WIRE_SAMPLES = 8;
 
@@ -134,7 +148,7 @@ export function scrollCurve(spec) {
   const ramp = kind === 'S' ? 0.2 * Math.min(h1, h2) : 0;
   const rMid = SCROLL_BODY[kind] * L;
   // the eye is the floor on the wire's LOCAL width there: the tip, tapered
-  const tEye = spec.taper ? taperTip(t) : t;
+  const tEye = spec.carved ? MIN_FEATURE_MM : spec.taper ? taperTip(t) : t;
   const re = (tEye + MIN_FEATURE_MM) / 2;
   const share = spec.share ?? VOLUTE_SHARE;
   const rv = [h1, h2].map((h) => voluteStart(h * share, re, turns, rMid));
@@ -145,7 +159,10 @@ export function scrollCurve(spec) {
   for (let i = 0; i < B.pts.length; i++) { pts.push(B.pts[i]); tan.push(B.phi[i]); u.push(B.u[i]); kap.push(B.kap[i]); }
   const nrm = tan.map((f) => [-Math.sin(f), Math.cos(f)]);
   const built = [h1, h2].map((h, i) => linTurn(h * share, rv[i], re) / (2 * Math.PI));
-  const out = { kind, pts, nrm, tan, u, kap, root: A.pts.length - 1, info: { L, t, rMid, rv, eye: re, h1, h2, turnsAsked: turns, turnsBuilt: built, share, taper: !!spec.taper, tip: tEye } };
+  const out = { kind, pts, nrm, tan, u, kap, root: A.pts.length - 1, info: { L, t, rMid, rv, eye: re, h1, h2, turnsAsked: turns, turnsBuilt: built, share, taper: !!spec.taper, carved: !!spec.carved, tip: tEye } };
+  // a CARVED stroke: the local width is the self-similar law on the curve's
+  // own curvature at each station (t is the cap)
+  if (spec.carved) { out.w = kap.map((k) => carvedWidth(1 / Math.max(1e-12, Math.abs(k)), t)); return out; }
   // the local width at every station: t through the body, linear in arc
   // length over the volute down to the tip at the eye
   if (spec.taper) out.w = u.map((s) => { const h = s < 0 ? h1 : h2, a = Math.abs(s), sv = h * (1 - share); return a <= sv ? t : t + (tEye - t) * Math.min(1, (a - sv) / (h - sv)); });
@@ -202,7 +219,7 @@ function printableTurns(base, t, asked) {
 const fitMemo = new Map();
 export function tightnessFit(spec) {
   const t = Math.max(spec.wire, MIN_FEATURE_MM);
-  const key = [spec.kind, spec.length, t, spec.balance, spec.share, !!spec.taper].join('|');
+  const key = [spec.kind, spec.length, t, spec.balance, spec.share, !!spec.taper, !!spec.carved].join('|');
   if (!fitMemo.has(key)) fitMemo.set(key, fitUncached({ ...spec, wire: t }, t));   // pure: tightness does not enter it
   return fitMemo.get(key);
 }
@@ -232,7 +249,7 @@ export function buildScroll(spec) {
     const tau = Math.min(1, Math.max(0, spec.tightness ?? 0.5));
     const lo = Math.min(VOLUTE_TURNS[0], fit.turnsMax);
     asked = lo + (fit.turnsMax - lo) * tau;
-    if (spec.taper && taperTip(t) >= t) told.push(`tapered wire: a ${t.toFixed(2)} mm wire is already at the ${MIN_FEATURE_MM.toFixed(1)} mm floor — no room to taper, built constant`);
+    if (spec.taper && !spec.carved && taperTip(t) >= t) told.push(`tapered wire: a ${t.toFixed(2)} mm wire is already at the ${MIN_FEATURE_MM.toFixed(1)} mm floor — no room to taper, built constant`);
     if (fit.turnsMax < VOLUTE_TURNS[1]) told.push(fit.turnsMax <= VOLUTE_TURNS[0]
       ? `tightness inert — a ${(spec.length).toFixed(0)} mm scroll on a ${t.toFixed(1)} mm wire prints at most ${fit.turnsMax.toFixed(2)} turns`
       : `tightness spans ${lo.toFixed(2)}–${fit.turnsMax.toFixed(2)} turns — the most a ${(spec.length).toFixed(0)} mm scroll on a ${t.toFixed(1)} mm wire prints (volute ${(fit.share * 100).toFixed(0)}% of each half)`);
@@ -268,15 +285,17 @@ export function placeCurve(c, { at = [0, 0], angle = 0, flip = false, mirror = f
    sides of its root. The child's root sits (t_lead + t_child)/2 − EMBED_MM
    off the lead's centreline, so the two closed shells OVERLAP by the embed
    at the contact (never a graze). */
-export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ratio = 0.6, balance = 0.6, kind = 'C', taper = false } = {}) {
-  const lead = buildScroll({ kind, length, tightness, wire, balance, taper });
+export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ratio = 0.6, balance = 0.6, kind = 'C', taper = false, carved = false } = {}) {
+  // a CARVED scroll's cap is its own length's (CARVED_CAP), so the wire
+  // control does not reach it
+  const lead = buildScroll({ kind, length, tightness, wire: carved ? carvedCap(length) : wire, balance, taper, carved });
   const out = [{ curve: lead, role: 'lead', parent: null, station: null }];
   const stations = [];
   for (let i = 1; i < n; i++) stations.push((i % 2 ? -1 : 1) * (0.18 + 0.14 * Math.floor((i - 1) / 2)));
   const placeChild = (frac, i, tau) => {
     const order = Math.floor(i / 2) + 1;
-    const len = length * ratio ** order, tw = Math.max(MIN_FEATURE_MM, wire * Math.sqrt(ratio) ** order);
-    const child = buildScroll({ kind: i % 2 ? 'S' : 'C', length: len, tightness: tau, wire: tw, balance, taper });
+    const len = length * ratio ** order, tw = carved ? carvedCap(len) : Math.max(MIN_FEATURE_MM, wire * Math.sqrt(ratio) ** order);
+    const child = buildScroll({ kind: i % 2 ? 'S' : 'C', length: len, tightness: tau, wire: tw, balance, taper, carved });
     // the lead's station at arc length frac · L from its root, on its BACK
     // (the side opposite its normal)
     const target = frac * lead.info.L;
@@ -318,6 +337,95 @@ export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ra
 }
 
 /* ------------------------------------------------------------------ */
+/* THE LEAF and THE CLUSTER (phase 3c, Eva's picks P4 and P5)          */
+/* ------------------------------------------------------------------ */
+
+/* A LEAF is a spine like a scroll's — a planar centreline with unit normals,
+   swept by the one bandSolid — whose curvature rises toward the tip so the
+   tip curls over: κ(s) = side · θ · (p + 1)/L · (s/L)^p, so the whole leaf
+   turns by exactly θ (LEAF_CURL) and most of it in its last third. Its width
+   is a lobed envelope with notched serrations,
+     w(s) = W · sin(π (s/L)^0.75)^0.8 · (½ + ½ √sin(π · frac(lobes · s/L)))
+   held under the fold limit (LEAF_FOLD · ρ — the inner edge reverses where
+   the half width passes ρ, so 1.6 keeps it at 0.8 of that) and floored at
+   MIN_FEATURE_MM, so the tip and the base are a printable feature wide and
+   every notch is a dip in the width, never a gap. `side` +1 curls left of
+   the direction of growth, −1 right. */
+export const LEAF_CURL = 2.2;          // rad: the whole leaf's turn
+export const LEAF_CURL_POWER = 2.2;
+export const LEAF_LOBES = 4;
+export const LEAF_FOLD = 1.6;
+export const LEAF_ASPECT = 0.38;       // the blade's width as a fraction of its length
+export const LEAF_RELIEF = 0.18;       // the blade's crown as a fraction of its width (× ornament relief)
+export const leafKappa = (s, L, side = 1, theta = LEAF_CURL) => side * theta * (LEAF_CURL_POWER + 1) / L * Math.pow(Math.max(0, s) / L, LEAF_CURL_POWER);
+export function leafEnvelope(s, L, W, lobes = LEAF_LOBES) {
+  const a = Math.min(1, Math.max(0, s / L));
+  const env = Math.pow(Math.sin(Math.PI * Math.pow(a, 0.75)), 0.8);
+  const fr = (a * lobes) % 1;
+  return W * env * (0.5 + 0.5 * Math.sqrt(Math.max(0, Math.sin(Math.PI * fr))));
+}
+export const leafWidth = (s, L, W, kap, lobes = LEAF_LOBES) => Math.max(MIN_FEATURE_MM, Math.min(leafEnvelope(s, L, W, lobes), LEAF_FOLD / Math.max(1e-12, Math.abs(kap))));
+export function buildLeaf({ length, width, side = 1, curl = LEAF_CURL, lobes = LEAF_LOBES } = {}) {
+  const L = length, told = [];
+  let W = width;
+  if (W < MIN_FEATURE_MM) { told.push(`leaf ${W.toFixed(2)} mm wide built at the ${MIN_FEATURE_MM.toFixed(1)} mm assumed minimum feature`); W = MIN_FEATURE_MM; }
+  // the arc law, finer than a scroll's step so each lobe is a dozen stations
+  const n = Math.max(48, Math.ceil(L / 0.4), 12 * lobes);
+  const ds = L / n;
+  const pts = [[0, 0]], tan = [0], u = [0], kap = [leafKappa(0, L, side, curl)];
+  let x = 0, y = 0, f = 0;
+  for (let i = 1; i <= n; i++) {
+    const sm = (i - 0.5) * ds, dphi = leafKappa(sm, L, side, curl) * ds, c = ds * sinc(dphi / 2);
+    x += c * Math.cos(f + dphi / 2); y += c * Math.sin(f + dphi / 2); f += dphi;
+    pts.push([x, y]); tan.push(f); u.push(i * ds); kap.push(leafKappa(i * ds, L, side, curl));
+  }
+  const nrm = tan.map((g) => [-Math.sin(g), Math.cos(g)]);
+  const w = u.map((s, i) => leafWidth(s, L, W, kap[i], lobes));
+  return { kind: 'leaf', pts, nrm, tan, u, kap, w, root: 0, info: { kind: 'leaf', L, wire: W, tip: MIN_FEATURE_MM, side, curl, lobes, told } };
+}
+
+/* A CLUSTER (P5): a group with two leaves LAPPING its lead scroll's root —
+   one growing along each half (LEAF_LAYOUT), curling the way the scroll
+   curls. A leaf is a stacked shell (Eva's ruling
+   b on the critique: the height field is kept): a closed column from the
+   back up to a crown LIFTED by the lead's own crown at its root, so where
+   the two overlap the leaf lies over the scroll. A leaf must JOIN the lead
+   (every approach a true overlap of the embed) and every other wire of the
+   group it comes near; where it would graze or cross one it is shortened
+   (×0.85, up to six times) and then dropped — told. */
+export const LEAF_SIZE = [0.42, 0.35];   // the two leaves, × the lead's length (the longer on the longer half)
+/* the two leaves: [curl side, angle off the lead's root tangent, length ×
+   the lead]. The longer leaf grows along the longer half splayed 0.3 rad
+   into the C's mouth; the shorter along the shorter half splayed 0.2 rad
+   toward the back, both curling toward the mouth — the best of 256 layouts
+   swept over 23 / 40 / 80 mm leads × 1 / 2 / 3 / 5 scrolls (mean leaf length
+   0.83 of asked; a leaf into the mouth on the short half meets its volute). */
+export const LEAF_LAYOUT = [[+1, 0.3, LEAF_SIZE[0]], [-1, Math.PI + 0.2, LEAF_SIZE[1]]];
+export const LEAF_CROSS = MIN_FEATURE_MM / 2;
+export function buildCluster(group, { size = 1, layout = LEAF_LAYOUT } = {}) {
+  const lead = group[0].curve, r = lead.pts[lead.root];
+  const others = group.slice(1).map((g) => g.curve);
+  const told = [];
+  const leaves = [];
+  // the host: a JOINT (every approach a true overlap of the embed); every
+  // other wire: clear by a feature, or a CROSSING — every approach under a
+  // feature reaches an overlap of LEAF_CROSS (the leaf is held by its host,
+  // so a crossing needs to be an overlap, never a near miss, not a joint)
+  const fits = (lf) => joinsCleanly(lf, lead) && [...others, ...leaves].every((o) => wireClear(lf, o) >= MIN_FEATURE_MM || joinsCleanly(lf, o, LEAF_CROSS));
+  layout.forEach(([side, angle, frac], k) => {
+    let len = frac * size * lead.info.L, got = null;
+    for (let q = 0; q < 7 && !got; q++, len *= 0.85) {
+      const lf = placeCurve(buildLeaf({ length: len, width: LEAF_ASPECT * len, side }), { at: r, angle: lead.tan[lead.root] + angle });
+      lf.info = { ...lf.info, hostWire: lead.info.wire, hostW: wAt(lead, lead.root), role: 'leaf', shortened: q };
+      if (fits(lf)) got = lf;
+    }
+    if (got) { leaves.push(got); if (got.info.shortened) told.push(`leaf ${k + 1} shortened to ${(100 * 0.85 ** got.info.shortened).toFixed(0)}% — at full length it grazes another wire of the group`); }
+    else told.push(`leaf ${k + 1} not built — it grazes another wire of the group at every length`);
+  });
+  return { leaves, told };
+}
+
+/* ------------------------------------------------------------------ */
 /* Relief                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -326,6 +434,8 @@ export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ra
    round raises it on a wall of t/2, so the visible top is the upper half of
    a round wire of diameter t. */
 export function wireProfile(shape = 'half-round') {
+  if (shape === 'arris') return arrisProfile();
+  if (shape === 'leaf') return leafProfile();
   const x = new Float64Array(WIRE_SAMPLES + 1), z = new Float64Array(WIRE_SAMPLES + 1);
   for (let i = 0; i <= WIRE_SAMPLES; i++) {
     x[i] = i / WIRE_SAMPLES;
@@ -334,7 +444,31 @@ export function wireProfile(shape = 'half-round') {
   }
   return { x, z, shape };
 }
-export const wireHeight = (t, shape) => (shape === 'half-round' ? t / 2 : t);
+/* THE ARRIS (phase 3c, Eva's pick P3 from the critique sheet — the default
+   carved section): a crisp spine down the stroke's middle with a shallow
+   hollow either side, falling to the base at both edges, so the light
+   catches a ridge and two shadowed channels the way a carved C-scroll does.
+   u = |2x − 1|; z = (1 − u)^0.55 · (0.72 + 0.28 cos²(1.6 π u)) · dome^0.25
+   (dome the semicircle). 16 samples across, so the spine is a vertex. */
+export const ARRIS_SAMPLES = 16;
+export function arrisProfile() {
+  const x = new Float64Array(ARRIS_SAMPLES + 1), z = new Float64Array(ARRIS_SAMPLES + 1);
+  for (let i = 0; i <= ARRIS_SAMPLES; i++) {
+    x[i] = i / ARRIS_SAMPLES;
+    const u = Math.abs(2 * x[i] - 1), dome = Math.sqrt(Math.max(0, 1 - u * u));
+    z[i] = Math.max(0, (1 - u) ** 0.55 * (0.72 + 0.28 * Math.cos(Math.PI * u * 1.6) ** 2)) * dome ** 0.25;
+  }
+  return { x, z, shape: 'arris' };
+}
+/* THE LEAF's section (P4): a raised midrib on a cupped blade — the edges lift
+   back up to half the rib so the lobes read as cupped, never as a flat plate. */
+export const LEAF_SAMPLES = 16;
+export function leafProfile() {
+  const x = new Float64Array(LEAF_SAMPLES + 1), z = new Float64Array(LEAF_SAMPLES + 1);
+  for (let i = 0; i <= LEAF_SAMPLES; i++) { x[i] = i / LEAF_SAMPLES; const u = 2 * x[i] - 1; z[i] = 0.28 + 0.5 * Math.exp(-((u / 0.12) ** 2)) + 0.22 * u ** 4; }
+  return { x, z, shape: 'leaf' };
+}
+export const wireHeight = (t, shape) => (shape === 'round' ? t : t / 2);
 
 /* The LOCAL wire width at station i (a constant wire: its one width). */
 export const wAt = (c, i) => (c.w ? c.w[i] : c.info.wire);
@@ -368,8 +502,8 @@ export function scrollRelief(curves, opts = {}) {
    (centreline distance less the half wires under F) reaches an overlap of
    at least EMBED_MM — the joint is a true overlap, and nowhere do the two
    come within a feature without joining (a graze prints as a web). */
-export function joinsCleanly(a, b) { return joinsFrom(a, b) && joinsFrom(b, a); }   // read from both wires
-function joinsFrom(a, b) {
+export function joinsCleanly(a, b, depth = EMBED_MM) { return joinsFrom(a, b, depth) && joinsFrom(b, a, depth); }   // read from both wires
+function joinsFrom(a, b, depth = EMBED_MM) {
   const half = (a.info.wire + b.info.wire) / 2, local = !!(a.w || b.w);
   let run = null;
   for (let i = 0; i < a.pts.length; i++) {
@@ -378,9 +512,9 @@ function joinsFrom(a, b) {
     if (local) for (let k = 0; k < b.pts.length - 1; k++) d = Math.min(d, segDist(q, b.pts[k], b.pts[k + 1]) - (wAt(a, i) + Math.max(wAt(b, k), wAt(b, k + 1))) / 2);
     else { for (let k = 0; k < b.pts.length - 1; k++) d = Math.min(d, segDist(q, b.pts[k], b.pts[k + 1])); d -= half; }
     if (d < MIN_FEATURE_MM) run = Math.min(run ?? Infinity, d);
-    else if (run !== null) { if (run > -EMBED_MM + 1e-9) return false; run = null; }
+    else if (run !== null) { if (run > -depth + 1e-9) return false; run = null; }
   }
-  return run === null || run <= -EMBED_MM + 1e-9;
+  return run === null || run <= -depth + 1e-9;
 }
 
 /* The least gap between two DIFFERENT wires outside their junction: the
@@ -571,7 +705,7 @@ function anchorFrame(model, anchor, scale) {
 
 /* The ornament of a frame model: groups at the asked anchors, built in print
    mm, mirrored, seated and checked. p carries the ornament controls. */
-export function ornamentFor(model) {
+export function ornamentFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
   const p = model.params;
   const kind = model.info.kind;
   const frameH = model.box.y1 - model.box.y0, scale = p.printHeight / frameH;
@@ -579,6 +713,10 @@ export function ornamentFor(model) {
   const told = [];
   const length = p.ornScale * p.moldingWidth * scale;
   const groups = [];                         // { group, anchor, curves (right), mirrored (left) }
+  // the frame's own bands' triangles, bounded (the embed rows and the lip
+  // column included), so the budget is the whole relief's
+  let tris = model.spines.reduce((a, sp) => a + solidTriBound(sp.pts.length + 2, model.prof.x.length + 1), 0);
+  const frameTris = tris;
   const accepted = [];
   const yMid = (model.box.y0 + model.box.y1) / 2 * scale;
   for (const g of ORNAMENT_ORDER) {
@@ -597,9 +735,12 @@ export function ornamentFor(model) {
       let mirrorX = false;
       if (onAxis) mirrorX = dir[0] < 0;
       else { const upper = Po[1] >= yMid - 1e-9; mirrorX = upper ? dir[1] < 0 : dir[1] > 0; }
-      const local = buildGroup({ n: p.ornDensity, length, tightness: p.ornTightness, wire: p.ornWire, balance: 0.6, taper: p.ornWireStyle === 'tapered' });
-      let curves = local.map((x) => rigid(x.curve, { at: Po, angle: theta, mirrorX }));
+      const local = buildGroup({ n: p.ornDensity, length, tightness: p.ornTightness, wire: p.ornWire, balance: 0.6, taper: p.ornWireStyle === 'tapered', carved: p.ornWireStyle === 'carved' });
       const childTold = local.flatMap((x) => x.curve.info.told.filter((m) => /^child/.test(m)));
+      // the CLUSTER: two leaves lapping the lead's root (phase 3c)
+      let localCurves = local.map((x) => x.curve);
+      if (p.ornLeaves === 'on') { const cl = buildCluster(local, { size: p.ornLeafSize / LEAF_SIZE[0] }); localCurves = [...localCurves, ...cl.leaves]; childTold.push(...cl.told); }
+      let curves = localCurves.map((c) => rigid(c, { at: Po, angle: theta, mirrorX }));
       if (onAxis) {
         // slide along the edge's tangent (here: x) until the nearest wire
         // edge stands F/2 off the axis — the mirrored pair a feature apart
@@ -628,6 +769,12 @@ export function ornamentFor(model) {
       let worst = Infinity, against = null;
       for (const a of mine) for (const b of accepted) { const d = wireClear(a, b.curve); if (d < worst) { worst = d; against = b.group; } }
       if (worst < MIN_FEATURE_MM) { told.push(`the ${g} group at ${id} is not built — it would come ${worst.toFixed(2)} mm from the ${against} group (under the ${MIN_FEATURE_MM.toFixed(1)} mm feature)`); continue; }
+      // THE TRIANGLE BUDGET (phase 3c): a group that would take the relief
+      // past FRAME_TRI_BUDGET gives way whole, in the same priority, told —
+      // the count is the solids' own upper bound (degenerate drops only lower it)
+      const gTris = mine.reduce((a, c) => a + solidTriBound(c.pts.length, profileFor(c, p).x.length), 0);
+      if (tris + gTris > triBudget) { told.push(`the ${g} group at ${id} is not built — it would take the relief to ${(tris + gTris).toLocaleString('en-US')} triangles, past the ${triBudget.toLocaleString('en-US')} budget`); continue; }
+      tris += gTris;
       for (const c of mine) accepted.push({ curve: c, group: g });
       groups.push({ group: g, anchor: id, onAxis, curves, mirrored, push: seated.push, told: childTold });
       for (const m of childTold) { const prev = told.find((q) => q.endsWith(`: ${m}`) && q.startsWith('groups ')); if (prev) told[told.indexOf(prev)] = prev.replace(/^groups ([^:]*):/, `groups $1, ${id}:`); else told.push(`groups ${id}: ${m}`); }
@@ -639,7 +786,17 @@ export function ornamentFor(model) {
   const fit = all.length ? groups[0].curves[0].info : null;
   if (fit) for (const m of fit.told.filter((q) => /^tightness/.test(q))) told.push(`lead scroll: ${m}`);
   const tip = all.length ? Math.min(...all.map((c) => c.info.tip ?? c.info.wire)) : wire;
-  return { scale, length, wire, style: p.ornWireStyle === 'tapered' ? 'tapered' : 'constant', tip, groups, curves: all, region, told };
+  return { scale, length, wire, style: p.ornWireStyle === 'tapered' || p.ornWireStyle === 'carved' ? p.ornWireStyle : 'constant', tip, groups, curves: all, region, told, tris: { bound: tris, frame: frameTris, budget: triBudget } };
+}
+
+/* The print section of a placed curve: a leaf's own, else the ornament wire
+   control's (arris by default). */
+export const profileFor = (c, p) => wireProfile(c.kind === 'leaf' ? 'leaf' : p.ornShape === 'round' ? 'round' : p.ornShape === 'half-round' ? 'half-round' : 'arris');
+/* A leaf's lift: its host's crown at the host's root — the host's depth for
+   its section and relief, times the host's own crown scale there. */
+export function leafLift(c, shape, projection) {
+  const D = wireHeight(c.info.hostWire, shape) * projection;
+  return D * Math.max(Math.min(MIN_FEATURE_MM, D) / D, c.info.hostW / c.info.hostWire);
 }
 
 /* The model with its ornament: the frame's bands unchanged and first, the
@@ -647,30 +804,40 @@ export function ornamentFor(model) {
    half-round wire's true section), the box widened to hold them and the
    frame's own box kept as frameBox (the print scale's owner). Off, the model
    comes back as itself. */
-export function withOrnament(model) {
+export function withOrnament(model, opts = {}) {
   const p = model.params;
   if (p.filigree !== 'scrolls') return model;
-  const orn = ornamentFor(model);
+  const orn = ornamentFor(model, opts);
   const s = orn.scale;
-  const shape = p.ornShape === 'round' ? 'round' : 'half-round';
+  const shape = p.ornShape === 'round' ? 'round' : p.ornShape === 'half-round' ? 'half-round' : 'arris';
   // a tapered wire's local width rides on the spine as widthScale (the one
   // offsetCurve reads); its crown thins with it but never under the floor
   const wScale = (c) => (c.w ? c.w.map((x) => x / c.info.wire) : null);
   const spines = orn.curves.map((c, i) => { const sp = { id: `orn${i}`, pts: c.pts.map(([x, y]) => [x / s, y / s]), nrm: c.nrm, bandWidth: c.info.wire / s }; const k = wScale(c); if (k) sp.widthScale = k; return sp; });
-  const drawProf = wireProfile('half-round');
-  const bands = spines.map((sp, i) => sweepSpine(sp, drawProf, { ...p, moldingWidth: orn.curves[i].info.wire / s, moldingDepth: orn.curves[i].info.wire / 2 / s }));
+  // the drawing: a wire's half-round section whatever is printed (the print
+  // section never reaches the paper); a LEAF is drawn with its own section
+  const drawProf = wireProfile('half-round'), leafDraw = wireProfile('leaf');
+  const bands = spines.map((sp, i) => { const c = orn.curves[i], lf = c.kind === 'leaf'; return sweepSpine(sp, lf ? leafDraw : drawProf, { ...p, moldingWidth: c.info.wire / s, moldingDepth: (lf ? LEAF_RELIEF * c.info.wire : c.info.wire / 2) / s }); });
   let { x0, y0, x1, y1 } = model.box, strokes = model.strokes;
   for (const b of bands) for (const poly of [...b.edges, ...b.creases, ...b.hatch.map((h) => h.pts), ...b.cross.map((h) => h.pts)]) {
     strokes++;
     for (const [x, y] of poly) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   }
-  const prof = wireProfile(shape);
   const solids = orn.curves.map((c, i) => {
-    const depth = wireHeight(c.info.wire, shape) * p.ornProjection;
+    const lf = c.kind === 'leaf';
+    // a CARVED stroke's crown and a leaf's are floored at the feature
+    // (phase 3c): a short child's cap and a small leaf's blade would
+    // otherwise print a ridge under MIN_FEATURE_MM high at the defaults (the
+    // tapered and constant wires keep their own told floor, by branch)
+    const raw = lf ? LEAF_RELIEF * c.info.wire * p.ornProjection : wireHeight(c.info.wire, shape) * p.ornProjection;
+    const depth = lf || orn.style === 'carved' ? Math.max(MIN_FEATURE_MM, raw) : raw;
     const spine = { id: `orn${i}`, pts: c.pts, nrm: c.nrm, bandWidth: c.info.wire };
     const k = wScale(c);
     if (k) { spine.widthScale = k; spine.depthScale = crownScale(c, depth); }
-    return { spine, prof, depth };
+    // a leaf is a STACKED shell: its crown is lifted by its host's crown at
+    // the host's root, so where the two overlap the leaf lies over the scroll
+    const lift = lf ? leafLift(c, shape, p.ornProjection) : 0;
+    return { spine, prof: profileFor(c, p), depth, lift, kind: lf ? 'leaf' : 'scroll' };
   });
   return { ...model, bands: [...model.bands, ...bands], frameBox: model.box, box: { x0, y0, x1, y1 }, strokes, ornament: { ...orn, spines, solids, shape } };
 }

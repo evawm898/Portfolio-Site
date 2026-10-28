@@ -445,10 +445,15 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       ['rect crowded (groups must give way)', { skeleton: 'rect', width: 70, height: 120, ...DENSE, ornScale: 6 }],
       ['dense, round wire, tight, thick', { ...DENSE, ornShape: 'round', ornTightness: 1, ornWire: 3.2 }],
     ];
-    // every row in BOTH wire styles (phase 3b, ruling 1; tapered the default)
-    for (const r of OROWS.splice(0)) { OROWS.push([`${r[0]} · tapered`, { ...r[1], ornWireStyle: 'tapered' }], [`${r[0]} · constant`, { ...r[1], ornWireStyle: 'constant' }]); }
-    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : 'constant');
-    const ST = { constant: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, tapered: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 } };
+    // every row in all THREE wire styles: CARVED with its leaves and the arris
+    // section (phase 3c, the default), and tapered and constant as phase 3b
+    // shipped them (half-round, no leaves)
+    for (const r of OROWS.splice(0)) { OROWS.push([`${r[0]} · carved`, { ...r[1], ornWireStyle: 'carved' }], [`${r[0]} · tapered`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'tapered', ornLeaves: 'off' }], [`${r[0]} · constant`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'constant', ornLeaves: 'off' }]); }
+    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : /carved$/.test(name) ? 'carved' : 'constant');
+    const ST = { carved: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, constant: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, tapered: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 } };
+    // CL / TB (phase 3c): a leaf lies OVER its host; the relief never passes the budget
+    const cl1 = [], tb1 = []; let leavesSeen = 0, leastLap = Infinity, mostTris = 0;
+    const BUDGET = 1500000;   // the ruled budget, restated (the bloom's precedent)
     // the gate's own band footprints, in print mm: an open band is one
     // polygon, a closed loop two (outer, inner) — never bridged
     const pip = (pt, poly) => { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) ins = !ins; } return ins; };
@@ -481,6 +486,21 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       // which wire is in which group, and which side: groups.flatMap(curves, mirrored)
       const owner = []; let k = 0;
       orn.groups.forEach((g, gi) => { for (const side of ['R', 'L']) for (let i = 0; i < g.curves.length; i++) owner[k++] = { gi, side, i }; });
+      const leafAt = orn.curves.map((c) => c.kind === 'leaf');
+      // TB1 the relief within the budget and within the ornament's own bound
+      const tri = rel.indices.length / 3; mostTris = Math.max(mostTris, tri);
+      if (tri > BUDGET || tri > orn.tris.bound) tb1.push(`${name}: ${tri} triangles (bound ${orn.tris.bound}, budget ${BUDGET})`);
+      // CL1 a leaf lies OVER its host: its emitted top at its root row stands
+      // above the host lead's emitted top at the lead's root row
+      const topAt = (pt, v) => { let m = -Infinity; for (let c = 0; c < pt.C; c++) m = Math.max(m, P[3 * pt.T(v, c) + 2]); return m; };
+      W.forEach((w, x) => {
+        if (!leafAt[x]) return;
+        leavesSeen++;
+        const host = owner.findIndex((o) => o.gi === owner[x].gi && o.side === owner[x].side && o.i === 0);
+        const lead = orn.curves[host], lap = topAt(w.part, 0) - topAt(W[host].part, lead.root);
+        leastLap = Math.min(leastLap, lap);
+        if (!(lap > 1e-6)) cl1.push(`${name}: leaf ${x} stands ${lap.toFixed(4)} mm against its host's crown (under it)`);
+      });
       built += orn.groups.length; notBuilt += orn.told.filter((m) => /not built/.test(m)).length;
       // OR3 gaps. Within one half-group: every approach under a feature is a
       // TRUE junction (it reaches an overlap of the embed), never a graze;
@@ -494,6 +514,10 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
         for (let i = 0; i < n; i += 2) for (let j = i + 2; j < n; j += 2) if (Math.abs(cum[j] - cum[i]) >= Math.PI) { const g = Math.hypot(C[j][0] - C[i][0], C[j][1] - C[i][1]) - (W[x].t[i] + W[x].t[j]) / 2; leastGap = Math.min(leastGap, g); st.gap = Math.min(st.gap, g); if (g < F - 2e-3) { or3.push(`${name}: wire ${x} comes ${g.toFixed(3)} mm from its own coil`); i = n; break; } }
         for (let y = x + 1; y < W.length; y++) {
           const same = owner[x].gi === owner[y].gi && owner[x].side === owner[y].side;
+          // a LEAF and any wire but its host lead CROSS (an overlap of half a
+          // feature — the leaf is held by its host); everything else JOINS
+          const hostPair = (leafAt[x] && owner[y].i === 0 && !leafAt[y]) || (leafAt[y] && owner[x].i === 0 && !leafAt[x]);
+          const need = (leafAt[x] || leafAt[y]) && !hostPair ? F / 2 : E;
           if (!same) { const d = minDL(W[x].c, W[x].t, W[y].c, W[y].t); leastGap = Math.min(leastGap, d); st.gap = Math.min(st.gap, d); if (d < F - 1e-6) or3.push(`${name}: wires ${x} and ${y} (different groups or sides) ${d.toFixed(3)} mm apart`); continue; }
           // runs of either wire's stations within a feature of the other; each
           // must reach an overlap ≥ E (read from both wires)
@@ -503,7 +527,7 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
             A.c.forEach((qq, i) => { const d = minDL([qq], [A.t[i]], B.c, B.t); if (d < F) { if (!run) run = { min: d }; run.min = Math.min(run.min, d); } else if (run) { runs.push(run); run = null; } });
             if (run) runs.push(run);
           }
-          for (const r of runs) { if (r.min > -E + 1e-6) { or3.push(`${name}: wires ${x} and ${y} graze at ${r.min.toFixed(3)} mm (neither a feature apart nor joined)`); break; } }
+          for (const r of runs) { if (r.min > -need + 1e-6) { or3.push(`${name}: wires ${x} and ${y} graze at ${r.min.toFixed(3)} mm (neither a feature apart nor ${need === E ? 'joined' : 'crossed'})`); break; } }
           const outside = runs.length ? null : minDL(W[x].c, W[x].t, W[y].c, W[y].t); if (outside != null) { leastGap = Math.min(leastGap, outside); st.gap = Math.min(st.gap, outside); }
         }
       }
@@ -542,7 +566,152 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
     rec('OR4 every scroll group is rooted: each half has a contact with the band (the gate\'s own footprints) at least EMBED_MM deep, and no contact is a graze', or4.length === 0, `${built} groups built, ${notBuilt} given way (told); embeds ${leastEmbed.toFixed(3)}–${deepest.toFixed(3)} mm${or4.length ? ' — ' + or4.slice(0, 3).join('; ') : ''}`);
     rec('OR5 the ornament is mirror-symmetric to the bit: every left wire\'s emitted vertices are the right\'s with x negated', or5.length === 0, or5.slice(0, 2).join('; '));
     rec('OR6 the filigree off is the frame itself (no ornament field, the same SVG string)', or6.length === 0, or6.slice(0, 2).join('; '));
-    console.log(`     per wire style (off the emitted mesh): ${['constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
+    rec('CL1 every leaf lies OVER its host scroll: its emitted top at its root stands above the host\'s crown at the host\'s root', leavesSeen > 0 && cl1.length === 0, `${leavesSeen} leaves, least lap ${leastLap.toFixed(4)} mm${cl1.length ? ' — ' + cl1.slice(0, 3).join('; ') : ''}`);
+    rec('TB1 every ornament row\'s relief is within the 1,500,000-triangle budget and within the ornament\'s own predicted bound', tb1.length === 0, `most ${mostTris.toLocaleString('en-US')} triangles${tb1.length ? ' — ' + tb1.slice(0, 3).join('; ') : ''}`);
+    console.log(`     per wire style (off the emitted mesh): ${['carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
+  }
+
+  // CV / AR / LF / TB2 — the CARVED primitives (phase 3c, Eva's rulings on
+  // the critique: the self-similar stroke 1B, the arris section P3, the leaf
+  // P4; the triangle budget). Every law is RESTATED here from the ruling's
+  // numbers and read against the EMITTED geometry — the walls' widths, the
+  // centreline's own circumradius, the top grid's heights — never against
+  // the module's records.
+  if (FL && (label === 'shipped' || MUTANTS.find((m) => m.id === label)?.file === 'filigree')) {
+    const F = R.MIN_FEATURE_MM;
+    const K = 0.7, CAP = 0.1, LEAF_FOLD = 1.6, LEAF_TURN = 2.2;   // restated: width = 0.7 ρ capped at 0.1 L; a leaf under 1.6 ρ; a leaf turns 2.2 rad
+    const circR = (a, b, c) => { const A = Math.hypot(b[0] - c[0], b[1] - c[1]), B = Math.hypot(a[0] - c[0], a[1] - c[1]), C = Math.hypot(a[0] - b[0], a[1] - b[1]); const ar = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2; return ar > 1e-15 ? A * B * C / (4 * ar) : Infinity; };
+    // one solid's emitted walls: per row, centre, width, the two wall points
+    const walls = (rel, pt) => { const P = rel.positions, out = []; for (let v = 0; v < pt.V; v++) { const i0 = 3 * pt.T(v, 0), i1 = 3 * pt.T(v, pt.C - 1); const A = [P[i0], P[i0 + 1]], B = [P[i1], P[i1 + 1]]; out.push({ c: [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2], w: Math.hypot(A[0] - B[0], A[1] - B[1]), A, B }); } return out; };
+    // the radius of curvature at each emitted row: the circumradius of the
+    // emitted centreline's own triples (the ends take their neighbour's)
+    const rhoOf = (Wl) => Wl.map((_, i) => { const j = Math.min(Math.max(i, 1), Wl.length - 2); return circR(Wl[j - 1].c, Wl[j].c, Wl[j + 1].c); });
+    const turnSum = (Wl) => { let t = 0; for (let i = 1; i < Wl.length - 1; i++) { const a = Wl[i].c, p0 = Wl[i - 1].c, b = Wl[i + 1].c; const ax = a[0] - p0[0], ay = a[1] - p0[1], bx = b[0] - a[0], by = b[1] - a[1]; t += Math.atan2(ax * by - ay * bx, ax * bx + ay * by); } return t; };
+    // no fold: each wall polyline runs WITH its centreline segment
+    const folds = (Wl) => { let n = 0; for (let i = 0; i < Wl.length - 1; i++) { const cx = Wl[i + 1].c[0] - Wl[i].c[0], cy = Wl[i + 1].c[1] - Wl[i].c[1]; for (const k of ['A', 'B']) { const dx = Wl[i + 1][k][0] - Wl[i][k][0], dy = Wl[i + 1][k][1] - Wl[i][k][1]; if (dx * cx + dy * cy < 0) n++; } } return n; };
+    const cv1 = [], cv2 = [], cv3 = [], cv4 = [], ar1 = [];
+    let cvErr = 0, cvThin = Infinity, cvGap = Infinity, cvHalf = 0, arErr = 0, arRows = 0;
+    // the arris section restated from its ruled formula (P3)
+    const arrisZ = (x) => { const u = Math.abs(2 * x - 1), dome = Math.sqrt(Math.max(0, 1 - u * u)); return Math.max(0, (1 - u) ** 0.55 * (0.72 + 0.28 * Math.cos(Math.PI * u * 1.6) ** 2)) * dome ** 0.25; };
+    for (const kind of ['C', 'S']) for (const L of [23, 40, 80, 120]) for (const tightness of [0, 0.5, 1]) {
+      const cap = Math.max(F, CAP * L), tag = `${kind} L${L} τ${tightness}`;
+      const c = FL.buildScroll({ kind, length: L, tightness, wire: cap, balance: kind === 'C' ? 0.6 : 1, carved: true });
+      const rel = FL.scrollRelief([c], { baseZ: 1, shape: 'arris' });
+      const a = RL.analyzeStl(RL.exportStl(rel)), cc = RL.connected(rel);
+      if (a.boundary !== 0 || cc.comps !== 1) cv1.push(`${tag}: boundary ${a.boundary}, ${cc.comps} regions`);
+      const pt = rel.parts[0], Wl = walls(rel, pt), rho = rhoOf(Wl);
+      // CV2 the width is the self-similar law: min(cap, max(F, 0.7 ρ)) on
+      // the EMITTED curvature. Rows at the floor or the cap are exact; an
+      // interior row is compared IN CURVATURE — |0.7 / w − κ| × L ≤ 1 rad —
+      // because near an inflection κ → 0 and a 3-point circumradius has an
+      // unbounded RELATIVE error on a correct curve (2.3 % shipped, 5.8 % on a
+      // longer volute), while its absolute error stays ~ds·|κ'| (0.27 rad
+      // per length shipped; a law of 0.6 ρ reads 12)
+      for (let i = 1; i < Wl.length - 1; i++) {
+        const k = 1 / rho[i], w = Wl[i].w, law = Math.min(cap, Math.max(F, K * rho[i]));
+        if (w > F + 1e-9 && w < cap - 1e-9) { const e = Math.abs(K / w - k) * L; cvErr = Math.max(cvErr, e); if (e > 1) { cv2.push(`${tag}: row ${i} width ${w.toFixed(4)} implies κ ${(K / w).toFixed(4)} against the emitted ${k.toFixed(4)}`); break; } }
+        else if (Math.abs(w - law) > 1e-6 * law) { cv2.push(`${tag}: clamped row ${i} width ${w.toFixed(4)}, the law ${law.toFixed(4)}`); break; }
+        cvThin = Math.min(cvThin, w);
+      }
+      { const lo = Math.min(...Wl.map((r) => r.w)), hi = Math.max(...Wl.map((r) => r.w)); if (lo < F - 1e-9 || hi > cap + 1e-9) cv2.push(`${tag}: width ${lo.toFixed(4)}–${hi.toFixed(4)} outside [${F}, ${cap}]`); }
+      // CV3 no fold: the half width stays under the radius of curvature and
+      // no wall runs back against its centreline
+      for (let i = 1; i < Wl.length - 1; i++) cvHalf = Math.max(cvHalf, Wl[i].w / 2 / rho[i]);
+      const nf = folds(Wl); if (nf || cvHalf >= 1) cv3.push(`${tag}: ${nf} wall segments reversed, half width / ρ up to ${cvHalf.toFixed(3)}`);
+      // CV4 the coils: stations the emitted centreline turns ≥ π between are a
+      // feature apart (centreline distance less the two emitted widths)
+      const cum = [0]; for (let i = 1; i < Wl.length - 1; i++) { const p0 = Wl[i - 1].c, q = Wl[i].c, b = Wl[i + 1].c; const ax = q[0] - p0[0], ay = q[1] - p0[1], bx = b[0] - q[0], by = b[1] - q[1]; cum.push(cum[i - 1] + Math.atan2(ax * by - ay * bx, ax * bx + ay * by)); } cum.push(cum[cum.length - 1]);
+      for (let i = 0; i < Wl.length; i++) for (let j = i + 2; j < Wl.length; j++) if (Math.abs(cum[j] - cum[i]) >= Math.PI) { const g = Math.hypot(Wl[j].c[0] - Wl[i].c[0], Wl[j].c[1] - Wl[i].c[1]) - (Wl[i].w + Wl[j].w) / 2; cvGap = Math.min(cvGap, g); if (g < F - 2e-3) { cv4.push(`${tag}: a coil ${g.toFixed(3)} mm from its neighbour`); i = Wl.length; break; } }
+      // AR1 the arris section: on every BODY row (the width at the cap) the
+      // top grid's heights across the columns are the restated arris × the
+      // crown cap/2 on the base, exactly
+      const P = rel.positions;
+      for (let v = 0; v < pt.V; v++) if (Math.abs(Wl[v].w - cap) < 1e-9) { arRows++; for (let k = 0; k < pt.C; k++) { const e = Math.abs(P[3 * pt.T(v, k) + 2] - (1 + arrisZ(k / (pt.C - 1)) * cap / 2)); arErr = Math.max(arErr, e); } }
+      if (pt.C !== 17) ar1.push(`${tag}: ${pt.C} columns across, not the arris's 17`);
+    }
+    if (arErr > 1e-9 || arRows === 0) ar1.push(`the body rows' heights are ${arErr.toExponential(2)} mm off the restated arris (${arRows} rows)`);
+    rec('CV1 every carved scroll (C and S, 23–120 mm, tightness 0 / ½ / 1) is a closed solid: boundary 0 and one voxel region', cv1.length === 0, `24 scrolls${cv1.length ? ' — ' + cv1.slice(0, 3).join('; ') : ''}`);
+    rec('CV2 the carved width is the self-similar law on the EMITTED curvature — min(0.1 L, max(F, 0.7 ρ)): the floor and cap rows exact, every other row within 1 rad per scroll length in curvature; never under F nor over the cap', cv2.length === 0, `worst κ error ${cvErr.toFixed(3)} rad per length, thinnest ${cvThin.toFixed(4)} mm${cv2.length ? ' — ' + cv2.slice(0, 3).join('; ') : ''}`);
+    rec('CV3 a carved stroke never folds: its half width stays under the radius of curvature and no emitted wall runs back against its centreline', cv3.length === 0, `half width / ρ at most ${cvHalf.toFixed(3)}${cv3.length ? ' — ' + cv3.slice(0, 3).join('; ') : ''}`);
+    rec('CV4 a carved scroll\'s coils stay a feature apart (off the emitted walls)', cv4.length === 0, `least coil gap ${cvGap.toFixed(4)} mm${cv4.length ? ' — ' + cv4.slice(0, 3).join('; ') : ''}`);
+    rec('AR1 the arris section is the ruled formula: every body row\'s top heights are the restated arris × the crown (cap/2) on the base, exactly, 17 columns across', ar1.length === 0, `${arRows} body rows, worst ${arErr.toExponential(1)} mm${ar1.length ? ' — ' + ar1.slice(0, 2).join('; ') : ''}`);
+
+    // CV5 no dead travel on a carved stroke either (Eva's ruling 2 on step 1,
+    // carried to the new law): every 0.01 tightness step builds more turns,
+    // and the top is the most that prints — a hundredth of a turn more closes
+    // a coil under F, by the gate's own coil gap (turning ≥ π, less the two
+    // carried widths), never the module's selfGap
+    const cv5 = []; const tops5 = [];
+    const gapC = (kind, L, turns) => {
+      const cap = Math.max(F, CAP * L), c = FL.scrollCurve({ kind, length: L, wire: cap, balance: kind === 'C' ? 0.6 : 1, share: 0.5, turns, carved: true }), P = c.pts, n = P.length;
+      const w = c.w;   // the widths the stroke carries — CV2 holds them to the law off the emitted walls; at the top the gap sits exactly on F, so a second statement 2 % off would flip it
+      const cum = [0]; for (let i = 1; i < n - 1; i++) { const ax = P[i][0] - P[i - 1][0], ay = P[i][1] - P[i - 1][1], bx = P[i + 1][0] - P[i][0], by = P[i + 1][1] - P[i][1]; cum.push(cum[i - 1] + Math.atan2(ax * by - ay * bx, ax * bx + ay * by)); } cum.push(cum[n - 2]);
+      let g = Infinity; for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) if (Math.abs(cum[j] - cum[i]) >= Math.PI) g = Math.min(g, Math.hypot(P[j][0] - P[i][0], P[j][1] - P[i][1]) - (w[i] + w[j]) / 2);
+      return g;
+    };
+    for (const kind of ['C', 'S']) for (const L of [23, 60, 120]) {
+      const cap = Math.max(F, CAP * L); let prev = -Infinity, dead = 0, last = null;
+      for (let i = 0; i <= 100; i++) { const c = FL.buildScroll({ kind, length: L, tightness: i / 100, wire: cap, balance: kind === 'C' ? 0.6 : 1, carved: true }); if (!(c.info.turnsHeld > prev + 1e-6)) dead++; prev = c.info.turnsHeld; last = c; }
+      const top = last.info.turnsHeld, tag = `${kind} L${L}`; tops5.push(`${tag} ${top.toFixed(2)}`);
+      if (dead) cv5.push(`${tag}: ${dead} dead steps`);
+      if (gapC(kind, L, top) < F - 2e-3) cv5.push(`${tag}: the top ${top.toFixed(3)} turns does not print`);
+      if (top < FL.VOLUTE_TURNS[1] - 1e-9 && gapC(kind, L, top + 0.01) >= F) cv5.push(`${tag}: ${(top + 0.01).toFixed(3)} turns still prints — the range stops short`);
+    }
+    rec('CV5 a carved scroll\'s tightness slider has no dead travel and its top is exactly the most that prints (the gate\'s own coil gap)', cv5.length === 0, `6 scrolls × 101 steps; tops (turns): ${tops5.join(', ')}${cv5.length ? ' — ' + cv5.slice(0, 3).join('; ') : ''}`);
+
+    // LF the LEAF (P4), on its own grid: 6 / 12 / 30 / 60 mm, both curls
+    const lf1 = [], lf2 = [], lf3 = [], lf4 = [];
+    let lfErr = 0, lfThin = Infinity, lfHalf = 0, lfTurn = 0;
+    const env = (a, Wd) => Wd * Math.pow(Math.sin(Math.PI * Math.pow(a, 0.75)), 0.8) * (0.5 + 0.5 * Math.sqrt(Math.max(0, Math.sin(Math.PI * ((4 * a) % 1)))));   // restated: 4 lobes, notched
+    // the fold guard (1.6 ρ) never binds at the shipped curl — the leaf's curl
+    // is not a control — so a written-down WITNESS row curls 6 rad, where the
+    // guard binds on 26 of its 76 rows (a law of the primitive the sliders
+    // cannot reach is still a law, and a gate that never exercises it is blind)
+    const LEAVES = []; for (const L of [6, 12, 30, 60]) for (const side of [1, -1]) LEAVES.push([L, side, LEAF_TURN]);
+    LEAVES.push([30, 1, 6]);
+    for (const [L, side, curl] of LEAVES) {
+      const Wd = 0.38 * L, tag = `leaf L${L} ${side > 0 ? 'left' : 'right'}${curl !== LEAF_TURN ? ` curl ${curl}` : ''}`;
+      const lf = FL.buildLeaf({ length: L, width: Wd, side, curl });
+      const mesh = new RL.Mesh();
+      RL.bandSolid(mesh, { id: 'leaf', pts: lf.pts, nrm: lf.nrm, bandWidth: lf.info.wire, widthScale: lf.w.map((x) => x / lf.info.wire) }, FL.wireProfile('leaf'), { scale: 1, plateT: 1, reliefDepth: 0.18 * Wd });
+      const rel = { positions: Float64Array.from(mesh.pos), indices: Uint32Array.from(mesh.idx), parts: mesh.parts };
+      const a = RL.analyzeStl(RL.exportStl(rel)), cc = RL.connected(rel);
+      if (a.boundary !== 0 || cc.comps !== 1) lf1.push(`${tag}: boundary ${a.boundary}, ${cc.comps} regions`);
+      const Wl = walls(rel, rel.parts[0]), rho = rhoOf(Wl);
+      // the arc length along the EMITTED centreline
+      const s = [0]; for (let i = 1; i < Wl.length; i++) s.push(s[i - 1] + Math.hypot(Wl[i].c[0] - Wl[i - 1].c[0], Wl[i].c[1] - Wl[i - 1].c[1]));
+      for (let i = 0; i < Wl.length; i++) {
+        const law = Math.max(F, Math.min(env(Math.min(1, s[i] / L), Wd), LEAF_FOLD * rho[i])), e = Math.abs(Wl[i].w - law) / law;
+        lfErr = Math.max(lfErr, e); lfThin = Math.min(lfThin, Wl[i].w);
+        if (e > 0.05) { lf2.push(`${tag}: row ${i} width ${Wl[i].w.toFixed(4)} against ${law.toFixed(4)}`); break; }
+      }
+      for (let i = 1; i < Wl.length - 1; i++) lfHalf = Math.max(lfHalf, Wl[i].w / 2 / rho[i]);
+      const nf = folds(Wl);
+      if (Math.min(...Wl.map((r) => r.w)) < F - 1e-9 || nf || lfHalf >= 1) lf3.push(`${tag}: thinnest ${Math.min(...Wl.map((r) => r.w)).toFixed(4)}, ${nf} reversed wall segments, half width / ρ ${lfHalf.toFixed(3)}`);
+      // the emitted centreline is a polygon, so its turn misses the
+      // curvature in the first and last half steps: restated from the law
+      // (κ ∝ s^p, p 2.2), the polygon turns θ[(1 − h)^(p+1) − h^(p+1)], h = ds / 2L
+      const hh = s[s.length - 1] / (Wl.length - 1) / 2 / L, want = side * curl * ((1 - hh) ** 3.2 - hh ** 3.2);
+      const turn = turnSum(Wl), te = Math.abs(turn - want);
+      lfTurn = Math.max(lfTurn, te);
+      if (te > 1e-3) lf4.push(`${tag}: turns ${turn.toFixed(4)} rad, the ruled law's polygon ${want.toFixed(4)}`);
+    }
+    rec('LF1 every leaf (6–60 mm, both curls, and the curl-6 witness) is a closed solid: boundary 0 and one voxel region', lf1.length === 0, `9 leaves${lf1.length ? ' — ' + lf1.slice(0, 3).join('; ') : ''}`);
+    rec('LF2 a leaf\'s width is the restated law on the EMITTED centreline: the lobed, notched envelope (4 lobes) held under 1.6 ρ (binding on the curl-6 witness) and floored at F, within 5 %', lf2.length === 0, `worst ${(100 * lfErr).toFixed(2)} %${lf2.length ? ' — ' + lf2.slice(0, 3).join('; ') : ''}`);
+    rec('LF3 a leaf is never under the feature and never folds (half width under ρ, no wall reversed)', lf3.length === 0, `thinnest ${lfThin.toFixed(4)} mm, half width / ρ at most ${lfHalf.toFixed(3)}${lf3.length ? ' — ' + lf3.slice(0, 3).join('; ') : ''}`);
+    rec('LF4 a leaf turns by the ruled 2.2 rad in the direction of its curl (summed off the emitted centreline, against the law\'s own polygon, within 1e-3 rad)', lf4.length === 0, `worst ${lfTurn.toExponential(1)} rad${lf4.length ? ' — ' + lf4.slice(0, 3).join('; ') : ''}`);
+
+    // TB2 the budget's give-way. No reachable state measured passes 1.5 M
+    // (the sliders' ceiling on a 600 mm print reads 831,272 rect / 1,152,588
+    // arch / 876,744 oval — crowding drops groups first), so the mechanism
+    // is exercised by handing the SHIPPED ornamentFor a budget the default
+    // rectangle at its ceiling passes: groups give way whole, told, the
+    // relief within it — and the real budget restated as 1,500,000.
+    const stress = G.buildFrame({ skeleton: 'rect', printHeight: 400, filigree: 'scrolls', ornDensity: 5, ornCrest: 'on', ornCorners: 'on', ornSides: 'on', ornBottom: 'on', ornScale: 6, ornLeafSize: 0.6, ornTightness: 1 });
+    const full = FL.withOrnament(stress), fullTris = RL.buildRelief(full).indices.length / 3;
+    const cut = Math.round((fullTris + full.ornament.tris.frame) / 2);
+    const tight = FL.withOrnament(stress, { triBudget: cut }), tightTris = RL.buildRelief(tight).indices.length / 3, gave = tight.ornament.told.filter((m) => /budget/.test(m));
+    rec('TB2 past the budget groups give way whole, told, and the relief stays within it (exercised at half the ceiling rectangle\'s own count); the shipped budget is 1,500,000', gave.length > 0 && tightTris <= cut && tight.ornament.groups.length > 0 && tight.ornament.groups.length < full.ornament.groups.length && RL.FRAME_TRI_BUDGET === 1500000, `ceiling rectangle ${fullTris.toLocaleString('en-US')} tris in ${full.ornament.groups.length} groups; at a ${cut.toLocaleString('en-US')} budget ${tight.ornament.groups.length} groups, ${tightTris.toLocaleString('en-US')} tris, ${gave.length} told${gave.length ? ' — "' + gave[0] + '"' : ''}`);
   }
 
   // base-tree byte identity, when a worktree is given
@@ -576,13 +745,13 @@ const MUTANTS = [
   { id: 'the-oval-seam-offset-0.1mm', file: 'geometry', from: "const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", to: "pts[0] = [pts[0][0] + 0.1, pts[0][1]]; const loop = { id: 'frame', pts, nrm, joins: [], closed: true, bandWidth: w };", breaks: ['Q'] },
   // phase 3a, the scroll: the gap clamp removed, the eye under the floor, a
   // child laid off its parent's back
-  { id: 'the-scroll-gap-clamp-removed', file: 'filigree', from: 'if (selfGap(scrollCurve({ ...base, turns: asked }), t).gap >= MIN_FEATURE_MM) return', to: 'if (true) return', breaks: ['SC3', 'SC6', 'SC7', 'OR3'] },
-  { id: 'the-tightness-range-not-fitted', file: 'filigree', from: 'fitMemo.set(key, fitUncached({ ...spec, wire: t }, t))', to: 'fitMemo.set(key, { share: VOLUTE_SHARE, turnsMax: VOLUTE_TURNS[1] })', breaks: ['SC7'] },
+  { id: 'the-scroll-gap-clamp-removed', file: 'filigree', from: 'if (selfGap(scrollCurve({ ...base, turns: asked }), t).gap >= MIN_FEATURE_MM) return', to: 'if (true) return', breaks: ['SC3', 'SC6', 'SC7', 'OR3', 'CV4', 'CV5'] },
+  { id: 'the-tightness-range-not-fitted', file: 'filigree', from: 'fitMemo.set(key, fitUncached({ ...spec, wire: t }, t))', to: 'fitMemo.set(key, { share: VOLUTE_SHARE, turnsMax: VOLUTE_TURNS[1] })', breaks: ['SC7', 'CV5'] },
   { id: 'the-eye-under-the-floor', file: 'filigree', from: 'const re = (tEye + MIN_FEATURE_MM) / 2;', to: 'const re = tEye / 2 + 0.1;', breaks: ['SC2', 'SC3', 'SC7'] },   // the eye itself is then a gap of 0.2 mm, so no turn count prints and the slider's top probe fails
   // phase 3b: the tapered wire and the held share
   { id: 'the-taper-tip-under-the-floor', file: 'filigree', from: 'export const taperTip = (t) => Math.max(MIN_FEATURE_MM, TAPER_TIP * t);', to: 'export const taperTip = (t) => TAPER_TIP * t;', breaks: ['SC8', 'OR2', 'SC2', 'SC7'] },   // the eye law and the top probe restate the floored tip too
-  { id: 'the-gap-clamp-reads-the-nominal-wire', file: 'filigree', from: '(curve.w ? (curve.w[i] + curve.w[j]) / 2 : t)', to: 't', breaks: ['SC7'] },
-  { id: 'the-volute-share-grows', file: 'filigree', from: 'return { share: VOLUTE_SHARE, turnsMax: at(VOLUTE_SHARE) };', to: 'if (at(VOLUTE_SHARE) >= VOLUTE_TURNS[1]) return { share: VOLUTE_SHARE, turnsMax: VOLUTE_TURNS[1] }; return { share: 0.8, turnsMax: at(0.8) };', breaks: ['SC7'] },
+  { id: 'the-gap-clamp-reads-the-nominal-wire', file: 'filigree', from: '(curve.w ? (curve.w[i] + curve.w[j]) / 2 : t)', to: 't', breaks: ['SC7', 'CV5'] },
+  { id: 'the-volute-share-grows', file: 'filigree', from: 'return { share: VOLUTE_SHARE, turnsMax: at(VOLUTE_SHARE) };', to: 'if (at(VOLUTE_SHARE) >= VOLUTE_TURNS[1]) return { share: VOLUTE_SHARE, turnsMax: VOLUTE_TURNS[1] }; return { share: 0.8, turnsMax: at(0.8) };', breaks: ['SC7', 'CV5'] },
   { id: 'a-child-floats-off-its-parent', file: 'filigree', from: 'const off = (wAt(lead, j) + tw) / 2 - EMBED_MM;', to: 'const off = (wAt(lead, j) + tw) / 2 + 0.5;', breaks: ['SC6'] },
   // phase 3a, step 2 — the ornament: a scroll left off its molding, the
   // graze rule removed (a gap under the floor between wire and band), the
@@ -593,7 +762,20 @@ const MUTANTS = [
   { id: 'the-group-clearance-removed', file: 'filigree', from: 'if (worst < MIN_FEATURE_MM) { told.push(', to: 'if (false) { told.push(', breaks: ['OR3'] },
   { id: 'the-mirror-is-broken', file: 'filigree', from: 'export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [-x, y])', to: 'export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [0.02 - x, y])', breaks: ['OR5', 'OR3'] },   // the crest pair stands exactly a feature apart, so 0.02 mm closes it under the floor
   { id: 'the-rect-seam-offset-0.1mm', file: 'geometry', from: 'push(0, yb, 0, 1, false); anchorIdx.bottom = 0;', to: 'push(0.1, yb, 0, 1, false); anchorIdx.bottom = 0;', breaks: ['Q'] },
+  // phase 3c, the carved primitives: the self-similar width law broken two
+  // ways, the arris section swapped, the leaf's width law broken two ways,
+  // its curl, its lift onto the host, the crossing rule and the budget
+  { id: 'the-carved-width-ignores-curvature', file: 'filigree', from: 'export const carvedWidth = (rho, cap) => Math.min(cap, Math.max(MIN_FEATURE_MM, CARVED_K * rho));', to: 'export const carvedWidth = (rho, cap) => cap;', breaks: ['CV2', 'CV3', 'CV4', 'CV5'] },
+  { id: 'the-carved-floor-removed', file: 'filigree', from: 'export const carvedWidth = (rho, cap) => Math.min(cap, Math.max(MIN_FEATURE_MM, CARVED_K * rho));', to: 'export const carvedWidth = (rho, cap) => Math.min(cap, CARVED_K * rho);', breaks: ['CV2', 'OR2'] },
+  { id: 'the-arris-is-a-half-round', file: 'filigree', from: "  if (shape === 'arris') return arrisProfile();", to: "  if (shape === 'arris') return wireProfile('half-round');", breaks: ['AR1'] },
+  { id: 'the-leaf-is-unfloored', file: 'filigree', from: 'export const leafWidth = (s, L, W, kap, lobes = LEAF_LOBES) => Math.max(MIN_FEATURE_MM, Math.min(', to: 'export const leafWidth = (s, L, W, kap, lobes = LEAF_LOBES) => (0.1 + Math.min(', breaks: ['LF2', 'LF3', 'OR2'] },
+  { id: 'the-leaf-fold-guard-removed', file: 'filigree', from: 'leafEnvelope(s, L, W, lobes), LEAF_FOLD / Math.max(1e-12, Math.abs(kap))));', to: 'leafEnvelope(s, L, W, lobes), 1e9 / Math.max(1e-12, Math.abs(kap))));', breaks: ['LF2', 'LF3'] },
+  { id: 'the-leaf-curls-half-as-far', file: 'filigree', from: 'side * theta * (LEAF_CURL_POWER + 1) / L', to: 'side * 0.5 * theta * (LEAF_CURL_POWER + 1) / L', breaks: ['LF4'] },
+  { id: 'the-leaf-is-not-lifted', file: 'filigree', from: '  return D * Math.max(Math.min(MIN_FEATURE_MM, D) / D, c.info.hostW / c.info.hostWire);', to: '  return 0;', breaks: ['CL1'] },
+  { id: 'the-leaf-crossing-rule-removed', file: 'filigree', from: '|| joinsCleanly(lf, o, LEAF_CROSS));', to: '|| true);', breaks: ['OR3'] },
+  { id: 'the-budget-give-way-removed', file: 'filigree', from: 'if (tris + gTris > triBudget) {', to: 'if (false) {', breaks: ['TB2'] },
 ];
+
 
 async function negativeControl() {
   const srcG = fs.readFileSync(path.join(ROOT, 'frame-geometry.js'), 'utf8');

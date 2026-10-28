@@ -1,7 +1,7 @@
 # /frame gate: node tools/verify-frame.mjs — part one (Node) then part two
 # (Chromium) — and the relief gate, in the `verify` job; the two negative
 # controls (every mutant must redden exactly what it names) in jobs of their
-# own, the relief one split into three shards by mutant index. One job used
+# own, the relief one split into four shards by mutant index. One job used
 # to run all of it and hit its 45-minute limit on runner variance (#459,
 # twice, in the last step). The mutant jobs are Node only: no npm install,
 # no browser. Path-scoped to the frame's own files: the frame gate reads nothing
@@ -91,7 +91,7 @@ jobs:
       - name: Frame gate (part one Node, part two Chromium)
         run: node tools/verify-frame.mjs
 
-  # The relief negative control, sharded by mutant INDEX (k mod 3): every
+  # The relief negative control, sharded by mutant INDEX (k mod 4): every
   # mutant is in exactly one shard by construction. Changing the shard count
   # is two edits: this matrix list and the n in --shard=k/n.
   relief-mutants:
@@ -100,14 +100,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2]
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Relief negative control (shard ${{ matrix.shard }} of 3)
-        run: node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/3
+      - name: Relief negative control (shard ${{ matrix.shard }} of 4)
+        run: node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/4
 
   frame-mutants:
     runs-on: ubuntu-latest

@@ -642,7 +642,14 @@ async function partTwo(G, R) {
   const CONTEXT = { cornerTreatment: { skeleton: 'rect' }, cornerSize: { skeleton: 'rect', cornerTreatment: 'rounded' }, aspect: { skeleton: 'oval' },
     // the ornament's rows are probed with the filigree on (they are hidden
     // and inert while it is off)
-    ornDensity: ORN, ornScale: ORN, ornTightness: ORN, ornWire: ORN, ornCrest: ORN, ornCorners: ORN, ornSides: ORN, ornBottom: ORN, ornShape: ORN, ornProjection: ORN, ornWireStyle: ORN };
+    ornDensity: ORN, ornScale: ORN, ornCrest: ORN, ornCorners: ORN, ornSides: ORN, ornBottom: ORN, ornShape: ORN, ornProjection: ORN, ornWireStyle: ORN, ornLeaves: ORN, ornLeafSize: ORN,
+    // the wire's thickness is the tapered and constant styles' — a carved
+    // stroke derives its width from the curve (phase 3c), so it is probed there
+    ornWire: { ...ORN, ornWireStyle: 'tapered' },
+    // the default carved lead (23 mm) holds only 0.50–0.53 turns — its fat
+    // body leaves the eye little room (charter §13.6) — so the slider's
+    // travel is probed on a 46 mm lead (scale 5), where it spans 0.50–0.70
+    ornTightness: { ...ORN, ornScale: 5 } };
   const baseOf = {};
   for (const s of R.PARAM_SPEC) {
     if (s.section === 'print') continue;        // the print rows reach the STL, never the paper: V2 below

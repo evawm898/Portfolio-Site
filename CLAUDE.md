@@ -11863,6 +11863,16 @@ sides), seats each in the molding by the embed (no graze), mirrors to the bit, a
 bands to the SVG and wire solids to the STL; filigree off returns the model itself (77 of 77
 rows byte-identical to `e4ce6eb`). The FRAME's box sets the print scale (`frameBox`). Read §10 of
 the charter.
+**Phase 3c (Oct 28): THE CARVED PRIMITIVES** (charter §13, Eva's picks P3/P4/P5 from the critique sheet).
+The default wire style is CARVED: width = min(0.1 L, max(F, 0.7 × the local radius of curvature)), so a
+scroll thins as it curls and cannot fold; the default section is the ARRIS (a spine with a hollow either
+side); every group's lead carries two LEAVES (curvature ∝ s^2.2, a 2.2 rad turn, a lobed notched blade
+under 1.6 ρ, floored at F) as separate shells LIFTED onto the host's crown, a joint with the host and a
+crossing (overlap ≥ F/2) or a feature's clearance with every other wire. `FRAME_TRI_BUDGET` 1.5 M is
+priced per group before building and a group past it gives way, told (no reachable state measured
+reaches it). Gates CV1–CV5, AR1, LF1–LF4, CL1, TB1–TB2, nine mutants. The default 23 mm carved lead
+spans only 0.50–0.53 turns, and one of each group's two leaves does not fit (told) — length is phase
+3d's (the running chains). Carved and leaf crowns are floored at F.
 **Phase 4 (Oct 23): TEXTURE WAS BUILT, RENDERED AND NOT SHIPPED** (charter §12) — stone grain,
 weathering, cracks and hammered metal as real displacement of the molding along its TRUE normal (smoothed or
 wall-held directions fold, measured). Eva picked **none** from `docs/img/frame-texture-vocabulary.png`, so the
