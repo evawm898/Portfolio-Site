@@ -204,18 +204,21 @@ node-run`. A row moves iff its restated layout differs from the same
 restatement with the four controls at their defaults, or some node's restated
 scale ≠ 1.
 
-* **23 predeclared movers**, all block-82 rows.
-* **1,593 holders**: every row of the base tree's matrix, plus block 82's
-  INSET CLAMP row (its start is raised to where the default already was) and
+* **23 predeclared movers**, all block-83 rows.
+* **1,613 holders**: every row of the base tree's matrix (main at `77ae7f9`,
+  1,608 rows), plus block 83's INSET CLAMP row (its start is raised to where the default already was) and
   its four GATED rows.
 
 RESULT: see §9.
 
 ## 7. Matrix, gates
 
-* **Block 82** has 28 rows (1,588 → 1,616). Smoke block 82 has 9 rows
+* **Block 83** has 28 rows (1,608 → 1,636). Smoke block 83 has 9 rows
   (`--conn`).
-* `frozen/phase89` is the 1,588 rows at `1acc0fb`.
+* `frozen/phase90` is the 1,608 rows at `77ae7f9` (main's head, after the
+  BONE texture, #470). BONE merged first and took block 82 and `phase89`.
+  This session's first `phase89`, at `1acc0fb`, was row for row BONE's, so it
+  is dropped.
 * **The combination gate gains the measure `leaf-leaf`.** It reads a leaf's
   BLADE against the blades of every OTHER node, with the rods excluded by the
   builder's own `rodAxes`. It is the first instrument here for leaves

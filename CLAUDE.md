@@ -4996,9 +4996,10 @@ DOWN THE STEM; EVERY STORED ROW HOLDS TO THE BIT** (Bloom P1, Eva's rulings of O
 - `restatedNodeLayout(ui, spineRec)` needs the builder's spine record on a DRAWN spine (LF4's rule).
 - Combination gate: the `leaf-leaf` measure (blade vs other nodes' blades) and four pairs; WHORLED × a full
   crowd reads 0.750 mm and a 25% leaf at 60° 0.311 mm to the stem — both declared, never clamped.
-- Block 82 (28 rows, 1,616), smoke block 82 (9); `frozen/phase89` = the 1,588 rows at `1acc0fb`; eleven
+- Block 83 (28 rows, 1,636), smoke block 83 (9); `frozen/phase90` = the 1,608 rows at `77ae7f9` (BONE took
+  block 82 and phase89 mid-session; this session's own phase89 was row for row BONE's, dropped); eleven
   `node-run-*` apex mutants on six `node run:` rows; the apex table now captures `NS` and `SN` (it never
-  captured SN). Bytes: `verify-bloom-surface-bytes --movers-predicate node-run` (23 movers, all block 82).
+  captured SN). Bytes: `verify-bloom-surface-bytes --movers-predicate node-run` (23 movers, all block 83).
   Sheet: `node tools/shot-bloom-node-span.mjs <png>` → `docs/img/node-span-spacing.png`.
 
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND

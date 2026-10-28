@@ -14663,7 +14663,7 @@ export const INFLO_APPROACH_XFAIL = Object.freeze({
      internode buys a raceme does not exist — neighbouring florets' petals
      pass through each other on every row but the two-floret ones. Measured
      0.0000 mm on each (both engines), declared by value, never clamped. */
-  /* Bloom P1, block 82: the umbel row there is about the LEAVES' run (an
+  /* Bloom P1, block 83: the umbel row there is about the LEAVES' run (an
      umbel's leaves keep the stem's own run); its florets overlap by the
      umbel's own construction, the mechanism above. */
   'NODE RUN: an UMBEL\'s leaves keep the stem\'s own run, 0.40 .. 0.80 x spacing 0.6': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
