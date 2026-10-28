@@ -1696,7 +1696,15 @@ let lightBuildCount = 0;   // how many light builds this page has made — the d
    while dragging, the full relief on release and in the export) — the same
    override, one more guard. */
 const DRAG_LIGHT_OVERRIDE = Object.freeze({ petalInfill: 'NONE', petalTexture: 'NONE' });
-function dragLight() { const ui = readUI(); return dragActive && (!infillIsAbsent(ui) || !textureIsAbsent(ui)); }
+/* (the page profile, Oct 27 — docs/bloom-page-profile-outcome.md) A HELD
+   SLIDER ALSO DEFERS THE INFLORESCENCE'S REPORTS: the umbel's pitch floor and
+   the placement pass's flags are report-only (nothing built reads them; the
+   geometry's `deferReports`), measured 64% of the spider lily's build and
+   ~29% of the mophead's. So a design with an inflorescence has something to
+   shed too, its drag build carries those reports as null, and the release
+   rebuilds them — the same bargain as the infill, and the bytes on screen are
+   the full build's (D10). */
+function dragLight() { const ui = readUI(); return dragActive && (!infillIsAbsent(ui) || !textureIsAbsent(ui) || !inflorescenceIsAbsent(ui)); }
 
 let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
 let lastRings = [];                               // every ring, in build order
@@ -1880,10 +1888,12 @@ const SMOOTH_SHADING_CREASE_DEG = 60;
 /* `override` (F7) — fields laid over readUI() for THIS build only; the drag
    preview's DRAG_LIGHT_OVERRIDE is its one caller. The export handlers never
    pass it. */
-function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false, override = null }) {
+/* `deferReports` (the page profile) — the held-slider build's report deferral,
+   passed by regenerate() on a light build and by nothing else. */
+function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false, override = null, deferReports = false }) {
   const acc = new MeshBuilder({ exportMode, captureGrid, captureNormals });
   const uiForBuild = override ? { ...readUI(), ...override } : readUI();
-  const built = buildBloomInto(acc, uiForBuild, { below: null, capability, scopes: scopesForBuild(scopes) });   // 'stem' | 'branch' | null — null is phase 1's only state
+  const built = buildBloomInto(acc, uiForBuild, { below: null, capability, scopes: scopesForBuild(scopes), ...(deferReports ? { deferReports: true } : {}) });   // 'stem' | 'branch' | null — null is phase 1's only state
   if (record) {
     lastShownMode = exportMode ? 'export' : 'live';
     lastPlacement = uiForBuild.placement;
@@ -2090,6 +2100,13 @@ function materialLines(ui, mode) {
    reader has to infer, and the toggle's whole reason to exist is that live
    and printed are different objects now. Reads shownMode(); owns nothing. */
 const DRAG_LINE = 'on screen while dragging: the infill cells are dropped — full print geometry rebuilds on release\n';
+/* what a light build sheds, named — the infill line verbatim where it is the
+   infill (the drag gate's D1 reads it), and the deferred reports where it is
+   an inflorescence: the bytes are the full build's, the reports are not yet */
+function dragLine(ui) {
+  if (!infillIsAbsent(ui) || !textureIsAbsent(ui)) return DRAG_LINE;
+  return "on screen while dragging: the full print geometry, with the inflorescence's reports (the umbel's pitch floor, the placement flags) deferred — they are measured on release\n";
+}
 let lastFullShownInfill = null, lastFullShownTexture = null;
 function showingLine(mode) {
   return mode === 'export'
@@ -3100,6 +3117,7 @@ function infloLine(plan, builtInflo) {
        where the florets are smaller than their stalks are thick. */
     + (plan.nodeDepthsMm.length > 1
         ? ` · INTERNODE ${(plan.nodeDepthsMm[1] - plan.nodeDepthsMm[0]).toFixed(1)} mm, floor ${plan.pitchFloorMm.toFixed(2)} mm ${plan.pitchFloorIsFlorets && plan.pitchFloorAt ? `(the FLORETS' own: the floret at ${plan.pitchFloorAt.aDeg.toFixed(0)} deg against the one ${plan.pitchFloorAt.nodesApart} node${plan.pitchFloorAt.nodesApart === 1 ? '' : 's'} below it at ${plan.pitchFloorAt.bDeg.toFixed(0)} deg clears the ${plan.insetGapMm.toFixed(2)} mm gap from ${plan.pitchFloorAt.boundMm.toFixed(1)} mm of shift; the rods' own is ${plan.pitchFloorRodMm.toFixed(2)})` : `(the RODS' own, two pedicel radii; the florets ask ${plan.pitchFloretMm.toFixed(2)})`}`
+        : plan.pitchDeferred ? ' · floor (deferred while the slider is held — measured on release)'
         : ` · floor ${plan.pitchFloorMm.toFixed(2)} mm ${plan.pitchFloorIsFlorets ? "(the FLORETS' own)" : "(the RODS' own)"}`)
     + (plan.sameNodeMayTouch ? ` — FLORETS OF ONE NODE MAY STAND WITHIN THE GAP OF EACH OTHER (the phyllotaxy's, not the internode's — no pitch moves two florets of one node apart; told)` : '')
     /* THE INSET IS THE FLORET'S OWN PETAL REACH (build 3, #355): the topmost
@@ -3733,7 +3751,12 @@ function regenerate() {
   const mode = shownMode();
   /* THE DRAG PREVIEW'S KIND, decided HERE, at run time (see dragLight). */
   const light = dragLight();
-  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true, captureNormals: true, override: light ? DRAG_LIGHT_OVERRIDE : null });
+  /* NORMALS ONCE (the page profile): the builder's own normals are what PRINT
+     PREVIEW shades with; the LIVE view replaces them with toCreasedNormals'
+     own, so a live build asks for none (they were computed and thrown away —
+     every append on the mophead paid for both). Moves no position: the
+     channel is shading only (MeshBuilder's captureNormals note). */
+  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true, captureNormals: mode === 'export', override: light ? DRAG_LIGHT_OVERRIDE : null, deferReports: light });
   lightOnScreen = light;
   if (light) lightBuildCount++;
   /* THE READ-OUT SPANS AND THE CAP MARK, AFTER THE BUILD (session 23) — they
@@ -3858,7 +3881,7 @@ function regenerate() {
   } else if (!userMoved) {
     fitCamera(lastFitRadius);
   }
-  shownSummary = (light ? DRAG_LINE : '') + showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.petals, built) + `\n${materialLines(ui, mode)}`;
+  shownSummary = (light ? dragLine(ui) : '') + showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.petals, built) + `\n${materialLines(ui, mode)}`;
   readout.textContent = shownSummary;
 }
 

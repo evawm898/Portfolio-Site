@@ -256,12 +256,12 @@ async function main() {
   /* 1. the rod floor restored, in a COPY of the geometry */
   {
     const src = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
-    const from = 'const pitchFloorMm = Math.max(pitchFloorRodMm, pitchFloretMm);';
+    const from = 'const pitchFloorMm = pitchDeferred ? null : Math.max(pitchFloorRodMm, pitchFloretMm);';
     if (src.split(from).length !== 2) throw new Error(`control 1: anchor matched ${src.split(from).length - 1} times — re-anchor`);
     const d = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-db-'));
     /* bloom-geometry.js imports ./bloom-curve.js (F3-global), so a copy written beside it needs the sampler too */
     fs.copyFileSync(new URL('../bloom-curve.js', import.meta.url), path.join(d, 'bloom-curve.js'));
-    fs.writeFileSync(path.join(d, 'bloom-geometry.js'), src.replace(from, 'const pitchFloorMm = pitchFloorRodMm;'));
+    fs.writeFileSync(path.join(d, 'bloom-geometry.js'), src.replace(from, 'const pitchFloorMm = pitchDeferred ? null : pitchFloorRodMm;'));
     const G2 = await import(pathToFileURL(path.join(d, 'bloom-geometry.js')).href);
     const bad = verify({ ...tree, G: G2 }, SHIPPED_STATES, matrix, { quiet: true });
     /* COLLATERAL, MEASURED AND NAMED: under the old floor the shared node's
