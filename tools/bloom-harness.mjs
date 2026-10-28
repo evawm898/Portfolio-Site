@@ -12830,10 +12830,24 @@ export function umbelSwellingExpected({ n, rP, aDeg, outerR, boreR, headOn, amou
   const RIN = new Float64Array(N), OUT = new Float64Array(N), Z0 = new Float64Array(N);
   { let q = 0; for (const r of R0) for (let k = 0; k < S; k++, q++) { const ph = (k * 2 * Math.PI) / S, cp = Math.cos(ph), sp = Math.sin(ph); RIN[q] = r.rMm - rP * cp * sa; Z0[q] = r.zMm + rP * cp * ca; OUT[q] = rP * sp; } }
   const Rof = (k, z) => outerR * (1 + k * Math.exp(-(z / w) * (z / w)));
+  /* the hold is tested against the body AS DRAWN — the chords between the
+     rings a `w/8` apart (the rise's own above the plane), restated here from
+     the controls as the geometry's `holds` does since Oct 28; a chord lies
+     inside the curve, and a root held by the curve to the half gap fell
+     outside the emitted polyline on the head-ON umbels */
+  const pitchH = w / 8, nBelowH = Math.max(1, Math.ceil(endAsked / pitchH));
+  const chordR = (k, z, rise) => {
+    let z0, z1;
+    if (z <= 0) { const j = Math.min(nBelowH, Math.max(1, Math.ceil(-z * nBelowH / endAsked))); z0 = -endAsked * j / nBelowH; z1 = -endAsked * (j - 1) / nBelowH; }
+    else if (headOn) { const j = Math.min(nBelowH, Math.max(1, Math.ceil(z * nBelowH / endAsked))); z0 = endAsked * (j - 1) / nBelowH; z1 = endAsked * j / nBelowH; }
+    else { const mm = Math.max(1, Math.ceil(rise / pitchH)), j = Math.min(mm, Math.max(1, Math.ceil(z * mm / rise))); z0 = rise * (j - 1) / mm; z1 = rise * j / mm; }
+    const t = z1 > z0 ? (z - z0) / (z1 - z0) : 0;
+    return Rof(k, z0) + t * (Rof(k, z1) - Rof(k, z0));
+  };
   const holds = (k, d, rise) => {
     for (let q = 0; q < N; q++) {
       const rho = Math.hypot(RIN[q] - d * ca, OUT[q]), z = Z0[q] - d * sa;
-      if (k > 0 && z >= -endAsked && (headOn ? z <= endAsked : z <= rise - m) && rho + m <= Rof(k, z)) continue;
+      if (k > 0 && z >= -endAsked && (headOn ? z <= endAsked : z <= rise - m) && rho + m <= chordR(k, z, rise)) continue;
       if (rho + m <= outerR && (boreR <= 0 || rho - m >= boreR) && (headOn || z + m <= 0)) continue;
       return false;
     }
@@ -12892,7 +12906,7 @@ export function umbelSwellingExpected({ n, rP, aDeg, outerR, boreR, headOn, amou
   const rings = k > 0 ? [{ z: -endMm - chamferMm, r: rodR }, ...zs.map((z) => ({ z, r: Rof(k, z) })), ...(headOn ? [{ z: endMm + chamferMm, r: rodR }] : [])] : [];
   const topZ = headOn ? endMm + chamferMm : held.riseMm, bottomZ = -endMm - chamferMm;
   const inside = (rho, z, margin = 0) => {
-    if (k > 0 && z >= -endMm && (headOn ? z <= endMm : z <= held.riseMm - margin) && rho + margin <= Rof(k, z)) return true;
+    if (k > 0 && z >= -endMm && (headOn ? z <= endMm : z <= held.riseMm - margin) && rho + margin <= chordR(k, z, held.riseMm)) return true;
     const inWall = rho + margin <= outerR && (boreR <= 0 || rho - margin >= boreR);
     return inWall && (headOn || z + margin <= 0);
   };
@@ -13022,7 +13036,8 @@ export function umbelClauses(m, ui) {
   if (K.widthForced !== E.widthForced) bad.push(`UM1: the builder says the width ${K.widthForced ? 'was' : 'was not'} forced; restated it ${E.widthForced ? 'is' : 'is not'} (asked ${(1 + E.kAsked).toFixed(3)}x, held ${(1 + E.k).toFixed(3)}x)`);
   /* the crossing the plan reports: from a root along its rod to where it
      leaves the solid, restated on the harness's own union */
-  if (!(P.crossesSolidMm + 1e-6 >= gap / 2)) bad.push(`UM1: the plan's pedicel crossing is ${P.crossesSolidMm} mm, under half a printable feature`);
+  if (P.pedicelLenMm > 0 && !(P.crossesSolidMm + 1e-6 >= gap / 2)) bad.push(`UM1: the plan's pedicel crossing is ${P.crossesSolidMm} mm, under half a printable feature`);
+  if (!(P.pedicelLenMm > 0) && P.crossesSolidMm !== null) bad.push(`UM1: a SESSILE umbel has no rod to cross the solid, yet the plan reports a crossing of ${P.crossesSolidMm} mm`);
   /* UM2 — every pedicel CONVERGES: its emitted rod END is the i-th restated
      root (the base point `rhoB` out at the whorl law's azimuth, `extendMm`
      plus its own stagger inward along its own line), its WHOLE root disc half
@@ -14362,7 +14377,10 @@ export const INFLO_APPROACH_XFAIL = Object.freeze({
   'UMBEL: x a 3 mm stem (the solid stem; the floored pedicel)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
   'UMBEL: x a 12 mm stem (the area rule\'s own pedicel)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
   'UMBEL: x leaves (the stem\'s OWN node law — the shared node is the raceme\'s)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
-  'UMBEL: x SPHERE florets (each floret\'s own stem channel)': { approachMm: 0.9127, mechanism: 'the UMBEL — five SPHERE florets on ONE node round the knot, 72 deg apart; no internode moves them apart, and their balls stand 0.9127 mm from each other, just under the printable gap; declared, never clamped' },
+  'UMBEL: x SPHERE florets (each floret\'s own stem channel)': { approachMm: 0, mechanism: 'the UMBEL — five SPHERE florets on ONE node round the knot, 72 deg apart; no internode moves them apart. Was 0.9127 (their balls just under the printable gap) under the band; since the converging roots (Oct 27-28) their pedicels, built `extendMm + deepenMm` longer, meet above the swelling\'s flat top and the florets read as passing through each other there; declared, never clamped (the junction is PARKED, Oct 28)' },
+  'UMBEL: 2 florets, head OFF': { approachMm: 0, mechanism: 'the CONVERGING ROOTS (Oct 27-28): two pedicels meet about a millimetre from the axis and their rods overlap each other just above the swelling\'s flat top, in the open — the combination gate\'s `umbel-florets-x-angle @ 2 x 35` cell, declared by value under Eva\'s Oct 28 ruling (the junction is PARKED); never clamped' },
+  'MOPHEAD: 2 rays x depth 2\'s ruled defaults (12 round four-petal florets a sub-umbel at the floor)': { approachMm: 0, mechanism: 'the CONVERGING ROOTS (Oct 27-28): two rays meet near the axis and their rods overlap each other just above the swelling\'s flat top — the combination gate\'s `mophead-rays-x-florets @ 2 x …` cells, declared by value under Eva\'s Oct 28 ruling (the junction is PARKED); never clamped' },
+  'MOPHEAD: x a 12 mm stem (2 rays: the area rule\'s own hollow rays)': { approachMm: 0, mechanism: 'the CONVERGING ROOTS (Oct 27-28): two rays meet near the axis and their rods overlap each other just above the swelling\'s flat top — declared by value under Eva\'s Oct 28 ruling (the junction is PARKED); never clamped' },
   'UMBEL: THE SPIDER LILY — 6 florets, head OFF, recurved narrow petals, buckled margin, long upturned stamens': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
   'UMBEL: SIZE CORNER — 12 florets x 12 petals x 1.00x, head ON': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
   /* THE MOPHEAD (Oct 24): every depth-2 row whose sub-umbels meet. */
@@ -15007,7 +15025,12 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
         const PA = B.petioleAxis;
         const got = PA ? fileRingRadius(positions, PA.inner, PA.outer, Math.max(6, 4 * askedR)) : null;
         if (got === null) bad.push(`T6: leaf ${i}: no ring in the file in the plane of the petiole's rooted end — whether it carries the root is told from nothing`);
-        else if (capped ? Math.abs(got - C.cap) > 1e-6 * C.cap + 1e-9 : got < askedR - 1e-6 * askedR - 1e-9) bad.push(`T6: leaf ${i}: the petiole's emitted radius is ${got.toFixed(5)} mm where half the ${ui.leafLength} mm blade's root is ${askedR.toFixed(5)} mm${capped ? ` and the stem caps it at ${C.cap.toFixed(5)}` : ''} — the root stands on a rod thinner than itself`);
+        /* THE FILE STORES FLOAT32: the ring's radius is read as a difference of
+           coordinates of the rooted end's own magnitude, so its grain is that
+           magnitude's float32 ulp (X0's eight — CI read 0.6171444 against an
+           asked 0.6171451 on a ring at z -79, Oct 28; the Node doubles agree). */
+        const grain = 8 * 2 ** -24 * Math.max(1, ...PA.inner.map(Math.abs), ...PA.outer.map(Math.abs));
+        if (capped ? Math.abs(got - C.cap) > 1e-6 * C.cap + 1e-9 + grain : got < askedR - 1e-6 * askedR - 1e-9 - grain) bad.push(`T6: leaf ${i}: the petiole's emitted radius is ${got.toFixed(5)} mm where half the ${ui.leafLength} mm blade's root is ${askedR.toFixed(5)} mm${capped ? ` and the stem caps it at ${C.cap.toFixed(5)}` : ''} — the root stands on a rod thinner than itself`);
         if (out && i === 0) out.petioleEmittedMm = got;
       }
       if (bad.length > 8) return bad;
@@ -15052,30 +15075,51 @@ export function stemTopClauses(positions, m, ui) {
   const hubR = m.hubRadius ?? S.hubR;
   const sphere = !!(D && D.closed);
   if (sphere || !(hubR > outerR)) return bad;
-  const t = D ? D.thickness : S.hubT;
+  /* THE FILE IS THE EXPORT, so the slab is the EXPORT's: a sheet under the
+     printable minimum is floored there (CI found the 0.60 mm rows reading the
+     live 0.30 half-slab against a 0.50 top face — 0.20 mm "over", Oct 28). */
+  const t = Math.max(D ? D.thickness : S.hubT, MIN_FEATURE_MM);
   const scale = Math.max(1, Math.abs(D ? D.centreZ : 0) + (D ? D.Rd : hubR) + t);
   const tol = 64 * Number.EPSILON * scale + 2e-6;            // the STL's own float32 grain at the build's scale, plus ulp
+  /* A TEXTURED STEM IS RELIEVED OUTWARD ALONG ITS OWN NORMAL BY UP TO THE RELIEF
+     HEIGHT (T5): its top face on a flat hub is coplanar with the slab's top and
+     is textured (the hub's own top is relieved by the same field there), so the
+     bar for the STEM's vertices carries the height, and the HUB range — whose
+     relieved skin IS the head's top skin — is read by name and skipped, ST9's
+     precedent (a declared blindness: a relieved hub is TX10's subject). */
+  const relH = ui.petalTexture && ui.petalTexture !== 'NONE' ? Number(ui.textureHeight) || 0 : 0;
+  const stemRelieved = relH > 0 && !!(m.texture && m.texture.organs && m.texture.organs.stem);
+  const hubRelieved = relH > 0 && !!(m.texture && m.texture.organs && m.texture.organs.hub);
+  const stemSlack = stemRelieved ? relH : 0;
+  /* A NODED STEM'S RINGS FOLLOW THE NODE LAW (a swelling up to `nodeMaxOuterR`,
+     a kink that moves the ring centres off the axis below the head), so the
+     rim is located as the stem's highest vertices whose radius lies between
+     the control's and the law's widest — the head end carries no kink offset
+     (`stemNodeAxisMm` is 0 at depth 0). On an unnoded stem the band is the
+     control's radius alone, as before. */
+  const rMax = Math.max(outerR, Number(S.nodeMaxOuterR) || outerR);
   const skinAt = (r) => (D ? D.centreZ + Math.sqrt(Math.max(0, (D.Rd + t / 2) ** 2 - r * r)) : t / 2);
   const midRim = D ? D.centreZ + Math.sqrt(D.Rd * D.Rd - outerR * outerR) : t / 2;
   let over = 0, worst = -Infinity, worstR = 0, worstWho = '';
   let rimTop = -Infinity, sawOuter = false, sawBore = false, stemVerts = 0;
   const boreR = boreExpected(outerR);
   for (const [who, range] of [['stem', R.stem], ['join', R.hub]]) {
+    if (who === 'join' && hubRelieved) continue;
     for (let i = range[0] * 9; i < range[1] * 9; i += 3) {
       const r = Math.hypot(positions[i], positions[i + 1]), z = positions[i + 2];
       if (who === 'stem') {
         stemVerts++;
-        if (Math.abs(r - outerR) < 1e-3) { sawOuter = true; if (z > rimTop) rimTop = z; }
+        if (r > outerR - 1e-3 && r < rMax + 1e-3) { sawOuter = true; if (z > rimTop) rimTop = z; }
         if (boreR > 0 && Math.abs(r - boreR) < 1e-3) sawBore = true;
       }
       if (r > hubR + tol) continue;
-      const d = z - skinAt(r);
+      const d = z - skinAt(r) - (who === 'stem' ? stemSlack : 0);
       if (d > tol) { over++; if (d > worst) { worst = d; worstR = r; worstWho = who; } }
     }
   }
-  if (!stemVerts || !sawOuter) { bad.push(`ST13: the stem's declared range [${R.stem}] carries ${stemVerts} vertices and ${sawOuter ? 'some' : 'NONE'} at the control's radius ${outerR} — it is not the stem`); return bad; }
-  if (over) bad.push(`ST13: ${over} ${worstWho === 'stem' ? 'stem' : 'join'} vertex(es) stand above the head's top skin within the hub's radius — the worst ${worst.toFixed(6)} mm over at r ${worstR.toFixed(3)} (${D ? `cap Rd ${D.Rd.toFixed(3)}, rise` : 'a flat hub'}) — the stem shows through the head`);
-  if (Math.abs(rimTop - midRim) > tol) bad.push(`ST13: the stem's top rim stands at z ${rimTop.toFixed(6)} mm; ${D ? `the cap's mid-sphere at r ${outerR} is ${midRim.toFixed(6)}` : `the slab's top face is ${midRim.toFixed(6)}`} (the stem is rooted ${rimTop > midRim ? 'ABOVE' : 'BELOW'} the mid-surface by ${Math.abs(rimTop - midRim).toFixed(6)} mm)`);
+  if (!stemVerts || !sawOuter) { bad.push(`ST13: the stem's declared range [${R.stem}] carries ${stemVerts} vertices and ${sawOuter ? 'some' : 'NONE'} at the control's radius ${outerR}${rMax > outerR ? ` (to the node law's ${rMax.toFixed(4)})` : ''} — it is not the stem`); return bad; }
+  if (over) bad.push(`ST13: ${over} ${worstWho === 'stem' ? 'stem' : 'join'} vertex(es) stand above the head's top skin within the hub's radius — the worst ${worst.toFixed(6)} mm over at r ${worstR.toFixed(3)} (${D ? `cap Rd ${D.Rd.toFixed(3)}, rise` : 'a flat hub'}${stemSlack ? `; the stem's relief of ${relH} mm allowed` : ''}) — the stem shows through the head`);
+  if (Math.abs(rimTop - midRim) > tol + stemSlack) bad.push(`ST13: the stem's top rim stands at z ${rimTop.toFixed(6)} mm; ${D ? `the cap's mid-sphere at r ${outerR} is ${midRim.toFixed(6)}` : `the slab's top face is ${midRim.toFixed(6)}`} (the stem is rooted ${rimTop > midRim ? 'ABOVE' : 'BELOW'} the mid-surface by ${Math.abs(rimTop - midRim).toFixed(6)} mm)`);
   return bad;
 }
 
@@ -15624,7 +15668,7 @@ export const EXPORT_REFUSED_XFAIL = Object.freeze({
      budget) — the cap never goes coarser without a ruling, so the build stands
      at 0.5 and the export is refused, told. Measured in Node, EXPORT; TX9 holds
      the record's `fits: false` against the builder's own tally. */
-  'TEXTURE CAP: past 0.50 mm — 40 x 3 x 40 sepals x 4 tiers x whorled leaves on a 120 mm stem (REFUSED at the cap, told)': { tris: 1873730, note: 'the texture edge cap (Oct 23): 2,594,618 tris at the ruled 0.4 mm edge, 1,795,898 at the 0.5 mm cap, still 119.7%% of the 1,500,000 budget (T5, Oct 23: 1,873,730 at the cap, 124.9%%, the hub and the 120 mm stem now refined and relieved; +77,832); the edge is never coarsened past the cap without a ruling, so the build stands at 0.5 mm and the export is refused with the count on the read-out (TX9 + XR1). Measured in Node, EXPORT, on this tree.' },
+  'TEXTURE CAP: past 0.50 mm — 40 x 3 x 40 sepals x 4 tiers x whorled leaves on a 120 mm stem (REFUSED at the cap, told)': { tris: 1873538, note: 'the umbel hubs (Oct 28): 1,873,730 -> 1,873,538 (-192), the hub-to-stem join default CURVED 0.50 re-triangulating the join under the 120 mm stem, measured by CI\'s own XR1 on bf2e43f (the read-out and the builder\'s tally agreeing). Before it: the texture edge cap (Oct 23): 2,594,618 tris at the ruled 0.4 mm edge, 1,795,898 at the 0.5 mm cap, still 119.7%% of the 1,500,000 budget (T5, Oct 23: 1,873,730 at the cap, 124.9%%, the hub and the 120 mm stem now refined and relieved; +77,832); the edge is never coarsened past the cap without a ruling, so the build stands at 0.5 mm and the export is refused with the count on the read-out (TX9 + XR1). Measured in Node, EXPORT, on this tree.' },
   'ALL MAX': { tris: 3334106, note: 'BIG PETALS (Oct 21) takes this row 2,716,406 -> 3,334,106 tris (export and live alike, 222.3%% of the 1,500,000 budget, still refused), in two steps measured in Node: `petalLength` to its new 100 mm maximum gave 2,692,174, and `petalWidth` to its new 46 mm maximum (Eva\'s ruling, the same day) 3,334,106 — ALL of the +641,932 is the FRINGE, measured: with `fringeCount` 0 this control set builds 928,586 at width 30 AND at width 46, to the integer (the fringe\'s tooth ceiling is a rule about the terminal\'s width, so the wider blades cut more teeth). With petalLength 100 alone: so the fringe\'s width rule and the apex ladder land differently on the longer blades; the root taper itself adds no triangle (the lattice is fixed). Measured in Node on this tree. Before that: ORGANIC VARIANCE build 3, SPACING (docs/bloom-organic-variance-spacing-outcome.md §8) takes this row 3,090,910 -> 2,716,406 tris (export and live alike, still 181.1%% of the 1,500,000 budget): the blanket sweep hands `varianceSpacing` its 0.90 at the shared frequency 1 and phase 0, the pitch-density law gathers the slots where the shared wave is NEGATIVE, and the SIZE field reads each slot\'s EMITTED azimuth, so more of the 240 petals stand at the small end of the size wave and the fringe\'s width rule cuts them fewer teeth. Same 240 petals built, 0 omitted, measured in Node with the amount at 0 (3,090,910) and 0.90 (2,716,406) on one tree. Before that: 3,090,910 tris. THE FLORIST\'S CUT (stem session 3, docs/bloom-stem-cut-outcome.md §12) takes this row 3,090,816 -> 3,090,910 tris (+94, both modes): the blanket sweep hands `stemLength` its 120 mm at the default 6 mm diameter, so this row carries a stem and `stemCut` ships FLORIST, and the cut costs exactly the +94 the shipping stem does (the cut band\'s 2N-2 plus the two fans less the flat annulus). Measured in Node on both trees, export and live. Before that: 3,090,816 tris. THE PETAL EDGE PROFILE (the rim taper and bead) takes this row 2,354,268 -> 3,090,816 tris (export), 157.0%% -> 206.1%% of the 1,500,000 budget. AT EIGHT BEAD SEGMENTS IT READ 4,239,920 (282.7%%); Eva ruled the count down to FOUR (eight puts facets at about 0.2 mm, under Nylon 12 White\'s ~0.35-0.4 mm resolvable detail) and this row fell 27.1%%. The treatment closes every petal\'s perimeter with a swept profile, so the cost is per PERIMETER VERTEX and this row carries a 240-petal head with the fringe at its maximum: measured +31.3%% over main here against +29.7%% on the shipping default. The treatment closes every petal\'s perimeter with a swept profile, so the cost is per PERIMETER VERTEX and this row carries a 240-petal head with the fringe at its maximum: measured +80.1%% here against +73.7%% on the shipping default. Measured in Node on both trees by `node tools/bloom-xfail-magnitudes.mjs --include-refused`; XR1\'s builder tally agrees with the refused count. Before that: 2,354,268 tris (export) against the 1,500,000 budget (ORGANIC VARIANCE build 1 — docs/bloom-organic-variance-size-outcome.md §6: the blanket sweep hands `varianceSize` its 0.50, and the FRINGE\'s tooth ceiling is a rule about the terminal\'s WIDTH, `W >= (2N-1) * MIN_FEATURE_MM`, so the 0.5x petals of the wave cut fewer teeth — per petal 10/9/8/…/1 where the unvaried row cut 10/8/6/4/3 per whorl — and the row lost 152,384 triangles: 2,506,652 -> 2,354,268, measured in Node on both amounts. A topology move by the fringe\'s own width rule, mode-free as that rule is; XR1\'s builder tally agrees with the refused count.) Before that: 2,506,652 tris, a 119.5 MiB file (sepals part 1: the blanket sweep now also hands `sepalCount` its maximum, 40 sepals at the shipped sub-control defaults on the 40-petal rim, +94,240 tris over the 2,412,412 the row read on main after the stem tip plug (the sepal session first quoted +94,140, computed against the stale 2,412,512; the count itself was measured); the sepal sub-controls are hidden at DEFAULTS and stay out of the sweep; the count is re-measured on the merged tree by `node tools/bloom-xfail-magnitudes.mjs --include-refused`). Before that, the fringe: the blanket sweep hands the three fringe controls their maxima (petalTipEnd 1, fringeCount 10, fringeDepth 0.50) on a 240-petal head (40 petals x 6 layers). The fringe is 3.79x this row on its own: the identical control set with those three at their SHIPPED DEFAULTS builds 636,672 tris and exports fine. THREE teeth is the most that exports here (1,267,392, 84.5% of budget); the fourth misses by 19,392, which is 1.3%.' },
   /* THE SHARED NODE ON RULING 9'S CORNER (the node-laws session). Not a
      control pushing `INFLO: ALL MAX` over — that row points its pedicels

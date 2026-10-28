@@ -6950,6 +6950,15 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
   overlap above the flat top stays DECLARED BY VALUE; do not raise the top or re-tune the swelling —
   the junction is the branching session's to replace. §8 of `docs/bloom-umbel-hubs-outcome.md`.
   `frozen/phase89` is the 1,588 rows at the merged base (block 82 takes the matrix to 1,605).
+  **The first full CI run found six classes on rows outside block 82 (§8a of the doc), all fixed at
+  their owner:** ST13 locates a NODED stem's rim between the control's radius and the node law's
+  widest, reads the EXPORT's floored slab, allows the stem's own relief on a textured row and skips
+  the relieved hub by name; T6's bar carries eight float32 ulp of the rooted end's magnitude; a
+  SESSILE umbel floret roots on the converging root along its own line (the radial wall law is the
+  raceme's); **the hold is tested against the DRAWN CHORDS, not the law's curve** (a chord lies
+  inside the arc — the geometry's `holds` and `umbelSwellingExpected` both); the two-floret umbel,
+  the two-ray mopheads and the SPHERE-floret umbel are declared at 0 (the converging roots); the
+  refused texture-cap row re-records 1,873,730 → 1,873,538.
 
 **ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
 AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of

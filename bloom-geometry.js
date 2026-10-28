@@ -23277,11 +23277,27 @@ export function umbelSwelling(n, rP, angleDeg, outerR, boreR, headOn = false, ba
     RIN[i] = q.rMm - rP * cp * sa; Z0[i] = q.zMm + rP * cp * ca; OUT[i] = rP * sp;
   } }
   const m = gap / 2;
+  /* THE HOLD IS TESTED AGAINST THE BODY AS DRAWN — the chords between the rings
+     `umbelSwellBody` lays (a `w/8` apart, the rise's own above the plane), never
+     the law's curve: a chord lies INSIDE a convex arc, and CI found a root disc
+     held by the curve to the half gap falling 2e-3 mm outside the emitted
+     polyline on the head-ON umbels (Oct 28). The harness restates the same
+     chords (`umbelSwellingExpected`) and UM2 reads the emitted rings. */
+  const pitch = spreadMm / UMBEL_SWELL_RINGS_PER_SPREAD, nBelow = Math.max(1, Math.ceil(endMm / pitch));
+  const chordR = (k, z, riseMm) => {
+    const Rof = (zz) => umbelSwellRadiusMm(k, spreadMm, outerR, zz);
+    let z0, z1;
+    if (z <= 0) { const j = Math.min(nBelow, Math.max(1, Math.ceil(-z * nBelow / endMm))); z0 = -endMm * j / nBelow; z1 = -endMm * (j - 1) / nBelow; }
+    else if (headOn) { const j = Math.min(nBelow, Math.max(1, Math.ceil(z * nBelow / endMm))); z0 = endMm * (j - 1) / nBelow; z1 = endMm * j / nBelow; }
+    else { const mm = Math.max(1, Math.ceil(riseMm / pitch)), j = Math.min(mm, Math.max(1, Math.ceil(z * mm / riseMm))); z0 = riseMm * (j - 1) / mm; z1 = riseMm * j / mm; }
+    const t = z1 > z0 ? (z - z0) / (z1 - z0) : 0;
+    return Rof(z0) + t * (Rof(z1) - Rof(z0));
+  };
   const holds = (k, d, riseMm) => {
     for (let i = 0; i < N; i++) {
       const rho = Math.hypot(RIN[i] - d * ca, OUT[i]), z = Z0[i] - d * sa;
       /* the body exists only at a width above 0 (a width-0 body would lie ON the rod's wall and is not built) */
-      if (k > 0 && z >= -endMm && (headOn ? z <= endMm : z <= riseMm - m)) { const u = z / spreadMm; if (rho + m <= outerR * (1 + k * Math.exp(-u * u))) continue; }
+      if (k > 0 && z >= -endMm && (headOn ? z <= endMm : z <= riseMm - m)) { if (rho + m <= chordR(k, z, riseMm)) continue; }
       if (rho + m <= outerR && (boreR <= 0 || rho - m >= boreR) && (headOn || z + m <= 0)) continue;
       return false;
     }
@@ -23959,7 +23975,7 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null, defe
   const pre = { floretPetals: Math.round(Number(state.floretPetals)), petalLength, petalWidth,
     pedicelR, pedicelLenMm, angleDeg, rootR, embedMm, rootExtendMm, rootStaggerMm, rootZ: 0, nodeDepthsMm: [0],
     azimuths: umbel ? [umbelAz.slice()] : null, compound, floretsPerRay: perRay, reducedFlorets,
-    reportsDeferred: !!deferReports };
+    reportsDeferred: !!deferReports, umbel };
   const unitMemo = floretUnitMemo(state, pre);
   const sessileTop = pedicelLenMm === 0;
   /* OVER EVERY AZIMUTH THE PHYLLOTAXY PRODUCES ON ANY ASKED NODE — found by
@@ -24567,7 +24583,14 @@ export function pedicelPlacement(plan, nodeIndex, az, tipZLocal, sessile = false
      step (`umbelRootLaw`), so no two root rings share a vertex */
   const stagger = plan.rootStaggerMm ? plan.rootStaggerMm[plan.azimuths[nodeIndex].indexOf(az)] || 0 : 0;
   const embed = plan.embedMm + stagger;
-  const root = sessile
+  /* AN UMBEL'S SESSILE FLORET ROOTS LIKE A STALKED ONE (Oct 28, a placement
+     made without a ruling, found by CI on the swelling): its hub's underside
+     point on the axis lands on the i-th CONVERGING ROOT — `extendMm +
+     deepenMm` plus its stagger inward along its own line — so the hub sinks
+     into the swelling as a rod's end would; the radial wall law above is the
+     RACEME's (a sessile floret rooted in the rachis WALL), where there is no
+     swelling to converge into. */
+  const root = sessile && !plan.umbel
     ? [base[0] - R[0] * plan.embedMm, base[1] - R[1] * plan.embedMm, base[2]]
     : [base[0] - D[0] * embed, base[1] - D[1] * embed, base[2] - D[2] * embed];
   const kx = -D[1], ky = D[0], kz = 0;                 // z x D

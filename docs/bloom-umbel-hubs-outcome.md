@@ -572,3 +572,48 @@ What ships from this branch, finished:
 Bookkeeping that follows: `main` merged in (#468's page profile and the two /frame merges),
 `frozen/phase89` registered as the 1,588 rows at the merged base, the PR opened and merged on
 green CI, `bloom-frozen-tags` dispatched from `main` and read back.
+
+### 8a. What the first full CI run found (bf2e43f, Oct 28) — rows the block-82 subset could not reach
+
+Twelve shards red, 48 distinct rows dropped, every one a validity clause of this branch's own
+on a row outside block 82 (the only block run locally). Six classes, each fixed at its owner:
+
+- **ST13 could not find a NODED stem.** It located the stem's top rim as the stem vertices at
+  the control's radius; a noded stem's rings follow the node law (a swelling up to
+  `nodeMaxOuterR`, a kink that moves the ring centres off the axis below the head), so on
+  twenty node rows it read NONE at that radius, or found the tip's ring and reported the rim
+  84 mm under the slab. The rim is now the stem's highest vertices whose radius lies between
+  the control's and the law's widest; the head end carries no kink offset by the law's own
+  construction (`stemNodeAxisMm` is 0 at depth 0).
+- **ST13 read the LIVE half-slab on a thin sheet.** `S.hubT` is 0.60 on the four 0.60 mm rows
+  while the file floors the slab to 1.00, so the 0.50 top face read 0.20 mm "over". The slab
+  is `max(t, MIN_FEATURE_MM)` now, the EXPORT's own.
+- **ST13 could not read a TEXTURED head.** T5 relieves the stem's top face (coplanar with the
+  slab's top and visible, so textured by the same field as the hub's top there) by up to the
+  relief height, and the hub's relieved skin IS the head's top skin. The stem's bar carries the
+  height where the stem organ is relieved; the hub range is skipped by name on a textured row
+  (ST9's precedent, a declared blindness — the relieved hub is TX10's subject). Fourteen rows.
+- **T6 compared a float32 ring against a double at the ring's own coordinate magnitude.**
+  `LOBED: THE LOBE COUNT YIELDS` read 0.6171444 against an asked 0.6171451 on leaf 2, whose
+  rooted end sits at z −79: the Node doubles agree on both trees (0.6171451248 emitted), the
+  file's ring moved by the float32 grain because the join's default moved the leaf 0.658 mm
+  down the stem. The bar carries eight float32 ulp of the rooted end's magnitude (X0's rule).
+- **A SESSILE umbel floret rooted in the wall, not in the swelling.** `pedicelPlacement`'s
+  sessile arm is the RACEME's (radially into the rachis wall); under an umbel the hub's
+  underside point now lands on the i-th converging root along its own line, as a rod's end
+  does — a placement made without a ruling, found by UM2 on the sessile umbel and the sessile
+  mophead. UM1's crossing clause stands down on a sessile umbel (no rod, no crossing).
+- **Declared by value, under the ruling**: the two-floret umbel and the two-ray mopheads read
+  0.0000 on ID10 (d) — the converging roots' own overlap, already declared in the combination
+  gate — and `UMBEL: x SPHERE florets` re-records 0.9127 → 0 for the same reason. The refused
+  texture-cap row's count is re-recorded 1,873,730 → 1,873,538 (−192, the join's default).
+
+The head-ON umbel rows that UM2 reported (`2 florets`, `7 florets`, `6 at 90 deg`, `250 mm
+pedicels`) are re-run below.
+- **The hold was tested against the law's curve and the emitted body is its chords.** UM2
+  reads the EMITTED rings, and a root disc the analytic Gaussian held to exactly the half gap
+  (the deepen search lands on the first grid depth that holds) fell about 2e-3 mm outside the
+  inscribed polyline on the head-ON umbels (`2 florets`, `7 florets`, `6 at 90 deg`, `250 mm
+  pedicels`). The geometry's `holds` and the harness's restatement both test against the
+  chords between the rings the body draws now (the same `w/8` ladder); every block-82 and
+  block-78 umbel row reads UM1/UM2-silent in Node, and the browser gate is the authority.

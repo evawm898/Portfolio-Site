@@ -1611,8 +1611,8 @@ const MUTANTS = [
     } },
   { id: 'a-root-disc-on-the-junctions-face', rows: /^an umbel/,
     why: "the hold drops its half gap: a root disc's rim lands EXACTLY on the top face or the spindle's skin, decided by its last bit — the tangency that welds (749 pairs on the Oct 23 sphere); watertight, one piece",
-    find: '  const m = gap / 2;\n  const holds = (k, d, riseMm) => {',
-    into: '  const m = 0;\n  const holds = (k, d, riseMm) => {', names: ['UM2'],
+    find: '  const m = gap / 2;\n  /* THE HOLD IS TESTED AGAINST THE BODY AS DRAWN',
+    into: '  const m = 0;\n  /* THE HOLD IS TESTED AGAINST THE BODY AS DRAWN', names: ['UM2'],
     witness: (M, C) => {
       const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescence.knot.deepenMm;
       const m = f(M), c = f(C);
