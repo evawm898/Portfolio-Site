@@ -402,11 +402,16 @@ the law in full); the dome, the flare, `umbelFlareDepthAt`, `umbelKnotInside` an
 4. **The width is derived where the asked one cannot hold the roots** — raised by bisection
    to the least width (2⁻⁸ grid) at which some depth buries them; reported as FORCED with the
    asked and reached widths (the mophead ray tip, §7b).
-5. **Where NO width up to the ceiling buries them by depth the top RISES instead** (a
-   decision made without a ruling, the only one here): a pedicel at or below horizontal goes
-   UP along its line, so with the head off its roots sit above the base plane and the body is
-   taller by `riseMm`, the least top height under which every rim point sits half a gap
-   (`heldBy: 'rise'`, told). At every angle above horizontal the shipped rows deepen.
+5. **Where depth cannot hold them at the asked width, the top RISES instead if that is the
+   NARROWER way** (two placements made without a ruling): "deeper" is along the rod's own
+   line toward the body — inward where a pedicel rises, OUTWARD past the base point where it
+   droops (inward goes up, out of a head-off rod; the root then sits under the plane and the
+   rod leaves the body's side). Each way is solved at the least width that holds it and the
+   narrower wins, a tie to the depth (Eva's target is the width, ~1.2×; her first order the
+   depth): a head-off body may then be taller by `riseMm`, the least top height under which
+   every rim point sits half a gap, the roots pulled back along the line only as far as that
+   needs (`heldBy: 'rise'`, told). The room the rod leaves below its end bounds the body in the
+   hold as in the drawing (`reachClamped`, told).
 6. **The crossing** is measured as before, root to surface along the rod's line.
 
 ### 7b. Measured (EXPORT, the ruled defaults; width is the spindle's peak diameter, length its reach below the base plane)
@@ -414,33 +419,36 @@ the law in full); the dome, the flare, `umbelFlareDepthAt`, `umbelKnotInside` an
 | state | rod | pedicel | width | × rod | length | roots | crossing |
 |---|---|---|---|---|---|---|---|
 | spider lily 6 @ 35° (the default) | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | 2.23 deeper | 3.02 |
-| 2 @ −60° | 6.00 | 4.24 | 8.02 | **1.336, forced** | 19.64 | top raised 2.66 | 4.57 |
+| 2 @ −60° | 6.00 | 4.24 | 7.20 | 1.200 | 19.64 | top raised 3.42 (roots pulled 0.88 up the line) | 4.75 |
 | 2 @ 35° | 6.00 | 4.24 | 7.20 | 1.200 | 19.64 | 2.23 deeper | 3.90 |
-| 2 @ 90° | 6.00 | 4.24 | 9.52 | **1.586, forced** | 19.64 | 0.57 deeper | 0.50 |
+| 2 @ 90° | 6.00 | 4.24 | 9.49 | **1.582, forced** | 19.64 | top raised 0.57 | 0.50 |
 | 6 @ −60° | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | top raised 2.37 | 4.36 |
 | 6 @ 90° | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | 0.95 deeper | 0.50 |
 | 12 @ −60° | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | top raised 2.88 | 3.78 |
-| 12 @ 35° | 6.00 | 3.00 | 8.27 | **1.379, forced** | 19.64 | 2.82 deeper | 3.01 |
+| 12 @ 35° | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | top raised 1.62 (by depth alone it needs 1.379×) | 2.75 |
 | 12 @ 90° | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | 1.53 deeper | 0.50 |
 | 6 @ 35°, head ON | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 either side | 0.01 deeper | 1.74 |
 | 6 @ 35°, amount 0 | 6.00 | 3.00 | 6.28 | **1.047, forced** from 1.00 | 19.64 | 2.23 deeper | 3.02 |
 | 6 @ 35°, Hub length 10 | 6.00 | 3.00 | 7.20 | 1.200 | 10.00 | 2.23 deeper | 3.02 |
+| 6 @ 35° on a 3 mm stem (room 1 mm) | 6.00 | 3.00 | 8.13 | **1.355, forced** | 1.00, CLAMPED | top raised 2.57 | 1.63 |
 | mophead, the stem top (12 rays @ 50°) | 6.00 | 3.00 | 7.20 | 1.200 | 19.64 | 1.98 deeper | 1.91 |
 | mophead ray tip, 12 @ 20° (the default) | 3.00 | 3.00 | 4.90 | **1.633, forced** | 9.82 | top raised 1.78 | 1.38 |
-| ray tip 2 @ −60° / 35° / 90° | 3.00 | 3.00 | 6.13 / 5.20 / 7.09 | 2.04 / 1.73 / 2.36, forced | 9.82 | raised 2.03 / 1.84 deeper / 0.55 deeper | 3.26 / 3.02 / 0.50 |
-| ray tip 6 @ −60° / 35° / 90° | 3.00 | 3.00 | 6.45 / 6.52 / 7.39 | 2.15 / 2.17 / 2.47, forced | 9.82 | raised 2.37 / 2.23 deeper / 0.95 deeper | 3.04 / 3.02 / 0.50 |
-| ray tip 12 @ −60° / 35° / 90° | 3.00 | 3.00 | 6.93 / 9.15 / 8.37 | 2.31 / 3.05 / 2.79, forced | 9.82 | raised 2.88 / 2.82 deeper / 1.53 deeper | 2.70 / 3.01 / 0.50 |
+| ray tip 2 @ −60° / 35° / 90° | 3.00 | 3.00 | 4.37 / 4.35 / 7.01 | 1.46 / 1.45 / 2.34, forced | 9.82 | raised 3.98 / 1.06 / 0.55 | 4.25 / 1.99 / 0.50 |
+| ray tip 6 @ −60° / 35° / 90° | 3.00 | 3.00 | 4.62 / 4.75 / 7.05 | 1.54 / 1.58 / 2.35, forced | 9.82 | raised 4.32 / 1.28 / 0.95 | 4.07 / 1.84 / 0.50 |
+| ray tip 12 @ −60° / 35° / 90° | 3.00 | 3.00 | 5.21 / 5.59 / 7.22 | 1.74 / 1.86 / 2.41, forced | 9.82 | raised 4.72 / 1.62 / 1.53 | 3.81 / 1.73 / 0.50 |
 
-**The lily reaches 1.20× over 19.6 mm at the default and at six of the nine grid cells.** Three
-are forced: two florets at 90° (the area rule gives two pedicels of 4.24 mm, and a horizontal
-root disc of that radius spans 8.5 mm across the axis: 1.59×); two at −60° (the same thick
-discs, risen: 1.34×); twelve at 35° (the stagger's 2.4 mm span along the line runs the deepest
-roots out through the far side before the shallowest is under the top, so the body widens to
-1.38× and they all deepen 2.82). **A mophead ray tip cannot get near 1.2×, as Eva allowed for:
-a 1.5 mm pedicel off a 1.5 mm ray needs 1.63× at the default (12 florets at 20°, risen 1.78
-mm because at 20° a disc 1.5 mm wide cannot be buried under a 3 mm rod's top by depth) and
-2.0–3.1× across the grid; it gets what holds the roots and the read-out and the sheet say
-FORCED.** The knot read 2.89× on the same tip (8.67 mm); the default tip is 4.90 mm now.
+**The lily reaches 1.20× over 19.6 mm at eight of the nine grid cells and at every shipped
+umbel row.** The one forced cell is two florets at 90°: the area rule gives two pedicels of
+4.24 mm, and a horizontal root disc of that radius spans 8.5 mm across the axis (1.58×).
+Three cells hold by a raised top rather than by depth: the drooping −60° column (inward is
+up), and twelve at 35°, where the stagger's 2.4 mm span along the line runs the deepest roots
+out through the far side before the shallowest is under the top — by depth alone that cell
+needs 1.379×, and the 1.62 mm rise is the narrower way. **A mophead ray tip cannot get near
+1.2×, as Eva allowed for: a 1.5 mm pedicel off a 1.5 mm ray needs 1.63× at the default (12
+florets at 20°, the top raised 1.78 mm) and 1.45–2.4× across the grid; it gets what holds the
+roots and the read-out and the sheet say FORCED.** The knot read 2.89× on the same tip (8.67
+mm); the default tip is 4.90 mm now. A 3 mm stem (a declared row) has 1 mm of room under its
+end, so its body is cut there and the roots held by a 2.57 mm rise at 1.36×, told.
 
 Cost: 1,728 tris a stem-top swelling (18 rings × 48 × 2) against the knot's 1,920 and the
 band's 960; 2,016 a ray tip; the lily 106,806 in all (knot 106,998), the mophead 1,265,418.

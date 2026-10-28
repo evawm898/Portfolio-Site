@@ -23253,7 +23253,12 @@ export function umbelSwelling(n, rP, angleDeg, outerR, boreR, headOn = false, ba
   const lengthAsked = !hub || hub.lengthMm === undefined ? 0 : Number(hub.lengthMm);
   const auto = !(lengthAsked > 0);
   const spreadMm = auto ? STEM_NODE_SPREAD_RADII * outerR : lengthAsked / UMBEL_SWELL_END_SPREADS;
-  const endMm = UMBEL_SWELL_END_SPREADS * spreadMm;
+  const endAskedMm = UMBEL_SWELL_END_SPREADS * spreadMm;
+  /* the hold reads the reach the ROOM leaves (the rod's own length below the
+     base plane, mode-free), so a short rod's roots are never buried in a body
+     the room cannot hold — `umbelSwellBody` clamps the drawn body the same way */
+  const roomMm = hub && Number.isFinite(hub.roomMm) ? hub.roomMm : Infinity;
+  const endMm = Number.isFinite(roomMm) && endAskedMm > roomMm - gap ? Math.max(gap, roomMm - gap) : endAskedMm;
   const swellAsked = Math.max(0, UMBEL_SWELL_PER_AMOUNT * amount);
   const rodR = outerR - gap / 2;
   const G = UMBEL_SWELL_GRID_MM, ceilG = (x) => Math.ceil(x / G) * G;
@@ -23286,30 +23291,44 @@ export function umbelSwelling(n, rP, angleDeg, outerR, boreR, headOn = false, ba
      the top-face half of the hold is closed form in the depth (`z - d sa`),
      the radial half is scanned a gap-eighth at a time from there and the first
      hold refined down onto the grid */
+  /* THE DIRECTION OF "DEEPER" IS ALONG THE ROD'S LINE TOWARD THE BODY: inward
+     where the pedicel rises (a > 0, the Oct 27 extension's own way), OUTWARD
+     past the base point where it droops (a < 0 — inward goes UP, out of a
+     head-off rod; the root then sits under the plane and the rod leaves the
+     body's SIDE, a drooping umbel's own look). `t` is the travel that way, the
+     signed `deepenMm` along the line is `dir t`. A horizontal pedicel (a = 0)
+     can only be buried by the rise. */
+  const dir = sa >= 0 ? 1 : -1, asa = Math.abs(sa);
   const deepenFor = (k) => {
-    if (!(headOn || sa > 0)) return null;
-    let d0 = 0;
-    if (!headOn) for (let i = 0; i < N; i++) d0 = Math.max(d0, (Z0[i] + m) / sa);
-    d0 = ceilG(Math.max(0, d0));
-    const dMax = (endMm + rP) / Math.max(Math.abs(sa), 1e-9) + 2 * (endMm + rP);
-    const ok = (d) => holds(k, d, 0);
+    if (!(headOn || asa > 0)) return null;
+    let t0 = 0;
+    if (!headOn) for (let i = 0; i < N; i++) t0 = Math.max(t0, (Z0[i] + m) / asa);
+    t0 = ceilG(Math.max(0, t0));
+    const tMax = (endMm + rP) / Math.max(asa, 1e-9) + 2 * (endMm + rP);
+    const ok = (t) => holds(k, dir * t, 0);
     const step = gap / 8;
-    let d = d0;
-    while (d <= dMax && !ok(d)) d += step;
-    if (d > dMax) return null;
-    if (d === d0) return d0;
-    let lo = d - step, hi = d;
+    let t = t0;
+    while (t <= tMax && !ok(t)) t += step;
+    if (t > tMax) return null;
+    if (t === t0) return dir * t0;
+    let lo = t - step, hi = t;
     while (hi - lo > G) { const mid = ceilG((lo + hi) / 2); if (mid >= hi) break; if (ok(mid)) hi = mid; else lo = mid; }
-    return ceilG(hi);
+    return dir * ceilG(hi);
   };
-  /* the rise: the least top-face height over the base plane, on the grid,
-     that puts every rim point half a gap under it with no deepening */
+  /* the rise (head off): the roots pulled the OTHER way along the line, the
+     least travel `u` (0 first — no pull) on the grid at which the top raised to
+     the least height over every rim point (half a gap) holds them */
   const riseFor = (k) => {
     if (headOn) return null;
-    let r = 0;
-    for (let i = 0; i < N; i++) r = Math.max(r, Z0[i] + m);
-    r = ceilG(r);
-    return holds(k, 0, r) ? r : null;
+    const uMax = (2 * rP + endMm) / Math.max(asa, 1e-9) + 2 * (endMm + rP), step = gap / 8;
+    for (let u = 0; u <= uMax; u += step) {
+      const d = -dir * u;
+      let r = 0;
+      for (let i = 0; i < N; i++) r = Math.max(r, Z0[i] - d * sa + m);
+      r = ceilG(r);
+      if (holds(k, d, r)) return { deepenMm: d === 0 ? 0 : -dir * ceilG(u), riseMm: r };
+    }
+    return null;
   };
   /* (3) the width and the depth, in Eva's order: DEEPER first — the asked width
      if some depth buries the roots in it, else the least width on the grid
@@ -23324,26 +23343,21 @@ export function umbelSwelling(n, rP, angleDeg, outerR, boreR, headOn = false, ba
     while (hi - lo > W) { const m = ceilW((lo + hi) / 2); if (m >= hi) break; const h = solve(m); if (h !== null) { hi = m; hiHeld = h; } else lo = m; }
     return { k: ceilW(hi), v: hiHeld };
   };
-  let swell = swellAsked, held = null, widthForced = false;
-  const d0 = deepenFor(swell);
-  if (d0 !== null) held = { deepenMm: d0, riseMm: 0, heldBy: 'deepen' };
-  else {
-    const wd = leastWidth(deepenFor);
-    if (wd) { swell = wd.k; held = { deepenMm: wd.v, riseMm: 0, heldBy: 'deepen' }; }
-    else {
-      const r0 = riseFor(swell);
-      if (r0 !== null) held = { deepenMm: 0, riseMm: r0, heldBy: 'rise' };
-      else { const wr = leastWidth(riseFor); if (wr) { swell = wr.k; held = { deepenMm: 0, riseMm: wr.v, heldBy: 'rise' }; } else { swell = UMBEL_SWELL_WIDTH_MAX; held = { deepenMm: 0, riseMm: 0, heldBy: 'unheld' }; } }
-    }
-    widthForced = swell !== swellAsked;
-  }
+  /* the two ways of holding, each at the least width that holds that way;
+     the NARROWER wins (Eva's target is the width — about 1.2x), a tie to the
+     depth (her first order) */
+  const byDepth = (() => { const d = deepenFor(swellAsked); if (d !== null) return { k: swellAsked, v: { deepenMm: d, riseMm: 0, heldBy: 'deepen' } }; const w = leastWidth(deepenFor); return w ? { k: w.k, v: { deepenMm: w.v, riseMm: 0, heldBy: 'deepen' } } : null; })();
+  const byRise = (() => { if (byDepth && byDepth.k === swellAsked) return null; const r = riseFor(swellAsked); if (r !== null) return { k: swellAsked, v: { ...r, heldBy: 'rise' } }; const w = leastWidth(riseFor); return w ? { k: w.k, v: { ...w.v, heldBy: 'rise' } } : null; })();
+  const pick = byDepth && byRise ? (byRise.k < byDepth.k ? byRise : byDepth) : (byDepth || byRise);
+  let swell = pick ? pick.k : UMBEL_SWELL_WIDTH_MAX, held = pick ? pick.v : { deepenMm: 0, riseMm: 0, heldBy: 'unheld' };
+  const widthForced = swell !== swellAsked;
   const RL = umbelRootLaw(n, rP, angleDeg, outerR, headOn, held.deepenMm);
   const riseMm = held.riseMm;
   const peakR = outerR * (1 + swell);
   const K = umbelSwellBody({ n, rP, angleDeg, style, styleInert: true, amount, lengthAsked, auto, swellAsked, swell, widthForced,
-    widthAskedMm: 2 * outerR * (1 + swellAsked), widthMm: 2 * peakR, peakR, spreadMm, endAskedMm: endMm, rodR,
+    widthAskedMm: 2 * outerR * (1 + swellAsked), widthMm: 2 * peakR, peakR, spreadMm, endAskedMm, rodR,
     rhoB: RL.rhoB, extendMm: RL.extendMm, deepenMm: RL.deepenMm, riseMm, heldBy: held.heldBy, staggerMm: RL.staggerMm, roots: RL.roots,
-    headOn, outerR, boreR, gapMm: gap, rimSamples: S, basePlaneZ, centre: [0, 0, basePlaneZ] }, hub && Number.isFinite(hub.roomMm) ? hub.roomMm : Infinity);
+    headOn, outerR, boreR, gapMm: gap, rimSamples: S, basePlaneZ, centre: [0, 0, basePlaneZ] }, roomMm);
   K.crossMm = umbelSwellCrossMm(K);
   return K;
 }
@@ -23833,8 +23847,14 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {
   /* THE SWELLING (Oct 28): the roots' depth is the swelling's own derivation,
      so the law runs here, before the unit is built `rootExtendMm` longer; the
      base plane and the room are stamped on it once they are known (below). */
+  /* the room the search reads: head OFF the rod's whole length below its end
+     (exact — the base plane IS the end); head ON the same less nothing, an
+     upper bound, because the umbel's depth is not known until the unit is
+     built — the placed record below clamps to the exact room, and UM2 holds
+     the roots against what was emitted */
+  const swellRoomMm = umbel ? stem.lengthMm - MIN_FEATURE_MM - (stem.cut && stem.cut.made ? stem.cut.spanMm : 0) : null;
   const swellLaw = umbel ? umbelSwelling(umbelCount, pedicelR, angleDeg, stem.outerR, stem.boreR, !headOff, 0,
-    { style: stem.hubStyle, amount: stem.hubAmount, lengthMm: stem.hubLengthAsked }) : null;
+    { style: stem.hubStyle, amount: stem.hubAmount, lengthMm: stem.hubLengthAsked, roomMm: swellRoomMm }) : null;
   const rootLaw = swellLaw;
   const rootR = umbel ? rootLaw.rhoB : rodWallRootMm(stem);
   const embedMm = umbel ? rootLaw.extendMm + rootLaw.deepenMm : rodWallEmbedMm(stem);

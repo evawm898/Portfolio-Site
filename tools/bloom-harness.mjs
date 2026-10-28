@@ -12818,7 +12818,9 @@ export function pedicelPinClauses(F, U) {
 export function umbelSwellingExpected({ n, rP, aDeg, outerR, boreR, headOn, amount, lengthAsked, roomMm }) {
   const gap = MIN_FEATURE_MM, a = (aDeg * Math.PI) / 180, ca = Math.cos(a), sa = Math.sin(a), m = gap / 2;
   const w = lengthAsked > 0 ? lengthAsked / 2 : GEOMETRY.STEM_NODE_SPREAD_RADII * outerR;
-  const endAsked = 2 * w, rodR = outerR - gap / 2;
+  const endAskedW = 2 * w, rodR = outerR - gap / 2;
+  /* the hold reads the reach the room leaves, as the geometry's does */
+  const endAsked = Number.isFinite(roomMm) && endAskedW > roomMm - gap ? Math.max(gap, roomMm - gap) : endAskedW;
   const kAsked = Math.max(0, 0.4 * amount);
   const rhoB = headOn ? outerR + rP + gap : rP;
   const extendMm = rhoB * ca;
@@ -12838,39 +12840,46 @@ export function umbelSwellingExpected({ n, rP, aDeg, outerR, boreR, headOn, amou
     return true;
   };
   const G = 2 ** -8, cg = (x) => Math.ceil(x / G) * G;
+  /* "deeper" is along the line toward the body: inward where the pedicel rises, outward past the base point where it droops */
+  const dir = sa >= 0 ? 1 : -1, asa = Math.abs(sa);
   const deepenFor = (k) => {
-    if (!(headOn || sa > 0)) return null;
-    let d0 = 0;
-    if (!headOn) for (let q = 0; q < N; q++) d0 = Math.max(d0, (Z0[q] + m) / sa);
-    d0 = cg(Math.max(0, d0));
-    const dMax = (endAsked + rP) / Math.max(Math.abs(sa), 1e-9) + 2 * (endAsked + rP), step = gap / 8;
-    let d = d0;
-    while (d <= dMax && !holds(k, d, 0)) d += step;
-    if (d > dMax) return null;
-    if (d === d0) return d0;
-    let lo = d - step, hi = d;
-    while (hi - lo > G) { const mid = cg((lo + hi) / 2); if (mid >= hi) break; if (holds(k, mid, 0)) hi = mid; else lo = mid; }
-    return cg(hi);
+    if (!(headOn || asa > 0)) return null;
+    let t0 = 0;
+    if (!headOn) for (let q = 0; q < N; q++) t0 = Math.max(t0, (Z0[q] + m) / asa);
+    t0 = cg(Math.max(0, t0));
+    const tMax = (endAsked + rP) / Math.max(asa, 1e-9) + 2 * (endAsked + rP), step = gap / 8;
+    let t = t0;
+    while (t <= tMax && !holds(k, dir * t, 0)) t += step;
+    if (t > tMax) return null;
+    if (t === t0) return dir * t0;
+    let lo = t - step, hi = t;
+    while (hi - lo > G) { const mid = cg((lo + hi) / 2); if (mid >= hi) break; if (holds(k, dir * mid, 0)) hi = mid; else lo = mid; }
+    return dir * cg(hi);
   };
-  const riseFor = (k) => { if (headOn) return null; let r = 0; for (let q = 0; q < N; q++) r = Math.max(r, Z0[q] + m); r = cg(r); return holds(k, 0, r) ? r : null; };
+  const riseFor = (k) => {
+    if (headOn) return null;
+    const uMax = (2 * rP + endAsked) / Math.max(asa, 1e-9) + 2 * (endAsked + rP), step = gap / 8;
+    for (let u = 0; u <= uMax; u += step) {
+      const d = -dir * u;
+      let r = 0;
+      for (let q = 0; q < N; q++) r = Math.max(r, Z0[q] - d * sa + m);
+      r = cg(r);
+      if (holds(k, d, r)) return { deepenMm: d === 0 ? 0 : -dir * cg(u), riseMm: r };
+    }
+    return null;
+  };
   /* DEEPER FIRST (Eva's order): the asked width if a depth buries the roots,
      else the least width that a depth does; the top RISES only where no width
      up to the ceiling (4) does, at the least width that holds it so */
   const W = 2 ** -8, cw = (x) => Math.ceil(x / W) * W;
   const leastWidth = (solve) => { let lo = kAsked, hi = 4, hiHeld = solve(hi); if (hiHeld === null) return null; while (hi - lo > W) { const mid = cw((lo + hi) / 2); if (mid >= hi) break; const h = solve(mid); if (h !== null) { hi = mid; hiHeld = h; } else lo = mid; } return { k: cw(hi), v: hiHeld }; };
-  let k = kAsked, held = null, widthForced = false;
-  const d0 = deepenFor(k);
-  if (d0 !== null) held = { deepenMm: d0, riseMm: 0, heldBy: 'deepen' };
-  else {
-    const wd = leastWidth(deepenFor);
-    if (wd) { k = wd.k; held = { deepenMm: wd.v, riseMm: 0, heldBy: 'deepen' }; }
-    else { const r0 = riseFor(k); if (r0 !== null) held = { deepenMm: 0, riseMm: r0, heldBy: 'rise' }; else { const wr = leastWidth(riseFor); if (wr) { k = wr.k; held = { deepenMm: 0, riseMm: wr.v, heldBy: 'rise' }; } else { k = 4; held = { deepenMm: 0, riseMm: 0, heldBy: 'unheld' }; } } }
-    widthForced = k !== kAsked;
-  }
+  const byDepth = (() => { const d = deepenFor(kAsked); if (d !== null) return { k: kAsked, v: { deepenMm: d, riseMm: 0, heldBy: 'deepen' } }; const w = leastWidth(deepenFor); return w ? { k: w.k, v: { deepenMm: w.v, riseMm: 0, heldBy: 'deepen' } } : null; })();
+  const byRise = (() => { if (byDepth && byDepth.k === kAsked) return null; const r = riseFor(kAsked); if (r !== null) return { k: kAsked, v: { ...r, heldBy: 'rise' } }; const w = leastWidth(riseFor); return w ? { k: w.k, v: { ...w.v, heldBy: 'rise' } } : null; })();
+  const pick = byDepth && byRise ? (byRise.k < byDepth.k ? byRise : byDepth) : (byDepth || byRise);
+  const k = pick ? pick.k : 4, held = pick ? pick.v : { deepenMm: 0, riseMm: 0, heldBy: 'unheld' }, widthForced = k !== kAsked;
   /* the body: the reach clamped to the rod's room, the chamfer as steep as the room leaves */
-  let endMm = endAsked;
-  const reachClamped = Number.isFinite(roomMm) && endMm > roomMm - gap;
-  if (reachClamped) endMm = Math.max(gap, roomMm - gap);
+  const endMm = endAsked;
+  const reachClamped = endAsked !== endAskedW;
   let chamferMm = Rof(k, endMm) - rodR;
   if (Number.isFinite(roomMm) && endMm + chamferMm > roomMm) chamferMm = Math.max(0, roomMm - endMm);
   const pitch = w / 8, nBelow = Math.max(1, Math.ceil(endMm / pitch));
@@ -12989,7 +12998,11 @@ export function umbelClauses(m, ui) {
   /* the base plane: head OFF the stem's own emitted top end; head ON the
      plan's own inset depth below the stem's root (UM3 holds the inset) */
   const baseZ = headOffAsked ? Number(S.emittedTopZ) : S.rootZ - P.nodeDepthsMm[0];
-  const roomMm = Number(ui.stemLength) - (headOffAsked ? 0 : Math.min(P.insetNeededMm, GEOMETRY.LEAF_NODE_BOTTOM * Number(ui.stemLength))) - gap - (S.cut && S.cut.made ? S.cut.spanMm : 0);
+  /* the search's room: the rod's length below its end (head on, the depth is
+     not known to the search — the placed body clamps to the exact room, and
+     UM2 holds the roots against what was emitted) */
+  const roomMm = Number(ui.stemLength) - gap - (S.cut && S.cut.made ? S.cut.spanMm : 0);
+  const roomExactMm = roomMm - (headOffAsked ? 0 : Math.min(P.insetNeededMm, GEOMETRY.LEAF_NODE_BOTTOM * Number(ui.stemLength)));
   const E = umbelSwellingExpected({ n, rP, aDeg, outerR: S.outerR, boreR: S.boreR, headOn: !headOffAsked, amount: ui.hubShapeAmount === undefined ? GEOMETRY.HUB_SHAPE_AMOUNT_DEFAULT : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), roomMm });
   /* the vertices are on the swelling to its own few ulp: bounded in ULP of the
      build's coordinate scale, never typed */
@@ -13318,13 +13331,13 @@ export async function inflorescenceAssertions(page, row) {
      floret stands where the asked length puts it. Restated from the controls
      and the stem's radius (UM1/UM2 own the knot; this is the one length the
      ID family's "the pedicel IS the floret's stem" clauses must add). */
-  const rootLawRestated = (rodR, n, angleDeg, headOn, boreR = Math.max(0, rodR - GEOMETRY.STEM_MIN_WALL_MM)) => {
+  const rootLawRestated = (rodR, n, angleDeg, headOn, boreR = Math.max(0, rodR - GEOMETRY.STEM_MIN_WALL_MM), rodLengthMm = Number(ui.stemLength), cutSpanMm = m.stem && m.stem.cut && m.stem.cut.made ? m.stem.cut.spanMm : 0) => {
     const rP = Math.max(STEM_DIAMETER_RANGE[0] / 2, rodR / Math.sqrt(n));
     /* the nearest point PLUS the swelling's derived deepening (Oct 28), restated
        through `umbelSwellingExpected`; the i-th root's stagger along its own
        line: `(i - (n-1)/2 + 1/4)` steps of the pedicel's own circumference over
        the junction's lattice (`umbelRootLaw`) */
-    const E = umbelSwellingExpected({ n, rP, aDeg: angleDeg, outerR: rodR, boreR, headOn, amount: ui.hubShapeAmount === undefined ? GEOMETRY.HUB_SHAPE_AMOUNT_DEFAULT : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), roomMm: Infinity });
+    const E = umbelSwellingExpected({ n, rP, aDeg: angleDeg, outerR: rodR, boreR, headOn, amount: ui.hubShapeAmount === undefined ? GEOMETRY.HUB_SHAPE_AMOUNT_DEFAULT : Number(ui.hubShapeAmount), lengthAsked: ui.hubLength === undefined ? 0 : Number(ui.hubLength), roomMm: rodLengthMm - MIN_FEATURE_MM - cutSpanMm });
     return { rP, rhoB: E.rhoB, extendMm: E.extendMm + E.deepenMm, staggerAt: (i) => (i - (n - 1) / 2 + 0.25) * E.staggerMm };
   };
   const rodExtendMm = (() => {
@@ -13338,7 +13351,7 @@ export async function inflorescenceAssertions(page, row) {
     if (!isUmbel || !compound || !m.stem) return 0;
     const rays = Math.round(Number(ui.umbelRays));
     const rayR = Math.max(STEM_DIAMETER_RANGE[0] / 2, m.stem.outerR / Math.sqrt(rays));
-    return rootLawRestated(rayR, Math.round(Number(ui.umbelFlorets)), Number(ui.pedicelAngle), false).extendMm;
+    return rootLawRestated(rayR, Math.round(Number(ui.umbelFlorets)), Number(ui.pedicelAngle), false, Math.max(0, rayR - GEOMETRY.STEM_MIN_WALL_MM), Number(ui.umbelRayLength), 0).extendMm;
   })();
   const uiTop = ui;
   if (compound) ui = { ...ui, umbelFlorets: ui.umbelRays, pedicelLength: ui.umbelRayLength, pedicelAngle: ui.umbelRayAngle, pedicelGradient: 1, pedicelCorymb: 'OFF', nodeVariance: 0 };
@@ -14368,16 +14381,16 @@ export const INFLO_APPROACH_XFAIL = Object.freeze({
   'MOPHEAD: SESSILE florets (pedicel 0: the florets\' hubs on each sub-boss)': { approachMm: 0, mechanism: 'the DOME — at depth 2 ID10 (d)\'s blocks are whole SUB-UMBELS (the rays are the outer pedicels), and neighbouring sub-umbels on rays of equal length from ONE boss meet: their florets pass through each other (an edge crossing, 0.0000 mm; touching at 90 deg). A mophead\'s florets fuse into one dome; declared by value, never clamped (Eva\'s ruling, Oct 24 — docs/bloom-mophead-outcome.md §8)' },
   'MOPHEAD: GATED — the depth and the rays at their extremes under depth 1 (hidden AND inert)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — block 81\'s GATED depth-1 row is a plain six-floret umbel' },
   /* THE UMBEL HUBS (Oct 27): block 82's umbel rows — the junction is a hub now and the florets are where they were. */
-  'UMBEL HUB: GOBLET at the spider lily\'s defaults (6 florets, head off, auto reach)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
-  'UMBEL HUB: ANGLED at the spider lily\'s defaults (6 florets, head off, auto reach)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
-  'UMBEL HUB: CURVED at the spider lily\'s defaults (6 florets, head off, auto reach)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
-  'UMBEL HUB: amount 0 — the band alone (the Oct 24 coin, by branch)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
-  'UMBEL HUB: 12 florets at 90 deg x CURVED (the widest band on a 6 mm stem)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
-  'UMBEL HUB: a 3 mm stem (the flare CLAMPED to the room below the band, told)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
-  'UMBEL HUB: x the head ON on a DOMED head (rise 0.35) x ANGLED — the stem-top fix and the junction on one row': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
-  'UMBEL HUB: THE MOPHEAD x ANGLED (12 x 12 at the floor; every ray tip a hub at its own ray\'s radius)': { approachMm: 0, mechanism: 'the DOME — at depth 2 ID10 (d)\'s blocks are whole SUB-UMBELS and the florets of neighbouring sub-umbels interleave on the dome by construction; declared, never clamped — the junction hubs (Oct 27) move no floret' },
-  'UMBEL HUB: THE MOPHEAD x CURVED (12 x 12 at the floor; every ray tip a hub at its own ray\'s radius)': { approachMm: 0, mechanism: 'the DOME — at depth 2 ID10 (d)\'s blocks are whole SUB-UMBELS and the florets of neighbouring sub-umbels interleave on the dome by construction; declared, never clamped — the junction hubs (Oct 27) move no floret' },
-  'UMBEL HUB: THE MOPHEAD x Hub length 10 x amount 1.5': { approachMm: 0, mechanism: 'the DOME — at depth 2 ID10 (d)\'s blocks are whole SUB-UMBELS and the florets of neighbouring sub-umbels interleave on the dome by construction; declared, never clamped — the junction hubs (Oct 27) move no floret' },
+  'UMBEL SWELLING: GOBLET at the spider lily\'s defaults (6 florets, head off, auto reach)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
+  'UMBEL SWELLING: ANGLED at the spider lily\'s defaults (6 florets, head off, auto reach)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
+  'UMBEL SWELLING: CURVED at the spider lily\'s defaults (6 florets, head off, auto reach)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
+  'UMBEL SWELLING: amount 0 — the width FORCED to what holds the roots (asked none, told)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
+  'UMBEL SWELLING: 12 florets at 90 deg x CURVED (the deepest roots on a 6 mm stem)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
+  'UMBEL SWELLING: a 3 mm stem (the reach CLAMPED to the room below the base plane, told)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
+  'UMBEL SWELLING: x the head ON on a DOMED head (rise 0.35) x ANGLED — the stem-top fix and the junction on one row': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — the junction hub (Oct 27) moves no floret' },
+  'UMBEL SWELLING: THE MOPHEAD x ANGLED (12 x 12 at the floor; every ray tip a swelling FORCED past 1.2x of its own ray)': { approachMm: 0, mechanism: 'the DOME — at depth 2 ID10 (d)\'s blocks are whole SUB-UMBELS and the florets of neighbouring sub-umbels interleave on the dome by construction; declared, never clamped — the junction hubs (Oct 27) move no floret' },
+  'UMBEL SWELLING: THE MOPHEAD x CURVED (12 x 12 at the floor; every ray tip a swelling FORCED past 1.2x of its own ray)': { approachMm: 0, mechanism: 'the DOME — at depth 2 ID10 (d)\'s blocks are whole SUB-UMBELS and the florets of neighbouring sub-umbels interleave on the dome by construction; declared, never clamped — the junction hubs (Oct 27) move no floret' },
+  'UMBEL SWELLING: THE MOPHEAD x Hub length 10 x amount 1.5': { approachMm: 0, mechanism: 'the DOME — at depth 2 ID10 (d)\'s blocks are whole SUB-UMBELS and the florets of neighbouring sub-umbels interleave on the dome by construction; declared, never clamped — the junction hubs (Oct 27) move no floret' },
   'NODE LAWS: SESSILE x whorled x 12 nodes (the densest spike)': { approachMm: 0, mechanism: 'the PHYLLOTAXY — three sessile florets of one node, 120 deg apart on a 6 mm rachis, which no internode moves apart; the top node\'s own pass through each other' },
 });
 for (const [label, e] of Object.entries(INFLO_APPROACH_XFAIL)) {

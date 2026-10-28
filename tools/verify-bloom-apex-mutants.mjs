@@ -1602,8 +1602,8 @@ const MUTANTS = [
     } },
   { id: 'the-roots-are-not-deepened', rows: /^an umbel/,
     why: "the depth search is gone, so no root goes deeper than its line's nearest point and every head-off umbel buries its roots by RAISING the top instead (a taller body, the pedicels leaving its side) — watertight, one piece, every root held",
-    find: '  const solveAt = (k) => { const d = deepenFor(k);',
-    into: '  const solveAt = (k) => { const d = null;', names: ['UM1', 'UM2'],
+    find: "  const byDepth = (() => { const d = deepenFor(swellAsked);",
+    into: "  const byDepth = (() => { const d = null;", names: ['UM1', 'UM2'],
     witness: (M, C) => {
       const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescence.knot;
       const m = f(M), c = f(C);
@@ -1630,8 +1630,8 @@ const MUTANTS = [
     } },
   { id: 'the-swelling-width-is-typed', rows: /^a mophead/,
     why: "the width search is gone: the swelling is the asked 1.20x whether or not that holds the roots — on a mophead ray tip (1.5 mm pedicels off a 1.5 mm ray) the roots then stand out through the skin; watertight, one piece",
-    find: "  let swell = swellAsked, held = solveAt(swell), widthForced = false;\n  if (!held) {",
-    into: "  let swell = swellAsked, held = solveAt(swell) || { deepenMm: 0, riseMm: 0, heldBy: 'typed' }, widthForced = false;\n  if (false) {", names: ['UM8'],
+    find: "  let swell = pick ? pick.k : UMBEL_SWELL_WIDTH_MAX, held = pick ? pick.v : { deepenMm: 0, riseMm: 0, heldBy: 'unheld' };",
+    into: "  let swell = swellAsked, held = pick ? pick.v : { deepenMm: 0, riseMm: 0, heldBy: 'unheld' };", names: ['UM8'],
     witness: (M, C) => {
       const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), MOPHEAD_STATE()).inflorescenceBuilt.sub.plan.knot;
       const m = f(M), c = f(C);
