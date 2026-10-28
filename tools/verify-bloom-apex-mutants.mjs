@@ -1527,8 +1527,12 @@ const MUTANTS = [
       /* the MEAN radial offset of the emitted roots from the base circle (the
          stagger is symmetric about the nearest point, so the mean is the extension's own) */
       const f = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); const pl = b.inflorescenceBuilt.placed; return pl.reduce((a, q) => a + Math.hypot(q.root[0], q.root[1]), 0) / pl.length - b.inflorescence.knot.rhoB; };
+      f.step = (X) => { const b = X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()); return b.inflorescence.knot.staggerMm; };
       const m = f(M), c = f(C);
-      return (Math.abs(m) < 1e-9 && c < -0.5) ? null : `the roots stand ${m.toFixed(3)} mm off the base circle on average on the mutant and ${c.toFixed(3)} on the clean tree`;
+      /* the mean sits a QUARTER STEP inward (the stagger is centred a quarter
+         step off the nearest point), so the bar is half a step, never zero */
+      const half = f.step(M) / 2;
+      return (Math.abs(m) < half && c < -0.5) ? null : `the roots stand ${m.toFixed(3)} mm off the base circle on average on the mutant (bar half a stagger step, ${half.toFixed(3)}) and ${c.toFixed(3)} on the clean tree`;
     } },
   { id: 'the-head-is-built-while-toggled-off', rows: /^an umbel/,
     why: "the head toggle is read and ignored: a spider lily asked with no head builds the whole head at the stem's top anyway — a perfectly good closed solid, watertight, one piece",
