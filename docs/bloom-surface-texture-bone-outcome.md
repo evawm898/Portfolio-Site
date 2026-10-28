@@ -80,14 +80,26 @@ mask is a function of world position.
    placement's M. **Two florets of one unit now differ**: their petals sample different world positions.
    - **No state newly coarsens or refuses**, because the relief moves vertices and never a count. BONE adds
      triangles only through the rods and the pedicels that take the field (§6).
-4. **A derived owner for shared positions.** A position several copies share — the hub rim and the tube's foot
-   row, the join and the stem's top ring, two sheets meeting — is relieved only if every copy would be relieved
-   and their normals agree (`dot ≥ 1 − 1e-9`). It then takes the minimum of the copies' displacements; otherwise
-   every copy takes 0.
-   - The answer is a function of the SET of copies, so emitter order cannot move it.
-   - Measured: on every real row, no shared position is relieved (the tube row has 3 shared across organs,
-     none relieved). So the rule binds nowhere today, and its witness is a fixture (§7).
-   - T5's first-emitter rule was the order-dependent one; the choice between the two is question 4.
+4. **A derived owner for shared positions.** A position several copies share is keyed on the STL's own
+   float32s, because what the census and a slicer see is the float32 file.
+   - **The value:** copies are relieved only if every copy would be relieved and their normals agree
+     (`dot ≥ 1 − 1e-9`). They then take the minimum of the copies' displacements; otherwise every copy takes 0.
+     The answer is a function of the SET of copies, so emitter order cannot move it.
+   - **The clearance:** where the copies belong to DIFFERENT closed organs, the organs are put in a canonical
+     order (name, vertex count, first vertex — never the emission order). The k-th organ's copies then move k
+     steps of `2⁻²⁰ ×` the position's own magnitude further out: eight float32 steps, X0's 8 and the foot
+     clearance's. This keeps the two organs apart in the file.
+     - It is skipped where an organ leaves the edge through the position OPEN (one face), because that is one
+       surface split across two records, and parting it would crack the shell. No shipped organ does; the
+       gate's two-sheet fixture does.
+     - **Why it exists, measured on the closed tube:** T5's refinement lands 5 positions on both the hub's top
+       and the tube ring's foot row (two of them equal only in float32). Outside a patch BONE gives both copies 0,
+       so the file welds the two shells (8 → 7) and the census reads their by-design overlap as 10,208
+       within-shell pairs, every one hub × tube.
+     - The same weld was behind the stamens' 77 pairs at the curvature maximum and the braid's O2
+       disagreement. With the clearance all three read 0 pairs, 8 / 37 / 25 shells, and watertight.
+     - T5's first-emitter rule hid this only because PEBBLE relieves every vertex.
+   - Choosing between this rule and T5's first-emitter rule is question 4.
 
 ## 4. Resolution: the smallest pore that reads, and the floor
 
@@ -154,7 +166,8 @@ raises 3,810, at 186,684 tris.
 **TXB0–TXB7 in both STL gates** (`textureAssertions` under BONE; TX2/TX5 stand down, TX8 reads `latticeSamples`):
 - **TXB0** — the controls against the record. The field and the patch arithmetic are restated in the harness;
   the constants are imported, as declarations.
-- **TXB1** — outward only. Every sampled pore floor's displacement is exactly 0, never negative.
+- **TXB1** — outward only. Every sampled pore floor's displacement is exactly 0, never negative, and every
+  cleared shared position moved a whole number of the derived steps outward (restated).
 - **TXB2** — the network and the patch, restated at every sampled vertex.
 - **TXB3** — the curvature mask: a ridge takes 0, and the sample is not vacuous.
 - **TXB5** — the pore floor, restated from the edge.
@@ -241,8 +254,9 @@ EXPORT triangles, the edge the cap used, PEBBLE against BONE:
    too (much more cost on big blooms).
 3. **The T5 follow-ups apply under BONE only**, so the retired patterns build as before. Options: (a) keep it;
    (b) apply them to PEBBLE and CELLULAR too, which moves bytes on up to 34 live rows and on frozen ones.
-4. **The owner rule.** Options: (a) the derived set rule shipped here (relieve only if all copies agree, take the
-   min); (b) T5's first-emitter rule, which is order-dependent. It binds on no real row today.
+4. **The owner rule.** Options: (a) the derived set rule shipped here — relieve only if all copies agree, take the
+   min, and part two closed organs' copies by a derived 8-float32-step clearance in a canonical organ order;
+   (b) T5's first-emitter rule, which is order-dependent and, under BONE, cannot part two copies that both take 0.
 5. **The reference photographs.** They are not in the repository, so the sheet has two placeholder panels.
    Options: (a) commit crops to `docs/img/`; (b) keep holding them beside the sheet.
 6. **The rods at the default curvature are smooth** (stamens, style, braid, leaflet stalks). Options: (a) keep
@@ -261,6 +275,13 @@ EXPORT triangles, the edge the cap used, PEBBLE against BONE:
     string-keyed maps and GC, profiled) in its own session.
 
 ## 11. Found
+
+- **The first browser run of block 82 dropped 7 rows on four defects, every one invisible to Node runs on
+  the smoke rows:**
+  - the weld above (the tube's X2, the stamens' X2, the braid's O2), fixed by the clearance;
+  - coverage R1 not counting a latticed rod's own triangles, fixed in both coverage instruments;
+  - and the umbel's by-design floret overlap, which this row now declares by value as every umbel row does.
+  The closed tube joined smoke block 82 as the clearance's witness.
 
 - **TXB2 dropped all 17 relieved BONE rows in the browser and passed every Node run.** A vertex with no ridge within
   reach carries `ridgeDistMm: Infinity`, and the page's record reaches the gate through JSON, which writes Infinity

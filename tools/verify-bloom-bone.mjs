@@ -76,7 +76,7 @@ export const ROWS = {
 export const MUTANTS = [
   { id: 'pores-sunk-below-the-sheet', row: 'default', names: /^TXB1:/,
     edits: [['      s[i] = w0[i] * (mc[i] * (mp * (H * f)));', '      s[i] = w0[i] * (mc[i] * (mp * (H * (f - 0.25))));'],
-      ['      const p1 = si > 0 ? [q[0] + n[0] * si, q[1] + n[1] * si, q[2] + n[2] * si] : q;', '      const p1 = si !== 0 ? [q[0] + n[0] * si, q[1] + n[1] * si, q[2] + n[2] * si] : q;']],
+      ['      const p1 = di > 0 ? [q[0] + n[0] * di, q[1] + n[1] * di, q[2] + n[2] * di] : q;', '      const p1 = di !== 0 ? [q[0] + n[0] * di, q[1] + n[1] * di, q[2] + n[2] * di] : q;']],
     witness: (rec) => ((rec.texture.organs.petal.bone.floorSamples || []).some((q) => q.s < 0) ? null : 'the mutated module sinks no pore floor below the sheet') },
   { id: 'a-typed-mask-list', row: 'stem', names: /^TXB2:/,
     edits: [['for (let i = 0; i < nV; i++) { const d = ridgeDist ? ridgeDist[i] : Infinity; mc[i] = d >= Lam ? 1 : rimEase(d / Lam); }', "for (let i = 0; i < nV; i++) { const d = ridgeDist ? ridgeDist[i] : Infinity; mc[i] = (['hub', 'stem'].includes(O.organ) ? 0 : 1) * (d >= Lam ? 1 : rimEase(d / Lam)); }"]],

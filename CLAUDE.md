@@ -1520,8 +1520,13 @@ follow-ups of Oct 26; read `docs/bloom-surface-texture-bone-outcome.md` before t
   - **The hub is smooth wherever a PETAL or SEPAL foot covers it, top and underside.** The cover is a list of
     emitted ranges. Found: the shipped `sepalHeight` 0.75 on a 6 mm stem covers nothing.
   - **Floret sheets, organs and nested floret organs defer to the parent pass** (one world layer).
-  - **A shared position is relieved only if every copy would be and their normals agree; it takes the min** (the
-    derived owner, order-free). It binds on no real row, so its witness is a two-sheet fixture.
+  - **The derived owner, keyed on the STL's float32s:** a shared position is relieved only if every copy would be
+    and their normals agree, and takes the min (order-free). The copies of DIFFERENT closed organs then part by
+    k × 2^-20 × the position's magnitude in a canonical organ order (name, vertex count, first vertex), unless an
+    organ leaves that edge open (one surface).
+    - Without the clearance, BONE's s = 0 outside a patch welded the closed tube's hub to its ring in the file
+      (10,208 false within-shell pairs), as well as the stamens at the curvature maximum and the braid.
+    - Witnesses: the two-sheet fixture for the order, the tube row's X2 for the clearance, and TXB1 restating it.
 - **Rods take the field under the same mask (Q12):** a rod whose every vertex is a ridge stays smooth and is
   told, and the decision is made on the export twin.
   - At the default 1/mm, the stamens, the style, the braid and the leaflet stalks are SMOOTH (tightest 1.04/mm and

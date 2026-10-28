@@ -1974,6 +1974,8 @@ export const SMOKE_BLOCKS = [
         path: "TX7 the counts live = export with the rods decided on the export twin, TX10 the organs' floor on the twin" },
       { label: 'BONE: x an UMBEL, head ON (floret petals and hubs in the world frame, the pedicels porous)',
         path: "TXB5 no two florets carry the same relief and the floret petals reach the parent's one pass, TX14 the floret hubs in the world frame, TXB6 the pass reversed the same bloom" },
+      { label: 'BONE: x a closed tube (6 petals, k 0)',
+        path: "TXB1 the clearance at the hub and the tube ring's shared positions restated (the two shells kept apart in the file — X2 is the witness), TX10 the tube ring's lattice" },
       { label: 'BONE: x the VORONOI infill (refused with the word infill, told)',
         path: "TX6 the texture refused with the word infill and told on the read-out" },
       { label: 'BONE: GATED — the five at their extremes under the retired PEBBLE (hidden AND inert; a saved PEBBLE design builds as before)',

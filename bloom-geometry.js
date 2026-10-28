@@ -14000,6 +14000,15 @@ function boneAdjacency(tri, nV) {
 /* THE BONE RELIEF PASS — once every part exists. Returns one record per
    organ name (sheets fold into the summary's own records by the caller). */
 export const BONE_SHARED_NORMAL_DOT = 1 - 1e-9;   // two copies' normals are "the same direction"
+export const BONE_SHARED_CLEARANCE_REL = 2 ** -20;  // eight float32 steps of a coordinate's own magnitude
+/* the canonical order of organs at a shared position: a property of the organs,
+   never of the order the builders emitted them in */
+function boneOrganKeyCmp(A, B) {
+  if (A.O.organ !== B.O.organ) return A.O.organ < B.O.organ ? -1 : 1;
+  if (A.nV !== B.nV) return A.nV - B.nV;
+  for (let k = 0; k < 3; k++) if (A.O.P[k] !== B.O.P[k]) return A.O.P[k] - B.O.P[k];
+  return 0;
+}
 function boneReliefPass(acc, T, organs, capability = null) {
   const off = !!(capability && capability.organReliefOff);
   if (!organs.length) return {};
@@ -14062,8 +14071,13 @@ function boneReliefPass(acc, T, organs, capability = null) {
   });
   /* ---- THE DERIVED OWNER: a position several organs emit ---- */
   const where = new Map();
-  per.forEach((X, oi) => { for (let i = 0; i < X.nV; i++) { const k = `${X.O.P[i * 3]}|${X.O.P[i * 3 + 1]}|${X.O.P[i * 3 + 2]}`; const l = where.get(k); if (l) l.push(oi, i); else where.set(k, [oi, i]); } });
-  let sharedPositions = 0, sharedRelieved = 0, sharedAcross = 0;
+  /* keyed on the STL's own float32s: copies the file would weld are one position
+     here even where their doubles differ in the last bits (the closed tube's ring
+     meets the hub at two such points) */
+  const f32 = Math.fround;
+  per.forEach((X, oi) => { for (let i = 0; i < X.nV; i++) { const k = `${f32(X.O.P[i * 3])}|${f32(X.O.P[i * 3 + 1])}|${f32(X.O.P[i * 3 + 2])}`; const l = where.get(k); if (l) l.push(oi, i); else where.set(k, [oi, i]); } });
+  let sharedPositions = 0, sharedRelieved = 0, sharedAcross = 0, sharedCleared = 0;
+  for (const X of per) X.clr = new Float64Array(X.nV);
   const sharedOf = per.map(() => 0);
   for (const l of where.values()) {
     if (l.length <= 2) continue;
@@ -14084,6 +14098,40 @@ function boneReliefPass(acc, T, organs, capability = null) {
     }
     for (let c = 0; c < l.length; c += 2) per[l[c]].s[l[c + 1]] = ok ? sMin : 0;
     if (ok) sharedRelieved++;
+    /* THE CLEARANCE. Every copy now carries one displacement, so copies of
+       DIFFERENT organs land on one double and the STL's float32s weld two closed
+       shells the untextured mesh keeps apart — and their by-design overlap then
+       reads as a within-shell fold (measured: the closed tube's hub against its
+       ring, 10,208 pairs, every one hub x tube). T5's first-emitter rule hid this
+       only because PEBBLE relieves every vertex; BONE leaves 40% of the surface
+       at s = 0, where no rule on s can part two copies. So the organs a position
+       spans are put in a CANONICAL order (name, vertex count, first vertex) —
+       never the emission order — and the k-th takes k clearance steps outward:
+       BONE_SHARED_CLEARANCE_REL of the position's own magnitude, eight float32
+       steps (X0's 8, the foot clearance's), so the file cannot merge them. All
+       of one organ's copies move together, so no organ cracks. */
+    const orgs = [];
+    for (let c = 0; c < l.length; c += 2) if (!orgs.includes(l[c])) orgs.push(l[c]);
+    /* ...but never where the position lies on an edge one of the organs leaves
+       OPEN (one face) and another carries: then they are ONE surface split
+       across two records, and parting their copies would crack it. Every
+       shipped organ is a closed solid (two faces on every edge of its own), so
+       two of them touching — even along an edge, four faces in all — are two
+       shells, and the clearance parts them. */
+    let oneSurface = false;
+    if (orgs.length > 1) for (const oi of orgs) {
+      const X = per[oi];
+      if (!X.edgeFaces) { X.edgeFaces = new Map(); const T3 = X.O.tri; for (let t = 0; t < T3.length; t += 3) for (let k = 0; k < 3; k++) { const a = T3[t + k], b = T3[t + (k + 1) % 3], e = a < b ? a * X.nV + b : b * X.nV + a; X.edgeFaces.set(e, (X.edgeFaces.get(e) || 0) + 1); } }
+      for (let c = 0; c < l.length && !oneSurface; c += 2) if (l[c] === oi) { const i = l[c + 1]; for (const j of X.adj[i]) if (X.edgeFaces.get(i < j ? i * X.nV + j : j * X.nV + i) === 1) { oneSurface = true; break; } }
+      if (oneSurface) break;
+    }
+    if (orgs.length > 1 && !oneSurface) {
+      sharedCleared++;
+      orgs.sort((a, b) => boneOrganKeyCmp(per[a], per[b]));
+      const X0 = per[l[0]], i0 = l[1];
+      const mag = Math.max(1, Math.abs(X0.O.P[i0 * 3]), Math.abs(X0.O.P[i0 * 3 + 1]), Math.abs(X0.O.P[i0 * 3 + 2]));
+      for (let c = 0; c < l.length; c += 2) per[l[c]].clr[l[c + 1]] = orgs.indexOf(l[c]) * BONE_SHARED_CLEARANCE_REL * mag;
+    }
   }
   /* ---- write, and the records ---- */
   const recs = {};
@@ -14091,21 +14139,23 @@ function boneReliefPass(acc, T, organs, capability = null) {
   per.forEach((X, oi) => {
     const { O, nV } = X;
     const rec = { blades: 1, refused: {}, panels: 0, subRows: 0, cfMax: 1, skinTris: O.sheet ? 0 : O.refinedTris - O.cavityTris, floorTris: 0, rimTris: 0, reliefMaxMm: 0, reliefMinMm: Infinity, displaced: 0, skinSamples: [], apexSamples: [], edgeMismatch: O.edgeMm === undefined || O.edgeMm === T.edgeMm ? 0 : 1 };
-    const bs = { vertices: nV, relievable: O.relievable.reduce((n, x) => n + x, 0), visible: X.visible, buried: X.buried, covered: X.covered, coveredUnder: X.coveredUnder, ridges: X.ridges, displaced: 0, shared: sharedOf[oi], sharedPositions, sharedRelieved, sharedAcross, poreFloor: 0, patchOff: 0, ridgeOff: 0, fadeMm: Lam, triRange: [O.from, O.to], sheet: !!O.sheet, rod: !!O.rod, samples: [], ridgeSamples: [], floorSamples: [] };
+    const bs = { vertices: nV, relievable: O.relievable.reduce((n, x) => n + x, 0), visible: X.visible, buried: X.buried, covered: X.covered, coveredUnder: X.coveredUnder, ridges: X.ridges, displaced: 0, shared: sharedOf[oi], sharedPositions, sharedRelieved, sharedAcross, sharedCleared, cleared: 0, clearSamples: [], poreFloor: 0, patchOff: 0, ridgeOff: 0, fadeMm: Lam, triRange: [O.from, O.to], sheet: !!O.sheet, rod: !!O.rod, samples: [], ridgeSamples: [], floorSamples: [] };
     const disp = new Float64Array(nV * 3);
     let tick = 0;
     for (let i = 0; i < nV; i++) {
       const q = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]], n = [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]];
-      const si = X.s[i];
-      const p1 = si > 0 ? [q[0] + n[0] * si, q[1] + n[1] * si, q[2] + n[2] * si] : q;
+      const si = X.s[i], ci = X.clr[i], di = si + ci;
+      const p1 = di > 0 ? [q[0] + n[0] * di, q[1] + n[1] * di, q[2] + n[2] * di] : q;
       disp[i * 3] = p1[0]; disp[i * 3 + 1] = p1[1]; disp[i * 3 + 2] = p1[2];
       if (X.w0[i] > 0) {
         if (X.ridge[i]) bs.ridgeOff++;
         else if (X.mpv[i] === 0) bs.patchOff++;
         else if (X.fv[i] === 0) bs.poreFloor++;
       }
+      if (ci > 0) bs.cleared++;
       if (si > 0) { bs.displaced++; rec.displaced++; if (si > rec.reliefMaxMm) rec.reliefMaxMm = si; if (si < rec.reliefMinMm) rec.reliefMinMm = si; }
-      const smp = () => ({ organ: O.organ, p0: q, p1, n, s: si, f: X.fv[i], mp: X.mpv[i], mc: X.mc[i], w0: X.w0[i], g: X.w0[i], kappa: X.kap[i], ridge: !!X.ridge[i], ridgeDistMm: X.ridgeDist ? X.ridgeDist[i] : Infinity, fadeDistMm: X.visDist ? X.visDist[i] : undefined, sheet: !!O.sheet });
+      const smp = () => ({ organ: O.organ, p0: q, p1, n, s: si, f: X.fv[i], mp: X.mpv[i], mc: X.mc[i], w0: X.w0[i], g: X.w0[i], kappa: X.kap[i], ridge: !!X.ridge[i], ridgeDistMm: X.ridgeDist ? X.ridgeDist[i] : Infinity, fadeDistMm: X.visDist ? X.visDist[i] : undefined, sheet: !!O.sheet, clearMm: ci });
+      if (ci > 0 && bs.clearSamples.length < 16) bs.clearSamples.push(smp());
       if (X.ridge[i] && bs.ridgeSamples.length < 32 && (bs.ridgeSamples.length === 0 || (tick % 7) === 0)) bs.ridgeSamples.push(smp());
       else if (X.fv[i] === 0 && X.w0[i] > 0 && X.mc[i] > 0 && bs.floorSamples.length < 16) bs.floorSamples.push(smp());
       if (X.w0[i] > 0 && (tick++ % SAMPLE_EVERY) === 0 && bs.samples.length < 64) bs.samples.push(smp());

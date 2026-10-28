@@ -72,7 +72,7 @@ const { SEPAL_TWINS, SEPAL_ANGLE_RANGE, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE, S
    noises here, so a field that drifts is caught instead of agreed with. */
 export const { TEXTURE_TYPES, TEXTURE_HEIGHT_RANGE, TEXTURE_HEIGHT_STEP, TEXTURE_HEIGHT_DEFAULT, TEXTURE_EDGE_MM, TEXTURE_EDGE_CAP_MM, TEXTURE_EDGE_GRID_MM, TEXTURE_EDGE_CAP_RUNGS, textureEdgeRung, TEXTURE_SIZE_RANGE,
                TEXTURE_SIZE_STEP, TEXTURE_SIZE_DEFAULT, TEXTURE_SEED, TEXTURE_LATTICE_BAR, textureIsAbsent,
-               TEXTURE_TYPES_SHOWN, TEXTURE_TYPES_HIDDEN, BONE_CONTROL_IDS, BONE_PORE_FLOOR_MM, BONE_PORE_RANGE, BONE_DENSITY_RANGE, BONE_RATIO_RANGE, BONE_COVERAGE_RANGE, BONE_CURVATURE_RANGE } = GEOMETRY;
+               TEXTURE_TYPES_SHOWN, TEXTURE_TYPES_HIDDEN, BONE_CONTROL_IDS, BONE_PORE_FLOOR_MM, BONE_PORE_RANGE, BONE_DENSITY_RANGE, BONE_RATIO_RANGE, BONE_COVERAGE_RANGE, BONE_CURVATURE_RANGE, BONE_SHARED_CLEARANCE_REL } = GEOMETRY;
 /* THE SEPAL'S OWN SIZE, RESTATED FROM THE CONTROLS (SP0b, SP3, SP5 — Eva's
    rulings of Oct 13, docs/bloom-sepal-own-size-outcome.md): a mm row at 0
    means the petal's x size, a set row WINS for its axis, a value under the
@@ -5872,16 +5872,27 @@ export function boneRecordClauses(ui, T, readout = null, rec = null) {
     const b = o.bone;
     if (!b) continue;
     if (Math.abs(b.fadeMm - lam) > 1e-9) once('fade' + name, `TXB0: ${name}: the relief fades over ${b.fadeMm} mm where max(H x 15/8, e) is ${lam}`);
+    /* THE CLEARANCE at a position two organs share: k steps of
+       2^-20 x the position's own largest |coordinate| (floored at 1 mm), k a
+       whole number from 1 — restated, so a clearance that is not the derived one
+       (or is inward) fires here. BONE_SHARED_CLEARANCE_REL is imported, a
+       DECLARATION (ST3's precedent); what is checked is the step count. */
+    for (const q of (b.clearSamples || [])) {
+      const step = BONE_SHARED_CLEARANCE_REL * Math.max(1, Math.abs(q.p0[0]), Math.abs(q.p0[1]), Math.abs(q.p0[2]));
+      const k = q.clearMm / step;
+      if (!(q.clearMm > 0) || Math.abs(k - Math.round(k)) > 1e-6 || Math.round(k) < 1) once('clr' + name, `TXB1: ${name}: a shared position at ${q.p0.map((x) => x.toFixed(4)).join(',')} is cleared ${q.clearMm} mm, which is not a whole number of ${step} mm steps outward (the derived clearance that keeps two organs' copies apart in the file)`);
+    }
     for (const q of [...(b.samples || []), ...(b.ridgeSamples || []), ...(b.floorSamples || [])]) {
       nS++;
       const dv = [q.p1[0] - q.p0[0], q.p1[1] - q.p0[1], q.p1[2] - q.p0[2]];
-      const off = Math.hypot(dv[0] - q.s * q.n[0], dv[1] - q.s * q.n[1], dv[2] - q.s * q.n[2]);
+      const sd = q.s + (q.clearMm || 0);
+      const off = Math.hypot(dv[0] - sd * q.n[0], dv[1] - sd * q.n[1], dv[2] - sd * q.n[2]);
       if (!(q.s >= 0) || off > 1e-9) once('out' + name, `TXB1: ${name}: a vertex at ${q.p0.map((x) => x.toFixed(4)).join(',')} moved ${(dv[0] * q.n[0] + dv[1] * q.n[1] + dv[2] * q.n[2]).toFixed(6)} mm along its normal (|p1 - p0 - s n| ${off.toExponential(2)}, s ${q.s}) — the relief is INWARD or off its normal (ruling: outward only)`);
       const fR = F(q.p0);
       if (q.f === 0 || fR === 0) {
         nFloor++;
         if (!(fR <= 1e-9)) once('floorF' + name, `TXB1: ${name}: the builder reads a pore FLOOR at ${q.p0.map((x) => x.toFixed(4)).join(',')} where the field restated here reads ${fR}`);
-        if (q.w0 > 0 && q.mc > 0 && q.mp > 0 && (q.s !== 0 || q.p1.some((x, i) => x !== q.p0[i]))) once('floor' + name, `TXB1: ${name}: a pore floor at ${q.p0.map((x) => x.toFixed(4)).join(',')} is displaced ${q.s} mm — a pore's floor is the sheet the build would have emitted, never above it and never below`);
+        if (q.w0 > 0 && q.mc > 0 && q.mp > 0 && (q.s !== 0 || (!(q.clearMm > 0) && q.p1.some((x, i) => x !== q.p0[i])))) once('floor' + name, `TXB1: ${name}: a pore floor at ${q.p0.map((x) => x.toFixed(4)).join(',')} is displaced ${q.s} mm — a pore's floor is the sheet the build would have emitted, never above it and never below`);
       }
       /* TXB3 — the ridge is the vertex's OWN convex curvature against the control */
       if (q.ridge) { nRidge++; if (!(q.kappa >= C.bone.curvature) || q.s !== 0) once('ridge' + name, `TXB3: ${name}: a ridge vertex (convex curvature ${q.kappa}/mm against the control's ${C.bone.curvature}) is relieved ${q.s} mm — a ridge takes nothing`); }
@@ -14316,6 +14327,7 @@ export const INFLO_APPROACH_XFAIL = Object.freeze({
      0.0000 mm on each (both engines), declared by value, never clamped. */
   'UMBEL: 5 florets, head OFF': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
   'TEXTURE T5: PEBBLE x an UMBEL, head ON (the florets\' hubs textured, their pedicels smooth)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — T5\'s textured copy of the default umbel, head ON' },
+  'BONE: x an UMBEL, head ON (floret petals and hubs in the world frame, the pedicels porous)': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped — BONE\'s copy of the default umbel, head ON' },
   'UMBEL: 5 florets, head ON': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
   'UMBEL: 7 florets, head OFF': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
   'UMBEL: 7 florets, head ON': { approachMm: 0, mechanism: 'the UMBEL — every floret on ONE node, evenly round the knot; equal pedicels and no internode, so neighbouring florets overlap by construction (a real umbel\'s florets interleave); declared, never clamped' },
