@@ -191,9 +191,9 @@ async function nodeClauses(G, F, R, rec) {
   /* SO0 — the census, restated from the registry */
   {
     const p = [];
-    /* the material (Q3.6) and, since T3, the texture's two sliders — ONE
+    /* the material (Q3.6) and, since T3, the texture's sliders (BONE's five since Oct 28) — ONE
        world-space field over the whole bloom, never a layer's or a pair's */
-    const UNSCOPED_RESTATED = ['sheetThickness', 'textureHeight', 'textureSize'];
+    const UNSCOPED_RESTATED = ['sheetThickness', 'textureHeight', 'textureSize', 'bonePoreSize', 'bonePoreDensity', 'boneBandRatio', 'bonePatchCoverage', 'boneCurvature'];
     if (JSON.stringify([...G.SCOPE_UNSCOPED]) !== JSON.stringify(UNSCOPED_RESTATED)) p.push(`SCOPE_UNSCOPED is ${JSON.stringify(G.SCOPE_UNSCOPED)}`);
     const whorl = ['petalCount', 'footDelicacy', 'tubeLayer1', 'tubeLayer2', 'tubeLayer3', 'tubeLayer4', 'tubeLayer5', 'tubeLayer6', 'tubeHeight', 'tubeBlend'];
     const want = REG.CONTROLS.filter((c) => c.kind === 'slider' && c.role === 'petal' && !UNSCOPED_RESTATED.includes(c.id) && !whorl.includes(c.id)).map((c) => c.id);

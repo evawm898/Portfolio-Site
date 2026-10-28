@@ -233,11 +233,23 @@ async function rootTaperArm(tree) {
   return bad;
 }
 
+/* THE BONE TEXTURE'S MUST-FAIL (Oct 28), spawned the same way and for the
+   same reason: tools/verify-bloom-bone.mjs is Node-only and imports the
+   harness, and spawning it here puts it in CI with no workflow edit. Its
+   clean arm runs beside the gate, its six mutants beside --control. */
+async function boneArm() {
+  const { spawnSync } = await import('node:child_process');
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/verify-bloom-bone.mjs'), ...(CONTROL ? ['--control'] : [])], { encoding: 'utf8' });
+  const tail = (r.stdout || '').trim().split('\n').slice(-1)[0];
+  console.log(`  bone texture ${CONTROL ? 'must-fail' : 'clean'} arm: ${tail}`);
+  return r.status !== 0 ? [`TXB: tools/verify-bloom-bone.mjs${CONTROL ? ' --control' : ''} exited ${r.status}: ${(r.stderr || '').trim().split('\n').slice(-3).join(' | ')}`] : [];
+}
+
 async function main() {
   const tree = await loadTree(ROOT);
   const matrix = buildMatrix();
-  const rootBad = await rootTaperArm(tree);
-  if (rootBad.length) { console.log(`defaults bar: FAILED — ${rootBad.length} root-taper finding(s)`); for (const b of rootBad) console.log('  - ' + b); process.exitCode = 1; return; }
+  const rootBad = [...await rootTaperArm(tree), ...await boneArm()];
+  if (rootBad.length) { console.log(`defaults bar: FAILED — ${rootBad.length} root-taper or bone finding(s)`); for (const b of rootBad) console.log('  - ' + b); process.exitCode = 1; return; }
   if (!CONTROL) {
     const bad = verify(tree, SHIPPED_STATES, matrix);
     if (bad.length) { console.log(`defaults bar: FAILED — ${bad.length} finding(s)`); for (const b of bad) console.log('  - ' + b); process.exitCode = 1; return; }

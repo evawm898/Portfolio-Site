@@ -2590,8 +2590,8 @@ const MUTANTS = [
       return (r3(m.rep) > r3(c.rep) + 0.1) ? null
         : `the mutant's rachis ring at the last pair is ${r3(m.rep)} mm against the clean tree's ${r3(c.rep)} — the behaviour did not move`; } },
   { id: 'the-stalk-roots-at-the-wire', why: "each stalk starts where a WIRE rachis's surface would be, one wire radius out along the stalk, instead of on the rachis's axis buried by the station's own radius — the #381-minded root that a thinner tapered section no longer holds",
-    find: "    const rings = rodPolylineInto(acc, [F.root, [F.root[0] + F.D[0] * len, F.root[1] + F.D[1] * len, F.root[2] + F.D[2] * len]], [F.T, F.T]",
-    into: "    const rings = rodPolylineInto(acc, [[F.root[0] + F.D[0] * cp.wireR, F.root[1] + F.D[1] * cp.wireR, F.root[2] + F.D[2] * cp.wireR], [F.root[0] + F.D[0] * len, F.root[1] + F.D[1] * len, F.root[2] + F.D[2] * len]], [F.T, F.T]", names: ['LF16', 'LF17'],
+    find: "    const rings = boneRodGroup(acc, 'stalk', () => rodPolylineInto(acc, [F.root, [F.root[0] + F.D[0] * len, F.root[1] + F.D[1] * len, F.root[2] + F.D[2] * len]], [F.T, F.T]",
+    into: "    const rings = boneRodGroup(acc, 'stalk', () => rodPolylineInto(acc, [[F.root[0] + F.D[0] * cp.wireR, F.root[1] + F.D[1] * cp.wireR, F.root[2] + F.D[2] * cp.wireR], [F.root[0] + F.D[0] * len, F.root[1] + F.D[1] * len, F.root[2] + F.D[2] * len]], [F.T, F.T]", names: ['LF16', 'LF17'],
     witness: (M, C) => { const m = compoundFacts(M, TAPER_WIT), c = compoundFacts(C, TAPER_WIT);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const off = (r) => { const q = r.stalkRods[2].root, t = r.leaflets[2].root; return Math.hypot(q[0] - t[0], q[1] - t[1], q[2] - t[2]); };
