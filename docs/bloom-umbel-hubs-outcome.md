@@ -493,3 +493,40 @@ Three columns — BAND (Oct 27 am) | KNOT (Oct 27 pm) | SWELLING (Oct 28) — fo
 and the mophead side-on, from below and at the junction, a mophead ray tip alone side-on, and
 the head-only bloom on a 60 mm stem at GOBLET 1.00 beside CURVED 0.50 (the new head default)
 side-on and from below; dimensions in every caption.
+
+### 7e. Ruling 2 (CURVED 0.50 the head's default too) — the partition, the re-records, the pins
+
+- **Mutant table** (after the control's own fix above): the eight swelling mutants
+  `the-umbel-pedicel-roots-off-the-junction`, `the-junction-ignores-the-hub-controls`,
+  `the-roots-share-a-vertex`, `the-roots-are-not-deepened`, `a-root-disc-on-the-junctions-face`,
+  `the-ray-junction-reads-the-stems-radius`, `the-swelling-width-is-typed`,
+  `the-umbel-sits-on-the-cut-end` each fire what they name and the clean tree is silent on all
+  129 rows. The hub-controls mutant needed a mophead row at amount 2 (the ray tips are FORCED
+  past the default, so at the default the mutation could not move UM8).
+- **Census** (`node tools/bloom-xfail-magnitudes.mjs`, every declared row): ONE mover, and it is
+  the join's — `TEXTURE: CELLULAR x a COMPOUND leaf` 59 / 0.1963 → **43 / 0.2730** (the join under
+  the hub re-meshes the stem ORGAN's lattice, 268,810 → 268,618 triangles on that row, and every
+  float after it, the relief's contact fade at the petiole roots with it); re-recorded with the
+  before figure. Every other entry reproduces exactly. `ALL MAX` names the Hub amount itself and
+  is a holder of the default move.
+- **Combination gate**: two cells re-recorded by value under the ruling —
+  `leafangle-x-textureheight @ 70 x 0.4` 0.252 → **0.213** (the leaf's node reads the stem's
+  join flare, curved now) and `inflo-corymb-angle-x-length @ 60 x 0` 0.214 → **0.123** (every
+  floret is a bloom, its own join curved with the head's). **And three cells the CONVERGING ROOTS
+  (Oct 27) made and nobody had declared**, found once the gate's join region read the swelling
+  (its exclusion read the retired knot's `radiusMinMm` and excluded nothing, so every umbel pair
+  read 0.000; fixed in `tools/bloom-inflo-approach.mjs`, with a rod-wall edge that runs from the
+  open air to its buried root end tested on its kept part only): `umbel-florets-x-angle @ 2 x 35`
+  and `mophead-rays-x-florets @ 2 x 2`, `@ 2 x 6` read **0.000** — TWO pedicels (or two rays)
+  converge to about a millimetre from the axis and their two 2.12 mm rods overlap each other
+  where they meet, which under the swelling is just ABOVE its flat top, in the open (the knot
+  held that overlap inside its dome and read the same 0.000). At −60° the rise holds the roots and
+  the two rods clear by 2.776 mm. Every cell of `mophead-rays-x-florets` reads 0 now, so both its
+  axes are in `COMBINATION_INERT` with the number. **Eva's to rule**: a top raised to cover the
+  rods' own overlap (the rise fallback's criterion widened from "the roots are held" to "the rods
+  do not meet in the open"), or the two-pedicel overlap accepted as the converging-root look.
+- **Defaults bar**: PASS, 11 shipped states at or over the bar — the pins read the curved join
+  already (the knot session moved the default).
+- **Byte partition** (`verify-bloom-surface-bytes --movers-predicate umbel-swelling --base
+  <worktree of main at 4beac00>`, three shards of 535 rows): see the run figures below.
+
