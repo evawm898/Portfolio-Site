@@ -515,7 +515,11 @@ const cutsAPattern = (part) => !!(part && part.infill && part.infill.built);
    about the UNRELIEVED profile. The same carve-out as the infill's, one
    feature later, and declared here rather than widened: the TX family holds
    the relieved bead to its law (TX5). */
-const isRelieved = (part) => !!(part && part.texture && !part.texture.refused && part.texture.panels && part.texture.panels.some((p) => p.displaced > 0));
+/* (BONE relieves every sheet in ONE deferred pass after the build, so a part's
+   own per-panel record reads 0 there; the pass writes the part's own count onto
+   the sheet record the part carries, `boneSheet.boneOut`) */
+const isRelieved = (part) => !!(part && ((part.texture && !part.texture.refused && part.texture.panels && part.texture.panels.some((p) => p.displaced > 0))
+  || (part.boneSheet && part.boneSheet.boneOut && (part.boneSheet.boneOut.displaced > 0 || part.boneSheet.boneOut.cleared > 0))));
 const outOfE2 = (part) => cutsAPattern(part) || isRelieved(part);
 const { DEFAULTS } = await import(pathToFileURL(path.join(HERE, 'bloom-registry.js')).href);
 const H = await import(pathToFileURL(path.join(HERE, 'tools', 'bloom-harness.mjs')).href);

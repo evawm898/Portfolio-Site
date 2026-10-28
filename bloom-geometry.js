@@ -14016,7 +14016,7 @@ function boneReliefPass(acc, T, organs, capability = null) {
      in reverse order — TXB6 requires the bytes not to move) */
   const list = capability && capability.boneOrganOrder === 'reversed' ? organs.slice().reverse() : organs;
   const B = T.bone, H = T.heightMm;
-  const Lam = capability && capability.textureFadeWidthMm > 0 ? capability.textureFadeWidthMm : textureFadeWidthMm(H, T.edgeMm);
+  const Lam = capability && capability.textureFadeWidthMm > 0 ? capability.textureFadeWidthMm : textureFadeWidthMm(T.heightMm, T.edgeMm);
   const G = list.some((O) => !O.sheet) ? t5Grid(acc.positions) : null;
   /* ---- per organ: its weight w0, its curvature mask, its relief ---- */
   const per = list.map((O) => {
@@ -14170,6 +14170,10 @@ function boneReliefPass(acc, T, organs, capability = null) {
        (Node only: non-enumerable, so the metrics hook does not clone it) */
     if (O.cover) { const R = []; for (let i = 0; i < nV; i++) if (X.s[i] > 0) R.push(O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2], O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]); Object.defineProperty(bs, 'relieved', { value: R, enumerable: false, configurable: true }); }
     rec.bone = bs;
+    /* a sheet's own relief, on the record its PART carries (`p.boneSheet`): the part's
+       per-panel texture record is T3's and reads 0 under BONE, whose relief is this
+       one deferred pass — so an instrument asking "was this part relieved" asks here */
+    if (O.sheet) O.boneOut = { displaced: rec.displaced, cleared: bs.cleared };
     /* the organ records TX10-TX13 read (T5's shape) for the hub, the stem, the tube */
     if (!O.sheet && !O.rod) {
       rec.organ = { shippedTris: O.shippedTris, refinedTris: O.refinedTris, cavityTris: O.cavityTris, vertices: nV, relievable: bs.relievable, visible: X.visible, buried: X.buried, covered: X.covered, shared: sharedOf[oi], fadeMm: Lam, fans: O.fans, pairs: O.pairs, normalFallback: O.normalFallback, twin: O.twin, twinMismatch: O.twinMismatch, triRange: [O.from, O.to], buriedSamples: [] };

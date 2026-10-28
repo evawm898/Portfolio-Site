@@ -294,6 +294,15 @@ EXPORT triangles, the edge the cap used, PEBBLE against BONE:
   - coverage R1 not counting a latticed rod's own triangles, fixed in both coverage instruments;
   - and the umbel's by-design floret overlap, which this row now declares by value as every umbel row does.
   The closed tube joined smoke block 82 as the clearance's witness.
+- **CI's first run found three more, none in the geometry's output:**
+  - **E4, on three BONE smoke rows.** The edge gate asks a part's own per-panel texture record whether it was
+    relieved, and under BONE that record reads 0, because the relief is one deferred pass. The pass now writes
+    each sheet's own count onto the record its part carries (`boneSheet.boneOut`), and the gate reads it. It
+    showed only where a rim really moves: at the default the bead is a ridge and stays put.
+  - **SO0.** The scopes gate's restated census of unscoped controls lacked BONE's five.
+  - **Two disarmed apex mutants:** the stalk's anchor, moved by its `boneRodGroup` wrapper, and T5's fade-width
+    anchor, matched twice because BONE's pass repeated T5's line. Both are re-armed, 255 of 255.
+  - **The export matrix itself passed in CI:** 1,606 of 1,608 rows, with the 2 declared refusals.
 
 - **TXB2 dropped all 17 relieved BONE rows in the browser and passed every Node run.** A vertex with no ridge within
   reach carries `ridgeDistMm: Infinity`, and the page's record reaches the gate through JSON, which writes Infinity
