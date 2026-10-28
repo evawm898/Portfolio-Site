@@ -4263,6 +4263,9 @@ const ROWS = [
   /* Hub amount 2 (Oct 28): the one row on which the amount mutant can move the swelling — every other umbel row is at the default the mutation fixes */
   { label: 'an umbel: six florets, the head OFF, Hub amount 2', for: /ignores-the-hub/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }, { id: 'hubShapeAmount', value: '2' }] },
+  /* and the ray tip at amount 2: the mophead's tips are FORCED past the default (1.63x), so only an asked width above that lets the amount mutant move UM8 */
+  { label: 'a mophead: two rays of three florets, the head OFF, Hub amount 2', for: /ignores-the-hub/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'floretScale', value: '0.2' }, { id: 'hubShapeAmount', value: '2' }] },
   { label: 'an umbel: six florets at 90 deg, the head OFF', for: /umbel|head-is-built|boss-|roots-|knot-|swelling-/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }, { id: 'pedicelAngle', value: '90' }] },
   /* (iv) A RACEME ASKED FOR WITH NO RACHIS, and it is the ONLY state ID0 can

@@ -474,6 +474,19 @@ through the skin), the umbel on the cut end. The byte predicate is `umbel-swelli
 knot's: every base umbel row, every stem-top mover, every head join active at the base's own
 GOBLET 1.00 default).
 
+**Run (Oct 28, after `2fe539d`):** `verify-bloom-export --only 'UMBEL SWELLING'` **11 of 11**
+reached the results and exported watertight (the amount-2 row declared in
+`INFLO_APPROACH_XFAIL` at its 0.0000 mm floret contact, as every other six-floret umbel is);
+`verify-bloom-connectedness --only 'UMBEL SWELLING'` **11 of 11** one connected body; the panel
+gate PASS. **The mutant table's unscoped control found one of the harness's own:** on
+`surface texture T5 — PEBBLE x an UMBEL, head ON` (a 60 mm stem under a head) UM1 read 35
+expected rings against 29 emitted — the restatement drew the body to the SEARCH's room (an upper
+bound, the inset depth unknown to it) where the placed body clamps to the EXACT room. The
+expectation takes a draw room now (`roomDrawMm`, `a9d91a3`); the search's room is unchanged,
+so no depth or width moved. (The first reading of that fire, booked against the lily's default
+row, was wrong — a `--rows` run on that row alone was silent, and the instrumented run put the
+fire on the textured row.)
+
 ### 7d. The sheet (`docs/img/umbel-hubs.png`, `node tools/shot-bloom-umbel-hubs.mjs <png> --base <band worktree 7c9d33d> --knot <knot worktree d08153e>`)
 
 Three columns — BAND (Oct 27 am) | KNOT (Oct 27 pm) | SWELLING (Oct 28) — for the spider lily
