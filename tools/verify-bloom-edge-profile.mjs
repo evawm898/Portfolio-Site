@@ -470,6 +470,23 @@ const E2_TURN_XFAIL = {
     { excessDeg: 37.320181, note: 'the X0 fix of the S4c follow-up (the fillet tangent held clear of the crest) moved it from 37.432361; earlier: NEW with the S4c follow-up: the first dead step, the same leaf (and the same figure) as roundness 0.5; RE-RECORDED at S5 from 37.320181 (the three arc rows of the nib re-space the stations of every leaf blade, so the bead is faceted at different rows mid-blade); RE-RECORDED at S5b from 43.466762 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
   "LOBED RULINGS: a told shoulder CORNER \u2014 the disc meets the flank (5 lobes on a 58 mm blade at lobe shape 1.5)":
     { excessDeg: 4.573785, note: 'RE-RECORDED 28.347335 -> 4.573785 by ROOT SUPPORT (Oct 21): the 58 mm lobed leaf takes the root law at its own length, and the thickened body re-faces the bead at the shoulder (better, measured by CI on b6759be). Earlier: NEW with the S4c follow-up: a told shoulder corner on a broad-sinus blade; RE-RECORDED at S5 from 28.346182 (the three arc rows of the nib re-space the stations of every leaf blade, so the bead is faceted at different rows mid-blade); RE-RECORDED at S5b from 20.886846 (the three arc rows of the nib now come from the stations nearest the arc — the lobe window and the blade below the donors keep their pre-S5 stations)' },
+  /* BLOOM P1 (node run + leaf size taper, Oct 28): three block-83 smoke rows
+     over the allowance, and NONE IS THE TAPER'S. Each tapered row was rebuilt
+     as UNTAPERED twins, one per node scale (the leaf set to that node's own
+     size through leafTaperState, `leafSizeTaper` 0), and each tapered turn is
+     an untapered twin's to ten digits: the COMPOUND row's is the HALF-SIZE leaf
+     (50.584074 on the twin at scale 0.5 — a smaller leaflet's narrow tip, the
+     narrow-span bead class; the full-size compound reads 43.69); the LOBED
+     row's is the ASKED leaf itself (78.699198 on the twin at scale 1.0, the
+     LOBED chevron x cup class `LOBED TEETH: max` already declares at 33.699198
+     over); the floored row's is the asked 4 mm-wide leaf (48.599123 on the twin
+     at scale 1.0). docs/bloom-node-span-taper-outcome.md §9. */
+  'NODE RUN: LEAF TAPER 0.5 \u2014 COMPOUND (the whole tree scales; the leaflet count does not)':
+    { excessDeg: 5.584074, note: 'adds 50.584074 deg at [11.619, -10.178, -17.951]; face-to-face 61.46, outline 10.88 — the top (half-size) compound leaf; its untapered twin at scale 0.5 reads 50.584074 to ten digits' },
+  'NODE RUN: LEAF TAPER 0.5 \u2014 LOBED (the envelope scales; the lobes and teeth yield per node)':
+    { excessDeg: 33.699198, note: 'adds 78.699198 deg at [-22.181, 13.298, -87.314]; face-to-face 83.06, outline 4.36 — the LOWEST (asked-size) lobed leaf; the untapered 46 x 34 twin reads 78.699198, the class `LOBED TEETH: max` declares' },
+  'NODE RUN: LEAF TAPER 0.75 FLOORED \u2014 a 4 mm wide leaf (its width floor holds it at 75%)':
+    { excessDeg: 3.599123, note: 'adds 48.599123 deg at [35.744, 0.552, -64.285]; face-to-face 49.10, outline 0.50 — the LOWEST (asked-size) 40 x 4 mm leaf; its untapered twin reads 48.599123 (the narrow-span bead class)' },
 };
 
 /* THE BEAD IS NOT DRAWN ON AN INFILLED BLADE, AND THAT IS DECLARED HERE
