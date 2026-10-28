@@ -1735,8 +1735,8 @@ const MUTANTS = [
      clean one, on a state where the law binds; never the assertion it names. */
   { id: 'the-internode-floor-is-the-rods-again',
     why: "the node law's pitch floor goes back to two pedicel radii alone — the florets' own floor derived from their emitted triangles is computed and ignored — so the shipped raceme's florets stand 0.676 mm from each other again (Phase A's finding, the state ruling 1 was written for): five nodes, watertight, one piece. ID10 (b) holds the emitted spacing to the restated floor and (d) reads the file",
-    find: '  const pitchFloorMm = Math.max(pitchFloorRodMm, pitchFloretMm);',
-    into: '  const pitchFloorMm = pitchFloorRodMm;', names: ['ID10'],
+    find: '  const pitchFloorMm = pitchDeferred ? null : Math.max(pitchFloorRodMm, pitchFloretMm);',
+    into: '  const pitchFloorMm = pitchDeferred ? null : pitchFloorRodMm;', names: ['ID10'],
     witness: (M, C) => {
       const [m, c] = infloPair(M, C);
       const t = bothBuilt(m, c); if (t) return t;
@@ -1745,8 +1745,8 @@ const MUTANTS = [
     } },
   { id: 'the-floor-reads-one-mode',
     why: "the florets' floor is the LIVE unit's alone, so where the export unit stands taller the export build's nodes sit under their own floor — and whether the two modes' node counts agree becomes a matter of luck, a mode-dependent topology refused eight times here. ID10 (a) restates the floor over BOTH modes' units",
-    find: '  const pitchFloretRawMm = Math.max(pitchLive.floorMm, pitchExport.floorMm);',
-    into: '  const pitchFloretRawMm = pitchLive.floorMm;', names: ['ID10'],
+    find: '  const pitchFloretRawMm = pitchDeferred ? null : Math.max(pitchLive.floorMm, pitchExport.floorMm);',
+    into: '  const pitchFloretRawMm = pitchDeferred ? null : pitchLive.floorMm;', names: ['ID10'],
     witness: (M, C) => {
       const [m, c] = infloPair(M, C, { sheetThickness: 0.6 });
       const t = bothBuilt(m, c); if (t) return t;

@@ -23778,7 +23778,16 @@ export function umbelPairClasses(azimuths) {
    and the phyllotaxis rather than restating either, because there are already
    exactly two owners of "azimuth of the i-th organ" in this file and a third
    would be the registration rule's own failure. */
-export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {}) {
+/* `deferReports` (the page profile, Oct 27 — docs/bloom-page-profile-outcome.md):
+   the HELD-SLIDER build. Two report-only instruments a drag does not need are
+   skipped and read null — the UMBEL's pitch floor (a raceme's internode law;
+   on an umbel's one node it decides nothing, measured 64% of the spider lily's
+   build) and the placement pass's flags in `buildInflorescenceInto` — and the
+   plan says so (`reportsDeferred`). Nothing BUILT reads either, so a deferred
+   build emits the full build's bytes: `verify-bloom-surface-bytes --defer` over
+   the whole matrix and D10 in the drag-preview gate. Only the page's drag build
+   passes it; at rest, and on every export, it is false. */
+export function inflorescencePlan(state, stem, acc, { floretsPerRay = null, deferReports = false } = {}) {
   if (inflorescenceIsAbsent(state) || !stem || !stem.present) {
     return { present: false, type: String(state.inflorescence ?? 'NONE'), nodes: 0, azimuths: [], nodeDepthsMm: [], built: 0 };
   }
@@ -23949,7 +23958,8 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {
   const perRay = compound ? (floretsPerRay === null ? Math.round(Number(state.umbelFlorets)) : floretsPerRay) : null;
   const pre = { floretPetals: Math.round(Number(state.floretPetals)), petalLength, petalWidth,
     pedicelR, pedicelLenMm, angleDeg, rootR, embedMm, rootExtendMm, rootStaggerMm, rootZ: 0, nodeDepthsMm: [0],
-    azimuths: umbel ? [umbelAz.slice()] : null, compound, floretsPerRay: perRay, reducedFlorets };
+    azimuths: umbel ? [umbelAz.slice()] : null, compound, floretsPerRay: perRay, reducedFlorets,
+    reportsDeferred: !!deferReports };
   const unitMemo = floretUnitMemo(state, pre);
   const sessileTop = pedicelLenMm === 0;
   /* OVER EVERY AZIMUTH THE PHYLLOTAXY PRODUCES ON ANY ASKED NODE — found by
@@ -24031,13 +24041,17 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {
     const U = unitMemo.get(pedicelLenMm, exportMode, az);
     return { positions: U.sub.positions, M: pedicelPlacement(pre, 0, az, U.tipZLocal, sessileTop).M };
   }, pairClasses, MIN_FEATURE_MM));
-  const pitchLive = pitchOf(false), pitchExport = pitchOf(true);
-  const pitchFloretRawMm = Math.max(pitchLive.floorMm, pitchExport.floorMm);
-  const pitchFloretMm = Math.ceil(pitchFloretRawMm / INFLO_REACH_GRID_MM) * INFLO_REACH_GRID_MM;
-  const pitchFloorMm = Math.max(pitchFloorRodMm, pitchFloretMm);
-  const pitchFloorIsFlorets = pitchFloretMm > pitchFloorRodMm;
-  const pitchFloorAt = pitchLive.floorMm >= pitchExport.floorMm ? { ...pitchLive.at, mode: 'live' } : { ...pitchExport.at, mode: 'export' };
-  const sameNodeMayTouch = pitchLive.sameNodeMayTouch || pitchExport.sameNodeMayTouch;
+  /* AN UMBEL'S PITCH FLOOR IS A REPORT (one node: `nodeDepthsMm` below never
+     reads it), so the held-slider build skips it and reads null — the
+     deferral above. A raceme's floor places its nodes and is never deferred. */
+  const pitchDeferred = umbel && !!deferReports && !(compound || reducedFlorets);
+  const pitchLive = pitchDeferred ? null : pitchOf(false), pitchExport = pitchDeferred ? null : pitchOf(true);
+  const pitchFloretRawMm = pitchDeferred ? null : Math.max(pitchLive.floorMm, pitchExport.floorMm);
+  const pitchFloretMm = pitchDeferred ? null : Math.ceil(pitchFloretRawMm / INFLO_REACH_GRID_MM) * INFLO_REACH_GRID_MM;
+  const pitchFloorMm = pitchDeferred ? null : Math.max(pitchFloorRodMm, pitchFloretMm);
+  const pitchFloorIsFlorets = pitchDeferred ? null : pitchFloretMm > pitchFloorRodMm;
+  const pitchFloorAt = pitchDeferred ? null : pitchLive.floorMm >= pitchExport.floorMm ? { ...pitchLive.at, mode: 'live' } : { ...pitchExport.at, mode: 'export' };
+  const sameNodeMayTouch = pitchDeferred ? null : pitchLive.sameNodeMayTouch || pitchExport.sameNodeMayTouch;
   const umbelDepthMm = umbel ? (headOff ? stem.rootZ - stem.topZ : Math.min(insetNeededMm, LEAF_NODE_BOTTOM * stem.lengthMm)) : null;
   const nodeDepthsMm = umbel ? [umbelDepthMm] : leafNodeDepthsMm(nodesAsked, stem.lengthMm, insetMm, pitchFloorMm);
   const nodesClamped = nodeDepthsMm.length < nodesAsked;
@@ -24155,6 +24169,7 @@ export function inflorescencePlan(state, stem, acc, { floretsPerRay = null } = {
        built on the reduced lattice down to the derived floor. */
     depth: umbel ? Number(String(state.umbelDepth ?? UMBEL_DEPTH_VALUES[0])) : null, level, compound, reducedFlorets,
     floretsPerRay: perRay, floretsPerRayAsked: compound ? Math.round(Number(state.umbelFlorets)) : null, budgetClamp: null,
+    reportsDeferred: !!deferReports, pitchDeferred,
     bodyFloor, scaleBuilt,
     nodes: nodeDepthsMm.length, nodesAsked, nodesBuilt: nodeDepthsMm.length, nodesClamped,
     nodeDepthsMm, azimuths, angleDeg, pedicelLenMm, pedicelR, pedicelRClamped, areaRuleR, pedicelRFloor,
@@ -24463,7 +24478,7 @@ export function umbelBudgetClamp(state, stem, acc, plan, restTris) {
   const rec = { budget: EXPORT_TRI_BUDGET, rays, floretsPerRayAsked: kAsked, floretsPerRay: k, askedFlorets: rays * kAsked, builtFlorets: rays * k,
     clamped: k !== kAsked, floretTris: F(k), floretTrisAsked: asked.F, floretTrisLive: asked.Fl, floretTrisExport: asked.Fe, subFixedTris: S, bossTris, restTris,
     askedTotal: total(kAsked), predictedTotal: total(k), fits: total(k) <= EXPORT_TRI_BUDGET };
-  const out = k === kAsked ? plan : inflorescencePlan(state, stem, acc, { floretsPerRay: k });
+  const out = k === kAsked ? plan : inflorescencePlan(state, stem, acc, { floretsPerRay: k, deferReports: !!plan.reportsDeferred });
   out.budgetClamp = rec;
   return out;
 }
@@ -24616,9 +24631,10 @@ export function floretUnitMemo(state, plan) {
          converging root, Oct 27): the floret stands where the asked length
          puts it and the extension is all root. The key stays the asked length. */
       const fs = floretState(state, plan, L + (plan.rootExtendMm || 0), az);
+      const fo = plan.reportsDeferred ? { below: null, pedicel: true, deferReports: true } : { below: null, pedicel: true };
       const rec = plan.reducedFlorets
-        ? withReducedFloretLattice(() => buildBloomInto(sub, fs, { below: null, pedicel: true }))
-        : buildBloomInto(sub, fs, { below: null, pedicel: true });
+        ? withReducedFloretLattice(() => buildBloomInto(sub, fs, fo))
+        : buildBloomInto(sub, fs, fo);
       const stalked = !!(rec.stem && rec.stem.present);
       const hubT = sub.floorThickness(rec.hub.thickness);
       const tipZ = stalked ? rec.stem.tipZ : hubAxisTopZ(rec.hub.dome, hubT) - hubT;
@@ -24816,7 +24832,10 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
          rooted along the pedicel's direction) shows as a radius short of the
          bore. Measured on every placement, asserted on the sessile ones. */
       let wallReachR = Infinity;
-      for (let k = 0; k < src.length; k += 3) {
+      /* THE FLAGS BELOW ARE REPORTS (nothing built reads them) and walk every
+         appended float a second time, so the held-slider build skips the
+         whole pass — the deferral on `inflorescencePlan` — and they read null. */
+      if (!plan.reportsDeferred) for (let k = 0; k < src.length; k += 3) {
         const x = src[k], y = src[k + 1], z = src[k + 2];
         const dx = acc.positions[at + k] - (M[0] * x + M[1] * y + M[2] * z + M[3]);
         const dy = acc.positions[at + k + 1] - (M[4] * x + M[5] * y + M[6] * z + M[7]);
@@ -24917,7 +24936,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
        numbers, and its floret unit with the lattice probe. */
     sub: plan.compound ? subUmbelSummary(units[0].rec) : null,
     budgetClamp: plan.budgetClamp || null,
-    tris: acc.triangleCount - tris0, placementResidual: residual, placementCompared: compared,
+    tris: acc.triangleCount - tris0, placementResidual: plan.reportsDeferred ? null : residual, placementCompared: compared, reportsDeferred: !!plan.reportsDeferred,
     /* THE FLAG: how near any floret's own body (never its pedicel rod) comes
        to the free rachis. Infinity where nothing was appended. */
     rachisApproachMm: Number.isFinite(rachisApproach) ? rachisApproach : null,
@@ -26126,7 +26145,7 @@ function buildBloomRamped(acc, state, opts = {}) {
   }
 }
 
-function buildBloomBody(acc, state, { below = null, capability = null, scopes = null, pedicel = false, t5Decide = null } = {}, tube = null) {
+function buildBloomBody(acc, state, { below = null, capability = null, scopes = null, pedicel = false, t5Decide = null, deferReports = false } = {}, tube = null) {
   if (below !== null && below !== 'stem' && below !== 'branch') {
     throw new Error(`below must be 'stem' | 'branch' | null, got ${JSON.stringify(below)}`);
   }
@@ -26234,7 +26253,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      here — `buildInflorescenceInto` runs after the sepals, last — so no byte
      moves by asking early, and the read-out can name the florets even on a
      row whose geometry is absent. */
-  let infloPlanned = inflorescencePlan(state, stemPlanned, acc);
+  let infloPlanned = inflorescencePlan(state, stemPlanned, acc, { deferReports });
   /* THE SIZE FIELD (organic variance, build 1): null at amount 0, the guard
      every consumer branches on. Asked once, before the omission mask, because
      the mask probes each slot's petal at the size this field gives it. */
