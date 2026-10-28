@@ -1,7 +1,10 @@
 # /frame gate: node tools/verify-frame.mjs — part one (Node) then part two
-# (Chromium), and the negative control (eleven mutants, part one only) in a
-# second step so a disarmed mutant is a red here rather than a hole nobody
-# runs. Path-scoped to the frame's own files: the frame gate reads nothing
+# (Chromium) — and the relief gate, in the `verify` job; the two negative
+# controls (every mutant must redden exactly what it names) in jobs of their
+# own, the relief one split into three shards by mutant index. One job used
+# to run all of it and hit its 45-minute limit on runner variance (#459,
+# twice, in the last step). The mutant jobs are Node only: no npm install,
+# no browser. Path-scoped to the frame's own files: the frame gate reads nothing
 # else, and (the charter's own point) a frame PR used to trigger the two
 # FLOWER gates through their 'tools/**' filter, which tested flower geometry.
 name: frame
@@ -58,7 +61,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -75,8 +78,7 @@ jobs:
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
       # Phase 2: the relief STL gate (Node only), with the SVG byte-identity
-      # clause against the commit the relief was built on. fetch-depth 0 so
-      # the base commit is reachable for the worktree.
+      # clause against the commit the relief was built on.
       # Phase 2b: every arch row's SVG AND STL bytes against e759041 (phase 2's
       # merge), the base the closed skeletons were built on.
       - name: Relief gate (watertight, connected, registered, embedded, floored, seam) + arch SVG and STL bytes vs e759041
@@ -86,9 +88,34 @@ jobs:
           node tools/verify-frame-relief.mjs --base /tmp/frame-base
       - name: Ruling 5 — the clamps sit on the measured fold
         run: node tools/frame-fold-boundary.mjs
-      - name: Relief negative control
-        run: node tools/verify-frame-relief.mjs --negative-control
       - name: Frame gate (part one Node, part two Chromium)
         run: node tools/verify-frame.mjs
+
+  # The relief negative control, sharded by mutant INDEX (k mod 3): every
+  # mutant is in exactly one shard by construction. Changing the shard count
+  # is two edits: this matrix list and the n in --shard=k/n.
+  relief-mutants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Relief negative control (shard ${{ matrix.shard }} of 3)
+        run: node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/3
+
+  frame-mutants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Negative control (every mutant must redden exactly what it names)
         run: node tools/verify-frame.mjs --negative-control
