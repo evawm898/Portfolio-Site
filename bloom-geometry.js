@@ -16740,7 +16740,16 @@ export function stemPlan(state, ring, acc) {
   const stemTopInnerZ = domedTop ? dome.centreZ + Math.sqrt(dome.Rd * dome.Rd - boreR * boreR) : topZ;
   const stemTopSagMm = topZ - stemTopZ;
   const refReach = sphere ? joinT : (hubLengthAsked > 0 ? Math.max(hubT, hubLengthAsked) : joinT);
-  const axisDepthRaw = hubAmount === 1 ? refReach : hubT + hubAmount * (refReach - hubT);
+  /* THE JOIN'S DEPTH IS A LENGTH THE RING LADDER COUNTS, SO IT IS MODE-FREE:
+     its sheet term is the EXPORT's floored slab in both modes (`max(t,
+     MIN_FEATURE_MM)`, `seamHalfThicknessMm`'s own rule). Found by the local
+     export gate on `STEM NODES: a thin sheet on a short stem` the day CURVED
+     0.50 became the default (Oct 28): at amount 1 the term cancels (main's
+     GOBLET), under it the live 0.60 and the export 1.00 put the join's
+     underside 0.20 mm apart and the ladder one ring apart (50,792 against
+     50,888). At or above the printable sheet it is `hubT` itself. */
+  const hubTJoin = Math.max(hubT, MIN_FEATURE_MM);
+  const axisDepthRaw = hubAmount === 1 ? refReach : hubTJoin + hubAmount * (refReach - hubTJoin);
   /* A DOMED HUB CARRIES THE SWELL AS A DEFORMATION OF ITS INNER CAP, and that
      cap can only be pushed down so far before its apex would invert (the inner
      sphere radius `Rd + t/2 - axisDepth` going negative) and self-intersect. A
@@ -16762,7 +16771,7 @@ export function stemPlan(state, ring, acc) {
      sag and the sheet), never typed; it binds only where a thin join meets a
      wide stem on a steep cap, TOLD as FLOORED, and is under the cap's apex
      clamp wherever the head is wider than a sheet or two. */
-  const capReachMin = domedTop ? stemTopSagMm + hubT / 2 : 0;
+  const capReachMin = domedTop ? stemTopSagMm + hubTJoin / 2 : 0;
   const axisDepth = Math.min(Math.max(axisDepthRaw, capReachMin), capReachMax);
   const hubReachClamped = axisDepthRaw > axisDepth + 1e-9;
   const hubReachFloored = axisDepthRaw < axisDepth - 1e-9;
@@ -24518,7 +24527,7 @@ function subUmbelSummary(rec) {
   if (!B || !P) return null;
   return {
     count: B.count, knot: B.knot, unitTris: B.unitTris, tris: B.tris,
-    placed: B.placed.map((q) => ({ az: q.az, root: q.root, headAt: q.headAt, pedicelAxis: q.pedicelAxis, M: q.M, at: q.at, tris: q.tris })),
+    placed: B.placed.map((q) => ({ az: q.az, root: q.root, headAt: q.headAt, pedicelAxis: q.pedicelAxis, rootAxis: q.rootAxis, M: q.M, at: q.at, tris: q.tris })),
     plan: { umbelCount: P.umbelCount, pedicelR: P.pedicelR, pedicelLenMm: P.pedicelLenMm, angleDeg: P.angleDeg, rho: P.knot && P.knot.rho, knot: P.knot ? { ...P.knot, centre: P.knot.centre.slice() } : null, level: P.level, depth: P.depth,
       reducedFlorets: P.reducedFlorets, petalLength: P.petalLength, petalWidth: P.petalWidth, lengthAsked: P.lengthAsked, widthAsked: P.widthAsked, scale: P.scale, scaleBuilt: P.scaleBuilt,
       sizeClamped: P.sizeClamped, bodyFloor: P.bodyFloor, floretPetals: P.floretPetals, outerR: P.outerR, boreR: P.boreR, rootZ: P.rootZ },
@@ -24653,7 +24662,10 @@ export function floretUnitMemo(state, plan) {
       /* AN UMBEL'S ROD IS BUILT `rootExtendMm` LONGER than the asked length (the
          converging root, Oct 27): the floret stands where the asked length
          puts it and the extension is all root. The key stays the asked length. */
-      const fs = floretState(state, plan, L + (plan.rootExtendMm || 0), az);
+      /* a SESSILE floret (L 0) has no rod to lengthen: its hub itself is placed
+         on the converging root (`pedicelPlacement`), and a unit built with a
+         stem of the extension's length would be a stem on a 0 mm pedicel (ID4) */
+      const fs = floretState(state, plan, L > 0 ? L + (plan.rootExtendMm || 0) : L, az);
       const fo = plan.reportsDeferred ? { below: null, pedicel: true, deferReports: true } : { below: null, pedicel: true };
       const rec = plan.reducedFlorets
         ? withReducedFloretLattice(() => buildBloomInto(sub, fs, fo))
@@ -24823,6 +24835,12 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
         pl.axis3 = sb && Number.isFinite(sb.emittedTopZ) && Number.isFinite(sb.emittedTipZ) && sb.emittedMaxR > 0
           ? { inner: at3(sb.emittedTopZ), outer: at3(sb.emittedTipZ), radiusMm: sb.emittedMaxR }
           : null;
+        /* A SESSILE UMBEL FLORET HAS NO ROD: its ROOT is the hub's underside
+           point on its own axis, placed on the converging root, and the disc
+           the law buries is the pedicel's radius — reported as `rootAxis` (a
+           millimetre up the line names the direction) for UM2 / UM8, and NOT
+           as a pedicel axis, which ST9 would excuse as a rod. */
+        pl.rootAxis = sessile && plan.umbel ? { inner: at3(U.tipZLocal + 1), outer: at3(U.tipZLocal), radiusMm: plan.pedicelR } : null;
       }
       const at = acc.positions.length;
       const n = acc.appendTransformed(U.sub, pl.M);
@@ -24915,7 +24933,7 @@ export function buildInflorescenceInto(acc, state, plan, memo = null) {
          rod is, and a rod emitted somewhere other than where the plan says is
          the defect the naming exists to keep visible. */
       placed.push({ nodeIndex: i, az, M: pl.M, D: pl.D, root: pl.root, tris: n, at,
-        headAt: [pl.M[3], pl.M[7], pl.M[11]], pedicelAxis: pl.axis3,
+        headAt: [pl.M[3], pl.M[7], pl.M[11]], pedicelAxis: pl.axis3, rootAxis: pl.rootAxis,
         unit: ui, lengthMm: U.lengthMm, sessile, wallReachR: Number.isFinite(wallReachR) ? wallReachR : null });
     }
   }

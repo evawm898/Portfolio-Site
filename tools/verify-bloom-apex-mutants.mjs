@@ -1565,7 +1565,7 @@ const MUTANTS = [
     } },
   { id: 'the-join-reach-floor-is-dropped', rows: /^a domed head with a WIDE/,
     why: "the join's reach floor on a domed top is removed, so under a thin join and a wide stem the stem's ROOT ring (its first station, at the join's underside on the axis) stands above the rim ring and through the cap's skin — the second half of the Oct 27 defect, independent of the top disc",
-    find: '  const capReachMin = domedTop ? stemTopSagMm + hubT / 2 : 0;',
+    find: '  const capReachMin = domedTop ? stemTopSagMm + hubTJoin / 2 : 0;',
     into: '  const capReachMin = 0;', names: ['ST4', 'ST5'],   // ST13 (the file-side clause) is witnessed by verify-bloom-stem-channel.mjs
     witness: (M, C) => {
       const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), { ...REGISTRY_DEFAULTS, headRise: 0.35, stemDiameter: 12, hubShapeAmount: 0, stemLength: 60 }).stem;

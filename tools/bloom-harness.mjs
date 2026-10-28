@@ -8201,13 +8201,16 @@ function stemJoinExpected(hubR, hubT, outerR, sphere = false) {
    `blend` and `at`. */
 function hubShapeExpected(hubR, hubT, outerR, sphere, style, amount, lengthAsked, joinT, capRd) {
   const refReach = sphere ? joinT : (lengthAsked > 0 ? Math.max(hubT, lengthAsked) : joinT);
-  const axisRaw = amount === 1 ? refReach : hubT + amount * (refReach - hubT);
+  /* the depth's sheet term is the EXPORT's floored slab in both modes (a
+     length the join's ring ladder counts — mode-free, Oct 28) */
+  const hubTJ = Math.max(hubT, MIN_FEATURE_MM);
+  const axisRaw = amount === 1 ? refReach : hubTJ + amount * (refReach - hubTJ);
   const capMax = (capRd > 0 && !sphere) ? Math.max(hubT, capRd - hubT / 2) : Infinity;
   /* THE DOMED TOP'S FLOOR (Oct 27): on a cap wider than the stem the reach is
      at least the mid-surface's sag under the stem's rim plus half a sheet, so
      the stem's root ring is inside the join at its own radius — restated from
      the cap's radius, the stem's and the sheet, never read from the plan */
-  const capMin = (capRd > 0 && !sphere && hubR > outerR) ? ((capRd + hubT / 2) - Math.sqrt(capRd * capRd - outerR * outerR)) + hubT / 2 : 0;
+  const capMin = (capRd > 0 && !sphere && hubR > outerR) ? ((capRd + hubT / 2) - Math.sqrt(capRd * capRd - outerR * outerR)) + hubTJ / 2 : 0;
   const axisDepth = Math.min(Math.max(axisRaw, capMin), capMax);
   const swellActive = !sphere && hubR > outerR && (axisDepth - hubT) > 0;
   const swell = axisDepth - hubT;
@@ -13051,7 +13054,7 @@ export function umbelClauses(m, ui) {
   (B.placed || []).forEach((q, i) => {
     const wantAz = (i * 2 * Math.PI) / n;
     if (Math.abs(red(q.az) - red(wantAz)) > 1e-9 && Math.abs(Math.abs(red(q.az) - red(wantAz)) - 2 * Math.PI) > 1e-9) bad.push(`UM2: floret ${i} stands at ${(q.az * 180 / Math.PI).toFixed(6)} deg; the i-th of ${n} evenly spread is ${(wantAz * 180 / Math.PI).toFixed(6)} deg`);
-    const ax = q.pedicelAxis;
+    const ax = q.pedicelAxis || q.rootAxis;   // a sessile umbel floret's root is its hub's own axis
     if (!ax) { bad.push(`UM2: floret ${i} reports no emitted pedicel axis — its root cannot be shown to converge`); return; }
     const d0 = v3sub(ax.inner, ax.outer), L = v3len(d0), d = d0.map((x) => x / L);
     bad.push(...umbelRootClauses('UM2', i, n, q.az, ax.outer, d, ax.radiusMm, E, baseZ, 'floret', Array.isArray(K.ringsEmitted) ? umbelKnotEmittedInside(K, S.outerR, S.boreR, !headOffAsked) : null));
@@ -13285,7 +13288,7 @@ export function mopheadClauses(m, ui, { gap }) {
     /* the florets, once, in the sub-umbel's own frame (every ray appends the same unit) */
     const endsS = [];
     for (const [j, f] of (sub.placed || []).entries()) {
-      const fax = f.pedicelAxis;
+      const fax = f.pedicelAxis || f.rootAxis;
       if (!fax) { bad.push(`UM8: floret ${j} of the sub-umbel reports no emitted pedicel axis`); continue; }
       const d0 = v3sub(fax.inner, fax.outer), L = v3len(d0), d = d0.map((x) => x / L);
       bad.push(...umbelRootClauses('UM8', j, kSub, f.az, fax.outer, d, fax.radiusMm, ES, baseS, 'sub-umbel floret', Array.isArray(SK.ringsEmitted) ? umbelKnotEmittedInside(SK, rayR, rayBore, false) : null));

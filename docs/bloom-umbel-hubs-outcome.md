@@ -617,3 +617,14 @@ pedicels`) are re-run below.
   pedicels`). The geometry's `holds` and the harness's restatement both test against the
   chords between the rings the body draws now (the same `w/8` ladder); every block-82 and
   block-78 umbel row reads UM1/UM2-silent in Node, and the browser gate is the authority.
+- **Two more from the local re-run of those rows.** A sessile umbel floret's UNIT was being built
+  with a stem of the extension's length (ID4: a stem on a 0 mm pedicel) — the extension is a
+  stalked rod's; the sessile floret stays stemless and reports a `rootAxis` (its hub's own axis
+  through the converging root) that UM2 / UM8 read in a pedicel axis's place and ST9 does not
+  excuse. And **the join's depth read the LIVE sheet**: `hubT + amount × (refReach − hubT)` cancels
+  at amount 1 (main's GOBLET) and under it carries the sheet, so on a 0.60 mm sheet (floored to
+  1.00 in export) the join's ladder laid one ring more in export than live — `STEM NODES: a thin
+  sheet on a short stem` 50,792 against 50,888, a mode-dependent topology CI never saw because
+  ST13 dropped the row first. The sheet term is `max(hubT, MIN_FEATURE_MM)` in both modes now
+  (the geometry and the restatement), the join's underside 0.20 mm deeper in LIVE on a thin
+  sheet, the shipping default's double untouched.

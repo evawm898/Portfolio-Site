@@ -4967,6 +4967,9 @@ window.__bloomMetrics = () => ({
       pedicelAxis: q.pedicelAxis
         ? { inner: q.pedicelAxis.inner.slice(), outer: q.pedicelAxis.outer.slice(), radiusMm: q.pedicelAxis.radiusMm }
         : null,
+      rootAxis: q.rootAxis
+        ? { inner: q.rootAxis.inner.slice(), outer: q.rootAxis.outer.slice(), radiusMm: q.rootAxis.radiusMm }
+        : null,
     })),
   } : null,
   inflorescenceTris: lastInfloTris,
