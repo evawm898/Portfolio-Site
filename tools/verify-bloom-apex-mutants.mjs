@@ -1612,7 +1612,7 @@ const MUTANTS = [
   { id: 'a-root-disc-on-the-junctions-face', rows: /^an umbel/,
     why: "the hold drops its half gap: a root disc's rim lands EXACTLY on the top face or the spindle's skin, decided by its last bit — the tangency that welds (749 pairs on the Oct 23 sphere); watertight, one piece",
     find: '  const m = gap / 2;\n  const holds = (k, d, riseMm) => {',
-    into: '  const m = 0;\n  const holds = (k, d, riseMm) => {', names: ['UM1', 'UM2'],
+    into: '  const m = 0;\n  const holds = (k, d, riseMm) => {', names: ['UM2'],
     witness: (M, C) => {
       const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), UMBEL_STATE()).inflorescence.knot.deepenMm;
       const m = f(M), c = f(C);
@@ -4260,6 +4260,9 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'umbelHead', value: 'ON' }] },
   /* the 90 deg knife edge (Eva, Oct 24): the only angle at which the crossing's
      margin binds on the band's height, so the margin mutant has a row to fire on */
+  /* Hub amount 2 (Oct 28): the one row on which the amount mutant can move the swelling — every other umbel row is at the default the mutation fixes */
+  { label: 'an umbel: six florets, the head OFF, Hub amount 2', for: /ignores-the-hub/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }, { id: 'hubShapeAmount', value: '2' }] },
   { label: 'an umbel: six florets at 90 deg, the head OFF', for: /umbel|head-is-built|boss-|roots-|knot-|swelling-/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelFlorets', value: '6' }, { id: 'pedicelAngle', value: '90' }] },
   /* (iv) A RACEME ASKED FOR WITH NO RACHIS, and it is the ONLY state ID0 can
