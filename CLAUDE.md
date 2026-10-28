@@ -6880,10 +6880,19 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
   top RISES instead (my placement). **Hub style is INERT on a spindle and HIDDEN with the head off**
   (`hubStyleLive`). `umbelSwelling` / `umbelSwellBody` / `umbelRootLaw`; UM1/UM2/UM8 restated through
   `umbelSwellingExpected`; eight mutants re-pointed; `--movers-predicate umbel-swelling`.
-  **RULED Oct 28 (2): CURVED 0.50 is the head's hub-to-stem default too** — ~353 stemmed rows
-  predeclared from the BASE record, census and combination magnitudes re-recorded by value, the defaults
-  bar's pins updated. Read `docs/bloom-umbel-hubs-outcome.md` §7 before touching any of it. The knot
-  paragraph below is kept as the record the ruling was made on.]**
+  **RULED Oct 28 (2): CURVED 0.50 is the head's hub-to-stem default too** — MEASURED with its own
+  instrument, because `verify-bloom-surface-bytes` builds both trees from THIS tree's defaults and cannot
+  see a default move: `verify-bloom-defaults-bytes --mover hubjoin --pair set` against `main` reads **394
+  movers / 1,194 holders, 0 floats on any holder** (`ALL MAX` a mover through its unnamed style), while the
+  surface tool reads 70 / 1,535 for ruling 1 alone. One census row re-recorded (`TEXTURE: CELLULAR x a
+  COMPOUND leaf` 59 / 0.1963 → 43 / 0.2730 — the stem ORGAN's lattice under the join), two combination
+  cells by value, the defaults bar PASS. **AND THE CONVERGING ROOTS' OWN FINDING, declared and Eva's to
+  rule**: TWO pedicels (or two mophead rays) converge and their rods overlap each other just ABOVE the
+  swelling's flat top, in the open — `umbel-florets-x-angle @ 2 x 35` and `mophead-rays-x-florets @ 2 x
+  2 / 2 x 6` at 0.000, that pair's axes inert; the approach measure's join region reads the swelling's
+  own body now (it read the retired knot's field and excluded nothing). Read
+  `docs/bloom-umbel-hubs-outcome.md` §7 before touching any of it. The knot paragraph below is kept as
+  the record the ruling was made on.]**
 - **The junction (RULED Oct 27, superseding the band): a CONVERGING KNOT.** Each pedicel's line
   crosses the base plane at `rhoB` (the pedicel's own radius head off; one gap off the stem head on)
   and continues straight inward, at its own angle, to its line's point nearest the centre

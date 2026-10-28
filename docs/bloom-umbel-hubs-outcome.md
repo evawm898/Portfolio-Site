@@ -527,6 +527,21 @@ side-on and from below; dimensions in every caption.
   do not meet in the open"), or the two-pedicel overlap accepted as the converging-root look.
 - **Defaults bar**: PASS, 11 shipped states at or over the bar — the pins read the curved join
   already (the knot session moved the default).
-- **Byte partition** (`verify-bloom-surface-bytes --movers-predicate umbel-swelling --base
-  <worktree of main at 4beac00>`, three shards of 535 rows): see the run figures below.
+- **Byte partitions, two instruments, both against a worktree of `main` at `4beac00`.**
+  `verify-bloom-surface-bytes --movers-predicate umbel-swelling` builds BOTH trees from THIS
+  tree's defaults, so it is blind to the default's move by construction (its own header says so)
+  and measures ruling 1 alone: **PASS — 70 of 70 predeclared movers moved (every base umbel row
+  and the Oct 27 stem-top movers), 0 floats moved on the 1,535 holders**, positionally under
+  `Object.is`, 1,990,297,872 export floats over 221,144,208 triangles and 82,702,544 captured-grid
+  values, both modes, five shards. Ruling 2 is `verify-bloom-defaults-bytes --mover hubjoin --pair
+  set` (each tree built from ITS OWN registry defaults and matrix, paired by control set; the
+  `hubjoin` mover predeclared from the BASE build record — the base builds an umbel, or a stem
+  whose join is ACTIVE with at least one of the two moved controls unnamed, or the stem-top mover):
+  **PASS — 394 of 394 predeclared movers moved (`ALL MAX` among them, through its unnamed style),
+  1,194 of 1,194 holders held**, 2,268,902,844 export floats and 223,991,200 grid values, both
+  modes, four shards; the 17 block-82 head rows have no base partner and are listed. Eva's
+  "~353" was the stemmed-row estimate; the 394 are those plus the 48 umbel and mophead rows and
+  the stem-top movers.
+- **Frozen phase**: `frozen/phase89` is OWED — block 82 took the matrix 1,588 → 1,605 — and
+  is NOT registered yet: it waits on Eva's ruling on the sheet, with CI and the merge.
 
