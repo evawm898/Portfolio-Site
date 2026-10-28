@@ -112,7 +112,14 @@ that build, beside the edge words; it does not refuse.
 
 ## 5. The bead and the 0.40 mm nib
 
-{{NIB}}
+Measured on the default petal in EXPORT (the sheet's cell 3): **0 of the 1,776 lattice corners within 1.2 mm of
+the apex are raised, the most by 0.0000 mm.** The bead's half-round and the nib's arc curve past the 1/mm threshold
+over their whole width, and the geodesic fade (0.75 mm) carries the smooth band onto the flank. **Both clear by
+curvature alone, so no bead mask was added.**
+
+The curvature mask holds 11,000 of the default petal's 75,816 vertices smooth as ridges, mostly the rim beads.
+The patch mask holds 23,411 more outside every patch. 7,051 vertices sit exactly on a pore floor, and 33,874 are
+raised, up to the full 0.400 mm.
 
 ## 6. Rods (Q12)
 
@@ -138,7 +145,8 @@ At the default curvature threshold (1/mm), EXPORT:
 
 - **So at the default, the 1.2 mm rods, the braid and the leaflet stalks are SMOOTH**, held by the mask at its
   own threshold. The simple petiole is latticed and takes almost nothing.
-- **At `boneCurvature` 4 (the maximum) the rods are relieved:** {{RODMAX}}.
+- **At `boneCurvature` 4 (the maximum) the rods are relieved:** **5,554 stamen vertices raised, 166,592 → 185,904 tris** on 12 stamens and the style; the braid (6 strands)
+raises 3,810, at 186,684 tris.
 - Whether the rods should take the field at the default is question 6.
 
 ## 7. Gates
@@ -197,7 +205,20 @@ for BONE without infill. Infill refuses the texture, so infill + BONE holds.
 
 EXPORT triangles, the edge the cap used, PEBBLE against BONE:
 
-{{BUDGET}}
+| state | PEBBLE (retired) | BONE |
+|---|---|---|
+| the default | 158,912 @ 0.40 | 158,912 @ 0.40 |
+| a 60 mm stem | 179,202 @ 0.40 | 179,202 @ 0.40 |
+| 8 sepals × stem | 253,938 @ 0.40 | 253,938 @ 0.40 |
+| 12 stamens + style | 166,592 @ 0.40 | 166,592 @ 0.40 (rods smooth) |
+| compound leaf × stem | 448,026 @ 0.40 | 461,586 @ 0.40 |
+| umbel, head ON | 486,498 @ 0.40 | 521,322 @ 0.40 |
+| raceme on 120 mm | 398,338 @ 0.40 | 421,554 @ 0.40 |
+| 40 × 3 whorls | 1,442,144 @ 0.42 | 1,442,144 @ 0.42 |
+| the mophead (depth 2) | 1,295,262 @ 0.40 | **1,445,862 @ 0.40 (96.4% of budget)** |
+
+**No state newly refuses, and none coarsens further than PEBBLE.** The mophead comes closest: it fits at 0.40 with
+3.6% to spare, against PEBBLE's 13.6%.
 
 - **BONE adds triangles only through the rods and pedicels that take the field.** The sheets' and organs'
   lattice is T5's, unchanged.
@@ -205,6 +226,9 @@ EXPORT triangles, the edge the cap used, PEBBLE against BONE:
   the default is ~2.0 s against PEBBLE's ~1.4 s in Node on this box.
   - `BONE: x 40 petals x 3 whorls` is 57–59 s a build in Node under load. It carries the edge cap's 120 s settle
     (`TEXTURE_CAP_ROW`), and its cap trials skip the relief and relieve only the picked build.
+  - **The mophead (depth 2) is ~90 s a build in Node under BONE, against PEBBLE's ~14 s**: BONE relieves the
+    nested floret organs PEBBLE skips (§11), and the pass's string-keyed maps scale with them. No matrix row
+    builds a BONE mophead.
   - Question 10.
 
 ## 10. Questions for Eva
@@ -216,7 +240,7 @@ EXPORT triangles, the edge the cap used, PEBBLE against BONE:
    under another petal is still textured. Options: (a) keep it (T3's ruling); (b) run the escape ray on sheets
    too (much more cost on big blooms).
 3. **The T5 follow-ups apply under BONE only**, so the retired patterns build as before. Options: (a) keep it;
-   (b) apply them to PEBBLE and CELLULAR too, which moves bytes on 34 live rows and on frozen ones.
+   (b) apply them to PEBBLE and CELLULAR too, which moves bytes on up to 34 live rows and on frozen ones.
 4. **The owner rule.** Options: (a) the derived set rule shipped here (relieve only if all copies agree, take the
    min); (b) T5's first-emitter rule, which is order-dependent. It binds on no real row today.
 5. **The reference photographs.** They are not in the repository, so the sheet has two placeholder panels.
@@ -232,13 +256,20 @@ EXPORT triangles, the edge the cap used, PEBBLE against BONE:
    for the pore floor as the slider's minimum, and the derived floor (2.0, reads-round at 0.4) is above 1.6. The
    floor won and the conflict is yours. Options: (a) keep 2.0; (b) define the floor by the pit-exists figure
    (0.94) so 1.6 is reachable and faceted; (c) refine the lattice under BONE.
-10. **Cost.** BONE builds are 1.4–2× PEBBLE's in time at the same triangle count, and the 40 × 3 corner runs close
-    to the browser's 120 s settle on a slow box. Options: (a) accept it; (b) optimise the pass (its hot paths are
+10. **Cost.** BONE builds are 1.4–2× PEBBLE's in time at the same triangle count, the 40 × 3 corner runs close
+    to the browser's 120 s settle on a slow box, and a BONE mophead is ~90 s a build against PEBBLE's ~14 s. Options: (a) accept it; (b) optimise the pass (its hot paths are
     string-keyed maps and GC, profiled) in its own session.
 
 ## 11. Found
 
 - **At the shipped `sepalHeight` 0.75 on a 6 mm stem, the sepal feet cover no hub vertex** (§3.2).
-- **The mophead (depth 2) under the retired PEBBLE:** {{MOPHEAD}}
+- **The mophead (depth 2) under the retired PEBBLE:** under PEBBLE a sub-umbel's OWN floret organs are never deferred to the top pass (`t5Finish` defers a
+pedicel build's organs but not its florets'). So at depth 2 the inner florets' hubs and pedicels and the rays are
+never relieved: the PEBBLE mophead's only organ record is the main stem.
+
+BONE carries them. Measured on the mophead in EXPORT: floret stems 59,554 of 190,512 vertices raised, floret hubs
+9,588 of 113,700, floret petals 165,126 of 418,800. That costs 150,600 triangles and the build time (§9).
+
+This is pre-existing and is NOT fixed under PEBBLE, because fixing it there would move the retired pattern's bytes.
 
 Sheet: `node tools/shot-bloom-texture-bone.mjs docs/img/bloom-texture-bone-shipped.png [--json <file>]`.
