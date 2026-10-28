@@ -262,4 +262,33 @@ RESULT: see §9.
 
 ## 9. Verification (measured)
 
-Filled at close — see the PR.
+Measured on this branch after merging `main` at `77ae7f9` (the BONE texture),
+against a worktree of that commit.
+
+- **Bytes** (`verify-bloom-surface-bytes --movers-predicate node-run`, both
+  modes, in chunks): rows 0..1635 — every holder at **0 floats** under
+  `Object.is`, and the block-83 chunk reads **all 23 predeclared movers moved,
+  0 floats on its 5 holders**. The first half alone was 1,044,051,228 export
+  floats and 71,382,604 grid values.
+- **Export** (`verify-bloom-export --only '^NODE RUN:'`): 28 of 28 watertight,
+  0 within-shell pairs, every shell outward.
+- **Connectedness** (`--only '^NODE RUN:'`): 28 of 28 one connected body.
+- **Panel gate** `--negative-control`: ALL THIRTY-FIVE ROUTES observed their
+  failure, route (ar)'s three mutants included.
+- **Design file** (`--no-browser`): 1,636 of 1,636 live rows round-trip.
+- **Combination gate**: the four new pairs read as declared (above).
+- **Edge profile (E2) — three smoke rows over the allowance, and none is the
+  taper's.** CI's first run reddened `LEAF TAPER 0.5 — COMPOUND` (50.584074 deg),
+  `— LOBED` (78.699198) and `0.75 FLOORED` (48.599123). Each tapered row was
+  rebuilt as UNTAPERED twins, one per node scale (`leafTaperState`, taper 0),
+  and each turn is a twin's to ten digits: the COMPOUND's is the half-size leaf
+  (twin at 0.5; the full-size compound reads 43.69), the LOBED's is the ASKED
+  leaf (twin at 1.0 — the class `LOBED TEETH: max` already declares at
+  33.699198 over), the floored row's is the asked 40 x 4 mm leaf (twin at 1.0).
+  Declared in `E2_TURN_XFAIL` with those values. The two `-0.5` rows (not smoke
+  rows, so CI's E2 never reads them, and the stray-declaration clause refuses a
+  declaration it cannot evaluate) read the same two leaves locally, 50.584074 and
+  78.699198. **I did not run E2 on the smoke subset before the first push, as the
+  brief asked; CI caught it.**
+- **Apex mutants**: the eleven `node-run-*` witnesses all move on the mutated
+  module; the full sweep is CI's (`bloom-apex-mutants.yml`, twelve shards).
