@@ -41,7 +41,11 @@ export const TUBE_SIDES = 10;            // a wire's section; a 1.4 mm bar's fac
 export const RING_SECTORS = 96;          // samples round a round ring
 export const BODY_STEP_MM = 1.5;         // bar sample spacing up the body
 export const CAP_STEP_MM = 1.0;          // and over the top cap, where the curvature is
-export const COLLAR_PACK = 1.05;         // bars converge until their pitch is this × their diameter (they all but touch)
+/* Eva's ruling 1 (Oct 29): bars read as individual wires meeting a collar. They converge until
+   neighbouring bars are ONE PRINTABLE GAP apart (pitch = bar diameter + the floor), never until
+   they touch — the pack is derived from the floor and the bar, not typed (phase 1's 1.05-diameter
+   pack constant is retired). The collar is a turned BOSS with a bead, and the hanger stands on it. */
+export const SHOULDER_DEG = 25;          // ruling 5: a profile knot whose chords turn by at least this (in mm) is a shoulder and auto-places a ring
 
 /* ---- the profile curve (bloom-curve.js's own kind) ---- */
 export const PROFILE_SPEC = Object.freeze({ modes: ['single'], x: [0, 1], y: [0.08, 1], points: [2, 10], lock: { first: 'x', last: 'x' }, monotoneX: true, owner: 'heightMm' });
@@ -88,11 +92,12 @@ export const PARAM_SPEC = [
   R('doorFrameMm', 'door', 'Door frame thickness', 1, 4, 0.1, 2.0, 'mm', hasDoor),
   C('baseStyle', 'base', 'Base', [['ring', 'plain ring'], ['tray', 'tray'], ['skirt', 'scalloped skirt'], ['feet', 'feet']], 'ring'),
   R('skirtMm', 'base', 'Skirt depth', 4, 20, 0.5, 9, 'mm', (p) => p.baseStyle === 'skirt'),
+  R('scallopCount', 'base', 'Scallops (built as a divisor of the bar count, cusps on bars)', 2, 24, 1, 8, '', (p) => p.baseStyle === 'skirt'),
   R('footCount', 'base', 'Feet', 3, 8, 1, 4, '', (p) => p.baseStyle === 'feet'),
   C('hanger', 'hanger', 'Hanger', [['none', 'none'], ['ring', 'ring'], ['hook', 'hook'], ['finial', 'finial + ring']], 'ring'),
   R('hangerMm', 'hanger', 'Hanger size', 4, 16, 0.5, 7, 'mm', (p) => p.hanger !== 'none'),
   R('frameRingMult', 'fine', 'Base and top ring (× ring)', 1, 2, 0.05, 1.25),
-  R('collarMult', 'fine', 'Apex collar (× its packed radius)', 1, 2, 0.05, 1.15, '', notFlat),
+  R('collarMult', 'fine', 'Apex collar (× the radius the bars meet it at)', 1, 2, 0.05, 1.0, '', notFlat),
   R('minFeature', 'print', 'Minimum wire (print floor)', 0.8, 2, 0.1, MIN_FEATURE_MM, 'mm'),
 ];
 export const PRESET_FIELD_IDS = PARAM_SPEC.filter((s) => s.section !== 'print' && s.id !== 'preset').map((s) => s.id);
@@ -105,7 +110,7 @@ export const PRESETS = {
   bell: { profile: P([[0, 1], [0.3, 0.96], [0.65, 0.8], [1, 0.64]]), sides: '0', topShape: 'dome', topHeight: 0.75, barCount: 22, barMm: 1.4, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'arch', doorWidth: 28, doorHeight: 46, doorY: 0.08, baseStyle: 'tray', hanger: 'finial', widthMm: 100, heightMm: 120 },
   cone: { profile: P([[0, 1], [1, 0.48]]), sides: '4', topShape: 'spire', topHeight: 1.1, barCount: 16, barMm: 1.4, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'gothic', doorWidth: 26, doorHeight: 50, doorY: 0.1, baseStyle: 'tray', hanger: 'ring', widthMm: 100, heightMm: 120 },
   onion: { profile: P([[0, 0.72], [0.3, 0.96], [0.55, 1], [1, 0.74]]), sides: '0', topShape: 'onion', topHeight: 1.15, barCount: 24, barMm: 1.4, barsConverge: true, ringCount: 2, ringPlace: 'even', ringMm: 1.8, doorShape: 'ogee', doorWidth: 28, doorHeight: 50, doorY: 0.12, baseStyle: 'feet', hanger: 'finial', widthMm: 96, heightMm: 100 },
-  tiered: { profile: P([[0, 1], [0.58, 1], [0.66, 0.7], [1, 0.7]]), sides: '0', topShape: 'dome', topHeight: 0.65, barCount: 24, barMm: 1.4, barsConverge: true, ringCount: 4, ringPlace: 'clustered', ringMm: 1.8, doorShape: 'rect', doorWidth: 30, doorHeight: 40, doorY: 0.1, baseStyle: 'skirt', hanger: 'finial', widthMm: 100, heightMm: 130 },
+  tiered: { profile: P([[0, 1], [0.58, 1], [0.66, 0.7], [1, 0.7]]), sides: '0', topShape: 'dome', topHeight: 0.65, barCount: 24, barMm: 1.4, barsConverge: true, ringCount: 4, ringPlace: 'clustered', ringMm: 1.8, doorShape: 'rect', doorWidth: 30, doorHeight: 40, doorY: 0.1, baseStyle: 'skirt', scallopCount: 8, hanger: 'finial', widthMm: 100, heightMm: 130 },
   hexLantern: { profile: P([[0, 1], [1, 1]]), sides: '6', topShape: 'spire', topHeight: 0.85, barCount: 18, barMm: 1.4, barsConverge: true, ringCount: 2, ringPlace: 'even', ringMm: 1.8, doorShape: 'rect', doorWidth: 28, doorHeight: 52, doorY: 0.12, baseStyle: 'feet', hanger: 'hook', widthMm: 86, heightMm: 120 },
 };
 
@@ -132,7 +137,7 @@ export function randomParams(seed) {
   p.barCount = within(12, 36, 1); p.barMm = within(1.0, 2.0, 0.1); p.barsConverge = rnd() < 0.7;
   p.ringCount = within(1, 6, 1); p.ringPlace = pick(['even', 'even', 'clustered']); p.ringMm = within(1.2, 2.6, 0.1);
   p.doorShape = pick(['rect', 'arch', 'arch', 'gothic', 'ogee']); p.doorWidth = within(20, 40, 1); p.doorHeight = within(30, 70, 1); p.doorY = within(0, 0.3, 0.01);
-  p.baseStyle = pick(['ring', 'tray', 'skirt', 'feet']); p.hanger = pick(['none', 'ring', 'hook', 'finial']);
+  p.baseStyle = pick(['ring', 'tray', 'skirt', 'feet']); p.scallopCount = within(4, 14, 1); p.hanger = pick(['none', 'ring', 'hook', 'finial']);
   // the profile: one of five families, jittered — a function of height, monotone in x by construction
   const fam = rnd();
   const j = () => within(-0.08, 0.08, 0.01);
@@ -178,6 +183,19 @@ export function capLaw(shape, s) {
   if (shape === 'spire') return Math.pow(1 - s, 1.35);
   if (shape === 'onion') return Math.pow(Math.max(0, 1 - Math.pow(s, 2.6)), 0.55) * (1 + 0.34 * Math.sin(Math.PI * Math.pow(s, 0.85)));
   return 0;   // flat: no cap
+}
+
+/* THE PROFILE'S SHOULDERS (ruling 5): a knot of the drawn profile whose two chords, in
+   millimetres (radius Rb·y against height H·x), turn by SHOULDER_DEG or more. PCHIP is C1 at
+   every knot, so a one-sided slope cannot see a step; the chords can. Returns body heights. */
+export function profileShoulders(points, Rb, H) {
+  const out = [];
+  for (let i = 1; i < points.length - 1; i++) {
+    const [x0, y0] = points[i - 1], [x1, y1] = points[i], [x2, y2] = points[i + 1];
+    const a0 = Math.atan2(Rb * (y1 - y0), H * (x1 - x0)), a1 = Math.atan2(Rb * (y2 - y1), H * (x2 - x1));
+    if (Math.abs(a1 - a0) * 180 / Math.PI >= SHOULDER_DEG - 1e-9) out.push(H * x1);
+  }
+  return out;
 }
 
 /* THE DOOR OUTLINE: the top edge's height above the sill at arc offset s from
@@ -334,18 +352,19 @@ export function buildCage(paramsIn) {
   const nz = Math.max(24, Math.ceil(H / BODY_STEP_MM));
   for (let i = 0; i <= nz; i++) stations.push(H * i / nz);
 
-  /* the apex collar: bars converge until their pitch is COLLAR_PACK bar
-     diameters, which fixes the collar's radius from the bar count and
-     thickness rather than from a typed number */
+  /* the apex collar: bars converge until neighbouring bars are one printable
+     gap apart (pitch = 2·rBar + floor), which fixes the collar's radius from the
+     bar count, the bar and the floor rather than from a typed number */
+  const collarPitch = 2 * rBar + floor;
   let collar = null;
   if (!flat) {
-    const packR = Math.max(2 * rBar, barCount * 2 * rBar * COLLAR_PACK / TAU);
+    const packR = Math.max(2 * rBar, barCount * collarPitch / TAU);
     // the cap station where its radius reaches packR (bisection on a decreasing law)
     let lo = 0, hi = 1; for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (capR(m) > packR) lo = m; else hi = m; }
     const sC = hi, zC = H + sC * Hc;
     const rc = packR * p.collarMult;
-    collar = { sC, zC, rc, zTop: H + Hc, zBot: zC - Math.max(1.2, rc * 0.5) };
-    if (sC < 0.3) told.push(`${barCount} bars at ${(2 * rBar).toFixed(1)} mm pack at ${(100 * (1 - sC)).toFixed(0)}% of the cap's height — a wide collar; fewer or thinner bars tighten it`);
+    collar = { sC, zC, rc, packR, pitch: collarPitch, zTop: H + Hc, zBot: zC - Math.max(2.0, rc * 0.6) };
+    if (sC < 0.3) told.push(`${barCount} bars at ${(2 * rBar).toFixed(1)} mm, one ${floor.toFixed(1)} mm gap apart, meet the collar at ${(100 * (1 - sC)).toFixed(0)}% of the cap's height — a wide collar; fewer or thinner bars tighten it`);
   }
 
   /* the door, in (arc s, height z) on the surface, facing -y */
@@ -424,7 +443,9 @@ export function buildCage(paramsIn) {
     told.push(`bars end at the top ring; ${ribCount} ribs carry the ${p.topShape} to the apex`);
   }
 
-  /* the rings: base and top (frame weight), the interior count placed even or clustered */
+  /* the rings: base and top (frame weight), the interior count placed even or clustered,
+     and (ruling 5) one at every profile SHOULDER — a knot where the chords either side turn
+     by SHOULDER_DEG or more, measured in mm, so a step or a tier always carries a ring */
   const ringZ = [];
   for (let i = 1; i <= p.ringCount; i++) {
     const t = i / (p.ringCount + 1);
@@ -432,6 +453,14 @@ export function buildCage(paramsIn) {
     const tc = p.ringPlace === 'clustered' ? 0.5 + 0.5 * Math.sign(u) * Math.pow(Math.abs(u), 0.45) : t;
     ringZ.push(H * tc);
   }
+  const shoulderZ = profileShoulders(p.profile.points, Rb, H);
+  const nearRing = Math.max(3 * rRing, 2 * rFrame + rRing);
+  for (const z of shoulderZ) {
+    if ([0, H, ...ringZ].some((q) => Math.abs(q - z) < nearRing)) continue;   // a ring is already there
+    ringZ.push(z);
+  }
+  ringZ.sort((a, b) => a - b);
+  if (shoulderZ.length) told.push(`${shoulderZ.length} profile shoulder${shoulderZ.length > 1 ? 's' : ''} (${shoulderZ.map((z) => z.toFixed(0) + ' mm').join(', ')}) carr${shoulderZ.length > 1 ? 'y' : 'ies'} a ring`);
   const ringLoop = (z, rr, kind, name) => {
     // a polygon ring samples each face too (16 a face, the corners exact), so a door on a face can cut it
     const M = N ? N * 16 : RING_SECTORS;
@@ -458,16 +487,19 @@ export function buildCage(paramsIn) {
   ringZ.forEach((z, i) => ringLoop(z, rRing, 'ring', `ring ${i + 1}`));
 
   /* the collar at the apex, or the flat top's spokes and hub */
+  const rH = wireR(Math.max(p.barMm, 1.2), 'hanger wire');
   let apexZ = H;
   if (collar) {
-    // a turned cap: a short cylinder where the bars enter, easing to a rounded crown at the apex
+    // a turned BOSS (ruling 1): a band where the bars enter, a bead standing proud of it above
+    // them, then a crown easing to a flat seat at the apex the hanger stands on
     const rc = collar.rc, zb = collar.zBot, zc = collar.zC, zt = collar.zTop, hT = zt - zc;
-    const prof = [[0.001, zb], [rc * 0.92, zb], [rc, zb + 0.5 * (zc - zb)], [rc, zc + 0.2 * hT], [rc * 0.9, zc + 0.55 * hT], [rc * 0.62, zc + 0.85 * hT], [rc * 0.25, zt], [0.001, zt]];
+    const bead = rc * 1.14, seat = Math.max(rc * 0.3, rH * 1.6);
+    const prof = [[0.001, zb], [rc * 0.9, zb], [rc, zb + 0.35 * (zc - zb)], [rc, zc + 0.1 * hT], [bead, zc + 0.28 * hT], [bead, zc + 0.5 * hT], [rc * 0.92, zc + 0.68 * hT], [rc * 0.66, zc + 0.88 * hT], [seat, zt], [0.001, zt]];
     revolve(mesh, prof, { sectors: 32, kind: 'collar', name: 'apex collar', poly: 0 });
     solids.push({ kind: 'collar', profile: prof });
     apexZ = collar.zTop;
   } else {
-    const hubR = Math.max(2 * rBar, barCount * 2 * rBar * COLLAR_PACK / TAU * 0.5);
+    const hubR = Math.max(2 * rBar, barCount * collarPitch / TAU * 0.5);
     const spokes = N || 4;
     for (let j = 0; j < spokes * 2; j++) { const th = TAU * j / (spokes * 2); const pts = [surf(th, H), [hubR * 0.5 * Math.cos(th), hubR * 0.5 * Math.sin(th), H]]; tube(mesh, pts, rBar, { kind: 'spoke', name: `spoke ${j}` }); wires.push({ kind: 'spoke', pts, r: rBar }); }
     const prof = [[0.001, H - rBar], [hubR, H - rBar], [hubR, H + rBar], [0.001, H + rBar]];
@@ -479,15 +511,22 @@ export function buildCage(paramsIn) {
 
   /* the base */
   const r0 = rho(0);
+  let scallops = 0;
   if (p.baseStyle === 'tray') {
     const tT = Math.max(floor, 1.6), lip = 3.5, lipT = Math.max(floor, 1.2);
     const prof = [[0.001, -tT], [r0 + lip, -tT], [r0 + lip, 2.5], [r0 + lip - lipT, 2.5], [r0 + lip - lipT, 0], [0.001, 0]];
     revolve(mesh, prof, { sectors: N ? N * 8 : 96, kind: 'base', name: 'tray', poly: N });
     solids.push({ kind: 'tray', profile: prof, poly: N });
   } else if (p.baseStyle === 'skirt') {
+    // ruling 9: fewer, wider scallops, their count a control; built as the divisor of the bar
+    // count nearest the asked one so every cusp sits ON a bar (told when it moved)
     const D = p.skirtMm, t = Math.max(floor, p.barMm);
-    const M = barCount * 12;
-    const depth = (th) => { const u = ((th * barCount / TAU) % 1 + 1) % 1; return D * (0.4 + 0.6 * Math.sqrt(Math.max(0, 1 - Math.pow(2 * u - 1, 2)))); };
+    const divisors = []; for (let d = 1; d <= barCount; d++) if (barCount % d === 0) divisors.push(d);
+    const asked = Math.round(p.scallopCount);
+    scallops = divisors.reduce((best, d) => Math.abs(d - asked) < Math.abs(best - asked) || (Math.abs(d - asked) === Math.abs(best - asked) && d > best) ? d : best, divisors[0]);
+    if (scallops !== asked) told.push(`${asked} scallops built as ${scallops}, the divisor of ${barCount} bars nearest it, so every cusp sits on a bar`);
+    const M = scallops * 24;
+    const depth = (th) => { const u = ((th * scallops / TAU) % 1 + 1) % 1; return D * (0.4 + 0.6 * Math.sqrt(Math.max(0, 1 - Math.pow(2 * u - 1, 2)))); };
     beginPart(mesh, 'base', 'scalloped skirt');
     const col = [];
     for (let j = 0; j < M; j++) {
@@ -509,9 +548,8 @@ export function buildCage(paramsIn) {
     }
   }
 
-  /* the hanger */
+  /* the hanger: it stands on the collar's seat (or the flat top's hub) — ruling 1 */
   const hz = apexZ;
-  const rH = wireR(Math.max(p.barMm, 1.2), 'hanger wire');
   const hs = p.hangerMm;
   let topZ = hz;
   const ringAt = (zc) => { const pts = []; const M = 40; for (let j = 0; j < M; j++) { const a = TAU * j / M; pts.push([hs * Math.cos(a), 0, zc + hs * Math.sin(a)]); } return pts; };
@@ -536,7 +574,7 @@ export function buildCage(paramsIn) {
   const lowZ = p.baseStyle === 'tray' ? -Math.max(floor, 1.6) : p.baseStyle === 'skirt' ? -p.skirtMm : p.baseStyle === 'feet' ? -7 : -rFrame;
   const triangles = mesh.idx.length / 3;
   const info = {
-    barCount, ribCount, barsEnd, ringZ, rTop, Hc, collar, door: door ? { W: door.W, Dh: door.Dh, z0: door.z0, shape: door.shape } : null,
+    barCount, ribCount, barsEnd, ringZ, shoulderZ, scallops, rTop, Hc, collar, door: door ? { W: door.W, Dh: door.Dh, z0: door.z0, shape: door.shape } : null,
     heightMm: topZ - lowZ, widthMm: 2 * Math.max(...stations.map((z) => rho(z))) + (p.baseStyle === 'tray' ? 7 : 0),
     triangles, parts: mesh.parts.length, floor, process: 'SLS PA12 (assumed)',
     overhang: { deg: +overhang.deg.toFixed(1), where: overhang.where, fdmSupport: overhang.deg < FDM_OVERHANG_DEG },

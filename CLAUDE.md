@@ -11883,11 +11883,18 @@ sweeps a 3D polyline** (frame's filigree is planar) — the tube is written here
 floor assumed for SLS PA12, every wire floored and TOLD; overhang is REPORTED (the shallowest
 wire and where), never clamped. Gates, both in CI (`cage-gate.yml`, path-scoped to the cage's
 files plus the two imported modules; no flower or bloom gate reads a cage file): `node
-tools/verify-cage.mjs` (C0–C15 over the presets + 24 random cages; `--negative-control` ten
+tools/verify-cage.mjs` (C0–C16 over the presets + 24 random cages; `--negative-control` thirteen
 mutants) and `node tools/verify-cage-page.mjs` (Chromium, real drags and downloads;
 `--negative-control` four). Sheet: `node tools/shot-cage.mjs <dir> --png <file>` →
-`docs/img/cage-phase-1.png`. **Phase 1 stopped at the ruling sheet; §5 of the doc is the open
-list. Phase 2 (decorative ring bands and door infill from /frame's filigree) is NOT built.**
+`docs/img/cage-phase-1.png`. **Eva's rulings on the Phase 1 sheet are applied (Oct 29, §5 of the
+doc): bars meet a turned collar BOSS one printable gap apart (`2·rBar + floor`, derived — the
+1.05-diameter pack is gone) and the hanger stands on it; every profile shoulder (a knot whose
+chords turn by `SHOULDER_DEG` 25° in mm, `profileShoulders` — PCHIP is C1 so one-sided slopes
+cannot see a step) auto-places a ring; the skirt's `scallopCount` is built as the nearest divisor
+of the bar count so every cusp sits on a bar; the 90 × 110 default and the single
+`MIN_FEATURE_MM` floor (SLS PA12 assumed) stand, both brackets having been left unfilled.
+Phase 2 (decorative ring bands and door infill from /frame's filigree) is NOT built and waits on
+/frame's ornament rework; a curved band will be approximated as a cone segment (doc §5.10).**
 
 ## `/frame` — the Parametric Frame (pointer only)
 

@@ -9,7 +9,7 @@
    frame, the polygon's corners, the rings' placement, the mitre's stretch,
    the SVG's census, and byte determinism.
 
-   `--negative-control` serves ten mutants of cage-geometry.js and requires
+   `--negative-control` serves thirteen mutants of cage-geometry.js and requires
    each to redden exactly the clauses it names (and nothing else); every
    anchor is checked before any mutant runs.
 
@@ -138,16 +138,40 @@ async function run(modulePath, { quiet = false } = {}) {
     // rings: the count, and clustered ones sit nearer the ends than even ones would
     const loops = m.wires.filter((w) => w.kind === 'ring' || w.kind === 'frame');
     const zs = [...new Set(loops.map((w) => +w.pts[0][2].toFixed(6)))];
-    check(`C8 ${cs.label} ring heights: base, top and ${cs.params.ringCount} between`, zs.length === cs.params.ringCount + 2, `${zs.length}`);
+    // ruling 5: every profile SHOULDER (restated here from the CONTROL's own points by the chord law) carries a ring,
+    // and the ring count is the asked count plus the shoulders that landed clear of one (within 1e-6 of a shoulder = its own)
+    const Rb = cs.params.widthMm / 2, Hb = cs.params.heightMm, pp = cs.params.profile.points;
+    const shoulders = []; for (let i = 1; i < pp.length - 1; i++) { const a0 = Math.atan2(Rb * (pp[i][1] - pp[i - 1][1]), Hb * (pp[i][0] - pp[i - 1][0])), a1 = Math.atan2(Rb * (pp[i + 1][1] - pp[i][1]), Hb * (pp[i + 1][0] - pp[i][0])); if (Math.abs(a1 - a0) * 180 / Math.PI >= G.SHOULDER_DEG - 1e-9) shoulders.push(Hb * pp[i][0]); }
+    const rRingE = Math.max(floor, cs.params.ringMm) / 2, rFrameE = Math.max(floor, cs.params.ringMm * cs.params.frameRingMult) / 2, nearRing = Math.max(3 * rRingE, 2 * rFrameE + rRingE);
+    const own = shoulders.filter((sz) => zs.some((z) => Math.abs(z - sz) < 1e-6)).length;
+    check(`C8 ${cs.label} ring heights: base, top, ${cs.params.ringCount} between and ${own} of ${shoulders.length} shoulder${shoulders.length === 1 ? '' : 's'}`, zs.length === cs.params.ringCount + 2 + own, `${zs.length}`);
+    if (shoulders.length) check(`C8c ${cs.label} every profile shoulder carries a ring within ${nearRing.toFixed(2)} mm (restated from the control's chords)`, shoulders.every((sz) => zs.some((z) => Math.abs(z - sz) < nearRing)) && m.told.some((t) => /shoulder/.test(t)));
     if (cs.params.ringPlace === 'clustered' && cs.params.ringCount >= 2) {
       const inner = m.info.ringZ, even = cs.params.heightMm / (cs.params.ringCount + 1);
       check(`C8b ${cs.label} clustered rings sit closer to the ends than even spacing`, inner[0] < even - 1e-9 && inner[inner.length - 1] > cs.params.heightMm - even + 1e-9);
     }
     // the top: converging bars reach the collar; bars ending at the ring leave ribs
     if (cs.params.topShape !== 'flat') {
+      if (cs.params.barsConverge && !(+cs.params.sides | 0)) {
+        // ruling 1: neighbouring bars meet the collar ONE PRINTABLE GAP apart — the chord between the bars' last
+        // cap stations (the point before the bury) against the pitch 2·rBar + floor, restated from the controls
+        const B = m.info.barCount, ends = m.wires.filter((w) => w.kind === 'bar' && w.pts[w.pts.length - 1][2] > cs.params.heightMm).map((w) => w.pts[w.pts.length - 2]);
+        const pitch = Math.max(floor, cs.params.barMm) + floor, sinc = Math.sin(Math.PI / B) / (Math.PI / B);
+        let worst = Infinity; for (const e of ends) { const th = Math.atan2(e[1], e[0]); const nb = ends.find((q) => q !== e && Math.abs(Math.atan2(Math.sin(Math.atan2(q[1], q[0]) - th - 2 * Math.PI / B), Math.cos(Math.atan2(q[1], q[0]) - th - 2 * Math.PI / B))) < 1e-6); if (nb) worst = Math.min(worst, Math.hypot(nb[0] - e[0], nb[1] - e[1], nb[2] - e[2])); }
+        check(`C9b ${cs.label} neighbouring bars meet the collar one printable gap apart (${worst.toFixed(3)} mm chord against a ${pitch.toFixed(2)} mm pitch)`, ends.length >= 2 && worst >= pitch * sinc - 1e-6 && worst <= pitch + 1e-6);
+      }
       if (cs.params.barsConverge) check(`C9 ${cs.label} bars converge: no ribs, every bar's top end inside the collar`, m.info.ribCount === 0 && m.wires.filter((w) => w.kind === 'bar').every((w) => w.pts[w.pts.length - 1][2] <= cs.params.heightMm + 1e-6 || Math.hypot(w.pts[w.pts.length - 1][0], w.pts[w.pts.length - 1][1]) <= m.info.collar.rc + 1e-6));
       else check(`C9 ${cs.label} bars end at the top ring: ${m.info.ribCount} ribs (about half the bars), told`, m.info.ribCount >= Math.floor(m.info.barCount / 2) - 1 && m.info.ribCount <= Math.ceil(m.info.barCount / 2) + (+cs.params.sides | 0) && m.told.some((t) => /ribs carry/.test(t)) && m.wires.filter((w) => w.kind === 'rib').length === m.info.ribCount);
     } else check(`C9 ${cs.label} flat top: spokes and a hub, told`, m.wires.some((w) => w.kind === 'spoke') && m.told.some((t) => /spokes/.test(t)));
+    // ruling 9: the skirt's cusps (the shallowest points of its edge) sit ON bars, and their count divides the bar count
+    if (cs.params.baseStyle === 'skirt') {
+      const sk = m.wires.find((w) => w.kind === 'skirt'), e = sk.pts.slice(0, -1), n = e.length;
+      const cusps = []; for (let i = 0; i < n; i++) { const z = e[i][2], zp = e[(i + n - 1) % n][2], zn = e[(i + 1) % n][2]; if (z > zp + 1e-9 && z >= zn - 1e-9 && !(z > zp && Math.abs(z - zn) < 1e-9 && cusps.length && cusps[cusps.length - 1] === (i + n - 1) % n)) cusps.push(i); }
+      const barAz = m.wires.filter((w) => w.kind === 'bar').map((w) => Math.atan2(w.pts[0][1], w.pts[0][0]));
+      const onBar = cusps.every((i) => { const th = Math.atan2(e[i][1], e[i][0]); return barAz.some((b) => Math.abs(Math.atan2(Math.sin(b - th), Math.cos(b - th))) < 1e-6); });
+      const asked = Math.round(cs.params.scallopCount);
+      check(`C16 ${cs.label} skirt: ${cusps.length} scallop cusps, a divisor of ${m.info.barCount} bars nearest the asked ${asked}, every cusp on a bar`, cusps.length === m.info.scallops && m.info.barCount % cusps.length === 0 && onBar && (cusps.length === asked || m.told.some((t) => /scallops built as/.test(t))));
+    }
     // the SVG: one path per wire and per solid, a viewBox in millimetres that holds the drawing
     const svg = G.exportSvg(m);
     const paths = (svg.match(/<path /g) || []).length;
@@ -181,6 +205,9 @@ const MUTANTS = [
   { id: 'the-svg-drops-the-door', from: "const order = ['skirt', 'frame', 'ring', 'bar', 'rib', 'spoke', 'door', 'hanger'];\n  const wires = [...model.wires]", to: "const order = ['skirt', 'frame', 'ring', 'bar', 'rib', 'spoke', 'door', 'hanger'];\n  const wires = [...model.wires].filter((w) => w.kind !== 'door')", breaks: /^C10b? / },
   { id: 'the-collar-is-not-built', from: "revolve(mesh, prof, { sectors: 32, kind: 'collar', name: 'apex collar', poly: 0 });", to: "", breaks: /^C3 / },
   { id: 'clustered-rings-are-even', from: "const tc = p.ringPlace === 'clustered' ?", to: "const tc = false ?", breaks: /^C8b / },
+  { id: 'a-profile-step-gets-no-ring', from: "const shoulderZ = profileShoulders(p.profile.points, Rb, H);", to: "const shoulderZ = [];", breaks: /^C8c? / },
+  { id: 'bars-pack-until-they-touch', from: "const collarPitch = 2 * rBar + floor;", to: "const collarPitch = 2 * rBar * 1.05;", breaks: /^C9b / },
+  { id: 'the-scallop-cusps-leave-the-bars', from: "const u = ((th * scallops / TAU) % 1 + 1) % 1;", to: "const u = ((th * (scallops + 1) / TAU) % 1 + 1) % 1;", breaks: /^C16 / },
   { id: 'bars-ending-at-the-ring-get-no-ribs', from: "if (!flat && barsEnd === 'ring') {", to: "if (false) {", breaks: /^C3 |^C9 / },
 ];
 if (NEG) {

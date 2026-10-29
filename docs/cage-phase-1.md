@@ -42,12 +42,21 @@ Z up, the base ring at z = 0, the door facing −y (the front elevation looks al
   `(1−s)^1.35`, onion a bulged cap, flat none.
 - **Bars** at even azimuths (a polygon's count is rounded to a multiple of N so every corner
   carries one, told), sampled every 1.5 mm up the body and 1.0 mm over the cap. Converging
-  bars run over the cap until their pitch is **1.05 bar diameters** (`COLLAR_PACK`), where a
-  turned **collar** (a revolve) takes them; its radius is derived from the count and the
-  thickness, never typed. Bars ending at the top ring leave the cap to **half their number of
+  bars run over the cap until neighbouring bars are **one printable gap apart** (pitch
+  `2·rBar + floor` — Eva's ruling 1, replacing the 1.05-diameter pack: the bars read as
+  individual wires meeting a collar), where a turned **collar boss** (a revolve: a band the
+  bars enter, a bead 1.14× proud of it, a crown to a flat seat the hanger stands on) takes
+  them; its radius is derived from the count, the bar and the floor, never typed
+  (`collarMult` scales it, default 1.0). Bars ending at the top ring leave the cap to **half their number of
   ribs** (told). A flat top gets **2N spokes (8 round) and a hub** so the hanger has something to stand on (told).
 - **Rings**: base and top at `ringMm × frameRingMult`, `ringCount` between, even or
-  clustered toward the ends (`t' = ½ + ½·sign(u)·|u|^0.45`). A polygon ring samples each
+  clustered toward the ends (`t' = ½ + ½·sign(u)·|u|^0.45`), **and one at every profile
+  shoulder** (ruling 5): a knot of the drawn profile whose two chords, in millimetres, turn by
+  `SHOULDER_DEG` (25°) or more — PCHIP is C1 at every knot, so a one-sided slope cannot see a
+  step and the chords are what decide it (`profileShoulders`). A shoulder within
+  `max(3·rRing, 2·rFrame + rRing)` of a ring already placed takes that ring; the rest are
+  added and told. The tiered preset's two shoulders (75 and 86 mm) carry rings now; the bell
+  and the onion, whose chords turn by 8–20°, get none. A polygon ring samples each
   face 16 times with the corners exact.
 - **Door**: an outline in (arc s, height z) on the surface — rectangle, round arch (radius
   `min(a, h/2)`), gothic (two arcs of radius W, rise `min(0.6h, 0.866W)`), ogee (pointed, rise
@@ -58,9 +67,12 @@ Z up, the base ring at z = 0, the door facing −y (the front elevation looks al
   cut's own arc coordinate, so the jambs and the ring ends meet to the bit (the first cut
   used an approximate inverse and the gate caught the polygon case 2 ends off).
 - **Base**: plain ring; tray (a revolved dish with a lip, polygon-aware); scalloped skirt (a
-  closed wall whose lower edge sags between the bars — cusps at the bars, one scallop per bar);
+  closed wall whose lower edge sags in `scallopCount` scallops — ruling 9: fewer, wider, the
+  count a control (2–24, default 8, about one per two or three bars), BUILT as the divisor of
+  the bar count nearest the asked one so every cusp sits on a bar, told when it moved);
   feet (turned buns, N under the ring).
-- **Hanger**: ring, hook (a J in the x–z plane), finial + ring (a turned spindle, then the ring).
+- **Hanger**: ring, hook (a J in the x–z plane), finial + ring (a turned spindle, then the
+  ring) — it stands on the collar's seat (or the flat top's hub), ruling 1.
 
 **Print.** Floor `MIN_FEATURE_MM = 1.0`, assumed for **SLS PA12** (the process this site's
 generators assume; nothing has been printed). Every wire radius is floored and the clamp
@@ -73,29 +85,38 @@ The dome ribs read 25–60° at the collar; a flat ring is a bridge for FDM and 
 
 | Preset | overall mm | triangles | STL | bars | door |
 |---|---|---|---|---|---|
-| Cylinder (default) | 90 × 152 | 53,292 | 2.5 MiB | 20 | arch 30×48 |
-| Bell | 107 × 173 | 60,924 | | 22 | arch 28×46 |
-| Pyramid / cone | 107 × 162 | 42,756 | | 16 (4-gon) | gothic 26×50 |
-| Onion | 96 × 175 | 64,832 | | 24 | ogee 28×50 |
-| Tiered dome on drum | 100 × 189 | 70,536 | | 24 | rect 30×40 |
-| Hex lantern | 86 × 179 | 52,092 | | 18 (6-gon) | rect 28×52 |
+| Cylinder (default) | 90 × 152 | 53,420 | 2.5 MiB | 20 | arch 30×48 |
+| Bell | 107 × 173 | 61,052 | | 22 | arch 28×46 |
+| Pyramid / cone | 107 × 162 | 41,924 | | 16 (4-gon) | gothic 26×50 |
+| Onion | 96 × 175 | 64,480 | | 24 | ogee 28×50 |
+| Tiered dome on drum | 100 × 189 | 73,256 | | 24 | rect 30×40 |
+| Hex lantern | 86 × 179 | 51,140 | | 18 (6-gon) | rect 28×52 |
+
+(After the Oct 29 rulings; the tiered cage gained its two shoulder rings. The default's
+collar boss reads r 7.6 mm, bead 8.7 mm, the twenty 1.4 mm bars meeting it 2.40 mm apart.)
 
 Worst reachable: 48 bars × 240 mm ≈ 230 k triangles. Builds are ~40 ms; a slider drag rebuilds
 on the next frame.
 
 ## 3. Gates
 
-`node tools/verify-cage.mjs` (427 checks over 6 presets + 24 random cages): C1 the STL's
+`node tools/verify-cage.mjs` (452 checks over 6 presets + 24 random cages): C1 the STL's
 bytes are watertight (`analyzeStl`, boundary 0); C2 every part is its own closed shell
 (directed-edge census per part); C3 ONE piece (a 1.0 mm voxel flood fill); C4 every emitted
 wire at or above the floor; C5 every cut end ON the frame wire, C5b the door cuts bars, **C5c
 no bar or ring sample inside the opening, restated from the EMITTED frame alone** (a
 point-in-polygon in (arc, z) — the clause the uncut-ring mutant needed; the ends-only clause
 could not see a ring that was never cut); C6 polygon corners; C7 the mitre read off the base
-ring's own vertices (`R + r/cos(π/N)`); C8 ring heights and clustering; C9 converge / ribs /
-spokes; C10 the SVG census and mm viewBox; C11 determinism; C12 the overhang report; C13 the
-floor told; C14 a profile outside the box refused; C15 the polygon rounding told.
-`--negative-control`: ten mutants, each caught by what it names, 10 of 10.
+ring's own vertices (`R + r/cos(π/N)`); C8 ring heights and clustering, **C8c every profile
+shoulder carries a ring** (the shoulders restated in the gate from the CONTROL's points by the
+chord law, never read off the builder); C9 converge / ribs / spokes, **C9b neighbouring bars
+meet the collar one printable gap apart** (the chord between the bars' last cap stations off the
+EMITTED wires against `2·rBar + floor` restated from the controls; round cages); C10 the SVG
+census and mm viewBox; C11 determinism; C12 the overhang report; C13 the floor told; C14 a
+profile outside the box refused; C15 the polygon rounding told; **C16 the skirt's cusps** (the
+shallowest points of the emitted edge) **sit on bars and divide the bar count**, told when the
+asked count moved. `--negative-control`: thirteen mutants, each caught by what it names, 13 of 13
+(the three new: a step that gets no ring, bars packing until they touch, cusps off the bars).
 
 `node tools/verify-cage-page.mjs` (14 checks, Chromium): controls in the DOM, a slider's own
 input rebuilds, preset → custom, visibility both ways, the SVG stage shows the export's own
@@ -107,8 +128,11 @@ four mutants of `cage.js`.
 
 ## 4. Decisions made without a ruling (each reversible, named)
 
-1. **Bars pack to 1.05 diameters at the collar** and the collar is a turned cap sized from
-   that. *Rejected*: a typed collar radius. *Undo*: `COLLAR_PACK`, `collarMult`.
+1. ~~**Bars pack to 1.05 diameters at the collar** and the collar is a turned cap sized from
+   that.~~ **RULED Oct 29 (1): a looser pack with a visible boss** — bars meet the collar one
+   printable gap apart (`2·rBar + floor`, derived), the collar is a turned boss with a bead,
+   and the hanger stands on its seat. *Rejected*: a typed collar radius. *Undo*: `collarPitch`
+   in `buildCage`, `collarMult`.
 2. **A polygon's bar count rounds to a multiple of N** so every corner carries a bar, told.
    *Undo*: one `if` in `buildCage`.
 3. **Bars ending at the top ring leave half their number of dome ribs** (the Victorian
@@ -120,17 +144,39 @@ four mutants of `cage.js`.
    so the door keeps its jambs. *Undo*: `doorTop`.
 7. **The SVG draws every wire, back and front** (a cage is its wires), each at its own
    diameter, solids as silhouettes; paper `#EDEDE8`, ink `#0A0A0C`.
-8. **Default size 90 × 110 mm body**, bars 1.4 mm, rings 1.8 mm, frame rings 1.25×.
+8. **Default size 90 × 110 mm body**, bars 1.4 mm, rings 1.8 mm, frame rings 1.25×. (Ruling 6
+   left the size bracket unfilled and asked only that the default be taller than wide: 90 × 110
+   is, so it stands.)
+9. **The shoulder threshold `SHOULDER_DEG` = 25°** (ruling 5 asked for a ring at every
+   step/shoulder and did not say what a shoulder is): chosen so the tiered preset's two knots
+   (55° of chord turn) and the random step family read as shoulders while the bell's (8°) and
+   the onion's (17–20°) do not. *Undo*: one constant.
+10. **Scallops default 8, built as the nearest divisor of the bar count** (ruling 9 asked for
+   about one per two or three bars with cusps on bars; a divisor is what puts every cusp on a
+   bar at any count). *Rejected*: snapping the bar count to the scallops. *Undo*: the divisor
+   reduce in the skirt block.
 
-## 5. Open questions for Eva (one line each)
+## 5. Eva's rulings on the Phase 1 sheet (Oct 29) — the open questions, answered
 
-1. **Collar**: bars packing to 1.05 diameters (they all but touch) — keep, or a looser pack with a visible collar?
-2. **Dome ribs** when bars end at the top ring: half the bar count — ruling, or a control?
-3. **Polygon bar count rounding to a multiple of N** — accept, or let the slider hold any count with corner-less faces?
-4. **Door on the front only** — enough for Phase 1, or does the door want an azimuth control?
-5. **Tiered preset**: the shoulder has no ring of its own; should a profile step auto-place a ring, or is the drawn shoulder enough?
-6. **Default cage**: cylinder 90 × 110, dome 0.6, 20 bars, arch door, ring hanger — is this the antique default?
-7. **Print process**: SLS PA12 at a 1.0 mm floor is assumed; if FDM is the target the dome ribs and the hanger ring need support (said on the read-out) — rule the process.
-8. **Size range**: 40–160 mm wide, 40–240 mm tall — enough?
-9. **Scalloped skirt**: one scallop per bar with cusps at the bars — or fewer, wider scallops?
-10. **Phase 2 attachment**: the ring bands are developable, so /frame's planar scroll groups unwrap onto them unchanged; the door infill is a planar panel — confirm that is the intended route before any filigree work.
+1. **Collar**: a looser pack with a visible collar/boss at the apex; bars read as individual
+   wires meeting a collar, not fused; the hanger attaches to the collar. **Applied** (§1, §4.1).
+2. **Dome ribs** at half the bar count when bars end at the top ring: **a fixed ruling, no control.**
+3. **Polygon bar count rounding to a multiple of N**: accepted.
+4. **Door on the front only**: fine for Phase 1.
+5. **Every profile step/shoulder auto-places a ring**: yes. **Applied** (§1, §4.9).
+6. **Default**: the bracket (keep 90 × 110, or change to ___) was left unfilled; the one
+   constraint given is that the default be taller than wide. 90 × 110 is, and **stands**.
+7. **Print process**: the bracket (SLS PA12 at 1.0 mm / other ___) was left unfilled; the one
+   instruction was that the floor be a single named constant. It is — `MIN_FEATURE_MM` is the
+   only floor, every wire and the skirt read it — and **SLS PA12 at 1.0 mm stays the assumption**.
+8. **Size range** 40–160 W, 40–240 H: fine.
+9. **Scalloped skirt**: fewer, wider scallops with the count a control (about one per two or
+   three bars, cusps on bars). **Applied** (§1, §4.10).
+10. **Phase 2 route**: confirmed in principle, and **not started** — /frame's ornament is being
+   reworked (it floats instead of following the shape); the cage's bands consume it once that
+   lands. **A bell's sections are not developable**: the ring bands of a profile that curves
+   in height are surfaces of revolution with curvature, so a planar scroll group cannot unwrap
+   onto them exactly. Phase 2 will approximate each band as a **cone segment** (the frustum
+   through the band's two edge rings — developable, a 1-chord error of the profile's sagitta
+   across the band's height) and unwrap onto that; the cylinder and the polygon faces are
+   exact. Recorded here so Phase 2 does not rediscover it.

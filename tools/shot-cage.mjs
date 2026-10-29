@@ -29,7 +29,7 @@ for (const id of PRESET_IDS) {
   await page.waitForTimeout(150);
   const s = path.join(OUT, `${id}-svg.png`); await page.screenshot({ path: s, clip: { x: 370, y: 30, width: 540, height: 815 } });
   fs.writeFileSync(path.join(OUT, `${id}.svg`), await page.evaluate(() => window.__cage.svgText()));
-  const cap = `${info.widthMm.toFixed(0)} × ${info.heightMm.toFixed(0)} mm · ${info.triangles.toLocaleString()} tris · bars ${info.barCount}${info.ribCount ? ` + ${info.ribCount} ribs` : ''} · door ${info.door ? `${info.door.shape} ${info.door.W.toFixed(0)}×${info.door.Dh.toFixed(0)}` : 'none'} · shallowest wire ${info.overhang.deg.toFixed(0)}° (${info.overhang.where})${info.told.length ? ' · told: ' + info.told.join('; ') : ''}`;
+  const cap = `${info.widthMm.toFixed(0)} × ${info.heightMm.toFixed(0)} mm · ${info.triangles.toLocaleString()} tris · bars ${info.barCount}${info.ribCount ? ` + ${info.ribCount} ribs` : ''} · rings ${info.ringZ.length}${info.shoulderZ.length ? ` (${info.shoulderZ.length} at shoulders)` : ''}${info.scallops ? ` · ${info.scallops} scallops` : ''} · door ${info.door ? `${info.door.shape} ${info.door.W.toFixed(0)}×${info.door.Dh.toFixed(0)}` : 'none'} · shallowest wire ${info.overhang.deg.toFixed(0)}° (${info.overhang.where})${info.told.length ? ' · told: ' + info.told.join('; ') : ''}`;
   cells.push({ id, label: PRESET_LABELS[id], r: path.basename(r), s: path.basename(s), cap });
   console.log(id, cap);
 }

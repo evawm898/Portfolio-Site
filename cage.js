@@ -245,7 +245,8 @@ function writeReadout() {
   document.getElementById('readout').innerHTML = [
     `<b>${i.widthMm.toFixed(0)} × ${i.heightMm.toFixed(0)} mm</b> overall · ${i.triangles.toLocaleString()} triangles · ${i.parts} closed parts`,
     `bars <b>${i.barCount}</b>${i.ribCount ? ` + ${i.ribCount} dome ribs` : ''} (${i.barsEnd === 'apex' ? 'converge at the apex' : 'end at the top ring'}) · rings ${i.ringZ.length} between base and top`,
-    i.collar ? `collar r ${i.collar.rc.toFixed(1)} mm at ${(100 * (1 - i.collar.sC)).toFixed(0)}% of the cap` : 'flat top',
+    i.collar ? `collar boss r ${i.collar.rc.toFixed(1)} mm (bead ${(i.collar.rc * 1.14).toFixed(1)}), the bars meeting it ${i.collar.pitch.toFixed(2)} mm apart at ${(100 * (1 - i.collar.sC)).toFixed(0)}% of the cap; the hanger stands on it` : 'flat top',
+    `${i.shoulderZ.length ? `${i.shoulderZ.length} profile shoulder${i.shoulderZ.length > 1 ? 's' : ''} auto-ringed` : 'no profile shoulder'}${i.scallops ? ` · skirt: ${i.scallops} scallops, cusps on bars` : ''}`,
     `door ${door}`,
     `print: ${PRINT_NOTE}; shallowest wire ${over}`,
   ].join('\n');
