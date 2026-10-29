@@ -652,7 +652,9 @@ async function partTwo(G, R) {
     // the default carved lead (23 mm) holds only 0.50–0.53 turns — its fat
     // body leaves the eye little room (charter §13.6) — so the slider's
     // travel is probed on a 46 mm lead (scale 5), where it spans 0.50–0.70
-    ornTightness: { ...ORN, ornScale: 5 } };
+    ornTightness: { ...ORN, ornScale: 5 },
+    // the band pattern's rows are hidden and inert at 'none': probed with the beading on
+    bandEdge: { bandPattern: 'beading' }, bandSize: { bandPattern: 'beading' }, bandPitch: { bandPattern: 'beading' } };
   const baseOf = {};
   for (const s of R.PARAM_SPEC) {
     if (s.section === 'print') continue;        // the print rows reach the STL, never the paper: V2 below

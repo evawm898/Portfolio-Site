@@ -367,12 +367,14 @@ export function leafEnvelope(s, L, W, lobes = LEAF_LOBES) {
   return W * env * (0.5 + 0.5 * Math.sqrt(Math.max(0, Math.sin(Math.PI * fr))));
 }
 export const leafWidth = (s, L, W, kap, lobes = LEAF_LOBES) => Math.max(MIN_FEATURE_MM, Math.min(leafEnvelope(s, L, W, lobes), LEAF_FOLD / Math.max(1e-12, Math.abs(kap))));
-export function buildLeaf({ length, width, side = 1, curl = LEAF_CURL, lobes = LEAF_LOBES } = {}) {
+export function buildLeaf({ length, width, side = 1, curl = LEAF_CURL, lobes = LEAF_LOBES, step = 0.4, minStations = 48 } = {}) {
   const L = length, told = [];
   let W = width;
   if (W < MIN_FEATURE_MM) { told.push(`leaf ${W.toFixed(2)} mm wide built at the ${MIN_FEATURE_MM.toFixed(1)} mm assumed minimum feature`); W = MIN_FEATURE_MM; }
   // the arc law, finer than a scroll's step so each lobe is a dozen stations
-  const n = Math.max(48, Math.ceil(L / 0.4), 12 * lobes);
+  // (the band pattern's small straight leaves pass their own step and floor:
+  // a 4 mm leaf at 48 stations is a lattice nothing resolves)
+  const n = Math.max(minStations, Math.ceil(L / step), 12 * lobes);
   const ds = L / n;
   const pts = [[0, 0]], tan = [0], u = [0], kap = [leafKappa(0, L, side, curl)];
   let x = 0, y = 0, f = 0;
