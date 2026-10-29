@@ -11866,6 +11866,29 @@ draggable line's case. The LB8–LB10 / IM15–IM16 families and the `library3:`
 gate's own fixture (three fanned LEAF blades, `THREE_PAIR_SHAPE` — a strap first, and its fitted row refused the STL: a straight margin into a notch leaves the front pair a 4.37 mm wedge under the floor) so they are never vacuous. **LB10's blend-pool mutant was a coin flip on a min-hash draw and LB8's zeroed-angle mutant had one owner on both sides** — a pool of one two-pair entry beside two N-pair ones, and the fixture's angles restated in the gate, are the witnesses now (design doc §18). **THREE SHIP (Eva, Oct 9): `three-3.webp#4`, `three-3.webp#5`, `three-4.png#3`**; four FIXABLE crops (`4.png` #1/#5/#6/#9) are NOT hand-placed and are the TEST CASES of a fitter-redesign session (§18.7). Dev tool
 and review page: `node tools/bug-wing-three-pair.mjs` over the gitignored sources.
 
+## `/cage` — the Parametric Cage (pointer only)
+
+Hidden generative page (`cage.html`, `cage.css`, `cage.js`, `cage-geometry.js`; `noindex`,
+unlinked). Its governing document is **`docs/cage-phase-1.md`** — read §0 (the audit) and §1
+before touching any cage file. The law: a cage is VERTICAL BARS on a surface of revolution or
+a regular prism whose side profile is a drawn curve (bloom-curve.js's own value, a `single`
+PCHIP function of height, edits REFUSED never clamped), crossed by horizontal RINGS, with a
+DOOR cut through the bars and closed by a frame wire. `buildCage()` is the ONE owner: every
+wire is a centreline in mm first, the STL sweeps those centrelines (`tube()`: a
+rotation-minimising frame with the exact elliptical MITRE at every vertex, so a polygon ring's
+corners are true), the SVG projects the same centrelines onto the front elevation. Imported
+unchanged: `bloom-curve.js`, and `Mesh` / `exportStl` / `analyzeStl` from `frame-relief.js`.
+Copied: bloom's `revolveInto` core, bug's panel builder and camera. **Nothing in the repo
+sweeps a 3D polyline** (frame's filigree is planar) — the tube is written here. Print: a 1.0 mm
+floor assumed for SLS PA12, every wire floored and TOLD; overhang is REPORTED (the shallowest
+wire and where), never clamped. Gates, both in CI (`cage-gate.yml`, path-scoped to the cage's
+files plus the two imported modules; no flower or bloom gate reads a cage file): `node
+tools/verify-cage.mjs` (C0–C15 over the presets + 24 random cages; `--negative-control` ten
+mutants) and `node tools/verify-cage-page.mjs` (Chromium, real drags and downloads;
+`--negative-control` four). Sheet: `node tools/shot-cage.mjs <dir> --png <file>` →
+`docs/img/cage-phase-1.png`. **Phase 1 stopped at the ruling sheet; §5 of the doc is the open
+list. Phase 2 (decorative ring bands and door infill from /frame's filigree) is NOT built.**
+
 ## `/frame` — the Parametric Frame (pointer only)
 
 Hidden generative page (`frame.html`, `frame.css`, `frame.js`, `frame-registry.js`,

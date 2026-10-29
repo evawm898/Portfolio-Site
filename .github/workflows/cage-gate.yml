@@ -1,0 +1,91 @@
+# /cage — the Parametric Cage (docs/cage-phase-1.md).
+#
+# geometry: tools/verify-cage.mjs, pure Node — every preset and 24 random
+#   cages: watertight bytes, every part closed, one voxel region, the print
+#   floor on every emitted wire, the door cut read off the emitted bars, the
+#   polygon's corners and mitre, the rings, the SVG census, determinism —
+#   then its negative control (ten mutants of cage-geometry.js, each caught
+#   by the clause that names it).
+# page: tools/verify-cage-page.mjs, headless Chromium with real pointer drags
+#   and downloads, then its negative control (four broken copies of cage.js).
+#
+# PATH SCOPE: the cage's own files, the two modules it imports from other
+# generators (bloom-curve.js, frame-relief.js and what that imports), and the
+# shared harness helper. No flower or bloom gate reads any cage file.
+name: cage-gate
+
+on:
+  pull_request:
+    paths:
+      - cage.html
+      - cage.css
+      - 'cage*.js'
+      - bloom-curve.js
+      - frame-relief.js
+      - frame-geometry.js
+      - frame-registry.js
+      - 'tools/verify-cage*.mjs'
+      - tools/cage-page-harness.mjs
+      - tools/shot-cage.mjs
+      - tools/chromium-harness.mjs
+      - .github/workflows/cage-gate.yml
+  push:
+    branches: [main]
+    paths:
+      - cage.html
+      - cage.css
+      - 'cage*.js'
+      - bloom-curve.js
+      - frame-relief.js
+      - frame-geometry.js
+      - frame-registry.js
+      - 'tools/verify-cage*.mjs'
+      - tools/cage-page-harness.mjs
+      - tools/shot-cage.mjs
+      - tools/chromium-harness.mjs
+      - .github/workflows/cage-gate.yml
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  geometry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Gate (every preset + 24 random cages)
+        run: node tools/verify-cage.mjs --seeds 24
+      - name: Negative control (every mutant caught by the clause that names it)
+        run: node tools/verify-cage.mjs --negative-control
+
+  page:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned playwright; three served from node_modules)
+        run: npm i --no-save playwright@1.62.1 three@0.161.0
+      - name: Drop Google's Chrome apt source (it is not used, and it broke CI)
+        run: |
+          sudo rm -fv /etc/apt/sources.list.d/google-chrome* || true
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Page gate (real pointer drags and downloads)
+        run: node tools/verify-cage-page.mjs
+      - name: Page negative control
+        run: node tools/verify-cage-page.mjs --negative-control
+      - name: Ruling sheet (every preset, render + SVG)
+        run: node tools/shot-cage.mjs cage-sheet --png cage-sheet/cage-phase-1.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cage-sheet
+          path: cage-sheet
