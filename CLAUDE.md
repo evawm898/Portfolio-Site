@@ -11950,6 +11950,25 @@ priced per group before building and a group past it gives way, told (no reachab
 reaches it). Gates CV1–CV5, AR1, LF1–LF4, CL1, TB1–TB2, nine mutants. The default 23 mm carved lead
 spans only 0.50–0.53 turns, and one of each group's two leaves does not fit (told) — length is phase
 3d's (the running chains). Carved and leaf crowns are floored at F.
+**Phase 3d (Oct 28): RUNNING CHAINS, SEATED ON THE MOLDING** (charter §14, Eva's 2B + 4B — read it before
+touching `CHAIN_RUNS`, `runPath`, `buildChain`, `settleChains`, `moldingHeightField`/`seatOn`, `baseLift` or
+OR7–OR9). The default layout (`ornLayout` chains; groups one choice away, unchanged). Each run between
+right-hand anchors is a path from `offsetCurve` inside the band's outer edge (cut at x = 0 on the axis, at
+the mitre vertex on a corner); C–S…S–C elements laid sequentially on the MAPPED geometry a feature + 0.1 mm
+apart, each pushed onto the molding until every stretch within 2F reaches the embed (read at 2F AND F — a
+curl-back is a second run only at F) and stopped at the opening (`plateOutline` less the bands), else not
+built, told. Junction motifs: a palmette on the axis (centre leaf exactly on x = 0, its own mirror),
+rosettes at springings/corners, settled first. **The seat is the molding's OWN height field** — the bands
+built by `bandSolid` into a scratch mesh, their tops rasterised, read across each row's span; the run's own
+profile in the run's frame sank wires 0.3 mm on an ear and 1.9 mm where a rosette reached the sill;
+then re-read at each row's EMITTED columns and at their mirror images (the raster is not bit-symmetric).
+An element the path folds across a sharp corner gives way (fewer turns cannot undo it).
+`mapToPath`'s tangents are UNWRAPPED (atan2 hid whole turns from `selfGap`; a coil overlapped itself
+1.375 mm). Under chains the groups' scale, wire and wire style hide (a chain is sized by its run and is
+carved), and Bottom centre hides on an arch (no bottom run). OR7/OR8 count the groups' slits and opening
+wires rather than asserting them; OR9 excludes the ornament solids, which are bands too, by name. Eight
+mutants; relief negative control in more CI shards. Sheet: `node tools/shot-frame-chains.mjs <dir> --refs <dir>` (refs not in the repo). Still a row
+of separate elements where refs 2/3 are one vine — 2C is Eva's call.
 **Phase 4 (Oct 23): TEXTURE WAS BUILT, RENDERED AND NOT SHIPPED** (charter §12) — stone grain,
 weathering, cracks and hammered metal as real displacement of the molding along its TRUE normal (smoothed or
 wall-held directions fold, measured). Eva picked **none** from `docs/img/frame-texture-vocabulary.png`, so the

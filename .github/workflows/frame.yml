@@ -1,7 +1,9 @@
 # /frame gate: node tools/verify-frame.mjs — part one (Node) then part two
 # (Chromium) — and the relief gate, in the `verify` job; the two negative
 # controls (every mutant must redden exactly what it names) in jobs of their
-# own, the relief one split into four shards by mutant index. One job used
+# own, the relief one split into twelve shards by mutant index (four until
+# phase 3d took the table from 27 to 35 mutants and each one's run ~2.4x —
+# the chains' rows and OR9 — so a shard holds at most three). One job used
 # to run all of it and hit its 45-minute limit on runner variance (#459,
 # twice, in the last step). The mutant jobs are Node only: no npm install,
 # no browser. Path-scoped to the frame's own files: the frame gate reads nothing
@@ -61,7 +63,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -91,23 +93,23 @@ jobs:
       - name: Frame gate (part one Node, part two Chromium)
         run: node tools/verify-frame.mjs
 
-  # The relief negative control, sharded by mutant INDEX (k mod 4): every
+  # The relief negative control, sharded by mutant INDEX (k mod 12): every
   # mutant is in exactly one shard by construction. Changing the shard count
   # is two edits: this matrix list and the n in --shard=k/n.
   relief-mutants:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Relief negative control (shard ${{ matrix.shard }} of 4)
-        run: node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/4
+      - name: Relief negative control (shard ${{ matrix.shard }} of 12)
+        run: node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/12
 
   frame-mutants:
     runs-on: ubuntu-latest

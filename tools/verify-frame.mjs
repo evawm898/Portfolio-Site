@@ -642,10 +642,13 @@ async function partTwo(G, R) {
   const CONTEXT = { cornerTreatment: { skeleton: 'rect' }, cornerSize: { skeleton: 'rect', cornerTreatment: 'rounded' }, aspect: { skeleton: 'oval' },
     // the ornament's rows are probed with the filigree on (they are hidden
     // and inert while it is off)
-    ornDensity: ORN, ornScale: ORN, ornCrest: ORN, ornCorners: ORN, ornSides: ORN, ornBottom: ORN, ornShape: ORN, ornProjection: ORN, ornWireStyle: ORN, ornLeaves: ORN, ornLeafSize: ORN,
+    ornDensity: ORN, ornCrest: ORN, ornCorners: ORN, ornSides: ORN, ornShape: ORN, ornProjection: ORN, ornLeaves: ORN, ornLeafSize: ORN,
     // the wire's thickness is the tapered and constant styles' — a carved
     // stroke derives its width from the curve (phase 3c), so it is probed there
-    ornWire: { ...ORN, ornWireStyle: 'tapered' },
+    ornWire: { ...ORN, ornLayout: 'groups', ornWireStyle: 'tapered' },
+    // the groups' controls (hidden under the chains) are probed on the groups;
+    // the layout itself and the bottom (no arch bottom run) on a rectangle
+    ornLayout: ORN, ornScale: { ...ORN, ornLayout: 'groups' }, ornWireStyle: { ...ORN, ornLayout: 'groups' }, ornBottom: { ...ORN, skeleton: 'rect' },
     // the default carved lead (23 mm) holds only 0.50–0.53 turns — its fat
     // body leaves the eye little room (charter §13.6) — so the slider's
     // travel is probed on a 46 mm lead (scale 5), where it spans 0.50–0.70
