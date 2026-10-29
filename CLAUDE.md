@@ -4967,6 +4967,41 @@ the roundness read-out's ALREADY ROUND words, or LF35 / LF36).
 - Block 60 (6 rows, 1,302), smoke block 60, five standing mutants, `frozen/phase64` = the 1,296 rows at
   `d92a0c6`. Sheet: `node tools/shot-bloom-leaf-tip-neck.mjs <png> --base <worktree>`.
 
+**WHERE THE NODES GO IS A RUN — START, END, SPACING — AND EACH NODE'S LEAF CAN BE SMALLER OR LARGER
+DOWN THE STEM; EVERY STORED ROW HOLDS TO THE BIT** (Bloom P1, Eva's rulings of Oct 28 — read
+`docs/bloom-node-span-taper-outcome.md` before touching `leafNodeRunOf`, `leafNodeRunMm`,
+`leafNodeRunPositions`, `leafNodeLayout`'s `layAt`, `leafTaperFields` / `leafTaperState` /
+`leafNodeScales`, `plan.nodeSizes`, `restatedNodeLayout`, `leafNodeViews`, NS0–NS4 or route (ar)).
+- `leafNodeStart` / `leafNodeEnd` (Stem, fractions FROM THE HEAD, defaults 0.16 / 0.86 — the flower's own
+  constants, so the default run IS the old law's doubles; NS2 holds it under `Object.is`) and
+  `leafNodeSpacing` (−1..1, a LINEAR internode law `1 + c(1 − 2j/(k−2))`, `c = 0.75 s`, positive crowds
+  toward the BASE, 7 : 1 at full, arithmetic only; spacing 0 is the even arm's own expression BY BRANCH).
+- The inset clamp (the TOP leaf's rise) and the pitch floor stay and are TOLD; one node stands at the
+  flower's 0.557 share of the asked run (`LEAF_NODE_SOLO` by branch at the defaults); a START PAST END
+  builds ONE node at the end, told, never swapped.
+- **The merge clamp:** a crowd that would put two SWELLINGS under √2 spindles apart is clamped to the
+  largest 1/4096 step that keeps every internode at `min(span/(k−1), gap)` — never tighter than even; a
+  kink alone is never clamped. It BINDS HARD on swelling stems (carnation 0.8 → 0.16, rose → 0.01). A
+  narrow EVEN run still merges swellings — ST12(f)'s existing told state.
+- `leafSizeTaper` (Leaves, ±0.75): every SIZE of a node's leaf (`leafTaperFields`: the simple blade's
+  length/width, LOBED's envelope, COMPOUND's rachis/leaflets/stalks) by its node's DEPTH in the run; the
+  largest leaf is always the asked one; floored uniformly at the slider minima, told per node; counts
+  never re-asked (the existing yields act per node); the inset reads the TOP leaf's rise; the compound
+  petiole (`wire √n`) does not scale, LOBED's area petiole does. Triangles per leaf unchanged.
+- All four are DEAD under a RACEME (and the spacing below 3 nodes, the taper below 2): two statements,
+  NS0 through the page's `nodeLive`; panel route (ar), THIRTY-FIVE routes, three mutants.
+- **Under a taper the LF/T5/T6 clauses run PER NODE** (`leafNodeViews`): the record split by node, the
+  controls scaled by the node's RESTATED scale. A clause that restates a leaf from the raw controls is
+  wrong on every tapered node — add any new blade clause inside `leafBladeClauses`.
+- `restatedNodeLayout(ui, spineRec)` needs the builder's spine record on a DRAWN spine (LF4's rule).
+- Combination gate: the `leaf-leaf` measure (blade vs other nodes' blades) and four pairs; WHORLED × a full
+  crowd reads 0.750 mm and a 25% leaf at 60° 0.311 mm to the stem — both declared, never clamped.
+- Block 83 (28 rows, 1,636), smoke block 83 (9); `frozen/phase90` = the 1,608 rows at `77ae7f9` (BONE took
+  block 82 and phase89 mid-session; this session's own phase89 was row for row BONE's, dropped); eleven
+  `node-run-*` apex mutants on six `node run:` rows; the apex table now captures `NS` and `SN` (it never
+  captured SN). Bytes: `verify-bloom-surface-bytes --movers-predicate node-run` (23 movers, all block 83).
+  Sheet: `node tools/shot-bloom-node-span.mjs <png>` → `docs/img/node-span-spacing.png`.
+
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
 `docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,

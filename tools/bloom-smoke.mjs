@@ -1982,6 +1982,40 @@ export const SMOKE_BLOCKS = [
         path: "TX0 the registry and the guard agree, TX2 the retired field restated (BONE's five reach nothing)" },
     ],
   },
+  {
+    n: 83, title: 'where the nodes go and leaf size along the stem (Bloom P1, Oct 28)',
+    anchor: 'NODE RUN: the widest run, 0.05 .. 0.95, under a DROOPING leaf (-30 deg: the start is not raised)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       run's own law (a start / end other than the defaults, and the solo
+       station in a moved span), the UNEVEN arm of the spacing (the linear
+       internode law, the count given at the pitch floor), the spacing's MERGE
+       clamp, the inverted span, the per-node leaf of a size taper (the builder
+       applying a node's own size, on each leaf type), the TOP leaf's inset,
+       and the dead side under a raceme. --conn is REQUIRED: every leaf roots
+       in the wall at a depth this block moves, and a petiole off its node is a
+       detached shell the export gate reads as watertight. */
+    conn: true,
+    rows: [
+      { label: 'NODE RUN: crowded toward the BASE, spacing 0.80 x 6 nodes',
+        path: "NS1 six depths on the linear internode law against the restated run and each leaf's emitted root, NS0 the three statements live, NS2 not on the default run, LF4 the inset from the top leaf, ST12 none (no node amount)" },
+      { label: 'NODE RUN: a narrow run HIGH on the stem, 0.20 .. 0.40 (the inset raises its start)',
+        path: "NS1 the span's own end and the inset clamp raising its start, LF4 the clamp told as a biconditional" },
+      { label: 'NODE RUN: START PAST END, 0.70 .. 0.40 x 4 nodes (one node at the end, told — never swapped)',
+        path: "NS3 the inverted span told as a biconditional, one node at the end, NS1 that node's depth" },
+      { label: "NODE RUN: the spacing's MERGE CLAMP — swelling 0.6 x spacing 1.00 x 4 nodes (CLAMPED at the swellings' sqrt(2) spindles)",
+        path: "NS3 the spacing's merge clamp told and every internode at the need, NS1 the clamped spacing restated by a downward search, ST12 the swellings on the emitted stem at the restated nodes" },
+      { label: 'NODE RUN: a BARE noded stem — kink 0.5 on a run 0.30 .. 0.90, spacing -0.6 x 5 nodes',
+        path: "ST12 a bare stem's kinked rings on the moved, crowded run restated from the controls, NS0 the run live with no leaves" },
+      { label: 'NODE RUN: LEAF TAPER 0.5 — COMPOUND (the whole tree scales; the leaflet count does not)',
+        path: "NS4 each node's scale restated and every leaflet's and the rachis's emitted chord in the ratio of the scales, the inset at the top leaf, LF14-LF18 per node on the node's own restated controls" },
+      { label: 'NODE RUN: LEAF TAPER 0.5 — LOBED (the envelope scales; the lobes and teeth yield per node)',
+        path: "NS4 the lobed blade's emitted chord per node, LF19-LF31 per node on the node's own restated envelope" },
+      { label: 'NODE RUN: LEAF TAPER 0.75 FLOORED — a 4 mm wide leaf (its width floor holds it at 75%)',
+        path: "NS4 the floor restated from the registry's own slider minima and every node at it" },
+      { label: 'NODE RUN: GATED — the run, the spacing and the taper under a RACEME (dead: hidden AND inert)',
+        path: "NS0 the three statements dead and the plan's run the default, no per-node size, SN0-SN4 the shared node unmoved" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

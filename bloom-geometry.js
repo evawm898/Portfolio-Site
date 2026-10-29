@@ -17006,14 +17006,49 @@ export function leafNodeLayout(state, stemLengthMm) {
   /* (curves-leaves) A DRAWN SPINE reaches the inset too: `leafBladeRiseMm`
      is the arch law VERBATIM in SLIDER mode and the drawn spine's own rise in
      CURVE mode; the compound tree reads its drawn rachis. */
-  const rise = leafIsCompound(state) ? compoundLeafRiseMm(state) : leafBladeRiseMm(state, lengthMm, angleDeg);
-  const insetAskedMm = LEAF_NODE_TOP * stemLengthMm;
-  const insetNeededMm = Math.max(0, rise);
-  const insetMm = Math.max(insetAskedMm, insetNeededMm);
-  const insetClamped = insetNeededMm > insetAskedMm;
-  const insetSatisfied = insetNeededMm <= LEAF_NODE_BOTTOM * stemLengthMm;
-  const nodeDepthsMm = leafNodeDepthsMm(nodes, stemLengthMm, insetMm, leafNodePitchFloorMm(state.sheetThickness));
-  return { nodes, insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied, nodeDepthsMm };
+  /* (Bloom P1) THE RUN — start, end, spacing — and THE TOP LEAF's own rise:
+     under a positive size taper the top leaf is `1 - taper` of the asked one,
+     and it is the TOP leaf the inset clears the head for. Both are the old
+     law BY BRANCH at their defaults: the run's `start * L` IS
+     `LEAF_NODE_TOP * L` at 0.16, and at scale 1 the rise is read off the asked
+     state itself, the expression it always was. */
+  const run = leafNodeRunOf(state);
+  const taper = leafSizeTaperOf(state);
+  const riseOf = (st) => (leafIsCompound(st) ? compoundLeafRiseMm(st) : leafBladeRiseMm(st, Number(st.leafLength), angleDeg));
+  /* A SWELLING's own profile — the crowd's clamp (see `leafNodeRunMm`); null
+     with no swelling to merge (a kink-only node is a bend, and two bends
+     closer than the spindle are two bends). The geometry's own `mergeGapMm`
+     expression, on the stem's own radius (`stemPlan`'s `outerR`). */
+  const swellAmt = Math.min(STEM_NODE_SWELLING_RANGE[1], Math.max(STEM_NODE_SWELLING_RANGE[0], leafNodeNum(state.stemNodeSwelling, 0)));
+  const mergeGapMm = !stemNodesAbsent(state) && swellAmt > 0 ? Math.SQRT2 * (STEM_NODE_SPREAD_RADII * (Number(state.stemDiameter) / 2)) : null;
+  const layAt = (scaleTop) => {
+    const rise = scaleTop === 1 ? (leafIsCompound(state) ? compoundLeafRiseMm(state) : leafBladeRiseMm(state, lengthMm, angleDeg)) : riseOf(leafTaperState(state, scaleTop));
+    const insetAskedMm = run.start * stemLengthMm;
+    const insetNeededMm = Math.max(0, rise);
+    const insetMm = Math.max(insetAskedMm, insetNeededMm);
+    const insetClamped = insetNeededMm > insetAskedMm;
+    const insetSatisfied = insetNeededMm <= run.end * stemLengthMm;
+    const R = leafNodeRunMm(nodes, stemLengthMm, insetMm, leafNodePitchFloorMm(state.sheetThickness), run, mergeGapMm);
+    return { insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied, R };
+  };
+  /* the TOP leaf's scale, from the ASKED count: with two or more nodes it is
+     the taper's top; and where the count then gives to ONE node, that node's
+     leaf is the asked size (a single leaf has nothing to taper between), so
+     the layout is taken again at scale 1 — two passes, never a loop */
+  const floor = taper > 0 ? leafTaperFloor(state) : 0;
+  const topAsked = taper > 0 && nodes >= 2 ? Math.max(1 - taper, floor) : 1;
+  let lay = layAt(topAsked), topScale = topAsked;
+  if (topAsked !== 1 && lay.R.depths.length < 2) { lay = layAt(1); topScale = 1; }
+  const { insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied } = lay;
+  const nodeDepthsMm = lay.R.depths;
+  const nodeScales = leafNodeScales(state, nodeDepthsMm);
+  return {
+    nodes, insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied, nodeDepthsMm,
+    /* THE RUN AS ASKED AND AS BUILT — the read-out's and the NS family's */
+    run: { start: run.start, end: run.end, spacingAsked: run.spacing, spacingBuilt: lay.R.spacingBuilt, spacingClamped: lay.R.spacingClamped,
+      mergeGapMm, inverted: run.inverted, empty: run.empty, shared: run.shared, soloFrac: lay.R.soloFrac === undefined ? null : lay.R.soloFrac },
+    taper, topScale, nodeScales,
+  };
 }
 
 /* THE NODE LAW, or NULL. Each node carries its depth `s` (mm below the hub's
@@ -17087,6 +17122,9 @@ export function stemNodeLaw(state, stemLengthMm, outerR) {
   }
   return {
     swelling, kink, outerR, lengthMm: stemLengthMm,
+    /* (Bloom P1) the run the nodes were laid on — start, end, spacing asked and
+       built — and the layout's inset and counts, for a bare stem's read-out */
+    run: layout.run, insetAskedMm: layout.insetAskedMm, insetNeededMm: layout.insetNeededMm, insetMm: layout.insetMm, insetClamped: layout.insetClamped, nodesAsked: layout.nodes,
     swell: STEM_NODE_SWELL * swelling, slope: STEM_NODE_SLOPE * kink,
     spreadMm, rampMm, nodes, bare, mergeGapMm, mergedPairs,
     /* WHERE EACH BEND PEAKS — the phasing, as a number a reader and a gate can
@@ -18829,6 +18867,248 @@ export function leafNodeDepthsMm(n, lengthMm, insetMm, pitchFloorMm = 0) {
   return Array.from({ length: k }, (_, i) => top + (span * i) / (k - 1));
 }
 
+/* ===================================================================
+   WHERE THE NODES GO, AND LEAF SIZE ALONG THE STEM (Bloom P1, Eva's rulings
+   of Oct 28 — read docs/bloom-node-span-taper-outcome.md before touching
+   anything below). Until this, nobody chose where the nodes went: they were
+   spaced evenly from `LEAF_NODE_TOP` (0.16) to `LEAF_NODE_BOTTOM` (0.86) of
+   the stem, a single node sat at `LEAF_NODE_SOLO` (0.55), the top inset was
+   raised to clear the head, and every node's leaf was the same size.
+
+   FOUR CONTROLS, AND EVERY ONE IS THE OLD LAW BY BRANCH AT ITS DEFAULT:
+     * `leafNodeStart` / `leafNodeEnd` — where the run of nodes starts and
+       ends, as FRACTIONS OF THE STEM MEASURED FROM THE HEAD (0.16 / 0.86).
+     * `leafNodeSpacing` — crowds the nodes toward the BASE (positive) or the
+       TOP (negative); 0 is even, by a branch to the old expression.
+     * `leafSizeTaper` — every leaf scaled by its node's place in the run;
+       positive SMALLER TOWARD THE TOP. 0 is no taper, by a branch (no
+       per-node sizes exist at all).
+
+   THE SPACING LAW IS A LINEAR INTERNODE LAW, NOT A POWER OR A GEOMETRIC ONE,
+   AND THE REASON IS THE ENGINES. Internode j of k-1 (j = 0 the TOP one) is
+   weighted `1 + c (1 - 2j / (k - 2))`, `c = spacing x LEAF_NODE_SPACING_GAIN`,
+   and the nodes stand at the weights' running sum over their total — the
+   internodes grow or shrink in arithmetic steps from one end to the other,
+   with the RATIO of the end internodes `(1 + |c|) / (1 - |c|)` the SAME AT
+   EVERY COUNT (7 at full spacing). A geometric law is the textbook choice
+   and needs `exp`/`log`, which are not correctly rounded and which this
+   repository has measured disagreeing between Node's V8 and the gate's
+   Chromium in the last bits (session 38 §B10.7) — and a node COUNT is decided
+   on these depths (the pitch floor), which is a discrete decision on a
+   continuous quantity, refused as engine-dependent seven times here. Every
+   step of this law is `+ - * /`, correctly rounded, identical in every engine
+   (the stamen hash's own reason). The end nodes stand on the span's ends
+   EXACTLY (`0 / W` and `W / W`).
+
+   A SINGLE NODE READS THE SPAN AT ITS OWN STATION — the place 0.55 has in the
+   DEFAULT span, `(0.55 - 0.16) / (0.86 - 0.16)` of the way from start to end
+   (`LEAF_NODE_SOLO_IN_SPAN`, 0.557…), so it follows both ends with no dead
+   travel; the default span takes `LEAF_NODE_SOLO` itself BY BRANCH, which is
+   what keeps every shipped single-node row to the bit (the law and the branch
+   agree there to the last bits — measured in the outcome doc — so the branch
+   is continuous, not a jump).
+
+   A START PAST THE END IS TOLD, NEVER SWAPPED: the span is empty, the top is
+   held at the end (the clamp the inset already applies when it saturates), the
+   count gives to one node there, and the sliders keep the values asked.
+
+   THE CLAMPS THAT WERE ALREADY HERE STAY, AND ARE TOLD: the head-clearing
+   inset raises a start the TOP leaf cannot clear (the slider keeps its value),
+   and the pitch floor gives the COUNT. ONE NEW CLAMP, AND IT IS THE SPACING's:
+   a crowd may not put two node SWELLINGS closer than their own profile — the
+   `sqrt(2)` spindles at which two Gaussian swellings stop reading as two
+   (`stemNodeLaw`'s `mergeGapMm`) — UNLESS the even layout is already that
+   close, in which case the crowd may not make it any closer. The spacing gives
+   (snapped to `LEAF_NODE_SPACING_GRID` toward 0, the asked value kept on the
+   slider), clamped and TOLD. Merges under EVEN spacing stay reported, never
+   clamped (Eva's earlier ruling on the spacing floor, unchanged).
+
+   ON A RACEME ALL FOUR ARE DEAD — HIDDEN AND INERT: the leaves stand at the
+   pedicels' nodes (the shared node) and the rachis carries no stem nodes.
+   `leafNodeRunOf` returns the DEFAULT run there and `leafSizeTaperOf` 0, so
+   the plan's own telemetry is the old law's to the bit as well. */
+export const LEAF_NODE_START_RANGE = Object.freeze([0.05, 0.95]);
+export const LEAF_NODE_END_RANGE = Object.freeze([0.05, 0.95]);
+export const LEAF_NODE_SPACING_RANGE = Object.freeze([-1, 1]);
+export const LEAF_NODE_SPACING_GAIN = 0.75;
+export const LEAF_NODE_SPACING_GRID = 1 / 4096;
+export const LEAF_NODE_SOLO_IN_SPAN = (LEAF_NODE_SOLO - LEAF_NODE_TOP) / (LEAF_NODE_BOTTOM - LEAF_NODE_TOP);
+/* THE TAPER'S RANGE. The LARGEST leaf is always the asked one — positive
+   takes the TOP leaf down to `1 - taper` of it, negative the LOWEST — so no
+   leaf is ever larger than the sliders say: no slider's maximum is exceeded,
+   no budget corner moves, and a negative taper leaves the top leaf, and so the
+   inset, exactly where they were. Symmetric at three quarters: a quarter of
+   the asked size is the smallest node leaf, and every scaled size is floored
+   at its own slider's minimum besides (told per node). */
+export const LEAF_SIZE_TAPER_RANGE = Object.freeze([-0.75, 0.75]);
+/* the smallest leaf the length slider builds (`leafPresent`'s own `min: 1`) */
+export const LEAF_LENGTH_MIN_BUILT_MM = 1;
+
+function leafNodeNum(v, d) { const x = Number(v); return Number.isFinite(x) ? x : d; }
+function leafNodeClamp(x, R) { return Math.min(R[1], Math.max(R[0], x)); }
+/* A RACEME'S SHARED NODE: the geometry's half of the registry's
+   `leafNodesOwn` / `leafNodeCountLive` raceme term. */
+export function leafNodesShared(state) { return !inflorescenceIsAbsent(state) && String(state.inflorescence) === 'RACEME'; }
+
+/* THE RUN AS ASKED — the one reader of the three node controls. A state with
+   no field (a frozen row, a Node tool without DEFAULTS) reads the old law. */
+export function leafNodeRunOf(state) {
+  if (leafNodesShared(state)) return { start: LEAF_NODE_TOP, end: LEAF_NODE_BOTTOM, spacing: 0, shared: true, inverted: false, empty: false };
+  const start = leafNodeClamp(leafNodeNum(state.leafNodeStart, LEAF_NODE_TOP), LEAF_NODE_START_RANGE);
+  const end = leafNodeClamp(leafNodeNum(state.leafNodeEnd, LEAF_NODE_BOTTOM), LEAF_NODE_END_RANGE);
+  const spacing = leafNodeClamp(leafNodeNum(state.leafNodeSpacing, 0), LEAF_NODE_SPACING_RANGE);
+  return { start, end, spacing, shared: false, inverted: start > end, empty: start >= end };
+}
+/* THE GEOMETRY'S HALF OF THE TWO STATEMENTS (NS0 compares them with the
+   registry's `leafNodeRunLive` / `leafNodeSpacingLive` / `leafSizeTaperLive`
+   per row): the run reaches something exactly where a stem that is not a
+   raceme's rachis carries leaves or its own swelling or kink; the spacing
+   needs a third node; the taper the leaves' own nodes and a second one. */
+export function leafNodeRunLive(state) {
+  return !stemIsAbsent(state) && !leafNodesShared(state) && (!leafIsAbsent(state) || !stemNodesAbsent(state));
+}
+export function leafNodeSpacingLive(state) { return leafNodeRunLive(state) && Math.round(Number(state.leafNodes)) >= 3; }
+export function leafSizeTaperLive(state) { return !leafIsAbsent(state) && !leafNodesShared(state) && Math.round(Number(state.leafNodes)) >= 2; }
+export function leafSizeTaperOf(state) {
+  if (leafIsAbsent(state) || leafNodesShared(state)) return 0;
+  return leafNodeClamp(leafNodeNum(state.leafSizeTaper, 0), LEAF_SIZE_TAPER_RANGE);
+}
+
+/* WHERE k NODES STAND IN A SPAN OF 1 — the linear internode law above.
+   `[0]` for one node; the ends are exactly 0 and 1. */
+export function leafNodeRunPositions(k, spacing) {
+  if (k <= 1) return [0];
+  const c = spacing * LEAF_NODE_SPACING_GAIN;
+  const cum = [0];
+  for (let j = 0; j < k - 1; j++) cum.push(cum[j] + (k === 2 ? 1 : 1 + c * (1 - (2 * j) / (k - 2))));
+  const W = cum[k - 1];
+  return cum.map((x) => x / W);
+}
+
+/* THE NODE DEPTHS FOR A RUN, IN MILLIMETRES DOWN FROM THE HUB'S UNDERSIDE.
+   `leafNodeDepthsMm`'s generalisation, and that function is LEFT AS IT WAS for
+   its other caller (the inflorescence's floret nodes, whose law this ruling
+   does not reach). With the default run and spacing 0 every line below forms
+   the very doubles `leafNodeDepthsMm` forms: `run.end * lengthMm` IS
+   `LEAF_NODE_BOTTOM * lengthMm` when `run.end` is 0.86, and the even arm is its
+   expression verbatim. */
+export function leafNodeRunMm(n, lengthMm, insetMm, pitchFloorMm, run, mergeGapMm = null) {
+  const bottom = run.end * lengthMm;
+  const top = Math.min(insetMm, bottom);
+  const rec = { spacingAsked: run.spacing, spacingBuilt: 0, spacingClamped: false, mergeGapMm, countSpacing: run.spacing !== 0 };
+  if (n === 1) {
+    const solo = run.start === LEAF_NODE_TOP && run.end === LEAF_NODE_BOTTOM ? LEAF_NODE_SOLO : run.start + (run.end - run.start) * LEAF_NODE_SOLO_IN_SPAN;
+    return { ...rec, depths: [Math.min(Math.max(solo * lengthMm, insetMm), bottom)], soloFrac: solo };
+  }
+  const span = Math.max(0, bottom - top);
+  const even = (k) => (k === 1 ? [top] : Array.from({ length: k }, (_, i) => top + (span * i) / (k - 1)));
+  if (run.spacing === 0) {
+    const fit = pitchFloorMm > 0 ? 1 + Math.floor(span / pitchFloorMm) : n;
+    const k = Math.max(1, Math.min(n, fit));
+    return { ...rec, depths: even(k) };
+  }
+  /* AN UNEVEN RUN: for each count from the asked one down, the spacing it would
+     be BUILT at (the merge clamp, which depends on the count), then the pitch
+     floor on the depths that spacing gives — the first count that fits wins.
+     The count gives at the pitch floor as it always has; the spacing gives
+     only where a crowd would merge two swellings. */
+  const at = (k, s) => (s === 0 ? even(k) : leafNodeRunPositions(k, s).map((p) => top + span * p));
+  const gapMin = (d) => { let g = Infinity; for (let i = 1; i < d.length; i++) g = Math.min(g, d[i] - d[i - 1]); return g; };
+  const sign = run.spacing < 0 ? -1 : 1;
+  for (let k = n; k >= 2; k--) {
+    let s = run.spacing, clamped = false;
+    if (mergeGapMm !== null && k >= 3 && span > 0) {
+      const need = Math.min(span / (k - 1), mergeGapMm);
+      if (gapMin(at(k, s)) < need) {
+        clamped = true;
+        let mag = Math.max(0, (1 - (need * (k - 1)) / span) / LEAF_NODE_SPACING_GAIN);
+        mag = Math.min(Math.abs(run.spacing), Math.floor(mag / LEAF_NODE_SPACING_GRID) * LEAF_NODE_SPACING_GRID);
+        while (mag > 0 && gapMin(at(k, sign * mag)) < need) mag = Math.max(0, mag - LEAF_NODE_SPACING_GRID);
+        /* and UP while the next grid step still keeps every internode at the
+           need — so the answer is the LARGEST grid multiple under the asked
+           spacing that does, whatever the closed-form estimate's last bits
+           (the minimum internode falls monotonically as the crowd grows) */
+        while (mag + LEAF_NODE_SPACING_GRID <= Math.abs(run.spacing) && gapMin(at(k, sign * (mag + LEAF_NODE_SPACING_GRID))) >= need) mag += LEAF_NODE_SPACING_GRID;
+        s = mag === 0 ? 0 : sign * mag;
+      }
+    }
+    const d = at(k, s);
+    if (!(pitchFloorMm > 0) || gapMin(d) >= pitchFloorMm) return { ...rec, depths: d, spacingBuilt: s, spacingClamped: clamped };
+  }
+  return { ...rec, depths: [top] };
+}
+
+/* WHAT A LEAF'S SIZE IS, PER TYPE — the ONE OWNER of which controls the taper
+   scales, and of each one's floor (its own slider's minimum; a stalk's is 0,
+   so it floors nothing). Angles, arch, cup, tooth depth (a fraction), tooth,
+   lobe and leaflet COUNTS, every curve (fractions of length; the outline's
+   width scale reads the scaled width) are NOT sizes and are never touched —
+   a smaller leaf is the SAME leaf, smaller, and where it cannot hold its asked
+   teeth or lobes the existing floors and yields act on it, per node. A
+   function, not a constant: the leaflet ranges are declared further down this
+   module. */
+export function leafTaperFields(state) {
+  if (leafIsCompound(state)) return [['leafLength', LEAF_LENGTH_MIN_BUILT_MM], ['leafletLength', LEAFLET_LENGTH_RANGE[0]], ['leafletWidth', LEAF_WIDTH_RANGE[0]],
+    ['leafletTerminalLength', LEAFLET_LENGTH_RANGE[0]], ['leafletTerminalWidth', LEAF_WIDTH_RANGE[0]], ['leafletStalk', 0], ['leafletTerminalStalk', 0]];
+  if (leafIsLobed(state)) return [['leafLength', LEAF_LENGTH_MIN_BUILT_MM], ['lobedWidth', LEAF_WIDTH_RANGE[0]]];
+  return [['leafLength', LEAF_LENGTH_MIN_BUILT_MM], ['leafWidth', LEAF_WIDTH_RANGE[0]]];
+}
+/* the least scale at which every size the taper touches is still on its own
+   slider — a smaller leaf is FLOORED there, uniformly, so it stays the same
+   shape (each size floored on its own would change the proportions) */
+export function leafTaperFloor(state) {
+  let f = 0;
+  for (const [id, min] of leafTaperFields(state)) {
+    const v = leafSizeOf(state, id);
+    if (min > 0 && v > 0) f = Math.max(f, min / v);
+  }
+  return Math.min(1, f);
+}
+/* a size field a state does not carry reads its OWN default (the owners the
+   leaf builders read, never restated) */
+function leafSizeOf(state, id) {
+  if (state[id] !== undefined) return Number(state[id]);
+  return Number({ leafLength: 0, leafWidth: LEAF_WIDTH_DEFAULT, lobedWidth: LOBED_WIDTH_DEFAULT, leafletLength: LEAFLET_LENGTH_DEFAULT,
+    leafletWidth: LEAFLET_WIDTH_DEFAULT, leafletTerminalLength: LEAFLET_TERMINAL_LENGTH_DEFAULT, leafletTerminalWidth: LEAFLET_TERMINAL_WIDTH_DEFAULT,
+    leafletStalk: LEAFLET_STALK_DEFAULT, leafletTerminalStalk: LEAFLET_TERMINAL_STALK_DEFAULT }[id]);
+}
+/* THE LEAF A NODE CARRIES — the asked state with every size multiplied by `s`.
+   MEMOISED on (state, s), so the plan, the builder and every record reach ONE
+   object and the per-state caches (the rise, the lobed outline) are shared.
+   `s === 1` IS the asked state, by branch. */
+const LEAF_TAPER_STATES = new WeakMap();
+export function leafTaperState(state, s) {
+  if (s === 1) return state;
+  let per = LEAF_TAPER_STATES.get(state);
+  if (!per) { per = new Map(); LEAF_TAPER_STATES.set(state, per); }
+  if (per.has(s)) return per.get(s);
+  const out = { ...state };
+  for (const [id] of leafTaperFields(state)) {
+    const v = leafSizeOf(state, id);
+    out[id] = v * s;
+  }
+  per.set(s, out);
+  return out;
+}
+/* THE SCALE OF EACH NODE'S LEAF, by its place in the RUN (0 at the top node,
+   1 at the lowest — the depth, not the index, so a crowd of nodes carries a
+   crowd of similar leaves). Positive: the lowest leaf is the asked size and
+   the top `1 - taper` of it; negative: the top is the asked size and the
+   lowest `1 + taper`. Floored per node (`leafTaperFloor`). Null with no taper
+   or fewer than two nodes — a single leaf has nothing to taper between, and
+   is the asked leaf. */
+export function leafNodeScales(state, depthsMm) {
+  const taper = leafSizeTaperOf(state);
+  if (taper === 0 || depthsMm.length < 2) return null;
+  const d0 = depthsMm[0], dn = depthsMm[depthsMm.length - 1];
+  const floor = leafTaperFloor(state);
+  return depthsMm.map((d) => {
+    const t = dn > d0 ? (d - d0) / (dn - d0) : 1;
+    const asked = taper > 0 ? 1 - taper * (1 - t) : 1 + taper * t;
+    return { asked, scale: Math.max(asked, floor), floored: asked < floor, t };
+  });
+}
+
 /* leafPlan — THE ONE OWNER of where leaves are and what they are made of.
    Reads the STEM's plan for the three lengths it needs (`boreR`, `outerR`,
    `rootZ`) and computes nothing the stem already owns. */
@@ -19044,6 +19324,47 @@ export function leafFloretCapMm(bladeP, xMin, xMax, gapMm, floretP, toLeaf) {
   return { tipReachMm: cap, behind, at };
 }
 
+/* THE PETIOLE'S RADIUS FOR A LEAF OF A GIVEN SIZE — extracted VERBATIM from
+   `leafPlan` (Bloom P1), so a tapered node's smaller leaf is sized by the same
+   lines as the asked one. WHETHER IT SCALES follows each type's own law:
+   a COMPOUND petiole is the wire x sqrt(leaflets) — the COUNT, never re-asked
+   per node — so it does NOT scale; a LOBED petiole is area-scaled, so a
+   smaller lobed leaf has a thinner one (floored at the wire); a SIMPLE leaf's
+   is the wire, and past the root-support reference length half its blade's
+   root, which follows the node's own length. */
+export function leafPetioleSizes(state, lengthMm, petioleR0, stem, angleDeg) {
+  const lobed = leafIsLobed(state);
+  /* A COMPOUND LEAF'S PETIOLE IS THICKER (Eva's ruling on #380): the area
+     rule read upward from the wire over its leaflets, capped by the stem —
+     `compoundLeafPlan` is its one owner. A SIMPLE leaf's is the wire, the
+     expression it always was, by branch. */
+  const compoundRec = leafIsCompound(state) ? compoundLeafPlan(state, lengthMm, petioleR0, stem, angleDeg) : null;
+  /* A LOBED LEAF'S PETIOLE SCALES WITH ITS BLADE'S AREA (S4b, Eva's ruling of
+     Oct 8), capped by the stem exactly as the compound one is —
+     `lobedPetiolePlan` is its one owner. Simple leaves keep the wire. */
+  const lobedPetiole = lobed && !compoundRec ? lobedPetiolePlan(state, lengthMm, petioleR0, stem, angleDeg) : null;
+  /* A SIMPLE LEAF'S PETIOLE CARRIES ITS BLADE'S ROOT (root support): past the
+     reference length the wire gives way to half the root, through the one
+     petiole clamp (`petioleRootFloorMm` above). The wire, verbatim, by branch. */
+  const simpleRootFloorMm = compoundRec || lobedPetiole ? null : petioleRootFloorMm(petioleR0, lengthMm);
+  const simplePetiole = simpleRootFloorMm === null ? null : (() => {
+    const c = petioleClampMm(petioleR0, simpleRootFloorMm, stem, angleDeg, state.sheetThickness);
+    return { askedMm: simpleRootFloorMm, capMm: c.capMm, radiusMm: c.radiusMm, clamped: c.thickens && simpleRootFloorMm > c.capMm, thickens: c.thickens, wireR: petioleR0 };
+  })();
+  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;
+  return { compoundRec, lobedPetiole, simplePetiole, petioleR };
+}
+
+/* THE LOBED LEAF'S LAW AS BUILT (S4, S4c) — the chevron law as asked, and the
+   count after ruling 3's yield off the outline the petiole's area law builds.
+   Extracted verbatim from `leafPlan` (Bloom P1) so a tapered node states its
+   own record through the same expression; `lobes` stays the ask. */
+function lobedPlanRecord(state, lengthMm) {
+  const { lobeAt, easeAt, easeDu, ...rec } = lobedChevronLaw(state);
+  const O = lobedOutline(state, lengthMm, true);
+  return { ...rec, lobesBuilt: O.law.lobes, lobesYielded: O.lobeYield.yielded, roundness: O.roundness,
+    toothPerLobe: lobedToothPerLobe(state), toothRimAsked: O.bs.lobeCount };
+}
 export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
   if (leafIsAbsent(state) || !stem || !stem.present) {
     return { present: false, nodes: 0, azimuths: [], nodeDepthsMm: [], built: 0 };
@@ -19074,7 +19395,8 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
      states: the inset scales with the STEM while the rise scales with the LEAF
      and its ANGLE, and no fraction of one holds the other two. CLAMPED AND
      TOLD — the read-out says when it bound and by how much. */
-  let { insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied, nodeDepthsMm } = leafNodeLayout(state, stem.lengthMm);
+  const layout = leafNodeLayout(state, stem.lengthMm);
+  let { insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied, nodeDepthsMm } = layout;
   /* ===================================================================
      THE SHARED NODE (ruling 5, the node-laws session). On a RACEME the leaves
      stop being their own arrangement: each pedicel is SUBTENDED by one leaf,
@@ -19144,24 +19466,10 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
      ruling — and its radius is `partRadius`'s own rule, the one every rod in
      this file already uses (the filament's and the style's). */
   const rootR = rodWallRootMm(stem);
-  /* A COMPOUND LEAF'S PETIOLE IS THICKER (Eva's ruling on #380): the area
-     rule read upward from the wire over its leaflets, capped by the stem —
-     `compoundLeafPlan` is its one owner. A SIMPLE leaf's is the wire, the
-     expression it always was, by branch. */
-  const compoundRec = leafIsCompound(state) ? compoundLeafPlan(state, lengthMm, petioleR0, stem, angleDeg) : null;
-  /* A LOBED LEAF'S PETIOLE SCALES WITH ITS BLADE'S AREA (S4b, Eva's ruling of
-     Oct 8), capped by the stem exactly as the compound one is —
-     `lobedPetiolePlan` is its one owner. Simple leaves keep the wire. */
-  const lobedPetiole = lobed && !compoundRec ? lobedPetiolePlan(state, lengthMm, petioleR0, stem, angleDeg) : null;
-  /* A SIMPLE LEAF'S PETIOLE CARRIES ITS BLADE'S ROOT (root support): past the
-     reference length the wire gives way to half the root, through the one
-     petiole clamp (`petioleRootFloorMm` above). The wire, verbatim, by branch. */
-  const simpleRootFloorMm = compoundRec || lobedPetiole ? null : petioleRootFloorMm(petioleR0, lengthMm);
-  const simplePetiole = simpleRootFloorMm === null ? null : (() => {
-    const c = petioleClampMm(petioleR0, simpleRootFloorMm, stem, angleDeg, state.sheetThickness);
-    return { askedMm: simpleRootFloorMm, capMm: c.capMm, radiusMm: c.radiusMm, clamped: c.thickens && simpleRootFloorMm > c.capMm, thickens: c.thickens, wireR: petioleR0 };
-  })();
-  const petioleR = compoundRec ? compoundRec.petiole.radiusMm : lobedPetiole ? lobedPetiole.radiusMm : simplePetiole ? simplePetiole.radiusMm : petioleR0;
+  /* THE PETIOLE'S RADIUS, per type — `leafPetioleSizes`, the one owner (Bloom
+     P1 extracted it verbatim so a tapered node's smaller leaf is sized by the
+     same lines). */
+  const { compoundRec, lobedPetiole, simplePetiole, petioleR } = leafPetioleSizes(state, lengthMm, petioleR0, stem, angleDeg);
   /* THE STEM'S NODES, WHERE THEY EXIST (`stem.nodeLaw`, null with both node amounts
      0). Two things move with them and nothing else does: every petiole roots
      on the DISPLACED axis at its own depth (`nodeOffsets`), and the clearance
@@ -19174,6 +19482,29 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
   const clearMm = (nodeOuterR - rootR) + 2 * acc.floorFeature(state.sheetThickness);
   const petioleLenMm = Math.max(LEAF_PETIOLE_FRACTION * lengthMm, clearMm);
   const embedMm = rodWallEmbedMm(stem);
+  /* ===================================================================
+     THE LEAF EACH NODE CARRIES UNDER A SIZE TAPER (Bloom P1): the asked leaf
+     scaled by its node's place in the run (`leafNodeScales`), through
+     `leafTaperState` — the one owner of what a leaf's SIZE is — and the very
+     lines the asked leaf is sized by (`leafPetioleSizes`, the petiole's own
+     length law). NULL with no taper and on a raceme's shared node (whose
+     leaves are sized by their florets' clearance cap, its own per-node law):
+     the builder then reads the plan's one size, the expression it always did.
+     The builder applies a node's entry and nothing else does. */
+  const nodeSizes = !shared && layout.nodeScales ? layout.nodeScales.map((q) => {
+    const st = leafTaperState(state, q.scale);
+    const Ls = Number(st.leafLength);
+    const sz = leafPetioleSizes(st, Ls, petioleR0, stem, angleDeg);
+    return {
+      scale: q.scale, scaleAsked: q.asked, floored: q.floored, runT: q.t, state: st,
+      lengthMm: Ls, widthMm: lobed ? Number(st.lobedWidth) : Number(st.leafWidth),
+      compound: sz.compoundRec, lobedPetiole: sz.lobedPetiole, simplePetiole: sz.simplePetiole, petioleR: sz.petioleR,
+      /* a LOBED node's own law as built (its lobe and tooth yields at its own
+         size) — the record the plan states for the asked leaf, per node */
+      lobed: lobed ? lobedPlanRecord(st, Ls) : null,
+      petioleLenMm: Math.max(LEAF_PETIOLE_FRACTION * Ls, clearMm),
+    };
+  }) : null;
   /* ===================================================================
      THE LEAF LENGTH AT A FLOWERING NODE (Eva's change 2 — "a node carrying a
      floret caps its leaf at the length that clears that floret"). Every node
@@ -19252,6 +19583,10 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
     divergenceDeg: !shared && phyllo === 'alternate' ? leafDivergenceDeg(state) : null,
     nodeDepthsMm, azimuths, rootR, petioleR, petioleLenMm, embedMm, nodeOffsets, nodeOuterR,
     insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied,
+    /* (Bloom P1) the RUN as asked and built, the size taper, the top leaf's
+       scale the inset was read at, and each node's own leaf (null with no
+       taper) */
+    nodeRun: layout.run, sizeTaper: layout.taper, topScale: layout.topScale, nodeSizes,
     nodesAsked: nodesAskedEff, nodesBuilt: nodeDepthsMm.length, nodesClamped,
     /* THE SHARED NODE'S RECORD — null off a raceme. */
     shared, sharedNode: sharedRec,
@@ -19290,14 +19625,7 @@ export function leafPlan(state, stem, acc, inflo = null, floretUnits = null) {
     type: leafIsCompound(state) ? 'COMPOUND' : lobed ? 'LOBED' : 'SIMPLE',
     typePinned: askedCompound && !leafIsCompound(state) && !lobed, typeAsked,
     /* the LOBED leaf's law as asked (S4) — null otherwise */
-    lobed: lobed ? (() => {
-      const { lobeAt, easeAt, easeDu, ...rec } = lobedChevronLaw(state);
-      /* the count AS BUILT after ruling 3's yield (S4c), off the outline the
-         petiole's area law already built at plan time — `lobes` stays the ask */
-      const O = lobedOutline(state, lengthMm, true);
-      return { ...rec, lobesBuilt: O.law.lobes, lobesYielded: O.lobeYield.yielded, roundness: O.roundness,
-        toothPerLobe: lobedToothPerLobe(state), toothRimAsked: O.bs.lobeCount };
-    })() : null,
+    lobed: lobed ? lobedPlanRecord(state, lengthMm) : null,
     /* the LOBED petiole's area law (S4b) — null otherwise */
     lobedPetiole,
     /* the simple blade's root-carrying petiole (root support), null at or under the reference */
@@ -19754,6 +20082,18 @@ function leafRootBase(plan, o, R, z) {
   return o ? [o[0] + plan.rootR * R[0], o[1] + plan.rootR * R[1], z] : [plan.rootR * R[0], plan.rootR * R[1], z];
 }
 export function buildLeafInto(acc, plan, state, nodeIndex, az, cap = null) {
+  /* A TAPERED NODE'S OWN LEAF (Bloom P1) — THE ONE PLACE a node's size is
+     applied: its scaled state and the plan fields its size decides (length,
+     width, petiole, the compound tree). A BRANCH: with no taper there is no
+     `nodeSizes` and every line below reads the plan it always read. */
+  if (plan.nodeSizes && plan.nodeSizes[nodeIndex]) {
+    const ns = plan.nodeSizes[nodeIndex];
+    if (ns.state !== state || ns.lengthMm !== plan.lengthMm) {
+      state = ns.state;
+      plan = { ...plan, lengthMm: ns.lengthMm, widthMm: ns.widthMm, petioleR: ns.petioleR, petioleLenMm: ns.petioleLenMm,
+        compound: ns.compound, lobedPetiole: ns.lobedPetiole, simplePetiole: ns.simplePetiole, nodeSizes: null };
+    }
+  }
   /* A COMPOUND LEAF (leaf/stem build S3) is its own builder, chosen by the
      PLAN — the one owner of the leaf's type — and never by the state, so a
      raceme's shared node, which pins the type to SIMPLE in the plan, cannot be
