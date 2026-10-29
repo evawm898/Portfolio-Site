@@ -1633,10 +1633,10 @@ const MUTANTS = [
     find: "  let swell = pick ? pick.k : UMBEL_SWELL_WIDTH_MAX, held = pick ? pick.v : { deepenMm: 0, riseMm: 0, heldBy: 'unheld' };",
     into: "  let swell = swellAsked, held = pick ? pick.v : { deepenMm: 0, riseMm: 0, heldBy: 'unheld' };", names: ['UM8'],
     witness: (M, C) => {
-      /* at depth 2's ruled defaults (12 florets a ray) the ray tip's width is FORCED past 1.2x on the clean tree; the table's three-floret ray holds at the asked width and cannot see this mutation (measured Oct 28) */
+      /* twelve florets on the table's two-ray mophead (20 mm pedicels): the ray tip's width is FORCED past the asked 1.20x on the clean tree (1.289x, measured Oct 29 — the search's own grid, so no typed slack: the clean swell is STRICTLY above the asked and the mutant's IS the asked); the table's three-floret ray holds at the asked width and cannot see this mutation (measured Oct 28) */
       const f = (X) => X.buildBloomInto(new X.MeshBuilder({ exportMode: true }), MOPHEAD_STATE({ umbelFlorets: 12 })).inflorescenceBuilt.sub.plan.knot;
       const m = f(M), c = f(C);
-      return (!m.widthForced && c.widthForced && c.swell > m.swell + 0.1) ? null : `the ray tip's width is ${m.swell} (forced ${m.widthForced}) on the mutant and ${c.swell} (forced ${c.widthForced}) on the clean tree`;
+      return (!m.widthForced && m.swell === m.swellAsked && c.widthForced && c.swell > c.swellAsked && c.swellAsked === m.swellAsked) ? null : `the ray tip's width is ${m.swell} (asked ${m.swellAsked}, forced ${m.widthForced}) on the mutant and ${c.swell} (asked ${c.swellAsked}, forced ${c.widthForced}) on the clean tree`;
     } },
   { id: 'the-umbel-sits-on-the-cut-end', rows: /^an umbel/,
     why: "the head-off umbel's node is put at the stem's TIP — the end the florist's cut is on — so the knot swallows the cut and the umbel hangs from the free end: watertight, one piece",
