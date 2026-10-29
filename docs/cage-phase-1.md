@@ -85,15 +85,18 @@ The dome ribs read 25–60° at the collar; a flat ring is a bridge for FDM and 
 
 | Preset | overall mm | triangles | STL | bars | door |
 |---|---|---|---|---|---|
-| Cylinder (default) | 90 × 152 | 53,420 | 2.5 MiB | 20 | arch 30×48 |
-| Bell | 107 × 173 | 61,052 | | 22 | arch 28×46 |
-| Pyramid / cone | 107 × 162 | 41,924 | | 16 (4-gon) | gothic 26×50 |
-| Onion | 96 × 175 | 64,480 | | 24 | ogee 28×50 |
-| Tiered dome on drum | 100 × 189 | 73,256 | | 24 | rect 30×40 |
-| Hex lantern | 86 × 179 | 51,140 | | 18 (6-gon) | rect 28×52 |
+| Bell (default) | 97 × 186 | 64,132 | 3.1 MiB | 22 | arch 28×46 |
+| Cylinder | 92 × 152 | 53,420 | 2.5 MiB | 20 | arch 30×48 |
+| Pyramid / cone | 107 × 162 | 42,244 | 2.0 MiB | 16 (4-gon) | gothic 26×50 |
+| Onion | 98 × 175 | 66,420 | 3.2 MiB | 24 | ogee 28×50 |
+| Tiered dome on drum | 102 × 189 | 73,736 | 3.5 MiB | 24 | rect 30×40 |
+| Hex lantern | 89 × 179 | 51,500 | 2.5 MiB | 18 (6-gon) | rect 28×52 |
 
-(After the Oct 29 rulings; the tiered cage gained its two shoulder rings. The default's
-collar boss reads r 7.6 mm, bead 8.7 mm, the twenty 1.4 mm bars meeting it 2.40 mm apart.)
+(After the Oct 29 default tweak, §6: every preset on 1.1 mm bars, the bell at 90 × 140 as the
+default, the onion with its third ring. The default's collar boss reads r 7.35 mm, bead 8.38 mm,
+the twenty-two 1.1 mm bars meeting it 2.10 mm apart — `2·rBar + floor`, the floor's share now
+the larger half of the pitch. The overall box is the body plus the base and the finial. Before
+this round the cylinder was the default at 53,420 and the bell read 61,052 at 100 × 120.)
 
 Worst reachable: 48 bars × 240 mm ≈ 230 k triangles. Builds are ~40 ms; a slider drag rebuilds
 on the next frame.
@@ -144,7 +147,8 @@ four mutants of `cage.js`.
    so the door keeps its jambs. *Undo*: `doorTop`.
 7. **The SVG draws every wire, back and front** (a cage is its wires), each at its own
    diameter, solids as silhouettes; paper `#EDEDE8`, ink `#0A0A0C`.
-8. **Default size 90 × 110 mm body**, bars 1.4 mm, rings 1.8 mm, frame rings 1.25×. (Ruling 6
+8. **Default size 90 × 110 mm body**, bars 1.4 mm, rings 1.8 mm, frame rings 1.25×. **[Oct 29,
+   second round: SUPERSEDED by §6 — the default is the BELL at 90 × 140 on 1.1 mm bars.]** (Ruling 6
    left the size bracket unfilled and asked only that the default be taller than wide: 90 × 110
    is, so it stands.)
 9. **The shoulder threshold `SHOULDER_DEG` = 25°** (ruling 5 asked for a ring at every
@@ -166,6 +170,7 @@ four mutants of `cage.js`.
 5. **Every profile step/shoulder auto-places a ring**: yes. **Applied** (§1, §4.9).
 6. **Default**: the bracket (keep 90 × 110, or change to ___) was left unfilled; the one
    constraint given is that the default be taller than wide. 90 × 110 is, and **stands**.
+   **[Superseded the same day by the default tweak, §6.]**
 7. **Print process**: the bracket (SLS PA12 at 1.0 mm / other ___) was left unfilled; the one
    instruction was that the floor be a single named constant. It is — `MIN_FEATURE_MM` is the
    only floor, every wire and the skirt read it — and **SLS PA12 at 1.0 mm stays the assumption**.
@@ -180,3 +185,32 @@ four mutants of `cage.js`.
    through the band's two edge rings — developable, a 1-chord error of the profile's sagitta
    across the band's height) and unwrap onto that; the cylinder and the polygon faces are
    exact. Recorded here so Phase 2 does not rediscover it.
+
+## 6. The default tweak (Oct 29, second round) — defaults and presets only, no new control
+
+Three rulings, each a value in `cage-geometry.js`'s registry or preset table and nowhere else.
+
+1. **The default cage is the BELL at 90 W × 140 H, dome 0.6.** `DEFAULTS` is the registry's
+   defaults with `PRESETS.bell` spread over them and `preset: 'bell'`, so the page opens on the
+   bell and the preset menu says so; every registry slider default was moved to the bell's own
+   value too (bars 22, door 28 × 46 at 0.08, tray base, finial hanger), and C0c holds the two
+   owners equal so they cannot drift. The bell preset itself moved 100 × 120 / dome 0.75 →
+   90 × 140 / dome 0.6, so picking Bell after a Reset is the identity. Overall 97 × 186 mm with
+   the tray and finial — clearly taller than wide. The cylinder is unchanged as a preset.
+2. **The default bar is 1.1 mm**, on the registry row and on every preset (all six carried the
+   old 1.4). **1.1 sits above `MIN_FEATURE_MM` (1.0), so no floor binds on it** — C0d asserts
+   that, and C13's 0.8 mm bar is still raised and told. The collar pitch is `2·rBar + floor` =
+   2.10 mm against the old 2.80 (the floor is now the larger half), so the apex boss shrinks
+   from r 7.6 to 7.35 mm on the default's 22 bars.
+3. **The onion gets a ring at the neck**: `ringCount` 2 → 3, even placement, so the upper ring
+   lands at 0.75 H where the profile has fallen from its widest (0.55 H, radius 1.00) toward the
+   top (0.74). The bracket offered "add a ring at the neck / leave as is"; it was read as the
+   first. A decision made without a ruling inside it: three even rings rather than `clustered`
+   (which would have put the upper ring at 0.805 H and moved the lower one to 0.195 H as well) —
+   literally one ring added, nothing else moved; one field to change back.
+
+Measured: C0–C16 455 of 455 (four new C0 clauses), 13 of 13 mutants; the page gate 14 of 14, 4 of
+4. The cone's and hex lantern's triangle counts move only through the thinner bar (the sweep's
+sector count does not change, so the delta is the tube's vertex count in the collar pack); the
+bell's +3,080 is 20 mm more bar. The sheet `docs/img/cage-phase-1.png` is re-rendered on these
+defaults. No bar of any preset is floored.
