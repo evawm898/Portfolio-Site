@@ -11926,7 +11926,9 @@ doc): bars meet a turned collar BOSS one printable gap apart (`2·rBar + floor`,
 1.05-diameter pack is gone) and the hanger stands on it; every profile shoulder (a knot whose
 chords turn by `SHOULDER_DEG` 25° in mm, `profileShoulders` — PCHIP is C1 so one-sided slopes
 cannot see a step) auto-places a ring; the skirt's `scallopCount` is built as the nearest divisor
-of the bar count so every cusp sits on a bar; the 90 × 110 default and the single
+of the bar count so every cusp sits on a bar; the 90 × 110 default **[Oct 29, second round: the
+default is the BELL at 90 × 140, dome 0.6, on 1.1 mm bars (above the 1.0 floor, nothing clamped); the
+onion has three rings, the upper in its neck taper — §6 of the doc]** and the single
 `MIN_FEATURE_MM` floor (SLS PA12 assumed) stand, both brackets having been left unfilled.
 Phase 2 (decorative ring bands and door infill from /frame's filigree) is NOT built and waits on
 /frame's ornament rework; a curved band will be approximated as a cone segment (doc §5.10).**

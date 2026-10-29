@@ -73,28 +73,28 @@ const notFlat = (p) => p.topShape !== 'flat';
 const hasDoor = (p) => p.doorShape !== 'none';
 
 export const PARAM_SPEC = [
-  C('preset', 'body', 'Preset', ['custom', ...PRESET_IDS].map((k) => [k, PRESET_LABELS[k]]), 'cylinder'),
+  C('preset', 'body', 'Preset', ['custom', ...PRESET_IDS].map((k) => [k, PRESET_LABELS[k]]), 'bell'),
   R('widthMm', 'body', 'Width', 40, 160, 1, 90, 'mm'),
-  R('heightMm', 'body', 'Body height', 40, 240, 1, 110, 'mm'),
+  R('heightMm', 'body', 'Body height', 40, 240, 1, 140, 'mm'),
   C('sides', 'body', 'Cross-section', [['0', 'round'], ['4', '4 sides'], ['6', '6 sides'], ['8', '8 sides']], '0'),
   C('topShape', 'top', 'Top', [['flat', 'flat'], ['dome', 'dome'], ['spire', 'point / spire'], ['onion', 'onion']], 'dome'),
   R('topHeight', 'top', 'Top height (× top radius)', 0.2, 1.6, 0.05, 0.6, '', notFlat),
-  R('barCount', 'bars', 'Bars', 6, 48, 1, 20),
-  R('barMm', 'bars', 'Bar thickness', 0.8, 3, 0.1, 1.4, 'mm'),
+  R('barCount', 'bars', 'Bars', 6, 48, 1, 22),
+  R('barMm', 'bars', 'Bar thickness', 0.8, 3, 0.1, 1.1, 'mm'),
   B('barsConverge', 'bars', 'bars converge at the apex (off: end at the top ring)', true, notFlat),
   R('ringCount', 'rings', 'Rings between base and top', 0, 8, 1, 3),
   C('ringPlace', 'rings', 'Placement', [['even', 'even'], ['clustered', 'clustered toward the ends']], 'even'),
   R('ringMm', 'rings', 'Ring thickness', 0.8, 4, 0.1, 1.8, 'mm'),
   C('doorShape', 'door', 'Door', [['none', 'none'], ['rect', 'rectangle'], ['arch', 'round arch'], ['gothic', 'gothic point'], ['ogee', 'ogee']], 'arch'),
-  R('doorWidth', 'door', 'Door width', 10, 90, 1, 30, 'mm', hasDoor),
-  R('doorHeight', 'door', 'Door height', 10, 180, 1, 48, 'mm', hasDoor),
-  R('doorY', 'door', 'Door position (bottom, of the body height)', 0, 1, 0.01, 0.1, '', hasDoor),
+  R('doorWidth', 'door', 'Door width', 10, 90, 1, 28, 'mm', hasDoor),
+  R('doorHeight', 'door', 'Door height', 10, 180, 1, 46, 'mm', hasDoor),
+  R('doorY', 'door', 'Door position (bottom, of the body height)', 0, 1, 0.01, 0.08, '', hasDoor),
   R('doorFrameMm', 'door', 'Door frame thickness', 1, 4, 0.1, 2.0, 'mm', hasDoor),
-  C('baseStyle', 'base', 'Base', [['ring', 'plain ring'], ['tray', 'tray'], ['skirt', 'scalloped skirt'], ['feet', 'feet']], 'ring'),
+  C('baseStyle', 'base', 'Base', [['ring', 'plain ring'], ['tray', 'tray'], ['skirt', 'scalloped skirt'], ['feet', 'feet']], 'tray'),
   R('skirtMm', 'base', 'Skirt depth', 4, 20, 0.5, 9, 'mm', (p) => p.baseStyle === 'skirt'),
   R('scallopCount', 'base', 'Scallops (built as a divisor of the bar count, cusps on bars)', 2, 24, 1, 8, '', (p) => p.baseStyle === 'skirt'),
   R('footCount', 'base', 'Feet', 3, 8, 1, 4, '', (p) => p.baseStyle === 'feet'),
-  C('hanger', 'hanger', 'Hanger', [['none', 'none'], ['ring', 'ring'], ['hook', 'hook'], ['finial', 'finial + ring']], 'ring'),
+  C('hanger', 'hanger', 'Hanger', [['none', 'none'], ['ring', 'ring'], ['hook', 'hook'], ['finial', 'finial + ring']], 'finial'),
   R('hangerMm', 'hanger', 'Hanger size', 4, 16, 0.5, 7, 'mm', (p) => p.hanger !== 'none'),
   R('frameRingMult', 'fine', 'Base and top ring (× ring)', 1, 2, 0.05, 1.25),
   R('collarMult', 'fine', 'Apex collar (× the radius the bars meet it at)', 1, 2, 0.05, 1.0, '', notFlat),
@@ -104,17 +104,21 @@ export const PRESET_FIELD_IDS = PARAM_SPEC.filter((s) => s.section !== 'print' &
 
 /* THE PRESETS — whole states, not proportions: picking one writes every field
    it names and the profile; editing any of them afterwards makes the preset
-   'custom' (the page does that; this file only says what a preset IS). */
+   'custom' (the page does that; this file only says what a preset IS).
+   THE DEFAULT IS THE BELL (Eva, Oct 29, second round): 90 W × 140 H, dome 0.6 — an antique
+   wrought cage, clearly taller than wide — on 1.1 mm bars, which every preset carries as the
+   default bar. 1.1 sits above MIN_FEATURE_MM (1.0), so no floor binds on it. The onion carries
+   three rings, the upper one (0.75 H) in its neck taper. */
 export const PRESETS = {
-  cylinder: { profile: P([[0, 1], [1, 1]]), sides: '0', topShape: 'dome', topHeight: 0.6, barCount: 20, barMm: 1.4, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'arch', doorWidth: 30, doorHeight: 48, doorY: 0.1, baseStyle: 'ring', hanger: 'ring', widthMm: 90, heightMm: 110 },
-  bell: { profile: P([[0, 1], [0.3, 0.96], [0.65, 0.8], [1, 0.64]]), sides: '0', topShape: 'dome', topHeight: 0.75, barCount: 22, barMm: 1.4, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'arch', doorWidth: 28, doorHeight: 46, doorY: 0.08, baseStyle: 'tray', hanger: 'finial', widthMm: 100, heightMm: 120 },
-  cone: { profile: P([[0, 1], [1, 0.48]]), sides: '4', topShape: 'spire', topHeight: 1.1, barCount: 16, barMm: 1.4, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'gothic', doorWidth: 26, doorHeight: 50, doorY: 0.1, baseStyle: 'tray', hanger: 'ring', widthMm: 100, heightMm: 120 },
-  onion: { profile: P([[0, 0.72], [0.3, 0.96], [0.55, 1], [1, 0.74]]), sides: '0', topShape: 'onion', topHeight: 1.15, barCount: 24, barMm: 1.4, barsConverge: true, ringCount: 2, ringPlace: 'even', ringMm: 1.8, doorShape: 'ogee', doorWidth: 28, doorHeight: 50, doorY: 0.12, baseStyle: 'feet', hanger: 'finial', widthMm: 96, heightMm: 100 },
-  tiered: { profile: P([[0, 1], [0.58, 1], [0.66, 0.7], [1, 0.7]]), sides: '0', topShape: 'dome', topHeight: 0.65, barCount: 24, barMm: 1.4, barsConverge: true, ringCount: 4, ringPlace: 'clustered', ringMm: 1.8, doorShape: 'rect', doorWidth: 30, doorHeight: 40, doorY: 0.1, baseStyle: 'skirt', scallopCount: 8, hanger: 'finial', widthMm: 100, heightMm: 130 },
-  hexLantern: { profile: P([[0, 1], [1, 1]]), sides: '6', topShape: 'spire', topHeight: 0.85, barCount: 18, barMm: 1.4, barsConverge: true, ringCount: 2, ringPlace: 'even', ringMm: 1.8, doorShape: 'rect', doorWidth: 28, doorHeight: 52, doorY: 0.12, baseStyle: 'feet', hanger: 'hook', widthMm: 86, heightMm: 120 },
+  cylinder: { profile: P([[0, 1], [1, 1]]), sides: '0', topShape: 'dome', topHeight: 0.6, barCount: 20, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'arch', doorWidth: 30, doorHeight: 48, doorY: 0.1, baseStyle: 'ring', hanger: 'ring', widthMm: 90, heightMm: 110 },
+  bell: { profile: P([[0, 1], [0.3, 0.96], [0.65, 0.8], [1, 0.64]]), sides: '0', topShape: 'dome', topHeight: 0.6, barCount: 22, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'arch', doorWidth: 28, doorHeight: 46, doorY: 0.08, baseStyle: 'tray', hanger: 'finial', widthMm: 90, heightMm: 140 },
+  cone: { profile: P([[0, 1], [1, 0.48]]), sides: '4', topShape: 'spire', topHeight: 1.1, barCount: 16, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'gothic', doorWidth: 26, doorHeight: 50, doorY: 0.1, baseStyle: 'tray', hanger: 'ring', widthMm: 100, heightMm: 120 },
+  onion: { profile: P([[0, 0.72], [0.3, 0.96], [0.55, 1], [1, 0.74]]), sides: '0', topShape: 'onion', topHeight: 1.15, barCount: 24, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'ogee', doorWidth: 28, doorHeight: 50, doorY: 0.12, baseStyle: 'feet', hanger: 'finial', widthMm: 96, heightMm: 100 },
+  tiered: { profile: P([[0, 1], [0.58, 1], [0.66, 0.7], [1, 0.7]]), sides: '0', topShape: 'dome', topHeight: 0.65, barCount: 24, barMm: 1.1, barsConverge: true, ringCount: 4, ringPlace: 'clustered', ringMm: 1.8, doorShape: 'rect', doorWidth: 30, doorHeight: 40, doorY: 0.1, baseStyle: 'skirt', scallopCount: 8, hanger: 'finial', widthMm: 100, heightMm: 130 },
+  hexLantern: { profile: P([[0, 1], [1, 1]]), sides: '6', topShape: 'spire', topHeight: 0.85, barCount: 18, barMm: 1.1, barsConverge: true, ringCount: 2, ringPlace: 'even', ringMm: 1.8, doorShape: 'rect', doorWidth: 28, doorHeight: 52, doorY: 0.12, baseStyle: 'feet', hanger: 'hook', widthMm: 86, heightMm: 120 },
 };
 
-export const DEFAULTS = Object.freeze({ ...Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default])), profile: PRESETS.cylinder.profile });
+export const DEFAULTS = Object.freeze({ ...Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default])), ...PRESETS.bell, preset: 'bell' });
 export const defaultParams = () => ({ ...DEFAULTS, profile: cloneCurve(DEFAULTS.profile) });
 export function applyPreset(params, id) {
   const pr = PRESETS[id]; if (!pr) throw new Error(`no preset ${id}`);

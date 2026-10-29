@@ -78,7 +78,10 @@ async function run(modulePath, { quiet = false } = {}) {
   // C0 the registry and the presets
   const ids = new Set(G.PARAM_SPEC.map((s) => s.id));
   check('C0 every preset names only registry fields and holds a profile the spec accepts', G.PRESET_IDS.every((id) => Object.keys(G.PRESETS[id]).every((k) => k === 'profile' || ids.has(k)) && G.PRESETS[id].profile && G.PRESETS[id].profile.mode === 'single'));
-  check('C0b the default state is the cylinder preset', G.DEFAULTS.preset === 'cylinder' && Object.keys(G.PRESETS.cylinder).filter((k) => k !== 'profile').every((k) => G.DEFAULTS[k] === G.PRESETS.cylinder[k]));
+  check('C0b the default state is the bell preset (90 × 140, dome 0.6, 1.1 mm bars — Eva, Oct 29)', G.DEFAULTS.preset === 'bell' && G.DEFAULTS.widthMm === 90 && G.DEFAULTS.heightMm === 140 && G.DEFAULTS.topHeight === 0.6 && G.DEFAULTS.barMm === 1.1 && Object.keys(G.PRESETS.bell).filter((k) => k !== 'profile').every((k) => G.DEFAULTS[k] === G.PRESETS.bell[k]) && G.DEFAULTS.profile === G.PRESETS.bell.profile);
+  check('C0c every registry slider default agrees with the default preset (one owner, not two)', G.PARAM_SPEC.filter((s) => s.id in G.PRESETS.bell).every((s) => s.default === G.PRESETS.bell[s.id]));
+  check('C0d the default bar sits at or above the print floor, so no floor binds on it', G.DEFAULTS.barMm >= G.MIN_FEATURE_MM && G.PRESET_IDS.every((id) => G.PRESETS[id].barMm === 1.1));
+  check('C0e the onion carries a ring in its neck taper (the upper of three, at 0.75 H)', G.PRESETS.onion.ringCount === 3);
 
   let sumTris = 0, worstFloor = Infinity;
   for (const cs of cases) {
