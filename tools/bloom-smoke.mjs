@@ -2014,7 +2014,9 @@ export const SMOKE_BLOCKS = [
         path: "NS4 the floor restated from the registry's own slider minima and every node at it" },
       { label: 'NODE RUN: GATED — the run, the spacing and the taper under a RACEME (dead: hidden AND inert)',
         path: "NS0 the three statements dead and the plan's run the default, no per-node size, SN0-SN4 the shared node unmoved" },
-
+    ],
+  },
+  {
     n: 84, title: 'the stem through the head, and the umbel junction as a hub (Oct 27)',
     anchor: "STEM TOP: Eva's state — 8 petals x spread 2.00 x rise 0.35 x CURVED 1.60 x a 60 mm stem (0.31 mm through the head on main)",
     /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the

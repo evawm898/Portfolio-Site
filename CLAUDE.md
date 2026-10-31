@@ -7031,7 +7031,7 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
   mid-surface rim) and the head's hub-to-stem default CURVED 0.50 (394 / 1,194). The two-pedicel
   overlap above the flat top stays DECLARED BY VALUE; do not raise the top or re-tune the swelling —
   the junction is the branching session's to replace. §8 of `docs/bloom-umbel-hubs-outcome.md`.
-  `frozen/phase90` is BONE's 1,608 rows at `77ae7f9` (block 84 takes the matrix to 1,625).
+  `frozen/phase91` is Bloom P1's 1,636 rows at `ec0f34b` (block 84 takes the matrix to 1,653; this session's own phase90 at `77ae7f9` was row for row Bloom P1's and was dropped).
   **The first full CI run found six classes on rows outside block 84 (§8a of the doc), all fixed at
   their owner:** ST13 locates a NODED stem's rim between the control's radius and the node law's
   widest, reads the EXPORT's floored slab, allows the stem's own relief on a textured row and skips
