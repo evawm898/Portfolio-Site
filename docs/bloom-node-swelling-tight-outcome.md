@@ -200,18 +200,28 @@ stays 1,636 rows.
 
 * **(c)** every emitted ring's radius against the restated law, now on the
   joint's own half-width (1e-9, unchanged bar).
-* **(d)** each half is isolated by its own width: the bend by the flower's
-  spindle, the swelling by the joint. The swelling arm searches the node's own
-  isolation (two half-widths) for the widest ring, so a displaced bulge is found
-  where it is; one half-width let the station-gap tolerance absorb a 2.5 mm
-  displacement (found when its plant went silent).
+* **(d)** each half is isolated by its own tail. The swelling is isolated by two
+  of the joint's half-widths. The BEND is isolated by a ramp plus a spindle on
+  each side (31.2 mm on a 6 mm stem). It was two spindles, but a kink's curvature
+  runs a whole ramp below its node and reverses sign past 0.75 of it. On the
+  golden-angle `BARE NODES: x a SPHERE` row, node 0's ramp tail sat inside node 1's
+  window and projected positive onto node 1's direction. The export gate found it
+  once the tight joint's denser stations sampled the tail; sparse stations had
+  hidden it on `main`. The swelling arm searches the node's own isolation (two
+  half-widths) for the widest ring, so a displaced bulge is found where it is. One
+  half-width let the station-gap tolerance absorb a 2.5 mm displacement, which
+  showed when its plant went silent.
 * **(f)** adds the plan's declared merge gap and joint length against the
   restated ones (1e-9).
 * **(g) new — the joint's length off the emitted rings.** On a node with two
   joint lengths of stem clear either side, the band where the emitted bulge
   stands at least 1/e² of its peak must bracket the ruled 1.25 diameters,
   between the emitted stations at each end. A band that does not close inside
-  two joint lengths is reported, never skipped. Non-vacuous: a lone swollen node
+  two joint lengths is reported, never skipped. It is OPEN only where the walk
+  stops at the window's edge with the next ring still over the cut. The first
+  version also called it open when the next station merely lay outside the
+  window, which a 0.01 swelling's sparse stations always do; the export gate
+  dropped `STEM NODES: 0.01` on it. Non-vacuous: a lone swollen node
   with room either side must have its joint read.
 
 **`node tools/verify-bloom-stem-nodes.mjs`:** 24 plants, each firing its own arm
@@ -229,8 +239,10 @@ module:**
 * `the-joint-rides-the-flower-spindle` (names ST12) — the swelling's half-width
   is the spindle again;
 * `the-merge-gap-reads-the-spindle` (ST12) — the merge report reads the spindle;
-* `node-run-spacing-clamp-reads-the-spindle` (NS3) — the spacing clamp reads the
-  spindle (built 0.857 clean);
+* `node-run-spacing-clamp-reads-the-spindle` (NS1) — the spacing clamp reads the
+  spindle. It was first written claiming NS3 and the subset read it SILENT there:
+  the clean tree clamps that row too (to 0.857), so the clamped flag agrees on
+  both sides, and what moves is the depths, NS1's subject;
 * `the-spindle-is-a-fraction-of-the-length` — **its claim corrected from
   ST12 + ST3 to ST12 + ST2**: the spindle is the kink's alone now, so it moves the
   bend and the tip (ST2), not the widest vertex (ST3).
@@ -274,9 +286,13 @@ The shipping default has no stem, so it is untouched at 24,688.
 4. **Two live rows' states no longer reached what they were named for** (§5) and
    were redefined; `frozen/phase91` registered.
 5. **`the-spindle-is-a-fraction-of-the-length` claimed ST3**, which the spindle no
-   longer reaches; corrected (§6).
+   longer reaches; corrected (§6). My own new clamp mutant claimed NS3 and fires NS1;
+   corrected (§6).
 6. **ST12(d)'s swelling arm searched one half-width**, which let the station-gap
    tolerance absorb a displaced bulge; it searches the node's isolation now (§6).
+6b. **ST12(d)'s BEND arm isolated by two spindles while a kink's tail is a ramp** —
+   latent on `main`, exposed by the denser stations, fixed by the arm's own stated
+   rule (§6). **And arm (g)'s first version read a sparse band as open** (§6).
 7. **`tools/leaf-lab-core.mjs` (the leaf lab, a prototype) keeps the old
    3.2738-radius swelling** in its own constants. It is not shipped and nothing
    reads it; recorded, not changed.
