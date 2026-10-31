@@ -9,6 +9,7 @@ import { buildFrame, exportSvg, toneAcross, profileFor } from './frame-geometry.
 import { buildRelief, exportStl } from './frame-relief.js';
 import { ProfileEditor } from './frame-profile-editor.js';
 import { withOrnament } from './frame-filigree.js';
+import { withPattern } from './frame-pattern.js';
 
 /* ---------------- state ---------------- */
 let params = { ...DEFAULTS };
@@ -102,7 +103,7 @@ const stats = { buildMs: 0 };
 function scheduleBuild() { if (!pending) pending = requestAnimationFrame(() => { pending = 0; buildNow(); }); }
 function buildNow() {
   const t = performance.now();
-  model = withOrnament(buildFrame(params, profile));
+  model = withPattern(withOrnament(buildFrame(params, profile)));
   stats.buildMs = performance.now() - t;
   const t2 = performance.now();
   relief = buildRelief(model);
@@ -185,8 +186,13 @@ function writeReadout() {
       + ` — print mm; it may stand past the frame (overall height is the frame's) · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> of ${o.tris.budget.toLocaleString('en-US')} triangles`
       + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
     : 'ornament: none';
+  const pt = model.pattern;
+  const patLine = pt
+    ? `band pattern <b>${pt.kind}</b> on the ${pt.edges.join(' and ')} edge${pt.edges.length > 1 ? 's' : ''}: <b>${pt.beads.length || pt.leaves.length}</b> ${pt.kind === 'beading' ? `beads of ${pt.size.toFixed(1)} mm` : `leaves of ${pt.size.toFixed(1)} mm`} at a pitch of <b>${(pt.beads[0] || pt.leaves[0] || { step: NaN }).step.toFixed(2)} mm</b> (${pt.runs} runs, mirrored, seated on the profile) — print mm; the engraving does not draw it · relief ≤ <b>${pt.tris.bound.toLocaleString('en-US')}</b> of ${pt.tris.budget.toLocaleString('en-US')} triangles`
+      + pt.told.map((t) => `\n<span class="warn">PATTERN — ${t}</span>`).join('')
+    : 'band pattern: none';
   document.getElementById('readout').innerHTML =
-    `${reliefLine}\n${ornLine}\n`
+    `${reliefLine}\n${ornLine}\n${patLine}\n`
     + `drawing <b>${(box.x1 - box.x0).toFixed(1)} × ${(box.y1 - box.y0).toFixed(1)} mm</b>, <b>${model.strokes}</b> strokes\n`
     + `${skelLines}\n`
     + `shade across the band <b>${tmin.toFixed(2)}–${tmax.toFixed(2)}</b> darkness (${tmax - tmin < 1e-9 ? 'uniform — a flat face' : 'graded — the profile turns'})\n`
@@ -219,6 +225,7 @@ window.__frame = {
   setView: (name) => setView(name),
   view3dInk: () => (viewer ? viewer.ink() : null),
   pinCamera: (v) => { pinnedCamera = !!v; if (viewer && v) { viewer.frame(v); viewer.render(); } },
+  pattern: () => (model.pattern ? { kind: model.pattern.kind, beads: model.pattern.beads.length, leaves: model.pattern.leaves.length, told: model.pattern.told } : null),
   ornament: () => (model.ornament ? { groups: model.ornament.groups.map((g) => ({ group: g.group, anchor: g.anchor, push: g.push, wires: g.curves.length * 2 })), wires: model.ornament.curves.length, told: model.ornament.told } : null),
   model: () => ({ info: { ...model.info, anchors: Object.fromEntries(Object.entries(model.info.anchors).map(([k, a]) => [k, { spine: a.spine, index: a.index, pt: a.pt }])) }, box: model.box, strokes: model.strokes, bands: model.bands.map((b) => ({ id: b.id, hatch: b.hatch.length, cross: b.cross.length, creases: b.creases.length, tone: b.tone, weights: b.hatch.map((h) => h.weight) })) }),
   setAdvanced: (on) => setAdvanced(on),

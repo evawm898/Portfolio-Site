@@ -131,7 +131,7 @@ function pointInPoly(pt, poly) {
 // distance reads the closing edge too — the band's end at the far springing)
 const footprint = (G, spine) => { const p = [...G.outerEdge(spine, spine.bandWidth), ...G.innerEdge(spine, spine.bandWidth).slice().reverse()]; return [...p, p[0]]; };
 
-async function run(G, R, RL, label = 'shipped', FL = null) {
+async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
   const out = [];
   const rec = (name, ok, detail = '') => { out.push({ name, ok: !!ok, detail }); if (label === 'shipped') check(name, ok, detail); };
 
@@ -810,6 +810,160 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       else console.log(`     S2 (STL byte identity): SKIPPED — ${path.basename(BASE)} has no frame-relief.js`);
     } else console.log('     S/S2 (SVG and STL byte identity against a base worktree): SKIPPED — pass --base <worktree of e759041>');
   }
+
+  // PT — THE BAND PATTERN (phase 3e, step 1): beads FUSED along a band's
+  // edge, or a laurel run of overlapping leaf tips, each seated on the
+  // molding's own profile. Every quantity is read off the EMITTED mesh —
+  // a bead's centre and radius off its two emitted poles, a leaf's rows off
+  // its top grid — against the gate's OWN owners: the band's two edges
+  // (outerEdge / innerEdge, the boundaries' owner), the profile samples
+  // restated over the element's span, MIN_FEATURE_MM, and the ruled 1.8 r
+  // and ½–¾-of-a-leaf pitch bands restated as numbers (never imported from
+  // frame-pattern.js, which is the quantity under test).
+  if (PT && (label === 'shipped' || MUTANTS.find((m) => m.id === label)?.file === 'pattern')) {
+    const F = R.MIN_FEATURE_MM, FUSE = 1.8, LEAF_LO = 0.5, LEAF_HI = 0.75;
+    const BEAD = { bandPattern: 'beading' }, LEAF = { bandPattern: 'leaf-tips' };
+    const PTROWS = [
+      ['arch beading inner', BEAD], ['arch beading both, pitch held (2 mm beads asked 3 mm apart)', { ...BEAD, bandEdge: 'both', bandSize: 2, bandPitch: 3 }],
+      ['arch leaf inner, pitch held (6 mm leaves asked 6 mm apart)', { ...LEAF, bandSize: 6, bandPitch: 6 }], ['arch sill none leaf', { ...LEAF, sill: 'none' }],
+      ['rect mitre beading', { skeleton: 'rect', ...BEAD }], ['rect eared leaf outer', { skeleton: 'rect', cornerTreatment: 'eared', ...LEAF, bandEdge: 'outer', bandSize: 6, bandPitch: 4 }],
+      ['rect rounded beading both', { skeleton: 'rect', cornerTreatment: 'rounded', ...BEAD, bandEdge: 'both' }],
+      ['oval reeded beading', { skeleton: 'oval', profilePreset: 'reeded', ...BEAD }], ['circle leaf both', { skeleton: 'oval', aspect: 1, ...LEAF, bandEdge: 'both', bandSize: 8, bandPitch: 5 }],
+      ['circle beading, fluted, outer', { skeleton: 'oval', aspect: 1, profilePreset: 'fluted', ...BEAD, bandEdge: 'outer' }],
+    ];
+    const pt0 = [], pt1 = [], pt2 = [], pt3 = [], pt4 = [], pt5 = [];
+    let beadsSeen = 0, leavesSeen = 0, leastNeck = Infinity, widestPitchR = 0, worstSeat = 0, worstStack = Infinity, mostTris = 0, overlapLo = Infinity, overlapHi = 0;
+    // PT0 the rows and the branch: four print rows, defaults in range, none by default; off, no pattern field
+    const prow = (id) => R.PARAM_SPEC.find((q) => q.id === id);
+    const prows = ['bandPattern', 'bandEdge', 'bandSize', 'bandPitch'].map(prow);
+    if (!prows.every((q) => q && q.section === 'print')) pt0.push('the four pattern rows are not all in the print section');
+    if (prow('bandPattern') && prow('bandPattern').default !== 'none') pt0.push('the pattern is on by default');
+    { const m = PT.withPattern(G.buildFrame({})); if (m.pattern) pt0.push('a frame with no pattern carries a pattern field'); }
+    const pip = (pt, poly) => { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) ins = !ins; } return ins; };
+    for (const [name, q] of PTROWS) {
+      const model = PT.withPattern(G.buildFrame(q));
+      const relief = RL.buildRelief(model), P = relief.positions, s = relief.scale;
+      const bytes = RL.exportStl(relief), a = RL.analyzeStl(bytes), c = RL.connected(relief);
+      mostTris = Math.max(mostTris, a.triangles);
+      if (a.boundary !== 0 || c.comps !== 1) pt1.push(`${name}: boundary ${a.boundary}, ${c.comps} regions`);
+      const prof = model.prof, rd = relief.reliefDepth, plateT = relief.plateT, W = model.params.moldingWidth * s;
+      // the gate's own band edges, print mm, and the across-fraction of a
+      // point: its distance to the outer edge over its distance to both
+      // the band(s) a path runs on, named by the record (used to know which
+      // part is which, never for a number): the loop, the head and jamb, the sill
+      const spinesOf = (key) => (/:loop\|/.test(key) ? ['frame'] : /:head\|/.test(key) ? ['head', 'jambR', 'jambL'] : ['sill']).map((id) => model.spines.find((sp) => sp.id === id)).filter(Boolean);
+      const edgeOf = (sp) => ({ o: G.outerEdge(sp, sp.bandWidth).map(([x, y]) => [x * s, y * s]), i: G.innerEdge(sp, sp.bandWidth).map(([x, y]) => [x * s, y * s]) });
+      const edgeMemo = new Map(), edgesFor = (key) => { if (!edgeMemo.has(key)) edgeMemo.set(key, spinesOf(key).map(edgeOf)); return edgeMemo.get(key); };
+      // the across-fraction of a point on its band: the distance to the
+      // outer edge over its distance to both, on the band of the path's
+      // own spines whose two edges the point lies between (the nearest pair)
+      const across = (q, key) => { let best = null; for (const e of edgesFor(key)) { const dO = G.distToPoly(q, e.o), dI = G.distToPoly(q, e.i); if (!best || dO + dI < best.sum) best = { sum: dO + dI, f: dO / (dO + dI) }; } return best.f; };
+      // ARC LENGTH along the gate's own column: offsetCurve at the pattern's
+      // column (the band's half width less the element's half width, the
+      // sign the record's edge), the spines of the path concatenated in the
+      // builder's own order — the apex to the sill on the arch, the whole
+      // loop on a closed frame — so a spacing is measured along the path,
+      // where a chord across a mitre reads short
+      const columnPoly = (key, half) => {
+        const inner = /^inner:/.test(key), d = (inner ? 1 : -1) * (model.params.moldingWidth / 2 - half / s);
+        const col = (sp) => { const off = G.offsetCurve(sp, d), joins = sp.joins || []; const near = (i) => { let b = joins[0], bd = Infinity; const n = off.length; for (const j of joins) { const dd = sp.closed ? Math.min((i - j + n) % n, (j - i + n) % n) : Math.abs(i - j); if (dd < bd) { bd = dd; b = j; } } return b; }; return off.map((q, i) => { const r = q || off[near(i)]; return [r[0] * s, r[1] * s]; }); };
+        const sps = spinesOf(key);
+        if (sps[0].closed) { const c = col(sps[0]); return [...c, c[0]]; }
+        if (/:head\|/.test(key)) { const h = col(sps[0]), j = sps[0].joins[0], out = []; for (let i = j; i >= 0; i--) out.push(h[i]); const jr = col(sps[1]); for (let i = jr.length - 1; i >= 0; i--) out.push(jr[i]); const m = out.slice(1).map(([x, y]) => [-x, y]).reverse(); return [...m, ...out]; }   // extended through its mirror past the axis, as the builder's path is (a first leaf's base lies past it)
+        return col(sps[0]);
+      };
+      const arcOn = (poly, q) => { const cum = [0]; for (let k = 1; k < poly.length; k++) cum.push(cum[k - 1] + Math.hypot(poly[k][0] - poly[k - 1][0], poly[k][1] - poly[k - 1][1])); let best = Infinity, at = 0; for (let k = 0; k < poly.length - 1; k++) { const A = poly[k], B = poly[k + 1], dx = B[0] - A[0], dy = B[1] - A[1], l2 = dx * dx + dy * dy, t = l2 ? Math.max(0, Math.min(1, ((q[0] - A[0]) * dx + (q[1] - A[1]) * dy) / l2)) : 0; const dd = Math.hypot(q[0] - A[0] - t * dx, q[1] - A[1] - t * dy); if (dd < best) { best = dd; at = cum[k] + t * (cum[k + 1] - cum[k]); } } return { s: at, total: cum[cum.length - 1], off: best }; };
+      const arcGaps = (poly, pts) => { const ss = pts.map((q) => arcOn(poly, q)), total = ss[0].total, out = []; for (let k = 1; k < ss.length; k++) { let d = Math.abs(ss[k].s - ss[k - 1].s); if (d > total / 2) d = total - d; out.push(d); } return { gaps: out, worstOff: Math.max(...ss.map((x) => x.off)) }; };
+      // the profile's highest z over an across span, restated: linear
+      // between the samples, so the maximum is at a sample or an end
+      const zAt = (f) => { const x = prof.x, z = prof.z; if (f <= x[0]) return z[0]; for (let k = 1; k < x.length; k++) if (f <= x[k]) return z[k - 1] + (z[k] - z[k - 1]) * (f - x[k - 1]) / (x[k] - x[k - 1]); return z[x.length - 1]; };
+      const zMax = (f0, f1) => { const lo = Math.max(0, Math.min(f0, f1)), hi = Math.min(1, Math.max(f0, f1)); let m = Math.max(zAt(lo), zAt(hi)); for (let k = 0; k < prof.x.length; k++) if (prof.x[k] >= lo && prof.x[k] <= hi) m = Math.max(m, prof.z[k]); return m; };
+      const parts = relief.parts.filter((pp) => pp.pattern);
+      const byPath = new Map();
+      for (const pp of parts) { const k = `${pp.pattern.path}|${pp.pattern.side}`; if (!byPath.has(k)) byPath.set(k, []); byPath.get(k).push(pp); }
+      for (const [key, list] of byPath) {
+        list.sort((x, y) => x.pattern.seq - y.pattern.seq);
+        const closed = /:loop\|/.test(key);
+        if (list[0].kind === 'bead') {
+          // the centre and radius off the two emitted poles
+          const beads = list.map((pp) => { const t = 3 * pp.base, b = 3 * (pp.base + 1 + (pp.lat - 1) * pp.lon); const top = [P[t], P[t + 1], P[t + 2]], bot = [P[b], P[b + 1], P[b + 2]]; return { c: [(top[0] + bot[0]) / 2, (top[1] + bot[1]) / 2, (top[2] + bot[2]) / 2], r: (top[2] - bot[2]) / 2, bot: bot[2] }; });
+          beadsSeen += beads.length;
+          // PT3 seated: the bottom pole at the band's highest surface under the
+          // bead's span — its across-fraction RESTATED from the record's edge and the
+          // emitted radius (the column the bead sits on), never read off the plan;
+          // bead's span, less the feature, exactly
+          for (const b of beads) { const f = 0.5 + (/^inner:/.test(key) ? 1 : -1) * (W / 2 - b.r) / W, want = plateT + zMax(f - b.r / W, f + b.r / W) * rd - F; worstSeat = Math.max(worstSeat, Math.abs(b.bot - want)); if (Math.abs(b.bot - want) > 1e-6) pt3.push(`${name} ${key}: a bead's bottom ${b.bot.toFixed(4)} against the band's surface less the feature ${want.toFixed(4)}`); }
+          // PT2 fused: every neighbouring pair within 1.8 r, with a neck
+          const gaps = [];
+          // on a closed loop the bead after the last is its own mirror across the seam
+          const beadSeq = closed && list[0].pattern.side === 'R' ? [...beads, { ...beads.at(-1), c: [-beads.at(-1).c[0], beads.at(-1).c[1], beads.at(-1).c[2]] }] : beads;
+          for (let k = 1; k < beadSeq.length; k++) { const d = Math.hypot(beadSeq[k].c[0] - beadSeq[k - 1].c[0], beadSeq[k].c[1] - beadSeq[k - 1].c[1]), r = Math.min(beadSeq[k].r, beadSeq[k - 1].r); gaps.push(d); widestPitchR = Math.max(widestPitchR, d / r); if (d > FUSE * r + 1e-6) pt2.push(`${name} ${key}: beads ${k - 1}-${k} ${d.toFixed(3)} mm apart on r ${r.toFixed(3)} (${(d / r).toFixed(3)} r)`); leastNeck = Math.min(leastNeck, Math.sqrt(Math.max(0, r * r - d * d / 4))); }
+          // PT4 seamless: the run starts ON the axis (its mirror's own bead),
+          // every spacing equal, and a closed loop's run ends on the axis too
+          // (the seam), so the gap across the seam and across the axis is that
+          // same spacing on the mirrored side
+          if (list[0].pattern.side === 'R') {
+            if (Math.abs(beads[0].c[0]) > 1e-9) pt4.push(`${name} ${key}: the first bead stands ${beads[0].c[0].toFixed(4)} mm off the axis`);
+            if (closed && Math.abs(beads[beads.length - 1].c[0]) > 1e-9) pt4.push(`${name} ${key}: the last bead stands ${beads[beads.length - 1].c[0].toFixed(4)} mm off the axis at the seam`);
+            // chord spacing is uniform only on a straight: compare ARC spacing
+            // along the gate's own edge polylines (the across-fraction's edge,
+            // projected)
+            const ag = arcGaps(columnPoly(key, beads[0].r), beads.map((b) => b.c)), mean = ag.gaps.reduce((x, y) => x + y, 0) / ag.gaps.length;
+            if (ag.worstOff > 1e-3) pt4.push(`${name} ${key}: a bead stands ${ag.worstOff.toFixed(4)} mm off the gate's own column`);
+            for (let k = 0; k < ag.gaps.length; k++) if (Math.abs(ag.gaps[k] - mean) > 1e-3 * mean + 1e-6) pt4.push(`${name} ${key}: arc spacing ${k} is ${ag.gaps[k].toFixed(4)} against a mean ${mean.toFixed(4)}`);
+          }
+        } else {
+          // a leaf part: its base row's centre column and its tip row's
+          const V = (pp, v, c) => { const ix = 3 * pp.T(v, c); return [P[ix], P[ix + 1], P[ix + 2]]; };
+          const mid = Math.floor(list[0].C / 2);
+          const leaves = list.map((pp) => { const r0 = pp.rowOffset, rN = pp.V - 1 - (pp.embedEnd ? 1 : 0); const base = V(pp, r0, mid), tip = V(pp, rN, mid); let len = 0; for (let v = r0; v < rN; v++) { const A = V(pp, v, mid), B = V(pp, v + 1, mid); len += Math.hypot(B[0] - A[0], B[1] - A[1]); } let crownBase = -Infinity, crownTip = -Infinity; for (let c = 0; c < pp.C; c++) { crownBase = Math.max(crownBase, V(pp, r0, c)[2]); crownTip = Math.max(crownTip, V(pp, rN, c)[2]); } return { pp, base, tip, len, crownBase, crownTip }; });
+          leavesSeen += leaves.length;
+          // PT3 seated: every top vertex at or above the band's surface under it
+          for (const lf of leaves) for (let v = 0; v < lf.pp.V; v++) for (let c = 0; c < lf.pp.C; c++) { const q = V(lf.pp, v, c), want = plateT + zAt(across(q, key)) * rd; if (q[2] < want - 1e-6) pt3.push(`${name} ${key}: a leaf's top vertex ${q[2].toFixed(4)} under the band's surface ${want.toFixed(4)}`); worstSeat = Math.max(worstSeat, Math.max(0, want - q[2])); }
+          // the leaf's width RESTATED from the control and the filigree's own aspect
+          // (clamped to the band) — the widest EMITTED row sits under the
+          // nominal width by the profile's own shoulder, 0.012 mm here
+          const Wl = Math.min(W, FL.LEAF_ASPECT * Math.max(F, model.params.bandSize)), mx = list[0].pattern.side === 'L' ? (q) => [-q[0], q[1] - 0] : (q) => q;
+          // on a closed loop the run continues through the seam into its mirror:
+          // the element after the last is the last's own mirror image
+          const basesSeq = leaves.map((l) => mx(l.base)); if (closed && list[0].pattern.side === 'R') basesSeq.push([-basesSeq.at(-1)[0], basesSeq.at(-1)[1]]);
+          const pt5gaps = arcGaps(columnPoly(key, Wl / 2), basesSeq).gaps;
+          // PT5 a laurel run: each leaf's base within ½–¾ of the previous
+          // leaf's length of its base (they overlap), and STACKED — its base
+          // crown at least a feature above the previous leaf's tip crown
+          for (let k = 1; k < basesSeq.length; k++) {
+            const d = pt5gaps[k - 1], f = d / leaves[k - 1].len;
+            overlapLo = Math.min(overlapLo, f); overlapHi = Math.max(overlapHi, f);
+            if (f > LEAF_HI + 0.02 || f < LEAF_LO - 0.02) pt5.push(`${name} ${key}: leaf ${k}'s base ${d.toFixed(3)} mm from leaf ${k - 1}'s, ${f.toFixed(3)} of its ${leaves[k - 1].len.toFixed(3)} mm length`);
+            if (k >= leaves.length) continue;   // the seam gap has no stack of its own (the mirror's base is this base)
+            const st = leaves[k].crownBase - leaves[k - 1].crownTip; worstStack = Math.min(worstStack, st);
+            if (st < F - 1e-6) pt5.push(`${name} ${key}: leaf ${k}'s base crown stands only ${st.toFixed(3)} mm over leaf ${k - 1}'s tip (wants the ${F} mm feature)`);
+          }
+          // PT4 seamless: the first leaf crosses the axis (base past it, so the
+          // mirrored pair cross base over base) and on a closed loop the last
+          // leaf crosses the seam
+          if (list[0].pattern.side === 'R') {
+            if (!(leaves[0].base[0] < -1e-6)) pt4.push(`${name} ${key}: the first leaf's base stands at x ${leaves[0].base[0].toFixed(3)} — it does not cross the axis`);
+            const last = leaves[leaves.length - 1];
+            if (closed && !(last.tip[0] < -1e-6 && last.base[0] > 1e-6)) pt4.push(`${name} ${key}: the last leaf does not cross the seam (base x ${last.base[0].toFixed(3)}, tip x ${last.tip[0].toFixed(3)})`);
+            // the leaf's width off its widest emitted row (its two walls)
+            const ag = arcGaps(columnPoly(key, Wl / 2), leaves.map((l) => l.base)), mean = ag.gaps.reduce((x, y) => x + y, 0) / ag.gaps.length;
+            if (ag.worstOff > 1e-3) pt4.push(`${name} ${key}: a leaf's base stands ${ag.worstOff.toFixed(4)} mm off the gate's own column`);
+            for (let k = 0; k < ag.gaps.length; k++) if (Math.abs(ag.gaps[k] - mean) > 1e-3 * mean + 1e-6) pt4.push(`${name} ${key}: leaf arc spacing ${k} is ${ag.gaps[k].toFixed(4)} against a mean ${mean.toFixed(4)}`);
+          }
+        }
+      }
+      if (!parts.length) pt1.push(`${name}: no pattern part emitted`);
+      if (model.pattern && model.pattern.told.some((t) => /not built/.test(t))) pt1.push(`${name}: ${model.pattern.told.find((t) => /not built/.test(t))}`);
+    }
+    rec('PT0 the band pattern is four print rows (pattern, edge, size, pitch), none by default, and off it adds no field', pt0.length === 0, pt0.join('; '));
+    rec('PT1 every band-pattern row is watertight (boundary 0) and ONE voxel region, beads and leaf tips on all three skeletons, inner / outer / both edges, and every run built', pt1.length === 0, `${PTROWS.length} rows, most ${mostTris.toLocaleString('en-US')} triangles${pt1.length ? ' — ' + pt1.slice(0, 3).join('; ') : ''}`);
+    rec('PT2 the beads are FUSED: every neighbouring pair of emitted beads within 1.8 r (restated), so each pair shares a neck', pt2.length === 0, `${beadsSeen} beads, widest pitch ${widestPitchR.toFixed(3)} r, least neck ${leastNeck.toFixed(3)} mm${pt2.length ? ' — ' + pt2.slice(0, 3).join('; ') : ''}`);
+    rec('PT3 the pattern is SEATED on the profile: a bead\'s bottom pole at the band\'s highest surface under its span less the feature (restated from the profile samples and the gate\'s own edges), every leaf top vertex at or above the surface under it', pt3.length === 0, `worst seat residual ${worstSeat.toExponential(2)} mm${pt3.length ? ' — ' + pt3.slice(0, 3).join('; ') : ''}`);
+    rec('PT4 the pattern is SEAMLESS: it starts on the axis (a bead its own mirror, a leaf crossing it), a closed loop\'s run ends on the axis at the seam, and every spacing along a run — across the apex mitre, the head-to-jamb join and the seam — is the run\'s one spacing', pt4.length === 0, pt4.slice(0, 3).join('; '));
+    rec('PT5 the leaf tips OVERLAP as a laurel run: each leaf\'s base ½–¾ of a leaf along from the previous, its base crown a feature above the previous tip (stacked)', pt5.length === 0, `${leavesSeen} leaves, bases ${overlapLo.toFixed(3)}–${overlapHi.toFixed(3)} of a leaf apart, least stack ${worstStack.toFixed(3)} mm${pt5.length ? ' — ' + pt5.slice(0, 3).join('; ') : ''}`);
+  }
+
   return out;
 }
 
@@ -862,6 +1016,13 @@ const MUTANTS = [
   { id: 'the-mapped-tangent-wraps', file: 'filigree', from: '  for (let i = 1; i < m; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', to: '  for (let i = 1; i < 0; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', breaks: ['OR3'] },   // the coil check blind where a mapped coil closes (found in the 3d build)
   { id: 'the-seat-is-read-off-the-centreline', file: 'filigree', from: 'spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth) : c.lift;', to: 'spine.baseLift = c.lift;', breaks: ['OR9'] },   // the seat read on the centreline's span, not at the emitted columns: crowns 0.989 mm where the floor is 1
   { id: 'a-folded-element-is-built', file: 'filigree', from: ": selfGap(on).gap < F + CHAIN_MARGIN ? 'laid across", to: ": false ? 'laid across", breaks: ['OR3'] },   // an element the path folds (across an ear) is built anyway
+  // PHASE 3e — the band pattern (frame-pattern.js)
+  { id: 'the-bead-pitch-cap-removed', file: 'pattern', from: 'if (pt > BEAD_FUSE * r) {', to: 'if (false) {', breaks: ['PT2'] },   // 2 mm beads asked 3 mm apart are built 3 mm apart: no neck
+  { id: 'the-beads-float', file: 'pattern', from: 'const z = seat + r - F;', to: 'const z = seat + r + 0.5;', breaks: ['PT1', 'PT3'] },   // the beads stand half a feature clear of the band: not seated, and detached
+  { id: 'the-seat-ignores-the-profile', file: 'pattern', from: '  let m = 0;\n  for (let k = 0; k <= 16; k++) m = Math.max(m, zAt(lo + (hi - lo) * k / 16));', to: '  let m = 0; return 0;\n  for (let k = 0; k <= 16; k++) m = Math.max(m, zAt(lo + (hi - lo) * k / 16));', breaks: ['PT3'] },   // every element seated on the plate instead of the molding
+  { id: 'the-leaf-run-parts', file: 'pattern', from: 'if (pt > LEAF_RUN_PITCH_MAX * len) {', to: 'if (false) {', breaks: ['PT5'] },   // 6 mm leaves asked 6 mm apart are built end to end: no overlap
+  { id: 'the-leaves-are-not-stacked', file: 'pattern', from: '(k > 0 ? depth * Math.max(0, 1 - x / Math.max(1e-9, over)) : 0)', to: '0', breaks: ['PT5'] },   // a leaf's base at the molding, under the previous tip
+  { id: 'the-seam-is-not-closed', file: 'pattern', from: 'const usable = path.closedPair ? path.L : path.L - endClear;', to: 'const usable = path.closedPair ? path.L - 0.7 * pitch : path.L - endClear;', breaks: ['PT2', 'PT4', 'PT5'] },   // a closed run stops short of the seam: the gap there is 1.4 pitches
   { id: 'the-axis-leaf-is-off-the-axis', file: 'filigree', from: 'lf.pts.map(([, y]) => [0, y])', to: 'lf.pts.map(([, y]) => [0.05, y])', breaks: ['OR5'] },
 ];
 
@@ -870,9 +1031,10 @@ async function negativeControl() {
   const srcG = fs.readFileSync(path.join(ROOT, 'frame-geometry.js'), 'utf8');
   const srcR = fs.readFileSync(path.join(ROOT, 'frame-relief.js'), 'utf8');
   const srcF = fs.readFileSync(path.join(ROOT, 'frame-filigree.js'), 'utf8');
+  const srcP = fs.readFileSync(path.join(ROOT, 'frame-pattern.js'), 'utf8');
   const R = await import(pathToFileURL(path.join(ROOT, 'frame-registry.js')).href);
   for (const m of MUTANTS) {
-    const n = (m.file === 'relief' ? srcR : m.file === 'filigree' ? srcF : srcG).split(m.from).length - 1;
+    const n = (m.file === 'relief' ? srcR : m.file === 'filigree' ? srcF : m.file === 'pattern' ? srcP : srcG).split(m.from).length - 1;
     if (n !== 1) { console.log(`FAIL anchor ${m.id}: matches ${n} times`); process.exit(1); }
   }
   let bad = 0;
@@ -902,8 +1064,11 @@ async function negativeControl() {
     const G = await import(pathToFileURL(gPath).href + `?${Date.now()}`);
     const RL = await import(pathToFileURL(rPath).href + `?${Date.now()}`);
     const FL = await import(pathToFileURL(fPath).href + `?${Date.now()}`);
-    const out = await run(G, R, RL, m.id, FL);
-    fs.unlinkSync(gPath); fs.unlinkSync(rPath); fs.unlinkSync(fPath);
+    const pPath = path.join(ROOT, `_frame-pattern-mutant-${m.id}.js`);
+    fs.writeFileSync(pPath, (m.file === 'pattern' ? srcP.replace(m.from, m.to) : srcP).replace("from './frame-geometry.js'", `from './${path.basename(gPath)}'`).replace("from './frame-relief.js'", `from './${path.basename(rPath)}'`).replace("from './frame-filigree.js'", `from './${path.basename(fPath)}'`));
+    const PT = await import(pathToFileURL(pPath).href + `?${Date.now()}`);
+    const out = await run(G, R, RL, m.id, FL, PT);
+    fs.unlinkSync(gPath); fs.unlinkSync(rPath); fs.unlinkSync(fPath); fs.unlinkSync(pPath);
     const red = out.filter((r) => !r.ok).map((r) => r.name.split(' ')[0]);
     const missed = m.breaks.filter((c) => !red.includes(c)), unclaimed = red.filter((c) => !m.breaks.includes(c));
     const ok = missed.length === 0 && unclaimed.length === 0;
@@ -920,7 +1085,8 @@ else {
   const R = await import(pathToFileURL(path.join(ROOT, 'frame-registry.js')).href);
   const RL = await import(pathToFileURL(path.join(ROOT, 'frame-relief.js')).href);
   const FL = await import(pathToFileURL(path.join(ROOT, 'frame-filigree.js')).href);
-  await run(G, R, RL, 'shipped', FL);
+  const PT = await import(pathToFileURL(path.join(ROOT, 'frame-pattern.js')).href);
+  await run(G, R, RL, 'shipped', FL, PT);
   const failed = results.filter((r) => !r.ok);
   console.log(`\n${results.length - failed.length} of ${results.length} checks passed${failed.length ? ' — FAILED: ' + failed.map((f) => f.name).join('; ') : ''}`);
   process.exit(failed.length ? 1 : 0);

@@ -24,6 +24,7 @@ const ornOn = (p) => p.filigree === 'scrolls';
 // the chains layout (phase 3d, the default): the groups' wire, style and
 // scale do not reach a chain, so they hide there
 const chains = (p) => (p.ornLayout ?? 'chains') === 'chains';
+const patternOn = (p) => (p.bandPattern ?? 'none') !== 'none';
 const ON_OFF = [['on', 'On'], ['off', 'Off']];
 
 export const PARAM_SPEC = [
@@ -143,6 +144,21 @@ export const PARAM_SPEC = [
   { id: 'ornShape', section: 'print', label: 'Ornament section', kind: 'choice', default: 'arris', visibleWhen: ornOn,
     options: [['arris', 'Arris — a crisp spine, hollow either side'], ['half-round', 'Half-round — flat back'], ['round', 'Round — on a wall']] },
   R('ornProjection', 'print', 'Ornament relief (× wire)', 0.5, 3, 0.05, 1.25, '', ornOn),   // 1.25 (Eva, phase 3b): the default 1.6 mm half-round crown is 1.0 mm, on the floor
+  // --- 4b. the BAND PATTERN (phase 3e, step 1 of the element vocabulary): a
+  //     repeat laid along a band's edge on the molding's own height — beads
+  //     FUSED at ≤ 1.8 r, or a laurel run of OVERLAPPING leaf tips. A print
+  //     feature (it reaches the STL and never the SVG), so it lives here;
+  //     none by default, every row below hidden AND inert at none. Read
+  //     docs/frame-charter.md §15.
+  { id: 'bandPattern', section: 'print', label: 'Band pattern', kind: 'choice', default: 'none',
+    options: [['none', 'None'], ['beading', 'Beading — fused beads'], ['leaf-tips', 'Leaf tips — a laurel run']] },
+  { id: 'bandEdge', section: 'print', label: 'Pattern edge', kind: 'choice', default: 'inner', visibleWhen: patternOn,
+    options: [['inner', 'Inner (sight) edge'], ['outer', 'Outer edge'], ['both', 'Both edges']] },
+  // the element's size (a bead's diameter, a leaf's length) and the pitch
+  // between elements, both print mm; a pitch outside what the pattern prints
+  // is held and told (beads at ≤ 1.8 r, leaves at ½–¾ of a leaf)
+  R('bandSize', 'print', 'Pattern size (print)', 1, 12, 0.1, 4, 'mm', patternOn),
+  R('bandPitch', 'print', 'Pattern pitch (print)', 0.5, 12, 0.1, 3, 'mm', patternOn),
 ];
 
 /* The minimum printable feature, in millimetres. AN ASSUMPTION: the print

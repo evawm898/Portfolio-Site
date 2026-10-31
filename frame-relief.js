@@ -236,6 +236,26 @@ function plateSolid(mesh, outline, { scale, plateT }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* A bead (the band pattern, phase 3e)                                 */
+/* ------------------------------------------------------------------ */
+
+/* A closed sphere of radius r about c, z from a base: `lat` rings of `lon`
+   vertices between two pole vertices, so no row is degenerate; oriented
+   by its own signed volume like every band. */
+export function sphereSolid(mesh, c, r, lat, lon) {
+  const base = mesh.pos.length / 3, t0 = mesh.idx.length / 3;
+  const top = mesh.vertex(c[0], c[1], c[2] + r);
+  for (let i = 1; i < lat; i++) { const th = Math.PI * i / lat; for (let j = 0; j < lon; j++) { const ph = 2 * Math.PI * j / lon; mesh.vertex(c[0] + r * Math.sin(th) * Math.cos(ph), c[1] + r * Math.sin(th) * Math.sin(ph), c[2] + r * Math.cos(th)); } }
+  const bot = mesh.vertex(c[0], c[1], c[2] - r);
+  const V = (i, j) => base + 1 + (i - 1) * lon + (j % lon);
+  for (let j = 0; j < lon; j++) mesh.tri(top, V(1, j), V(1, j + 1));
+  for (let i = 1; i < lat - 1; i++) for (let j = 0; j < lon; j++) mesh.quad(V(i, j), V(i + 1, j), V(i + 1, j + 1), V(i, j + 1));
+  for (let j = 0; j < lon; j++) mesh.tri(bot, V(lat - 1, j + 1), V(lat - 1, j));
+  orientOutward(mesh, t0);
+  mesh.parts.push({ id: 'bead', kind: 'bead', base, c: [c[0], c[1], c[2]], r, lat, lon, t0, t1: mesh.idx.length / 3 });
+}
+
+/* ------------------------------------------------------------------ */
 /* The relief                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -245,6 +265,8 @@ function plateSolid(mesh, outline, { scale, plateT }) {
    open band solid's own count — top and bottom grids, two walls, two caps —
    which the degenerate drops only lower. */
 export const FRAME_TRI_BUDGET = 1500000;
+/* a bead's lattice (frame-pattern.js reads these for its own count) */
+export const PATTERN_LAT = 10, PATTERN_LON = 20;
 export const solidTriBound = (V, C) => 4 * (V - 1) * (C - 1) + 4 * (V - 1) + 4 * (C - 1);
 
 /* The floor as ASSUMED: everything below reads MIN_FEATURE_MM and says so. */
@@ -277,6 +299,19 @@ export function buildRelief(model) {
     const crown = Math.min(...model.ornament.solids.map((o) => o.depth * (o.spine.depthScale ? Math.min(...o.spine.depthScale) : 1)));
     if (model.ornament.solids.length && crown < MIN_FEATURE_MM) underFloor.push(`ornament crown ${crown.toFixed(2)} mm high`);
   }
+  // THE BAND PATTERN (phase 3e): beads and leaf tips laid along the bands'
+  // edges in print mm, built in frame-pattern.js, each standing on the
+  // plate thickness (its seat is above the plate); a bead is its own sphere
+  if (model.pattern) {
+    const part0 = mesh.parts.length;
+    for (const b of model.pattern.beads) sphereSolid(mesh, [b.c[0], b.c[1], plateT + b.z], b.r, PATTERN_LAT, PATTERN_LON);
+    for (const l of model.pattern.leaves) bandSolid(mesh, l.spine, l.prof, { scale: 1, plateT, reliefDepth: l.depth });
+    // every part the pattern emitted, in the pattern's own order, carries
+    // its record (the gate reads the mesh, never the record, and uses the
+    // record only to know which part is which)
+    const recs = [...model.pattern.beads, ...model.pattern.leaves];
+    for (let i = part0; i < mesh.parts.length; i++) mesh.parts[i].pattern = recs[i - part0];
+  }
   // the interior: open, a plate behind at the plate thickness (backed), or
   // the same plate at the floor so the opening reads deeper (recessed)
   let plate = null, panelT = null;
@@ -290,7 +325,7 @@ export function buildRelief(model) {
   let z1 = 0; for (let i = 2; i < positions.length; i += 3) if (positions[i] > z1) z1 = positions[i];
   return {
     positions, indices, parts: mesh.parts, scale, plateT, reliefDepth, plate, panelT,
-    info: { scale, plateT, reliefDepth, bandW, mullW, told, underFloor, triangles: indices.length / 3, heightMm: p.printHeight, widthMm: (model.box.x1 - model.box.x0) * scale, ornament: model.ornament ? { groups: model.ornament.groups.length, wires: model.ornament.solids.length, told: model.ornament.told } : null, depthMm: z1, floorNote: FLOOR_NOTE },
+    info: { scale, plateT, reliefDepth, bandW, mullW, told, underFloor, triangles: indices.length / 3, heightMm: p.printHeight, widthMm: (model.box.x1 - model.box.x0) * scale, ornament: model.ornament ? { groups: model.ornament.groups.length, wires: model.ornament.solids.length, told: model.ornament.told } : null, pattern: model.pattern ? { kind: model.pattern.kind, beads: model.pattern.beads.length, leaves: model.pattern.leaves.length, told: model.pattern.told } : null, depthMm: z1, floorNote: FLOOR_NOTE },
   };
 }
 

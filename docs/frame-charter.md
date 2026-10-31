@@ -1112,3 +1112,112 @@ rosettes at the junctions. **They are still a ROW OF SEPARATE ELEMENTS**, each a
 next, where references 2 and 3 are one continuous vine. The rosettes stand proud of the molding like
 stars. That gap is Eva's to judge; option 2C (the molding's own edge becomes the scroll) is costed in
 the session report.
+
+## 15. Phase 3e, step 1 — the band pattern: a repeat along a band's edge (beading, leaf tips)
+
+### 15.0 Rulings (Eva, Oct 29, the element-vocabulary brief)
+
+- **Seven elements ship**: (a) shell, (b) palmette with boss, (c) a simplified rose (no undercut),
+  (d) rosette, (e) bud / berry, (f) beading, (g) a leaf-tip run. Openwork stays out. (b) and (d)
+  are reconciled with phase 3d's palmette and rosette: one primitive each.
+- **One repeat-along-a-path owner** for (f) and (g): the path from `offsetCurve`, the seat from the
+  profile's height at that column. Controls: pattern, which band edge (inner / sight, outer, both),
+  pitch, size. **Beading fused at ≤ 1.8 r** (at 2 r two beads print a knife-edge web). **Leaf tips
+  OVERLAP in a continuous laurel run**, never spaced apart.
+- Gate: boundary 0, one region, beads fused (a measured overlap), seated on the profile, seamless at
+  the oval's closing point and at the mitres; a mutant for each.
+
+### 15.1 The pattern (`frame-pattern.js`)
+
+- **The path is `offsetCurve`** at the pattern's own column (the bead's or the leaf's edge flush with
+  the band's edge), the nulls past a join's bisector the join's mitre point as the relief's grid has
+  them, in print mm. **The seat is the profile's own height** at that column: the profile's highest z
+  over the element's span across the band (`profileMax`) × the relief depth. Nothing here reads the
+  height field the chains read — the profile is the same along a spine and the gate restates it.
+- **Every path starts ON THE AXIS and is extended through its own mirror image** (the left run
+  reversed before it; after it too on a closed loop), so an element may cross the axis or the seam.
+  The right half is built and mirrored, x negated to the double. A closed frame's one path runs from
+  the top centre to the bottom centre (the seam); the arch's inner edge of head and jamb is ONE path
+  from the apex to the sill, the sill its own from its centre; the arch's mullions carry nothing.
+- **Stations** divide the run's usable length exactly at a step ≤ the pitch (`stations`), so the
+  spacing is one number per run, and on a closed loop the seam and the axis are two more of it.
+- **BEADING**: a sphere of radius r = size / 2 (10 rings of 20), its centre r − F above the seat, so
+  its bottom embeds the band by the feature at its column. The pitch is held at or under
+  `BEAD_FUSE` 1.8 r and at or over r, told. A run ends on the axis both ways (a bead on the axis is
+  its own mirror); an open run keeps r clear at its far end.
+- **LEAF TIPS**: a straight laurel leaf (phase 3c's `buildLeaf` with one lobe, no curl, 16 stations
+  of its own — the shipped leaf's 48 are byte-identical by branch) laid along the path through the
+  relief's own `bandSolid`, its width 0.38 of its length, its crown `max(F, LEAF_RELIEF × width ×
+  ornament relief)`. The pitch is held inside [½, ¾] of a leaf, told: each leaf's BASE lies over the
+  previous leaf's tip, a stacked shell — a lift of one crown at the base falling to the molding where
+  the previous leaf ends. The first leaf's base stands 0.15 of a leaf PAST the axis, so the mirrored
+  pair cross base over base (met face to face on the axis they would graze, which the voxel gate
+  cannot tell from an overlap); on a closed loop the last leaf crosses the seam tip over tip.
+- **Budget**: a run is priced before it is built (the ornament's bound counted first) and gives way
+  past `FRAME_TRI_BUDGET`, told.
+- **The paper**: the pattern reaches the STL and never the SVG — its four rows live in the registry's
+  print section, and the read-out says the engraving does not draw it. Default `none`, by branch.
+
+### 15.2 Measured (relief gate, default print, ogee)
+
+| row | triangles |
+|---|---|
+| arch, beading on the sight edge (4 mm beads, 3 mm pitch) | 123,516 |
+| arch, beading both edges | 181,116 |
+| arch, leaf tips (4 mm) | 243,180 |
+| rectangle, beading | 123,608 |
+| rectangle eared, leaf tips outer (6 mm leaves, 4 mm pitch) | 502,368 |
+| oval reeded, beading | 156,120 |
+| circle, leaf tips both edges (8 mm, 5 mm) | 544,704 |
+
+Every row: boundary edges 0, one voxel region. The leaf run is the costly one (a leaf is a band
+solid of 17 × 17), and a dense run on both edges of a large frame is what the budget give-way is for.
+
+### 15.3 Gate (PT0–PT5) and mutants
+
+PT0 the four print rows, none by default, no field when off; PT1 watertight and one region on ten
+rows (every skeleton, every edge, the reeded and fluted profiles, the eared and rounded corners, a
+sill-less arch, two held-pitch rows); PT2 every neighbouring pair of EMITTED beads (centre and radius
+off the two poles) within 1.8 r restated, the neck reported; PT3 a bead's bottom pole at the band's
+highest surface under its span less the feature, restated from the profile samples with the bead's
+across-fraction REBUILT from the record's edge and the emitted radius (the column a flush bead sits
+on — never the builder's own seat, and not a distance to the nearest edges either: near the head-to-jamb
+join a jamb's edge is nearer than the head's and that reading drifted 0.04 mm), every leaf top vertex
+at or above the surface under it (there the across-fraction IS the point's distance to the outer edge
+over its distance to both, on the path's own spines); PT4 seamless — the run starts on the axis (a bead
+its own mirror, a leaf crossing it), a closed loop's run ends on the axis at the seam, every element
+lies on the gate's OWN column (`offsetCurve` at the pattern's column, within 1e-3 mm), and every
+ARC spacing along that column is the run's one spacing to 1e-3 relative (chords read 8 % short
+across the apex mitre, which is why the first cut compared chords and was wrong); the column is the
+builder's path restated — the closed loop whole, the arch's head and jamb apex to sill EXTENDED THROUGH
+THE MIRROR past the axis (a first leaf's base lies past it), a left-side element measured on its own
+mirror; PT5 the laurel run — each base ½–¾ of a leaf from the previous along that column and its base
+crown a feature above the previous tip. **AND ONE WAS THE BUILDER'S, FOUND BY THE GATE ON THE EARED FRAME**: the closed loop's path began
+at the column's HIGHEST VERTEX nearest the axis, which on an eared rectangle is an ear's corner, off
+the axis — the half-path was then mirrored from there and ran straight across the inset top, so a row
+of leaves floated over no band at all (PT3 read them under the surface, PT5 read their bases 23.7 mm
+and 0.0 mm apart as they fell off the column). The path now opens at the column's own highest AXIS
+CROSSING and ends at the lowest (the seam), with the slice between them keeping every corner vertex
+(the first cut resampled at 1 mm and cut each mitre by a chord, 0.012 mm off the column on the arch).
+**And the leaf run BROKE AT THE SEAM**: a closed loop's leaves stationed their last base a whole step
+before the seam, so with its mirror's base a step past it the gap across the seam was TWICE the pitch
+(7.98 mm on 6 mm leaves, 1.33 of a leaf — no overlap). `stations()`'s `seamHalf` arm puts the last base
+half a step before the seam (`step = (L − start) / (N − ½)`), so the seam gap IS the step; the gate
+appends the last element's own mirror to the right-hand sequence on a closed loop and reads that gap
+with the rest (PT2 for beads — whose last bead sits ON the seam and is its own mirror — PT5 for leaves).
+**Three readings of the first gate run were the gate's and not the pattern's**: a closed loop's run started at the seam rather than the top (the builder's, fixed:
+the path opens at the HIGHEST axis crossing), the across-fraction near a join, and chord against arc
+across the mitre. Six mutants: the pitch cap removed (PT2), the beads floating (PT1,
+PT3), the seat reading the plate (PT3), the leaf run parting (PT5), the leaves unstacked (PT5), a
+closed run stopping short of the seam (PT2, PT4, PT5).
+
+### 15.4 Decisions made without a ruling
+
+33. **The pattern is print-only** (no SVG) — the relief is the primary output and a drawn bead is a
+    second producer of its outline. *Undo:* a sweep per element in `withOrnament`'s manner.
+34. **The sight edge is the inner edge**; "both" is two runs. *Undo:* `bandEdge`'s options.
+35. **A pattern leaf is one lobe, straight, 0.38 wide**, and the laurel's leaves all point away
+    from the axis. *Undo:* `LEAF_RUN_LOBES`, the `curl` and the direction in `bandPatternFor`.
+36. **Defaults size 4 mm, pitch 3 mm** — inside both patterns' pitch bands, so the shipped defaults
+    are held nowhere. *Undo:* two registry rows.
+37. **The arch's mullions carry no pattern.** *Undo:* `patternPaths`.
