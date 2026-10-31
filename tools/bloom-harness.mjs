@@ -8939,7 +8939,19 @@ export function stemNodeClauses({ S, ui, NL, regNodes, geoAbsent, hasLeaf, leaf 
         for (const [k, nd] of NL.nodes.entries()) {
           const prev = k > 0 ? NL.nodes[k - 1].s : -Infinity, next = k + 1 < NL.nodes.length ? NL.nodes[k + 1].s : Infinity;
           const isoBy = (w) => nd.s - prev >= 2 * w && next - nd.s >= 2 * w && nd.s + w < Lstem && nd.s - w > 0;
-          const isolated = NL.slope > 0 ? isoBy(NL.w) : isoBy(NL.ws);
+          /* THE BEND's OWN TAIL IS A RAMP, NOT A SPINDLE (P1b, found by the export
+             gate on `BARE NODES: x a SPHERE`): a kink's curvature runs the whole
+             ramp below its node and REVERSES SIGN past 0.75 of it, so a
+             neighbour within a ramp of this node's search window (which runs a
+             spindle above the node to a ramp and a spindle below it) puts its
+             own bend there — on a golden-angle stem it projects POSITIVE onto
+             this node's direction. Two spindles hid that while the stations
+             were sparse; the tight joint's denser stations sample it. So a
+             kinked node is isolated by a ramp and a spindle either side, the
+             arm's own rule ("that node's and not a sum of its neighbours'
+             tails") stated for the bend's own tail. */
+          const isoBend = nd.s - prev >= NL.ramp + NL.w && next - nd.s >= NL.ramp + NL.w && nd.s + NL.w < Lstem && nd.s - NL.w > 0;
+          const isolated = NL.slope > 0 ? isoBend : isoBy(NL.ws);
           if (!isolated) continue;
           resolvable++;
           if (NL.slope > 0) {
@@ -8985,11 +8997,17 @@ export function stemNodeClauses({ S, ui, NL, regNodes, geoAbsent, hasLeaf, leaf 
                swelling drawn on stations placed for a tight one is exactly a
                band that runs on into the next node's. */
             const peak = rMax - NL.R, cut = peak * Math.exp(-2);
+            /* The band is OPEN only where the walk stopped at the window's edge
+               with the next ring still at or over the cut. A next ring outside
+               the window but UNDER the cut means the band closed between the
+               two (sparse stations at a tiny swelling, measured at 0.01): the
+               bracket then says so, honestly wide. */
             const inWin = (i) => i >= 0 && i < outer.length && Math.abs(outer[i].s - nd.s) <= 2 * NL.joint;
+            const over = (i) => i >= 0 && i < outer.length && outer[i].r - NL.R >= cut;
             let a = rI, b = rI;
-            while (inWin(a - 1) && outer[a - 1].r - NL.R >= cut) a--;
-            while (inWin(b + 1) && outer[b + 1].r - NL.R >= cut) b++;
-            const openA = !inWin(a - 1) || outer[a - 1].r - NL.R >= cut, openB = !inWin(b + 1) || outer[b + 1].r - NL.R >= cut;
+            while (inWin(a - 1) && over(a - 1)) a--;
+            while (inWin(b + 1) && over(b + 1)) b++;
+            const openA = a === 0 || over(a - 1), openB = b === outer.length - 1 || over(b + 1);
             {
               jointsRead++;
               const lo = outer[b].s - outer[a].s, hi = openA || openB ? Infinity : outer[b + 1].s - outer[a - 1].s;
