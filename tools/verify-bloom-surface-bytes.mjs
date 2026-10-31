@@ -569,6 +569,72 @@ const PREDICATE_MOVERS = {
      builds. Read off the base's record, never the label; every other row —
      every NONE, every RACEME, the GATED umbel rows with no stem — must hold to
      the bit in both modes, because only the junction's emitter changed. */
+  /* THE UMBEL JUNCTION AS A HUB AND THE STEM'S DOMED TOP (Oct 27). A row moves
+     iff the BASE tree builds an umbel on it (the junction's emitter changed —
+     `umbel-boss`'s own predicate) OR builds a stem rooted through a CAP wider
+     than itself with the head present (`stem-top`: the stem's top ring moves
+     onto the mid-surface on every such row, since the cap's sagitta at the
+     stem's radius is never 0). Every other row holds to the bit. */
+  'stem-top': (st) => {
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    const fr = base.footRing(bs, acc);
+    const sp = fr.hub && base.stemPlan(bs, fr.hub, acc);
+    if (!(sp && sp.present)) return false;
+    const dome = fr.hub.dome;
+    if (!dome || dome.closed) return false;
+    if (typeof base.umbelHeadIsAbsent === 'function' && base.umbelHeadIsAbsent(bs)) return false;
+    return sp.hubR > sp.outerR;
+  },
+  /* THE UMBEL HUBS (Oct 27): a row moves iff it is a `stem-top` mover OR the
+     BASE builds an umbel knot on it AND the junction's flare is BUILT there —
+     `umbelBoss`'s own branch: Hub amount > 0, a flare width (the band's rim
+     past the rod at `outerR - gap/2`) and room below the band for a swell
+     (`roomMm - halfHeightMm > 0`, the room read off the BASE's own knot centre
+     against its stem tip, less the gap and the cut's span). Amount 0 is the
+     Oct 24 coin BY BRANCH and holds — the first predicate named it a mover and
+     the run said so. */
+  'umbel-hubs': (st) => {
+    if (PREDICATE_MOVERS['stem-top'](st)) return true;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    if (base.umbelIsAbsent(bs)) return false;
+    const fr = base.footRing(bs, acc);
+    const sp = fr.hub && base.stemPlan(bs, fr.hub, acc);
+    if (!(sp && sp.present)) return false;
+    const P = base.inflorescencePlan(bs, sp, acc);
+    if (!(P && P.present && P.umbel && P.knot)) return false;
+    if (!(Number(st.hubShapeAmount) > 0)) return false;
+    const K = P.knot, gap = base.MIN_FEATURE_MM;
+    const widthMm = K.radiusMm - (sp.outerR - gap / 2);
+    const roomMm = K.centre[2] - P.stemTipZ - gap - (sp.cut && sp.cut.made ? sp.cut.spanMm : 0);
+    return widthMm > 0 && roomMm - K.halfHeightMm > 0;
+  },
+  /* THE CONVERGING KNOT (Oct 27, Eva's second ruling): every row the BASE
+     builds an umbel knot on moves (the band is the knot now, and every
+     pedicel's root converges), plus every `stem-top` mover, plus — because the
+     ruling moves the HUB CONTROLS' DEFAULTS to CURVED 0.50 — every row whose
+     BASE builds a head's hub-to-stem join that is ACTIVE at the base's own
+     default (GOBLET 1.00) with the row not naming the two controls itself. */
+  'umbel-knot': (st) => {
+    if (PREDICATE_MOVERS['stem-top'](st)) return true;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const bs = baseState(st);
+    const fr = base.footRing(bs, acc);
+    const sp = fr.hub && base.stemPlan(bs, fr.hub, acc);
+    if (!(sp && sp.present)) return false;
+    if (!base.umbelIsAbsent(bs)) { const P = base.inflorescencePlan(bs, sp, acc); if (P && P.present && P.umbel && P.knot) return true; }
+    /* the head's join under the moved default: active on the base at its own default, and neither control named */
+    if (st.hubStyle === undefined && st.hubShapeAmount === undefined && sp.hubJoinActive !== false && Number(base.HUB_SHAPE_AMOUNT_DEFAULT) === 1) return !!(sp.swellActive ?? sp.joinActive ?? true);
+    return false;
+  },
+  /* THE GENTLE SWELLING (Oct 28, Eva's rulings): every row the BASE builds an
+     umbel junction on moves (the knot is the swelling now, every root is
+     deepened), plus every `stem-top` mover, plus — ruling 2, the head's hub
+     default moved to CURVED 0.50 — every row whose BASE builds a head's
+     hub-to-stem join ACTIVE at the base's own default (GOBLET 1.00) with the
+     row not naming the two controls itself. Against a worktree of `main`. */
+  'umbel-swelling': (st) => PREDICATE_MOVERS['umbel-knot'](st),
   'umbel-boss': (st) => {
     const acc = new base.MeshBuilder({ exportMode: true });
     const bs = baseState(st);

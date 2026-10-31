@@ -284,6 +284,11 @@ built compound umbel.
 **RULED Oct 26: the drag-light extension is NOT built yet. The page-side cost (~10 s of the 11–17 s
 step) is profiled first, in its own session.**
 
+**RULED Oct 27: Eva dragged the mophead on her own machine and it feels fine. The 2-florets drag
+build is NOT built; CLOSED.** (The page-profile outcome doc — `docs/bloom-page-profile-outcome.md`,
+on the still-open #468 — carries the same sentence in its §5 once that PR lands; the closure is
+recorded here so it does not wait on it.)
+
 ### 12c. The matrix, the defaults bar and the gate
 
 - **Block 81 is redefined in place, 20 rows, 1,588 unchanged.** Every row that builds depth 2

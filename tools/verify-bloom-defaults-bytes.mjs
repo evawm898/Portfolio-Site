@@ -1,7 +1,7 @@
 /* ===================================================================
    verify-bloom-defaults-bytes.mjs — THE BYTE PARTITION OF A DEFAULTS MOVE.
 
-     node tools/verify-bloom-defaults-bytes.mjs --base <worktree> [--shard k/n] [--out <file>] [--control] [--mover infill|lobed|none|depth2] [--pair index|set] [--only <regex>] [--redefined <regex>]
+     node tools/verify-bloom-defaults-bytes.mjs --base <worktree> [--shard k/n] [--out <file>] [--control] [--mover infill|lobed|none|depth2|hubjoin] [--pair index|set] [--only <regex>] [--redefined <regex>]
      node tools/verify-bloom-defaults-bytes.mjs --merge <file> <file> ...
 
    WHY IT EXISTS. `verify-bloom-surface-bytes.mjs` builds BOTH trees from THIS
@@ -121,6 +121,26 @@ const MOVER_OF = {
      it builds depth 2 off the defaults". A depth-2 row that named every
      overlay value holds; a row that builds no depth 2 holds. The overlay is
      the HEAD's (the base has none), the build record and the set the BASE's. */
+  /* `hubjoin` (Eva's ruling 2 of Oct 28: CURVED 0.50 is the head's hub-to-stem
+     join default too, was GOBLET 1.00 — and the umbel junction is the gentle
+     SWELLING, was the knot): a row moves iff the BASE builds an UMBEL on it
+     (every umbel's junction and every pedicel's root moved), or the BASE
+     builds a STEM whose hub-to-stem join is ACTIVE (`swellActive`, the plan's
+     own field: a cap wider than its stem with room under the plate) with at
+     least one of the two moved controls UNNAMED by the base row, or the BASE
+     stem's top is the Oct 27 stem-top mover (an open cap wider than its stem
+     under a present head). A sphere, a head no wider than its stem, a row
+     naming both controls, and every stemless row hold. */
+  hubjoin: (b, br) => {
+    const m = b.built, inf = m.inflorescence;
+    if (inf && inf.present && inf.umbel) return true;
+    const sp = m.stem; if (!(sp && sp.present)) return false;
+    const named = new Set((br.set || []).map((w) => w.id));
+    if (sp.swellActive && !(named.has('hubStyle') && named.has('hubShapeAmount'))) return true;
+    const dome = m.hub && m.hub.dome;
+    const headAbsent = m.hubBuilt && m.hubBuilt.absent === true;
+    return !!(dome && !dome.closed && !headAbsent && sp.hubR > sp.outerR);
+  },
   depth2: (b, br) => {
     const p = b.built.inflorescence;
     if (!(p && p.present && p.compound)) return false;
