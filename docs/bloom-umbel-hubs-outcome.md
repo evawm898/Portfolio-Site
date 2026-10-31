@@ -231,7 +231,7 @@ Every run on this box, `CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium`, block 82
   domed head / hemisphere` rows, the sepal-height and sepal-tier dome rows, the sessile domed floret head, the hemisphere
   reach-inset row, and every `UMBEL:` / `MOPHEAD:` row that builds a flare — the umbel knot has a GOBLET flare at the
   shipping Hub defaults on all of them.
-- A frozen phase IS owed: `frozen/phase91` at the merged base (see §8b — the block is 83 and the phase 90 after BONE merged first).
+- A frozen phase IS owed: `frozen/phase92` at the merged base (see §8b — three merges moved the block to 84 and the phase to 92).
   Every one of the 88 older baselines' DEFINITIONS reproduces; the bytes of every baseline carrying a domed head with a
   stem, or an umbel, stop reproducing on those rows (the stem-top sagitta and the flare), named here rather than owed as
   a phase.
@@ -542,9 +542,9 @@ side-on and from below; dimensions in every caption.
   modes, four shards; the 17 block-82 head rows have no base partner and are listed. Eva's
   "~353" was the stemmed-row estimate; the 394 are those plus the 48 umbel and mophead rows and
   the stem-top movers.
-- **Frozen phase**: `frozen/phase91` is OWED — block 84 takes BONE's 1,608 rows to 1,625 (§8b) — and is
-  REGISTERED (§8): the 1,588 rows at `a43bf23`, main's head after #468 / #459 / #469, proved
-  deep-equal by `--verify-frozen --phase91` against a worktree of `77ae7f9`.
+- **Frozen phase**: `frozen/phase92` is OWED — block 84 takes Bloom P1b's 1,636 rows to 1,653 (§8b) — and is
+  REGISTERED (§8): the 1,636 rows at `8e00721`, main's head at the fourth merge, proved
+  deep-equal by `--verify-frozen --phase92` against a worktree of `8e00721`.
 
 
 ## 8. The junction is PARKED, the swelling ships INTERIM (Oct 28, Eva's third ruling, on §7's sheet)
@@ -570,7 +570,7 @@ What ships from this branch, finished:
   what the branching session replaces.
 
 Bookkeeping that follows: `main` merged in (#468's page profile and the two /frame merges),
-`frozen/phase91` registered as BONE's 1,608 rows at `77ae7f9` (§8b), the PR opened and merged on
+`frozen/phase92` registered as Bloom P1b's 1,636 rows at `8e00721` (§8b), the PR opened and merged on
 green CI, `bloom-frozen-tags` dispatched from `main` and read back.
 
 ### 8a. What the first full CI run found (bf2e43f, Oct 28) — rows the block-82 subset could not reach
@@ -629,14 +629,14 @@ pedicels`) are re-run below.
   (the geometry and the restatement), the join's underside 0.20 mm deeper in LIVE on a thin
   sheet, the shipping default's double untouched.
 
-### §8b — the second merge: BONE took block 82 and phase89, so this is block 84 and phase91
+### §8b — the merges: BONE took block 82 and phase89, Bloom P1 block 83 and phase90, Bloom P1b phase91 — so this is block 84 and phase92
 
 `main` moved again while the PR was in CI: #470 (the BONE texture) appended ITS block as 82 and registered
 `frozen/phase89` at the same base commit this session had registered it at (`a43bf23`, the same 1,588 rows
 row for row — two sessions in flight against one base). Resolved at the merge, not by renaming history:
 BONE keeps block 82 and phase89; this session's seventeen rows are **block 84** (smoke block 84), and the
-phase it owes is **`frozen/phase91` = BONE's 1,608 rows at `77ae7f9`**, generated from that commit's own
-`buildMatrix()` and proved deep-equal by `--verify-frozen --phase91 --base <worktree of 77ae7f9>`. Every
+phase it owed at that point was **BONE's 1,608 rows at `77ae7f9`** (the later merges below moved it twice
+more), generated from that commit's own `buildMatrix()` and proved deep-equal by `--verify-frozen`. Every
 "block 82", "1,605" and "353 of 1,605" figure above was measured on the pre-merge tree and is left as
 measured; the live matrix is 1,625 now and the row labels are unchanged, so every `--only` regex in this
 doc still names the same rows. The FROZEN_MATRICES census is what would have caught the collision at module
@@ -644,8 +644,24 @@ load, by name (session 32's rule) — here `git merge` caught it first, as a con
 
 **Third merge (Oct 31).** Bloom P1 (#473, `9921fc6`) merged while this PR was in CI, taking block 83 and
 `frozen/phase90` at the same base `77ae7f9` this session had frozen (row for row, so this session's copy
-was dropped). This session's block is **84** (harness and smoke) and it owes **`frozen/phase91`** = Bloom
-P1's 1,636 rows at `ec0f34b` (main's head at the merge; #474–#476 touched no bloom row). The live matrix
+was dropped). This session's block is **84** (harness and smoke) and it then froze **`frozen/phase91`** = Bloom
+P1's 1,636 rows at `ec0f34b` (main's head at that merge; #474–#476 touched no bloom row) — superseded by the
+fourth merge below. The live matrix
 is 1,653. The merge also folded main's T6 restatement (`uiN`, `else if`) together with this session's
 float32 grain. Every figure measured on "block 82" / "block 83" above is unchanged: the seventeen rows and
 their labels did not move, only their block number.
+
+**Fourth merge (Oct 31, later).** `main` moved again while CI was green on `2f217cf`: #477 (frame band
+patterns, which edited `.github/workflows/frame.yml` — no bloom file) and #478 (Bloom P1b, the tight joint,
+`8e00721`), which **also registered `frozen/phase91` at `ec0f34b`** — owed by it because it REDEFINED two
+block-83 rows (the merge-clamp row 4 → 7 nodes, the bare "eight nodes" row 60 → 24 mm). Two sessions in
+flight registering the same baseline under the same name, the phase89 and phase90 shape a third time, and
+`git merge` reported it as six conflict hunks inside `phase91Matrix()`. Resolved the same way: main's
+registration is kept (it is the one that merged, and `--verify-frozen --phase91` PASSES on a worktree of
+`ec0f34b` — the nine other rows the two copies differ on are key order and an extra `solidCoverage`
+field the deep-compare does not read), this session's copy is dropped, and because #478's redefinitions
+mean `ec0f34b`'s rows are no longer main's current matrix, this session owes **`frozen/phase92` = Bloom
+P1b's 1,636 rows at `8e00721`**, generated from that commit's own `buildMatrix()` and proved deep-equal by
+`--verify-frozen --phase92 --base <worktree of 8e00721>`. The live matrix is 1,653 (block 84 is still the
+last block; #478 added none). `frozen/phase90` and `frozen/phase91` are already PUBLISHED on the remote,
+so #477's `frame.yml` edit costs them nothing; `phase92`'s base is after that edit, so it should publish.

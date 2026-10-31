@@ -4332,8 +4332,14 @@ export const CONTROLS = [
   { id: 'stemNodeSwelling', section: 'stem', kind: 'slider',
     min: STEM_NODE_SWELLING_RANGE[0], max: STEM_NODE_SWELLING_RANGE[1], step: 0.01, default: 0,
     label: 'Node swelling',
-    fmt: (v) => (Number(v) === 0 ? 'none — the stem keeps its radius at the nodes'
-      : `${Number(v).toFixed(2)} — the stem swells +${(100 * STEM_NODE_SWELL * Number(v)).toFixed(1)}% of its radius at each node (the carnation's joint; the read-out says over what length)`),
+    /* (P1b) the JOINT'S LENGTH in mm, read off the shown build's own node law —
+       the tight joint of 1.25 stem diameters (Eva's ruling, Oct 29) */
+    fmt: (v, ui, shown) => {
+      if (Number(v) === 0) return 'none — the stem keeps its radius at the nodes';
+      const L = shown && shown.stem && shown.stem.nodeLaw;
+      const len = L && L.jointMm !== undefined ? ` over a ${L.jointMm.toFixed(2)} mm joint (1.25 stem diameters)` : '';
+      return `${Number(v).toFixed(2)} — the stem swells +${(100 * STEM_NODE_SWELL * Number(v)).toFixed(1)}% of its radius at each node${len} (the carnation's joint)`;
+    },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemNodesEligible' } },
   { id: 'stemNodeKink', section: 'stem', kind: 'slider',
     min: STEM_NODE_KINK_RANGE[0], max: STEM_NODE_KINK_RANGE[1], step: 0.01, default: 0,
@@ -5572,7 +5578,7 @@ function nodeRunFmt(which, v, ui, shown) {
     const said = x === 0 ? ` · every internode ${mm(gaps[0])}`
       : ` · the lowest internode ${mm(gaps[gaps.length - 1])}, the highest ${mm(gaps[0])}`;
     const cl = N.run.spacingClamped
-      ? ` · CLAMPED to ${N.run.spacingBuilt.toFixed(3)}: a closer crowd would put two node SWELLINGS under ${N.run.mergeGapMm.toFixed(2)} mm apart (sqrt(2) spindles, where two read as one)${N.run.spacingBuilt === 0 ? ' — evenly spaced they are already that close' : ''}; the slider keeps ${x.toFixed(2)} (told)`
+      ? ` · CLAMPED to ${N.run.spacingBuilt.toFixed(3)}: a closer crowd would put two node SWELLINGS under ${N.run.mergeGapMm.toFixed(2)} mm apart (sqrt(2) half-widths of the joint, where two read as one)${N.run.spacingBuilt === 0 ? ' — evenly spaced they are already that close' : ''}; the slider keeps ${x.toFixed(2)} (told)`
       : '';
     return head + said + cl;
   }

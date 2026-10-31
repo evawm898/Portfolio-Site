@@ -23,6 +23,7 @@ on:
       - frame-relief.js
       - frame-view3d.js
       - frame-filigree.js
+      - frame-pattern.js
       - tools/verify-frame.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
@@ -44,6 +45,7 @@ on:
       - frame-relief.js
       - frame-view3d.js
       - frame-filigree.js
+      - frame-pattern.js
       - tools/verify-frame.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
