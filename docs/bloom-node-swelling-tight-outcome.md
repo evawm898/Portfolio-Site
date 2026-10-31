@@ -273,7 +273,48 @@ The shipping default has no stem, so it is untouched at 24,688.
 
 ## 8. Verification (measured)
 
-(filled at the close)
+All local runs were on this box (headless Chromium, Node 22). CI on the PR is
+the merge criterion.
+
+- **Byte partition**: `node tools/verify-bloom-surface-bytes.mjs --base <worktree
+  of 9921fc6> --movers-predicate node-joint`, in 55 resumable chunks of 30 rows,
+  merged with `--merge`.
+  - **PASS: 29 of 29 predeclared movers moved; 0 floats moved on the 1,607 holders**,
+    positionally under `Object.is`, both modes.
+  - That covers 2,363,129,532 export floats over 262,569,948 triangles and 83,073,014
+    captured-grid values over 9,572 panels.
+  - The movers were predeclared from the BASE tree's record: a stem node law with a
+    swelling above 0.
+- **Export gate on the moved rows** (`verify-bloom-export.mjs --only` over the 29
+  movers plus the two redefined rows): **PASS, 31 of 31** reached the results, all
+  watertight.
+  - The first run dropped 2 rows to ST12. Both were clause defects (arm (g), the bend
+    arm), fixed in `c635860` (§6, finding 6b).
+- **Connectedness on the moved rows**: 31 of 31 are one piece.
+- **E2 on the smoke subset** (edge-profile gate): **PASS, E0–E7 clean**. 64 of 64
+  declared surface-turn rows reproduce.
+- **Combination gate**: 856 cells; 299 under the bar, all 299 declared; CG0–CG7
+  clean.
+- **Defaults bar**: DB0–DB2 clean over the 11 ruled-default states.
+- **Panel gate with `--negative-control`**: **all thirty-five routes, and session
+  23's four clauses, observed the failure** they exist to catch.
+- **Stem-nodes must-fail** (`verify-bloom-stem-nodes.mjs`): all 24 plants fire their
+  own clause and the baseline is silent. ST12 is silent on all 70 live row-modes that
+  carry a node law.
+- **Mutants**:
+  - Every node and spacing-clamp mutant in the apex table was run (25), and all
+    behave.
+  - Two needed their claims corrected, never a loosening:
+    `node-run-spacing-clamp-reads-the-spindle` fires NS1, not NS3, and
+    `the-spindle-is-a-fraction-of-the-length` now names ST12 and ST2 (§6).
+  - The five that touch ST12 were re-run after `c635860`, and all five behave.
+  - The three new mutants are each witnessed on the mutated module:
+    `the-joint-rides-the-flower-spindle`, `the-merge-gap-reads-the-spindle` and
+    `node-run-spacing-clamp-reads-the-spindle`.
+  - The other 244 mutants in the table cover code this session did not change and
+    were not run locally. The table runs in CI (`bloom-apex-mutants`).
+- **Frozen matrices**: `frozen/phase91` (the 1,636 rows at `ec0f34b`) is registered
+  in both maps; `--verify-frozen` passes.
 
 ## 9. Findings flagged mid-session
 
