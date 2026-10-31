@@ -665,3 +665,14 @@ P1b's 1,636 rows at `8e00721`**, generated from that commit's own `buildMatrix()
 `--verify-frozen --phase92 --base <worktree of 8e00721>`. The live matrix is 1,653 (block 84 is still the
 last block; #478 added none). `frozen/phase90` and `frozen/phase91` are already PUBLISHED on the remote,
 so #477's `frame.yml` edit costs them nothing; `phase92`'s base is after that edit, so it should publish.
+
+**And the merge broke the ray-tip swelling, which the block-84 export gate found at once.** #478 moved the
+node law's Gaussian half-width onto a new field, `law.swellMm` (the tight joint), leaving `spreadMm` for the
+kink's ramp. `umbelSwellRadiusMm` built its one-node law with `spreadMm` alone — the umbel's swelling IS the
+flower's spindle, the width the junction was parked at — so after the merge the law read `undefined`, every
+sub-umbel knot collapsed (swell 4, peak radius 1, a bottom of `-Infinity` that the metrics hook serialised as
+null) and UM8 crashed on `emittedTopZ.toFixed`. Neither tree alone could see it: #478 had no umbel swelling
+and this branch had no `swellMm`. Fixed at the owner by handing the law its width under the name it now reads;
+the ray tip's record on `THE MOPHEAD x ANGLED` is then identical field for field to the pre-merge tree's
+(21 rings, peak 2.4492 mm, 2,016 triangles, 1,265,418 for the bloom), and the block-84 export gate and the
+three mutants were re-run on the fixed tree before the push.

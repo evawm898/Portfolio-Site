@@ -24191,7 +24191,13 @@ export function umbelRootLaw(n, rP, angleDeg, outerR, headOn = false, deepenMm =
 }
 /* THE PROFILE (1): the stem node's own spindle with its node at the base plane */
 export function umbelSwellRadiusMm(k, spreadMm, outerR, z) {
-  return stemNodeRadiusMm({ nodes: [{ s: 0 }], spreadMm, swell: k, outerR }, z);
+  /* the umbel's swelling is ONE Gaussian of half-width `spreadMm` (the
+     flower's spindle, STEM_NODE_SPREAD_RADII — the junction is PARKED at that
+     width, Eva's Oct 28 ruling (3)); the node law reads its swelling width as
+     `swellMm` since P1b's tight joint (#478), so it is handed under that name.
+     Without it the law read undefined and every ray tip collapsed (found by the
+     block-84 export gate on the merge, UM8 reading an emitted top of null). */
+  return stemNodeRadiusMm({ nodes: [{ s: 0 }], spreadMm, swellMm: spreadMm, swell: k, outerR }, z);
 }
 /* inside the swelling or the rod, in the base plane's own (radial, z), z UP
    from the base plane; `margin` the half-gap of a hold test */
