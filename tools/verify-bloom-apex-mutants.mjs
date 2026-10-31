@@ -2990,7 +2990,9 @@ const MUTANTS = [
       return m.mergeGap > 3 * c.mergeGap ? null : `the mutant's merge gap is ${m.mergeGap} mm against ${c.mergeGap} clean`; } },
   { id: 'node-run-spacing-clamp-reads-the-spindle', rows: NR_ROWS, why: "the spacing's merge clamp measures the crowd against the flower's spindle while the swelling is the tight joint — the crowd is held back for a merge the geometry does not make (P1's 0.16 on the carnation, again)",
     find: '  const mergeGapMm = !stemNodesAbsent(state) && swellAmt > 0 ? Math.SQRT2 * stemNodeSwellWidthMm(Number(state.stemDiameter) / 2) : null;',
-    into: '  const mergeGapMm = !stemNodesAbsent(state) && swellAmt > 0 ? Math.SQRT2 * (STEM_NODE_SPREAD_RADII * (Number(state.stemDiameter) / 2)) : null;', names: ['NS3'],
+    /* NS1, not NS3: the clean tree clamps this row too (to 0.857), so the CLAMPED FLAG agrees and NS3 has
+       nothing to see; what moves is the DEPTHS, against the layout restated from the controls (measured). */
+    into: '  const mergeGapMm = !stemNodesAbsent(state) && swellAmt > 0 ? Math.SQRT2 * (STEM_NODE_SPREAD_RADII * (Number(state.stemDiameter) / 2)) : null;', names: ['NS1'],
     witness: (M, C) => { const m = runFacts(M, NR_MERGE), c = runFacts(C, NR_MERGE);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.run.spacingBuilt < c.run.spacingBuilt - 0.1) ? null : `the mutant builds spacing ${m.run.spacingBuilt} against the clean tree's ${c.run.spacingBuilt}`; } },
