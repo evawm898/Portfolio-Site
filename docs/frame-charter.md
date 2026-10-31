@@ -1221,3 +1221,79 @@ closed run stopping short of the seam (PT2, PT4, PT5).
 36. **Defaults size 4 mm, pitch 3 mm** — inside both patterns' pitch bands, so the shipped defaults
     are held nowhere. *Undo:* two registry rows.
 37. **The arch's mullions carry no pattern.** *Undo:* `patternPaths`.
+
+## 16. Phase 3e, step 2 — the placed elements, refined (Eva's rulings pending)
+
+`frame-elements.js` builds the five PLACED ELEMENTS Eva ruled in (the openwork stays out), each a
+closed relief solid about the origin on a flat base in print mm, as pure Node-importable functions —
+`buildElement(kind)` for `shell`, `palmette`, `rose`, `rosette`, `bud`. **Nothing is placed on a
+frame yet** (the brief: not wired into the chains or a hierarchy — the next session). **Eva's ruling
+that the palmette and the rosette are ONE primitive each with phase 3d's chain motifs is discharged
+by that wiring session, not here**: the layouts (`PALMETTE`, `ROSETTE`) are declared in this module
+for it to read, and until then frame-filigree's three-leaf palmette and five-petal rosette stand as
+they shipped — this PR moves 0 chain bytes, by construction (frame-filigree.js is untouched).
+
+### 16.1 The construction
+
+Every element is a HEIGHT FIELD or a stack of them (no undercut — Eva's ruling on the rose): a surface
+z(u, v) over a parametric lattice, closed as a column down to the base (`patchSolid`), the patches of
+one element overlapping as stacked shells, so each element is one connected watertight solid by
+construction — and the gate measures it rather than trusts it. A blade (`bladeGrid`, and
+`curvedBladeGrid` whose centreline bends in plan by a curvature ∝ u, the tip turning the most) carries a
+half-width law (`roundedHalf` for a pointed leaf, `bluntHalf` — a superellipse about the blade's
+middle — for a petal that must never come to a point), a crown z(u, v), a tip lift and a margin cup;
+**the crown is scaled by the row's half-width over the widest**, because a midrib whose width is a share
+of the row's became a 130° crest on a 1 mm tip row (EL4 found it). Beads are `sphereSolid`; the boss is
+an oblate dome (`bossGrid`, a superellipse profile) on a collar disc.
+
+- **(a) The shell**: a fan of `SHELL_FAN` 1.25 rad about a HINGE, CUPPED — the dish rises toward the
+  rim as (ρ/R)^2.2 by 0.34 of the size, concave toward the viewer — with eleven ribs as cos² crests
+  converging on the hinge, the rim scalloped by the same ribs (a lobe on every crest, a notch
+  `SHELL_SCALLOP` 0.14 R deep in every groove), two straight ears at the hinge. 11,032 triangles.
+- **(b) The palmette**: five blades on a boss — the centre on the axis, pairs at ±0.5 and ±0.95 rad
+  flaring OUTWARD by 1.6 and 2.4 rad of curvature over their length and lifting at the tip (0.18 L);
+  the boss an oblate dome half its radius high on a collar a quarter wider, a boss and not a ball.
+  10,704 triangles.
+- **(c) The rose**: 21 BLUNT petals on a golden-angle spiral, root and size shrinking inward, each a
+  low cushion rising toward its outer edge and curling up at the margins, lifted stepwise inward so
+  every petal lies over the ones outside it (stacked shells); angle, size and lift jittered by a
+  seeded hash so no two match; a small dome at the heart. 33,120 triangles. **Does it still read as a
+  lotus? Said plainly: no longer a faceted star — the petals are round-ended and overlap — but from
+  front-on it reads nearer a camellia or a flat peony than a cabbage rose; the spiral is legible,
+  the cup is shallow.** Eva's call.
+- **(d) The rosette**: eight wide blunt petals (1.55 × their share of the circle at half radius, so
+  neighbours overlap), alternate petals lifted 0.4 crown so the overlap stacks, a low flat cushion
+  crown, a boss at the centre. 10,664 triangles, 4.08 mm high — flat and wide.
+- **(e) The bud**: three berries of graded size SUNK a third into a cup of five short cupped leaves
+  rising from one root and flaring apart — no stalk, no dome on a stick. 7,360 triangles.
+
+### 16.2 Gate — `node tools/verify-frame-elements.mjs` (EL0–EL5), in `frame.yml`'s verify job
+
+EL0 boundary edges 0 on every element's STL; EL1 one voxel region at 0.4 mm AND 0.2 mm; EL2 floors —
+every patch top at least the feature over the base, every blade ROW at least the feature across (its
+two margin columns), every bead at least the feature in diameter, all read off the emitted vertices;
+EL3 the triangle count under each element's declared bound, reported; EL4 SMOOTH — the dihedral
+between neighbouring top-lattice quads (their normals from the lattice's own corners, never the
+triangle list, which drops degenerates) under a per-element cap declared with its reason (shell 85°:
+the ribs and scallops are sharp by design, measured 78.7°; palmette 55° / 53.1°; rose 45° / 38.1°;
+rosette 45° / 40.8°; bud 55° / 49.0°); EL5 the element's own record is the mesh's. Six mutants under
+`--negative-control`, every anchor checked first: a patch with no bottom (EL0), the berries lifted
+clear of the cup (EL1), blunt petals narrowing to a hair (EL2), the rose lattice doubled (EL3), the
+petals stepped (EL4), the record under-reporting (EL5). **What EL4 found while it was being written**:
+every blade's tip, narrowed to the floor, carried the full midrib crest (120–133°); and the rose's
+short inner petals rose a whole crown over a few millimetres (51° at their tips) — the crown and the
+tip lift now scale with the petal's own length.
+
+Sheet: `node tools/shot-frame-elements.mjs <dir> --base <worktree of e78e448> [--refs <dir>]` — each
+element's reference crop (not in the repository) beside the BEFORE (the phase-3d chain motif cut from
+the default arch, for (b) and (d); (a), (c), (e) had prototypes on no branch) and the AFTER front-on
+and at a grazing light, every caption carrying the gate's own numbers. No pixel claim anywhere.
+
+### 16.3 Decisions made without a ruling
+
+38. **The reconciliation with the chain motifs is the wiring session's** (above). *Undo:* none needed —
+    the layouts are already one declaration here.
+39. **The shell's cup is a power 2.2 dish to 0.34 of the size**, its ribs eleven. *Undo:* `SHELL_*`.
+40. **The rose is 21 petals on the golden angle**, seed 7. *Undo:* `ROSE_PETALS`, `seed`.
+41. **A base slab is the SHEET's, not the element's** (`{ base: true }` only on the sheet) — an element
+    built for placement carries no plate. *Undo:* the option.
