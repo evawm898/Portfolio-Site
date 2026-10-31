@@ -61,11 +61,11 @@ const off = records({ stemNodeSwelling: 0, stemNodeKink: 0 });
 const NLon = restatedStemNodes(on.state);
 const NLoff = restatedStemNodes(off.state);
 /* RULING 6 (stem session 2): a BARE stem — golden-angle nodes, no leaf record
-   — and a bare stem whose eight nodes MERGE (60 mm, sqrt(2) spindles), the
+   — and a bare stem whose eight nodes MERGE (24 mm, the joint's sqrt(2) half-widths), the
    state the (f) arm speaks on. */
 const bare = records({ stemNodeSwelling: 0.48, stemNodeKink: 0.48, leafLength: 0 });
 const NLbare = restatedStemNodes(bare.state);
-const merged = records({ stemNodeSwelling: 0.48, stemNodeKink: 0.48, leafLength: 0, stemLength: 60, leafNodes: 8 });
+const merged = records({ stemNodeSwelling: 0.48, stemNodeKink: 0.48, leafLength: 0, stemLength: 24, leafNodes: 8 });
 const NLmerged = restatedStemNodes(merged.state);
 /* THE SPLIT (Eva's ruling, Oct 6): each half ALONE, leafed — the carnation's
    swelling with no kink and the rose's kink with no swelling — and a kink-only
@@ -141,7 +141,7 @@ const plants = [
   { arm: '(d) phasing: the swelling widest away from its node (reference moved with it)', want: 'emitted swelling is widest', only: true,
     make: () => {
       const r = clone(on), rootZ = r.S.root[2];
-      const moved = { ...NLon, radius: (s) => NLon.radius(s - 0.8 * NLon.w) };
+      const moved = { ...NLon, radius: (s) => NLon.radius(s - 0.95 * NLon.ws) };
       for (const g of r.S.emittedRings) if (g.which === 'outer') g.r = moved.radius(rootZ - g.z);
       return { rec: r, NL: moved };
     } },
@@ -193,9 +193,24 @@ const plants = [
       return { rec: r, NL: moved }; } },
   { arm: '(d) phasing on a SWELLING-ONLY stem: the swelling widest away from its node (reference moved with it)', want: 'emitted swelling is widest', only: true,
     make: () => { const r = clone(swellOnly), rootZ = r.S.root[2];
-      const moved = { ...NLswell, radius: (s) => NLswell.radius(s - 0.8 * NLswell.w) };
+      const moved = { ...NLswell, radius: (s) => NLswell.radius(s - 0.8 * NLswell.ws) };
       for (const g of r.S.emittedRings) if (g.which === 'outer') g.r = moved.radius(rootZ - g.z);
       return { rec: r, NL: moved }; } },
+  /* (g) ALONE — the swelling drawn on the FLOWER'S SPINDLE (the pre-P1b law),
+     with the restated radius moved WITH it, so (c) sees the rings agree and
+     only (g), reading the joint's length off the emitted rings against the
+     ruling's 1.25 stem diameters, can say the swelling is not the tight joint.
+     (P1b, Eva's ruling of Oct 29.) Shifts in (d)'s two plants above are the
+     joint's own half-width now: the old 0.8 spindle left a 0.003 mm tail in
+     the joint's window and no longer tested "widest away from its node". */
+  { arm: '(g) the joint: a swelling drawn on the flower\'s spindle (reference moved with it)', want: 'emitted joint', only: true,
+    make: () => { const r = clone(swellOnly), rootZ = r.S.root[2];
+      const wide = (s) => { let sw = 0; for (const n of NLswell.nodes) { const u = (s - n.s) / NLswell.w; sw += Math.exp(-u * u); } return NLswell.R * (1 + NLswell.swell * sw); };
+      const moved = { ...NLswell, radius: wide };
+      for (const g of r.S.emittedRings) if (g.which === 'outer') g.r = wide(rootZ - g.z);
+      return { rec: r, NL: moved }; } },
+  { arm: '(f) the merge gap read off the flower\'s spindle, not the joint', want: "the plan's merge gap is",
+    make: () => { const r = clone(swellOnly); r.S.nodeLaw.mergeGapMm = Math.SQRT2 * NLswell.w; return { rec: r, NL: NLswell }; } },
   { arm: '(f) a KINK-ONLY stem reporting merged swellings it does not have', want: 'reports merged swellings at node pair', only: true,
     make: () => { const r = clone(kinkMerged); r.S.nodeLaw.mergedPairs = [{ a: 0, b: 1, gapMm: 1 }]; return { rec: r, NL: NLkinkMerged }; } },
 ];

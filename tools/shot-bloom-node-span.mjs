@@ -50,7 +50,14 @@ const mmpx = (c) => ((2 * c.halfHeight) / IMG_H).toFixed(3);
 const rowOf = (c, z) => Math.round(IMG_H / 2 - ((z - c.center[2]) / (2 * c.halfHeight)) * IMG_H);
 function cell(bl, lines, L) {
   const c = cam(bl.S, L);
-  const img = render(bl.acc.positions, CW, IMG_H, c, { color: [214, 206, 190] });
+  /* (P1b, Job 0) LEAVES IN THEIR OWN TONE AND A FILL LIGHT FROM THE CAMERA's
+     SIDE: lit only from above, the carnation's decussate leaves at nodes 2 and
+     4 — pointing straight at this side camera — showed their undersides at
+     ambient light inside a same-coloured stem and read as dark lozenges, holes
+     in a stem whose wall is >= 1.5 mm everywhere (docs/bloom-node-swelling-
+     tight-outcome.md §1). The committed P1 image predates this and stays put. */
+  const img = render(bl.acc.positions, CW, IMG_H, c, { color: [214, 206, 190],
+    colorOf: (t) => (t < bl.b.stemTriEnd ? [214, 206, 190] : [150, 178, 132]), light2: [0, -0.8, -0.6] });
   const rgb = Buffer.alloc(CW * CH * 3, 18);
   blit(rgb, CW, CH, img, CW, IMG_H, 0, CAP);
   /* the node ticks — the PLAN's own depths, below the hub's underside */

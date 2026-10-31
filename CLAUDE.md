@@ -5002,6 +5002,47 @@ DOWN THE STEM; EVERY STORED ROW HOLDS TO THE BIT** (Bloom P1, Eva's rulings of O
   captured SN). Bytes: `verify-bloom-surface-bytes --movers-predicate node-run` (23 movers, all block 83).
   Sheet: `node tools/shot-bloom-node-span.mjs <png>` → `docs/img/node-span-spacing.png`.
 
+**THE NODE SWELLING IS A SHORT, TIGHT JOINT OF 1.25 STEM DIAMETERS, NOT THE FLOWER'S SPINDLE; THE KINK
+KEEPS THE SPINDLE** (Bloom P1b, Eva's ruling of Oct 29 — read `docs/bloom-node-swelling-tight-outcome.md`
+before touching `stemNodeSwellWidthMm`, `STEM_NODE_JOINT_DIAMETERS`, the law's `swellMm` / `jointMm` /
+`mergeGapMm`, the placer's step, `RESTATED_JOINT_DIAMETERS` or ST12(d)/(f)/(g)).
+- **The law.** The swelling's Gaussian half-width is `1.25 R / sqrt 2`, so its +/-2 sigma band is 1.25 stem
+  diameters (7.5 mm on a 6 mm stem; it was 4.6 diameters on the 3.27-radius spindle). It comes from two
+  *D. caryophyllus* plant patents read off their own pages (US PP29,628 and US PP30,795: a node band of 1.0 to
+  1.25 diameters). Reading "node length" as the +/-2 sigma band is this session's choice.
+- **What did not change.** The profile is symmetric: the sheath above the node is leaf tissue and D1's. The
+  amplitude (0.6 R) is unchanged.
+- **One owner.** `stemNodeSwellWidthMm` is read by the law, the radius, the placer and the layout's merge gap.
+  The harness restates the 1.25 and refuses to load if it moves.
+- **The kink keeps `STEM_NODE_SPREAD_RADII`.** Kink-only stems build the same bytes, because the placer's step
+  is the spindle's when the swelling is 0.
+- **Consequence 1: the bend now peaks BELOW the joint, not inside it** (8.04 mm against a band ending 3.75 mm
+  below the node, 6 mm stem). The read-out says so. It is Eva's question.
+- **Consequence 2: the wall square to a leaning axis falls to 1.4652 mm at kink 1**, because the old spindle
+  covered the ramp's steep stretch. The horizontal wall is 1.5 mm, as ruled; this is the stem-nodes §7
+  reported consequence, now larger.
+- **Merge gap 13.89 -> 3.75 mm.** The carnation's 0.8 crowd builds 0.800 (was 0.158) and the rose's 0.800
+  (was 0.005). P1's narrow 0.20..0.45 run separates (4 merged pairs -> 0).
+- **Job 0: P1's dark lozenges were decussate LEAVES pointing at the side camera**, undersides lit only by
+  ambient (`bloom-soft-render`'s lights are both above). It is not geometry. The sheet tools now tone leaves
+  and add a camera-side fill light (`PART_LIGHTING`).
+- **ST12, re-derived.**
+  - (c) reads the joint's width.
+  - (d) isolates each half by its own tail: the swelling by two half-widths; the BEND by a ramp plus a
+    spindle. Two spindles let a golden-angle neighbour's sign-reversed ramp tail into the window, found by
+    the export gate once the stations got denser.
+  - (f) checks the declared merge gap and joint.
+  - (g) is new: the joint's length is read off the EMITTED rings, between stations. It opens only where the
+    walk stops at the window with the ring still over the cut.
+- **Must-fails and mutants.** The stem-nodes must-fail fires 24 plants. Three mutants are new:
+  `the-joint-rides-the-flower-spindle`, `the-merge-gap-reads-the-spindle`,
+  `node-run-spacing-clamp-reads-the-spindle` (NS1). `the-spindle-is-a-fraction-of-the-length` was re-claimed
+  ST3 -> ST2.
+- **Two rows redefined** (the merge-clamp row 4 -> 7 nodes; the merged bare row 60 -> 24 mm), and
+  `frozen/phase91` is the 1,636 rows at `ec0f34b`.
+- **Bytes:** `--movers-predicate node-joint`, 29 movers / 1,607 holders. Sheet:
+  `node tools/shot-bloom-node-swelling-tight.mjs <png> --base <worktree>` -> `docs/img/node-swelling-tight.png`.
+
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
 `docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,

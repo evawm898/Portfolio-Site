@@ -355,7 +355,7 @@ function runFacts(M, over = {}, buildNode = null) {
 const NR_NARROW = { leafNodes: 4, leafNodeStart: 0.3, leafNodeEnd: 0.6 };
 const NR_CROWD = { leafNodes: 6, leafNodeSpacing: 0.8, leafSizeTaper: 0.5 };
 const NR_PAST = { leafNodes: 4, leafNodeStart: 0.7, leafNodeEnd: 0.4 };
-const NR_MERGE = { leafNodes: 4, leafNodeSpacing: 1, stemNodeSwelling: 0.6 };
+const NR_MERGE = { leafNodes: 7, leafNodeSpacing: 1, stemNodeSwelling: 0.6 };
 const NR_FLOOR = { leafWidth: 4, leafSizeTaper: 0.75 };
 const NR_EVEN = { stemLength: 60, leafNodes: 6 };
 const NR_MUTANTS = /^node-run-/;
@@ -400,7 +400,7 @@ function nodeFacts(M, state = NODE_STATE()) {
       const lb = M.buildLeafInto(new M.MeshBuilder({ exportMode: true }), lp, state, n, lp.azimuths[n][0]);
       lastPetioleX = lb.petioleAxis.inner[0]; lastPetioleY = lb.petioleAxis.inner[1];
     }
-    return { stations: plan.stations.length, hasLaw: !!law, spread: law ? law.spreadMm : 0, maxCentreOff, offAtFirstNode, lastPetioleX, lastPetioleY };
+    return { stations: plan.stations.length, hasLaw: !!law, spread: law ? law.spreadMm : 0, swellW: law ? law.swellMm : 0, mergeGap: law ? law.mergeGapMm : 0, maxCentreOff, offAtFirstNode, lastPetioleX, lastPetioleY };
   } catch (e) { return { threw: e.message }; }
 }
 function stemFacts(M, state = STEM_STATE()) {
@@ -2966,12 +2966,36 @@ const MUTANTS = [
     witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.offAtFirstNode > 1e-3 && c.offAtFirstNode === 0) ? null : `the axis at the first node stands ${m.offAtFirstNode} mm off in the mutant against ${c.offAtFirstNode} clean`; } },
-  { id: 'the-spindle-is-a-fraction-of-the-length', why: "the spindle is 0.055 of the STEM'S LENGTH, the flower's literal constant, rather than 3.27 of its RADIUS — #296's too-short node arriving by the other route, 1.83 radii on a 100 x 6 mm stem",
+  /* (P1b) THE SPINDLE IS THE KINK'S NOW, NOT THE SWELLING'S (the swelling has its own joint), so this
+     mutation reaches the kink's ramp alone: ST12's centres and ST2's tip. It claimed ST3 (the widest
+     vertex) while the spindle was also the swelling's width, and no longer can. */
+  { id: 'the-spindle-is-a-fraction-of-the-length', why: "the KINK's spindle is 0.055 of the STEM'S LENGTH, the flower's literal constant, rather than 3.27 of its RADIUS — #296's too-short node arriving by the other route, 1.83 radii on a 100 x 6 mm stem, and the bend's ramp with it",
     find: '  const spreadMm = STEM_NODE_SPREAD_RADII * outerR;',
-    into: '  const spreadMm = 0.055 * stemLengthMm;', names: ['ST12', 'ST3'],
+    into: '  const spreadMm = 0.055 * stemLengthMm;', names: ['ST12', 'ST2'],
     witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return Math.abs(m.spread - c.spread) > 0.5 ? null : `the mutant's spindle is ${m.spread} mm against ${c.spread}`; } },
+  /* ===== BLOOM P1b — THE SHORT, TIGHT JOINT (Eva's ruling, Oct 29) ===== */
+  { id: 'the-joint-rides-the-flower-spindle', why: "the swelling's half-width is the flower's 3.27-radius spindle again, not the ruled joint of 1.25 stem diameters — the long sausage bulge P1 photographed, watertight and one piece, on a law the plan and the builder agree on",
+    find: 'export function stemNodeSwellWidthMm(outerR) { return STEM_NODE_SWELL_RADII * outerR; }',
+    into: 'export function stemNodeSwellWidthMm(outerR) { return STEM_NODE_SPREAD_RADII * outerR; }', names: ['ST12'],
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return m.swellW > 3 * c.swellW ? null : `the mutant's swelling half-width is ${m.swellW} mm against ${c.swellW} clean`; } },
+  { id: 'the-merge-gap-reads-the-spindle', why: "the merge report measures two swellings against the flower's spindle while the swelling is the tight joint — eight separate joints on a 60 mm stem are reported as one merged bulge",
+    find: '  const mergeGapMm = Math.SQRT2 * swellMm;',
+    into: '  const mergeGapMm = Math.SQRT2 * spreadMm;', names: ['ST12'],
+    witness: (M, C) => { const m = nodeFacts(M), c = nodeFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return m.mergeGap > 3 * c.mergeGap ? null : `the mutant's merge gap is ${m.mergeGap} mm against ${c.mergeGap} clean`; } },
+  { id: 'node-run-spacing-clamp-reads-the-spindle', rows: NR_ROWS, why: "the spacing's merge clamp measures the crowd against the flower's spindle while the swelling is the tight joint — the crowd is held back for a merge the geometry does not make (P1's 0.16 on the carnation, again)",
+    find: '  const mergeGapMm = !stemNodesAbsent(state) && swellAmt > 0 ? Math.SQRT2 * stemNodeSwellWidthMm(Number(state.stemDiameter) / 2) : null;',
+    /* NS1, not NS3: the clean tree clamps this row too (to 0.857), so the CLAMPED FLAG agrees and NS3 has
+       nothing to see; what moves is the DEPTHS, against the layout restated from the controls (measured). */
+    into: '  const mergeGapMm = !stemNodesAbsent(state) && swellAmt > 0 ? Math.SQRT2 * (STEM_NODE_SPREAD_RADII * (Number(state.stemDiameter) / 2)) : null;', names: ['NS1'],
+    witness: (M, C) => { const m = runFacts(M, NR_MERGE), c = runFacts(C, NR_MERGE);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.run.spacingBuilt < c.run.spacingBuilt - 0.1) ? null : `the mutant builds spacing ${m.run.spacingBuilt} against the clean tree's ${c.run.spacingBuilt}`; } },
   { id: 'the-noded-rings-stay-on-the-world-axis', why: 'the builder draws every noded ring about the world axis while the plan declares the kink — the swelling ships and the kink does not, on a watertight stem at the predicted count',
     find: '      const c = stemNodeAxisMm(law, sDepth);\n      return thetas.map((th) => [c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th), z]);',
     into: '      const c = [0, 0];\n      return thetas.map((th) => [c[0] + rad * Math.cos(th), c[1] + rad * Math.sin(th), z]);', names: ['ST2', 'ST12'],
@@ -3650,7 +3674,7 @@ const MUTANTS = [
     witness: (M, C) => { const m = runFacts(M, NR_PAST), c = runFacts(C, NR_PAST);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.depths.length === 4 && c.depths.length === 1 && c.run.inverted && !m.run.inverted) ? null : `the mutant builds ${m.depths.length} node(s) (inverted ${m.run.inverted}) and the clean tree ${c.depths.length} (inverted ${c.run.inverted})`; } },
-  { id: 'node-run-merge-clamp-dropped', rows: NR_ROWS, why: "the crowd is never clamped, so two node swellings stand closer than their own sqrt(2) spindles and merge into one bulge — watertight, one piece, the spacing the panel reports exactly the one asked",
+  { id: 'node-run-merge-clamp-dropped', rows: NR_ROWS, why: "the crowd is never clamped, so two node swellings stand closer than the joint's own sqrt(2) half-widths and merge into one bulge — watertight, one piece, the spacing the panel reports exactly the one asked",
     find: '    if (mergeGapMm !== null && k >= 3 && span > 0) {',
     into: '    if (false) {', names: ['NS3'],
     witness: (M, C) => { const m = runFacts(M, NR_MERGE), c = runFacts(C, NR_MERGE);
@@ -4430,8 +4454,8 @@ const ROWS = [
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '6' }, { id: 'leafNodeSpacing', value: '0.8' }, { id: 'leafSizeTaper', value: '0.5' }] },
   { label: 'node run: start past end 0.70 .. 0.40 x 4 nodes', for: NR_MUTANTS,
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '4' }, { id: 'leafNodeStart', value: '0.7' }, { id: 'leafNodeEnd', value: '0.4' }] },
-  { label: 'node run: the merge clamp, swelling 0.6 x spacing 1 x 4 nodes', for: NR_MUTANTS,
-    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '4' }, { id: 'leafNodeSpacing', value: '1' }, { id: 'stemNodeSwelling', value: '0.6' }] },
+  { label: 'node run: the merge clamp, swelling 0.6 x spacing 1 x 7 nodes', for: NR_MUTANTS,
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '7' }, { id: 'leafNodeSpacing', value: '1' }, { id: 'stemNodeSwelling', value: '0.6' }] },
   { label: 'node run: taper 0.75 floored on a 4 mm wide leaf', for: NR_MUTANTS,
     set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '5' }, { id: 'leafWidth', value: '4' }, { id: 'leafSizeTaper', value: '0.75' }] },
   { label: 'node run: the default run on a 60 mm stem x 6 nodes (where an even arm in another order moves a bit)', for: NR_MUTANTS,
