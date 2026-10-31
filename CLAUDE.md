@@ -4967,6 +4967,41 @@ the roundness read-out's ALREADY ROUND words, or LF35 / LF36).
 - Block 60 (6 rows, 1,302), smoke block 60, five standing mutants, `frozen/phase64` = the 1,296 rows at
   `d92a0c6`. Sheet: `node tools/shot-bloom-leaf-tip-neck.mjs <png> --base <worktree>`.
 
+**WHERE THE NODES GO IS A RUN — START, END, SPACING — AND EACH NODE'S LEAF CAN BE SMALLER OR LARGER
+DOWN THE STEM; EVERY STORED ROW HOLDS TO THE BIT** (Bloom P1, Eva's rulings of Oct 28 — read
+`docs/bloom-node-span-taper-outcome.md` before touching `leafNodeRunOf`, `leafNodeRunMm`,
+`leafNodeRunPositions`, `leafNodeLayout`'s `layAt`, `leafTaperFields` / `leafTaperState` /
+`leafNodeScales`, `plan.nodeSizes`, `restatedNodeLayout`, `leafNodeViews`, NS0–NS4 or route (ar)).
+- `leafNodeStart` / `leafNodeEnd` (Stem, fractions FROM THE HEAD, defaults 0.16 / 0.86 — the flower's own
+  constants, so the default run IS the old law's doubles; NS2 holds it under `Object.is`) and
+  `leafNodeSpacing` (−1..1, a LINEAR internode law `1 + c(1 − 2j/(k−2))`, `c = 0.75 s`, positive crowds
+  toward the BASE, 7 : 1 at full, arithmetic only; spacing 0 is the even arm's own expression BY BRANCH).
+- The inset clamp (the TOP leaf's rise) and the pitch floor stay and are TOLD; one node stands at the
+  flower's 0.557 share of the asked run (`LEAF_NODE_SOLO` by branch at the defaults); a START PAST END
+  builds ONE node at the end, told, never swapped.
+- **The merge clamp:** a crowd that would put two SWELLINGS under √2 spindles apart is clamped to the
+  largest 1/4096 step that keeps every internode at `min(span/(k−1), gap)` — never tighter than even; a
+  kink alone is never clamped. It BINDS HARD on swelling stems (carnation 0.8 → 0.16, rose → 0.01). A
+  narrow EVEN run still merges swellings — ST12(f)'s existing told state.
+- `leafSizeTaper` (Leaves, ±0.75): every SIZE of a node's leaf (`leafTaperFields`: the simple blade's
+  length/width, LOBED's envelope, COMPOUND's rachis/leaflets/stalks) by its node's DEPTH in the run; the
+  largest leaf is always the asked one; floored uniformly at the slider minima, told per node; counts
+  never re-asked (the existing yields act per node); the inset reads the TOP leaf's rise; the compound
+  petiole (`wire √n`) does not scale, LOBED's area petiole does. Triangles per leaf unchanged.
+- All four are DEAD under a RACEME (and the spacing below 3 nodes, the taper below 2): two statements,
+  NS0 through the page's `nodeLive`; panel route (ar), THIRTY-FIVE routes, three mutants.
+- **Under a taper the LF/T5/T6 clauses run PER NODE** (`leafNodeViews`): the record split by node, the
+  controls scaled by the node's RESTATED scale. A clause that restates a leaf from the raw controls is
+  wrong on every tapered node — add any new blade clause inside `leafBladeClauses`.
+- `restatedNodeLayout(ui, spineRec)` needs the builder's spine record on a DRAWN spine (LF4's rule).
+- Combination gate: the `leaf-leaf` measure (blade vs other nodes' blades) and four pairs; WHORLED × a full
+  crowd reads 0.750 mm and a 25% leaf at 60° 0.311 mm to the stem — both declared, never clamped.
+- Block 83 (28 rows, 1,636), smoke block 83 (9); `frozen/phase90` = the 1,608 rows at `77ae7f9` (BONE took
+  block 82 and phase89 mid-session; this session's own phase89 was row for row BONE's, dropped); eleven
+  `node-run-*` apex mutants on six `node run:` rows; the apex table now captures `NS` and `SN` (it never
+  captured SN). Bytes: `verify-bloom-surface-bytes --movers-predicate node-run` (23 movers, all block 83).
+  Sheet: `node tools/shot-bloom-node-span.mjs <png>` → `docs/img/node-span-spacing.png`.
+
 **THE STEM'S FREE END IS A 45° FLORIST'S CUT, THE ANGLE IS A SLOPE OF EXACTLY 1, AND THE LAND
 IS DERIVED FROM THE PRINT FLOOR AND THE NOZZLE** (Eva's ruling 7, stem session 3 — read
 `docs/bloom-stem-cut-outcome.md` before touching `stemCutAbsent`, `stemPlan`'s cut record,
@@ -6925,7 +6960,7 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
 `umbelKnot`, `umbelKnotInside`, `umbelFlareDepthAt`, `UMBEL_DOME_RINGS` / `UMBEL_FLARE_RINGS` /
 `UMBEL_KNOT_RIM_SAMPLES`, `floretUnitMemo`'s `rootExtendMm`, `pedicelPlacement`'s stagger,
 `HUB_STYLE_DEFAULT` / `HUB_SHAPE_AMOUNT_DEFAULT`, ST13, `umbelKnotExpected` / `umbelKnotClauses` /
-`umbelRootClauses` or block 83).
+`umbelRootClauses` or block 84).
 - **The fix at its owner (`stemPlan`):** on a cap wider than its stem with the head present, the
   top rim ring sits ON the cap's MID-surface at the stem's radius and the bore opens at the
   mid-surface at the bore's; the join's reach is floored at that sag plus half a sheet (told
@@ -6985,7 +7020,7 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
 - **Byte partition (`--movers-predicate umbel-hubs`, the base tree's own records): 69 movers / 1,536
   holders, 0 floats on any holder**, both modes — a row moves iff the base builds a stem on an open cap
   wider than it with the head present, or an umbel whose flare is BUILT (amount 0 holds, by branch; the
-  first predicate named it and the run refused it). Local gates on block 83 (block 82 while in flight — BONE, #470, took 82 and phase89 at the same base; §8b of the doc): export 17/17 (one declared
+  first predicate named it and the run refused it). Local gates on block 84 (block 82 while in flight — BONE, #470, took 82 and phase89; then Bloom P1, #473, took 83 and phase90 at the same base `77ae7f9`; §8b of the doc): export 17/17 (one declared
   fold, `headRise max (1)`'s own 248 / 0.4262 under a 12 mm stem), connectedness 17/17, panel PASS, the
   ten umbel rows declared in `INFLO_APPROACH_XFAIL` (the junction moves no floret). **ST13 is a
   FILE-side clause and the apex table cannot fire it** — its witness is `verify-bloom-stem-channel.mjs`
@@ -6996,8 +7031,8 @@ the ray-tip comparison sheet; read `docs/bloom-umbel-hubs-outcome.md` §1 and §
   mid-surface rim) and the head's hub-to-stem default CURVED 0.50 (394 / 1,194). The two-pedicel
   overlap above the flat top stays DECLARED BY VALUE; do not raise the top or re-tune the swelling —
   the junction is the branching session's to replace. §8 of `docs/bloom-umbel-hubs-outcome.md`.
-  `frozen/phase90` is BONE's 1,608 rows at `77ae7f9` (block 83 takes the matrix to 1,625).
-  **The first full CI run found six classes on rows outside block 83 (§8a of the doc), all fixed at
+  `frozen/phase90` is BONE's 1,608 rows at `77ae7f9` (block 84 takes the matrix to 1,625).
+  **The first full CI run found six classes on rows outside block 84 (§8a of the doc), all fixed at
   their owner:** ST13 locates a NODED stem's rim between the control's radius and the node law's
   widest, reads the EXPORT's floored slab, allows the stem's own relief on a textured row and skips
   the relieved hub by name; T6's bar carries eight float32 ulp of the rooted end's magnitude; a
@@ -11957,6 +11992,38 @@ draggable line's case. The LB8–LB10 / IM15–IM16 families and the `library3:`
 gate's own fixture (three fanned LEAF blades, `THREE_PAIR_SHAPE` — a strap first, and its fitted row refused the STL: a straight margin into a notch leaves the front pair a 4.37 mm wedge under the floor) so they are never vacuous. **LB10's blend-pool mutant was a coin flip on a min-hash draw and LB8's zeroed-angle mutant had one owner on both sides** — a pool of one two-pair entry beside two N-pair ones, and the fixture's angles restated in the gate, are the witnesses now (design doc §18). **THREE SHIP (Eva, Oct 9): `three-3.webp#4`, `three-3.webp#5`, `three-4.png#3`**; four FIXABLE crops (`4.png` #1/#5/#6/#9) are NOT hand-placed and are the TEST CASES of a fitter-redesign session (§18.7). Dev tool
 and review page: `node tools/bug-wing-three-pair.mjs` over the gitignored sources.
 
+## `/cage` — the Parametric Cage (pointer only)
+
+Hidden generative page (`cage.html`, `cage.css`, `cage.js`, `cage-geometry.js`; `noindex`,
+unlinked). Its governing document is **`docs/cage-phase-1.md`** — read §0 (the audit) and §1
+before touching any cage file. The law: a cage is VERTICAL BARS on a surface of revolution or
+a regular prism whose side profile is a drawn curve (bloom-curve.js's own value, a `single`
+PCHIP function of height, edits REFUSED never clamped), crossed by horizontal RINGS, with a
+DOOR cut through the bars and closed by a frame wire. `buildCage()` is the ONE owner: every
+wire is a centreline in mm first, the STL sweeps those centrelines (`tube()`: a
+rotation-minimising frame with the exact elliptical MITRE at every vertex, so a polygon ring's
+corners are true), the SVG projects the same centrelines onto the front elevation. Imported
+unchanged: `bloom-curve.js`, and `Mesh` / `exportStl` / `analyzeStl` from `frame-relief.js`.
+Copied: bloom's `revolveInto` core, bug's panel builder and camera. **Nothing in the repo
+sweeps a 3D polyline** (frame's filigree is planar) — the tube is written here. Print: a 1.0 mm
+floor assumed for SLS PA12, every wire floored and TOLD; overhang is REPORTED (the shallowest
+wire and where), never clamped. Gates, both in CI (`cage-gate.yml`, path-scoped to the cage's
+files plus the two imported modules; no flower or bloom gate reads a cage file): `node
+tools/verify-cage.mjs` (C0–C16 over the presets + 24 random cages; `--negative-control` thirteen
+mutants) and `node tools/verify-cage-page.mjs` (Chromium, real drags and downloads;
+`--negative-control` four). Sheet: `node tools/shot-cage.mjs <dir> --png <file>` →
+`docs/img/cage-phase-1.png`. **Eva's rulings on the Phase 1 sheet are applied (Oct 29, §5 of the
+doc): bars meet a turned collar BOSS one printable gap apart (`2·rBar + floor`, derived — the
+1.05-diameter pack is gone) and the hanger stands on it; every profile shoulder (a knot whose
+chords turn by `SHOULDER_DEG` 25° in mm, `profileShoulders` — PCHIP is C1 so one-sided slopes
+cannot see a step) auto-places a ring; the skirt's `scallopCount` is built as the nearest divisor
+of the bar count so every cusp sits on a bar; the 90 × 110 default **[Oct 29, second round: the
+default is the BELL at 90 × 140, dome 0.6, on 1.1 mm bars (above the 1.0 floor, nothing clamped); the
+onion has three rings, the upper in its neck taper — §6 of the doc]** and the single
+`MIN_FEATURE_MM` floor (SLS PA12 assumed) stand, both brackets having been left unfilled.
+Phase 2 (decorative ring bands and door infill from /frame's filigree) is NOT built and waits on
+/frame's ornament rework; a curved band will be approximated as a cone segment (doc §5.10).**
+
 ## `/frame` — the Parametric Frame (pointer only)
 
 Hidden generative page (`frame.html`, `frame.css`, `frame.js`, `frame-registry.js`,
@@ -12011,6 +12078,25 @@ priced per group before building and a group past it gives way, told (no reachab
 reaches it). Gates CV1–CV5, AR1, LF1–LF4, CL1, TB1–TB2, nine mutants. The default 23 mm carved lead
 spans only 0.50–0.53 turns, and one of each group's two leaves does not fit (told) — length is phase
 3d's (the running chains). Carved and leaf crowns are floored at F.
+**Phase 3d (Oct 28): RUNNING CHAINS, SEATED ON THE MOLDING** (charter §14, Eva's 2B + 4B — read it before
+touching `CHAIN_RUNS`, `runPath`, `buildChain`, `settleChains`, `moldingHeightField`/`seatOn`, `baseLift` or
+OR7–OR9). The default layout (`ornLayout` chains; groups one choice away, unchanged). Each run between
+right-hand anchors is a path from `offsetCurve` inside the band's outer edge (cut at x = 0 on the axis, at
+the mitre vertex on a corner); C–S…S–C elements laid sequentially on the MAPPED geometry a feature + 0.1 mm
+apart, each pushed onto the molding until every stretch within 2F reaches the embed (read at 2F AND F — a
+curl-back is a second run only at F) and stopped at the opening (`plateOutline` less the bands), else not
+built, told. Junction motifs: a palmette on the axis (centre leaf exactly on x = 0, its own mirror),
+rosettes at springings/corners, settled first. **The seat is the molding's OWN height field** — the bands
+built by `bandSolid` into a scratch mesh, their tops rasterised, read across each row's span; the run's own
+profile in the run's frame sank wires 0.3 mm on an ear and 1.9 mm where a rosette reached the sill;
+then re-read at each row's EMITTED columns and at their mirror images (the raster is not bit-symmetric).
+An element the path folds across a sharp corner gives way (fewer turns cannot undo it).
+`mapToPath`'s tangents are UNWRAPPED (atan2 hid whole turns from `selfGap`; a coil overlapped itself
+1.375 mm). Under chains the groups' scale, wire and wire style hide (a chain is sized by its run and is
+carved), and Bottom centre hides on an arch (no bottom run). OR7/OR8 count the groups' slits and opening
+wires rather than asserting them; OR9 excludes the ornament solids, which are bands too, by name. Eight
+mutants; relief negative control in more CI shards. Sheet: `node tools/shot-frame-chains.mjs <dir> --refs <dir>` (refs not in the repo). Still a row
+of separate elements where refs 2/3 are one vine — 2C is Eva's call.
 **Phase 4 (Oct 23): TEXTURE WAS BUILT, RENDERED AND NOT SHIPPED** (charter §12) — stone grain,
 weathering, cracks and hammered metal as real displacement of the molding along its TRUE normal (smoothed or
 wall-held directions fold, measured). Eva picked **none** from `docs/img/frame-texture-vocabulary.png`, so the

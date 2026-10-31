@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parametric Cage — Eva Maskalenko</title>
+<meta name="description" content="Parametric Cage — a decorative birdcage: bars on a drawn profile, rings, a door; one 3D model exported as a printable STL and a front-elevation SVG.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="cage.css">
+
+<!-- three pinned to the version every other generator here uses, so the
+     headless tools serve one local copy from node_modules for all of them. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="cage-canvas"></canvas>
+
+<header class="cg-header">
+  <a class="cg-back" href="index.html">&larr; Index</a>
+  <div class="cg-eyebrow" style="margin-top:10px">EM / CAGE</div>
+  <h1>Parametric Cage</h1>
+  <p class="cg-sub">Phase 1 — bars on a drawn profile, rings, a door cut clean at its frame, a base and a hanger. One 3D model; the STL is the solid, the SVG its front elevation.</p>
+</header>
+
+<div id="svgStage" hidden></div>
+
+<div class="cg-viewtoggle" id="viewToggle" aria-label="Render or SVG">
+  <button class="cg-btn is-on" data-main="render" title="The 3D model">Render</button>
+  <button class="cg-btn" data-main="svg" title="The front elevation — exactly what Get SVG exports">SVG</button>
+</div>
+
+<aside class="cg-view cg-box" aria-label="View">
+  <div class="cg-label">View</div>
+  <div class="cg-row" id="viewButtons">
+    <button class="cg-btn is-on" data-view="three">3/4</button>
+    <button class="cg-btn" data-view="front">Front</button>
+    <button class="cg-btn" data-view="side">Side</button>
+    <button class="cg-btn" data-view="top">Top</button>
+  </div>
+  <p class="cg-note" id="viewNote">Drag to orbit, wheel to zoom. The door faces the front.</p>
+</aside>
+
+<aside class="cg-panel cg-box" aria-label="Cage controls">
+  <div class="cg-row"><button class="cg-btn" id="randomBtn">Randomize</button><button class="cg-btn" id="resetBtn">Default cage</button></div>
+  <div id="controls"></div>
+  <div class="cg-label" style="margin-top:12px">Export</div>
+  <div class="cg-row">
+    <button class="cg-btn cg-btn--solid" id="exportStl">Get STL &darr;</button>
+    <button class="cg-btn cg-btn--solid" id="exportSvg">Get SVG &darr;</button>
+  </div>
+  <p class="cg-told" id="told"></p>
+  <div class="cg-readout" id="readout"></div>
+</aside>
+
+<script type="module" src="cage.js"></script>
+</body>
+</html>

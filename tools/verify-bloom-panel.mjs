@@ -569,6 +569,23 @@
          back restores the registry defaults. Three mutants (bloom.js): the
          switch writes nothing, a set control is overwritten, a load writes
          the overlay. Still route (aq) — the route count does not move.
+     (ar) WHERE THE NODES GO AND LEAF SIZE ALONG THE STEM (Bloom P1 — docs/
+         bloom-node-span-taper-outcome.md; Eva's rulings of Oct 28). On a
+         100 mm stem with 40 mm leaves: the four controls (start, end,
+         spacing, size along the stem) SHOW on a leafed stem of five nodes;
+         under a RACEME all four HIDE (dead — the pedicels own the nodes); at
+         TWO nodes the spacing hides and the taper shows; at ONE node both
+         hide; with nothing at the nodes (no leaves, no swelling or kink) the
+         run hides. The spacing's read-out names the crowd's direction in
+         plain words and the lowest and highest internodes, read against the
+         builder's own node depths (positive: the BASE, the lowest internode
+         the shorter; negative: the TOP); a start past the end is TOLD on the
+         start's read-out; the taper's read-out lists each node's size against
+         the plan's own per-node scales. Three mutants under --negative-control
+         (all bloom-registry.js): the run live under a raceme, the crowd's
+         direction named backwards, a start past the end not told. Three
+         edits: this entry, the block, the negative control's flags and
+         banner (THIRTY-FIVE routes).
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -5060,6 +5077,91 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (ar) THE NODE RUN AND THE SIZE TAPER ON THE PANEL (Bloom P1) -----
+   See the header. Visibility off the wrappers the page hid, the words off the
+   read-outs the page wrote, the numbers against `__bloomMetrics()` (the
+   builder's own node depths and the plan's own per-node scales). */
+{
+  const tag = '[node run]';
+  const IDS = ['leafNodeStart', 'leafNodeEnd', 'leafNodeSpacing', 'leafSizeTaper'];
+  const snap = (pg) => pg.evaluate((ids) => {
+    const vis = (id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return !!(w && !w.hidden); };
+    const txt = (id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return w ? w.textContent : ''; };
+    const m = window.__bloomMetrics();
+    return { vis: Object.fromEntries(ids.map((i) => [i, vis(i)])), txt: Object.fromEntries(ids.map((i) => [i, txt(i)])),
+      depths: m.leaf ? m.leaf.nodeDepthsMm : null, scales: m.leaf && m.leaf.nodeSizes ? m.leaf.nodeSizes.map((q) => q.scale) : null };
+  }, IDS);
+  const shows = (r, want) => IDS.filter((i) => r.vis[i] !== want[i]).map((i) => `${i} ${r.vis[i] ? 'SHOWN' : 'hidden'}`);
+  const run = async (pg, label) => {
+    const p = [];
+    const base = [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '5' }];
+    let bad = await applyConfig(pg, base);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    let r = await snap(pg), w;
+    if ((w = shows(r, { leafNodeStart: true, leafNodeEnd: true, leafNodeSpacing: true, leafSizeTaper: true })).length) p.push(`on a leafed stem of five nodes ${w.join(', ')}`);
+    bad = await applyConfig(pg, [{ id: 'inflorescence', value: 'RACEME' }]);
+    r = await snap(pg);
+    if (bad.length || (w = shows(r, { leafNodeStart: false, leafNodeEnd: false, leafNodeSpacing: false, leafSizeTaper: false })).length) p.push(`under a RACEME ${(w || []).join(', ')} — the pedicels own the nodes, so every one of the four is dead (${bad.join('; ')})`);
+    bad = await applyConfig(pg, [{ id: 'inflorescence', value: 'NONE' }, { id: 'leafNodes', value: '2' }]);
+    r = await snap(pg);
+    if (bad.length || (w = shows(r, { leafNodeStart: true, leafNodeEnd: true, leafNodeSpacing: false, leafSizeTaper: true })).length) p.push(`at TWO nodes ${(w || []).join(', ')} (${bad.join('; ')})`);
+    bad = await applyConfig(pg, [{ id: 'leafNodes', value: '1' }]);
+    r = await snap(pg);
+    if (bad.length || (w = shows(r, { leafNodeStart: true, leafNodeEnd: true, leafNodeSpacing: false, leafSizeTaper: false })).length) p.push(`at ONE node ${(w || []).join(', ')} (${bad.join('; ')})`);
+    bad = await applyConfig(pg, [{ id: 'leafNodes', value: '5' }, { id: 'leafLength', value: '0' }]);
+    r = await snap(pg);
+    if (bad.length || (w = shows(r, { leafNodeStart: false, leafNodeEnd: false, leafNodeSpacing: false, leafSizeTaper: false })).length) p.push(`with nothing at the nodes ${(w || []).join(', ')} (${bad.join('; ')})`);
+    /* the crowd, both ways, against the builder's own depths */
+    for (const sp of ['0.8', '-0.8']) {
+      bad = await applyConfig(pg, [{ id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '6' }, { id: 'leafNodeSpacing', value: sp }]);
+      r = await snap(pg);
+      if (bad.length || !r.depths || r.depths.length < 3) { p.push(`spacing ${sp}: no depths to read (${bad.join('; ')})`); continue; }
+      const g = r.depths.slice(1).map((q, i) => q - r.depths[i]);
+      const lowest = g[g.length - 1], highest = g[0];
+      const where = Number(sp) > 0 ? 'BASE' : 'TOP';
+      if ((Number(sp) > 0) !== (lowest < highest)) p.push(`spacing ${sp}: the builder's lowest internode ${lowest.toFixed(2)} mm and highest ${highest.toFixed(2)} mm do not crowd toward the ${where}`);
+      const want = new RegExp(`crowd toward the ${where}.*the lowest internode ${lowest.toFixed(1)} mm, the highest ${highest.toFixed(1)} mm`);
+      if (!want.test(r.txt.leafNodeSpacing)) p.push(`spacing ${sp}: the read-out does not say the nodes crowd toward the ${where} with the lowest internode ${lowest.toFixed(1)} mm and the highest ${highest.toFixed(1)} mm: "${r.txt.leafNodeSpacing.slice(0, 260)}"`);
+    }
+    /* a start past the end, told */
+    bad = await applyConfig(pg, [{ id: 'leafNodeSpacing', value: '0' }, { id: 'leafNodes', value: '4' }, { id: 'leafNodeStart', value: '0.7' }, { id: 'leafNodeEnd', value: '0.4' }]);
+    r = await snap(pg);
+    if (bad.length || !r.depths || r.depths.length !== 1) p.push(`a start past the end did not build ONE node (${bad.join('; ')}; ${r.depths ? r.depths.length : 'no'} depths)`);
+    if (!/START PAST END/.test(r.txt.leafNodeStart)) p.push(`a start past the end is not TOLD on the start's read-out: "${r.txt.leafNodeStart.slice(0, 220)}"`);
+    /* the taper, per node, against the plan's own scales */
+    bad = await applyConfig(pg, [{ id: 'leafNodeStart', value: '0.16' }, { id: 'leafNodeEnd', value: '0.86' }, { id: 'leafNodes', value: '5' }, { id: 'leafSizeTaper', value: '0.5' }]);
+    r = await snap(pg);
+    if (bad.length || !r.scales) p.push(`a taper of 0.5 built no per-node sizes (${bad.join('; ')})`);
+    else {
+      const list = r.scales.map((q) => `${(100 * q).toFixed(0)}%`).join(' / ');
+      if (!r.txt.leafSizeTaper.includes(`by node, top to bottom: ${list}`) || !/SMALLER toward the top/.test(r.txt.leafSizeTaper)) p.push(`the taper's read-out does not list the plan's per-node sizes ${list} or say SMALLER toward the top: "${r.txt.leafSizeTaper.slice(0, 260)}"`);
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: the four show on a leafed stem; a RACEME hides all four; two nodes hide the spacing, one node the taper too; nothing at the nodes hides the run; the crowd is named BASE / TOP with the builder's own internodes; a start past the end is told; the taper lists the plan's per-node sizes`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'node run and size taper');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const regSrc = fs.readFileSync(new URL('../bloom-registry.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the run is live under a raceme', from: "  leafNodeRunLive: { all: [{ ref: 'leafNodeCountLive' }, { any: [{ ref: 'leafPresent' }, { ref: 'stemNodesPresent' }] }] },", to: "  leafNodeRunLive: { any: [{ ref: 'leafPresent' }, { ref: 'stemNodesPresent' }] }," },
+      { name: 'the crowd is named backwards', from: "the nodes crowd toward the ${x > 0 ? 'BASE' : 'TOP'}", to: "the nodes crowd toward the ${x > 0 ? 'TOP' : 'BASE'}" },
+      { name: 'a start past the end is not told', from: '  if (N.run.inverted) return `${head} · START PAST END', to: '  if (false) return `${head} · START PAST END' },
+    ];
+    for (const m of MUTANTS) if (regSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom-registry.js — the mutant cannot be applied`);
+    for (const m of MUTANTS) {
+      if (regSrc.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route('**/bloom-registry.js', (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: regSrc.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -5199,18 +5301,22 @@ if (NEGATIVE_CONTROL) {
     const sawDepthWrites = fail.some((f) => /^\[depth defaults\] MUTANT \(the switch writes nothing\).*depth 2's defaults were not written/.test(f));
     const sawDepthKeeps = fail.some((f) => /^\[depth defaults\] MUTANT \(a set control is overwritten\).*OVERWROTE the Florets/.test(f));
     const sawDepthLoad = fail.some((f) => /^\[depth defaults\] MUTANT \(a load writes the overlay\).*a LOAD to depth 2 wrote the overlay/.test(f));
+    /* ROUTE (ar), THE NODE RUN AND THE SIZE TAPER — one flag per mutant */
+    const sawRunRaceme = fail.some((f) => /^\[node run\] MUTANT \(the run is live under a raceme\).*under a RACEME/.test(f));
+    const sawRunCrowd = fail.some((f) => /^\[node run\] MUTANT \(the crowd is named backwards\).*does not say the nodes crowd toward the/.test(f));
+    const sawRunPast = fail.some((f) => /^\[node run\] MUTANT \(a start past the end is not told\).*is not TOLD/.test(f));
     /* ROUTE (ap), THE UMBEL'S HEAD TOGGLE — one flag per mutant */
     const sawUmbelLabel = fail.some((f) => /^\[umbel head\] MUTANT \(the label is never derived\).*it must say its controls shape the florets/.test(f));
     const sawUmbelCount = fail.some((f) => /^\[umbel head\] MUTANT \(the head petal count shows with the head off\).*the head-only controls show/.test(f));
-    if (sawMopheadRays && sawMopheadClamp && sawDepthWrites && sawDepthKeeps && sawDepthLoad && sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    if (sawRunRaceme && sawRunCrowd && sawRunPast && sawMopheadRays && sawMopheadClamp && sawDepthWrites && sawDepthKeeps && sawDepthLoad && sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
         && sawTextureGrey && sawTextureLine
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-FOUR ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}, umbel head — the label never derived: ${sawUmbelLabel}, the petal count shown: ${sawUmbelCount}, mophead — the rays at depth 1: ${sawMopheadRays}, the clamp untold: ${sawMopheadClamp}, depth 2's defaults — never written: ${sawDepthWrites}, a set control overwritten: ${sawDepthKeeps}, a load writes: ${sawDepthLoad}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-FIVE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}, umbel head — the label never derived: ${sawUmbelLabel}, the petal count shown: ${sawUmbelCount}, mophead — the rays at depth 1: ${sawMopheadRays}, the clamp untold: ${sawMopheadClamp}, depth 2's defaults — never written: ${sawDepthWrites}, a set control overwritten: ${sawDepthKeeps}, a load writes: ${sawDepthLoad}, node run — live under a raceme: ${sawRunRaceme}, the crowd backwards: ${sawRunCrowd}, a start past the end untold: ${sawRunPast}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

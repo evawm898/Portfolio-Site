@@ -921,3 +921,194 @@ one row that can see it; the fold-guard mutant fired nothing until that row exis
 its own bound), TB2 (the give-way, exercised). Nine new mutants: the carved width ignoring curvature,
 its floor removed, the arris swapped for a half-round, the leaf unfloored, its fold guard removed, its
 curl halved, its lift removed, the leaf crossing rule removed, the budget give-way removed.
+
+## 14. Phase 3d — running chains, seated on the molding
+
+### 14.0 Rulings (Eva, Oct 28, on the filigree critique sheet)
+
+- **The ornament must FOLLOW THE FRAME.** The phase-3a pairs read as floating, not incorporated.
+  Target (b): references 2 and 3, and reference 4's corner runs are the same idea.
+- **2B, SEATED:** the ornament's root stands on the molding's own height field, and its top clears the
+  molding top.
+- **4B, RUNNING CHAINS:** C–S–C scroll-and-leaf chains whose centreline derives from the band's path
+  via `offsetCurve`, sized to the run between anchors, meeting at the crest, the corners or springings
+  and the bottom as junctions.
+- **No visible gap between ornament and band anywhere. A motif on the axis.**
+
+The chains are the new default layout (`ornLayout` chains / groups). The groups stay one choice away,
+and every row of theirs builds as it did.
+
+### 14.1 The runs (`CHAIN_RUNS`, `runPath`)
+
+**A RUN is the band between two consecutive right-hand anchors**, read as a path:
+- The path is `offsetCurve(spine, −w/2 + δ)`, at δ = `CHAIN_SEAT` (0.3) × the molding width inside
+  the band's OUTER edge. `offsetCurve` is the one producer of every parallel curve, so a chain cannot
+  drift from the band.
+- It is resampled at 0.5 mm of arc and smoothed by 24 Laplacian passes.
+- **An anchor ON the axis cuts the path where it crosses x = 0**, so the two mirrored halves meet
+  exactly.
+- **An anchor on the same spine (a rectangle's corner) cuts at its full offset vertex**, so a run
+  reaches the mitre rather than stopping short of it.
+
+The runs, each switched by the control it replaces:
+
+| skeleton | run | anchors | switched by |
+|---|---|---|---|
+| arch | head | apex → right springing | Crest |
+| arch | jamb | right springing → sill | Sides |
+| rectangle | top | top centre → top-right corner | Crest |
+| rectangle | side | top-right → bottom-right corner | Sides |
+| rectangle | bottom | bottom-right corner → bottom centre | Bottom centre |
+| oval | upper | top → right side | Crest |
+| oval | lower | right side → bottom | Bottom centre |
+
+An arch has no bottom run, so Bottom centre hides on an arch under the chains. A run whose anchor the
+frame does not carry (an arch with no sill) is not built, told.
+
+### 14.2 The chain (`buildChain`, `mapToPath`)
+
+**Elements.**
+- N elements, a C at each end and S's between, N = max(3, round(L / lead × density / 3)). L is the
+  run's length; the lead is `CHAIN_LEAD` (2.5, the scale slider's own default) × the molding width.
+- **A chain is sized by its run, so the groups' scale, wire and wire-style controls hide under the
+  chains.** The chains are carved, by ruling 1B.
+- Each element is laid in the path's frame (x = arc length, y = outward) and mapped through it, and
+  its carved widths are re-read off the mapped curve.
+- **Elements are laid SEQUENTIALLY on the MAPPED geometry.** A curved run compresses whatever lies
+  over the molding, so each element is pushed along until it clears the one before it (and, at the
+  axis, its own mirror) by F + `CHAIN_MARGIN` (0.1 mm). A chain that overruns its run has every
+  element scaled down and is laid again.
+- Each end keeps 0.35 of an element clear for the junction motif.
+
+**Coils.** An element's coils are re-read after mapping, and again at its final seat, because a
+curved run can close them. A coil that would close under the feature is built with fewer turns, told.
+**The mapped tangents are UNWRAPPED.** `atan2` wraps at ±π, and `selfGap` finds a coil by stations
+whose tangents differ by a half turn or more. Wrapped, it missed stations that turned a whole turn:
+the coil check was blind exactly where a mapped coil closes. The gate read a coil overlapping itself
+by 1.375 mm on the eared rectangle. The standing mutant is `the-mapped-tangent-wraps`.
+**Fewer turns cannot undo a fold the PATH makes.** An S laid across an ear's corner, sharper than the
+element itself, folded onto itself: stations 0.13 mm apart after turning 3.46 rad. The coil re-check
+saw it and could only reduce turns, so the element was built anyway. An element whose coils still
+close at its final seat gives way now, told (`a-folded-element-is-built`).
+
+**No visible gap, and nothing in the opening** (`slitWorst`, the opening test).
+- Every stretch of an element within 2F of the band must reach an embed. An approach that comes near
+  and does not touch reads as a slit, and the element is pushed onto the molding until it holds.
+- **This is read at BOTH 2F and F.** A stretch that leaves the band and curls back is one run at 2F
+  and two at F, and the second is a graze the coarser reading alone lets through.
+- An element pushed onto the molding stops at its inner edge. The opening is `plateOutline` (its
+  owner) less every band's footprint.
+- An element that cannot hold both rules is not built, told.
+
+**Leaves.** Two leaves per element lap its root, as phase 3c's stacked shells on the host's crown.
+
+### 14.3 The junctions (the motifs)
+
+- **On the axis, a PALMETTE (ref 3's crest).** A straight centre leaf lies exactly on x = 0, with
+  its normal along ∓x so it is its own mirror to the bit. A pair of leaves either side fans 0.6 rad
+  off it.
+- **At an interior junction (springing, corner, the oval's side), a ROSETTE:** five two-lobed petals
+  about the meeting point, gated by Corners / springings.
+- **Motif leaves are settled FIRST.** A chain's leaf gives way to a motif, never the reverse, because
+  the motif is what marks the junction.
+
+**Settling (`settleChains`).**
+- Scroll elements clear every other scroll by F + the margin, or the later one is not built.
+- Leaves join their host, and with every other wire are either a feature clear or a crossing (an
+  overlap of `LEAF_CROSS`), and obey the band rule above.
+- A leaf that fails is remade 15 % shorter, up to seven times, then dropped, told.
+
+### 14.4 SEATED (2B): the molding's own height field
+
+**Every chain row's crown stands on the molding as the STL carries it.**
+- `moldingHeightField` builds the frame's bands with the relief's own `bandSolid` into a scratch mesh
+  and rasterises their tops, so it is the highest band where bands embed.
+- `seatOn` reads that field across each row's whole span (its local width plus a tenth) at 17
+  stations.
+- The row's `baseLift` is the larger of that and the run's own profile ramp, which carries the seat
+  down off the band's edge.
+- **The seat is then read AT THE EMITTED COLUMNS** (`seatEmitted`): the wire's own solid is built on
+  that first seat, and each row is lifted to the highest molding under its own top vertices. Those
+  stand off the centreline's normal by the spine's own offset curves, and a seat read on the
+  centreline's span cleared the molding by 0.989 mm where the crown is the 1 mm floor.
+- **The seat is read at each vertex AND its mirror image.** The raster is not symmetric to the bit,
+  and a one-sided seat broke OR5 on the eared rectangle.
+- `bandSolid` stands the crown at plateT + baseLift + z × depth, and its base stays at 0, so the
+  ornament and the molding overlap all the way down. There is no underside to show a gap.
+
+**The first cut read the run's own profile in the run's own frame. That frame drifts wherever the
+band does not follow the path:**
+- 0.06 mm under the molding on a rounded corner, and 0.30 mm on an ear.
+- 1.9 mm where a junction rosette's petals reach over a DIFFERENT band, such as the sill.
+
+Its standing mutant is `the-seat-is-read-off-the-centreline`, which drops the emitted-column read. A first mutant restoring the run-profile seat fired nothing once that read existed: it re-lifts every row anyway, so the mutated layer had become redundant and the mutant was re-pointed at the law that carries the seat.
+
+### 14.5 Measured (relief, default print)
+
+**Build time (Node, one call of `withOrnament`).**
+- Default arch: 2.5 s, the groups' own.
+- Dense eared rectangle, every run on: 15 s, the heaviest state measured.
+- The first cut took 42 s on that row, and that is the page's rebuild time too. The placement search
+  walked forward in up to 200 steps, bisected 30 times, and re-checked every candidate's coils. It is
+  an expanding step and sixteen bisections now, and settling reads a box bound before an exact
+  clearance and only the band segments near each wire.
+- What is left is `selfGap`'s exact O(n²) coil check. It is kept exact on purpose: it is what the
+  build guarantees.
+
+
+| row | triangles |
+|---|---|
+| arch default (head chain + palmette + springing rosettes) | 225,620 |
+| arch, density 5, every run on | 569,716 |
+| rectangle default (top chain + palmette + corner rosettes) | 142,824 |
+| rectangle, density 5, every run on | 626,464 |
+| oval default | 212,088 |
+| oval, density 5, every run on | 563,776 |
+
+- **At the sliders' ceiling on a 600 mm print the chains read 886,936 (arch), 1,155,128 (rectangle)
+  and 1,076,792 (oval)**, the groups 1,152,588 / 831,272 / 876,744: all under the 1,500,000 budget,
+  the rectangle's chains within a quarter of it.
+- A chain is priced whole before it is built, and gives way past the budget, told (TB2 exercises both
+  layouts).
+- Every row: boundary edges 0, one voxel region.
+
+### 14.6 Gate (OR7 / OR8 / OR9) and mutants
+
+**Three clauses, the chains' rules, each read off the EMITTED mesh against the gate's own owners.**
+- **OR7, nothing in the opening.** No chain vertex inside `plateOutline` and outside every band
+  footprint.
+- **OR8, no visible gap.** Every stretch of every chain wire within 2F of a band footprint reaches
+  the embed. The 2 × `MIN_FEATURE_MM` is restated in the gate, never imported from `CHAIN_GAP`.
+- **OR9, seated.** The molding surface is read off the exported BAND solids' top grids: the ornament
+  solids are bands too and are excluded by name. Its first version included them and read wires
+  sitting "under" the leaves that lap them. No ornament top vertex may sit below the molding under
+  it, and every row's crest must stand a feature above the highest molding under it.
+
+**The phase-3a groups are COUNTED, not asserted, on OR7 and OR8.** Their 146 slits and 52 wires in
+the opening are the floating the ruling replaced.
+
+**Other gate changes.**
+- OR3 and OR5 learned the chains: a leaf's host is its element; a motif on the axis is its own
+  mirror, column c against column C − 1 − c, compared with `===` so ±0 agree.
+- TB2 runs on both layouts.
+- **The page gate's V1 probed Layout with the filigree off**, where it cannot move a pixel. It probes
+  it with the filigree on now, and probes the groups' own controls on the groups.
+
+**Mutants.**
+- Eight new: the chain not seated; an element the path folds built anyway; the slit rule removed; the opening check removed; the axis leaf
+  0.05 mm off the axis; the mapped tangent wrapping; the seat read off the centreline; the
+  chain's budget give-way removed.
+- The groups' budget mutant is re-anchored: its anchor matched twice once the chains carried their
+  own budget test.
+
+### 14.7 What it still is, read off the sheet
+
+`node tools/shot-frame-chains.mjs <dir> --refs <dir of ref 2/3/4>` draws all three skeletons default
+and dense, the engraving, the crest and a corner junction close, the seat from low, and the groups at
+the same cameras, beside the references. The photographs are not in the repository.
+
+**The chains follow the frame**: on the band, along every run, meeting at a motif on the axis and at
+rosettes at the junctions. **They are still a ROW OF SEPARATE ELEMENTS**, each a feature clear of the
+next, where references 2 and 3 are one continuous vine. The rosettes stand proud of the molding like
+stars. That gap is Eva's to judge; option 2C (the molding's own edge becomes the scroll) is costed in
+the session report.

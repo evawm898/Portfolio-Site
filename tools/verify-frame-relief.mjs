@@ -445,11 +445,10 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       ['rect crowded (groups must give way)', { skeleton: 'rect', width: 70, height: 120, ...DENSE, ornScale: 6 }],
       ['dense, round wire, tight, thick', { ...DENSE, ornShape: 'round', ornTightness: 1, ornWire: 3.2 }],
     ];
-    // every row in all THREE wire styles: CARVED with its leaves and the arris
-    // section (phase 3c, the default), and tapered and constant as phase 3b
-    // shipped them (half-round, no leaves)
-    for (const r of OROWS.splice(0)) { OROWS.push([`${r[0]} · carved`, { ...r[1], ornWireStyle: 'carved' }], [`${r[0]} · tapered`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'tapered', ornLeaves: 'off' }], [`${r[0]} · constant`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'constant', ornLeaves: 'off' }]); }
-    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : /carved$/.test(name) ? 'carved' : 'constant');
+    // the default (phase 3d): carved RUNNING CHAINS; beside it the phase-3c
+    // carved GROUPS with their clusters, and the tapered and constant groups
+    for (const r of OROWS.splice(0)) { OROWS.push([`${r[0]} · chains`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'chains' }], [`${r[0]} · carved`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'groups' }], [`${r[0]} · tapered`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'tapered', ornLeaves: 'off', ornLayout: 'groups' }], [`${r[0]} · constant`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'constant', ornLeaves: 'off', ornLayout: 'groups' }]); }
+    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : /(carved|chains)$/.test(name) ? 'carved' : 'constant');
     const ST = { carved: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, constant: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, tapered: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 } };
     // CL / TB (phase 3c): a leaf lies OVER its host; the relief never passes the budget
     const cl1 = [], tb1 = []; let leavesSeen = 0, leastLap = Infinity, mostTris = 0;
@@ -465,7 +464,9 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
     // segment of B, centreline distance less the two local half widths (the
     // wider end of B's segment — the stricter reading)
     const minDL = (A, tA, B, tB) => { let m = Infinity; for (let i = 0; i < A.length; i++) for (let k = 0; k < B.length - 1; k++) m = Math.min(m, dseg(A[i], B[k], B[k + 1]) - (tA[i] + Math.max(tB[k], tB[k + 1])) / 2); return m; };
-    const or1 = [], or2 = [], or3 = [], or4 = [], or5 = [], or6 = [];
+    const or1 = [], or2 = [], or3 = [], or4 = [], or5 = [], or6 = [], or7 = [], or8 = [], or9 = [];
+    let seatRows = 0, leastCrown = Infinity, worstSink = -Infinity;
+    let worstSlit = -Infinity, slitRuns = 0, opened = 0, groupSlits = 0, groupOpen = 0;
     let leastWire = Infinity, leastGap = Infinity, leastEmbed = Infinity, deepest = 0, built = 0, notBuilt = 0;
     for (const [name, q] of OROWS) {
       const model = FL.withOrnament(G.buildFrame(q));
@@ -485,8 +486,17 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       for (const w of W) { leastWire = Math.min(leastWire, w.wire); st.wire = Math.min(st.wire, w.wire); if (w.wire < F - 1e-9) or2.push(`${name}: a wire ${w.wire.toFixed(4)} mm wide`); }
       // which wire is in which group, and which side: groups.flatMap(curves, mirrored)
       const owner = []; let k = 0;
-      orn.groups.forEach((g, gi) => { for (const side of ['R', 'L']) for (let i = 0; i < g.curves.length; i++) owner[k++] = { gi, side, i }; });
+      orn.groups.forEach((g, gi) => { for (const side of g.mirrored.length ? ['R', 'L'] : ['R']) for (let i = 0; i < g.curves.length; i++) owner[k++] = { gi, side, i }; });
       const leafAt = orn.curves.map((c) => c.kind === 'leaf');
+      // a leaf's HOST: in a group (phase 3c) the lead, its group's first wire;
+      // in a CHAIN (phase 3d) the element of its own chain index; a junction
+      // motif's leaf has none (the crossing rule throughout)
+      const hostOf = (x) => {
+        const c = orn.curves[x];
+        if (!leafAt[x] || /^(axis|palmette|rosette)$/.test(c.info.role || '')) return -1;
+        if (c.chainIndex != null) return owner.findIndex((o, y) => o.gi === owner[x].gi && o.side === owner[x].side && !leafAt[y] && orn.curves[y].chainIndex === c.chainIndex);
+        return owner.findIndex((o) => o.gi === owner[x].gi && o.side === owner[x].side && o.i === 0);
+      };
       // TB1 the relief within the budget and within the ornament's own bound
       const tri = rel.indices.length / 3; mostTris = Math.max(mostTris, tri);
       if (tri > BUDGET || tri > orn.tris.bound) tb1.push(`${name}: ${tri} triangles (bound ${orn.tris.bound}, budget ${BUDGET})`);
@@ -495,8 +505,9 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       const topAt = (pt, v) => { let m = -Infinity; for (let c = 0; c < pt.C; c++) m = Math.max(m, P[3 * pt.T(v, c) + 2]); return m; };
       W.forEach((w, x) => {
         if (!leafAt[x]) return;
+        const host = hostOf(x);
+        if (host < 0) return;
         leavesSeen++;
-        const host = owner.findIndex((o) => o.gi === owner[x].gi && o.side === owner[x].side && o.i === 0);
         const lead = orn.curves[host], lap = topAt(w.part, 0) - topAt(W[host].part, lead.root);
         leastLap = Math.min(leastLap, lap);
         if (!(lap > 1e-6)) cl1.push(`${name}: leaf ${x} stands ${lap.toFixed(4)} mm against its host's crown (under it)`);
@@ -516,9 +527,11 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
           const same = owner[x].gi === owner[y].gi && owner[x].side === owner[y].side;
           // a LEAF and any wire but its host lead CROSS (an overlap of half a
           // feature — the leaf is held by its host); everything else JOINS
-          const hostPair = (leafAt[x] && owner[y].i === 0 && !leafAt[y]) || (leafAt[y] && owner[x].i === 0 && !leafAt[x]);
+          const hostPair = (leafAt[x] && hostOf(x) === y) || (leafAt[y] && hostOf(y) === x);
           const need = (leafAt[x] || leafAt[y]) && !hostPair ? F / 2 : E;
-          if (!same) { const d = minDL(W[x].c, W[x].t, W[y].c, W[y].t); leastGap = Math.min(leastGap, d); st.gap = Math.min(st.gap, d); if (d < F - 1e-6) or3.push(`${name}: wires ${x} and ${y} (different groups or sides) ${d.toFixed(3)} mm apart`); continue; }
+          // two SCROLLS of different groups or sides: a feature clear. A LEAF may
+          // cross another group's wire (phase 3d: a junction motif and a chain)
+          if (!same && !(leafAt[x] || leafAt[y])) { const d = minDL(W[x].c, W[x].t, W[y].c, W[y].t); leastGap = Math.min(leastGap, d); st.gap = Math.min(st.gap, d); if (d < F - 1e-6) or3.push(`${name}: wires ${x} and ${y} (different groups or sides) ${d.toFixed(3)} mm apart`); continue; }
           // runs of either wire's stations within a feature of the other; each
           // must reach an overlap ≥ E (read from both wires)
           const runs = [];
@@ -546,13 +559,72 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
         }
         if (!rooted) or4.push(`${name} group ${key}: not rooted in the band (no contact reaches the ${E} mm embed)`);
       }
+      // OR7 nothing in the OPENING: no ornament vertex inside the frame's
+      // silhouette (plateOutline, the owner of it) and in no band's footprint
+      // (the gate's own feet). OR8 NO VISIBLE GAP (phase 3d, Eva's 2B): every
+      // stretch of every wire within 2F of the band (2 × MIN_FEATURE_MM —
+      // restated, never the module's CHAIN_GAP) reaches an embed; an approach
+      // that comes near and does not touch reads as a slit
+      const sil = RL.plateOutline(model).map(([x, y]) => [x * rel.scale, y * rel.scale]);
+      W.forEach((w, x) => {
+        // the chains' rule; the phase-3a groups are counted and reported
+        for (const q of w.c) if (pip(q, sil) && depthIn(fs_, q) < 0) { if (!/chains$/.test(name)) { groupOpen++; break; } or7.push(`${name}: wire ${x} reaches into the opening at (${q[0].toFixed(1)}, ${q[1].toFixed(1)})`); opened++; break; }
+        let run = null; const runs = [];
+        w.c.forEach((qq, i) => { const cl = -depthIn(fs_, qq) - w.t[i] / 2; if (cl < 2 * F) { if (!run) run = { min: cl }; run.min = Math.min(run.min, cl); } else if (run) { runs.push(run); run = null; } });
+        if (run) runs.push(run);
+        // the CHAINS' rule (phase 3d); the phase-3a groups float by design — their
+        // slits are what the ruling replaced, counted and reported, not asserted
+        for (const r of runs) { slitRuns++; if (r.min > -E + 1e-6) { if (/chains$/.test(name)) { worstSlit = Math.max(worstSlit, r.min); or8.push(`${name}: wire ${x} comes ${r.min.toFixed(3)} mm from the band without joining it`); } else groupSlits++; break; } }
+      });
+      // OR9 SEATED ON THE MOLDING (phase 3d, Eva's 2B), the chains only: the
+      // molding surface is read off the EMITTED band solids (their top grids,
+      // rasterised; where bands embed, the higher), never off the module's
+      // moldingLift. No ornament top vertex is below the molding under it (the
+      // root stands on the height field — nothing of the band shows through),
+      // and every ornament row's crest clears the highest molding under that row
+      // by the feature (the top clears the molding top)
+      if (/chains$/.test(name)) {
+        const cell = 2, grid = new Map(), key = (i, j) => i * 100003 + j, tris = [];
+        for (const bp of rel.parts.filter((x) => x.kind === 'band' && !/^orn/.test(x.id))) {   // the MOLDING: the ornament solids are bands too
+          const last = bp.closed ? bp.V : bp.V - 1;
+          for (let v = 0; v < last; v++) for (let c = 0; c < bp.C - 1; c++) {
+            const nv = (v + 1) % bp.V, ids = [bp.T(v, c), bp.T(nv, c), bp.T(nv, c + 1), bp.T(v, c + 1)];
+            for (const tri of [[ids[0], ids[1], ids[2]], [ids[0], ids[2], ids[3]]]) {
+              const pt3 = tri.map((ix) => [P[3 * ix], P[3 * ix + 1], P[3 * ix + 2]]); const ti = tris.push(pt3) - 1;
+              const xs = pt3.map((u) => u[0]), ys = pt3.map((u) => u[1]);
+              for (let i = Math.floor(Math.min(...xs) / cell); i <= Math.floor(Math.max(...xs) / cell); i++) for (let j = Math.floor(Math.min(...ys) / cell); j <= Math.floor(Math.max(...ys) / cell); j++) { const kk = key(i, j); if (!grid.has(kk)) grid.set(kk, []); grid.get(kk).push(ti); }
+            }
+          }
+        }
+        const surf = (x, y) => { let h = -Infinity; for (const ti of grid.get(key(Math.floor(x / cell), Math.floor(y / cell))) || []) { const [A, B, C2] = tris[ti]; const d = (B[1] - C2[1]) * (A[0] - C2[0]) + (C2[0] - B[0]) * (A[1] - C2[1]); if (Math.abs(d) < 1e-14) continue; const l1 = ((B[1] - C2[1]) * (x - C2[0]) + (C2[0] - B[0]) * (y - C2[1])) / d, l2 = ((C2[1] - A[1]) * (x - C2[0]) + (A[0] - C2[0]) * (y - C2[1])) / d, l3 = 1 - l1 - l2; if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) h = Math.max(h, l1 * A[2] + l2 * B[2] + l3 * C2[2]); } return h; };
+        parts.forEach((pt, x) => {
+          for (let v = 0; v < pt.V; v++) {
+            let crest = -Infinity, under = -Infinity;
+            for (let c = 0; c < pt.C; c++) {
+              const ix = 3 * pt.T(v, c), z = P[ix + 2], h = surf(P[ix], P[ix + 1]); crest = Math.max(crest, z);
+              if (h > -Infinity) { under = Math.max(under, h); worstSink = Math.max(worstSink, h - z); if (h - z > 1e-6) { or9.push(`${name}: wire ${x} row ${v} sits ${(h - z).toFixed(3)} mm under the molding`); break; } }
+            }
+            if (under > -Infinity) { seatRows++; leastCrown = Math.min(leastCrown, crest - under); if (crest - under < F - 1e-6) or9.push(`${name}: wire ${x} row ${v}'s crest clears the molding by ${(crest - under).toFixed(3)} mm`); }
+          }
+        });
+      }
       // OR5 the mirror, to the bit, on the emitted vertices
       orn.groups.forEach((g, gi) => {
         const base = owner.findIndex((o) => o.gi === gi && o.side === 'R');
+        // a motif ON the axis (phase 3d) is its own mirror: column c is column
+        // C − 1 − c with x negated (=== so the centre column's ±0 agree)
+        if (!g.mirrored.length) {
+          for (let i = 0; i < g.curves.length; i++) {
+            const A = parts[base + i]; let bad = false;
+            for (let v = 0; v < A.V && !bad; v++) for (let c = 0; c < A.C && !bad; c++) { const ia = 3 * A.T(v, c), ib = 3 * A.T(v, A.C - 1 - c); if (P[ib] !== -P[ia] || P[ib + 1] !== P[ia + 1] || P[ib + 2] !== P[ia + 2]) bad = true; }
+            if (bad) or5.push(`${name}: the ${g.group} motif on the axis is not its own mirror`);
+          }
+          return;
+        }
         for (let i = 0; i < g.curves.length; i++) {
           const A = parts[base + i], B = parts[base + g.curves.length + i];
           let bad = A.V !== B.V || A.C !== B.C;
-          for (let v = 0; v < A.V && !bad; v++) for (let c = 0; c < A.C && !bad; c++) { const ia = 3 * A.T(v, c), ib = 3 * B.T(v, c); if (!Object.is(P[ib], -P[ia]) || !Object.is(P[ib + 1], P[ia + 1]) || !Object.is(P[ib + 2], P[ia + 2])) bad = true; }
+          for (let v = 0; v < A.V && !bad; v++) for (let c = 0; c < A.C && !bad; c++) { const ia = 3 * A.T(v, c), ib = 3 * B.T(v, c); if (P[ib] !== -P[ia] || P[ib + 1] !== P[ia + 1] || P[ib + 2] !== P[ia + 2]) bad = true; }   // === (a vertex ON the axis mirrors to −0)
           if (bad) or5.push(`${name}: ${g.group} wire ${i}'s mirror is not its source with x negated`);
         }
       });
@@ -560,12 +632,15 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
       const off = FL.withOrnament(G.buildFrame({ ...q, filigree: 'none' }));
       if (off.ornament || G.exportSvg(off).svg !== G.exportSvg(G.buildFrame({ ...q, filigree: 'none' })).svg) or6.push(`${name}: off is not the frame`);
     }
+    rec('OR9 the chains are SEATED on the molding: no ornament top vertex below the emitted band surface under it, and every row\'s crest a feature above the highest molding under that row', or9.length === 0, `${seatRows} rows over the band, least crown above the molding ${leastCrown.toFixed(3)} mm, deepest sink ${worstSink.toFixed(4)} mm${or9.length ? ' — ' + or9.slice(0, 3).join('; ') : ''}`);
     rec('OR1 with the filigree on, every ornament row is watertight (boundary 0) and ONE voxel region, at the default and at density 5 with every group on, on all three skeletons', or1.length === 0, `${OROWS.length} rows${or1.length ? ' — ' + or1.slice(0, 3).join('; ') : ''}`);
     rec('OR2 no wire is narrower than the feature (read off the emitted walls)', or2.length === 0, `least wire ${leastWire.toFixed(4)} mm${or2.length ? ' — ' + or2.slice(0, 2).join('; ') : ''}`);
     rec('OR3 every gap is a feature or a junction: a wire\'s own coils, wires of one half-group (a contact must be a true overlap of the embed, never a graze), and wires of different groups or sides at least a feature apart', or3.length === 0, `least gap ${leastGap.toFixed(4)} mm${or3.length ? ' — ' + or3.slice(0, 3).join('; ') : ''}`);
     rec('OR4 every scroll group is rooted: each half has a contact with the band (the gate\'s own footprints) at least EMBED_MM deep, and no contact is a graze', or4.length === 0, `${built} groups built, ${notBuilt} given way (told); embeds ${leastEmbed.toFixed(3)}–${deepest.toFixed(3)} mm${or4.length ? ' — ' + or4.slice(0, 3).join('; ') : ''}`);
     rec('OR5 the ornament is mirror-symmetric to the bit: every left wire\'s emitted vertices are the right\'s with x negated', or5.length === 0, or5.slice(0, 2).join('; '));
     rec('OR6 the filigree off is the frame itself (no ornament field, the same SVG string)', or6.length === 0, or6.slice(0, 2).join('; '));
+    rec('OR7 the CHAINS reach nothing into the OPENING: no chain vertex inside the frame\'s silhouette and in no band\'s footprint', or7.length === 0, `${opened} chain wires in the opening; the phase-3a groups put ${groupOpen} there (reported)${or7.length ? ' — ' + or7.slice(0, 3).join('; ') : ''}`);
+    rec('OR8 no visible gap between the CHAINS and the band: every stretch of every chain wire within 2F of the band reaches an embed', or8.length === 0, `${slitRuns} approaches${worstSlit > -Infinity ? `, worst ${worstSlit.toFixed(3)} mm` : ', every chain one an embed'}; the phase-3a groups leave ${groupSlits} slits (reported)${or8.length ? ' — ' + or8.slice(0, 3).join('; ') : ''}`);
     rec('CL1 every leaf lies OVER its host scroll: its emitted top at its root stands above the host\'s crown at the host\'s root', leavesSeen > 0 && cl1.length === 0, `${leavesSeen} leaves, least lap ${leastLap.toFixed(4)} mm${cl1.length ? ' — ' + cl1.slice(0, 3).join('; ') : ''}`);
     rec('TB1 every ornament row\'s relief is within the 1,500,000-triangle budget and within the ornament\'s own predicted bound', tb1.length === 0, `most ${mostTris.toLocaleString('en-US')} triangles${tb1.length ? ' — ' + tb1.slice(0, 3).join('; ') : ''}`);
     console.log(`     per wire style (off the emitted mesh): ${['carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
@@ -707,11 +782,16 @@ async function run(G, R, RL, label = 'shipped', FL = null) {
     // is exercised by handing the SHIPPED ornamentFor a budget the default
     // rectangle at its ceiling passes: groups give way whole, told, the
     // relief within it — and the real budget restated as 1,500,000.
-    const stress = G.buildFrame({ skeleton: 'rect', printHeight: 400, filigree: 'scrolls', ornDensity: 5, ornCrest: 'on', ornCorners: 'on', ornSides: 'on', ornBottom: 'on', ornScale: 6, ornLeafSize: 0.6, ornTightness: 1 });
-    const full = FL.withOrnament(stress), fullTris = RL.buildRelief(full).indices.length / 3;
-    const cut = Math.round((fullTris + full.ornament.tris.frame) / 2);
-    const tight = FL.withOrnament(stress, { triBudget: cut }), tightTris = RL.buildRelief(tight).indices.length / 3, gave = tight.ornament.told.filter((m) => /budget/.test(m));
-    rec('TB2 past the budget groups give way whole, told, and the relief stays within it (exercised at half the ceiling rectangle\'s own count); the shipped budget is 1,500,000', gave.length > 0 && tightTris <= cut && tight.ornament.groups.length > 0 && tight.ornament.groups.length < full.ornament.groups.length && RL.FRAME_TRI_BUDGET === 1500000, `ceiling rectangle ${fullTris.toLocaleString('en-US')} tris in ${full.ornament.groups.length} groups; at a ${cut.toLocaleString('en-US')} budget ${tight.ornament.groups.length} groups, ${tightTris.toLocaleString('en-US')} tris, ${gave.length} told${gave.length ? ' — "' + gave[0] + '"' : ''}`);
+    // both layouts: the chains (phase 3d, the default) and the groups
+    const tb = [];
+    for (const layout of ['chains', 'groups']) {
+      const stress = G.buildFrame({ skeleton: 'rect', printHeight: 400, filigree: 'scrolls', ornLayout: layout, ornDensity: 5, ornCrest: 'on', ornCorners: 'on', ornSides: 'on', ornBottom: 'on', ornScale: 6, ornLeafSize: 0.6, ornTightness: 1 });
+      const full = FL.withOrnament(stress), fullTris = RL.buildRelief(full).indices.length / 3;
+      const cut = Math.round((fullTris + full.ornament.tris.frame) / 2);
+      const tight = FL.withOrnament(stress, { triBudget: cut }), tightTris = RL.buildRelief(tight).indices.length / 3, gave = tight.ornament.told.filter((m) => /budget/.test(m));
+      tb.push({ layout, ok: gave.length > 0 && tightTris <= cut && tight.ornament.groups.length > 0 && tight.ornament.groups.length < full.ornament.groups.length, msg: `${layout}: ceiling rectangle ${fullTris.toLocaleString('en-US')} tris in ${full.ornament.groups.length} groups; at a ${cut.toLocaleString('en-US')} budget ${tight.ornament.groups.length}, ${tightTris.toLocaleString('en-US')} tris, ${gave.length} told${gave.length ? ' — "' + gave[0] + '"' : ''}` });
+    }
+    rec('TB2 past the budget a chain (or a group) gives way whole, told, and the relief stays within it — both layouts, exercised at half the ceiling rectangle\'s own count; the shipped budget is 1,500,000', tb.every((t) => t.ok) && RL.FRAME_TRI_BUDGET === 1500000, tb.map((t) => t.msg).join(' · '));
   }
 
   // base-tree byte identity, when a worktree is given
@@ -750,7 +830,7 @@ const MUTANTS = [
   { id: 'the-eye-under-the-floor', file: 'filigree', from: 'const re = (tEye + MIN_FEATURE_MM) / 2;', to: 'const re = tEye / 2 + 0.1;', breaks: ['SC2', 'SC3', 'SC7'] },   // the eye itself is then a gap of 0.2 mm, so no turn count prints and the slider's top probe fails
   // phase 3b: the tapered wire and the held share
   { id: 'the-taper-tip-under-the-floor', file: 'filigree', from: 'export const taperTip = (t) => Math.max(MIN_FEATURE_MM, TAPER_TIP * t);', to: 'export const taperTip = (t) => TAPER_TIP * t;', breaks: ['SC8', 'OR2', 'SC2', 'SC7'] },   // the eye law and the top probe restate the floored tip too
-  { id: 'the-gap-clamp-reads-the-nominal-wire', file: 'filigree', from: '(curve.w ? (curve.w[i] + curve.w[j]) / 2 : t)', to: 't', breaks: ['SC7', 'CV5'] },
+  { id: 'the-gap-clamp-reads-the-nominal-wire', file: 'filigree', from: '(curve.w ? (curve.w[i] + curve.w[j]) / 2 : t)', to: 't', breaks: ['SC7', 'CV5', 'OR3'] },
   { id: 'the-volute-share-grows', file: 'filigree', from: 'return { share: VOLUTE_SHARE, turnsMax: at(VOLUTE_SHARE) };', to: 'if (at(VOLUTE_SHARE) >= VOLUTE_TURNS[1]) return { share: VOLUTE_SHARE, turnsMax: VOLUTE_TURNS[1] }; return { share: 0.8, turnsMax: at(0.8) };', breaks: ['SC7', 'CV5'] },
   { id: 'a-child-floats-off-its-parent', file: 'filigree', from: 'const off = (wAt(lead, j) + tw) / 2 - EMBED_MM;', to: 'const off = (wAt(lead, j) + tw) / 2 + 0.5;', breaks: ['SC6'] },
   // phase 3a, step 2 — the ornament: a scroll left off its molding, the
@@ -773,7 +853,16 @@ const MUTANTS = [
   { id: 'the-leaf-curls-half-as-far', file: 'filigree', from: 'side * theta * (LEAF_CURL_POWER + 1) / L', to: 'side * 0.5 * theta * (LEAF_CURL_POWER + 1) / L', breaks: ['LF4'] },
   { id: 'the-leaf-is-not-lifted', file: 'filigree', from: '  return D * Math.max(Math.min(MIN_FEATURE_MM, D) / D, c.info.hostW / c.info.hostWire);', to: '  return 0;', breaks: ['CL1'] },
   { id: 'the-leaf-crossing-rule-removed', file: 'filigree', from: '|| joinsCleanly(lf, o, LEAF_CROSS));', to: '|| true);', breaks: ['OR3'] },
-  { id: 'the-budget-give-way-removed', file: 'filigree', from: 'if (tris + gTris > triBudget) {', to: 'if (false) {', breaks: ['TB2'] },
+  { id: 'the-budget-give-way-removed', file: 'filigree', from: 'if (tris + gTris > triBudget) { told.push(`the ${g} group', to: 'if (false) { told.push(`the ${g} group', breaks: ['TB2'] },
+  { id: 'the-chain-budget-give-way-removed', file: 'filigree', from: 'if (tris + gTris > triBudget) { told.push(`the ${run.id} chain', to: 'if (false) { told.push(`the ${run.id} chain', breaks: ['TB2'] },
+  // phase 3d — the chains
+  { id: 'the-chain-is-not-seated', file: 'filigree', from: '    if (c.lift) spine.baseLift = orn.H ?', to: '    if (false) spine.baseLift = orn.H ?', breaks: ['OR9', 'CL1'] },   // unseated, a chain's leaves no longer stand on their host's crown (CL1)
+  { id: 'the-chain-slit-rule-removed', file: 'filigree', from: 'export function slitWorst(c, region) {\n  let worst = -Infinity;', to: 'export function slitWorst(c, region) {\n  return -Infinity;\n  let worst = -Infinity;', breaks: ['OR8', 'OR4', 'OR3'] },   // unpushed, an element grazes the band (OR4) and its neighbours (OR3)
+  { id: 'the-chain-opening-check-removed', file: 'filigree', from: 'const intrusion = (o) => { if (!opening) return 0;', to: 'const intrusion = (o) => { return 0;', breaks: ['OR7', 'OR3'] },   // left in the opening, elements also crowd each other (OR3)
+  { id: 'the-mapped-tangent-wraps', file: 'filigree', from: '  for (let i = 1; i < m; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', to: '  for (let i = 1; i < 0; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', breaks: ['OR3'] },   // the coil check blind where a mapped coil closes (found in the 3d build)
+  { id: 'the-seat-is-read-off-the-centreline', file: 'filigree', from: 'spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth) : c.lift;', to: 'spine.baseLift = c.lift;', breaks: ['OR9'] },   // the seat read on the centreline's span, not at the emitted columns: crowns 0.989 mm where the floor is 1
+  { id: 'a-folded-element-is-built', file: 'filigree', from: ": selfGap(on).gap < F + CHAIN_MARGIN ? 'laid across", to: ": false ? 'laid across", breaks: ['OR3'] },   // an element the path folds (across an ear) is built anyway
+  { id: 'the-axis-leaf-is-off-the-axis', file: 'filigree', from: 'lf.pts.map(([, y]) => [0, y])', to: 'lf.pts.map(([, y]) => [0.05, y])', breaks: ['OR5'] },
 ];
 
 

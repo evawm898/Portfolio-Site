@@ -46,7 +46,7 @@
    The wire thickness is floored at it and told. */
 
 import { offsetCurve, outerEdge, innerEdge, sweepSpine } from './frame-geometry.js';
-import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound } from './frame-relief.js';
+import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound, plateOutline } from './frame-relief.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
 
 export const SCROLL_STEP_DEG = 3;
@@ -146,7 +146,9 @@ export function scrollCurve(spec) {
   const turns = spec.turns ?? tightnessTurns(spec.tightness ?? 0.5);
   const h2 = L / (1 + beta), h1 = L - h2;
   const ramp = kind === 'S' ? 0.2 * Math.min(h1, h2) : 0;
-  const rMid = SCROLL_BODY[kind] * L;
+  // spec.rBody: a chain's STEM (phase 3d) — the same law with a body so
+  // flat it follows the band, ending in a volute at each end
+  const rMid = spec.rBody ?? SCROLL_BODY[kind] * L;
   // the eye is the floor on the wire's LOCAL width there: the tip, tapered
   const tEye = spec.carved ? MIN_FEATURE_MM : spec.taper ? taperTip(t) : t;
   const re = (tEye + MIN_FEATURE_MM) / 2;
@@ -219,7 +221,7 @@ function printableTurns(base, t, asked) {
 const fitMemo = new Map();
 export function tightnessFit(spec) {
   const t = Math.max(spec.wire, MIN_FEATURE_MM);
-  const key = [spec.kind, spec.length, t, spec.balance, spec.share, !!spec.taper, !!spec.carved].join('|');
+  const key = [spec.kind, spec.length, t, spec.balance, spec.share, !!spec.taper, !!spec.carved, spec.rBody ?? ''].join('|');
   if (!fitMemo.has(key)) fitMemo.set(key, fitUncached({ ...spec, wire: t }, t));   // pure: tightness does not enter it
   return fitMemo.get(key);
 }
@@ -636,6 +638,20 @@ const shift = (c, d) => ({ ...c, pts: c.pts.map(([x, y]) => [x + d[0], y + d[1]]
 /* THE mirror: x negated, the doubles never recomputed. */
 export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [-x, y]), nrm: c.nrm.map(([x, y]) => [-x, y]), tan: c.tan.map((f) => Math.PI - f) });
 
+/* A LOWER BOUND on wireClear, from the two wires' padded boxes (cached on
+   the curve): the box gap less the two widest half wires. Where it already
+   clears the bar, the exact O(n·m) reading is not needed. */
+const boxOf = (c) => {
+  if (c._box && c._box.pts === c.pts) return c._box;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, w = 0;
+  c.pts.forEach(([x, y], i) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); w = Math.max(w, wAt(c, i)); });
+  return (c._box = { pts: c.pts, x0, y0, x1, y1, w });
+};
+export function wireClearBound(a, b) {
+  const A = boxOf(a), B = boxOf(b);
+  const gx = Math.max(0, A.x0 - B.x1, B.x0 - A.x1), gy = Math.max(0, A.y0 - B.y1, B.y0 - A.y1);
+  return Math.hypot(gx, gy) - (A.w + B.w) / 2;
+}
 /* The least clearance between two wires of DIFFERENT groups: centreline
    distance less the half wires, with no junction excused. */
 export function wireClear(a, b) {
@@ -701,6 +717,516 @@ function anchorFrame(model, anchor, scale) {
   if (anchor.index == null) Po = [anchor.pt[0] - anchor.nrm[0] * w / 2, anchor.pt[1] - anchor.nrm[1] * w / 2];
   else Po = offsetCurve(s, -w / 2)[anchor.index];
   return { Po: [Po[0] * scale, Po[1] * scale], out };
+}
+
+/* ================================================================== */
+/* RUNNING CHAINS (phase 3d, Eva's ruling 4B)                          */
+/* ================================================================== */
+
+/* A RUN is a stretch of band between two consecutive right-hand anchors,
+   read as a path at depth δ inside the band's OUTER edge — offsetCurve, the
+   one producer of every parallel curve, at d = −w/2 + δ — in print mm, cut
+   between the two anchors' own points and resampled by arc length. The
+   chain lies in that path's frame: x its arc length from the run's first
+   anchor, y outward (−nrm: every spine's normal points into the opening). */
+export const CHAIN_RUNS = {
+  arch: [
+    { id: 'head', spine: 'head', from: 'apex', to: 'springR', control: 'ornCrest' },
+    { id: 'jamb', spine: 'jambR', from: 'springR', to: 'sillR', control: 'ornSides' },
+  ],
+  rect: [
+    { id: 'top', spine: 'frame', from: 'topCentre', to: 'cornerTR', control: 'ornCrest' },
+    { id: 'side', spine: 'frame', from: 'cornerTR', to: 'cornerBR', control: 'ornSides' },
+    { id: 'bottom', spine: 'frame', from: 'cornerBR', to: 'bottomCentre', control: 'ornBottom' },
+  ],
+  oval: [
+    { id: 'upper', spine: 'frame', from: 'topCentre', to: 'sideR', control: 'ornCrest' },
+    { id: 'lower', spine: 'frame', from: 'sideR', to: 'bottomCentre', control: 'ornBottom' },
+  ],
+};
+export const CHAIN_STEP_MM = 0.5;
+export const CHAIN_LEAD = 2.5;       // × molding width: the lead the element count is read against (the scale slider's own default, so every default measurement holds)
+export const CHAIN_SEAT = 0.3;       // the elements' backs lie this share of the molding width inside its outer edge
+export const CHAIN_PATH_SMOOTH = 24;
+
+const nearestOn = (poly, cum, q) => {
+  let best = Infinity, at = 0;
+  for (let k = 0; k < poly.length - 1; k++) {
+    const a = poly[k], b = poly[k + 1], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2)) : 0;
+    const d = Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy);
+    if (d < best) { best = d; at = cum[k] + t * (cum[k + 1] - cum[k]); }
+  }
+  return at;
+};
+const pointAt = (poly, cum, s) => {
+  let k = 0; while (k < cum.length - 2 && cum[k + 1] < s) k++;
+  const t = (s - cum[k]) / Math.max(1e-12, cum[k + 1] - cum[k]);
+  return [poly[k][0] + t * (poly[k + 1][0] - poly[k][0]), poly[k][1] + t * (poly[k + 1][1] - poly[k][1])];
+};
+
+/* The run's path: { pts, s (arc length), tan, out (outward unit normal),
+   length } in print mm, from its first anchor to its second. */
+export function runPath(model, run, scale, depth) {
+  const sp = model.spines.find((q) => q.id === run.spine), w = sp.bandWidth;
+  const full = offsetCurve(sp, -w / 2 + depth / scale);
+  const raw = full.filter(Boolean).map(([x, y]) => [x * scale, y * scale]);
+  const poly = sp.closed ? [...raw, raw[0]] : raw;
+  const cum = [0]; for (let k = 1; k < poly.length; k++) cum.push(cum[k - 1] + Math.hypot(poly[k][0] - poly[k - 1][0], poly[k][1] - poly[k - 1][1]));
+  const A = model.info.anchors[run.from], B = model.info.anchors[run.to];
+  // an anchor that is a VERTEX of this spine maps to that vertex's own offset
+  // point (at a corner: the mitre, where the two edges meet); any other
+  // anchor projects onto the path
+  const target = (Q) => (Q.spine === run.spine && Q.index != null && full[Q.index] ? [full[Q.index][0] * scale, full[Q.index][1] * scale] : [Q.pt[0] * scale, Q.pt[1] * scale]);
+  let sa = nearestOn(poly, cum, target(A)), sb = nearestOn(poly, cum, target(B));
+  // an anchor ON the axis: the run starts where the path crosses x = 0 (the
+  // join's own trimming leaves the nearest vertex a hair past it)
+  const onAxis = (Q) => Math.abs(Q.pt[0]) < 1e-9;
+  const crossing = (s0) => { let best = s0, bd = Infinity; for (let k = 0; k < poly.length - 1; k++) { const a = poly[k], b = poly[k + 1]; if ((a[0] <= 0) !== (b[0] <= 0) || a[0] === 0) { const t = a[0] === b[0] ? 0 : a[0] / (a[0] - b[0]); const q = cum[k] + t * (cum[k + 1] - cum[k]); if (Math.abs(q - s0) < bd) { bd = Math.abs(q - s0); best = q; } } } return best; };
+  if (onAxis(A)) sa = crossing(sa);
+  if (onAxis(B)) sb = crossing(sb);
+  const total = cum[cum.length - 1];
+  // a closed loop's run may cross the seam; walk the short way round on the
+  // right half (x ≥ 0)
+  let dirn = sb >= sa ? 1 : -1, len = Math.abs(sb - sa);
+  if (sp.closed && len > total / 2) { len = total - len; dirn = -dirn; }
+  const n = Math.max(2, Math.ceil(len / CHAIN_STEP_MM) + 1);
+  const at = (k) => { let q = sa + dirn * len * k / (n - 1); q = sp.closed ? ((q % total) + total) % total : Math.min(total, Math.max(0, q)); return pointAt(poly, cum, q); };
+  const pts = []; for (let k = 0; k < n; k++) pts.push(at(k));
+  // the band's polyline kinks at every vertex (an arc sampled every ~2 mm),
+  // and a carved width read off mapped curvature would jitter at each one:
+  // smooth the resampled path (ends held). 24 passes at 0.5 mm move a 46 mm
+  // arc by ~0.03 mm; a straight run is a fixed point
+  for (let it = 0; it < CHAIN_PATH_SMOOTH; it++) { const q = pts.map((p) => p.slice()); for (let k = 1; k < n - 1; k++) { pts[k] = [(q[k - 1][0] + 2 * q[k][0] + q[k + 1][0]) / 4, (q[k - 1][1] + 2 * q[k][1] + q[k + 1][1]) / 4]; } }
+  const tan = pts.map((_, k) => { const a = pts[Math.max(0, k - 1)], b = pts[Math.min(n - 1, k + 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1]); return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; });
+  // outward: the side away from the spine's own (inward) normal
+  const n0 = sp.nrm[0];
+  let out = tan.map(([tx, ty]) => [ty, -tx]);
+  const mid = Math.floor(n / 2), probe = [pts[mid][0] + out[mid][0], pts[mid][1] + out[mid][1]];
+  const inside = offsetCurve(sp, 0).filter(Boolean).map(([x, y]) => [x * scale, y * scale]);
+  const dCentre = (q) => Math.min(...inside.map((c) => Math.hypot(q[0] - c[0], q[1] - c[1])));
+  if (dCentre(probe) < dCentre(pts[mid])) out = out.map(([x, y]) => [-x, -y]);
+  void n0;
+  const s = pts.map((_, k) => len * k / (n - 1));
+  return { pts, s, tan, out, length: len };
+}
+
+/* A curve laid in a run's frame: local x is arc length along the path from
+   x0, local y the outward offset. Points, tangents and normals are re-read
+   off the mapped polyline; a CARVED curve's width is re-derived from the
+   MAPPED curvature (the law is the curve's own, wherever it lies). */
+export function mapToPath(c, path, x0 = 0) {
+  const S = path.s, L = path.length, n = S.length;
+  const frameAt = (x) => {
+    const q = Math.min(L, Math.max(0, x)), k = Math.min(n - 2, Math.floor(q / L * (n - 1))), t = (q - S[k]) / Math.max(1e-12, S[k + 1] - S[k]);
+    const P = [path.pts[k][0] + t * (path.pts[k + 1][0] - path.pts[k][0]), path.pts[k][1] + t * (path.pts[k + 1][1] - path.pts[k][1])];
+    const N = [path.out[k][0] + t * (path.out[k + 1][0] - path.out[k][0]), path.out[k][1] + t * (path.out[k + 1][1] - path.out[k][1])], l = Math.hypot(N[0], N[1]);
+    // past either end the path continues straight along its end tangent
+    const over = x - q, T = [N[1] / l, -N[0] / l], sgn = Math.sign(path.tan[k][0] * T[0] + path.tan[k][1] * T[1]) || 1;
+    return { P: [P[0] + over * sgn * T[0], P[1] + over * sgn * T[1]], N: [N[0] / l, N[1] / l] };
+  };
+  const pts = c.pts.map(([x, y]) => { const f = frameAt(x0 + x); return [f.P[0] + y * f.N[0], f.P[1] + y * f.N[1]]; });
+  const m = pts.length;
+  const tanA = pts.map((_, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(m - 1, i + 1)]; return Math.atan2(b[1] - a[1], b[0] - a[0]); });
+  // UNWRAPPED (atan2 wraps at ±π): selfGap finds a coil by stations whose
+  // tangents differ by a half turn or more, and a wrapped angle hides a
+  // stretch that turned a whole turn — the mapped coil's check went blind
+  // exactly where a coil closes
+  for (let i = 1; i < m; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI; while (tanA[i] - tanA[i - 1] < -Math.PI) tanA[i] += 2 * Math.PI; }
+  // keep the source's sense of left: the mapped normal is the source normal
+  // carried through the frame, re-orthogonalised against the new tangent
+  const nrm = tanA.map((f, i) => { const nn = [-Math.sin(f), Math.cos(f)]; const src = c.nrm[i], fr = frameAt(x0 + c.pts[i][0]); const tl = [fr.N[1], -fr.N[0]]; const carried = [src[0] * tl[0] + src[1] * fr.N[0], src[0] * tl[1] + src[1] * fr.N[1]]; return nn[0] * carried[0] + nn[1] * carried[1] >= 0 ? nn : [-nn[0], -nn[1]]; });
+  const out = { ...c, pts, nrm, tan: tanA };
+  if (c.info && c.info.carved && c.w) {
+    const cap = c.info.wire;
+    const circ = (a, b, q) => { const A2 = Math.hypot(b[0] - q[0], b[1] - q[1]), B2 = Math.hypot(a[0] - q[0], a[1] - q[1]), C2 = Math.hypot(a[0] - b[0], a[1] - b[1]); const ar = Math.abs((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / 2; return ar > 1e-15 ? A2 * B2 * C2 / (4 * ar) : Infinity; };
+    out.w = pts.map((_, i) => { const j = Math.min(Math.max(i, 1), m - 2); return carvedWidth(circ(pts[j - 1], pts[j], pts[j + 1]), cap); });
+    out.kap = pts.map((_, i) => { const j = Math.min(Math.max(i, 1), m - 2); return 1 / circ(pts[j - 1], pts[j], pts[j + 1]); });
+  }
+  return out;
+}
+
+/* THE CHAIN on one run (Eva's ruling 4B: C–S–C, sized to the run). A run of
+   length L takes N = max(3, round(L / lead)) ELEMENTS laid TANGENTIALLY
+   along the band, each over a footprint L / N: a C at each junction and S's
+   between. Every element is a carved scroll whose BACK lies on the molding
+   (its root at the path, which runs `depth` inside the outer edge) and whose
+   volutes curl outward — an S's second volute curls back over the molding.
+   A C faces its junction: its SHORT half (balance 0.6) toward the run's
+   end. Footprints are measured off the built curve (its x extent) and the
+   element scaled so footprint = L / N less a feature between neighbours.
+   Leaves lap each element's root, one either side. Choices made without a
+   ruling, each one constant: the element count law, the leaf layout. */
+export const CHAIN_ELEMENT_ASPECT = { C: 0.46, S: 0.52 };   // a scroll's x extent ÷ its length (measured, carved, tightness ½)
+export const CHAIN_S_TILT = 0.0;                            // rad
+export const CHAIN_JUNCTION = 0.35;     // × a footprint: a run stops this short of an INTERIOR junction (its leaf stands there)
+export const CHAIN_MARGIN = 0.1;        // mm: the build's clearances stand this far past F (the gate reads the emitted walls, ~0.07 mm off a centreline estimate)
+export const CHAIN_GAP = 2;             // × MIN_FEATURE_MM: an element's approach to the band is an embed or at least this far off (no visible slit)
+export function buildChain(path, { moldW, lead, density = 3, tightness = 0.5, leaves = true, leafSize = 0.42, startAxis = false, endAxis = false, region = null, opening = null }) {
+  const F = MIN_FEATURE_MM, told = [];
+  // the junction allowances: at the AXIS the two mirrored start C's stand a
+  // feature apart (F/2 each side); at an interior junction the run stops
+  // CHAIN_JUNCTION of a footprint short, for the junction's leaf
+  const N = Math.max(3, Math.round(path.length / lead * density / 3));
+  let foot = path.length / N;
+  // (at the AXIS too: the palmette stands between the two start C's)
+  const j0 = CHAIN_JUNCTION * foot, j1 = CHAIN_JUNCTION * foot;
+  const L = path.length - j0 - j1; foot = L / N;
+  // the elements, LAID SEQUENTIALLY in the path's own geometry: each pushed
+  // along until it clears the one before (and, at the axis, its own mirror)
+  // by a feature, read off the MAPPED curves — a curved run compresses
+  // whatever lies over the molding (y < 0) — and, when the chain overruns
+  // the run, every element's length scaled down and the chain laid again
+  const kinds = []; for (let k = 0; k < N; k++) kinds.push(k === 0 || k === N - 1 ? 'C' : 'S');
+  // NO VISIBLE GAP (Eva's 2B): every stretch of an element within
+  // CHAIN_GAP × F of the band's footprint must reach an embed (it is one
+  // contact, rooted) — an approach that comes near and does not touch reads
+  // as a slit. Read on the mapped curve; the element is pushed onto the
+  // molding (−y) until it holds
+  const slit = (on) => (region ? slitWorst(on, region) : -Infinity);
+  const make = (k, len, x) => {
+    const kind = kinds[k];
+    let c = buildScroll({ kind, length: len, tightness, wire: carvedCap(len), balance: 0.6, carved: true });
+    const place = (cc, dy) => { const local = shift(rigid(cc, { at: [0, 0], angle: 0, mirrorX: kind === 'C' && k === N - 1 }), [x, dy]); const on = mapToPath(local, path, 0); on.local = local; return on; };
+    let dy = 0, on = place(c, dy);
+    // the coils, re-read after mapping (a curved run can close them), at
+    // the element's seat — read again once the seat moves: fewer turns until
+    // a feature (and the margin) apart, told
+    const holdCoils = () => {
+      if (selfGap(on).gap >= F + CHAIN_MARGIN) return;
+      let lo = 0, hi = c.info.turnsHeld;
+      for (let it = 0; it < 16; it++) { const m = (lo + hi) / 2; if (selfGap(place(buildScroll({ kind, length: len, turns: m, wire: carvedCap(len), balance: 0.6, carved: true }), dy)).gap >= F + CHAIN_MARGIN) lo = m; else hi = m; }
+      const held = c.info.turnsHeld;
+      c = buildScroll({ kind, length: len, turns: lo, wire: carvedCap(len), balance: 0.6, carved: true }); on = place(c, dy);
+      told.push(`element ${k + 1}: volutes held at ${lo.toFixed(2)} of ${held.toFixed(2)} turns — laid on the run, a closer coil leaves a gap under the feature`);
+    };
+    holdCoils();
+    // and NOTHING IN THE OPENING: an element pushed onto the molding stops at
+    // its inner edge — pushed back out by its deepest intrusion; an element
+    // that cannot hold both is given way (told by the caller)
+    const intrusion = (o) => { if (!opening) return 0; let m = 0; o.pts.forEach((q, i) => { if (opening(q)) m = Math.max(m, -region.depth(q) + wAt(o, i) / 2); }); return m; };
+    let held = false;
+    for (let it = 0; it < 16; it++) {
+      const o = intrusion(on); if (o > 0) { dy += o + 0.05; on = place(c, dy); continue; }
+      const w = slit(on); if (!(w > -Infinity)) { held = true; break; }
+      dy -= w + EMBED_MM + 1e-3; on = place(c, dy);
+    }
+    if (held) { holdCoils(); held = !(intrusion(on) > 0) && !(slit(on) > -Infinity); }
+    // fewer turns cannot undo a fold the PATH makes (an element laid across a
+    // corner sharper than itself): if its coils still close, it gives way
+    on.unseated = !held ? 'it cannot lie on the molding without reaching into the opening or leaving a gap' : selfGap(on).gap < F + CHAIN_MARGIN ? 'laid across the band\'s corner it would fold onto itself' : null;
+    on.info = { ...c.info, role: kind === 'C' ? (k === 0 ? 'start' : 'end') : 'link', seatPush: -dy };
+    on.localY = on.local.pts.map((q) => q[1]); on.chainIndex = k; on.len = len;
+    return on;
+  };
+  const extentX = (on) => { let lo = Infinity, hi = -Infinity; on.local.pts.forEach(([x], i) => { const h = wAt(on, i) / 2; lo = Math.min(lo, x - h); hi = Math.max(hi, x + h); }); return [lo, hi]; };
+  const clearOf = (on, prev) => (prev ? wireClear(on, prev) : startAxis ? wireClear(on, mirrorCurve(on)) : Infinity);
+  const lay = (lens) => {
+    const out = []; let x = j0;
+    for (let k = 0; k < N; k++) {
+      // the first guess: the extent's left end at x
+      let c = make(k, lens[k], 0); const [lo] = extentX(c); let at = x - lo; c = make(k, lens[k], at);
+      const prev = out[k - 1] || null;
+      // push on until a feature clear (a step growing from 2 % of a footprint,
+      // then bisected sixteen times — 2^-16 of the last step)
+      let a = at, b = at;
+      if (clearOf(c, prev) < F + CHAIN_MARGIN) { let step = 0.02 * foot; for (let it = 0; it < 40 && clearOf(c, prev) < F + CHAIN_MARGIN; it++) { a = b; b += step; step *= 1.6; c = make(k, lens[k], b); } for (let it = 0; it < 16; it++) { const m = (a + b) / 2, cm = make(k, lens[k], m); if (clearOf(cm, prev) >= F + CHAIN_MARGIN) { b = m; c = cm; } else a = m; } }
+      out.push(c); x = extentX(c)[1];
+    }
+    return { out, end: x };
+  };
+  let lens = kinds.map((kind) => (foot - F) / CHAIN_ELEMENT_ASPECT[kind]);
+  let laid = lay(lens);
+  for (let it = 0; it < 6 && laid.end > path.length - j1 + 1e-6; it++) { const f = (path.length - j1 - j0) / (laid.end - j0); lens = lens.map((l) => l * Math.min(0.995, f)); laid = lay(lens); }
+  if (laid.end > path.length - j1 + 1e-6) told.push(`the chain overruns its run by ${(laid.end - path.length + j1).toFixed(2)} mm`);
+  const curves = [];
+  for (const on of laid.out) {
+    if (on.unseated) { told.push(`element ${on.chainIndex + 1} not built — ${on.unseated}`); continue; }
+    curves.push(on);
+    if (leaves) {
+      const k = on.chainIndex, len = on.len, r = on.local.pts[on.local.root];
+      for (const [side, ang, frac] of [[+1, 0.35, leafSize], [-1, Math.PI - 0.35, leafSize * 0.85]]) {
+        const make2 = (ll) => {
+          const lf0 = buildLeaf({ length: ll, width: LEAF_ASPECT * ll, side });
+          const lfl = rigid(lf0, { at: r, angle: ang });
+          const lon = mapToPath(lfl, path, 0);
+          lon.info = { ...lf0.info, hostWire: on.info.wire, hostW: wAt(on, on.root), role: 'leaf' };
+          lon.localY = lfl.pts.map((q) => q[1]);
+          lon.chainIndex = k;
+          lon.remake = (f) => make2(ll * f);
+          return lon;
+        };
+        curves.push(make2(frac * len));
+      }
+    }
+  }
+  return { curves, told, n: N, foot };
+}
+
+/* SEATED ON THE MOLDING (Eva's ruling 2B): a chain curve's crown stands on
+   the molding's own height under it. A row at local y (its centre's offset
+   outward from the path, which runs `depth` inside the outer edge) spanning
+   its own width w covers the band across-fraction [(depth − y − w/2)/W,
+   (depth − y + w/2)/W] (0 at the outer edge); its lift is the profile's
+   HIGHEST z over that span × the relief depth, so the crown clears the
+   molding under every part of it. Past the outer edge the lift falls
+   linearly to the plate over one stem width (the ornament steps down off
+   the molding rather than dropping off it). */
+/* The worst SLIT of a wire against the band: over every stretch within
+   G of the band's footprint that reaches no embed, the nearest approach
+   (−Infinity when there is none). Read at BOTH G = CHAIN_GAP × F and G = F:
+   a stretch that leaves the band and curls back is one run at 2F and two at
+   F, and the second is a graze the coarser reading alone would let through. */
+export function slitWorst(c, region) {
+  let worst = -Infinity;
+  for (const G of [CHAIN_GAP * MIN_FEATURE_MM, MIN_FEATURE_MM]) {
+    let run = null;
+    c.pts.forEach((q, i) => { const cl = -region.depth(q) - wAt(c, i) / 2; if (cl < G) { if (!run) run = { min: cl }; run.min = Math.min(run.min, cl); } else if (run) { if (run.min > -EMBED_MM) worst = Math.max(worst, run.min); run = null; } });
+    if (run && run.min > -EMBED_MM) worst = Math.max(worst, run.min);
+  }
+  return worst;
+}
+
+/* THE MOLDING'S OWN HEIGHT FIELD (phase 3d, Eva's 2B): the frame's bands
+   built by the relief's own bandSolid into a scratch mesh (print mm, plate 0)
+   and their top grids rasterised — so a seat reads the surface the STL will
+   carry, the highest band where bands embed, at every junction, jog and ear,
+   not the run's own profile in the run's own frame (which drifts wherever
+   the band does not follow the path). Returns q → height above the plate,
+   −Infinity off every band. */
+export function moldingHeightField(model, scale) {
+  const p = model.params, mesh = new Mesh();
+  const reliefDepth = p.moldingDepth * scale * p.reliefScale;
+  for (const sp of model.spines) bandSolid(mesh, sp, model.prof, { scale, plateT: 0, reliefDepth });
+  const P = mesh.pos, cell = 2, grid = new Map(), tris = [], key = (i, j) => i * 100003 + j;
+  for (const bp of mesh.parts) {
+    const last = bp.closed ? bp.V : bp.V - 1;
+    for (let v = 0; v < last; v++) for (let c = 0; c < bp.C - 1; c++) {
+      const nv = (v + 1) % bp.V, ids = [bp.T(v, c), bp.T(nv, c), bp.T(nv, c + 1), bp.T(v, c + 1)];
+      for (const t of [[ids[0], ids[1], ids[2]], [ids[0], ids[2], ids[3]]]) {
+        const q = t.map((ix) => [P[3 * ix], P[3 * ix + 1], P[3 * ix + 2]]), ti = tris.push(q) - 1;
+        const xs = q.map((u) => u[0]), ys = q.map((u) => u[1]);
+        for (let i = Math.floor(Math.min(...xs) / cell); i <= Math.floor(Math.max(...xs) / cell); i++) for (let j = Math.floor(Math.min(...ys) / cell); j <= Math.floor(Math.max(...ys) / cell); j++) { const k = key(i, j); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(ti); }
+      }
+    }
+  }
+  return ([x, y]) => {
+    let h = -Infinity;
+    for (const ti of grid.get(key(Math.floor(x / cell), Math.floor(y / cell))) || []) {
+      const [A, B, C] = tris[ti], d = (B[1] - C[1]) * (A[0] - C[0]) + (C[0] - B[0]) * (A[1] - C[1]);
+      if (Math.abs(d) < 1e-14) continue;
+      const l1 = ((B[1] - C[1]) * (x - C[0]) + (C[0] - B[0]) * (y - C[1])) / d, l2 = ((C[1] - A[1]) * (x - C[0]) + (A[0] - C[0]) * (y - C[1])) / d, l3 = 1 - l1 - l2;
+      if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) h = Math.max(h, l1 * A[2] + l2 * B[2] + l3 * C[2]);
+    }
+    return h;
+  };
+}
+/* The seat READ AT THE EMITTED COLUMNS: the wire's own solid built (by the
+   relief's bandSolid, into a scratch mesh) on its first seat, and every row
+   lifted to the highest molding under that row's own top vertices — the
+   positions the STL carries, which stand off the centreline's normal by the
+   spine's own offset curves (a wire whose seat was read on the centreline's
+   span cleared the molding by 0.989 mm where its crown is the 1 mm floor).
+   An embed row beyond either end lifts the end row it extends. */
+export function seatEmitted(H, spine, prof, lift, depth) {
+  const mesh = new Mesh();
+  bandSolid(mesh, { ...spine, baseLift: lift }, prof, { scale: 1, plateT: 0, reliefDepth: depth });
+  const part = mesh.parts[0], P = mesh.pos, n = lift.length, out = lift.slice();
+  for (let v = 0; v < part.V; v++) {
+    const i = Math.min(n - 1, Math.max(0, v - part.rowOffset));
+    // read at the vertex AND its mirror image: the raster is not symmetric to
+    // the bit, and a seat read on one side only would break the mirror (OR5)
+    for (let c = 0; c < part.C; c++) { const ix = 3 * part.T(v, c); out[i] = Math.max(out[i], H([P[ix], P[ix + 1]]), H([-P[ix], P[ix + 1]])); }
+  }
+  return out;
+}
+/* The highest molding under a wire's row: the height field across the
+   row's whole span (its local width, padded a tenth for the emitted columns'
+   own offset), at 17 stations. */
+export const SEAT_PAD = 0.1;
+export function seatOn(H, c, i) {
+  const w = wAt(c, i) * (1 + SEAT_PAD), q = c.pts[i], n = c.nrm[i];
+  let m = -Infinity;
+  for (let k = 0; k <= 16; k++) { const t = (k / 16 - 0.5) * w; m = Math.max(m, H([q[0] + t * n[0], q[1] + t * n[1]])); }
+  return m;
+}
+
+export function moldingLift(y, w, { depth, moldW, prof, reliefDepth, ramp }) {
+  const zAt = (f) => { const x = prof.x; if (f <= x[0]) return prof.z[0]; for (let k = 1; k < x.length; k++) if (f <= x[k]) return prof.z[k - 1] + (prof.z[k] - prof.z[k - 1]) * (f - x[k - 1]) / (x[k] - x[k - 1]); return prof.z[x.length - 1]; };
+  const a = (depth - y - w / 2) / moldW, b = (depth - y + w / 2) / moldW;
+  if (b <= 0) { const over = -b * moldW; return zAt(0) * reliefDepth * Math.max(0, 1 - over / ramp); }
+  let m = 0; const lo = Math.max(0, a), hi = Math.min(1, b);
+  for (let k = 0; k <= 16; k++) m = Math.max(m, zAt(lo + (hi - lo) * k / 16));
+  for (let k = 0; k < prof.x.length; k++) if (prof.x[k] >= lo && prof.x[k] <= hi) m = Math.max(m, prof.z[k]);
+  return m * reliefDepth;
+}
+
+/* SETTLING the chains: the contact rules the groups obey, applied to every
+   wire of every chain, both sides, and the junctions'. Scroll elements: a
+   feature clear of every other scroll element — a later element that is not
+   gives way (told). Leaves: a JOINT with their host element (the embed), and
+   with every other wire either a feature clear or a CROSSING (every approach
+   under a feature an overlap of LEAF_CROSS); a leaf that is neither is
+   shortened 15 % at a time from its root, up to seven times, then dropped
+   (told). A junction or axis leaf has no host: the crossing rule throughout.
+   The mirror is re-taken from each settled right half, so it stays exact. */
+function settleChains(groups, told, region, opening) {
+  const F = MIN_FEATURE_MM, Fm = F + CHAIN_MARGIN;
+  const clear = (a, b) => (wireClearBound(a, b) >= Fm ? Infinity : wireClear(a, b));
+  const near = (c) => { const B = boxOf(c); return region.near([(B.x0 + B.x1) / 2, (B.y0 + B.y1) / 2], Math.hypot(B.x1 - B.x0, B.y1 - B.y0) / 2 + B.w + 3 * F); };
+  // a leaf's own band rule: no slit (every approach within CHAIN_GAP × F an
+  // embed) and nothing in the opening
+  const bandOK = (c) => !c.pts.some((q) => opening(q)) && !(slitWorst(c, near(c)) > -Infinity);
+  const isLeaf = (c) => c.kind === 'leaf';
+  // the scroll elements first, in build order, against everything kept
+  const keptScroll = [];
+  for (const g of groups) {
+    const keep = [];
+    for (const c of g.curves) {
+      if (isLeaf(c)) { keep.push(c); continue; }
+      const mates = [c, ...(g.mirrored.length ? [mirrorCurve(c)] : [])];
+      let worst = Infinity; for (const m of mates) for (const o of keptScroll) worst = Math.min(worst, clear(m, o));
+      if (g.mirrored.length) worst = Math.min(worst, clear(c, mates[1]));
+      if (worst < Fm) { told.push(`chain ${g.group}: element ${c.chainIndex + 1} not built — it would come ${worst.toFixed(2)} mm from another`); continue; }
+      keep.push(c); keptScroll.push(...mates);
+    }
+    g.curves = keep;
+  }
+  // then the leaves, against every scroll and every leaf already kept — the
+  // junction MOTIFS first (a chain's leaf gives way to a motif, never the
+  // reverse: the motif is what marks the junction)
+  const keptLeaves = [];
+  const MOTIF = new Set(['axis', 'palmette', 'rosette']);
+  for (const g of [...groups.filter((q) => MOTIF.has(q.group)), ...groups.filter((q) => !MOTIF.has(q.group))]) {
+    const keep = [];
+    for (const c of g.curves) {
+      if (!isLeaf(c)) { keep.push(c); continue; }
+      const host = c.chainIndex != null ? g.curves.find((h) => !isLeaf(h) && h.chainIndex === c.chainIndex) : null;
+      if (c.chainIndex != null && !host) continue;               // its element gave way
+      let got = null, q = 0, cur = c;
+      for (; q < 8 && !got; q++) {
+        const mates = [cur, ...(g.mirrored.length ? [mirrorCurve(cur)] : [])];
+        const others = [...keptScroll, ...keptLeaves].filter((o) => o !== host);
+        const ok = bandOK(cur) && (host ? joinsCleanly(cur, host) : true) && mates.every((m) => others.every((o) => o === host || clear(m, o) >= Fm || joinsCleanly(m, o, LEAF_CROSS)))
+          && (mates.length < 2 || clear(mates[0], mates[1]) >= Fm || joinsCleanly(mates[0], mates[1], LEAF_CROSS));
+        if (ok) { got = cur; break; }
+        if (c.remake) { cur = c.remake(0.85 ** (q + 1)); if (c.finish) c.finish(cur); } else cur = truncateCurve(cur, 0.85);
+      }
+      if (!got) { told.push(`chain ${g.group}: a leaf not built — it grazes another wire at every length`); continue; }
+      if (q) told.push(`chain ${g.group}: a leaf shortened to ${(100 * 0.85 ** q).toFixed(0)}% — at full length it grazes another wire`);
+      keep.push(got); keptLeaves.push(got, ...(g.mirrored.length ? [mirrorCurve(got)] : []));
+    }
+    g.curves = keep;
+    g.mirrored = g.mirrored.length || g.group !== 'axis' ? keep.map(mirrorCurve) : [];
+  }
+}
+/* A curve cut to a fraction of its stations from its root (row 0): every
+   per-station array sliced alike. */
+function truncateCurve(c, frac) {
+  const n = Math.max(3, Math.round(c.pts.length * frac));
+  const cut = (a) => (Array.isArray(a) ? a.slice(0, n) : a);
+  const out = { ...c, pts: c.pts.slice(0, n), nrm: c.nrm.slice(0, n), tan: c.tan.slice(0, n) };
+  for (const k of ['w', 'kap', 'u', 'localY', 'lift']) if (c[k]) out[k] = cut(c[k]);
+  return out;
+}
+
+/* The ornament as RUNNING CHAINS: one chain per run whose control is on,
+   mirrored; the same record ornamentFor returns. */
+export function chainsFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
+  const p = model.params, kind = model.info.kind;
+  const frameH = model.box.y1 - model.box.y0, scale = p.printHeight / frameH;
+  const region = bandRegion(model, scale);
+  const told = [];
+  // a chain is sized by its RUN (its elements share the run's length), so
+  // the scale slider is the groups' and is hidden here; the lead the element
+  // count is read against is CHAIN_LEAD × the molding width
+  const moldW = p.moldingWidth * scale, length = CHAIN_LEAD * p.moldingWidth * scale;
+  const groups = [], ends = [];
+  // the OPENING: inside the frame's silhouette (plateOutline, its owner) and
+  // in no band's footprint
+  const sil = plateOutline(model).map(([x, y]) => [x * scale, y * scale]);
+  const opening = (q) => pip(q, sil) && !region.inside(q);
+  const H = moldingHeightField(model, scale);
+  const depth = CHAIN_SEAT * moldW;
+  let tris = model.spines.reduce((a, sp) => a + solidTriBound(sp.pts.length + 2, model.prof.x.length + 1), 0);
+  const frameTris = tris;
+  for (const run of CHAIN_RUNS[kind] || []) {
+    if (p[run.control] !== 'on') continue;
+    if (!model.info.anchors[run.from] || !model.info.anchors[run.to]) { told.push(`no ${!model.info.anchors[run.from] ? run.from : run.to} on this frame — its ${run.id} chain is not built`); continue; }
+    const path = runPath(model, run, scale, depth);
+    const axis = (id) => Math.abs(model.info.anchors[id].pt[0]) < 1e-9;
+    const ch = buildChain(path, { moldW, lead: length, density: p.ornDensity, tightness: p.ornTightness, leaves: p.ornLeaves === 'on', leafSize: p.ornLeafSize, startAxis: axis(run.from), endAxis: axis(run.to), region: region.near(path.pts[Math.floor(path.pts.length / 2)], path.length + 6 * length), opening });
+    ends.push({ id: run.from, P: path.pts[0], N: path.out[0], axis: axis(run.from), foot: ch.foot, path, at: 0 }, { id: run.to, P: path.pts.at(-1), N: path.out.at(-1), axis: axis(run.to), foot: ch.foot, path, at: path.length });
+    const reliefDepth = p.moldingDepth * scale * p.reliefScale;
+    const lp = { depth, moldW, prof: model.prof, reliefDepth, ramp: 0.35 * moldW };
+    const finish = (c) => {
+      // on the molding's own height field; off the band, the ramp down from its edge
+      c.lift = c.localY.map((y, i) => Math.max(moldingLift(y, wAt(c, i), lp), seatOn(H, c, i)));
+      // a LEAF lies over the scroll it laps: its base on the host's crown at
+      // the host's root (the stacked shell of phase 3c, standing on the molding)
+      if (c.kind === 'leaf') { const host = ch.curves.find((h) => h.kind !== 'leaf' && h.chainIndex === c.chainIndex); const hc = wireHeight(c.info.hostW, p.ornShape === 'round' ? 'round' : 'half-round') * p.ornProjection; const hl = host.lift[host.root]; c.lift = c.lift.map((z) => Math.max(z, hl) + hc); }
+      c.finish = finish;
+      return c;
+    };
+    for (const c of ch.curves) finish(c);
+    const curves = ch.curves, mirrored = curves.map(mirrorCurve);
+    const mine = [...curves, ...mirrored];
+    const gTris = mine.reduce((a, c) => a + solidTriBound(c.pts.length, profileFor(c, p).x.length), 0);
+    if (tris + gTris > triBudget) { told.push(`the ${run.id} chain is not built — it would take the relief to ${(tris + gTris).toLocaleString('en-US')} triangles, past the ${triBudget.toLocaleString('en-US')} budget`); continue; }
+    tris += gTris;
+    groups.push({ group: run.id, anchor: `${run.from}→${run.to}`, onAxis: false, curves, mirrored, push: depth, told: ch.told, chain: { path, depth, elements: ch.n, foot: ch.foot } });
+  }
+  // THE JUNCTIONS: one straight LEAF per anchor a built run ends at — on the
+  // AXIS (the crest, the bottom) a single leaf, its own mirror, pointing out
+  // between the two mirrored start C's; at an interior junction (a corner, a
+  // springing, an oval's side) a leaf on the bisector of the runs' outward
+  // normals, when Corners / springings is on. Its root on the molding at the
+  // runs' seat; its lift the molding's height there.
+  const byId = new Map(); for (const e of ends) { if (!byId.has(e.id)) byId.set(e.id, []); byId.get(e.id).push(e); }
+  for (const [id, es] of byId) {
+    const isAxis = es[0].axis;
+    if (!isAxis && p.ornCorners !== 'on') continue;
+    let nx = 0, ny = 0; for (const e of es) { nx += e.N[0]; ny += e.N[1]; } const nl = Math.hypot(nx, ny); nx /= nl; ny /= nl;
+    const foot = Math.min(...es.map((e) => e.foot));
+    const P = isAxis ? [0, es[0].P[1]] : es.reduce((a, e) => [a[0] + e.P[0] / es.length, a[1] + e.P[1] / es.length], [0, 0]);
+    const e0 = es[0], lpE = { depth, moldW, prof: model.prof, reliefDepth: p.moldingDepth * scale * p.reliefScale, ramp: 0.35 * moldW };
+    const base = Math.atan2(ny, nx);
+    // a leaf of the motif: straight or curled, at an angle off the bisector
+    const motifLeaf = (ll, ang, curl, side, lobes, role) => {
+      const make = (L1) => {
+        let lf = rigid(buildLeaf({ length: L1, width: LEAF_ASPECT * L1, side, curl, lobes }), { at: P, angle: ang });
+        // ON THE AXIS the centre leaf is its own mirror, exactly: its straight
+        // centreline on x = 0 and its normal along ∓x, so every column's
+        // offset is ±d to the bit
+        if (role === 'axis') lf = { ...lf, pts: lf.pts.map(([, y]) => [0, y]), nrm: lf.nrm.map(() => [-Math.sign(ny), 0]) };
+        lf.localY = lf.pts.map((q) => (q[0] - e0.P[0]) * e0.N[0] + (q[1] - e0.P[1]) * e0.N[1]);
+        lf.lift = lf.localY.map((y, k) => Math.max(moldingLift(y, wAt(lf, k), lpE), seatOn(H, lf, k)) + MIN_FEATURE_MM / 2);
+        lf.info = { ...lf.info, hostWire: lf.info.wire, hostW: 0, role };
+        lf.remake = (f) => make(L1 * f);
+        return lf;
+      };
+      return make(ll);
+    };
+    if (isAxis) {
+      // THE PALMETTE (ref 3's crest): a straight centre leaf on the axis, and
+      // a leaf either side fanning 0.6 rad off it, curling away
+      const ang = Math.sign(ny) * Math.PI / 2;
+      groups.push({ group: 'axis', anchor: id, onAxis: true, curves: [motifLeaf(1.0 * foot, ang, 0, 1, LEAF_LOBES, 'axis')], mirrored: [], push: depth, told: [] });
+      const side = motifLeaf(0.8 * foot, ang - Math.sign(ny) * 0.6, LEAF_CURL, -Math.sign(ny), LEAF_LOBES, 'palmette');
+      groups.push({ group: 'palmette', anchor: id, onAxis: false, curves: [side], mirrored: [mirrorCurve(side)], push: depth, told: [] });
+    } else {
+      // THE ROSETTE (ref 2's side flowers): five short straight petals of two
+      // lobes radiating from the junction, one along the bisector
+      const petals = []; for (let k = 0; k < 5; k++) petals.push(motifLeaf(0.45 * foot, base + k * 2 * Math.PI / 5, 0, 1, 2, 'rosette'));
+      groups.push({ group: 'rosette', anchor: id, onAxis: false, curves: petals, mirrored: petals.map(mirrorCurve), push: depth, told: [] });
+    }
+  }
+  settleChains(groups, told, region, opening);
+  // the budget, once everything is settled (a junction leaf counted too)
+  for (const g of groups) if (['axis', 'palmette', 'rosette'].includes(g.group)) tris += [...g.curves, ...g.mirrored].reduce((a, c) => a + solidTriBound(c.pts.length, profileFor(c, p).x.length), 0);
+  const all = groups.flatMap((g) => [...g.curves, ...g.mirrored]);
+  const tip = all.length ? Math.min(...all.map((c) => c.info.tip ?? c.info.wire)) : MIN_FEATURE_MM;
+  return { scale, length, wire: MIN_FEATURE_MM, style: 'carved', layout: 'chains', tip, groups, curves: all, region, H, told, tris: { bound: tris, frame: frameTris, budget: triBudget } };
 }
 
 /* The ornament of a frame model: groups at the asked anchors, built in print
@@ -807,7 +1333,7 @@ export function leafLift(c, shape, projection) {
 export function withOrnament(model, opts = {}) {
   const p = model.params;
   if (p.filigree !== 'scrolls') return model;
-  const orn = ornamentFor(model, opts);
+  const orn = p.ornLayout === 'chains' ? chainsFor(model, opts) : ornamentFor(model, opts);
   const s = orn.scale;
   const shape = p.ornShape === 'round' ? 'round' : p.ornShape === 'half-round' ? 'half-round' : 'arris';
   // a tapered wire's local width rides on the spine as widthScale (the one
@@ -836,7 +1362,8 @@ export function withOrnament(model, opts = {}) {
     if (k) { spine.widthScale = k; spine.depthScale = crownScale(c, depth); }
     // a leaf is a STACKED shell: its crown is lifted by its host's crown at
     // the host's root, so where the two overlap the leaf lies over the scroll
-    const lift = lf ? leafLift(c, shape, p.ornProjection) : 0;
+    if (c.lift) spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth) : c.lift;
+    const lift = c.lift ? 0 : lf ? leafLift(c, shape, p.ornProjection) : 0;
     return { spine, prof: profileFor(c, p), depth, lift, kind: lf ? 'leaf' : 'scroll' };
   });
   return { ...model, bands: [...model.bands, ...bands], frameBox: model.box, box: { x0, y0, x1, y1 }, strokes, ornament: { ...orn, spines, solids, shape } };

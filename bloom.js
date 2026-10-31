@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, UMBEL_DEPTH2_DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, umbelHeadIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, umbelDepthRefusal, umbelIsCompound, UMBEL_DEPTH_VALUES, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, leafNodeRunLive, leafNodeSpacingLive, leafSizeTaperLive, sepalsAbsent, inflorescenceIsAbsent, umbelHeadIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, umbelDepthRefusal, umbelIsCompound, UMBEL_DEPTH_VALUES, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -1719,6 +1719,8 @@ let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actu
    emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
 let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemAbsent = true, lastStemNodesAbsent = true, lastStemCutAbsent = true;
 let lastLeaf = null, lastLeavesBuilt = null, lastLeafAbsent = true, lastLeafTris = 0;
+/* (Bloom P1) the geometry's half of the node controls' two statements — NS0 */
+let lastNodeLive = { run: false, spacing: false, taper: false };
 /* THE SEPALS (part 1) — footRing()'s descriptor (the ring, the count and its
    ceiling, the phase, the foot), the builder's own emitted whorl and the angle
    limit it drew. SP0-SP9 read these; the read-out prints them. */
@@ -1963,6 +1965,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastLeavesBuilt = built.leavesBuilt || null;
     lastLeafTris = (built.leavesBuilt || []).reduce((n, r) => n + r.tris, 0);
     lastLeafAbsent = leafIsAbsent(uiForBuild);
+    lastNodeLive = { run: leafNodeRunLive(uiForBuild), spacing: leafNodeSpacingLive(uiForBuild), taper: leafSizeTaperLive(uiForBuild) };
     lastSepals = built.foot.sepals || null;
     lastSepalsBuilt = built.sepals || null;
     lastSepalTris = built.sepals ? built.sepals.tris : 0;
@@ -3271,6 +3274,40 @@ function lobedPetioleLine(leaf, b0) {
       ? ` — and its rooted end stands ${(b0.petioleRootReachMm - leaf.outerR).toFixed(2)} mm PROUD of the stem, as a simple leaf's own petiole does at this sheet and angle (told)`
       : '');
 }
+/* THE NODE RUN AND THE SIZE TAPER (Bloom P1), off the leaf plan's own record
+   and the builder's per-leaf records: the run as asked against the depths it
+   built, the spacing in the words Eva asked for ("nodes crowd toward the base:
+   the lowest internode X mm, the highest Y mm"), every clamp told, and under a
+   taper each node's leaf with the yields its own floors made. Empty on a
+   raceme's shared node (the pedicels own the nodes there). */
+function nodeRunLine(leaf, leavesBuilt) {
+  if (leaf.shared || !leaf.nodeRun) return '';
+  const R = leaf.nodeRun, d = leaf.nodeDepthsMm;
+  const gaps = d.slice(1).map((q, i) => q - d[i]);
+  const crowd = R.spacingBuilt === 0 ? (d.length > 1 ? `evenly, every internode ${gaps[0].toFixed(1)} mm` : 'one node')
+    : `nodes crowd toward the ${R.spacingBuilt > 0 ? 'base' : 'top'}: the lowest internode ${gaps[gaps.length - 1].toFixed(1)} mm, the highest ${gaps[0].toFixed(1)} mm`;
+  let out = `\n     NODE RUN ${R.start.toFixed(2)} .. ${R.end.toFixed(2)} of the stem from the head · nodes at ${d.map((q) => q.toFixed(1)).join(', ')} mm · ${crowd}`
+    + (R.inverted ? ` · START PAST END: the span is empty, one node at the end (told; the sliders keep ${R.start.toFixed(2)} / ${R.end.toFixed(2)})` : '')
+    + (R.spacingAsked !== 0 && d.length < 3 ? ` · spacing ${R.spacingAsked.toFixed(2)} INERT here (${d.length} node${d.length === 1 ? '' : 's'})` : '')
+    + (R.spacingClamped ? ` · SPACING CLAMPED ${R.spacingAsked.toFixed(2)} -> ${R.spacingBuilt.toFixed(3)}: a closer crowd would merge two node swellings (under ${R.mergeGapMm.toFixed(2)} mm, sqrt(2) spindles)` : '');
+  if (leaf.sizeTaper !== 0) {
+    const S = leaf.nodeSizes;
+    if (!S) out += `\n     SIZE ALONG THE STEM taper ${leaf.sizeTaper.toFixed(2)} INERT on this build — one node, so its leaf is the asked leaf`;
+    else {
+      const byNode = S.map((q, i) => {
+        const r = (leavesBuilt || []).find((b) => b.nodeIndex === i);
+        const sr = r && r.serration;
+        const yieldW = sr && !sr.noRoom && sr.countBuilt < sr.countAsked ? `, teeth ${sr.countBuilt} of ${sr.countAsked}` : sr && sr.noRoom && sr.countAsked ? ', NO teeth' : '';
+        const lob = r && r.lobed && r.lobed.lobes !== undefined && r.lobed.lobesAsked !== undefined && r.lobed.lobes < r.lobed.lobesAsked ? `, lobes ${r.lobed.lobes} of ${r.lobed.lobesAsked}` : '';
+        return `${(100 * q.scale).toFixed(0)}% ${q.lengthMm.toFixed(1)} x ${q.widthMm.toFixed(1)} mm${q.floored ? ' FLOORED' : ''}${yieldW}${lob}`;
+      });
+      out += `\n     SIZE ALONG THE STEM taper ${leaf.sizeTaper.toFixed(2)}, ${leaf.sizeTaper > 0 ? 'smaller' : 'larger'} toward the top — by node, top to bottom: ${byNode.join(' / ')}`
+        + (leaf.topScale !== 1 ? ` · the inset clears the head for the TOP leaf, at ${(100 * leaf.topScale).toFixed(0)}%` : '')
+        + ` · the counts are never re-asked; a node's own floors act on its leaf (told above per node)`;
+    }
+  }
+  return out;
+}
 function leafLine(leaf, leavesBuilt) {
   const per = leaf.phyllotaxy === 'opposite' ? 2 : leaf.phyllotaxy === 'whorled' ? 3 : 1;
   const over = 90 - Math.abs(leaf.angleDeg);
@@ -3431,6 +3468,7 @@ function leafLine(leaf, leavesBuilt) {
         : ` (the stem's own inset; the leaf needs ${leaf.insetNeededMm.toFixed(1)} mm and has it)`)
     + (leaf.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: a ${leaf.lengthMm} mm leaf rises further than this stem's node span is long, so the top leaf stands inside the head (told, not refused)`)
     + (leaf.nodesClamped ? `\n     NODE COUNT CLAMPED ${leaf.nodesAsked} -> ${leaf.nodesBuilt} — the span left cannot hold them a petiole apart` : '')
+    + nodeRunLine(leaf, leavesBuilt)
     + archLine + edgeLine + teethLine
     + tipLine + sharedLine + capLine
     + compoundLine
@@ -3580,6 +3618,24 @@ function stemCutLine(stem) {
    to the leaning axis — a reported consequence of the horizontal wall (Eva's
    ruling 5), not an open question. Absent where
    the control is at 0 or has nothing to act on. */
+/* THE NODE RUN AS BUILT (Bloom P1) — one record the four node controls'
+   read-outs read: the leaf plan's when leaves stand on the nodes (it carries
+   the inset, the counts and each node's own leaf), the stem node law's on a
+   bare noded stem, null where nothing stands at a node. */
+function nodeRunShown(built) {
+  const P = built.leaf && built.leaf.present ? built.leaf : null;
+  if (P && P.nodeRun && !P.shared) {
+    return { stemLengthMm: P.stemLengthMm, depthsMm: P.nodeDepthsMm.slice(), run: P.nodeRun, insetMm: P.insetMm, insetNeededMm: P.insetNeededMm,
+      insetClamped: P.insetClamped, nodesAsked: P.nodesAsked, nodesBuilt: P.nodesBuilt, topScale: P.topScale,
+      scales: P.nodeSizes ? P.nodeSizes.map((q) => ({ scale: q.scale, asked: q.scaleAsked, floored: q.floored, lengthMm: q.lengthMm, widthMm: q.widthMm, petioleR: q.petioleR })) : null };
+  }
+  const N = built.stem && built.stem.nodeLaw;
+  if (N && N.run) {
+    return { stemLengthMm: N.lengthMm, depthsMm: N.nodes.map((q) => q.s), run: N.run, insetMm: N.insetMm, insetNeededMm: N.insetNeededMm,
+      insetClamped: N.insetClamped, nodesAsked: N.nodesAsked, nodesBuilt: N.nodes.length, topScale: 1, scales: null };
+  }
+  return null;
+}
 function stemNodesLine(stem) {
   const L = stem.nodeLaw;
   if (!L) return '';
@@ -3893,7 +3949,16 @@ function regenerate() {
                   /* THE SCOPES the builder was handed (Scoping-b): its own summary —
                      which layers and pairs carry an offset, and whether each
                      container's toggle was live — for the two toggles' read-outs. */
-                  scopes: built.scopes || null };
+                  scopes: built.scopes || null,
+                  /* THE STEM'S PLAN — `stemCut`'s read-out has read `shown.stem.cut`
+                     since stem session 3 and NOTHING SET IT, so the cut's numbers
+                     never printed on the control (found by Bloom P1 wiring the node
+                     run beside it, the S3 leaf finding one control over). */
+                  stem: built.stem || null,
+                  /* THE NODE RUN AS BUILT (Bloom P1), for the start / end / spacing
+                     and size-taper read-outs: the leaf plan's when leaves stand on
+                     the nodes, the stem node law's on a bare noded stem, else null. */
+                  nodes: nodeRunShown(built) };
   /* A LIGHT BUILD CARRIES NO INFILL PLAN, so the infill controls keep the
      last FULL build's numbers through a drag rather than flickering to none. */
   if (!light) { lastFullShownInfill = shown.infill; lastFullShownTexture = shown.texture; }
@@ -4722,6 +4787,16 @@ window.__bloomMetrics = () => ({
     insetSatisfied: lastLeaf.insetSatisfied,
     nodesAsked: lastLeaf.nodesAsked, nodesBuilt: lastLeaf.nodesBuilt, nodesClamped: lastLeaf.nodesClamped,
     slenderness: lastLeaf.slenderness,
+    /* WHERE THE NODES GO AND LEAF SIZE ALONG THE STEM (Bloom P1) — the NS
+       family's record side: the run as asked and built, the taper, the scale
+       the inset was read at, each node's own leaf (null with no taper), and
+       which node each built leaf stands on. */
+    nodeRun: lastLeaf.nodeRun ? { ...lastLeaf.nodeRun } : null, sizeTaper: lastLeaf.sizeTaper, topScale: lastLeaf.topScale,
+    nodeSizes: lastLeaf.nodeSizes ? lastLeaf.nodeSizes.map((q) => ({ scale: q.scale, scaleAsked: q.scaleAsked, floored: q.floored, runT: q.runT,
+      lengthMm: q.lengthMm, widthMm: q.widthMm, petioleR: q.petioleR, petioleLenMm: q.petioleLenMm,
+      lobed: q.lobed ? JSON.parse(JSON.stringify(q.lobed)) : null, lobedPetiole: q.lobedPetiole ? { ...q.lobedPetiole } : null,
+      simplePetiole: q.simplePetiole ? { ...q.simplePetiole } : null, compound: q.compound ? JSON.parse(JSON.stringify(q.compound)) : null })) : null,
+    leafNode: (lastLeavesBuilt || []).map((r) => r.nodeIndex),
     /* THE SHARED NODE (SN0-SN3): the plan's own flag and record. */
     shared: lastLeaf.shared === true,
     sharedNode: lastLeaf.sharedNode ? (({ bladeP, ...rest }) => ({ ...rest, pedicelDepthsMm: rest.pedicelDepthsMm.slice() }))(lastLeaf.sharedNode) : null,
@@ -4843,6 +4918,7 @@ window.__bloomMetrics = () => ({
   } : null,
   leafTris: lastLeafTris,
   leafAbsent: lastLeafAbsent,
+  nodeLive: { ...lastNodeLive },
   /* THE INFLORESCENCE (ID0-ID6). THE PLAN'S own declarations beside the
      BUILDER's own record, the leaf's pairing exactly: ID1 predicts the floret
      count from the plan's azimuth list and compares it against the tally, ID2

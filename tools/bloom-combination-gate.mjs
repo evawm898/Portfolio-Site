@@ -1074,6 +1074,62 @@ export const PAIRS = [
     cite: "bloom-geometry.js — the whorl's `slot.scale = sepalScale` shortens the blade while the sheet thickness and the spine curvature floor stay in millimetres; docs/bloom-sepal-discovery.md §7.1 and §6 (R6)",
     why: 'a full turn on a shorter blade is a tighter hoop against the same sheet, so the size the sepal ships at decides how much curl it can carry',
   },
+  /* WHERE THE NODES GO AND LEAF SIZE ALONG THE STEM (Bloom P1, Eva's rulings
+     of Oct 28 — docs/bloom-node-span-taper-outcome.md). Two measures: the
+     new `leaf-leaf` (a crowd puts the leaves of neighbouring nodes nearer each
+     other, and nothing here measured that before), and the existing
+     `leaf-stem` for the taper (a smaller or larger leaf at the steep angle).
+     On a 100 mm stem with the shipped 40 x 17 mm leaves unless a row says. */
+  {
+    id: 'nodespacing-x-nodes',
+    tier: 2,
+    label: 'leafNodeSpacing x leafNodes — the leaves of neighbouring nodes under a crowd',
+    measure: 'leaf-leaf',
+    base: { stemLength: 100, leafLength: 40, leafWidth: 17 },
+    a: { id: 'leafNodeSpacing', values: [0, 0.5, 1, -1] },
+    b: { id: 'leafNodes', values: [3, 5, 8] },
+    /* CLEARS, measured: the crowd brings neighbouring ALTERNATE leaves to 3.686 mm at eight nodes and no nearer — they stand on opposite sides */
+    verdict: 'clears',
+    cite: "bloom-geometry.js — `leafNodeRunPositions` (the linear internode law) and `leafNodeRunMm`; docs/bloom-node-span-taper-outcome.md",
+    why: 'the crowd shortens the internodes at one end of the run, and more nodes shorten every internode, so the two together put the leaves of neighbouring nodes nearest',
+  },
+  {
+    id: 'nodespacing-x-phyllotaxy',
+    tier: 2,
+    label: 'leafNodeSpacing x leafPhyllotaxy — the crowd under each arrangement',
+    measure: 'leaf-leaf',
+    base: { stemLength: 100, leafLength: 40, leafWidth: 17, leafNodes: 6 },
+    a: { id: 'leafNodeSpacing', values: [0, 1, -1] },
+    b: { id: 'leafPhyllotaxy', values: ['alternate', 'opposite', 'whorled'] },
+    verdict: 'product-only',
+    cite: "bloom-geometry.js — `leafNodeRunMm` and `leafAzimuths`; docs/bloom-node-span-taper-outcome.md",
+    why: 'an alternate stem puts a node\'s neighbour on the other side, an opposite or whorled one puts a neighbour leaf nearer in azimuth, so the crowd reaches the bar on one arrangement before another',
+  },
+  {
+    id: 'nodespacing-x-taper',
+    tier: 2,
+    label: 'leafNodeSpacing x leafSizeTaper — a crowd of large leaves at the base',
+    measure: 'leaf-leaf',
+    base: { stemLength: 100, leafLength: 40, leafWidth: 17, leafNodes: 6 },
+    a: { id: 'leafNodeSpacing', values: [0, 1, -1] },
+    b: { id: 'leafSizeTaper', values: [0, 0.75, -0.75] },
+    /* CLEARS, measured: 6.775 mm at the worst cell (the large leaves crowded at the base), 0.088 mm nearer than the crowd alone */
+    verdict: 'clears',
+    cite: "bloom-geometry.js — `leafNodeRunMm` and `leafNodeScales` (the scale follows the depth); docs/bloom-node-span-taper-outcome.md",
+    why: 'a crowd toward the base under a NEGATIVE taper puts the largest leaves at the shortest internodes, the one place the two controls compound',
+  },
+  {
+    id: 'leafsizetaper-x-angle',
+    tier: 2,
+    label: 'leafSizeTaper x leafAngle — the tapered leaves against the stem they hang off',
+    measure: 'leaf-stem',
+    base: { stemLength: 100, leafLength: 40, leafWidth: 17, leafNodes: 5 },
+    a: { id: 'leafSizeTaper', values: [0, 0.75, -0.75] },
+    b: { id: 'leafAngle', values: [35, 60, 85] },
+    verdict: 'single-reaches',
+    cite: "bloom-geometry.js — `leafNodeScales` and `leafTaperState`; the pair `leafangle-x-stem` (the steep angle's own hazard); docs/bloom-node-span-taper-outcome.md",
+    why: 'the steep angle lays a blade back along the stem whatever its size; the taper moves which leaves are large, so the pair asks whether a smaller or larger leaf at the steep angle reaches the stem nearer',
+  },
 ];
 
 /* ------------------------------------------------------------- the triples */
@@ -1371,6 +1427,14 @@ export const COMBINATION_XFAIL = Object.freeze({
   'leafangle-x-textureheight @ leafAngle=85 x textureHeight=1.5': { mm: 0, note: 'measured 2026-10-25.' },
   /* leafarch-x-angle (leaf/stem build S2): the arch's own grid. Four cells are
      the 85 deg column, which the angle reaches alone; ONE is the product. */
+  /* Bloom P1 (docs/bloom-node-span-taper-outcome.md) — measured on its tree. */
+  'nodespacing-x-phyllotaxy @ leafNodeSpacing=1 x leafPhyllotaxy=whorled': { mm: 0.75, note: 'the crowd toward the BASE at six WHORLED nodes: three leaves a node 120 deg apart turned by a third of the turn each node, so a leaf of the next node stands nearest in azimuth, and the shortest internode puts its blade 0.750 mm from its neighbour\'s — under the bar, declared, never clamped (the spacing\'s only clamp is the swellings\', which this stem has none of). Alternate and opposite at the same crowd read 6.864.' },
+  'nodespacing-x-phyllotaxy @ leafNodeSpacing=-1 x leafPhyllotaxy=whorled': { mm: 0.75, note: 'the same crowd toward the TOP — the run is symmetric for equal leaves, so the shortest internode and the nearest blades are the same figure at the other end.' },
+  'leafsizetaper-x-angle @ leafSizeTaper=0 x leafAngle=85': { mm: 0, note: 'a SINGLE-axis cell — the 85 deg blade reaches the stem with no taper at all (`leafangle-x-stem @ leafAngle=85` declares the same class).' },
+  'leafsizetaper-x-angle @ leafSizeTaper=0.75 x leafAngle=60': { mm: 0.311, note: 'the SMALLEST leaf (25%, the top one) at 60 deg: its petiole is a fraction of its own length, so a small blade starts nearer the stem and lays its base 0.311 mm off it — the law any 10 mm leaf at 60 deg obeys (the taper builds a size the length slider already reaches); declared, never clamped. The asked 40 mm leaf at 60 deg reads 1.059.' },
+  'leafsizetaper-x-angle @ leafSizeTaper=0.75 x leafAngle=85': { mm: 0, note: 'the angle\'s own hazard; the taper moves nothing toward a stem the blade already reaches.' },
+  'leafsizetaper-x-angle @ leafSizeTaper=-0.75 x leafAngle=60': { mm: 0.311, note: 'the same 25% leaf, the LOWEST one under a negative taper — the identical figure to the positive row\'s top leaf, by construction (one leaf size, one angle).' },
+  'leafsizetaper-x-angle @ leafSizeTaper=-0.75 x leafAngle=85': { mm: 0, note: 'the angle\'s own hazard, as above.' },
   'leafarch-x-angle @ leafArch=0 x leafAngle=85': { mm: 0, note: 'a SINGLE-axis cell — the 85 deg blade reaches the stem with no arch at all (`leafangle-x-stem @ leafAngle=85` declares the same state). Measured on the S2 tree.' },
   'leafarch-x-angle @ leafArch=90 x leafAngle=85': { mm: 0, note: 'the angle\'s own hazard under an over-arch; the arch moves nothing toward the stem from 85 deg. Measured on the S2 tree.' },
   'leafarch-x-angle @ leafArch=180 x leafAngle=85': { mm: 0, note: 'as the cell above, at the arch\'s maximum. Measured on the S2 tree.' },
@@ -1967,6 +2031,60 @@ export function measureLeafStemApproachMm(G, state, exportMode) {
   return { mm: best >= INFLO_SEARCH_CAP_MM ? INFLO_SEARCH_CAP_MM : best, at, leaves: LB.length, verts, inside, crossing, stemTris: stemRange[1] - stemRange[0], capped: best >= INFLO_SEARCH_CAP_MM };
 }
 
+/* LEAF AGAINST LEAF (Bloom P1) — the nearest approach of any leaf's BLADE to
+   the blade of a leaf at ANOTHER NODE. A crowd of nodes (the spacing) and a
+   taper (which puts the large leaves where the crowd is) move it; nothing
+   here measured it before. ONE EXPORT build and its own stream, the
+   leaf-stem measure's discipline: each leaf's emitted block
+   (`leavesBuilt[*].triStart/tris`, the builder's tally), every triangle all
+   of whose corners lie on one of that leaf's own rods (`rodAxes`, the
+   builder's — the petiole roots THROUGH the stem wall and two petioles of
+   neighbouring nodes meet inside it by design) dropped, every distinct blade
+   vertex read against the blade triangles of the OTHER nodes, and the whole
+   reading 0 where a blade edge crosses another node's blade. Leaves of ONE
+   node are skipped against each other: they stand at the phyllotaxy's own
+   azimuths whatever the run does, which is the arrangement's question and not
+   the crowd's. NAMES ITS SAMPLING: EXPORT, every distinct blade vertex against
+   every other node's blade triangle, searched to `SEARCH_CAP_MM`. */
+export function measureLeafLeafApproachMm(G, state) {
+  const acc = new G.MeshBuilder({ exportMode: true });
+  const m = G.buildBloomInto(acc, state);
+  if (!m.leaf || !m.leaf.present) return { mm: Infinity, why: 'no leaf is built' };
+  const LB = (m.leavesBuilt || []).filter((lb) => lb && lb.triStart >= 0 && lb.tris > 0);
+  if (new Set(LB.map((lb) => lb.nodeIndex)).size < 2) return { mm: Infinity, why: 'fewer than two nodes carry a leaf, so there is no neighbour to approach' };
+  const P = acc.positions, flat = [], blades = [];
+  for (const lb of LB) {
+    const axes = (Array.isArray(lb.rodAxes) ? lb.rodAxes : [lb.petioleAxis]).filter(Boolean);
+    const onRod = (p) => axes.some((ax) => (G.rodAxisExcessMm ? G.rodAxisExcessMm(ax, p[0], p[1], p[2]) : segDist(p, ax.inner, ax.outer) - ax.radiusMm) <= ax.radiusMm * 1e-6);
+    const lo = flat.length;
+    for (let t = lb.triStart * 9; t < (lb.triStart + lb.tris) * 9; t += 9) {
+      const v = [[P[t], P[t + 1], P[t + 2]], [P[t + 3], P[t + 4], P[t + 5]], [P[t + 6], P[t + 7], P[t + 8]]];
+      if (v.every(onRod)) continue;
+      for (let q = 0; q < 9; q++) flat.push(P[t + q]);
+    }
+    blades.push({ node: lb.nodeIndex, lo, hi: flat.length, onRod });
+  }
+  const F = Float64Array.from(flat);
+  const grid = triGrid(F, blades.map((b) => ({ lo: b.lo, hi: b.hi, owner: b.node })));
+  let best = INFLO_SEARCH_CAP_MM, at = null, verts = 0, crossing = false;
+  for (const b of blades) {
+    const seen = new Set();
+    for (let j = b.lo; j < b.hi; j += 3) {
+      const sk = `${F[j]},${F[j + 1]},${F[j + 2]}`;
+      if (seen.has(sk)) continue;
+      seen.add(sk);
+      const p = [F[j], F[j + 1], F[j + 2]];
+      if (b.onRod(p)) continue;
+      verts++;
+      const d = nearest(grid, p, b.node, best);
+      if (d < best) { best = d; at = { node: b.node, p: p.map((x) => Number(x.toFixed(3))) }; }
+    }
+    if (!crossing && crosses(grid, F, b.lo, b.hi, b.node, (q) => !b.onRod(q))) { crossing = true; best = 0; at = { node: b.node, crossing: true }; }
+  }
+  if (!verts) return { mm: Infinity, why: 'every emitted vertex is a rod — there is no blade to measure' };
+  return { mm: best >= INFLO_SEARCH_CAP_MM ? INFLO_SEARCH_CAP_MM : best, at, leaves: LB.length, verts, crossing, capped: best >= INFLO_SEARCH_CAP_MM };
+}
+
 
 /* RETIRED AS THE GATE'S MEASURE (the leaf-stem instrument session, Oct 25),
    KEPT ONLY AS THE MUST-FAIL'S "old instrument": the control's leaf-stem leg
@@ -2149,6 +2267,7 @@ function measureCell(tree, DEFAULTS, pair, va, vb, wallOpts = {}) {
    shipped run never passes it. */
 function measureState({ G, W, R }, DEFAULTS, pair, state, where, wallOpts = {}) {
   if (pair.measure === 'leaf-stem') return measureLeafStemApproachMm(G, state, true);
+  if (pair.measure === 'leaf-leaf') return measureLeafLeafApproachMm(G, state);
   if (pair.measure === 'stamen-stamen') return measureStamenStamenApproachMm(G, state);
   if (pair.measure === 'stamen-self') return measureStamenSelfApproachMm(G, state);
   if (pair.measure === 'stamen-style') return measureStamenStyleApproachMm(G, state);
@@ -2366,7 +2485,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
 
     /* ---------------------------------------------- the table, per pair */
     say(`  [tier ${pair.tier}${pair.guess ? ', a GUESS' : ''}] ${pair.label}`);
-    say(`    measure: ${pair.measure === 'sepal-self' ? 'SEPAL SELF — every sepal\'s sheet against another part of itself (measureWall on each emitted sepal grid, the smallest)' : pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : pair.measure === 'stamen-stamen' ? 'STAMEN against STAMEN — every rod segment and anther of one stamen against every one of another, the builder\'s own stations and the owner\'s radii (F1.2)' : pair.measure === 'stamen-self' ? 'A STAMEN against ITSELF — one rod\'s own segments at least pi t apart along it, the builder\'s own stations (F1.3a, the coil)' : pair.measure === 'stamen-style' ? 'the STAMENS against the STYLE — every rod and anther segment against the style\'s stations and stigma lobes (F1.3a)' : INFLO_MEASURES.has(pair.measure) ? INFLO_MEASURES.get(pair.measure) : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
+    say(`    measure: ${pair.measure === 'sepal-self' ? 'SEPAL SELF — every sepal\'s sheet against another part of itself (measureWall on each emitted sepal grid, the smallest)' : pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : pair.measure === 'stamen-stamen' ? 'STAMEN against STAMEN — every rod segment and anther of one stamen against every one of another, the builder\'s own stations and the owner\'s radii (F1.2)' : pair.measure === 'stamen-self' ? 'A STAMEN against ITSELF — one rod\'s own segments at least pi t apart along it, the builder\'s own stations (F1.3a, the coil)' : pair.measure === 'stamen-style' ? 'the STAMENS against the STYLE — every rod and anther segment against the style\'s stations and stigma lobes (F1.3a)' : INFLO_MEASURES.has(pair.measure) ? INFLO_MEASURES.get(pair.measure) : pair.measure === 'leaf-leaf' ? 'LEAF BLADE against the BLADES of every OTHER node (emitted vertices against emitted triangles, edge crossings read 0; the rods excluded by the builder\'s own rodAxes; a node\'s own leaves are its phyllotaxy\'s, not the crowd\'s)' : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
     say('      ' + `${pair.a.id} \\ ${pair.b.id}`.padEnd(30) + pair.b.values.map((v) => (num(v) + (Object.is(v, pair.b.values[0]) ? '*' : '')).padStart(10)).join(''));
     for (let i = 0; i < grid.length; i++) {
       const lead = num(pair.a.values[i]) + (i === 0 ? '*' : '');
@@ -2424,7 +2543,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
         fails.push(`CG1 reachability: "${pair.id}" moves the measure by at most ${moved.toExponential(2)} mm across the whole of ${ax.id} — under the ${COMBINATION_TOLERANCE_MM} mm band its own records are held to, so that control does not reach this measure and the pair is a ${other.id} sweep wearing a product's clothes. Every other clause about it is vacuous. Either the pair is wrong, or the measure is, or the inertness is a finding and belongs in COMBINATION_INERT with its number.`);
       }
     }
-    if (!Number.isFinite(base.mm) && (pair.measure === 'leaf-stem' || pair.measure === 'infill-wall' || INFLO_MEASURES.has(pair.measure))) {
+    if (!Number.isFinite(base.mm) && (pair.measure === 'leaf-stem' || pair.measure === 'leaf-leaf' || pair.measure === 'infill-wall' || INFLO_MEASURES.has(pair.measure))) {
       fails.push(`CG1 reachability: "${pair.id}" measures nothing at its own default cell (${base.why || 'no reading'}) — its base set does not build the parts it is about`);
     }
 

@@ -337,6 +337,30 @@ const NODE_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter:
    the halves equal the coupled mutant is a no-op), and the rose's divergence,
    where an ignored divergence differs from 180. */
 const SPLIT_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, leafLength: 40, leafNodes: 3, stemNodeSwelling: 0.3, stemNodeKink: 1 });
+/* THE NODE RUN's WITNESS (Bloom P1) — the MUTATED module's own leaf plan on a
+   state over the run's base (a 100 mm stem, five 40 mm leaves), and the leaf
+   the builder emits at a node (its reach along its own axis). */
+const NR_BASE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, leafLength: 40, leafNodes: 5, ...over });
+function runFacts(M, over = {}, buildNode = null) {
+  try {
+    const st = NR_BASE(over), acc = new M.MeshBuilder({ exportMode: true });
+    const sp = M.stemPlan(st, M.footRing(st, acc).hub, acc);
+    const lp = M.leafPlan(st, sp, acc);
+    let reach = null;
+    if (buildNode !== null && lp.present) reach = M.buildLeafInto(new M.MeshBuilder({ exportMode: true }), lp, st, buildNode, lp.azimuths[buildNode][0]).emittedReachMm;
+    return { depths: lp.nodeDepthsMm.slice(), run: lp.nodeRun, topScale: lp.topScale, insetNeeded: lp.insetNeededMm,
+      scales: lp.nodeSizes ? lp.nodeSizes.map((q) => q.scale) : null, reach };
+  } catch (e) { return { threw: e.message }; }
+}
+const NR_NARROW = { leafNodes: 4, leafNodeStart: 0.3, leafNodeEnd: 0.6 };
+const NR_CROWD = { leafNodes: 6, leafNodeSpacing: 0.8, leafSizeTaper: 0.5 };
+const NR_PAST = { leafNodes: 4, leafNodeStart: 0.7, leafNodeEnd: 0.4 };
+const NR_MERGE = { leafNodes: 4, leafNodeSpacing: 1, stemNodeSwelling: 0.6 };
+const NR_FLOOR = { leafWidth: 4, leafSizeTaper: 0.75 };
+const NR_EVEN = { stemLength: 60, leafNodes: 6 };
+const NR_MUTANTS = /^node-run-/;
+const NR_ROWS = /^node run:/;
+const sameArr = (a, b) => a.length === b.length && a.every((x, i) => Object.is(x, b[i]));
 const DIVERGENCE_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 100, stemDiameter: 6, leafLength: 40, leafNodes: 5, leafDivergence: 137.5, ...over });
 /* RULING 6's TWO WITNESS STATES (stem session 2): a BARE noded stem, and a
    raceme whose head asks for prominence 1 — the state where every floret's own
@@ -2890,8 +2914,11 @@ const MUTANTS = [
       const tm = m.rep.leaflets.find((b) => b.role === 'terminal'), tc = c.rep.leaflets.find((b) => b.role === 'terminal');
       return (tm.outline.scale === 1 && Math.abs(tc.outline.scale - 1) > 1e-3) ? null : `the terminal is drawn at scale ${tm.outline.scale} on the mutant against ${tc.outline.scale} clean`; } },
   { id: 'the-inset-reads-the-slider-arch', rows: LEAFC_ROWS, why: "the node inset reads the ARCH slider's rise where the leaf is on a drawn spine — an upward curl rising above its chord puts the top leaf into the head",
-    find: '  const rise = leafIsCompound(state) ? compoundLeafRiseMm(state) : leafBladeRiseMm(state, lengthMm, angleDeg);',
-    into: '  const rise = leafIsCompound(state) ? compoundLeafRiseMm(state) : leafArchRiseMm(lengthMm, angleDeg, Number(state.leafArch ?? 0));', names: ['LF4'],
+    /* RE-ANCHORED (Bloom P1): the inset is read per scale now (`layAt`), and
+       at scale 1 — every row without a size taper — the asked leaf's rise is
+       this expression verbatim */
+    find: '(leafIsCompound(state) ? compoundLeafRiseMm(state) : leafBladeRiseMm(state, lengthMm, angleDeg))',
+    into: '(leafIsCompound(state) ? compoundLeafRiseMm(state) : leafArchRiseMm(lengthMm, angleDeg, Number(state.leafArch ?? 0)))', names: ['LF4'],
     witness: (M, C) => { const m = compoundFacts(M, LC_UP), c = compoundFacts(C, LC_UP);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.plan.insetNeededMm < c.plan.insetNeededMm - 1) ? null : `the inset needs ${m.plan.insetNeededMm} mm on the mutant against ${c.plan.insetNeededMm} clean`; } },
@@ -3650,6 +3677,82 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const t = (P, s) => (P.find((p) => p.slot === s) || {}).turn;
       return (Math.abs(t(m, 5) + t(m, 2)) < 1e-9 && Math.abs(t(m, 2)) > 1 && t(c, 5) === t(c, 2)) ? null : `the partner turns ${t(m, 5)} against ${t(m, 2)} on the mutant (the clean tree ${t(c, 5)} / ${t(c, 2)})`; } },
+
+  /* ===================================================================
+     WHERE THE NODES GO AND LEAF SIZE ALONG THE STEM (Bloom P1, Eva's rulings
+     of Oct 28) — the NS family. Every witness reads the MUTATED module's own
+     leaf plan (or the leaf its builder emits), never the clause it names.
+     Scoped to the `node run:` rows. */
+  { id: 'node-run-ignores-its-start', rows: NR_ROWS, why: "the run's start is the flower's 0.16 whatever the slider says — a run asked to begin at 0.30 begins at the inset, every node where the old law put it, on a watertight stem at the identical leaf count",
+    find: '    const insetAskedMm = run.start * stemLengthMm;',
+    into: '    const insetAskedMm = LEAF_NODE_TOP * stemLengthMm;', names: ['NS1'],
+    witness: (M, C) => { const m = runFacts(M, NR_NARROW), c = runFacts(C, NR_NARROW);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(c.depths[0] - 30) < 1e-9 && m.depths[0] < 29) ? null : `the top node stands at ${m.depths[0]} mm on the mutant and ${c.depths[0]} clean`; } },
+  { id: 'node-run-ignores-its-end', rows: NR_ROWS, why: "the run's end is the flower's 0.86 whatever the slider says — a run asked to stop at 0.60 runs on to 86 mm",
+    find: '  const bottom = run.end * lengthMm;',
+    into: '  const bottom = LEAF_NODE_BOTTOM * lengthMm;', names: ['NS1'],
+    witness: (M, C) => { const m = runFacts(M, NR_NARROW), c = runFacts(C, NR_NARROW);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(c.depths.at(-1) - 60) < 1e-9 && Math.abs(m.depths.at(-1) - 86) < 1e-9) ? null : `the lowest node stands at ${m.depths.at(-1)} mm on the mutant and ${c.depths.at(-1)} clean`; } },
+  { id: 'node-run-spacing-ignored', rows: NR_ROWS, why: "the spacing never reaches the depths — the nodes stand evenly under a crowd the panel reports, a dead slider on a watertight stem",
+    find: '  if (run.spacing === 0) {',
+    into: '  if (true) {', names: ['NS1'],
+    witness: (M, C) => { const m = runFacts(M, NR_CROWD), c = runFacts(C, NR_CROWD);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const g = (d) => d.slice(1).map((x, i) => x - d[i]);
+      const gm = g(m.depths), gc = g(c.depths);
+      return (Math.abs(gm[0] - gm.at(-1)) < 1e-9 && gc[0] > 2 * gc.at(-1)) ? null : `the internodes read ${gm.map((x) => x.toFixed(3)).join('/')} on the mutant and ${gc.map((x) => x.toFixed(3)).join('/')} clean`; } },
+  { id: 'node-run-spacing-reversed', rows: NR_ROWS, why: "a positive spacing crowds the nodes toward the TOP where the ruling (and the read-out) says the BASE — the law's sign flipped, every internode still positive, the count unchanged",
+    find: '  const c = spacing * LEAF_NODE_SPACING_GAIN;',
+    into: '  const c = -spacing * LEAF_NODE_SPACING_GAIN;', names: ['NS1'],
+    witness: (M, C) => { const m = runFacts(M, NR_CROWD), c = runFacts(C, NR_CROWD);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const g = (d) => d.slice(1).map((x, i) => x - d[i]);
+      const gm = g(m.depths), gc = g(c.depths);
+      return (gm[0] < gm.at(-1) && gc[0] > gc.at(-1)) ? null : `the top internode reads ${gm[0]} against the lowest ${gm.at(-1)} on the mutant (clean ${gc[0]} / ${gc.at(-1)})`; } },
+  { id: 'node-run-even-arm-reformed', rows: NR_ROWS, why: "the even arm is written as the same mathematics in another order — span x (i / (k-1)) — so the default run lands a node one ulp off the old law's double: no figure moves, and every shipped byte stops reproducing",
+    find: '  const even = (k) => (k === 1 ? [top] : Array.from({ length: k }, (_, i) => top + (span * i) / (k - 1)));',
+    into: '  const even = (k) => (k === 1 ? [top] : Array.from({ length: k }, (_, i) => top + span * (i / (k - 1))));', names: ['NS2'],
+    witness: (M, C) => { const m = runFacts(M, NR_EVEN), c = runFacts(C, NR_EVEN);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (!sameArr(m.depths, c.depths) && m.depths.every((x, i) => Math.abs(x - c.depths[i]) < 1e-9)) ? null : `the mutant's depths ${m.depths.join(', ')} against the clean ${c.depths.join(', ')}`; } },
+  { id: 'node-run-start-past-end-swapped', rows: NR_ROWS, why: "a start past the end is silently SWAPPED into a run — four nodes stand between 40 and 70 mm and nothing says the two sliders are reversed (Eva: told, never silently swapped)",
+    find: '  return { start, end, spacing, shared: false, inverted: start > end, empty: start >= end };',
+    into: '  return start > end ? { start: end, end: start, spacing, shared: false, inverted: false, empty: false } : { start, end, spacing, shared: false, inverted: start > end, empty: start >= end };', names: ['NS3'],
+    witness: (M, C) => { const m = runFacts(M, NR_PAST), c = runFacts(C, NR_PAST);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.depths.length === 4 && c.depths.length === 1 && c.run.inverted && !m.run.inverted) ? null : `the mutant builds ${m.depths.length} node(s) (inverted ${m.run.inverted}) and the clean tree ${c.depths.length} (inverted ${c.run.inverted})`; } },
+  { id: 'node-run-merge-clamp-dropped', rows: NR_ROWS, why: "the crowd is never clamped, so two node swellings stand closer than their own sqrt(2) spindles and merge into one bulge — watertight, one piece, the spacing the panel reports exactly the one asked",
+    find: '    if (mergeGapMm !== null && k >= 3 && span > 0) {',
+    into: '    if (false) {', names: ['NS3'],
+    witness: (M, C) => { const m = runFacts(M, NR_MERGE), c = runFacts(C, NR_MERGE);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.run.spacingBuilt === 1 && !m.run.spacingClamped && c.run.spacingClamped && c.run.spacingBuilt < 1) ? null : `the mutant builds spacing ${m.run.spacingBuilt} (clamped ${m.run.spacingClamped}) and the clean tree ${c.run.spacingBuilt} (clamped ${c.run.spacingClamped})`; } },
+  { id: 'node-run-taper-never-reaches-the-leaf', rows: NR_ROWS, why: "the builder never applies a node's own size, so every leaf is the asked one under a taper the plan and the read-out report — the plan right, the geometry not",
+    find: '  if (plan.nodeSizes && plan.nodeSizes[nodeIndex]) {',
+    into: '  if (false) {', names: ['NS4'],
+    witness: (M, C) => { const m = runFacts(M, NR_CROWD, 0), c = runFacts(C, NR_CROWD, 0);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.reach > c.reach + 5) ? null : `the top leaf reaches ${m.reach} mm on the mutant and ${c.reach} clean`; } },
+  { id: 'node-run-inset-reads-the-asked-leaf', rows: NR_ROWS, why: "the inset clears the head for the ASKED leaf, not the smaller top leaf the taper builds — the top node is pushed down by a leaf that is not there",
+    find: '  const topAsked = taper > 0 && nodes >= 2 ? Math.max(1 - taper, floor) : 1;',
+    into: '  const topAsked = 1;', names: ['NS4'],
+    witness: (M, C) => { const m = runFacts(M, NR_CROWD), c = runFacts(C, NR_CROWD);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.topScale === 1 && c.topScale === 0.5 && m.insetNeeded > c.insetNeeded + 5) ? null : `the mutant reads the inset at scale ${m.topScale} (${m.insetNeeded} mm) and the clean tree at ${c.topScale} (${c.insetNeeded} mm)`; } },
+  { id: 'node-run-taper-reads-the-index', rows: NR_ROWS, why: "each node's size follows its INDEX rather than its depth, so a crowd of nodes at the base carries a ladder of sizes instead of a crowd of similar leaves",
+    find: '    const t = dn > d0 ? (d - d0) / (dn - d0) : 1;',
+    into: '    const t = depthsMm.indexOf(d) / (depthsMm.length - 1);', names: ['NS4'],
+    witness: (M, C) => { const m = runFacts(M, NR_CROWD), c = runFacts(C, NR_CROWD);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.scales && c.scales && Math.abs(m.scales[1] - c.scales[1]) > 0.01) ? null : `node 1's scale reads ${m.scales && m.scales[1]} on the mutant and ${c.scales && c.scales[1]} clean`; } },
+  { id: 'node-run-taper-floor-skipped', rows: NR_ROWS, why: "the taper is not floored, so a 4 mm wide leaf's top node is drawn 1 mm wide — under its own slider's minimum, a leaf the panel cannot ask for",
+    find: '    return { asked, scale: Math.max(asked, floor), floored: asked < floor, t };',
+    into: '    return { asked, scale: asked, floored: asked < floor, t };', names: ['NS4'],
+    witness: (M, C) => { const m = runFacts(M, NR_FLOOR), c = runFacts(C, NR_FLOOR);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.scales && c.scales && m.scales[0] < 0.3 && Math.abs(c.scales[0] - 0.75) < 1e-12) ? null : `the top node's scale reads ${m.scales && m.scales[0]} on the mutant and ${c.scales && c.scales[0]} clean`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -4264,6 +4367,8 @@ const ROWS = [
      scoped to the five mophead mutants and they to these. */
   { label: 'a mophead: two rays of three florets, the head OFF, at the floor', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor|junction|swelling-width/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'floretScale', value: '0.2' }] },
+  { label: 'a mophead: two rays of TWELVE florets, the head OFF (the ray tip FORCED past 1.2x — the one table row the width search binds on)', for: /swelling-width/,
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '12' }, { id: 'umbelHead', value: 'OFF' }] },
   { label: 'a mophead: two rays of three florets, the head ON', for: /sub-umbel|depth-3|reduced-lattice|clamp-counts|floret-floor|junction|swelling-width/,
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'UMBEL' }, { id: 'umbelDepth', value: '2' }, { id: 'umbelRays', value: '2' }, { id: 'umbelFlorets', value: '3' }, { id: 'umbelHead', value: 'ON' }] },
   /* the 90 deg knife edge (Eva, Oct 24): the only angle at which the crossing's
@@ -4411,6 +4516,20 @@ const ROWS = [
     set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
   { label: 'an asymmetric outline curve — a PINWHEEL x 5 petals', for: ASYM_MUTANTS,
     set: [{ id: 'petalCount', value: '5' }, { id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify({ mode: 'two-sided', points: [[0, 0.05], [0.3, 0.15], [0.6, 0.26], [0.85, 0.24], [1, 0]], right: [[0, 0.05], [0.3, 0.08], [0.6, 0.12], [0.85, 0.1], [1, 0]] }) }] },
+  /* THE NODE RUN's ROWS (Bloom P1) — scoped to the node-run mutants (and they
+     to these rows), on the run's own base: a 100 mm stem, 40 mm leaves. */
+  { label: 'node run: a narrow run 0.30 .. 0.60 x 4 nodes', for: NR_MUTANTS,
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '4' }, { id: 'leafNodeStart', value: '0.3' }, { id: 'leafNodeEnd', value: '0.6' }] },
+  { label: 'node run: crowded toward the base 0.80 x 6 nodes, taper 0.5', for: NR_MUTANTS,
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '6' }, { id: 'leafNodeSpacing', value: '0.8' }, { id: 'leafSizeTaper', value: '0.5' }] },
+  { label: 'node run: start past end 0.70 .. 0.40 x 4 nodes', for: NR_MUTANTS,
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '4' }, { id: 'leafNodeStart', value: '0.7' }, { id: 'leafNodeEnd', value: '0.4' }] },
+  { label: 'node run: the merge clamp, swelling 0.6 x spacing 1 x 4 nodes', for: NR_MUTANTS,
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '4' }, { id: 'leafNodeSpacing', value: '1' }, { id: 'stemNodeSwelling', value: '0.6' }] },
+  { label: 'node run: taper 0.75 floored on a 4 mm wide leaf', for: NR_MUTANTS,
+    set: [{ id: 'stemLength', value: '100' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '5' }, { id: 'leafWidth', value: '4' }, { id: 'leafSizeTaper', value: '0.75' }] },
+  { label: 'node run: the default run on a 60 mm stem x 6 nodes (where an even arm in another order moves a bit)', for: NR_MUTANTS,
+    set: [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '40' }, { id: 'leafNodes', value: '6' }] },
 ];
 
 /* ===================================================================
@@ -4596,7 +4715,12 @@ async function famsOn(rows) {
     }
     /* THE LEAF FAMILY (the leaf tip-shape session) — the rule once more. */
     for (const msg of await leafAssertions(page, row)) {
-      const mm = /^(LF\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+      /* NS (Bloom P1) and SN ride in the same call — SN since the node-laws
+         session, and this capture read `LF\d+` alone, so an SN message has
+         never reached this table (the ST10-as-ST1 class: a family pushed
+         through a call captured under another family's prefix is silent by
+         construction). Found when the NS family arrived. */
+      const mm = /^(LF\d+|NS\d+|SN\d+):/.exec(msg); if (mm) seen.add(mm[1]);
       /* `--why` prints each leaf message beside its row (S5: the control fired
          LF26 on one row of 68 and the table names families, never rows) */
       if (process.argv.includes('--why')) console.log(`      [${row.label}] ${msg.slice(0, 260)}`);
