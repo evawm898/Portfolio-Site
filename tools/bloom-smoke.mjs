@@ -1067,7 +1067,7 @@ export const SMOKE_BLOCKS = [
     rows: [
       { label: "BARE NODES: the flower's 0.48 on 100 x 6 mm, three nodes, golden angle",
         path: "ST12 on a BARE stem — the two statements with no leaf term, the emitted rings against the node law restated from the CONTROLS (the flower's 0.16/0.86 layout, the golden angle written as pi(3 - sqrt 5)), the phasing, and (e)'s other half: a bare stem reports no leaf record; ST1/ST2/ST3/ST10 restated onto it" },
-      { label: 'BARE NODES: eight nodes on 60 mm (SWELLINGS MERGED — told, not clamped)',
+      { label: 'BARE NODES: eight nodes on 24 mm (SWELLINGS MERGED — told, not clamped)',
         path: "ST12(f) — the plan's `mergedPairs` against the restated gaps and sqrt(2) spindles, both directions; the count is NOT clamped, so ST12(c) still holds all eight nodes to the law" },
       { label: 'BARE NODES: GATED — prominence 1 under a raceme (head inert; every PEDICEL pinned straight)',
         path: "ID4's PEDICEL PIN — the floret state carries stemNodeSwelling 0 and stemNodeKink 0 and the floret's own stem is a two-station tube with no node law, though the head asks for both at 1 and a pedicel is a bare stem the ungated law would otherwise node" },
@@ -2002,7 +2002,7 @@ export const SMOKE_BLOCKS = [
         path: "NS1 the span's own end and the inset clamp raising its start, LF4 the clamp told as a biconditional" },
       { label: 'NODE RUN: START PAST END, 0.70 .. 0.40 x 4 nodes (one node at the end, told — never swapped)',
         path: "NS3 the inverted span told as a biconditional, one node at the end, NS1 that node's depth" },
-      { label: "NODE RUN: the spacing's MERGE CLAMP — swelling 0.6 x spacing 1.00 x 4 nodes (CLAMPED at the swellings' sqrt(2) spindles)",
+      { label: "NODE RUN: the spacing's MERGE CLAMP — swelling 0.6 x spacing 1.00 x 7 nodes (CLAMPED at the joint's sqrt(2) half-widths)",
         path: "NS3 the spacing's merge clamp told and every internode at the need, NS1 the clamped spacing restated by a downward search, ST12 the swellings on the emitted stem at the restated nodes" },
       { label: 'NODE RUN: a BARE noded stem — kink 0.5 on a run 0.30 .. 0.90, spacing -0.6 x 5 nodes',
         path: "ST12 a bare stem's kinked rings on the moved, crowded run restated from the controls, NS0 the run live with no leaves" },

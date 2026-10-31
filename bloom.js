@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, UMBEL_DEPTH2_DEFAULTS, evalPredicate, coerceValue, sectionLabel, fanGroupSaid } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_SPREAD_RADII, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, leafNodeRunLive, leafNodeSpacingLive, leafSizeTaperLive, sepalsAbsent, inflorescenceIsAbsent, umbelHeadIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, umbelDepthRefusal, umbelIsCompound, UMBEL_DEPTH_VALUES, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, stemIsAbsent, stemNodesAbsent, stemAxisAt, STEM_NODE_JOINT_DIAMETERS, STEM_MIN_WALL_MM, NOZZLE_MM, stemCutAbsent, leafIsAbsent, leafNodeRunLive, leafNodeSpacingLive, leafSizeTaperLive, sepalsAbsent, inflorescenceIsAbsent, umbelHeadIsAbsent, varianceIsAbsent, varianceFormIsAbsent, infillIsAbsent, textureIsAbsent, TEXTURE_LATTICE_BAR, varianceSpacingIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM, RIM_TAPER_MM, RIM_TIP_ROWS, nodeVarianceIsAbsent, umbelDepthRefusal, umbelIsCompound, UMBEL_DEPTH_VALUES, outlineWidthScale, spineBendRefusal, stamenBraidBuilt, strandOffsetsFor, strandValue, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -3264,7 +3264,7 @@ function nodeRunLine(leaf, leavesBuilt) {
   let out = `\n     NODE RUN ${R.start.toFixed(2)} .. ${R.end.toFixed(2)} of the stem from the head · nodes at ${d.map((q) => q.toFixed(1)).join(', ')} mm · ${crowd}`
     + (R.inverted ? ` · START PAST END: the span is empty, one node at the end (told; the sliders keep ${R.start.toFixed(2)} / ${R.end.toFixed(2)})` : '')
     + (R.spacingAsked !== 0 && d.length < 3 ? ` · spacing ${R.spacingAsked.toFixed(2)} INERT here (${d.length} node${d.length === 1 ? '' : 's'})` : '')
-    + (R.spacingClamped ? ` · SPACING CLAMPED ${R.spacingAsked.toFixed(2)} -> ${R.spacingBuilt.toFixed(3)}: a closer crowd would merge two node swellings (under ${R.mergeGapMm.toFixed(2)} mm, sqrt(2) spindles)` : '');
+    + (R.spacingClamped ? ` · SPACING CLAMPED ${R.spacingAsked.toFixed(2)} -> ${R.spacingBuilt.toFixed(3)}: a closer crowd would merge two node swellings (under ${R.mergeGapMm.toFixed(2)} mm, sqrt(2) half-widths of the joint)` : '');
   if (leaf.sizeTaper !== 0) {
     const S = leaf.nodeSizes;
     if (!S) out += `\n     SIZE ALONG THE STEM taper ${leaf.sizeTaper.toFixed(2)} INERT on this build — one node, so its leaf is the asked leaf`;
@@ -3615,16 +3615,16 @@ function stemNodesLine(stem) {
   /* MERGED SWELLINGS ARE TOLD, NEVER CLAMPED (Eva's ruling on the spacing
      floor): the plan's own `mergedPairs`, against `sqrt(2)` spindles. */
   const merged = L.mergedPairs && L.mergedPairs.length
-    ? ` · SWELLINGS MERGED: ${L.mergedPairs.length} adjacent pair${L.mergedPairs.length > 1 ? 's' : ''} closer than ${L.mergeGapMm.toFixed(2)} mm (sqrt(2) spindles), the nearest ${Math.min(...L.mergedPairs.map((q) => q.gapMm)).toFixed(2)} mm apart — they read as one bump, not separate joints (reported, not clamped)`
+    ? ` · SWELLINGS MERGED: ${L.mergedPairs.length} adjacent pair${L.mergedPairs.length > 1 ? 's' : ''} closer than ${L.mergeGapMm.toFixed(2)} mm (sqrt(2) half-widths of the joint), the nearest ${Math.min(...L.mergedPairs.map((q) => q.gapMm)).toFixed(2)} mm apart — they read as one bump, not separate joints (reported, not clamped)`
     : '';
   /* TWO HALVES, EACH TOLD — or told as absent (Eva's ruling, Oct 6: the
      swelling and the kink are two controls). A half at 0 is an exact zero in
      the law, so "none" is a statement about the geometry, not a rounding. */
   const swellPart = L.swell > 0
-    ? ` · swelling ${L.swelling.toFixed(2)}: +${(L.swell * 100).toFixed(1)}% of radius over a ${L.spreadMm.toFixed(2)} mm spindle (${STEM_NODE_SPREAD_RADII.toFixed(2)} stem radii, the flower's own proportion)`
+    ? ` · swelling ${L.swelling.toFixed(2)}: +${(L.swell * 100).toFixed(1)}% of radius over a ${L.jointMm.toFixed(2)} mm joint (${STEM_NODE_JOINT_DIAMETERS.toFixed(2)} stem diameters, a carnation's node band; Gaussian half-width ${L.swellMm.toFixed(2)} mm)`
     : ' · no swelling (the stem keeps its radius at the nodes)';
   const kinkPart = L.slope > 0
-    ? ` · kink ${L.kink.toFixed(2)}: turn ${L.turnDeg.toFixed(2)}° a node, ${L.bare ? 'at the golden angle (no leaf to turn from)' : 'away from its first leaf'}, peaking ${L.bendPeakBelowMm.toFixed(2)} mm below it (${L.bendPeakInSpreads.toFixed(3)} of the spindle${L.swell > 0 ? ' — inside the swelling' : ''})`
+    ? ` · kink ${L.kink.toFixed(2)}: turn ${L.turnDeg.toFixed(2)}° a node, ${L.bare ? 'at the golden angle (no leaf to turn from)' : 'away from its first leaf'}, peaking ${L.bendPeakBelowMm.toFixed(2)} mm below it (${L.bendPeakInSpreads.toFixed(3)} of the flower's spindle${L.swell > 0 ? (L.bendPeakBelowMm <= L.jointMm / 2 ? ' — inside the joint' : ` — BELOW the ${L.jointMm.toFixed(2)} mm joint, whose band ends ${(L.jointMm / 2).toFixed(2)} mm below the node`) : ''})`
     : ' · no kink (the stem runs straight through its nodes)';
   return `\n     NODES ${L.nodes.length} ${L.bare ? 'on a bare stem' : 'at the leaves'}`
     + swellPart + kinkPart

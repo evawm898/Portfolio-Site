@@ -329,6 +329,15 @@ const PREDICATE_MOVERS = {
     const R0 = harness.restatedNodeLayout({ ...st, leafNodeStart: 0.16, leafNodeEnd: 0.86, leafNodeSpacing: 0, leafSizeTaper: 0 });
     return R.depths.length !== R0.depths.length || R.depths.some((d, i) => !Object.is(d, R0.depths[i]));
   },
+  /* THE TIGHT JOINT (Bloom P1b, Eva's ruling of Oct 29). A row moves iff its
+     stem carries a node SWELLING: a stem present, no inflorescence (the
+     rachis carries no stem nodes, and every pedicel is pinned node-free), the
+     swelling above 0. The kink keeps the flower's spindle, so a kink-only stem
+     HOLDS to the bit (its station placer's step is the spindle's when the
+     swelling is 0). Written from the CONTROLS — the ruling's own sentence —
+     never from either tree's guard. */
+  'node-joint': (st) => Number(st.stemLength) >= 1 && String(st.inflorescence ?? 'NONE') === 'NONE'
+    && Math.min(1, Math.max(0, Number(st.stemNodeSwelling) || 0)) > 0,
   /* THE BONE TEXTURE (Oct 28). A row moves iff its texture choice is BONE —
      the base tree does not know the value and builds it untextured — and the
      infill is NONE (both on, the texture is REFUSED and nothing moves, Q9).

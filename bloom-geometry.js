@@ -16940,6 +16940,47 @@ export const STEM_NODE_SWELL = FLOWER_STEM.swell;
 export const STEM_NODE_SLOPE = FLOWER_STEM.slope;
 export const STEM_NODE_SPREAD_RADII = FLOWER_STEM.spread * FLOWER_STEM.lengthUnits / FLOWER_STEM.topRadiusUnits;
 export const STEM_NODE_RAMP_SPREADS = FLOWER_STEM.ramp / FLOWER_STEM.spread;
+/* THE SWELLING IS A SHORT, TIGHT JOINT, NOT THE FLOWER'S SPINDLE (Eva's
+   ruling, Oct 29 — Bloom P1b; docs/bloom-node-swelling-tight-outcome.md).
+   The swelling used to ride the flower's spindle above (3.27 stem radii of
+   Gaussian half-width), which draws a bulge about 5.7 stem DIAMETERS long and
+   left the crowd no room: P1's merge clamp held the carnation's 0.8 to 0.16
+   and the rose's to 0.01. A real carnation's node band is about ONE stem
+   diameter long — measured off two Dianthus caryophyllus plant patents read
+   from their own pages: 'KLEDP16231' (US PP29,628), branch 0.3–0.5 cm across,
+   node length 0.4–0.6 cm; 'KLEDP18090' (US PP30,795), branch 2.0–4.0 mm, node
+   length 0.3 cm — so 1.0 to 1.25 diameters, and the floras (Kew POWO's
+   Dianthus, after FTEA) give the leaves "joined at the base into a sheath
+   above the nodes, which are often swollen".
+
+   THE LAW: the joint is the Gaussian's own +/-2 sigma band (where the bulge
+   has fallen to 1/e^2, 13.5% of its peak — the edge of a visible swelling;
+   that reading of a patent's "node length" is this file's, not the patent's),
+   set to `STEM_NODE_JOINT_DIAMETERS` stem diameters. With sigma = w / sqrt 2
+   the band is `2 sqrt(2) w`, so the half-width is
+   `w = JOINT_DIAMETERS x R / sqrt 2` — 0.884 stem radii, a LENGTH FROM A
+   LENGTH (the stem's own radius), never a fraction of the stem. The PROFILE
+   STAYS SYMMETRIC: the sources state no asymmetry for the stem's own node
+   tissue, and what IS sharper above the node is the connate LEAF SHEATH, which
+   is leaf tissue and the leaf-shape discovery's (D1) to build on this seat.
+
+   THE AMPLITUDE (`STEM_NODE_SWELL`, 0.6 x the radius at swelling 1) IS NOT
+   CHANGED. The patents' node diameters sit at about the stem's (pot
+   carnations); the slider already reaches every amplitude below 0.6, and a
+   tighter joint does not need a different one.
+
+   THE KINK IS NOT THIS. Its ramp stays on the flower's spindle
+   (`STEM_NODE_SPREAD_RADII`), so a kink-only stem builds the doubles it built
+   before; on a stem with both, the bend now peaks below the tighter joint
+   rather than inside it (reported, the outcome doc §3). */
+export const STEM_NODE_JOINT_DIAMETERS = 1.25;
+export const STEM_NODE_SWELL_RADII = STEM_NODE_JOINT_DIAMETERS / Math.SQRT2;
+/* THE ONE OWNER OF THE SWELLING'S GAUSSIAN HALF-WIDTH (mm) on a stem of outer
+   radius `outerR` — read by the node law, the radius, the station placer and
+   the layout's merge gap. */
+export function stemNodeSwellWidthMm(outerR) { return STEM_NODE_SWELL_RADII * outerR; }
+/* the joint's own length in mm — the +/-2 sigma band, `2 sqrt(2) w` */
+export function stemNodeJointMm(outerR) { return 2 * Math.SQRT2 * stemNodeSwellWidthMm(outerR); }
 /* A STATION'S POSITION IS SNAPPED TO A DYADIC GRID (2^-12 mm, a quarter of a
    micron), and that is a decision about ENGINES rather than about geometry.
    The placer below equidistributes a transcendental density, so a station's
@@ -17020,7 +17061,7 @@ export function leafNodeLayout(state, stemLengthMm) {
      closer than the spindle are two bends). The geometry's own `mergeGapMm`
      expression, on the stem's own radius (`stemPlan`'s `outerR`). */
   const swellAmt = Math.min(STEM_NODE_SWELLING_RANGE[1], Math.max(STEM_NODE_SWELLING_RANGE[0], leafNodeNum(state.stemNodeSwelling, 0)));
-  const mergeGapMm = !stemNodesAbsent(state) && swellAmt > 0 ? Math.SQRT2 * (STEM_NODE_SPREAD_RADII * (Number(state.stemDiameter) / 2)) : null;
+  const mergeGapMm = !stemNodesAbsent(state) && swellAmt > 0 ? Math.SQRT2 * stemNodeSwellWidthMm(Number(state.stemDiameter) / 2) : null;
   const layAt = (scaleTop) => {
     const rise = scaleTop === 1 ? (leafIsCompound(state) ? compoundLeafRiseMm(state) : leafBladeRiseMm(state, lengthMm, angleDeg)) : riseOf(leafTaperState(state, scaleTop));
     const insetAskedMm = run.start * stemLengthMm;
@@ -17092,6 +17133,8 @@ export function stemNodeLaw(state, stemLengthMm, outerR) {
   const phyllo = String(state.leafPhyllotaxy);
   const spreadMm = STEM_NODE_SPREAD_RADII * outerR;
   const rampMm = STEM_NODE_RAMP_SPREADS * spreadMm;
+  /* (P1b) the SWELLING's own half-width — the tight joint, not the spindle */
+  const swellMm = stemNodeSwellWidthMm(outerR);
   const bare = leafIsAbsent(state);
   /* A LEAFED node turns away from its first leaf, and with the divergence
      (ruling, Oct 6) the first leaf of an ALTERNATE stem stands wherever the
@@ -17114,7 +17157,7 @@ export function stemNodeLaw(state, stemLengthMm, outerR) {
   /* With NO swelling there is nothing to merge: a kink-only stem's nodes are
      bends, and two bends closer than the spindle are two bends. Telemetry only
      — the geometry never reads this list. */
-  const mergeGapMm = Math.SQRT2 * spreadMm;
+  const mergeGapMm = Math.SQRT2 * swellMm;
   const mergedPairs = [];
   if (swelling > 0) for (let i = 1; i < nodes.length; i++) {
     const gap = nodes[i].s - nodes[i - 1].s;
@@ -17126,7 +17169,7 @@ export function stemNodeLaw(state, stemLengthMm, outerR) {
        built — and the layout's inset and counts, for a bare stem's read-out */
     run: layout.run, insetAskedMm: layout.insetAskedMm, insetNeededMm: layout.insetNeededMm, insetMm: layout.insetMm, insetClamped: layout.insetClamped, nodesAsked: layout.nodes,
     swell: STEM_NODE_SWELL * swelling, slope: STEM_NODE_SLOPE * kink,
-    spreadMm, rampMm, nodes, bare, mergeGapMm, mergedPairs,
+    spreadMm, rampMm, swellMm, jointMm: 2 * Math.SQRT2 * swellMm, nodes, bare, mergeGapMm, mergedPairs,
     /* WHERE EACH BEND PEAKS — the phasing, as a number a reader and a gate can
        both hold: 0.375 of the ramp below each node (the smoothstep-weighted
        ramp's own curvature maximum), stated against the spindle's width. */
@@ -17138,7 +17181,7 @@ export function stemNodeLaw(state, stemLengthMm, outerR) {
 /* THE OUTER RADIUS AT DEPTH `s` (mm below the hub's underside). */
 export function stemNodeRadiusMm(law, s) {
   let sw = 0;
-  for (const n of law.nodes) { const u = (s - n.s) / law.spreadMm; sw += Math.exp(-u * u); }
+  for (const n of law.nodes) { const u = (s - n.s) / law.swellMm; sw += Math.exp(-u * u); }
   return law.outerR * (1 + law.swell * sw);
 }
 
@@ -17193,15 +17236,18 @@ export function stemNodeTiltRad(law, s) {
 export function stemNodeStations(law, s0, s1) {
   if (!(s1 > s0)) return [s0, s1];
   const eps = law.outerR * (1 - Math.cos(Math.PI / HUB_SECTORS));
-  const h0 = law.spreadMm / 64;
+  /* the integration step resolves the NARROWER feature: the kink's spindle
+     alone where there is no swelling (so a kink-only stem places the stations
+     it always placed), the tight joint where there is one */
+  const h0 = (law.swell > 0 ? Math.min(law.spreadMm, law.swellMm) : law.spreadMm) / 64;
   const n = Math.max(2, Math.ceil((s1 - s0) / h0));
   const kappa = (s) => {
     let rpp = 0;
     for (const nd of law.nodes) {
-      const u = (s - nd.s) / law.spreadMm;
+      const u = (s - nd.s) / law.swellMm;
       rpp += (4 * u * u - 2) * Math.exp(-u * u);
     }
-    rpp = Math.abs(law.outerR * law.swell * rpp) / (law.spreadMm * law.spreadMm);
+    rpp = Math.abs(law.outerR * law.swell * rpp) / (law.swellMm * law.swellMm);
     let app = 0;
     for (const nd of law.nodes) {
       const p = s - nd.s;
