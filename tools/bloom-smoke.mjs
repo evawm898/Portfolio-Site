@@ -2016,6 +2016,38 @@ export const SMOKE_BLOCKS = [
         path: "NS0 the three statements dead and the plan's run the default, no per-node size, SN0-SN4 the shared node unmoved" },
     ],
   },
+  {
+    n: 84, title: 'the stem through the head, and the umbel junction as a hub (Oct 27)',
+    anchor: "STEM TOP: Eva's state — 8 petals x spread 2.00 x rise 0.35 x CURVED 1.60 x a 60 mm stem (0.31 mm through the head on main)",
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       stem's DOMED TOP (its rim ring on the cap's mid-surface at its own radius,
+       the bore's at the bore's — `domedTop` in stemPlan, a branch on a cap
+       wider than its stem with the head present), the join's reach FLOOR under
+       it, and the junction's FLARE (`umbelBoss`'s `flare`, the hub-to-stem join
+       reversed, three styles, amount 0 the coin by branch, the room clamp). The
+       anchor is Eva's own defect state; the subset adds the worst overshoot,
+       the floored reach (a thin join under a wide stem), one styled junction on
+       the spider lily, the mophead on another style (the ray tips), and the head
+       ON a domed head (both rulings on one row). --conn is REQUIRED: the stem's
+       top moved off the apex onto the cap's wall and the flare's foot sits inside
+       the rod — the voxel fill is what says the stem is still rooted and the
+       junction still one piece with its rod. */
+    conn: true,
+    rows: [
+      { label: "STEM TOP: Eva's state — 8 petals x spread 2.00 x rise 0.35 x CURVED 1.60 x a 60 mm stem (0.31 mm through the head on main)",
+        path: "ST13 no stem or join vertex above the head's skin within the hub's radius and the rim ON the cap's mid-sphere, read off the exported file against the hub builder's own dome, ST4 the domed arm, ST10 the bore's top ring on the mid-sphere at the bore's radius, ST11 the CURVED profile at 1.60x" },
+      { label: 'STEM TOP: rise 1 x a 12 mm stem (the worst overshoot on main, 2.15 mm)',
+        path: "ST13 the widest stem on the steepest cap, ST10 the domed band on a 4.5 mm bore" },
+      { label: 'STEM TOP: rise 0.35 x a 12 mm stem x amount 0 (the root ring poked on main; the reach FLOORED)',
+        path: "ST5 the join ACTIVE under amount 0 because the reach is FLOORED at the cap's sag plus half a sheet (restated), ST13 the root ring under the skin, ST4 the rim at least half a sheet above the join's underside" },
+      { label: "UMBEL SWELLING: ANGLED at the spider lily's defaults (6 florets, head off, auto reach)",
+        path: "UM1 the flare restated from the Hub controls — the ANGLED cone from the band's foot to the rod, as deep as it is wide, the rod met half a gap inside its wall, eight rings on the profile" },
+      { label: "UMBEL SWELLING: THE MOPHEAD x CURVED (12 x 12 at the floor; every ray tip a swelling FORCED past 1.2x of its own ray)",
+        path: "UM8 every ray tip's flare restated at the RAY's own radius and room (never the stem's), UM1 the stem-top junction on CURVED, UM7 the clamp's count with the flare's triangles in the boss" },
+      { label: 'UMBEL SWELLING: x the head ON on a DOMED head (rise 0.35) x ANGLED — the stem-top fix and the junction on one row',
+        path: "ST13 the stem's top under a domed head above an umbel, UM1 the flare on a stem that runs on through the band to the head, UM3 the boss on the stem below the head" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

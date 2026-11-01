@@ -324,6 +324,57 @@ for (const mu of MUTS) {
   }
 }
 
+/* ---- 2b. ST13 — THE STEM TOP ON A DOMED HEAD (Oct 27) ------------------
+   ST13 is the second file-side clause here (it reads the EXPORTED positions
+   by the builder's own stream ranges against the hub builder's emitted dome),
+   so the apex table cannot fire it either, for ST9's reason. Its two
+   mutations are run by id, each on the row it was written against, and the
+   `m` is built the way bloom.js's metrics hook builds it — the builder's own
+   `petalTriEnd / hubTriEnd / stemTriEnd` and its `hubBuilt.dome` — never a
+   restatement. The clean tree must be SILENT on both rows and every mutant
+   must FIRE ST13 on its own row; under --control (the replacement IS the
+   find-string) it must stay silent, or this tool measures its plumbing. */
+const ST13_ROWS = [
+  ["Eva's Oct 27 state: 8 petals x spread 2 x rise 0.35 x CURVED 1.60 x a 60 mm stem",
+   { placement: 'RADIAL', hubShape: 'CAP', petalCount: 8, spread: 2, headRise: 0.35, hubStyle: 'CURVED', hubShapeAmount: 1.6, stemLength: 60, stemDiameter: 6 }],
+  ['rise 0.35 x a 12 mm stem x amount 0 (the root ring on the rim; the reach FLOORED)',
+   { placement: 'RADIAL', hubShape: 'CAP', headRise: 0.35, hubShapeAmount: 0, stemLength: 60, stemDiameter: 12 }],
+];
+const ST13_MUTS = [
+  { id: 'the-stem-top-is-laid-at-the-apex', rows: [0, 1] },
+  { id: 'the-join-reach-floor-is-dropped', rows: [1] },
+];
+function runST13(G, ui) {
+  const acc = new G.MeshBuilder({ exportMode: true });
+  const b = G.buildBloomInto(acc, ui);
+  const p = new Float64Array(acc.positions.length);
+  for (let i = 0; i < p.length; i++) p[i] = Math.fround(acc.positions[i]);
+  const m = { sphereMode: false, headAbsent: false, hubRadius: b.hub.radius,
+              hubBuilt: { dome: b.hubBuilt && b.hubBuilt.dome ? { ...b.hubBuilt.dome } : null },
+              stem: { ...b.stem, triRanges: { hub: [b.petalTriEnd, b.hubTriEnd], stem: [b.hubTriEnd, b.stemTriEnd] } } };
+  return stemChannelAssertions(p, null, m, ui).filter((x) => /^ST13:/.test(x));
+}
+console.log('\nST13 — CLEAN TREE must be silent on both domed rows');
+for (const [n, set] of ST13_ROWS) {
+  const f = runST13(CLEAN, { ...DEFAULTS, ...set });
+  console.log(`  ${n.padEnd(72)} ST13 ${f.length ? 'FIRED' : 'silent'}`);
+  if (f.length) bad.push(`ST13 fired on the CLEAN tree at "${n}": ${f[0]}`);
+}
+for (const mu of ST13_MUTS) {
+  const m = mutationFor(mu.id);
+  if (m.err) { bad.push(m.err); console.log(`\n${mu.id}: ${m.err}`); continue; }
+  const into = CONTROL ? m.find : m.into;
+  const G = await moduleOf(mu.id.replace(/[^a-z0-9-]/gi, '_') + (CONTROL ? '_ctl' : ''), SRC.replace(m.find, into));
+  console.log(`\n${mu.id}${CONTROL ? '  [CONTROL: the replacement IS the find-string]' : ''}`);
+  for (const k of mu.rows) {
+    const [n, set] = ST13_ROWS[k];
+    const f = runST13(G, { ...DEFAULTS, ...set });
+    console.log(`  ${n.padEnd(72)} ST13 ${f.length ? 'FIRED' : 'SILENT'}${f.length ? ' — ' + f[0].slice(0, 110) : ''}`);
+    if (!CONTROL && !f.length) bad.push(`${mu.id}: ST13 stayed SILENT at "${n}" — the clause cannot see the defect it exists for`);
+    if (CONTROL && f.length) bad.push(`${mu.id}: ST13 fired under the control at "${n}"`);
+  }
+}
+
 /* ---- 3. the verdict, on stdout on BOTH branches (#220) --------------- */
 console.log('');
 if (CONTROL) {
@@ -332,5 +383,5 @@ if (CONTROL) {
   process.exit(1);
 }
 if (bad.length) { console.log(`ST9 WITNESS: FAILED — ${bad.length} finding(s)`); for (const b of bad) console.log(`  - ${b}`); process.exit(1); }
-console.log('ST9 WITNESS: ST9 is silent on the clean tree and FIRES on both mutations at every row declared to separate the bars, and stays silent where a mutation is declared inert. Every separating row is measured LIVE under the typed bar from the two builds\' own tallies, and ST9\'s magnitude is corroborated against the criterion\'s own record.');
+console.log('ST9/ST13 WITNESS: silent on the clean tree; ST13 FIRES on both stem-top mutations; ST9 FIRES on both mutations at every row declared to separate the bars, and stays silent where a mutation is declared inert. Every separating row is measured LIVE under the typed bar from the two builds\' own tallies, and ST9\'s magnitude is corroborated against the criterion\'s own record.');
 process.exit(0);
