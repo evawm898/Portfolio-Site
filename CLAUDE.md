@@ -1559,7 +1559,14 @@ before touching `bloom-texture-bone2.js` or starting the shipping session). No s
   default, 101% whole, 166% umbel, 319% mophead, 513% 40 × 3.
   - The lattice-edge cap cannot reach the pores' cost: Eva's question 3, STOP.
 - **The height**: "depth ≈ diameter" derives 1.5 mm for the ruled pores, not 2.5 (question 4).
-- **Walls** are 0.02–0.13 mm (question 6). **Release build** ~9 s in the browser (question 8).
+- **Walls** are 0.006–0.27 mm (merging, thinnest to median) (question 6). **Release build** on the default: ~4.9 s for the rings (estimate), 11.5 s for the 0.1 mm grid, against v1's 0.7 s; the mophead ~49 s against v1's 29 s (question 8).
+- **The grid refiner WELDED three petals to the hub on its first build** (9 → 7 shells, 4,492 within-shell pairs,
+  the same at every height). A midpoint landed EXACTLY on a hub rim vertex at 45°. The refiner now withdraws the
+  porous triangles behind any new vertex whose float32 key another organ carries (15 on the default). A shipping
+  refiner owes this rule and a gate for it.
+- **The nib is NOT smooth by curvature under v2** (88 lattice vertices within 1.2 mm of an apex carry > 0.05 mm at
+  H 0.4). v1 read 0 there because of its 20 mm patch scale, so v1's "smooth by curvature alone" is that scale's, not
+  the law's.
 - Gate: `node tools/verify-bloom-bone2.mjs [--control]` (B2a–B2d, four witnessed mutants; not in CI).
 - Sheet: `node tools/shot-bloom-texture-bone2.mjs docs/img/bloom-texture-bone-v2.png`.
 

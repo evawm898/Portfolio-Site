@@ -162,7 +162,7 @@ if (SECTIONS.includes('print')) {
       const r = await B.bone2Bloom(st, opt);
       const t0 = Date.now();
       const c = census(new Float64Array(r.acc.positions));
-      row[m] = { junctionTris: r.stats.junctionTris, tris: r.acc.triangleCount, withinPairs: c.within, crossPairs: c.cross, worstSpanMm: r3(c.worstSpanMm), shells: c.shells, censusMs: Date.now() - t0 };
+      row[m] = { junctionTris: r.stats.junctionTris, coincidentWithdrawn: r.stats.coincidentWithdrawn, tris: r.acc.triangleCount, withinPairs: c.within, crossPairs: c.cross, worstSpanMm: r3(c.worstSpanMm), shells: c.shells, censusMs: Date.now() - t0 };
       console.log(`print H ${H} ${m}: ${r.acc.triangleCount} tris, census ${JSON.stringify(row[m])}`);
     }
     /* the bead and the nib: corners near the apex of petal 0, relieved or not */

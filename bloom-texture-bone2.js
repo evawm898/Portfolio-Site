@@ -769,12 +769,51 @@ export function bone2Hook({ mode = 'grid', edgeMm = null, stats = {}, focus = nu
       const H = T.heightMm;
       const repl = [];
       let added = 0;
-      for (const { X, mw, porous, porousTris } of plans) {
+      /* A REFINED VERTEX MAY NOT LAND ON ANOTHER ORGAN'S VERTEX. The junction
+         rule above keeps refinement off positions two organs already share,
+         and that is not enough: a midpoint (or a transition fan's centroid)
+         can land EXACTLY on a vertex of a neighbouring organ — measured, five
+         hub/petal positions at the rim on the 45-degree petals (6.2541,
+         6.2541, +-0.6), which welded three petals to the hub (9 -> 7 shells,
+         4,492 within-shell pairs). So refine, look for a new vertex whose
+         float32 key another organ also carries, withdraw the porous triangles
+         that produced it (and the porous neighbours of a transition triangle
+         that produced it), and refine again until none is left. */
+      const keyOf = (PP, v) => `${f32(PP[v * 3])}|${f32(PP[v * 3 + 1])}|${f32(PP[v * 3 + 2])}`;
+      const refined = new Map();
+      const refineAll = (onlyIdx) => { plans.forEach((pl, i) => { if (onlyIdx && !onlyIdx.has(i)) return; if (mode === 'rings' || !pl.porousTris) { refined.set(i, null); return; } const O = pl.X.O; refined.set(i, gridRefine(Array.from(O.P), Array.from(O.tri), [{ dim: 3, v: Array.from(O.N) }, { dim: 1, v: Array.from(pl.mw) }, { dim: 1, v: Array.from(pl.X.clr) }], pl.porous, e)); }); };
+      if (mode !== 'rings') {
+        refineAll(null);
+        let withdrawn = 0;
+        for (let pass = 0; pass < 6; pass++) {
+          const seen = new Map();
+          plans.forEach((pl, i) => { const R = refined.get(i); const PP = R ? R.P : pl.X.O.P; const n = PP.length / 3; for (let v = 0; v < n; v++) { const k = keyOf(PP, v); const o = seen.get(k); if (o === undefined) seen.set(k, i); else if (o !== i) seen.set(k, -1); } });
+          const redo = new Set();
+          plans.forEach((pl, i) => {
+            const R = refined.get(i); if (!R) return;
+            const bad = new Set();
+            for (let v = R.nV0; v < R.P.length / 3; v++) if (seen.get(keyOf(R.P, v)) === -1) bad.add(v);
+            if (!bad.size) return;
+            const O = pl.X.O, src = new Set();
+            for (let t = 0; t < R.tri.length / 3; t++) if (bad.has(R.tri[t * 3]) || bad.has(R.tri[t * 3 + 1]) || bad.has(R.tri[t * 3 + 2])) src.add(R.parent[t]);
+            for (const t of src) {
+              if (pl.porous[t]) { pl.porous[t] = 0; pl.porousTris--; withdrawn++; continue; }
+              const vs = [O.tri[t * 3], O.tri[t * 3 + 1], O.tri[t * 3 + 2]];
+              for (let u = 0; u < O.tri.length / 3; u++) if (pl.porous[u]) { let sh = 0; for (let c = 0; c < 3; c++) if (vs.includes(O.tri[u * 3 + c])) sh++; if (sh >= 2) { pl.porous[u] = 0; pl.porousTris--; withdrawn++; } }
+            }
+            redo.add(i);
+          });
+          if (!redo.size) break;
+          refineAll(redo);
+        }
+        stats.coincidentWithdrawn = withdrawn;
+      }
+      for (const [pi, { X, mw, porous, porousTris }] of plans.entries()) {
         const O = X.O, nV = X.nV;
         if (mode === 'rings') { repl.push({ from: O.from, to: O.to, X, out: (focus.organ ? O.organ === focus.organ : true) ? ringsWindowOrgan(X, mw, focus, T, FIELD, focus.layout || 'full', stats) : null }); continue; }
         if (!porousTris) { repl.push({ from: O.from, to: O.to, X, out: null }); continue; }
         const clr = X.clr;
-        const R = gridRefine(Array.from(O.P), Array.from(O.tri), [{ dim: 3, v: Array.from(O.N) }, { dim: 1, v: Array.from(mw) }, { dim: 1, v: Array.from(clr) }], porous, e);
+        const R = refined.get(pi);
         const nN = R.P.length / 3;
         const D = new Float64Array(nN * 3);
         for (let i = 0; i < nN; i++) {
@@ -805,9 +844,11 @@ export function bone2Hook({ mode = 'grid', edgeMm = null, stats = {}, focus = nu
       const pos = [], nrm = oldN ? [] : null;
       let cur = 0;
       const pushOld = (t0x, t1x) => { for (let i = t0x * 9; i < t1x * 9; i++) pos.push(old[i]); if (nrm) for (let i = t0x * 9; i < t1x * 9; i++) nrm.push(oldN[i]); };
+      stats.ranges = [];
       for (const r of repl) {
         if (r.from < cur) continue;           // an overlap: kept as emitted (none expected)
         pushOld(cur, r.from);
+        const outFrom = pos.length / 9;
         let out = r.out;
         if (!out) {
           const O = r.X.O; out = new Float64Array(O.tri.length * 3);
@@ -819,6 +860,7 @@ export function bone2Hook({ mode = 'grid', edgeMm = null, stats = {}, focus = nu
           let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const L = Math.hypot(nx, ny, nz) || 1;
           for (let c = 0; c < 3; c++) nrm.push(nx / L, ny / L, nz / L);
         }
+        stats.ranges.push({ organ: r.X.O.organ, from: outFrom, to: pos.length / 9, refined: !!r.out });
         cur = r.to;
       }
       pushOld(cur, old.length / 9);

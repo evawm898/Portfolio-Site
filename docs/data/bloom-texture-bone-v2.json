@@ -1746,10 +1746,11 @@
  "bloomGridBuilt": {
   "state": "the default",
   "edgeMm": 0.1,
-  "tris": 2857886,
+  "tris": 2856784,
   "ms": 6466,
   "passMs": 5523.381,
-  "countSays": 2814659
+  "countSays": 2814659,
+  "note": "re-built after the coincidence rule (15 porous triangles withdrawn); ms/passMs are the pre-rule build"
  },
  "print": [
   {
@@ -1760,29 +1761,33 @@
     "crossPairs": 15614,
     "worstSpanMm": 0,
     "shells": 9,
-    "censusMs": 2687
+    "censusMs": 2453
    },
    "v2-lattice": {
+    "junctionTris": 0,
     "tris": 158912,
     "withinPairs": 0,
     "crossPairs": 15589,
     "worstSpanMm": 0,
     "shells": 9,
-    "censusMs": 2611
+    "censusMs": 2891
    },
    "v2-grid0.1": {
-    "tris": 2857886,
-    "withinPairs": 4492,
-    "crossPairs": 17499,
-    "worstSpanMm": 0.433,
-    "shells": 7,
-    "censusMs": 61194
+    "junctionTris": 0,
+    "coincidentWithdrawn": 15,
+    "tris": 2856784,
+    "withinPairs": 0,
+    "crossPairs": 21754,
+    "worstSpanMm": 0,
+    "shells": 9,
+    "censusMs": 64593
    },
    "nib": {
     "cornersWithin1_2mm": 1776,
-    "raised": 773,
+    "reliefOver005": 88,
+    "tailUnder005": 685,
     "maxMm": 0.399,
-    "nearestRaisedToApexMm": 0.004,
+    "nearestReliefToApexMm": 0.702,
     "fadeMm": 0.75
    },
    "gaps": {
@@ -1790,6 +1795,50 @@
     "newlyClosedPrintableGaps": 0,
     "newlyTouching": 0,
     "nearestTexturedMm": 0.171
+   }
+  },
+  {
+   "H": 2.5,
+   "v1": {
+    "tris": 158912,
+    "withinPairs": 0,
+    "crossPairs": 15614,
+    "worstSpanMm": 0,
+    "shells": 9,
+    "censusMs": 3092
+   },
+   "v2-lattice": {
+    "junctionTris": 0,
+    "tris": 158912,
+    "withinPairs": 0,
+    "crossPairs": 15589,
+    "worstSpanMm": 0,
+    "shells": 9,
+    "censusMs": 3612
+   },
+   "v2-grid0.1": {
+    "junctionTris": 0,
+    "coincidentWithdrawn": 15,
+    "tris": 2856784,
+    "withinPairs": 0,
+    "crossPairs": 21754,
+    "worstSpanMm": 0,
+    "shells": 9,
+    "censusMs": 75797
+   },
+   "nib": {
+    "cornersWithin1_2mm": 1776,
+    "reliefOver005": 7,
+    "tailUnder005": 754,
+    "maxMm": 0.098,
+    "nearestReliefToApexMm": 1.185,
+    "fadeMm": 4.688
+   },
+   "gaps": {
+    "sampledRelievedVerticesNearAnotherPart": 21367,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestTexturedMm": 0.16
    }
   }
  ]

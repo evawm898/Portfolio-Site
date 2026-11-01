@@ -217,7 +217,20 @@ WITNESS, a direct call on the mutated module proving its behaviour moved, run be
 | `a-typed-refinement-edge` | the edge is the same at 0.5 and 1.0 mm pores | B2c |
 | `pores-revert-to-grid-aligned` | the field on a pore's axis and diagonal differ (an L∞ radius) | B2d |
 
-RESULT_CONTROL
+**Measured, this tree:** clean PASS on B2a–B2d.
+- B2a: 0 vertices below the sheet, and all 22 deepest points sit at exactly 0.
+- B2b: 45,874 smooth-interior triangles, none missing from the 2,856,784-triangle grid build.
+- B2c: the edge is 0.02649 / 0.05298 mm at 0.5 / 1.0 mm pores, matching the restatement.
+- B2d: the rings run 2.25% off the circle at 32 segments; the grid 1.16% at 255.
+
+`--control`: 4 of 4 mutants fire the clause they name.
+
+| mutant | its witness | what the gate reads |
+|---|---|---|
+| leaking refinement | 64 extra triangles | B2b |
+| pore floor below the sheet | −0.436 | B2a |
+| typed edge | 0.05 / 0.05 mm | B2c |
+| grid-aligned pores | 0.478 apart | B2d: rings 17.3%, grid 22.0% off the circle |
 
 ## 8. The budget, and how the cap would have to apply
 
@@ -234,8 +247,9 @@ lengths, never built), and the rings are ESTIMATED (§6):
 | 40 × 3 whorls | 1,442,144 (96.1%, @0.42) | 35,386 | 313 M | 22.9 M (1,525%) | 89.3 M | 7.69 M (**513%**) | 4.85 M (324%) | 5.28 M (352%) |
 | the mophead (depth 2) | 1,240,446 (82.7%) | 20,737 | 179 M | 13.4 M (890%) | 50.7 M | 4.79 M (**319%**) | 3.13 M (209%) | 3.38 M (225%) |
 
-The grid at 0.1 mm BUILT on the default is **2,857,886** triangles. That is 43,227 over the count, the transition
-fans, which the count leaves out on purpose.
+The grid at 0.1 mm BUILT on the default is **2,856,784** triangles. That is 42,125 over the count:
+- the transition fans, which the count leaves out on purpose;
+- less the 15 triangles the coincidence rule withdraws (§10).
 
 **What it says.**
 
@@ -255,11 +269,25 @@ refinement and the field).
 
 **In the browser** (`node tools/bloom-texture-bone2-browser.mjs`, headless Chromium, the geometry build only):
 
-RESULT_BROWSER
+Run alone on the box, ms, geometry build only. **Preview** is the held-slider build (untextured);
+**v1** is the shipped BONE on release. The rings are ESTIMATED: the v2-lattice build plus the porous area × the
+rings' measured browser cost (0.845 ms/mm² merging, 0.403 hard-core, on the plate).
+
+| state, mode | preview | v1 | v2 field on lattice | v2 grid 0.1 mm | v2 rings, merging (est.) | v2 rings, hard-core (est.) |
+|---|---|---|---|---|---|---|
+| default, EXPORT | 61 | 711 | 1,149 | **11,464** (2.86 M tris) | **4,885** | 2,932 |
+| default, LIVE | 49 | 705 | 843 | 15,964 | 4,580 | 2,627 |
+| umbel, head ON, EXPORT | 488 | 3,743 | 4,280 | — | 13,866 | 8,856 |
+| mophead, EXPORT | 1,549 | 28,961 | 31,102 | — | 48,608 | 39,458 |
+
+The grid was not built on the umbel or the mophead (7.05 M and 13.4 M triangles at 0.1 mm, past the budget, §8).
+An earlier run of the same tool with other work on the box read 8.6 s for the default's grid; the figures above are
+the uncontended run.
 
 - The held-slider preview is untouched: the page drops the texture while a slider is held
   (`DRAG_LIGHT_OVERRIDE`).
-- What moves is the build on RELEASE. On the default it goes from v1's ~1 s to ~9 s, grid or rings, because:
+- What moves is the build on RELEASE. On the default it goes from v1's 0.7 s to ~4.9 s on the rings (estimate) and
+  11.5 s on the 0.1 mm grid. On the mophead, v1 is ALREADY 29 s on release and the rings add ~20 s. The costs:
   - the field evaluates 81–100 candidates a vertex across three bands;
   - the refinement allocates in JS arrays;
   - the rings run a Delaunay per patch.
@@ -267,14 +295,54 @@ RESULT_BROWSER
 
 ## 10. Print reality
 
-RESULT_PRINT
+`--section print`, EXPORT, the default bloom, at H 0.4 and at the 2.5 mm maximum. The census is
+`tools/bloom-self-intersection.mjs`'s, run on every build.
+
+| build | H 0.4: tris / within-shell pairs / shells | H 2.5 |
+|---|---|---|
+| v1 (shipped) | 158,912 / 0 / 9 | 158,912 / 0 / 9 |
+| v2 field on the lattice | 158,912 / 0 / 9 | 158,912 / 0 / 9 |
+| v2 grid 0.1 mm | 2,856,784 / **0** / 9 | 2,856,784 / **0** / 9 |
+
+- **No relief fold at either height, on either mesh.**
+- **THE GRID WELDED THE BLOOM ON ITS FIRST BUILD, AND THE CENSUS IS WHAT SAID SO.**
+  - First run: 9 → 7 shells and 4,492 within-shell pairs at a 0.433 mm "span". The count was identical at
+    H 0.4 and 2.5, so it was topology, not relief.
+  - Attributed by emitter, it came to FIVE positions: refined vertices landing EXACTLY on the hub's rim points at
+    the 45° petals (6.2541, 6.2541, ±0.6). That welded three petals to the hub.
+  - The junction rule (no refinement on a position two organs already share) was not enough, because a midpoint
+    can land on a position only ONE other organ has.
+  - The refiner therefore checks every new vertex against every other organ's float32 keys, withdraws the porous
+    triangles that produced a coincident one, and refines again. **15 triangles withdrawn, 0 shared positions,
+    9 shells.**
+  - This is v1's own clearance finding (§3.4 of its doc), arriving through refinement. A shipping refiner owes
+    the same rule and a gate for it.
+- **Printable gaps:** 21,367 relieved vertices sampled near another part. **0 gaps newly close and 0 newly
+  touch**, at 0.4 and at 2.5. The nearest textured approach is 0.171 / 0.160 mm, the same pairs that sit that
+  close untextured.
+- **THE NIB, AND A CORRECTION TO v1 §5.** Of 1,776 lattice vertices within 1.2 mm of a petal apex:
+
+  | | relief > 0.05 mm | nearest such relief to the apex | largest |
+  |---|---|---|---|
+  | H 0.4 | 88 | 0.70 mm | 0.399 mm |
+  | H 2.5 | 7 | 1.19 mm | 0.098 mm |
+
+  - The rest are fade tails under 0.05 mm (685 / 754).
+  - So under v2 the curvature mask does NOT keep the whole nib smooth; the fade does more at height (4.69 mm at
+    2.5).
+  - v1 read 0 there because its patches are 20 mm across against v2's 6 mm, and the 1.2 mm nib fell between them.
+  - **v1 §5's "the nib is smooth by curvature alone" is therefore true of v1's patch scale, not of the law.**
+    A shipping session states the nib's clearance explicitly.
 
 - **Walls between pores are thin**, measured on the field at mid-height between adjacent fully admitted pores
   (default pores):
-  - **merging:** the thinnest 0.018 mm, 10th percentile 0.034, median 0.13;
-  - **hard-core:** the wall at the rim never under `0.2 ×` the summed radii, ≥ 0.17 mm on the default pores.
+  - **merging:** the thinnest 0.006 mm, 10th percentile 0.046, median 0.27;
+  - **hard-core:** the wall at the rim never under `0.2 ×` the summed radii; thinnest 0.17 mm, 10th percentile
+    0.17, median 0.36 on the default pores.
+  - These are a re-run with the pairing restricted to true neighbours (`d < 1.6 × (R1 + R2)`). The first pass
+    paired far pores and read 0.018 / 0.034 / 0.13.
   - Both are far below the ~0.35–0.4 mm SLS resolves, and far below `MIN_FEATURE_MM` 1.0 (a declared guess).
-  - **A 2.5 mm relief standing on a 0.13 mm wall** is a printability question for Eva (question 6), not a number to
+  - **A 2.5 mm relief standing on a 0.05–0.3 mm wall** is a printability question for Eva (question 6), not a number to
     tune.
 
 ## 11. Questions for Eva
@@ -301,11 +369,11 @@ RESULT_PRINT
 5. **THE NESTED PITS.** 0.25 mm minimum (under SLS's ~0.35–0.4), 0.32 of the pore, a shelf at 0.4 of the depth.
    Options: (a) keep; (b) raise the minimum to 0.35 mm (only pores ≥ 1.1 mm carry them); (c) drop the shelf
    (nested pits only where the pore's floor stands above the sheet).
-6. **A PRINTABLE WALL.** The walls are 0.02–0.13 mm (merging). Options: (a) keep the look and let the print decide;
+6. **A PRINTABLE WALL.** The walls are 0.006–0.27 mm (merging, thinnest to median). Options: (a) keep the look and let the print decide;
    (b) a wall floor (e.g. 0.4 mm), which spaces the pores out.
 7. **THE CONTROLS PROPOSED.** Smallest pore 0.5–1.0 mm (default 0.5), spread 1.5–3 (default 3), height 0.4–2.5,
    density default 0.9.
-8. **THE RELEASE BUILD.** ~9 s on the default in the browser, against v1's ~1 s; the drag preview is unchanged.
+8. **THE RELEASE BUILD.** On the default in the browser: ~4.9 s for the rings (estimate) and 11.5 s for the 0.1 mm grid, against v1's 0.7 s. The mophead goes from v1's 29 s to ~49 s. The drag preview is unchanged.
    Options: (a) accept; (b) an optimisation session (cache the pore lists per cell, typed arrays in the refiner,
    the build in a worker) before shipping.
 9. **THE FADE AT HEIGHT.** v1's derived fade `max(H × 15/8, e)` is **4.69 mm at 2.5**, so a tall relief leaves only
