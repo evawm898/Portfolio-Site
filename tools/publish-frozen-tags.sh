@@ -127,6 +127,7 @@ declare -A TAG_PUSH_XFAIL=(
   [phase49]='DECLARED IN ADVANCE: the TUBE build session edits .github/workflows/bloom-export-watertight.yml after f266606 (the TU0-TU6 preflight step), the shape GitHub refused for phase42; an absence is expected and a publish is called out as stale'
   [phase65]='GITHUB_TOKEN refused: .github/workflows/bloom-panel.yml (run 38441209204; #403, the design file, edited that file after c1fc595 and merged while #402 was in CI — the two sessions in flight against one base, so the refusal was not declarable in advance)'
   [phase83]='GITHUB_TOKEN refused: .github/workflows/frame.yml (run 39878247322; #452, /frame phase 3a, edited that file after 56f91f4 and merged while #451, the surface texture, was in CI — two sessions in flight against one base, the phase65 shape, so the refusal was not declarable in advance)'
+  [phase92]='GITHUB_TOKEN refused: .github/workflows/frame.yml (run 41310696958; #479, /frame phase 3e step 2, edited that file after 8e00721 and merged while #472, the umbel hubs, was in CI — two sessions in flight against one base, the phase65 shape, so the refusal was not declarable in advance)'
 )
 
 CHECK_ONLY=0
