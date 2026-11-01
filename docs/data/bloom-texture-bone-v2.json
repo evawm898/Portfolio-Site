@@ -1,0 +1,1754 @@
+{
+ "plate": [
+  {
+   "domain": "plate",
+   "params": {
+    "D": 0.5,
+    "spread": 3,
+    "Dmax": 1.5,
+    "H": 0.4,
+    "density": 0.9,
+    "packing": "overlap"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 1.604,
+   "wall": {
+    "pairs": 289,
+    "merged": 160,
+    "thinnestMm": 0.0059953980212783635,
+    "p10Mm": 0.04591688408904741,
+    "medianMm": 0.2697827989974217
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.017,
+     "edgeMm": 0.4,
+     "poresMeasured": 3,
+     "edgesPerCircMedian": 18,
+     "devPctMedian": 15.806,
+     "devPctMax": 17.271,
+     "devMmMax": 0.107,
+     "depthOverDiamMedian": 0.306,
+     "depthOverDiamRange": [
+      0.256,
+      0.363
+     ],
+     "depthMmMedian": 0.399
+    },
+    "grid": {
+     "trisPerMm2": 5515.87,
+     "msPerMm2": 7.026,
+     "edgeMm": 0.026,
+     "poresMeasured": 21,
+     "edgesPerCircMedian": 255,
+     "devPctMedian": 1.155,
+     "devPctMax": 1.936,
+     "devMmMax": 0.006,
+     "depthOverDiamMedian": 0.564,
+     "depthOverDiamRange": [
+      0.307,
+      0.762
+     ],
+     "depthMmMedian": 0.4
+    },
+    "grid0.1": {
+     "trisPerMm2": 340.72,
+     "msPerMm2": 0.399,
+     "edgeMm": 0.1,
+     "poresMeasured": 19,
+     "edgesPerCircMedian": 68,
+     "devPctMedian": 6.995,
+     "devPctMax": 11.719,
+     "devMmMax": 0.033,
+     "depthOverDiamMedian": 0.546,
+     "depthOverDiamRange": [
+      0.307,
+      0.762
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings": {
+     "trisPerMm2": 198.57,
+     "msPerMm2": 1.211,
+     "edgeMm": 0.25,
+     "poresMeasured": 19,
+     "edgesPerCircMedian": 51,
+     "devPctMedian": 9.027,
+     "devPctMax": 14.302,
+     "devMmMax": 0.054,
+     "depthOverDiamMedian": 0.548,
+     "depthOverDiamRange": [
+      0.307,
+      0.762
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings-lean": {
+     "trisPerMm2": 118.45,
+     "msPerMm2": 0.544,
+     "edgeMm": 0.25,
+     "poresMeasured": 19,
+     "edgesPerCircMedian": 40,
+     "devPctMedian": 12.063,
+     "devPctMax": 24.712,
+     "devMmMax": 0.082,
+     "depthOverDiamMedian": 0.548,
+     "depthOverDiamRange": [
+      0.307,
+      0.762
+     ],
+     "depthMmMedian": 0.4
+    }
+   }
+  },
+  {
+   "domain": "plate",
+   "params": {
+    "D": 0.5,
+    "spread": 3,
+    "Dmax": 1.5,
+    "H": 1,
+    "density": 0.9,
+    "packing": "overlap"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 1.604,
+   "wall": {
+    "pairs": 289,
+    "merged": 160,
+    "thinnestMm": 0.0059953980212783635,
+    "p10Mm": 0.04591688408904741,
+    "medianMm": 0.2697827989974217
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.017,
+     "edgeMm": 0.4,
+     "poresMeasured": 3,
+     "edgesPerCircMedian": 18,
+     "devPctMedian": 15.806,
+     "devPctMax": 17.271,
+     "devMmMax": 0.107,
+     "depthOverDiamMedian": 0.765,
+     "depthOverDiamRange": [
+      0.641,
+      0.908
+     ],
+     "depthMmMedian": 0.998
+    },
+    "grid": {
+     "trisPerMm2": 5515.87,
+     "msPerMm2": 7.495,
+     "edgeMm": 0.026,
+     "poresMeasured": 21,
+     "edgesPerCircMedian": 255,
+     "devPctMedian": 1.155,
+     "devPctMax": 1.936,
+     "devMmMax": 0.006,
+     "depthOverDiamMedian": 1.41,
+     "depthOverDiamRange": [
+      0.766,
+      1.904
+     ],
+     "depthMmMedian": 1
+    },
+    "grid0.1": {
+     "trisPerMm2": 340.72,
+     "msPerMm2": 0.426,
+     "edgeMm": 0.1,
+     "poresMeasured": 19,
+     "edgesPerCircMedian": 68,
+     "devPctMedian": 6.995,
+     "devPctMax": 11.719,
+     "devMmMax": 0.033,
+     "depthOverDiamMedian": 1.364,
+     "depthOverDiamRange": [
+      0.766,
+      1.904
+     ],
+     "depthMmMedian": 1
+    },
+    "rings": {
+     "trisPerMm2": 198.57,
+     "msPerMm2": 1.01,
+     "edgeMm": 0.25,
+     "poresMeasured": 19,
+     "edgesPerCircMedian": 51,
+     "devPctMedian": 9.027,
+     "devPctMax": 14.302,
+     "devMmMax": 0.054,
+     "depthOverDiamMedian": 1.37,
+     "depthOverDiamRange": [
+      0.766,
+      1.904
+     ],
+     "depthMmMedian": 1
+    },
+    "rings-lean": {
+     "trisPerMm2": 118.45,
+     "msPerMm2": 0.469,
+     "edgeMm": 0.25,
+     "poresMeasured": 19,
+     "edgesPerCircMedian": 40,
+     "devPctMedian": 12.063,
+     "devPctMax": 24.712,
+     "devMmMax": 0.082,
+     "depthOverDiamMedian": 1.37,
+     "depthOverDiamRange": [
+      0.766,
+      1.904
+     ],
+     "depthMmMedian": 1
+    }
+   }
+  },
+  {
+   "domain": "plate",
+   "params": {
+    "D": 0.5,
+    "spread": 3,
+    "Dmax": 1.5,
+    "H": 2.5,
+    "density": 0.9,
+    "packing": "overlap"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 1.604,
+   "wall": {
+    "pairs": 289,
+    "merged": 160,
+    "thinnestMm": 0.0059953980212783635,
+    "p10Mm": 0.04591688408904741,
+    "medianMm": 0.2697827989974217
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.018,
+     "edgeMm": 0.4,
+     "poresMeasured": 3,
+     "edgesPerCircMedian": 18,
+     "devPctMedian": 15.806,
+     "devPctMax": 17.271,
+     "devMmMax": 0.107,
+     "depthOverDiamMedian": 1.912,
+     "depthOverDiamRange": [
+      1.603,
+      2.27
+     ],
+     "depthMmMedian": 2.495
+    },
+    "grid": {
+     "trisPerMm2": 5515.87,
+     "msPerMm2": 7.359,
+     "edgeMm": 0.026,
+     "poresMeasured": 21,
+     "edgesPerCircMedian": 255,
+     "devPctMedian": 1.155,
+     "devPctMax": 1.936,
+     "devMmMax": 0.006,
+     "depthOverDiamMedian": 3.525,
+     "depthOverDiamRange": [
+      1.916,
+      4.761
+     ],
+     "depthMmMedian": 2.5
+    },
+    "grid0.1": {
+     "trisPerMm2": 340.72,
+     "msPerMm2": 0.599,
+     "edgeMm": 0.1,
+     "poresMeasured": 19,
+     "edgesPerCircMedian": 68,
+     "devPctMedian": 6.995,
+     "devPctMax": 11.719,
+     "devMmMax": 0.033,
+     "depthOverDiamMedian": 3.41,
+     "depthOverDiamRange": [
+      1.916,
+      4.761
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings": {
+     "trisPerMm2": 198.57,
+     "msPerMm2": 0.803,
+     "edgeMm": 0.25,
+     "poresMeasured": 19,
+     "edgesPerCircMedian": 51,
+     "devPctMedian": 9.027,
+     "devPctMax": 14.302,
+     "devMmMax": 0.054,
+     "depthOverDiamMedian": 3.426,
+     "depthOverDiamRange": [
+      1.916,
+      4.761
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings-lean": {
+     "trisPerMm2": 118.45,
+     "msPerMm2": 0.468,
+     "edgeMm": 0.25,
+     "poresMeasured": 19,
+     "edgesPerCircMedian": 40,
+     "devPctMedian": 12.063,
+     "devPctMax": 24.712,
+     "devMmMax": 0.082,
+     "depthOverDiamMedian": 3.426,
+     "depthOverDiamRange": [
+      1.916,
+      4.761
+     ],
+     "depthMmMedian": 2.5
+    }
+   }
+  },
+  {
+   "domain": "plate",
+   "params": {
+    "D": 1,
+    "spread": 3,
+    "Dmax": 3,
+    "H": 0.4,
+    "density": 0.9,
+    "packing": "overlap"
+   },
+   "gridEdgeMm": 0.053,
+   "poresPerMm2": 0.417,
+   "wall": {
+    "pairs": 127,
+    "merged": 77,
+    "thinnestMm": 0.007996124056437421,
+    "p10Mm": 0.08195696772787574,
+    "medianMm": 0.6219990365157723
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.013,
+     "edgeMm": 0.4,
+     "poresMeasured": 1,
+     "edgesPerCircMedian": 21,
+     "devPctMedian": 18.649,
+     "devPctMax": 18.649,
+     "devMmMax": 0.118,
+     "depthOverDiamMedian": 0.309,
+     "depthOverDiamRange": [
+      0.309,
+      0.309
+     ],
+     "depthMmMedian": 0.38
+    },
+    "grid": {
+     "trisPerMm2": 1379.06,
+     "msPerMm2": 1.723,
+     "edgeMm": 0.053,
+     "poresMeasured": 2,
+     "edgesPerCircMedian": 222,
+     "devPctMedian": 2.153,
+     "devPctMax": 2.153,
+     "devMmMax": 0.014,
+     "depthOverDiamMedian": 0.326,
+     "depthOverDiamRange": [
+      0.316,
+      0.326
+     ],
+     "depthMmMedian": 0.4
+    },
+    "grid0.1": {
+     "trisPerMm2": 341.69,
+     "msPerMm2": 0.347,
+     "edgeMm": 0.1,
+     "poresMeasured": 2,
+     "edgesPerCircMedian": 112,
+     "devPctMedian": 4.625,
+     "devPctMax": 4.625,
+     "devMmMax": 0.029,
+     "depthOverDiamMedian": 0.326,
+     "depthOverDiamRange": [
+      0.316,
+      0.326
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings": {
+     "trisPerMm2": 55.13,
+     "msPerMm2": 0.325,
+     "edgeMm": 0.5,
+     "poresMeasured": 2,
+     "edgesPerCircMedian": 45,
+     "devPctMedian": 9.306,
+     "devPctMax": 9.306,
+     "devMmMax": 0.059,
+     "depthOverDiamMedian": 0.326,
+     "depthOverDiamRange": [
+      0.316,
+      0.326
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings-lean": {
+     "trisPerMm2": 33.81,
+     "msPerMm2": 0.135,
+     "edgeMm": 0.5,
+     "poresMeasured": 2,
+     "edgesPerCircMedian": 46,
+     "devPctMedian": 14.81,
+     "devPctMax": 14.81,
+     "devMmMax": 0.094,
+     "depthOverDiamMedian": 0.316,
+     "depthOverDiamRange": [
+      0.243,
+      0.316
+     ],
+     "depthMmMedian": 0.4
+    }
+   }
+  },
+  {
+   "domain": "plate",
+   "params": {
+    "D": 1,
+    "spread": 3,
+    "Dmax": 3,
+    "H": 2.5,
+    "density": 0.9,
+    "packing": "overlap"
+   },
+   "gridEdgeMm": 0.053,
+   "poresPerMm2": 0.417,
+   "wall": {
+    "pairs": 127,
+    "merged": 77,
+    "thinnestMm": 0.007996124056437421,
+    "p10Mm": 0.08195696772787574,
+    "medianMm": 0.6219990365157723
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.016,
+     "edgeMm": 0.4,
+     "poresMeasured": 1,
+     "edgesPerCircMedian": 21,
+     "devPctMedian": 18.649,
+     "devPctMax": 18.649,
+     "devMmMax": 0.118,
+     "depthOverDiamMedian": 1.932,
+     "depthOverDiamRange": [
+      1.932,
+      1.932
+     ],
+     "depthMmMedian": 2.373
+    },
+    "grid": {
+     "trisPerMm2": 1379.06,
+     "msPerMm2": 1.612,
+     "edgeMm": 0.053,
+     "poresMeasured": 2,
+     "edgesPerCircMedian": 222,
+     "devPctMedian": 2.153,
+     "devPctMax": 2.153,
+     "devMmMax": 0.014,
+     "depthOverDiamMedian": 2.035,
+     "depthOverDiamRange": [
+      1.975,
+      2.035
+     ],
+     "depthMmMedian": 2.5
+    },
+    "grid0.1": {
+     "trisPerMm2": 341.69,
+     "msPerMm2": 0.348,
+     "edgeMm": 0.1,
+     "poresMeasured": 2,
+     "edgesPerCircMedian": 112,
+     "devPctMedian": 4.625,
+     "devPctMax": 4.625,
+     "devMmMax": 0.029,
+     "depthOverDiamMedian": 2.035,
+     "depthOverDiamRange": [
+      1.975,
+      2.035
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings": {
+     "trisPerMm2": 55.13,
+     "msPerMm2": 0.209,
+     "edgeMm": 0.5,
+     "poresMeasured": 2,
+     "edgesPerCircMedian": 45,
+     "devPctMedian": 9.306,
+     "devPctMax": 9.306,
+     "devMmMax": 0.059,
+     "depthOverDiamMedian": 2.035,
+     "depthOverDiamRange": [
+      1.975,
+      2.035
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings-lean": {
+     "trisPerMm2": 33.81,
+     "msPerMm2": 0.155,
+     "edgeMm": 0.5,
+     "poresMeasured": 2,
+     "edgesPerCircMedian": 46,
+     "devPctMedian": 14.81,
+     "devPctMax": 14.81,
+     "devMmMax": 0.094,
+     "depthOverDiamMedian": 1.974,
+     "depthOverDiamRange": [
+      1.52,
+      1.974
+     ],
+     "depthMmMedian": 2.5
+    }
+   }
+  },
+  {
+   "domain": "plate",
+   "params": {
+    "D": 0.5,
+    "spread": 1.5,
+    "Dmax": 0.75,
+    "H": 0.4,
+    "density": 0.9,
+    "packing": "overlap"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 3.9,
+   "wall": {
+    "pairs": 1056,
+    "merged": 699,
+    "thinnestMm": 0.003994455106010811,
+    "p10Mm": 0.04198086788777921,
+    "medianMm": 0.14565423702262936
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.02,
+     "edgeMm": 0.4,
+     "poresMeasured": 0,
+     "edgesPerCircMedian": null,
+     "devPctMedian": null,
+     "devPctMax": null,
+     "devMmMax": null,
+     "depthOverDiamMedian": null,
+     "depthOverDiamRange": null,
+     "depthMmMedian": null
+    },
+    "grid": {
+     "trisPerMm2": 5516.75,
+     "msPerMm2": 6.975,
+     "edgeMm": 0.026,
+     "poresMeasured": 26,
+     "edgesPerCircMedian": 209,
+     "devPctMedian": 1.746,
+     "devPctMax": 2.524,
+     "devMmMax": 0.007,
+     "depthOverDiamMedian": 0.688,
+     "depthOverDiamRange": [
+      0.616,
+      0.799
+     ],
+     "depthMmMedian": 0.4
+    },
+    "grid0.1": {
+     "trisPerMm2": 339.9,
+     "msPerMm2": 0.497,
+     "edgeMm": 0.1,
+     "poresMeasured": 21,
+     "edgesPerCircMedian": 52,
+     "devPctMedian": 10.365,
+     "devPctMax": 13.098,
+     "devMmMax": 0.036,
+     "depthOverDiamMedian": 0.664,
+     "depthOverDiamRange": [
+      0.616,
+      0.799
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings": {
+     "trisPerMm2": 260.39,
+     "msPerMm2": 1.528,
+     "edgeMm": 0.25,
+     "poresMeasured": 23,
+     "edgesPerCircMedian": 43,
+     "devPctMedian": 9.704,
+     "devPctMax": 18.784,
+     "devMmMax": 0.057,
+     "depthOverDiamMedian": 0.664,
+     "depthOverDiamRange": [
+      0.6,
+      0.799
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings-lean": {
+     "trisPerMm2": 140.98,
+     "msPerMm2": 0.798,
+     "edgeMm": 0.25,
+     "poresMeasured": 20,
+     "edgesPerCircMedian": 34,
+     "devPctMedian": 15.005,
+     "devPctMax": 26.502,
+     "devMmMax": 0.07,
+     "depthOverDiamMedian": 0.653,
+     "depthOverDiamRange": [
+      0.602,
+      0.794
+     ],
+     "depthMmMedian": 0.4
+    }
+   }
+  },
+  {
+   "domain": "plate",
+   "params": {
+    "D": 0.5,
+    "spread": 1.5,
+    "Dmax": 0.75,
+    "H": 2.5,
+    "density": 0.9,
+    "packing": "overlap"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 3.9,
+   "wall": {
+    "pairs": 1056,
+    "merged": 699,
+    "thinnestMm": 0.003994455106010811,
+    "p10Mm": 0.04198086788777921,
+    "medianMm": 0.14565423702262936
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.018,
+     "edgeMm": 0.4,
+     "poresMeasured": 0,
+     "edgesPerCircMedian": null,
+     "devPctMedian": null,
+     "devPctMax": null,
+     "devMmMax": null,
+     "depthOverDiamMedian": null,
+     "depthOverDiamRange": null,
+     "depthMmMedian": null
+    },
+    "grid": {
+     "trisPerMm2": 5516.75,
+     "msPerMm2": 7.459,
+     "edgeMm": 0.026,
+     "poresMeasured": 26,
+     "edgesPerCircMedian": 209,
+     "devPctMedian": 1.746,
+     "devPctMax": 2.524,
+     "devMmMax": 0.007,
+     "depthOverDiamMedian": 4.298,
+     "depthOverDiamRange": [
+      3.85,
+      4.996
+     ],
+     "depthMmMedian": 2.5
+    },
+    "grid0.1": {
+     "trisPerMm2": 339.9,
+     "msPerMm2": 0.389,
+     "edgeMm": 0.1,
+     "poresMeasured": 21,
+     "edgesPerCircMedian": 52,
+     "devPctMedian": 10.365,
+     "devPctMax": 13.098,
+     "devMmMax": 0.036,
+     "depthOverDiamMedian": 4.147,
+     "depthOverDiamRange": [
+      3.85,
+      4.996
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings": {
+     "trisPerMm2": 260.39,
+     "msPerMm2": 1.479,
+     "edgeMm": 0.25,
+     "poresMeasured": 23,
+     "edgesPerCircMedian": 43,
+     "devPctMedian": 9.704,
+     "devPctMax": 18.784,
+     "devMmMax": 0.057,
+     "depthOverDiamMedian": 4.147,
+     "depthOverDiamRange": [
+      3.75,
+      4.994
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings-lean": {
+     "trisPerMm2": 140.98,
+     "msPerMm2": 0.772,
+     "edgeMm": 0.25,
+     "poresMeasured": 20,
+     "edgesPerCircMedian": 34,
+     "devPctMedian": 15.005,
+     "devPctMax": 26.502,
+     "devMmMax": 0.07,
+     "depthOverDiamMedian": 4.079,
+     "depthOverDiamRange": [
+      3.761,
+      4.961
+     ],
+     "depthMmMedian": 2.5
+    }
+   }
+  },
+  {
+   "domain": "plate",
+   "params": {
+    "D": 0.5,
+    "spread": 3,
+    "Dmax": 1.5,
+    "H": 0.4,
+    "density": 0.9,
+    "packing": "hardcore"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 0.388,
+   "wall": {
+    "pairs": 7,
+    "merged": 0,
+    "thinnestMm": 0.1698630133060251,
+    "p10Mm": 0.1698630133060251,
+    "medianMm": 0.35553573365067265
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.023,
+     "edgeMm": 0.4,
+     "poresMeasured": 11,
+     "edgesPerCircMedian": 13,
+     "devPctMedian": 20.349,
+     "devPctMax": 29.102,
+     "devMmMax": 0.1,
+     "depthOverDiamMedian": 0.42,
+     "depthOverDiamRange": [
+      null,
+      0.556
+     ],
+     "depthMmMedian": 0.375
+    },
+    "grid": {
+     "trisPerMm2": 5515.87,
+     "msPerMm2": 7.656,
+     "edgeMm": 0.026,
+     "poresMeasured": 23,
+     "edgesPerCircMedian": 228,
+     "devPctMedian": 1.656,
+     "devPctMax": 2.047,
+     "devMmMax": 0.006,
+     "depthOverDiamMedian": 0.616,
+     "depthOverDiamRange": [
+      0.407,
+      0.717
+     ],
+     "depthMmMedian": 0.4
+    },
+    "grid0.1": {
+     "trisPerMm2": 340.72,
+     "msPerMm2": 0.429,
+     "edgeMm": 0.1,
+     "poresMeasured": 23,
+     "edgesPerCircMedian": 56,
+     "devPctMedian": 9.46,
+     "devPctMax": 12.059,
+     "devMmMax": 0.035,
+     "depthOverDiamMedian": 0.616,
+     "depthOverDiamRange": [
+      0.407,
+      0.716
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings": {
+     "trisPerMm2": 130.44,
+     "msPerMm2": 0.641,
+     "edgeMm": 0.25,
+     "poresMeasured": 23,
+     "edgesPerCircMedian": 32,
+     "devPctMedian": 2.251,
+     "devPctMax": 2.251,
+     "devMmMax": 0.01,
+     "depthOverDiamMedian": 0.617,
+     "depthOverDiamRange": [
+      0.4,
+      0.717
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings-lean": {
+     "trisPerMm2": 80.82,
+     "msPerMm2": 0.194,
+     "edgeMm": 0.25,
+     "poresMeasured": 23,
+     "edgesPerCircMedian": 24,
+     "devPctMedian": 4.916,
+     "devPctMax": 5.258,
+     "devMmMax": 0.027,
+     "depthOverDiamMedian": 0.617,
+     "depthOverDiamRange": [
+      0.4,
+      0.717
+     ],
+     "depthMmMedian": 0.4
+    }
+   }
+  },
+  {
+   "domain": "plate",
+   "params": {
+    "D": 0.5,
+    "spread": 3,
+    "Dmax": 1.5,
+    "H": 2.5,
+    "density": 0.9,
+    "packing": "hardcore"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 0.388,
+   "wall": {
+    "pairs": 7,
+    "merged": 0,
+    "thinnestMm": 0.1698630133060251,
+    "p10Mm": 0.1698630133060251,
+    "medianMm": 0.35553573365067265
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.022,
+     "edgeMm": 0.4,
+     "poresMeasured": 11,
+     "edgesPerCircMedian": 13,
+     "devPctMedian": 20.349,
+     "devPctMax": 29.102,
+     "devMmMax": 0.1,
+     "depthOverDiamMedian": 2.625,
+     "depthOverDiamRange": [
+      null,
+      3.478
+     ],
+     "depthMmMedian": 2.346
+    },
+    "grid": {
+     "trisPerMm2": 5515.87,
+     "msPerMm2": 7.183,
+     "edgeMm": 0.026,
+     "poresMeasured": 23,
+     "edgesPerCircMedian": 228,
+     "devPctMedian": 1.656,
+     "devPctMax": 2.047,
+     "devMmMax": 0.006,
+     "depthOverDiamMedian": 3.853,
+     "depthOverDiamRange": [
+      2.546,
+      4.479
+     ],
+     "depthMmMedian": 2.5
+    },
+    "grid0.1": {
+     "trisPerMm2": 340.72,
+     "msPerMm2": 0.417,
+     "edgeMm": 0.1,
+     "poresMeasured": 23,
+     "edgesPerCircMedian": 56,
+     "devPctMedian": 9.46,
+     "devPctMax": 12.059,
+     "devMmMax": 0.035,
+     "depthOverDiamMedian": 3.852,
+     "depthOverDiamRange": [
+      2.546,
+      4.475
+     ],
+     "depthMmMedian": 2.499
+    },
+    "rings": {
+     "trisPerMm2": 130.44,
+     "msPerMm2": 0.552,
+     "edgeMm": 0.25,
+     "poresMeasured": 23,
+     "edgesPerCircMedian": 32,
+     "devPctMedian": 2.251,
+     "devPctMax": 2.251,
+     "devMmMax": 0.01,
+     "depthOverDiamMedian": 3.853,
+     "depthOverDiamRange": [
+      2.502,
+      4.479
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings-lean": {
+     "trisPerMm2": 80.82,
+     "msPerMm2": 0.199,
+     "edgeMm": 0.25,
+     "poresMeasured": 23,
+     "edgesPerCircMedian": 24,
+     "devPctMedian": 4.916,
+     "devPctMax": 5.258,
+     "devMmMax": 0.027,
+     "depthOverDiamMedian": 3.853,
+     "depthOverDiamRange": [
+      2.502,
+      4.479
+     ],
+     "depthMmMedian": 2.5
+    }
+   }
+  },
+  {
+   "domain": "plate",
+   "params": {
+    "D": 1,
+    "spread": 3,
+    "Dmax": 3,
+    "H": 0.4,
+    "density": 0.9,
+    "packing": "hardcore"
+   },
+   "gridEdgeMm": 0.053,
+   "poresPerMm2": 0.095,
+   "wall": {
+    "pairs": 3,
+    "merged": 0,
+    "thinnestMm": 0.6239433740034958,
+    "p10Mm": 0.6239433740034958,
+    "medianMm": 0.769444001369973
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.018,
+     "edgeMm": 0.4,
+     "poresMeasured": 5,
+     "edgesPerCircMedian": 24,
+     "devPctMedian": 15.846,
+     "devPctMax": 20.563,
+     "devMmMax": 0.136,
+     "depthOverDiamMedian": 0.271,
+     "depthOverDiamRange": [
+      0.205,
+      0.35
+     ],
+     "depthMmMedian": 0.395
+    },
+    "grid": {
+     "trisPerMm2": 1379.06,
+     "msPerMm2": 1.603,
+     "edgeMm": 0.053,
+     "poresMeasured": 5,
+     "edgesPerCircMedian": 264,
+     "devPctMedian": 1.637,
+     "devPctMax": 2.153,
+     "devMmMax": 0.014,
+     "depthOverDiamMedian": 0.274,
+     "depthOverDiamRange": [
+      0.207,
+      0.355
+     ],
+     "depthMmMedian": 0.4
+    },
+    "grid0.1": {
+     "trisPerMm2": 341.69,
+     "msPerMm2": 0.36,
+     "edgeMm": 0.1,
+     "poresMeasured": 5,
+     "edgesPerCircMedian": 129,
+     "devPctMedian": 3.956,
+     "devPctMax": 5.262,
+     "devMmMax": 0.031,
+     "depthOverDiamMedian": 0.274,
+     "depthOverDiamRange": [
+      0.207,
+      0.355
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings": {
+     "trisPerMm2": 36.54,
+     "msPerMm2": 0.154,
+     "edgeMm": 0.5,
+     "poresMeasured": 5,
+     "edgesPerCircMedian": 32,
+     "devPctMedian": 1.994,
+     "devPctMax": 2.251,
+     "devMmMax": 0.02,
+     "depthOverDiamMedian": 0.27,
+     "depthOverDiamRange": [
+      0.207,
+      0.355
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings-lean": {
+     "trisPerMm2": 22.12,
+     "msPerMm2": 0.05,
+     "edgeMm": 0.5,
+     "poresMeasured": 5,
+     "edgesPerCircMedian": 24,
+     "devPctMedian": 5.258,
+     "devPctMax": 5.258,
+     "devMmMax": 0.052,
+     "depthOverDiamMedian": 0.27,
+     "depthOverDiamRange": [
+      0.207,
+      0.355
+     ],
+     "depthMmMedian": 0.4
+    }
+   }
+  },
+  {
+   "domain": "cylinder R6",
+   "params": {
+    "D": 0.5,
+    "spread": 3,
+    "Dmax": 1.5,
+    "H": 0.4,
+    "density": 0.9,
+    "packing": "overlap"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 1.46,
+   "wall": {
+    "pairs": 262,
+    "merged": 141,
+    "thinnestMm": 0.001999574827902416,
+    "p10Mm": 0.057935967830439264,
+    "medianMm": 0.2657867610420639
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.025,
+     "edgeMm": 0.4,
+     "poresMeasured": 7,
+     "edgesPerCircMedian": 13,
+     "devPctMedian": 20.766,
+     "devPctMax": 29.31,
+     "devMmMax": 0.102,
+     "depthOverDiamMedian": 0.386,
+     "depthOverDiamRange": [
+      null,
+      0.591
+     ],
+     "depthMmMedian": 0.377
+    },
+    "grid": {
+     "trisPerMm2": 5515.87,
+     "msPerMm2": 7.623,
+     "edgeMm": 0.026,
+     "poresMeasured": 29,
+     "edgesPerCircMedian": 264,
+     "devPctMedian": 1.607,
+     "devPctMax": 2.918,
+     "devMmMax": 0.012,
+     "depthOverDiamMedian": 0.557,
+     "depthOverDiamRange": [
+      0.318,
+      0.686
+     ],
+     "depthMmMedian": 0.4
+    },
+    "grid0.1": {
+     "trisPerMm2": 340.72,
+     "msPerMm2": 0.449,
+     "edgeMm": 0.1,
+     "poresMeasured": 26,
+     "edgesPerCircMedian": 68,
+     "devPctMedian": 8.484,
+     "devPctMax": 11.602,
+     "devMmMax": 0.038,
+     "depthOverDiamMedian": 0.565,
+     "depthOverDiamRange": [
+      0.318,
+      0.686
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings": {
+     "trisPerMm2": 180.38,
+     "msPerMm2": 0.784,
+     "edgeMm": 0.25,
+     "poresMeasured": 26,
+     "edgesPerCircMedian": 44,
+     "devPctMedian": 4.199,
+     "devPctMax": 13.517,
+     "devMmMax": 0.046,
+     "depthOverDiamMedian": 0.565,
+     "depthOverDiamRange": [
+      0.318,
+      0.686
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings-lean": {
+     "trisPerMm2": 107.65,
+     "msPerMm2": 0.449,
+     "edgeMm": 0.25,
+     "poresMeasured": 26,
+     "edgesPerCircMedian": 38,
+     "devPctMedian": 9.497,
+     "devPctMax": 16.467,
+     "devMmMax": 0.056,
+     "depthOverDiamMedian": 0.565,
+     "depthOverDiamRange": [
+      0.376,
+      0.686
+     ],
+     "depthMmMedian": 0.4
+    }
+   }
+  },
+  {
+   "domain": "cylinder R6",
+   "params": {
+    "D": 0.5,
+    "spread": 3,
+    "Dmax": 1.5,
+    "H": 2.5,
+    "density": 0.9,
+    "packing": "overlap"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 1.46,
+   "wall": {
+    "pairs": 262,
+    "merged": 141,
+    "thinnestMm": 0.001999574827902416,
+    "p10Mm": 0.057935967830439264,
+    "medianMm": 0.2657867610420639
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.018,
+     "edgeMm": 0.4,
+     "poresMeasured": 7,
+     "edgesPerCircMedian": 13,
+     "devPctMedian": 20.766,
+     "devPctMax": 29.31,
+     "devMmMax": 0.102,
+     "depthOverDiamMedian": 2.41,
+     "depthOverDiamRange": [
+      null,
+      3.691
+     ],
+     "depthMmMedian": 2.357
+    },
+    "grid": {
+     "trisPerMm2": 5515.87,
+     "msPerMm2": 7.47,
+     "edgeMm": 0.026,
+     "poresMeasured": 29,
+     "edgesPerCircMedian": 264,
+     "devPctMedian": 1.607,
+     "devPctMax": 2.918,
+     "devMmMax": 0.012,
+     "depthOverDiamMedian": 3.482,
+     "depthOverDiamRange": [
+      1.99,
+      4.287
+     ],
+     "depthMmMedian": 2.5
+    },
+    "grid0.1": {
+     "trisPerMm2": 340.72,
+     "msPerMm2": 0.439,
+     "edgeMm": 0.1,
+     "poresMeasured": 26,
+     "edgesPerCircMedian": 68,
+     "devPctMedian": 8.484,
+     "devPctMax": 11.602,
+     "devMmMax": 0.038,
+     "depthOverDiamMedian": 3.53,
+     "depthOverDiamRange": [
+      1.99,
+      4.286
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings": {
+     "trisPerMm2": 180.38,
+     "msPerMm2": 0.739,
+     "edgeMm": 0.25,
+     "poresMeasured": 26,
+     "edgesPerCircMedian": 44,
+     "devPctMedian": 4.199,
+     "devPctMax": 13.517,
+     "devMmMax": 0.046,
+     "depthOverDiamMedian": 3.533,
+     "depthOverDiamRange": [
+      1.99,
+      4.287
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings-lean": {
+     "trisPerMm2": 107.65,
+     "msPerMm2": 0.45,
+     "edgeMm": 0.25,
+     "poresMeasured": 26,
+     "edgesPerCircMedian": 38,
+     "devPctMedian": 9.497,
+     "devPctMax": 16.467,
+     "devMmMax": 0.056,
+     "depthOverDiamMedian": 3.533,
+     "depthOverDiamRange": [
+      2.351,
+      4.287
+     ],
+     "depthMmMedian": 2.5
+    }
+   }
+  },
+  {
+   "domain": "cylinder R6",
+   "params": {
+    "D": 0.5,
+    "spread": 3,
+    "Dmax": 1.5,
+    "H": 0.4,
+    "density": 0.9,
+    "packing": "hardcore"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 0.357,
+   "wall": {
+    "pairs": 6,
+    "merged": 0,
+    "thinnestMm": 0.24147022673361038,
+    "p10Mm": 0.24147022673361038,
+    "medianMm": 0.3634421420800522
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.023,
+     "edgeMm": 0.4,
+     "poresMeasured": 14,
+     "edgesPerCircMedian": 14,
+     "devPctMedian": 22.854,
+     "devPctMax": 31.415,
+     "devMmMax": 0.127,
+     "depthOverDiamMedian": 0.56,
+     "depthOverDiamRange": [
+      null,
+      0.657
+     ],
+     "depthMmMedian": 0.386
+    },
+    "grid": {
+     "trisPerMm2": 5515.87,
+     "msPerMm2": 7.347,
+     "edgeMm": 0.026,
+     "poresMeasured": 20,
+     "edgesPerCircMedian": 243,
+     "devPctMedian": 1.815,
+     "devPctMax": 2.675,
+     "devMmMax": 0.015,
+     "depthOverDiamMedian": 0.604,
+     "depthOverDiamRange": [
+      0.331,
+      0.732
+     ],
+     "depthMmMedian": 0.4
+    },
+    "grid0.1": {
+     "trisPerMm2": 340.72,
+     "msPerMm2": 0.418,
+     "edgeMm": 0.1,
+     "poresMeasured": 20,
+     "edgesPerCircMedian": 60,
+     "devPctMedian": 9.834,
+     "devPctMax": 11.772,
+     "devMmMax": 0.04,
+     "depthOverDiamMedian": 0.604,
+     "depthOverDiamRange": [
+      0.331,
+      0.731
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings": {
+     "trisPerMm2": 102.45,
+     "msPerMm2": 0.743,
+     "edgeMm": 0.25,
+     "poresMeasured": 20,
+     "edgesPerCircMedian": 32,
+     "devPctMedian": 2.246,
+     "devPctMax": 4.753,
+     "devMmMax": 0.03,
+     "depthOverDiamMedian": 0.604,
+     "depthOverDiamRange": [
+      0.331,
+      0.732
+     ],
+     "depthMmMedian": 0.4
+    },
+    "rings-lean": {
+     "trisPerMm2": 70.16,
+     "msPerMm2": 0.357,
+     "edgeMm": 0.25,
+     "poresMeasured": 20,
+     "edgesPerCircMedian": 24,
+     "devPctMedian": 5.011,
+     "devPctMax": 5.811,
+     "devMmMax": 0.037,
+     "depthOverDiamMedian": 0.604,
+     "depthOverDiamRange": [
+      0.331,
+      0.732
+     ],
+     "depthMmMedian": 0.4
+    }
+   }
+  },
+  {
+   "domain": "cylinder R6",
+   "params": {
+    "D": 0.5,
+    "spread": 3,
+    "Dmax": 1.5,
+    "H": 2.5,
+    "density": 0.9,
+    "packing": "hardcore"
+   },
+   "gridEdgeMm": 0.026,
+   "poresPerMm2": 0.357,
+   "wall": {
+    "pairs": 6,
+    "merged": 0,
+    "thinnestMm": 0.24147022673361038,
+    "p10Mm": 0.24147022673361038,
+    "medianMm": 0.3634421420800522
+   },
+   "methods": {
+    "lattice": {
+     "trisPerMm2": 13.44,
+     "msPerMm2": 0.022,
+     "edgeMm": 0.4,
+     "poresMeasured": 14,
+     "edgesPerCircMedian": 14,
+     "devPctMedian": 22.854,
+     "devPctMax": 31.415,
+     "devMmMax": 0.127,
+     "depthOverDiamMedian": 3.5,
+     "depthOverDiamRange": [
+      null,
+      4.107
+     ],
+     "depthMmMedian": 2.413
+    },
+    "grid": {
+     "trisPerMm2": 5515.87,
+     "msPerMm2": 7.587,
+     "edgeMm": 0.026,
+     "poresMeasured": 20,
+     "edgesPerCircMedian": 243,
+     "devPctMedian": 1.815,
+     "devPctMax": 2.675,
+     "devMmMax": 0.015,
+     "depthOverDiamMedian": 3.777,
+     "depthOverDiamRange": [
+      2.071,
+      4.573
+     ],
+     "depthMmMedian": 2.5
+    },
+    "grid0.1": {
+     "trisPerMm2": 340.72,
+     "msPerMm2": 0.41,
+     "edgeMm": 0.1,
+     "poresMeasured": 20,
+     "edgesPerCircMedian": 60,
+     "devPctMedian": 9.834,
+     "devPctMax": 11.772,
+     "devMmMax": 0.04,
+     "depthOverDiamMedian": 3.777,
+     "depthOverDiamRange": [
+      2.071,
+      4.57
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings": {
+     "trisPerMm2": 102.45,
+     "msPerMm2": 0.852,
+     "edgeMm": 0.25,
+     "poresMeasured": 20,
+     "edgesPerCircMedian": 32,
+     "devPctMedian": 2.246,
+     "devPctMax": 4.753,
+     "devMmMax": 0.03,
+     "depthOverDiamMedian": 3.777,
+     "depthOverDiamRange": [
+      2.071,
+      4.573
+     ],
+     "depthMmMedian": 2.5
+    },
+    "rings-lean": {
+     "trisPerMm2": 70.16,
+     "msPerMm2": 0.241,
+     "edgeMm": 0.25,
+     "poresMeasured": 20,
+     "edgesPerCircMedian": 24,
+     "devPctMedian": 5.011,
+     "devPctMax": 5.811,
+     "devMmMax": 0.037,
+     "depthOverDiamMedian": 3.777,
+     "depthOverDiamRange": [
+      2.071,
+      4.573
+     ],
+     "depthMmMedian": 2.5
+    }
+   }
+  }
+ ],
+ "round": {
+  "lattice": [
+   {
+    "D": 0.5,
+    "poresMeasured": 12,
+    "devPctMedian": 27.738,
+    "readsRound": false
+   },
+   {
+    "D": 1,
+    "poresMeasured": 10,
+    "devPctMedian": 18.775,
+    "readsRound": false
+   },
+   {
+    "D": 1.5,
+    "poresMeasured": 3,
+    "devPctMedian": 11.704,
+    "readsRound": false
+   },
+   {
+    "D": 2,
+    "poresMeasured": 2,
+    "devPctMedian": 10.12,
+    "readsRound": false
+   },
+   {
+    "D": 2.5,
+    "poresMeasured": 2,
+    "devPctMedian": 7.612,
+    "readsRound": false
+   },
+   {
+    "D": 3,
+    "poresMeasured": 2,
+    "devPctMedian": 7.301,
+    "readsRound": false
+   },
+   {
+    "D": 4,
+    "poresMeasured": 1,
+    "devPctMedian": 4.961,
+    "readsRound": true
+   }
+  ],
+  "grid0.1": [
+   {
+    "D": 0.5,
+    "poresMeasured": 33,
+    "devPctMedian": 10.467,
+    "readsRound": false
+   },
+   {
+    "D": 0.75,
+    "poresMeasured": 17,
+    "devPctMedian": 6.996,
+    "readsRound": false
+   },
+   {
+    "D": 1,
+    "poresMeasured": 10,
+    "devPctMedian": 5.09,
+    "readsRound": false
+   },
+   {
+    "D": 1.5,
+    "poresMeasured": 3,
+    "devPctMedian": 2.738,
+    "readsRound": true
+   },
+   {
+    "D": 2,
+    "poresMeasured": 2,
+    "devPctMedian": 1.79,
+    "readsRound": true
+   }
+  ],
+  "rings": [
+   {
+    "D": 0.5,
+    "poresMeasured": 33,
+    "devPctMedian": 2.251,
+    "readsRound": true
+   },
+   {
+    "D": 0.75,
+    "poresMeasured": 17,
+    "devPctMedian": 1.994,
+    "readsRound": true
+   },
+   {
+    "D": 1,
+    "poresMeasured": 10,
+    "devPctMedian": 1.994,
+    "readsRound": true
+   },
+   {
+    "D": 1.5,
+    "poresMeasured": 3,
+    "devPctMedian": 2.251,
+    "readsRound": true
+   }
+  ],
+  "rings-lean": [
+   {
+    "D": 0.5,
+    "poresMeasured": 33,
+    "devPctMedian": 4.916,
+    "readsRound": true
+   },
+   {
+    "D": 0.75,
+    "poresMeasured": 17,
+    "devPctMedian": 5.258,
+    "readsRound": false
+   },
+   {
+    "D": 1,
+    "poresMeasured": 10,
+    "devPctMedian": 5.258,
+    "readsRound": false
+   },
+   {
+    "D": 1.5,
+    "poresMeasured": 3,
+    "devPctMedian": 4.916,
+    "readsRound": true
+   }
+  ]
+ },
+ "bloom": [
+  {
+   "name": "the default",
+   "v1Tris": 158912,
+   "v1Pct": 10.6,
+   "v1EdgeMm": 0.4,
+   "v1Ms": 1238,
+   "baseTris": 158912,
+   "edgeMm": 0.4,
+   "refused": null,
+   "countMs": 2704,
+   "areaMm2": 7922.72,
+   "porousAreaMm2": 4423.839,
+   "porousTris": 96693,
+   "derivedGridEdgeMm": 0.026,
+   "derivedGridTris": 39731661,
+   "derivedGridPct": 2648.8,
+   "grid01Tris": 2814659,
+   "grid01Pct": 187.6,
+   "grid005Tris": 11061043,
+   "grid005Pct": 737.4,
+   "ringsEstTris": 940661,
+   "ringsLeanEstTris": 586223,
+   "ringsHardcoreEstTris": 639265,
+   "ringsEstPct": 62.7,
+   "ringsLeanEstPct": 39.1,
+   "ringsHardcoreEstPct": 42.6
+  },
+  {
+   "name": "whole bloom (60 mm stem, a leaf, 5 sepals, 12 stamens, the style)",
+   "v1Tris": 289008,
+   "v1Pct": 19.3,
+   "v1EdgeMm": 0.4,
+   "v1Ms": 3052,
+   "baseTris": 289008,
+   "edgeMm": 0.4,
+   "refused": null,
+   "countMs": 5444,
+   "areaMm2": 13336.172,
+   "porousAreaMm2": 6955.775,
+   "porousTris": 160652,
+   "derivedGridEdgeMm": 0.026,
+   "derivedGridTris": 59394520,
+   "derivedGridPct": 3959.6,
+   "grid01Tris": 4262109,
+   "grid01Pct": 284.1,
+   "grid005Tris": 16616677,
+   "grid005Pct": 1107.8,
+   "ringsEstTris": 1509564,
+   "ringsLeanEstTris": 952268,
+   "ringsHardcoreEstTris": 1035667,
+   "ringsEstPct": 100.6,
+   "ringsLeanEstPct": 63.5,
+   "ringsHardcoreEstPct": 69
+  },
+  {
+   "name": "Voronoi infill (texture refused)",
+   "v1Tris": 108928,
+   "v1Pct": 7.3,
+   "v1EdgeMm": 0.4,
+   "v1Ms": 2019,
+   "baseTris": 108928,
+   "edgeMm": 0.4,
+   "refused": "infill",
+   "countMs": 1394,
+   "areaMm2": 0,
+   "porousAreaMm2": 0,
+   "porousTris": 0,
+   "derivedGridTris": 108928,
+   "derivedGridPct": 7.3,
+   "grid01Tris": 108928,
+   "grid01Pct": 7.3,
+   "grid005Tris": 108928,
+   "grid005Pct": 7.3,
+   "ringsEstTris": 108928,
+   "ringsLeanEstTris": 108928,
+   "ringsHardcoreEstTris": 108928,
+   "ringsEstPct": 7.3,
+   "ringsLeanEstPct": 7.3,
+   "ringsHardcoreEstPct": 7.3
+  },
+  {
+   "name": "closed tube",
+   "v1Tris": 143376,
+   "v1Pct": 9.6,
+   "v1EdgeMm": 0.4,
+   "v1Ms": 1250,
+   "baseTris": 143376,
+   "edgeMm": 0.4,
+   "refused": null,
+   "countMs": 3265,
+   "areaMm2": 8698.253,
+   "porousAreaMm2": 5021.041,
+   "porousTris": 80153,
+   "derivedGridEdgeMm": 0.026,
+   "derivedGridTris": 43816987,
+   "derivedGridPct": 2921.1,
+   "grid01Tris": 3097573,
+   "grid01Pct": 206.5,
+   "grid005Tris": 12033431,
+   "grid005Pct": 802.2,
+   "ringsEstTris": 1060251,
+   "ringsLeanEstTris": 657965,
+   "ringsHardcoreEstTris": 718168,
+   "ringsEstPct": 70.7,
+   "ringsLeanEstPct": 43.9,
+   "ringsHardcoreEstPct": 47.9
+  },
+  {
+   "name": "umbel, head ON",
+   "v1Tris": 530634,
+   "v1Pct": 35.4,
+   "v1EdgeMm": 0.4,
+   "v1Ms": 5398,
+   "baseTris": 530634,
+   "edgeMm": 0.4,
+   "refused": null,
+   "countMs": 9272,
+   "areaMm2": 22949.812,
+   "porousAreaMm2": 11350.301,
+   "porousTris": 292336,
+   "derivedGridEdgeMm": 0.026,
+   "derivedGridTris": 95171311,
+   "derivedGridPct": 6344.8,
+   "grid01Tris": 7053005,
+   "grid01Pct": 470.2,
+   "grid005Tris": 27339524,
+   "grid005Pct": 1822.6,
+   "ringsEstTris": 2492127,
+   "ringsLeanEstTris": 1582741,
+   "ringsHardcoreEstTris": 1718831,
+   "ringsEstPct": 166.1,
+   "ringsLeanEstPct": 105.5,
+   "ringsHardcoreEstPct": 114.6
+  },
+  {
+   "name": "40 x 3 whorls",
+   "v1Tris": 1442144,
+   "v1Pct": 96.1,
+   "v1EdgeMm": 0.42,
+   "v1Ms": 46238,
+   "baseTris": 1442144,
+   "edgeMm": 0.42,
+   "refused": null,
+   "countMs": 50670,
+   "areaMm2": 78536.106,
+   "porousAreaMm2": 35385.567,
+   "porousTris": 780683,
+   "derivedGridEdgeMm": 0.026,
+   "derivedGridTris": 313405798,
+   "derivedGridPct": 20893.7,
+   "grid01Tris": 22879687,
+   "grid01Pct": 1525.3,
+   "grid005Tris": 89338570,
+   "grid005Pct": 5955.9,
+   "ringsEstTris": 7687973,
+   "ringsLeanEstTris": 4852881,
+   "ringsHardcoreEstTris": 5277154,
+   "ringsEstPct": 512.5,
+   "ringsLeanEstPct": 323.5,
+   "ringsHardcoreEstPct": 351.8
+  },
+  {
+   "name": "the mophead (depth 2)",
+   "v1Tris": 1240446,
+   "v1Pct": 82.7,
+   "v1EdgeMm": 0.4,
+   "v1Ms": 38351,
+   "baseTris": 1240446,
+   "edgeMm": 0.4,
+   "refused": null,
+   "countMs": 47683,
+   "areaMm2": 50848.658,
+   "porousAreaMm2": 20736.966,
+   "porousTris": 567315,
+   "derivedGridEdgeMm": 0.026,
+   "derivedGridTris": 178880887,
+   "derivedGridPct": 11925.4,
+   "grid01Tris": 13356564,
+   "grid01Pct": 890.4,
+   "grid005Tris": 50721394,
+   "grid005Pct": 3381.4,
+   "ringsEstTris": 4790870,
+   "ringsLeanEstTris": 3129425,
+   "ringsHardcoreEstTris": 3378061,
+   "ringsEstPct": 319.4,
+   "ringsLeanEstPct": 208.6,
+   "ringsHardcoreEstPct": 225.2
+  }
+ ],
+ "bloomGridBuilt": {
+  "state": "the default",
+  "edgeMm": 0.1,
+  "tris": 2857886,
+  "ms": 6466,
+  "passMs": 5523.381,
+  "countSays": 2814659
+ }
+}
