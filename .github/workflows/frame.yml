@@ -24,7 +24,10 @@ on:
       - frame-view3d.js
       - frame-filigree.js
       - frame-pattern.js
+      - frame-elements.js
       - tools/verify-frame.mjs
+      - tools/verify-frame-elements.mjs
+      - tools/shot-frame-elements.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
@@ -46,7 +49,10 @@ on:
       - frame-view3d.js
       - frame-filigree.js
       - frame-pattern.js
+      - frame-elements.js
       - tools/verify-frame.mjs
+      - tools/verify-frame-elements.mjs
+      - tools/shot-frame-elements.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
@@ -92,6 +98,12 @@ jobs:
           node tools/verify-frame-relief.mjs --base /tmp/frame-base
       - name: Ruling 5 — the clamps sit on the measured fold
         run: node tools/frame-fold-boundary.mjs
+      # Phase 3e step 2: the placed elements (EL0-EL5) and their six mutants —
+      # Node only, under a minute, so the sweep rides here rather than in a shard.
+      - name: Placed elements gate (closed, one region, floors, cost, smooth, the record) + its negative control
+        run: |
+          node tools/verify-frame-elements.mjs
+          node tools/verify-frame-elements.mjs --negative-control
       - name: Frame gate (part one Node, part two Chromium)
         run: node tools/verify-frame.mjs
 
