@@ -158,11 +158,11 @@ if (SECTIONS.includes('print')) {
   for (const H of [0.4, 2.5]) {
     const row = { H };
     /* folds: the census within shells, v1 / v2 lattice / v2 grid 0.1 */
-    for (const [m, st, opt] of [['v1', { ...DEFAULTS, petalTexture: 'BONE', textureHeight: Math.min(H, 1.5) }, { mode: 'v1' }], ['v2-lattice', B.bone2State(DEFAULTS, { textureHeight: H }), { mode: 'lattice' }], ['v2-grid0.1', B.bone2State(DEFAULTS, { textureHeight: H }), { mode: 'grid', edgeMm: 0.1 }]]) {
+    for (const [m, st, opt] of (args.includes('--grid-only') ? [] : [['v1', { ...DEFAULTS, petalTexture: 'BONE', textureHeight: Math.min(H, 1.5) }, { mode: 'v1' }], ['v2-lattice', B.bone2State(DEFAULTS, { textureHeight: H }), { mode: 'lattice' }], ['v2-grid0.1', B.bone2State(DEFAULTS, { textureHeight: H }), { mode: 'grid', edgeMm: 0.1 }]]).concat(args.includes('--grid-only') ? [['v2-grid0.1', B.bone2State(DEFAULTS, { textureHeight: H }), { mode: 'grid', edgeMm: 0.1 }]] : [])) {
       const r = await B.bone2Bloom(st, opt);
       const t0 = Date.now();
       const c = census(new Float64Array(r.acc.positions));
-      row[m] = { tris: r.acc.triangleCount, withinPairs: c.within, crossPairs: c.cross, worstSpanMm: r3(c.worstSpanMm), shells: c.shells, censusMs: Date.now() - t0 };
+      row[m] = { junctionTris: r.stats.junctionTris, tris: r.acc.triangleCount, withinPairs: c.within, crossPairs: c.cross, worstSpanMm: r3(c.worstSpanMm), shells: c.shells, censusMs: Date.now() - t0 };
       console.log(`print H ${H} ${m}: ${r.acc.triangleCount} tris, census ${JSON.stringify(row[m])}`);
     }
     /* the bead and the nib: corners near the apex of petal 0, relieved or not */
@@ -172,15 +172,17 @@ if (SECTIONS.includes('print')) {
     const pr = off.rec.petalsAll[0].triRange;
     let apex = null, best = -Infinity;
     for (let i = pr[0] * 9; i < pr[1] * 9; i += 3) { const r = Math.hypot(off.acc.positions[i], off.acc.positions[i + 1]); if (r > best) { best = r; apex = [off.acc.positions[i], off.acc.positions[i + 1], off.acc.positions[i + 2]]; } }
-    let nibN = 0, nibRaised = 0, nibMax = 0, nearestRaisedToApex = Infinity;
+    /* raised by more than 0.05 mm is RELIEF; under 0.001 mm is a fade's tail
+       (both counted, never conflated) */
+    let nibN = 0, nibRelief = 0, nibTail = 0, nibMax = 0, nearestReliefToApex = Infinity;
     for (let i = pr[0] * 9; i < pr[1] * 9; i += 3) {
       const d = Math.hypot(off.acc.positions[i] - apex[0], off.acc.positions[i + 1] - apex[1], off.acc.positions[i + 2] - apex[2]);
       const m = Math.hypot(on.acc.positions[i] - off.acc.positions[i], on.acc.positions[i + 1] - off.acc.positions[i + 1], on.acc.positions[i + 2] - off.acc.positions[i + 2]);
-      if (m > 1e-9 && d < nearestRaisedToApex) nearestRaisedToApex = d;
+      if (m > 0.05 && d < nearestReliefToApex) nearestReliefToApex = d;
       if (d > 1.2) continue;
-      nibN++; if (m > 1e-9) nibRaised++; if (m > nibMax) nibMax = m;
+      nibN++; if (m > 0.05) nibRelief++; else if (m > 1e-9) nibTail++; if (m > nibMax) nibMax = m;
     }
-    row.nib = { cornersWithin1_2mm: nibN, raised: nibRaised, maxMm: r3(nibMax), nearestRaisedToApexMm: r3(nearestRaisedToApex), fadeMm: r3(Math.max((H * 15) / 8, 0.4)) };
+    row.nib = { cornersWithin1_2mm: nibN, reliefOver005: nibRelief, tailUnder005: nibTail, maxMm: r3(nibMax), nearestReliefToApexMm: r3(nearestReliefToApex), fadeMm: r3(Math.max((H * 15) / 8, 0.4)) };
     console.log(`print H ${H} nib: ${JSON.stringify(row.nib)}`);
     /* printable gaps newly closed between PARTS: every relieved petal vertex
        (sampled) against every other part's triangles, untextured -> textured */

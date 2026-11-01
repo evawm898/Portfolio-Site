@@ -727,6 +727,15 @@ export function bone2Hook({ mode = 'grid', edgeMm = null, stats = {}, focus = nu
       stats.edgeDerivedMm = eDerived; stats.edgeMm = e; stats.mode = mode;
       stats.organs = {};
       const t0 = performance.now();
+      /* a position two ORGANS both emit (keyed on the STL's float32s, the
+         derived owner's own key) is a junction: a triangle carrying one is
+         never refined, so no refined vertex lands on an edge two organs share
+         — a midpoint there would be one position in two closed shells and the
+         file would weld them (v1's 10,208-pair finding, §3.4 of its doc) */
+      const f32 = Math.fround, owners = new Map();
+      per.forEach((X, oi) => { for (let i = 0; i < X.nV; i++) { const k = `${f32(X.O.P[i * 3])}|${f32(X.O.P[i * 3 + 1])}|${f32(X.O.P[i * 3 + 2])}`; const o = owners.get(k); if (o === undefined) owners.set(k, oi); else if (o !== oi) owners.set(k, -1); } });
+      const junction = (O, v) => owners.get(`${f32(O.P[v * 3])}|${f32(O.P[v * 3 + 1])}|${f32(O.P[v * 3 + 2])}`) === -1;
+      let junctionTris = 0;
       const plans = [];
       for (const X of per) {
         const O = X.O, nV = X.nV;
@@ -739,6 +748,7 @@ export function bone2Hook({ mode = 'grid', edgeMm = null, stats = {}, focus = nu
           const a = O.tri[t * 3], b = O.tri[t * 3 + 1], c = O.tri[t * 3 + 2];
           if ((mw[a] > 0 && X.mpv[a] > 0) || (mw[b] > 0 && X.mpv[b] > 0) || (mw[c] > 0 && X.mpv[c] > 0)) {
             if (focusOut(O, a, b, c)) continue;
+            if (junction(O, a) || junction(O, b) || junction(O, c)) { junctionTris++; continue; }
             porous[t] = 1; porousTris++; porousArea += triArea(O.P, a, b, c);
             if (mode === 'count') {
               const L = (u, v) => Math.hypot(O.P[u * 3] - O.P[v * 3], O.P[u * 3 + 1] - O.P[v * 3 + 1], O.P[u * 3 + 2] - O.P[v * 3 + 2]);
@@ -752,6 +762,7 @@ export function bone2Hook({ mode = 'grid', edgeMm = null, stats = {}, focus = nu
         for (let t = 0; t < nT; t++) st.areaMm2 += triArea(O.P, O.tri[t * 3], O.tri[t * 3 + 1], O.tri[t * 3 + 2]);
         plans.push({ X, mw, porous, porousTris });
       }
+      stats.junctionTris = junctionTris;
       if (mode === 'count' || mode === 'lattice') { stats.passMs = performance.now() - t0; return null; }
       if (mode === 'rings' && !focus) throw new Error('bone2: the rings run in a FOCUS window only (a charted patch) — see the doc §6');
       /* GRID: refine each organ's porous triangles; rebuild the stream */

@@ -1750,5 +1750,47 @@
   "ms": 6466,
   "passMs": 5523.381,
   "countSays": 2814659
- }
+ },
+ "print": [
+  {
+   "H": 0.4,
+   "v1": {
+    "tris": 158912,
+    "withinPairs": 0,
+    "crossPairs": 15614,
+    "worstSpanMm": 0,
+    "shells": 9,
+    "censusMs": 2687
+   },
+   "v2-lattice": {
+    "tris": 158912,
+    "withinPairs": 0,
+    "crossPairs": 15589,
+    "worstSpanMm": 0,
+    "shells": 9,
+    "censusMs": 2611
+   },
+   "v2-grid0.1": {
+    "tris": 2857886,
+    "withinPairs": 4492,
+    "crossPairs": 17499,
+    "worstSpanMm": 0.433,
+    "shells": 7,
+    "censusMs": 61194
+   },
+   "nib": {
+    "cornersWithin1_2mm": 1776,
+    "raised": 773,
+    "maxMm": 0.399,
+    "nearestRaisedToApexMm": 0.004,
+    "fadeMm": 0.75
+   },
+   "gaps": {
+    "sampledRelievedVerticesNearAnotherPart": 21367,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestTexturedMm": 0.171
+   }
+  }
+ ]
 }
