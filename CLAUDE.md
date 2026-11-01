@@ -1542,6 +1542,34 @@ follow-ups of Oct 26; read `docs/bloom-surface-texture-bone-outcome.md` before t
   - Byte partition: `--movers-predicate bone`.
   - Sheet: `node tools/shot-bloom-texture-bone.mjs docs/img/bloom-texture-bone-shipped.png`.
 
+**BONE v2 IS A PROTOTYPE AND A SHEET, NOT SHIPPED — THE MESHING AND THE PACKING ARE ONE DECISION, AND THE
+BUDGET CAP CANNOT REACH THE COST** (Nov 1, Eva's rulings of Nov 1 — read `docs/bloom-surface-texture-bone-v2.md`
+before touching `bloom-texture-bone2.js` or starting the shipping session). No shipped file moved.
+- **The prototype** is a runtime-patched COPY of the geometry (six anchored edits, the hook OFF is v1 to the byte).
+  - **Pores** are spheres in the world: 0.5–1.5 mm at the defaults, a superellipse cup, a lip-rounding smooth
+    minimum, nested pits on a shelf.
+  - **The grid edge is DERIVED**: half the lip's width at the smallest pore, 0.0265 mm at 0.5.
+  - **Refinement reaches only porous triangles** (longest-edge bisection, conforming by construction).
+- **Rings beat the grid only where pores stand apart**: 2.3% off round at 130 tris/mm², against the grid's 42×. On the
+  merging field (v1's ruling, ~42% porous) rings read 9.0% at 199/mm², worse than a 0.1 mm grid (7.0% at 341/mm²).
+  - A wall between every pore (3D hard-core) covers only ~15% of a surface.
+  - **Rings need a 2D chart per organ**; they run in a focus window here, and their whole-bloom figures are estimates.
+  - **Delaunay alone drops a pore's wall ring** (rings closer than a side). A pore's own rings are structured strips.
+- **Budget**: the derived grid is 26–209× over everywhere. The 0.1 mm grid is 188% on the default. Rings are 63%
+  default, 101% whole, 167% umbel, 320% mophead, 514% 40 × 3.
+  - The lattice-edge cap cannot reach the pores' cost: Eva's question 3, STOP.
+- **The height**: "depth ≈ diameter" derives 1.5 mm for the ruled pores, not 2.5 (question 4).
+- **Walls** are 0.006–0.27 mm (merging, thinnest to median) (question 6). **Release build** on the default: ~4.9 s for the rings (estimate), 11.5 s for the 0.1 mm grid, against v1's 0.7 s; the mophead ~49 s against v1's 29 s (question 8).
+- **The grid refiner WELDED three petals to the hub on its first build** (9 → 7 shells, 4,492 within-shell pairs,
+  the same at every height). A midpoint landed EXACTLY on a hub rim vertex at 45°. The refiner now withdraws the
+  porous triangles behind any new vertex whose float32 key another organ carries (15 on the default). A shipping
+  refiner owes this rule and a gate for it.
+- **The nib is NOT smooth by curvature under v2** (88 lattice vertices within 1.2 mm of an apex carry > 0.05 mm at
+  H 0.4). v1 read 0 there because of its 20 mm patch scale, so v1's "smooth by curvature alone" is that scale's, not
+  the law's.
+- Gate: `node tools/verify-bloom-bone2.mjs [--control]` (B2a–B2d, four witnessed mutants; not in CI).
+- Sheet: `node tools/shot-bloom-texture-bone2.mjs docs/img/bloom-texture-bone-v2.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
