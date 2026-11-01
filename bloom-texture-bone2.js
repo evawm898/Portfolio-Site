@@ -435,7 +435,14 @@ export function delaunay2(xy) {
   const dx = maxX - minX, dy = maxY - minY, dmax = Math.max(dx, dy) || 1, mx = (minX + maxX) / 2, my = (minY + maxY) / 2;
   const X = new Float64Array(n + 3), Y = new Float64Array(n + 3);
   for (let i = 0; i < n; i++) { X[i] = xy[i * 2]; Y[i] = xy[i * 2 + 1]; }
-  X[n] = mx - 20 * dmax; Y[n] = my - dmax; X[n + 1] = mx + 20 * dmax; Y[n + 1] = my - dmax; X[n + 2] = mx; Y[n + 2] = my + 20 * dmax;   // CCW
+  /* the super-triangle is FAR (2000x the extent): a finite one can make a
+     convex-hull edge non-Delaunay against its own vertices, and the edge is then
+     lost with the triangles that touch them — measured, 6 of a hole's 92
+     lattice edges on a sparse window at 20x (Gabriel edges, no point inside
+     their diametral circles). Doubles keep the predicates exact enough here:
+     the squared terms reach ~1e9 against details of ~1e-2. */
+  const SK = 2000;
+  X[n] = mx - SK * dmax; Y[n] = my - SK * dmax; X[n + 1] = mx + SK * dmax; Y[n + 1] = my - SK * dmax; X[n + 2] = mx; Y[n + 2] = my + SK * dmax;   // CCW
   /* triangles: v (3 per), nb (3 per: the neighbour opposite vertex k), alive */
   let V = [n, n + 1, n + 2], NB = [-1, -1, -1], alive = [1];
   const orient = (a, b, c) => (X[b] - X[a]) * (Y[c] - Y[a]) - (Y[b] - Y[a]) * (X[c] - X[a]);
@@ -638,6 +645,16 @@ function ringsWindowOrgan(X, mw, focus, T, FIELD, layout, stats) {
     return null;
   };
   const params = FIELD.params, LAY = B2_RING_LAYOUTS[layout], en = params.D / 2, uOut = LAY.u[LAY.u.length - 1];
+  /* THE HOLE'S EDGES ARE THE LATTICE'S (0.4 mm) AND MUST SURVIVE THE DELAUNAY.
+     An edge is in the triangulation when no other point lies inside the circle
+     on it as diameter (the Gabriel condition): a point at distance d from the
+     edge can be inside that circle only if d < L/2. So the fill and every
+     ringed pore keep half the longest hole edge (+0.5%) clear of the hole.
+     The first cut kept en/2 = 0.125 mm, under 0.2, and lost 7 hole edges on a
+     sparse (hard-core) window. */
+  let Lmax = 0; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; Lmax = Math.max(Lmax, Math.hypot(b[0] - a[0], b[1] - a[1])); }
+  const holeClear = Math.max(en * 0.5, Lmax * 0.505);
+  const clearOfHole = (x, y) => distPoly(x, y) - (holeClear - en * 0.5);
   /* the pores: every pore whose outer ring fits inside the hole */
   let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (const t of cut) for (let k = 0; k < 3; k++) { const v = O.tri[t * 3 + k]; for (let j = 0; j < 3; j++) { lo[j] = Math.min(lo[j], O.P[v * 3 + j]); hi[j] = Math.max(hi[j], O.P[v * 3 + j]); } }
@@ -650,7 +667,7 @@ function ringsWindowOrgan(X, mw, focus, T, FIELD, layout, stats) {
     const disc = FIELD.discOf(pore, at0.p, at0.n);
     if (!disc) continue;
     const c2 = ch(disc.centre[0], disc.centre[1], disc.centre[2]);
-    if (distPoly(c2[0], c2[1]) < disc.rho * uOut + en * 0.5 || !inPoly(c2[0], c2[1])) { edgeSkipped++; continue; }
+    if (distPoly(c2[0], c2[1]) < disc.rho * uOut + holeClear || !inPoly(c2[0], c2[1])) { edgeSkipped++; continue; }
     ringed++;
     const fr = FIELD.frame(at0.n);
     const nested = disc.nested.map((q) => { const o = [q.ox * fr.t1[0] + q.oy * fr.t2[0], q.ox * fr.t1[1] + q.oy * fr.t2[1], q.ox * fr.t1[2] + q.oy * fr.t2[2]]; nestedRinged++; return { x: c2[0] + o[0] * t1[0] + o[1] * t1[1] + o[2] * t1[2], y: c2[1] + o[0] * t2[0] + o[1] * t2[1] + o[2] * t2[2], R: q.R }; });
@@ -658,7 +675,7 @@ function ringsWindowOrgan(X, mw, focus, T, FIELD, layout, stats) {
   }
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const q of poly) { minX = Math.min(minX, q[0]); maxX = Math.max(maxX, q[0]); minY = Math.min(minY, q[1]); maxY = Math.max(maxY, q[1]); }
-  const RM = ringsMeshChart({ pores: placed, layout, boundary: poly, fill: { spacing: en, inside: inPoly, clearOf: distPoly, bbox: [minX, minY, maxX, maxY] } });
+  const RM = ringsMeshChart({ pores: placed, layout, boundary: poly, fill: { spacing: en, inside: inPoly, clearOf: clearOfHole, bbox: [minX, minY, maxX, maxY] } });
   const pts = []; for (let i = 0; i < RM.xy.length / 2; i++) pts.push([RM.xy[i * 2], RM.xy[i * 2 + 1]]);
   const ids = pts.map((_, i) => (i < loop.length ? loop[i] : -1));
   const kept = RM.tri;
@@ -934,7 +951,15 @@ export function ringsMeshChart({ pores, fill, boundary = null, layout = 'full' }
        length, so the saddle's walls are drawn */
     const lay = (sp, keep) => {
       const h = sp * Math.sqrt(3) / 2;
-      for (let j = 0, y = bbox[1]; y <= bbox[3]; j++, y += h) for (let x = bbox[0] + (j % 2) * sp / 2; x <= bbox[2]; x += sp) {
+      /* a regular hex lattice puts every point's six neighbours on ONE circle,
+         and a Bowyer-Watson insertion on cocircular points decides its cavity
+         by the last bit (measured: 171 of 1,943 triangles not Delaunay and 6
+         of a hole's lattice edges lost, on a sparse window). So each fill
+         point is moved by a deterministic jitter of up to 2% of the spacing:
+         nothing reads the fill's exact positions, only that it is even. */
+      const jit = (i, j, s) => { let h = (Math.imul(i + 0x9e3779b9, 0x85ebca6b) ^ Math.imul(j + s, 0xc2b2ae35)) >>> 0; h = Math.imul(h ^ (h >>> 13), 0x27d4eb2d) >>> 0; return ((h & 0xffff) / 0xffff - 0.5) * 0.04 * sp; };
+      for (let j = 0, y0 = bbox[1]; y0 <= bbox[3]; j++, y0 += h) for (let i = 0, x0 = bbox[0] + (j % 2) * sp / 2; x0 <= bbox[2]; i++, x0 += sp) {
+        const x = x0 + jit(i, j, 1), y = y0 + jit(i, j, 7);
         if (!inside(x, y) || clearOf(x, y) < sp * 0.5 || !keep(x, y)) continue;
         let ok = true;
         for (const l of loops) { const dx = x - l.x, dy = y - l.y; if (dx * dx + dy * dy < (l.r + sp * 0.5) ** 2) { ok = false; break; } }

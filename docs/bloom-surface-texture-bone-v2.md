@@ -114,6 +114,12 @@ the gate (B2c).
   is always split, and always at its midpoint, whichever triangle reaches it first;
 - a non-porous triangle that carries a split edge is fanned from its centroid (a transition fan) and refined
   nowhere else.
+- **The edge the grid LANDS on is quantised.** Bisection halves the shipped lattice's ~0.4 mm edges, so an edge
+  target `e` lands near `0.4 / 2^k`, the first halving at or under `e`:
+  - the derived 0.0265 mm (a 0.5 mm pore) lands on ~0.025;
+  - so does 0.0397 (a 0.75 mm pore) — the same density;
+  - 0.053 (1.0 mm) lands on ~0.05.
+  - A grid whose density followed the edge continuously would have to resample the lattice, not bisect it.
 
 **A porous triangle is one with a corner whose mask (visibility × curvature × patch) is > 0**, the shipped pass's
 own masks, read where the pass reads them. B2b measures this on the default bloom: **every one of the 45,874
@@ -171,6 +177,22 @@ The 6 mm cylinder (a cupped petal's curvature) agrees: rings, hard-core, 102/mm�
 is a few hundredths of the radius from the next and a side a third of it, so the empty-circle test joined rings
 PAST the wall, and big pores read 5–15% off-round. The pore's own rings are now STRUCTURED strips (aligned sides,
 one diagonal), and only the network and a nested pore's floor are Delaunay-filled.
+
+**Two more mesher defects, found by the sheet.** The sheet's first render showed the hard-core window on the real
+petal with shards and 7 open edges. Both causes are fixed, and every plate, roundness and budget figure in this doc
+is from the run after them.
+
+- **The network fill was a regular hex lattice, so every fill point's six neighbours were ON ONE CIRCLE.**
+  - Bowyer–Watson with floating-point predicates decides a cavity there by the last bit. Measured on that window:
+    171 of 1,943 triangles not Delaunay, and 6 of the hole's 92 lattice edges lost, though no point lay inside
+    their diametral circles.
+  - The comment's "no four points co-circular" was true of the staggered rings and false of the fill.
+  - Each fill point is now moved by a deterministic jitter of ≤ 2% of the spacing. Result: 0 violations, 0 lost
+    edges.
+- **The fill and the ringed pores kept only half a fill spacing (0.125 mm) off the hole**, under half the 0.4 mm
+  lattice edge they must preserve. They now keep half the longest hole edge, the Gabriel condition.
+- An enlarged super-triangle (2000×, from 20×) was tried first, on the textbook hull-edge diagnosis. It changed
+  nothing measurable, and is kept because it is harmless.
 
 ## 6. The rings on the real bloom — a window, and what porting them takes
 
@@ -243,9 +265,9 @@ lengths, never built), and the rings are ESTIMATED (§6):
 | whole bloom | 289,008 (19.3%) | 6,956 | 59.4 M | 4.26 M (284%) | 16.6 M | 1.51 M (**101%**) | 0.95 M (63%) | 1.04 M (69%) |
 | Voronoi infill | 108,928 (refused, untextured) | 0 | — | — | — | — | — | — |
 | closed tube | 143,376 (9.6%) | 5,021 | 43.8 M | 3.10 M (207%) | 12.0 M | 1.06 M (71%) | 0.66 M (44%) | 0.72 M (48%) |
-| umbel, head ON | 530,634 (35.4%) | 11,350 | 95.2 M | 7.05 M (470%) | 27.3 M | 2.49 M (**166%**) | 1.58 M (106%) | 1.72 M (115%) |
-| 40 × 3 whorls | 1,442,144 (96.1%, @0.42) | 35,386 | 313 M | 22.9 M (1,525%) | 89.3 M | 7.69 M (**513%**) | 4.85 M (324%) | 5.28 M (352%) |
-| the mophead (depth 2) | 1,240,446 (82.7%) | 20,737 | 179 M | 13.4 M (890%) | 50.7 M | 4.79 M (**319%**) | 3.13 M (209%) | 3.38 M (225%) |
+| umbel, head ON | 530,634 (35.4%) | 11,350 | 95.2 M | 7.05 M (470%) | 27.3 M | 2.50 M (**167%**) | 1.58 M (106%) | 1.72 M (115%) |
+| 40 × 3 whorls | 1,442,144 (96.1%, @0.42) | 35,386 | 313 M | 22.9 M (1,525%) | 89.3 M | 7.71 M (**514%**) | 4.86 M (324%) | 5.28 M (352%) |
+| the mophead (depth 2) | 1,240,446 (82.7%) | 20,737 | 179 M | 13.4 M (890%) | 50.7 M | 4.80 M (**320%**) | 3.13 M (209%) | 3.38 M (225%) |
 
 The grid at 0.1 mm BUILT on the default is **2,856,784** triangles. That is 42,125 over the count:
 - the transition fans, which the count leaves out on purpose;
@@ -257,7 +279,7 @@ The grid at 0.1 mm BUILT on the default is **2,856,784** triangles. That is 42,1
 - **The 0.1 mm grid is over on every state with a texture, the default included.**
 - **The rings fit the default, the tube and (lean) the whole bloom, and nothing larger.**
 - **The cap as ruled cannot reach this.** It coarsens the LATTICE edge 0.4 → 0.5 (a 36% saving on the lattice). But
-  the lattice is 159 k of the default's 0.94 M and 1.44 M of the 40 × 3 corner's 7.69 M: **the cost is the pores',
+  the lattice is 159 k of the default's 0.94 M and 1.44 M of the 40 × 3 corner's 7.71 M: **the cost is the pores',
   and the cap has no lever on them.**
 - What a cap on the pores could coarsen is question 3. **The brief says to STOP and ask rather than pick, and this
   prototype stops there.**

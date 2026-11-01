@@ -1556,7 +1556,7 @@ before touching `bloom-texture-bone2.js` or starting the shipping session). No s
   - **Rings need a 2D chart per organ**; they run in a focus window here, and their whole-bloom figures are estimates.
   - **Delaunay alone drops a pore's wall ring** (rings closer than a side). A pore's own rings are structured strips.
 - **Budget**: the derived grid is 26–209× over everywhere. The 0.1 mm grid is 188% on the default. Rings are 63%
-  default, 101% whole, 166% umbel, 319% mophead, 513% 40 × 3.
+  default, 101% whole, 167% umbel, 320% mophead, 514% 40 × 3.
   - The lattice-edge cap cannot reach the pores' cost: Eva's question 3, STOP.
 - **The height**: "depth ≈ diameter" derives 1.5 mm for the ruled pores, not 2.5 (question 4).
 - **Walls** are 0.006–0.27 mm (merging, thinnest to median) (question 6). **Release build** on the default: ~4.9 s for the rings (estimate), 11.5 s for the 0.1 mm grid, against v1's 0.7 s; the mophead ~49 s against v1's 29 s (question 8).

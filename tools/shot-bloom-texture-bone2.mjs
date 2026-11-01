@@ -17,7 +17,8 @@
         edge, the grid at 0.1 mm, the rings (merging), the rings (hard-core)
      C  a depth cross-section through a row of pores (the field and the two
         meshes), and the nested specks close-up
-     D  a sweep of pore size and of height (the rings, the plate)
+     D  a sweep of pore size and of height (the plate, on the DERIVED grid: the
+        field as drawn, so the sweep shows the look and not a mesher)
      E  the budget and time table
    Cells B-D carry a CAVITY TINT (darker with depth) so a pit reads as a pit,
    as the references' do (photographs, where a pit's floor is in shadow); the
@@ -36,7 +37,7 @@ if (!OUT) { console.error('usage: shot-bloom-texture-bone2.mjs <out.png> [--data
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
 const DATA = JSON.parse(fs.readFileSync(arg('--data', path.join(ROOT, 'docs/data/bloom-texture-bone-v2.json')), 'utf8'));
 const BR = fs.existsSync(arg('--browser', path.join(ROOT, 'docs/data/bloom-texture-bone-v2-browser.json'))) ? JSON.parse(fs.readFileSync(arg('--browser', path.join(ROOT, 'docs/data/bloom-texture-bone-v2-browser.json')), 'utf8')) : null;
-const W = 360, Hc = 360, CAP = 52, COLS = 5;
+const W = 360, Hc = 360, CAP = 64, COLS = 5;
 const RAKE = { light1: [0.95, -0.15, 0.25], light2: [-0.3, 0.4, 0.3] };
 const fmt = (n) => n.toLocaleString('en-US');
 const norm = (v) => { const L = Math.hypot(...v); return v.map((x) => x / L); };
@@ -70,16 +71,28 @@ const L = await B.bone2Bloom(st0, { mode: 'lattice' });
 const MO = new Float32Array(L.acc.triangleCount * 12 + 8);
 await B.bone2Bloom(st0, { mode: 'lattice', capability: { boneMaskOut: MO } });
 const pr0 = L.rec.petalsAll[0].triRange;
-let focus = null, best = Infinity;
-for (let t = pr0[0]; t < pr0[1]; t++) {
-  const o = t * 9, pos = L.acc.positions;
-  let m = 1; for (let c = 0; c < 3; c++) { const q = (t * 3 + c) * 4; m = Math.min(m, MO[q] * MO[q + 1] * MO[q + 2]); }
-  if (m < 0.9) continue;
-  const n = norm(cross([pos[o + 3] - pos[o], pos[o + 4] - pos[o + 1], pos[o + 5] - pos[o + 2]], [pos[o + 6] - pos[o], pos[o + 7] - pos[o + 1], pos[o + 8] - pos[o + 2]]));
-  if (n[2] < 0.5) continue;
-  const c = [(pos[o] + pos[o + 3] + pos[o + 6]) / 3, (pos[o + 1] + pos[o + 4] + pos[o + 7]) / 3, (pos[o + 2] + pos[o + 5] + pos[o + 8]) / 3];
-  const d = Math.hypot(c[0] - 20, c[1], c[2] - 7);
-  if (d < best) { best = d; focus = { centre: c, normal: n }; }
+/* the focus: the upward-facing point of petal 0 whose 2.6 mm neighbourhood (what
+   the cell shows) is the MOST porous — so the cell shows pores, not the smooth
+   ground between two patches */
+let focus = null, best = -1;
+{
+  const pos = L.acc.positions, tris = [];
+  for (let t = pr0[0]; t < pr0[1]; t++) {
+    const o = t * 9;
+    let m = 1; for (let c = 0; c < 3; c++) { const q = (t * 3 + c) * 4; m = Math.min(m, MO[q] * MO[q + 1] * MO[q + 2]); }
+    const n = norm(cross([pos[o + 3] - pos[o], pos[o + 4] - pos[o + 1], pos[o + 5] - pos[o + 2]], [pos[o + 6] - pos[o], pos[o + 7] - pos[o + 1], pos[o + 8] - pos[o + 2]]));
+    tris.push({ m, n, c: [(pos[o] + pos[o + 3] + pos[o + 6]) / 3, (pos[o + 1] + pos[o + 4] + pos[o + 7]) / 3, (pos[o + 2] + pos[o + 5] + pos[o + 8]) / 3] });
+  }
+  for (let i = 0; i < tris.length; i += 3) {
+    const T0 = tris[i]; if (T0.n[2] < 0.5 || T0.m < 0.9) continue;
+    /* x the share of the 4.5 mm refinement window that faces the same way: the
+       rings run in a planar chart of that window and need it nearly flat */
+    let tot = 0, por = 0, win = 0, flat = 0;
+    for (const q of tris) { const d = Math.hypot(q.c[0] - T0.c[0], q.c[1] - T0.c[1], q.c[2] - T0.c[2]); if (d <= 4.5) { win++; if (dot(q.n, T0.n) >= 0.9) flat++; } if (d > 2.6) continue; tot++; if (q.m > 0.5) por++; }
+    const sc = tot && win ? (por / tot) * (flat / win) : 0;
+    if (sc > best) { best = sc; focus = { centre: T0.c, normal: T0.n }; }
+  }
+  console.log('focus score (porous share within 2.6 mm x flat share within 4.5)', best.toFixed(3));
 }
 console.log('focus', focus);
 const petalCam = { center: focus.centre, dir: norm([focus.normal[0] + 0.25, focus.normal[1] - 0.35, focus.normal[2]]), up: [1, 0, 0], halfHeight: 2.6 };
@@ -93,10 +106,19 @@ for (const H of [0.4, 1.0]) {
     ['v2 RINGS (hard-core)', { ...stH, bone2Packing: 'hardcore' }, { mode: 'rings', focus: { organ: 'petal', ...focus, radiusMm: 4.5 } }],
   ];
   for (const [name, st, opt] of runs) {
-    const r = await B.bone2Bloom(st, { ...opt, captureNormals: false });
+    const MOv = opt.mode === 'v1' ? new Float32Array(158912 * 12 + 8) : null;
+    const r = await B.bone2Bloom(st, { ...opt, captureNormals: false, ...(MOv ? { capability: { boneMaskOut: MOv } } : {}) });
+    /* v1's own relief in the cell (MO[3] is s/H per corner): how much of what the
+       cell shows v1 relieves at all, and by how much at most */
+    let v1Note = '';
+    if (MOv) {
+      let n = 0, lit = 0, mx = 0; const pos = r.acc.positions;
+      for (let t = 0; t < r.acc.triangleCount; t++) for (let c = 0; c < 3; c++) { const o = t * 9 + c * 3; if (Math.hypot(pos[o] - focus.centre[0], pos[o + 1] - focus.centre[1], pos[o + 2] - focus.centre[2]) > 2.6) continue; const rel = MOv[(t * 3 + c) * 4 + 3] * H; n++; if (rel > 1e-3) lit++; mx = Math.max(mx, rel); }
+      v1Note = `; within 2.6 mm: ${lit} of ${n} corners relieved, max ${mx.toFixed(3)} mm (v1's 20 mm patches)`;
+    }
     const img = render(new Float32Array(r.acc.positions), W, Hc, petalCam, { ...RAKE, supersample: 2 });
     const rw = r.stats.ringsWindow;
-    push(img, [`${name}, H ${H} mm (EXPORT, raking light)`, opt.mode === 'v1' ? `v1: pores ${DEFAULTS.bonePoreSize ?? 2} mm x ratio 2.5; ${fmt(r.acc.triangleCount)} tris` : opt.mode === 'lattice' ? `v2 pores 0.5-1.5 mm on 0.4 mm edges: ${fmt(r.acc.triangleCount)} tris` : opt.mode === 'grid' ? `refined in the window: +${fmt(r.acc.triangleCount - L.acc.triangleCount)} tris` : `window: ${rw ? rw.ringed : 0} pores ringed, ${rw ? rw.nestedRinged : 0} nested, +${fmt(r.acc.triangleCount - L.acc.triangleCount)} tris${rw && rw.missingBoundaryEdges ? `, ${rw.missingBoundaryEdges} open edges` : ''}`]);
+    push(img, [`${name}, H ${H} mm (EXPORT, raking light)`, opt.mode === 'v1' ? `v1: pores ${DEFAULTS.bonePoreSize ?? 2} mm x ratio 2.5; ${fmt(r.acc.triangleCount)} tris${v1Note}` : opt.mode === 'lattice' ? `v2 pores 0.5-1.5 mm on 0.4 mm edges: ${fmt(r.acc.triangleCount)} tris` : opt.mode === 'grid' ? `refined in the window: +${fmt(r.acc.triangleCount - L.acc.triangleCount)} tris` : `window: ${rw ? rw.ringed : 0} pores ringed, ${rw ? rw.nestedRinged : 0} nested, +${fmt(r.acc.triangleCount - L.acc.triangleCount)} tris${rw && rw.missingBoundaryEdges ? `, ${rw.missingBoundaryEdges} open edges` : ''}`]);
     console.log('A', name, H, r.acc.triangleCount, JSON.stringify(rw || {}));
   }
 }
@@ -160,18 +182,18 @@ for (const H of [1.0, 2.5]) {
 {
   const dom = PL.plateDomain();
   const win = { x0: 10, x1: 16, y0: -3, y1: 3 };
-  const cam = { center: [13, 0, 0], dir: [0.55, -0.1, 0.83], up: [0, 1, 0], halfHeight: 2.2 };
+  const cam = { center: [13, 0, 0], dir: [0.12, -0.22, 0.97], up: [0, 1, 0], halfHeight: 2.2 };   // near top-down, raking light: a pit reads as a pit
   for (const D of [0.5, 0.75, 1.0]) {
     const params = { ...B.bone2Params({ textureHeight: 1.0, bonePoreSize: D }) };
     const field = B.bone2Field(params);
-    const M = PL.meshPatch('rings', dom, field, params, win);
-    push(render(soupOf(M), W, Hc, cam, { ...RAKE, supersample: 2, tint: cavity(M) }), [`SIZE: smallest pore ${D} mm (x3 spread), H 1.0`, `rings (merging), ${fmt(Math.round(M.trisPerMm2))} tris/mm2, ${M.ringPores} pores`, 'cavity tint']);
+    const M = PL.meshPatch('grid', dom, field, params, win);
+    push(render(soupOf(M), W, Hc, cam, { ...RAKE, supersample: 2, tint: cavity(M) }), [`SIZE: smallest pore ${D} mm (x3 spread), H 1.0, near top-down`, `the derived grid (the field as drawn): edge ${(M.eUsed ?? 0).toFixed(3)} mm asked, ${(0.4 / 2 ** Math.ceil(Math.log2(0.4 / M.eUsed))).toFixed(4)} landed (0.4/2^k), ${fmt(Math.round(M.trisPerMm2))} tris/mm2`, 'merging pores, cavity tint']);
   }
   for (const H of [0.4, 1.5, 2.5]) {
     const params = { ...B.bone2Params({ textureHeight: H }) };
     const field = B.bone2Field(params);
-    const M = PL.meshPatch('rings', dom, field, params, win);
-    push(render(soupOf(M), W, Hc, cam, { ...RAKE, supersample: 2, tint: cavity(M) }), [`HEIGHT ${H} mm (smallest pore 0.5, x3)`, `rings (merging); fade from a ridge ${Math.max(H * 15 / 8, 0.4).toFixed(2)} mm`, 'cavity tint']);
+    const M = PL.meshPatch('grid', dom, field, params, win);
+    push(render(soupOf(M), W, Hc, cam, { ...RAKE, supersample: 2, tint: cavity(M) }), [`HEIGHT ${H} mm (smallest pore 0.5, x3), near top-down`, `the derived grid (the field as drawn); fade from a ridge ${Math.max(H * 15 / 8, 0.4).toFixed(2)} mm on a bloom`, 'merging pores, cavity tint']);
   }
 }
 
@@ -180,7 +202,10 @@ for (const H of [1.0, 2.5]) {
   const img = Buffer.alloc(W * 2 * Hc * 3, 30);
   const lines = ['BUDGET (EXPORT triangles, % of 1,500,000) and TIME', ''];
   lines.push('state            v1      v2 grid 0.1   rings*   rings* hc   derived grid');
-  for (const r of DATA.bloom || []) lines.push(`${r.name.slice(0, 15).padEnd(16)} ${String(r.v1Pct).padStart(5)}%  ${String(r.grid01Pct).padStart(7)}%   ${String(r.ringsEstPct).padStart(6)}%  ${String(r.ringsHardcoreEstPct).padStart(6)}%   ${String(r.derivedGridPct).padStart(8)}%`);
+  for (const r of DATA.bloom || []) {
+    if (r.refused) { lines.push(`${r.name.slice(0, 15).padEnd(16)} ${String(r.v1Pct).padStart(5)}%  texture refused (${r.refused}): untextured, nothing to refine`); continue; }
+    lines.push(`${r.name.slice(0, 15).padEnd(16)} ${String(r.v1Pct).padStart(5)}%  ${String(r.grid01Pct).padStart(7)}%   ${String(r.ringsEstPct).padStart(6)}%  ${String(r.ringsHardcoreEstPct).padStart(6)}%   ${String(r.derivedGridPct).padStart(8)}%`);
+  }
   lines.push('* estimated: porous area x the plate\'s measured density');
   lines.push('');
   if (BR) {
@@ -199,7 +224,10 @@ if (row.length) rows.push(row);
 const SW = W * COLS, SH = rows.length * (Hc + CAP) + 40;
 const sheet = Buffer.alloc(SW * SH * 3, 18);
 text(sheet, SW, SH, 10, 10, 'BONE v2 (PROTOTYPE): finer, rounder, deeper pores. EXPORT, Node builds, deterministic soft render.', [240, 200, 120], 2);
-rows.forEach((r, ri) => { let x = 0; for (const c of r) { const w = (c.wide || 1) * W; blit(sheet, SW, SH, c.img, w, Hc, x, 40 + ri * (Hc + CAP)); c.caption.forEach((l, k) => text(sheet, SW, SH, x + 6, 40 + ri * (Hc + CAP) + Hc + 4 + k * 12, l, [220, 220, 210], 1)); x += w; } });
+/* captions wrap at the cell's width (6 px a glyph): a caption may not run into
+   the next cell */
+const wrap = (lines, cols) => { const out = []; for (const l of lines) { let cur = ''; for (const w of l.split(' ')) { if (cur && (cur + ' ' + w).length > cols) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } if (cur) out.push(cur); } return out; };
+rows.forEach((r, ri) => { let x = 0; for (const c of r) { const w = (c.wide || 1) * W; blit(sheet, SW, SH, c.img, w, Hc, x, 40 + ri * (Hc + CAP)); const cap = wrap(c.caption, Math.floor((w - 12) / 6)); if (cap.length > 5) throw new Error(`a caption needs ${cap.length} lines: ${cap.join(' / ')}`); cap.forEach((l, k) => text(sheet, SW, SH, x + 6, 40 + ri * (Hc + CAP) + Hc + 4 + k * 12, l, [220, 220, 210], 1)); x += w; } });
 fs.mkdirSync(path.dirname(path.resolve(OUT)), { recursive: true });
 writePng(OUT, SW, SH, sheet);
 console.log(`wrote ${OUT} (${SW}x${SH})`);

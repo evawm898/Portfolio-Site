@@ -38,7 +38,7 @@
     },
     "grid": {
      "trisPerMm2": 5515.87,
-     "msPerMm2": 7.026,
+     "msPerMm2": 7.627,
      "edgeMm": 0.026,
      "poresMeasured": 21,
      "edgesPerCircMedian": 255,
@@ -54,7 +54,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 340.72,
-     "msPerMm2": 0.399,
+     "msPerMm2": 0.415,
      "edgeMm": 0.1,
      "poresMeasured": 19,
      "edgesPerCircMedian": 68,
@@ -69,14 +69,14 @@
      "depthMmMedian": 0.4
     },
     "rings": {
-     "trisPerMm2": 198.57,
-     "msPerMm2": 1.211,
+     "trisPerMm2": 199.07,
+     "msPerMm2": 1.165,
      "edgeMm": 0.25,
      "poresMeasured": 19,
      "edgesPerCircMedian": 51,
-     "devPctMedian": 9.027,
-     "devPctMax": 14.302,
-     "devMmMax": 0.054,
+     "devPctMedian": 8.968,
+     "devPctMax": 10.863,
+     "devMmMax": 0.042,
      "depthOverDiamMedian": 0.548,
      "depthOverDiamRange": [
       0.307,
@@ -85,14 +85,14 @@
      "depthMmMedian": 0.4
     },
     "rings-lean": {
-     "trisPerMm2": 118.45,
-     "msPerMm2": 0.544,
+     "trisPerMm2": 118.54,
+     "msPerMm2": 0.535,
      "edgeMm": 0.25,
-     "poresMeasured": 19,
+     "poresMeasured": 21,
      "edgesPerCircMedian": 40,
-     "devPctMedian": 12.063,
-     "devPctMax": 24.712,
-     "devMmMax": 0.082,
+     "devPctMedian": 11.862,
+     "devPctMax": 26.878,
+     "devMmMax": 0.133,
      "depthOverDiamMedian": 0.548,
      "depthOverDiamRange": [
       0.307,
@@ -124,7 +124,7 @@
    "methods": {
     "lattice": {
      "trisPerMm2": 13.44,
-     "msPerMm2": 0.017,
+     "msPerMm2": 0.016,
      "edgeMm": 0.4,
      "poresMeasured": 3,
      "edgesPerCircMedian": 18,
@@ -140,7 +140,7 @@
     },
     "grid": {
      "trisPerMm2": 5515.87,
-     "msPerMm2": 7.495,
+     "msPerMm2": 7.169,
      "edgeMm": 0.026,
      "poresMeasured": 21,
      "edgesPerCircMedian": 255,
@@ -156,7 +156,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 340.72,
-     "msPerMm2": 0.426,
+     "msPerMm2": 0.399,
      "edgeMm": 0.1,
      "poresMeasured": 19,
      "edgesPerCircMedian": 68,
@@ -171,14 +171,14 @@
      "depthMmMedian": 1
     },
     "rings": {
-     "trisPerMm2": 198.57,
-     "msPerMm2": 1.01,
+     "trisPerMm2": 199.07,
+     "msPerMm2": 0.841,
      "edgeMm": 0.25,
      "poresMeasured": 19,
      "edgesPerCircMedian": 51,
-     "devPctMedian": 9.027,
-     "devPctMax": 14.302,
-     "devMmMax": 0.054,
+     "devPctMedian": 8.968,
+     "devPctMax": 10.863,
+     "devMmMax": 0.042,
      "depthOverDiamMedian": 1.37,
      "depthOverDiamRange": [
       0.766,
@@ -187,14 +187,14 @@
      "depthMmMedian": 1
     },
     "rings-lean": {
-     "trisPerMm2": 118.45,
-     "msPerMm2": 0.469,
+     "trisPerMm2": 118.54,
+     "msPerMm2": 0.441,
      "edgeMm": 0.25,
-     "poresMeasured": 19,
+     "poresMeasured": 21,
      "edgesPerCircMedian": 40,
-     "devPctMedian": 12.063,
-     "devPctMax": 24.712,
-     "devMmMax": 0.082,
+     "devPctMedian": 11.862,
+     "devPctMax": 26.878,
+     "devMmMax": 0.133,
      "depthOverDiamMedian": 1.37,
      "depthOverDiamRange": [
       0.766,
@@ -226,7 +226,7 @@
    "methods": {
     "lattice": {
      "trisPerMm2": 13.44,
-     "msPerMm2": 0.018,
+     "msPerMm2": 0.017,
      "edgeMm": 0.4,
      "poresMeasured": 3,
      "edgesPerCircMedian": 18,
@@ -242,7 +242,7 @@
     },
     "grid": {
      "trisPerMm2": 5515.87,
-     "msPerMm2": 7.359,
+     "msPerMm2": 8.011,
      "edgeMm": 0.026,
      "poresMeasured": 21,
      "edgesPerCircMedian": 255,
@@ -258,7 +258,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 340.72,
-     "msPerMm2": 0.599,
+     "msPerMm2": 0.408,
      "edgeMm": 0.1,
      "poresMeasured": 19,
      "edgesPerCircMedian": 68,
@@ -273,14 +273,14 @@
      "depthMmMedian": 2.5
     },
     "rings": {
-     "trisPerMm2": 198.57,
-     "msPerMm2": 0.803,
+     "trisPerMm2": 199.07,
+     "msPerMm2": 0.783,
      "edgeMm": 0.25,
      "poresMeasured": 19,
      "edgesPerCircMedian": 51,
-     "devPctMedian": 9.027,
-     "devPctMax": 14.302,
-     "devMmMax": 0.054,
+     "devPctMedian": 8.968,
+     "devPctMax": 10.863,
+     "devMmMax": 0.042,
      "depthOverDiamMedian": 3.426,
      "depthOverDiamRange": [
       1.916,
@@ -289,14 +289,14 @@
      "depthMmMedian": 2.5
     },
     "rings-lean": {
-     "trisPerMm2": 118.45,
-     "msPerMm2": 0.468,
+     "trisPerMm2": 118.54,
+     "msPerMm2": 0.842,
      "edgeMm": 0.25,
-     "poresMeasured": 19,
+     "poresMeasured": 21,
      "edgesPerCircMedian": 40,
-     "devPctMedian": 12.063,
-     "devPctMax": 24.712,
-     "devMmMax": 0.082,
+     "devPctMedian": 11.862,
+     "devPctMax": 26.878,
+     "devMmMax": 0.133,
      "depthOverDiamMedian": 3.426,
      "depthOverDiamRange": [
       1.916,
@@ -344,7 +344,7 @@
     },
     "grid": {
      "trisPerMm2": 1379.06,
-     "msPerMm2": 1.723,
+     "msPerMm2": 1.755,
      "edgeMm": 0.053,
      "poresMeasured": 2,
      "edgesPerCircMedian": 222,
@@ -360,7 +360,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 341.69,
-     "msPerMm2": 0.347,
+     "msPerMm2": 0.44,
      "edgeMm": 0.1,
      "poresMeasured": 2,
      "edgesPerCircMedian": 112,
@@ -375,14 +375,14 @@
      "depthMmMedian": 0.4
     },
     "rings": {
-     "trisPerMm2": 55.13,
-     "msPerMm2": 0.325,
+     "trisPerMm2": 55.1,
+     "msPerMm2": 0.297,
      "edgeMm": 0.5,
      "poresMeasured": 2,
      "edgesPerCircMedian": 45,
-     "devPctMedian": 9.306,
-     "devPctMax": 9.306,
-     "devMmMax": 0.059,
+     "devPctMedian": 8.997,
+     "devPctMax": 8.997,
+     "devMmMax": 0.057,
      "depthOverDiamMedian": 0.326,
      "depthOverDiamRange": [
       0.316,
@@ -391,14 +391,14 @@
      "depthMmMedian": 0.4
     },
     "rings-lean": {
-     "trisPerMm2": 33.81,
-     "msPerMm2": 0.135,
+     "trisPerMm2": 33.76,
+     "msPerMm2": 0.108,
      "edgeMm": 0.5,
      "poresMeasured": 2,
-     "edgesPerCircMedian": 46,
-     "devPctMedian": 14.81,
-     "devPctMax": 14.81,
-     "devMmMax": 0.094,
+     "edgesPerCircMedian": 48,
+     "devPctMedian": 14.885,
+     "devPctMax": 14.885,
+     "devMmMax": 0.095,
      "depthOverDiamMedian": 0.316,
      "depthOverDiamRange": [
       0.243,
@@ -446,7 +446,7 @@
     },
     "grid": {
      "trisPerMm2": 1379.06,
-     "msPerMm2": 1.612,
+     "msPerMm2": 1.666,
      "edgeMm": 0.053,
      "poresMeasured": 2,
      "edgesPerCircMedian": 222,
@@ -462,7 +462,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 341.69,
-     "msPerMm2": 0.348,
+     "msPerMm2": 0.421,
      "edgeMm": 0.1,
      "poresMeasured": 2,
      "edgesPerCircMedian": 112,
@@ -477,14 +477,14 @@
      "depthMmMedian": 2.5
     },
     "rings": {
-     "trisPerMm2": 55.13,
-     "msPerMm2": 0.209,
+     "trisPerMm2": 55.1,
+     "msPerMm2": 0.213,
      "edgeMm": 0.5,
      "poresMeasured": 2,
      "edgesPerCircMedian": 45,
-     "devPctMedian": 9.306,
-     "devPctMax": 9.306,
-     "devMmMax": 0.059,
+     "devPctMedian": 8.997,
+     "devPctMax": 8.997,
+     "devMmMax": 0.057,
      "depthOverDiamMedian": 2.035,
      "depthOverDiamRange": [
       1.975,
@@ -493,18 +493,18 @@
      "depthMmMedian": 2.5
     },
     "rings-lean": {
-     "trisPerMm2": 33.81,
-     "msPerMm2": 0.155,
+     "trisPerMm2": 33.76,
+     "msPerMm2": 0.132,
      "edgeMm": 0.5,
      "poresMeasured": 2,
-     "edgesPerCircMedian": 46,
-     "devPctMedian": 14.81,
-     "devPctMax": 14.81,
-     "devMmMax": 0.094,
-     "depthOverDiamMedian": 1.974,
+     "edgesPerCircMedian": 48,
+     "devPctMedian": 14.885,
+     "devPctMax": 14.885,
+     "devMmMax": 0.095,
+     "depthOverDiamMedian": 1.975,
      "depthOverDiamRange": [
       1.52,
-      1.974
+      1.975
      ],
      "depthMmMedian": 2.5
     }
@@ -532,7 +532,7 @@
    "methods": {
     "lattice": {
      "trisPerMm2": 13.44,
-     "msPerMm2": 0.02,
+     "msPerMm2": 0.018,
      "edgeMm": 0.4,
      "poresMeasured": 0,
      "edgesPerCircMedian": null,
@@ -545,7 +545,7 @@
     },
     "grid": {
      "trisPerMm2": 5516.75,
-     "msPerMm2": 6.975,
+     "msPerMm2": 6.931,
      "edgeMm": 0.026,
      "poresMeasured": 26,
      "edgesPerCircMedian": 209,
@@ -561,7 +561,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 339.9,
-     "msPerMm2": 0.497,
+     "msPerMm2": 0.394,
      "edgeMm": 0.1,
      "poresMeasured": 21,
      "edgesPerCircMedian": 52,
@@ -576,14 +576,14 @@
      "depthMmMedian": 0.4
     },
     "rings": {
-     "trisPerMm2": 260.39,
-     "msPerMm2": 1.528,
+     "trisPerMm2": 260.65,
+     "msPerMm2": 1.509,
      "edgeMm": 0.25,
-     "poresMeasured": 23,
+     "poresMeasured": 24,
      "edgesPerCircMedian": 43,
-     "devPctMedian": 9.704,
-     "devPctMax": 18.784,
-     "devMmMax": 0.057,
+     "devPctMedian": 9.452,
+     "devPctMax": 18.518,
+     "devMmMax": 0.056,
      "depthOverDiamMedian": 0.664,
      "depthOverDiamRange": [
       0.6,
@@ -592,13 +592,13 @@
      "depthMmMedian": 0.4
     },
     "rings-lean": {
-     "trisPerMm2": 140.98,
-     "msPerMm2": 0.798,
+     "trisPerMm2": 140.87,
+     "msPerMm2": 0.72,
      "edgeMm": 0.25,
      "poresMeasured": 20,
      "edgesPerCircMedian": 34,
-     "devPctMedian": 15.005,
-     "devPctMax": 26.502,
+     "devPctMedian": 14.961,
+     "devPctMax": 26.473,
      "devMmMax": 0.07,
      "depthOverDiamMedian": 0.653,
      "depthOverDiamRange": [
@@ -631,7 +631,7 @@
    "methods": {
     "lattice": {
      "trisPerMm2": 13.44,
-     "msPerMm2": 0.018,
+     "msPerMm2": 0.019,
      "edgeMm": 0.4,
      "poresMeasured": 0,
      "edgesPerCircMedian": null,
@@ -644,7 +644,7 @@
     },
     "grid": {
      "trisPerMm2": 5516.75,
-     "msPerMm2": 7.459,
+     "msPerMm2": 6.928,
      "edgeMm": 0.026,
      "poresMeasured": 26,
      "edgesPerCircMedian": 209,
@@ -660,7 +660,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 339.9,
-     "msPerMm2": 0.389,
+     "msPerMm2": 0.395,
      "edgeMm": 0.1,
      "poresMeasured": 21,
      "edgesPerCircMedian": 52,
@@ -675,29 +675,29 @@
      "depthMmMedian": 2.5
     },
     "rings": {
-     "trisPerMm2": 260.39,
-     "msPerMm2": 1.479,
+     "trisPerMm2": 260.65,
+     "msPerMm2": 1.595,
      "edgeMm": 0.25,
-     "poresMeasured": 23,
+     "poresMeasured": 24,
      "edgesPerCircMedian": 43,
-     "devPctMedian": 9.704,
-     "devPctMax": 18.784,
-     "devMmMax": 0.057,
-     "depthOverDiamMedian": 4.147,
+     "devPctMedian": 9.452,
+     "devPctMax": 18.518,
+     "devMmMax": 0.056,
+     "depthOverDiamMedian": 4.151,
      "depthOverDiamRange": [
       3.75,
-      4.994
+      4.995
      ],
      "depthMmMedian": 2.5
     },
     "rings-lean": {
-     "trisPerMm2": 140.98,
-     "msPerMm2": 0.772,
+     "trisPerMm2": 140.87,
+     "msPerMm2": 0.738,
      "edgeMm": 0.25,
      "poresMeasured": 20,
      "edgesPerCircMedian": 34,
-     "devPctMedian": 15.005,
-     "devPctMax": 26.502,
+     "devPctMedian": 14.961,
+     "devPctMax": 26.473,
      "devMmMax": 0.07,
      "depthOverDiamMedian": 4.079,
      "depthOverDiamRange": [
@@ -730,7 +730,7 @@
    "methods": {
     "lattice": {
      "trisPerMm2": 13.44,
-     "msPerMm2": 0.023,
+     "msPerMm2": 0.021,
      "edgeMm": 0.4,
      "poresMeasured": 11,
      "edgesPerCircMedian": 13,
@@ -746,7 +746,7 @@
     },
     "grid": {
      "trisPerMm2": 5515.87,
-     "msPerMm2": 7.656,
+     "msPerMm2": 7.715,
      "edgeMm": 0.026,
      "poresMeasured": 23,
      "edgesPerCircMedian": 228,
@@ -762,7 +762,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 340.72,
-     "msPerMm2": 0.429,
+     "msPerMm2": 0.397,
      "edgeMm": 0.1,
      "poresMeasured": 23,
      "edgesPerCircMedian": 56,
@@ -777,8 +777,8 @@
      "depthMmMedian": 0.4
     },
     "rings": {
-     "trisPerMm2": 130.44,
-     "msPerMm2": 0.641,
+     "trisPerMm2": 130.51,
+     "msPerMm2": 0.625,
      "edgeMm": 0.25,
      "poresMeasured": 23,
      "edgesPerCircMedian": 32,
@@ -793,8 +793,8 @@
      "depthMmMedian": 0.4
     },
     "rings-lean": {
-     "trisPerMm2": 80.82,
-     "msPerMm2": 0.194,
+     "trisPerMm2": 80.89,
+     "msPerMm2": 0.186,
      "edgeMm": 0.25,
      "poresMeasured": 23,
      "edgesPerCircMedian": 24,
@@ -848,7 +848,7 @@
     },
     "grid": {
      "trisPerMm2": 5515.87,
-     "msPerMm2": 7.183,
+     "msPerMm2": 7.943,
      "edgeMm": 0.026,
      "poresMeasured": 23,
      "edgesPerCircMedian": 228,
@@ -864,7 +864,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 340.72,
-     "msPerMm2": 0.417,
+     "msPerMm2": 0.406,
      "edgeMm": 0.1,
      "poresMeasured": 23,
      "edgesPerCircMedian": 56,
@@ -879,8 +879,8 @@
      "depthMmMedian": 2.499
     },
     "rings": {
-     "trisPerMm2": 130.44,
-     "msPerMm2": 0.552,
+     "trisPerMm2": 130.51,
+     "msPerMm2": 0.521,
      "edgeMm": 0.25,
      "poresMeasured": 23,
      "edgesPerCircMedian": 32,
@@ -895,8 +895,8 @@
      "depthMmMedian": 2.5
     },
     "rings-lean": {
-     "trisPerMm2": 80.82,
-     "msPerMm2": 0.199,
+     "trisPerMm2": 80.89,
+     "msPerMm2": 0.194,
      "edgeMm": 0.25,
      "poresMeasured": 23,
      "edgesPerCircMedian": 24,
@@ -950,7 +950,7 @@
     },
     "grid": {
      "trisPerMm2": 1379.06,
-     "msPerMm2": 1.603,
+     "msPerMm2": 1.687,
      "edgeMm": 0.053,
      "poresMeasured": 5,
      "edgesPerCircMedian": 264,
@@ -966,7 +966,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 341.69,
-     "msPerMm2": 0.36,
+     "msPerMm2": 0.366,
      "edgeMm": 0.1,
      "poresMeasured": 5,
      "edgesPerCircMedian": 129,
@@ -981,8 +981,8 @@
      "depthMmMedian": 0.4
     },
     "rings": {
-     "trisPerMm2": 36.54,
-     "msPerMm2": 0.154,
+     "trisPerMm2": 36.49,
+     "msPerMm2": 0.139,
      "edgeMm": 0.5,
      "poresMeasured": 5,
      "edgesPerCircMedian": 32,
@@ -997,7 +997,7 @@
      "depthMmMedian": 0.4
     },
     "rings-lean": {
-     "trisPerMm2": 22.12,
+     "trisPerMm2": 22.11,
      "msPerMm2": 0.05,
      "edgeMm": 0.5,
      "poresMeasured": 5,
@@ -1036,7 +1036,7 @@
    "methods": {
     "lattice": {
      "trisPerMm2": 13.44,
-     "msPerMm2": 0.025,
+     "msPerMm2": 0.027,
      "edgeMm": 0.4,
      "poresMeasured": 7,
      "edgesPerCircMedian": 13,
@@ -1052,7 +1052,7 @@
     },
     "grid": {
      "trisPerMm2": 5515.87,
-     "msPerMm2": 7.623,
+     "msPerMm2": 7.692,
      "edgeMm": 0.026,
      "poresMeasured": 29,
      "edgesPerCircMedian": 264,
@@ -1068,7 +1068,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 340.72,
-     "msPerMm2": 0.449,
+     "msPerMm2": 0.526,
      "edgeMm": 0.1,
      "poresMeasured": 26,
      "edgesPerCircMedian": 68,
@@ -1083,14 +1083,14 @@
      "depthMmMedian": 0.4
     },
     "rings": {
-     "trisPerMm2": 180.38,
-     "msPerMm2": 0.784,
+     "trisPerMm2": 180.34,
+     "msPerMm2": 0.959,
      "edgeMm": 0.25,
-     "poresMeasured": 26,
+     "poresMeasured": 27,
      "edgesPerCircMedian": 44,
-     "devPctMedian": 4.199,
-     "devPctMax": 13.517,
-     "devMmMax": 0.046,
+     "devPctMedian": 4.173,
+     "devPctMax": 13.3,
+     "devMmMax": 0.045,
      "depthOverDiamMedian": 0.565,
      "depthOverDiamRange": [
       0.318,
@@ -1099,13 +1099,13 @@
      "depthMmMedian": 0.4
     },
     "rings-lean": {
-     "trisPerMm2": 107.65,
-     "msPerMm2": 0.449,
+     "trisPerMm2": 107.72,
+     "msPerMm2": 0.436,
      "edgeMm": 0.25,
      "poresMeasured": 26,
-     "edgesPerCircMedian": 38,
-     "devPctMedian": 9.497,
-     "devPctMax": 16.467,
+     "edgesPerCircMedian": 37,
+     "devPctMedian": 9.523,
+     "devPctMax": 15.774,
      "devMmMax": 0.056,
      "depthOverDiamMedian": 0.565,
      "depthOverDiamRange": [
@@ -1138,7 +1138,7 @@
    "methods": {
     "lattice": {
      "trisPerMm2": 13.44,
-     "msPerMm2": 0.018,
+     "msPerMm2": 0.019,
      "edgeMm": 0.4,
      "poresMeasured": 7,
      "edgesPerCircMedian": 13,
@@ -1154,7 +1154,7 @@
     },
     "grid": {
      "trisPerMm2": 5515.87,
-     "msPerMm2": 7.47,
+     "msPerMm2": 7.859,
      "edgeMm": 0.026,
      "poresMeasured": 29,
      "edgesPerCircMedian": 264,
@@ -1170,7 +1170,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 340.72,
-     "msPerMm2": 0.439,
+     "msPerMm2": 0.416,
      "edgeMm": 0.1,
      "poresMeasured": 26,
      "edgesPerCircMedian": 68,
@@ -1185,15 +1185,15 @@
      "depthMmMedian": 2.5
     },
     "rings": {
-     "trisPerMm2": 180.38,
-     "msPerMm2": 0.739,
+     "trisPerMm2": 180.34,
+     "msPerMm2": 1.005,
      "edgeMm": 0.25,
-     "poresMeasured": 26,
+     "poresMeasured": 27,
      "edgesPerCircMedian": 44,
-     "devPctMedian": 4.199,
-     "devPctMax": 13.517,
-     "devMmMax": 0.046,
-     "depthOverDiamMedian": 3.533,
+     "devPctMedian": 4.173,
+     "devPctMax": 13.3,
+     "devMmMax": 0.045,
+     "depthOverDiamMedian": 3.531,
      "depthOverDiamRange": [
       1.99,
       4.287
@@ -1201,13 +1201,13 @@
      "depthMmMedian": 2.5
     },
     "rings-lean": {
-     "trisPerMm2": 107.65,
-     "msPerMm2": 0.45,
+     "trisPerMm2": 107.72,
+     "msPerMm2": 0.579,
      "edgeMm": 0.25,
      "poresMeasured": 26,
-     "edgesPerCircMedian": 38,
-     "devPctMedian": 9.497,
-     "devPctMax": 16.467,
+     "edgesPerCircMedian": 37,
+     "devPctMedian": 9.523,
+     "devPctMax": 15.774,
      "devMmMax": 0.056,
      "depthOverDiamMedian": 3.533,
      "depthOverDiamRange": [
@@ -1240,7 +1240,7 @@
    "methods": {
     "lattice": {
      "trisPerMm2": 13.44,
-     "msPerMm2": 0.023,
+     "msPerMm2": 0.027,
      "edgeMm": 0.4,
      "poresMeasured": 14,
      "edgesPerCircMedian": 14,
@@ -1256,7 +1256,7 @@
     },
     "grid": {
      "trisPerMm2": 5515.87,
-     "msPerMm2": 7.347,
+     "msPerMm2": 8.65,
      "edgeMm": 0.026,
      "poresMeasured": 20,
      "edgesPerCircMedian": 243,
@@ -1272,7 +1272,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 340.72,
-     "msPerMm2": 0.418,
+     "msPerMm2": 0.531,
      "edgeMm": 0.1,
      "poresMeasured": 20,
      "edgesPerCircMedian": 60,
@@ -1287,8 +1287,8 @@
      "depthMmMedian": 0.4
     },
     "rings": {
-     "trisPerMm2": 102.45,
-     "msPerMm2": 0.743,
+     "trisPerMm2": 109.55,
+     "msPerMm2": 0.86,
      "edgeMm": 0.25,
      "poresMeasured": 20,
      "edgesPerCircMedian": 32,
@@ -1303,8 +1303,8 @@
      "depthMmMedian": 0.4
     },
     "rings-lean": {
-     "trisPerMm2": 70.16,
-     "msPerMm2": 0.357,
+     "trisPerMm2": 70.34,
+     "msPerMm2": 0.242,
      "edgeMm": 0.25,
      "poresMeasured": 20,
      "edgesPerCircMedian": 24,
@@ -1342,7 +1342,7 @@
    "methods": {
     "lattice": {
      "trisPerMm2": 13.44,
-     "msPerMm2": 0.022,
+     "msPerMm2": 0.026,
      "edgeMm": 0.4,
      "poresMeasured": 14,
      "edgesPerCircMedian": 14,
@@ -1358,7 +1358,7 @@
     },
     "grid": {
      "trisPerMm2": 5515.87,
-     "msPerMm2": 7.587,
+     "msPerMm2": 8.2,
      "edgeMm": 0.026,
      "poresMeasured": 20,
      "edgesPerCircMedian": 243,
@@ -1374,7 +1374,7 @@
     },
     "grid0.1": {
      "trisPerMm2": 340.72,
-     "msPerMm2": 0.41,
+     "msPerMm2": 0.477,
      "edgeMm": 0.1,
      "poresMeasured": 20,
      "edgesPerCircMedian": 60,
@@ -1389,8 +1389,8 @@
      "depthMmMedian": 2.5
     },
     "rings": {
-     "trisPerMm2": 102.45,
-     "msPerMm2": 0.852,
+     "trisPerMm2": 109.55,
+     "msPerMm2": 0.853,
      "edgeMm": 0.25,
      "poresMeasured": 20,
      "edgesPerCircMedian": 32,
@@ -1405,8 +1405,8 @@
      "depthMmMedian": 2.5
     },
     "rings-lean": {
-     "trisPerMm2": 70.16,
-     "msPerMm2": 0.241,
+     "trisPerMm2": 70.34,
+     "msPerMm2": 0.238,
      "edgeMm": 0.25,
      "poresMeasured": 20,
      "edgesPerCircMedian": 24,
@@ -1559,11 +1559,11 @@
    "v1Tris": 158912,
    "v1Pct": 10.6,
    "v1EdgeMm": 0.4,
-   "v1Ms": 1238,
+   "v1Ms": 1232,
    "baseTris": 158912,
    "edgeMm": 0.4,
    "refused": null,
-   "countMs": 2704,
+   "countMs": 2885,
    "areaMm2": 7922.72,
    "porousAreaMm2": 4423.839,
    "porousTris": 96693,
@@ -1574,10 +1574,10 @@
    "grid01Pct": 187.6,
    "grid005Tris": 11061043,
    "grid005Pct": 737.4,
-   "ringsEstTris": 940661,
-   "ringsLeanEstTris": 586223,
-   "ringsHardcoreEstTris": 639265,
-   "ringsEstPct": 62.7,
+   "ringsEstTris": 942873,
+   "ringsLeanEstTris": 586621,
+   "ringsHardcoreEstTris": 639574,
+   "ringsEstPct": 62.9,
    "ringsLeanEstPct": 39.1,
    "ringsHardcoreEstPct": 42.6
   },
@@ -1586,11 +1586,11 @@
    "v1Tris": 289008,
    "v1Pct": 19.3,
    "v1EdgeMm": 0.4,
-   "v1Ms": 3052,
+   "v1Ms": 2636,
    "baseTris": 289008,
    "edgeMm": 0.4,
    "refused": null,
-   "countMs": 5444,
+   "countMs": 5543,
    "areaMm2": 13336.172,
    "porousAreaMm2": 6955.775,
    "porousTris": 160652,
@@ -1601,23 +1601,23 @@
    "grid01Pct": 284.1,
    "grid005Tris": 16616677,
    "grid005Pct": 1107.8,
-   "ringsEstTris": 1509564,
-   "ringsLeanEstTris": 952268,
-   "ringsHardcoreEstTris": 1035667,
-   "ringsEstPct": 100.6,
+   "ringsEstTris": 1513042,
+   "ringsLeanEstTris": 952894,
+   "ringsHardcoreEstTris": 1036154,
+   "ringsEstPct": 100.9,
    "ringsLeanEstPct": 63.5,
-   "ringsHardcoreEstPct": 69
+   "ringsHardcoreEstPct": 69.1
   },
   {
    "name": "Voronoi infill (texture refused)",
    "v1Tris": 108928,
    "v1Pct": 7.3,
    "v1EdgeMm": 0.4,
-   "v1Ms": 2019,
+   "v1Ms": 1453,
    "baseTris": 108928,
    "edgeMm": 0.4,
    "refused": "infill",
-   "countMs": 1394,
+   "countMs": 1341,
    "areaMm2": 0,
    "porousAreaMm2": 0,
    "porousTris": 0,
@@ -1639,11 +1639,11 @@
    "v1Tris": 143376,
    "v1Pct": 9.6,
    "v1EdgeMm": 0.4,
-   "v1Ms": 1250,
+   "v1Ms": 1308,
    "baseTris": 143376,
    "edgeMm": 0.4,
    "refused": null,
-   "countMs": 3265,
+   "countMs": 3263,
    "areaMm2": 8698.253,
    "porousAreaMm2": 5021.041,
    "porousTris": 80153,
@@ -1654,10 +1654,10 @@
    "grid01Pct": 206.5,
    "grid005Tris": 12033431,
    "grid005Pct": 802.2,
-   "ringsEstTris": 1060251,
-   "ringsLeanEstTris": 657965,
-   "ringsHardcoreEstTris": 718168,
-   "ringsEstPct": 70.7,
+   "ringsEstTris": 1062762,
+   "ringsLeanEstTris": 658417,
+   "ringsHardcoreEstTris": 718519,
+   "ringsEstPct": 70.9,
    "ringsLeanEstPct": 43.9,
    "ringsHardcoreEstPct": 47.9
   },
@@ -1666,26 +1666,26 @@
    "v1Tris": 530634,
    "v1Pct": 35.4,
    "v1EdgeMm": 0.4,
-   "v1Ms": 5398,
+   "v1Ms": 4925,
    "baseTris": 530634,
    "edgeMm": 0.4,
    "refused": null,
-   "countMs": 9272,
+   "countMs": 10207,
    "areaMm2": 22949.812,
-   "porousAreaMm2": 11350.301,
-   "porousTris": 292336,
+   "porousAreaMm2": 11349.071,
+   "porousTris": 292307,
    "derivedGridEdgeMm": 0.026,
-   "derivedGridTris": 95171311,
-   "derivedGridPct": 6344.8,
-   "grid01Tris": 7053005,
+   "derivedGridTris": 95162860,
+   "derivedGridPct": 6344.2,
+   "grid01Tris": 7052466,
    "grid01Pct": 470.2,
-   "grid005Tris": 27339524,
-   "grid005Pct": 1822.6,
-   "ringsEstTris": 2492127,
-   "ringsLeanEstTris": 1582741,
-   "ringsHardcoreEstTris": 1718831,
-   "ringsEstPct": 166.1,
-   "ringsLeanEstPct": 105.5,
+   "grid005Tris": 27337329,
+   "grid005Pct": 1822.5,
+   "ringsEstTris": 2497586,
+   "ringsLeanEstTris": 1583646,
+   "ringsHardcoreEstTris": 1719494,
+   "ringsEstPct": 166.5,
+   "ringsLeanEstPct": 105.6,
    "ringsHardcoreEstPct": 114.6
   },
   {
@@ -1693,11 +1693,11 @@
    "v1Tris": 1442144,
    "v1Pct": 96.1,
    "v1EdgeMm": 0.42,
-   "v1Ms": 46238,
+   "v1Ms": 35508,
    "baseTris": 1442144,
    "edgeMm": 0.42,
    "refused": null,
-   "countMs": 50670,
+   "countMs": 55370,
    "areaMm2": 78536.106,
    "porousAreaMm2": 35385.567,
    "porousTris": 780683,
@@ -1708,38 +1708,38 @@
    "grid01Pct": 1525.3,
    "grid005Tris": 89338570,
    "grid005Pct": 5955.9,
-   "ringsEstTris": 7687973,
-   "ringsLeanEstTris": 4852881,
-   "ringsHardcoreEstTris": 5277154,
-   "ringsEstPct": 512.5,
-   "ringsLeanEstPct": 323.5,
-   "ringsHardcoreEstPct": 351.8
+   "ringsEstTris": 7705666,
+   "ringsLeanEstTris": 4856066,
+   "ringsHardcoreEstTris": 5279631,
+   "ringsEstPct": 513.7,
+   "ringsLeanEstPct": 323.7,
+   "ringsHardcoreEstPct": 352
   },
   {
    "name": "the mophead (depth 2)",
    "v1Tris": 1240446,
    "v1Pct": 82.7,
    "v1EdgeMm": 0.4,
-   "v1Ms": 38351,
+   "v1Ms": 39017,
    "baseTris": 1240446,
    "edgeMm": 0.4,
    "refused": null,
-   "countMs": 47683,
+   "countMs": 49563,
    "areaMm2": 50848.658,
-   "porousAreaMm2": 20736.966,
-   "porousTris": 567315,
+   "porousAreaMm2": 20724.475,
+   "porousTris": 567004,
    "derivedGridEdgeMm": 0.026,
-   "derivedGridTris": 178880887,
-   "derivedGridPct": 11925.4,
-   "grid01Tris": 13356564,
-   "grid01Pct": 890.4,
-   "grid005Tris": 50721394,
-   "grid005Pct": 3381.4,
-   "ringsEstTris": 4790870,
-   "ringsLeanEstTris": 3129425,
-   "ringsHardcoreEstTris": 3378061,
-   "ringsEstPct": 319.4,
-   "ringsLeanEstPct": 208.6,
+   "derivedGridTris": 178793174,
+   "derivedGridPct": 11919.5,
+   "grid01Tris": 13350921,
+   "grid01Pct": 890.1,
+   "grid005Tris": 50698457,
+   "grid005Pct": 3379.9,
+   "ringsEstTris": 4799063,
+   "ringsLeanEstTris": 3130121,
+   "ringsHardcoreEstTris": 3378193,
+   "ringsEstPct": 319.9,
+   "ringsLeanEstPct": 208.7,
    "ringsHardcoreEstPct": 225.2
   }
  ],
@@ -1747,10 +1747,9 @@
   "state": "the default",
   "edgeMm": 0.1,
   "tris": 2856784,
-  "ms": 6466,
-  "passMs": 5523.381,
-  "countSays": 2814659,
-  "note": "re-built after the coincidence rule (15 porous triangles withdrawn); ms/passMs are the pre-rule build"
+  "ms": 20373,
+  "passMs": 19481.956,
+  "countSays": 2814659
  },
  "print": [
   {
