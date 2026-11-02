@@ -97,6 +97,7 @@ const RS = {
 /* ------------------------------------------- the round-2 restatements */
 /* the merged pairs, their creases, h and the junctions, from the DISCS (the
    field's own pores) and the RESTATED profile — never the mesher's pairs */
+const JUNCTION_H_RESTATED = 2;   // HY_JUNCTION_H, restated; checked against the CLEAN module at load
 function restateSeams(B, discs) {
   const wallU = RS.levelU(B, 0.8) - RS.levelU(B, 0.2);
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], len = (v) => Math.hypot(v[0], v[1], v[2]);
@@ -131,7 +132,10 @@ function restateSeams(B, discs) {
 /* B2e1 and B2e2 over a list of fine points (positions) and the discs */
 function seamClauses(B, H2, fine, discs, tag) {
   const bad = [], { pairs, junctions } = restateSeams(B, discs);
-  const JH = H2.HY_JUNCTION_H + 0.5;
+  /* the junction patch's reach RESTATED, never read from the module under test: a reference read from
+     H2 would widen with the mutation that widens the patch (the fourth durable rule), and did — the
+     junction-patch mutant went silent the day the patch stopped leaving the lenses */
+  const JH = JUNCTION_H_RESTATED + 0.5;
   let unexplained = 0, outside = 0, inFree = 0;
   const merged = new Set(); for (const p of pairs) { merged.add(p.i); merged.add(p.j); }
   const free = discs.filter((d, i) => !merged.has(i));
@@ -366,6 +370,7 @@ if (CONTROL) {
   console.log(`anchors: ${MUTANTS.length} mutants, every anchor matches exactly once`);
 }
 const H2c = await import(pathToFileURL(HYB).href), MSc = await import(pathToFileURL(MEASURE).href);
+if (H2c.HY_JUNCTION_H !== JUNCTION_H_RESTATED) { console.log(`FAIL: HY_JUNCTION_H is ${H2c.HY_JUNCTION_H}, the gate restates ${JUNCTION_H_RESTATED} — a ruling or a gate edit, never silently`); process.exit(1); }
 const clean = await runClauses(await import(pathToFileURL(MOD).href), await import(pathToFileURL(PLATE).href), 'clean', H2c, MSc);
 let failed = false;
 if (clean.length) { console.log('CLEAN TREE FAILS:'); for (const b of clean) console.log('  ' + b); failed = true; } else console.log('clean: PASS (B2a B2b B2c B2d B2e B2f)');
