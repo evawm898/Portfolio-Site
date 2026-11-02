@@ -159,7 +159,7 @@ function section(field, H, p0, p1, meshes, legend) {
     const n04 = DATA.nib && DATA.nib.find((q) => q.H === H);
     const cam = { center: apex, dir: norm([nn[0] * 0.6 - apex[0] * 0.02, nn[1] * 0.6 - apex[1] * 0.02, nn[2] + 0.3]), up: norm([apex[0], apex[1], 0]), halfHeight: 1.6 };
     const img = render(new Float32Array(r.acc.positions), W, Hc, cam, { ...RAKE, supersample: 2 });
-    push(img, [`THE NIB, petal 0's apex, HYBRID, H ${H} mm (raking light)`, n04 ? `within 1.2 mm of the apex: ${n04.reliefOver005} corners raised > 0.05 mm, max ${n04.maxMm} mm, nearest ${n04.nearestReliefToApexMm} mm from the apex` : '', 'curvature decides; no nib mask (ruling 5)']);
+    push(img, [`THE NIB, petal 0's apex, HYBRID, H ${H} mm (raking light)`, n04 ? `within 1.2 mm of the apex: ${n04.hybrid.raisedOver005} of ${n04.hybrid.verticesWithin1_2mm} vertices raised > 0.05 mm (coarse ${n04.coarse.raisedOver005} of ${n04.coarse.verticesWithin1_2mm}), max ${n04.hybrid.maxMm} mm, nearest raised ${n04.hybrid.nearestRaisedToApexMm} mm from the apex; fade ${n04.hybrid.fadeMm} mm` : '', 'curvature decides; no nib mask (ruling 6)']);
   }
 }
 
