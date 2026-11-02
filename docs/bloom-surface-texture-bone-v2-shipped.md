@@ -211,8 +211,16 @@ and compares the count and an FNV hash of every float32: §8.
   extremes); block 79 redefined (§3). No row added. `frozen/phase93` = the 1,653
   rows at `986fd96`, deep-equal (`--verify-frozen`).
 - **Byte partition** (`verify-bloom-surface-bytes --movers-predicate bone-v2`,
-  predeclared from the BASE tree's own records, both modes, the whole matrix):
-  §8.
+  predeclared from the BASE tree's own records, both modes, the whole 1,653-row
+  matrix against a worktree of `986fd96`, 28 chunks merged): **PASS — 20 of 20
+  predeclared movers moved, 0 floats moved on the 1,633 holders**, over
+  2,360,454,516 export floats (262 M triangles) and 83,179,338 captured-grid
+  values. The movers are the 18 BONE rows that build BONE and the two
+  redefined block-79 rows that coarsen; the refused block-79 row stands at
+  0.5 mm on both trees and holds. **Every PEBBLE / CELLULAR row, every umbel
+  and mophead row (the depth-2 clamp included) and the shipping default hold to
+  the bit** — so in the matrix the cap moved nothing but block 79; question 1
+  is about saved designs over 1.5 M, which the matrix does not hold.
 
 ## 8. Measurements
 
@@ -273,6 +281,23 @@ defaults — a wall is what is left between two pores that nearly merge, so it i
 thin by construction. Question 2 proposes a rule; none is built.
 
 ## 9. The PreForm ladder
+
+`node tools/bloom-preform-ladder.mjs <dir> --design default|umbel --caps …`
+builds ONE design at a ladder of caps — only the cap varies (the allocator's
+`boneFullCapTris` lever, nothing else) — and writes binary STLs named with their
+triangle count and size. **They are committed nowhere** (the brief). Each rung's
+census on the written float32s is printed beside it.
+
+| design | cap asked | file | triangles | MB | full share | shells / open / degenerate |
+|---|---|---|---|---|---|---|
+| default | 1.5 M | `bloom-bone-v2-default-1484338tris-74.2MB.stl` | 1,484,338 | 74.2 | 62.8 % | 9 / 0 / 0 |
+| default | 2.0 M | `bloom-bone-v2-default-1978546tris-98.9MB.stl` | 1,978,546 | 98.9 | 87.3 % | 9 / 0 / 0 |
+| default | 3.0 M (its ceiling) | `bloom-bone-v2-default-2232724tris-111.6MB.stl` | 2,232,724 | 111.6 | 100 % | 9 / 0 / 0 |
+
+**The default bloom cannot reach 3.0 / 4.5 / 6.0 M by the cap**: with every
+porous cell full it is 2.23 M (the fold check gives back a little of the
+2.26 M all-full count). The upper rungs therefore come from the umbel (head ON,
+60 mm stem) — question 3.
 
 ## 10. Questions for Eva
 

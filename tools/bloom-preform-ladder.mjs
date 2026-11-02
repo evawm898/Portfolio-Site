@@ -77,7 +77,7 @@ for (const cap of caps) {
   const ms = Math.round(performance.now() - t0);
   const F = rec.texture && rec.texture.bone && rec.texture.bone.full;
   const P = acc.positions, nT = P.length / 9;
-  if (ceiling !== null && F && F.allFullTris <= cap && nT === ceiling) { console.log(`${design.name} cap ${cap}: the design's ceiling (${ceiling}) is already written — skipped`); manifest.push({ design: design.name, cap, tris: nT, skipped: 'ceiling' }); continue; }
+  if (ceiling !== null && F && F.fullShare >= 1 && nT === ceiling) { console.log(`${design.name} cap ${cap}: the design's ceiling (${ceiling}) is already written — skipped`); manifest.push({ design: design.name, cap, tris: nT, skipped: 'ceiling' }); continue; }
   const buf = Buffer.alloc(84 + nT * 50);
   buf.write(`bloom BONE v2 full detail, ${design.name}, cap ${cap}`.slice(0, 79), 0, 'ascii');
   buf.writeUInt32LE(nT, 80);
@@ -86,7 +86,8 @@ for (const cap of caps) {
   const file = `bloom-bone-v2-${design.name}-${nT}tris-${mb.toFixed(1)}MB.stl`;
   fs.writeFileSync(path.join(OUT, file), buf);
   const C = census(P);
-  const reached = F ? F.allFullTris > cap : null;
+  /* the cap binds iff some porous cell was left coarse */
+  const reached = F ? F.fullShare < 1 : null;
   if (F && !reached) ceiling = nT;
   const row = { design: design.name, cap, file, tris: nT, mb: +mb.toFixed(2), share: F ? +F.fullShare.toFixed(4) : null, allFull: F ? F.allFullTris : null,
     capBinds: reached, ms, ...C };
