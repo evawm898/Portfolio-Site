@@ -84,7 +84,7 @@ const best = L.map((c, i) => ({ ...c, i })).filter((c) => c.selected && c.organ 
 {
   /* a selected cell with an unselected porous neighbour on the same organ */
   let pair = null;
-  for (const a of L) { if (!a.selected) continue; for (const b of L) { if (b.selected || b.organ !== a.organ) continue; const d = Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1], a.p[2] - b.p[2]); if (d < F.cellMm * 1.2 && (!pair || a.E > pair.a.E)) pair = { a, b, d }; } }
+  for (const a of L) { if (!a.selected) continue; for (const b of L) { if (b.selected || b.organ !== a.organ || dot(norm(a.n), norm(b.n)) < 0.97) continue; const d = Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1], a.p[2] - b.p[2]); if (d < F.cellMm * 1.2 && (!pair || a.E > pair.a.E)) pair = { a, b, d }; } }
   if (pair) {
     const c = pair.a.p.map((v, k) => (v + pair.b.p[k]) / 2), n = norm(pair.a.n.map((v, k) => v + pair.b.n[k]));
     const cam = { center: c, dir: n, up: Math.abs(n[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0], halfHeight: 2.2 };
@@ -97,7 +97,7 @@ const best = L.map((c, i) => ({ ...c, i })).filter((c) => c.selected && c.organ 
     let nAll = 0;
     for (let t = 0; t < P.length / 9; t++) {
       const o = t * 9, q = [0, 1, 2].map((k) => pr([P[o + k * 3], P[o + k * 3 + 1], P[o + k * 3 + 2]]));
-      if (q.some((v) => Math.abs(v[2]) > 2.5 || v[0] < -20 || v[0] > W + 20 || v[1] < -20 || v[1] > Hc + 20)) continue;
+      if (q.some((v) => Math.abs(v[2]) > 0.6 || v[0] < -20 || v[0] > W + 20 || v[1] < -20 || v[1] > Hc + 20)) continue;
       nAll++;
       for (let k = 0; k < 3; k++) line(q[k], q[(k + 1) % 3], [40, 200, 220]);
     }
@@ -107,7 +107,6 @@ const best = L.map((c, i) => ({ ...c, i })).filter((c) => c.selected && c.organ 
 
 /* -------------------------------------------- D: the table */
 {
-  const img = Buffer.alloc(W * 3 * Hc * 3, 30);
   const lines = [`BUDGET (Node, EXPORT): triangles / MB of binary STL / % of the 2,000,000 cap (PROVISIONAL)`, ''];
   lines.push('state                         COARSE                     FULL                       full share  cells');
   for (const r of DATA.budget || []) lines.push(`${r.key.padEnd(10)} ${fmt(r.coarseTris).padStart(10)} ${String(r.coarseMB).padStart(6)} MB ${String(r.coarsePct).padStart(5)}%   ${fmt(r.fullTris).padStart(10)} ${String(r.fullMB).padStart(6)} MB ${String(r.fullPct).padStart(5)}%   ${r.share === null ? '-' : (100 * r.share).toFixed(1).padStart(5) + '%'}   ${r.selectedCells}/${r.cells}   (${(r.fullMs / 1000).toFixed(0)} s)`);
@@ -119,10 +118,14 @@ const best = L.map((c, i) => ({ ...c, i })).filter((c) => c.selected && c.organ 
   }
   if (DATA.print) { lines.push('PRINT (the default, FULL):'); for (const p of DATA.print) lines.push(`H ${p.H} mm: ${fmt(p.tris)} tris, ${p.shells} shells, ${p.open} open edges, ${p.withinPairs} within-shell pairs (worst span ${p.worstSpanMm} mm), gaps closed ${p.gaps ? p.gaps.newlyClosedPrintableGaps : '-'}`); lines.push(''); }
   if (DATA.walls) { lines.push('WALLS between adjacent pores (the shipped field, mid-height):'); for (const w of DATA.walls) lines.push(`${w.label.slice(0, 44).padEnd(45)} thinnest ${w.walls.min} median ${w.walls.median} mm; under 0.7 mm: ${w.under} of ${w.walls.n}`); lines.push(''); }
-  if (DATA.round) lines.push(`ROUNDNESS (isolated refined pores, mid-wall): FULL median ${DATA.round.full.devPct.median}% max ${DATA.round.full.devPct.max}% | COARSE median ${DATA.round.coarse.devPct.median}% max ${DATA.round.coarse.devPct.max}% (n ${DATA.round.full.measured})`);
+  if (DATA.roundPlate) { lines.push('ROUNDNESS (round 2\'s plate, H 1.0; drawn mid-wall against its circle; median % off round):'); for (const [dom, M] of Object.entries(DATA.roundPlate)) for (const [m, r] of Object.entries(M)) lines.push(`${dom.padEnd(12)} ${m.padEnd(20)} ${String(r.trisPerMm2).padStart(4)}/mm2  free ${r.free.median}%  merged ${r.merged.median}% (p90 ${r.merged.p90}%, n ${r.merged.n})`); }
   if (LAD) { lines.push(''); lines.push('PREFORM LADDER (only the cap varies; committed nowhere):'); for (const r of LAD) lines.push(r.file ? `${r.design.padEnd(8)} cap ${fmt(r.cap).padStart(9)}: ${r.file}  ${r.capBinds ? '' : '(the design\'s ceiling)'}` : `${r.design} cap ${fmt(r.cap)}: skipped (${r.skipped})`); }
-  lines.forEach((l, i) => text(img, W * 3, Hc, 10, 12 + i * 15, l, [215, 215, 205], 1));
-  cells.push({ img, caption: ['THE BUDGET, TIME, HEAP, PRINT AND WALL TABLE (docs/data/bloom-texture-bone-v2-*.json)'], wide: 3 });
+  /* 26 lines a panel: the table runs over as many full-width panels as it needs */
+  for (let at = 0, k = 1; at < lines.length; at += 26, k++) {
+    const pane = Buffer.alloc(W * 3 * Hc * 3, 30);
+    lines.slice(at, at + 26).forEach((l, i) => text(pane, W * 3, Hc, 10, 12 + i * 15, l, [215, 215, 205], 1));
+    cells.push({ img: pane, caption: [`THE BUDGET, TIME, HEAP, PRINT, WALL, ROUNDNESS AND LADDER TABLE, part ${k} (docs/data/bloom-texture-bone-v2-*.json)`], wide: 3 });
+  }
 }
 
 /* ----------------------------------------------------- compose */

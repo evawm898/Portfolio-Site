@@ -15456,7 +15456,9 @@ function bone2FullWrite(acc, T, per, G, capability) {
   rec.fits = built.count <= capTris;
   /* the cells as recorded (for the read-out's share, the TXB clauses and the heat-map sheet) */
   rec.cellList = cells.map((C) => ({ key: C.key, organ: C.organ, area: C.area, cost: C.cost, E: C.E, rank: C.rank, selected: C.selected, p: C.sample.p, n: C.sample.n, t: C.sample.t, tris: C.tris.length }));
-  Object.defineProperty(rec, 'cellTris', { value: cells.map((C) => C.tris), enumerable: false, configurable: true });
+  /* each cell's triangles as indices into the BASE (coarse) stream — a cell's
+     own `tris` are local to its organ (O.tri), which starts at O.from */
+  Object.defineProperty(rec, 'cellTris', { value: cells.map((C) => { const from = plans[C.oi].X.O.from; return C.tris.map((t) => from + t); }), enumerable: false, configurable: true });
   Object.defineProperty(rec, 'discList', { value: built.discList, enumerable: false, configurable: true });
   Object.defineProperty(rec, 'kindsOut', { value: built.kindsOut, enumerable: false, configurable: true });
   rec.ms = performance.now() - t0;
