@@ -183,7 +183,7 @@ for (const H of [1.5, 2.5]) {
   lines.push('');
   if (BR) {
     lines.push('BROWSER (Chromium, EXPORT, geometry build): drag preview / v1 / COARSE release / FULL');
-    for (const [k, v] of Object.entries(BR.states)) lines.push(`${k.padEnd(9)} ${v.preview ? v.preview.ms : '-'} ms / ${v.v1 ? v.v1.ms : '-'} ms / ${v.coarse ? v.coarse.ms : '-'} ms / ${v.full ? (v.full.ms ? `${fmt(v.full.ms)} ms (${fmt(v.full.tris)} tris)` : v.full.stalled ? `stalled > ${v.full.stalled} s` : v.full.error || '-') : '-'}`);
+    for (const [k, v] of Object.entries(BR.states)) lines.push(`${k.padEnd(9)} ${v.preview ? v.preview.ms : '-'} ms / ${v.v1 ? v.v1.ms : '-'} ms / ${v.coarse ? v.coarse.ms : '-'} ms / ${v.full ? (v.full.ms ? `${fmt(v.full.ms)} ms (${fmt(v.full.tris)} tris)` : v.full.crashed ? 'THE PAGE CRASHED (out of memory)' : v.full.stalled ? `stalled > ${v.full.stalled} s` : v.full.error || '-') : '-'}`);
     lines.push('');
   }
   if (LIM) {

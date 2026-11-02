@@ -1570,6 +1570,38 @@ before touching `bloom-texture-bone2.js` or starting the shipping session). No s
 - Gate: `node tools/verify-bloom-bone2.mjs [--control]` (B2a–B2d, four witnessed mutants; not in CI).
 - Sheet: `node tools/shot-bloom-texture-bone2.mjs docs/img/bloom-texture-bone-v2.png`.
 
+**BONE v2 ROUND 2 IS A PROTOTYPE TOO: THE HYBRID MESHER, THE COARSE/FULL SPLIT, AND THE CAP INVESTIGATED BUT NOT
+MOVED** (Nov 2, Eva's Nov 1 rulings — read §13–§22 of `docs/bloom-surface-texture-bone-v2.md` before touching
+`bloom-texture-bone2-hybrid.js`, `hybridWrite` or B2d–B2f). No shipped file moved.
+- **The hybrid** is pore-conforming rings plus fine rows ONLY on the creases between merged pores and at their triple
+  junctions, both derived from the field (half-width `h` = wallU·ρmin/2). Each 0.4 mm lattice triangle is
+  re-meshed by an exact-integer constrained Delaunay, and lattice-edge points are registered once per edge, so
+  closure holds by construction. #481's weld withdrawal is kept.
+  - A crease is the equal-u surface between two pores, never the radical plane, which is wrong for unequal pores.
+  - **Merged pores 1.9–2.1 % off round, against the 0.1 mm grid's 6.7–8.2 %.**
+- **Coarse = the v2 field on the shipped lattice:** v1's exact count on every state.
+  - Its pores are 17–26 % off round.
+  - Coarse rings (3.5× v1's count) is the measured alternative, not chosen.
+- **The full build exceeds the cap everywhere:**
+  - default 2.30 M (154 %), umbel 6.21 M, mophead 11.74 M, 40 × 3 18.5 M;
+  - 39 % of its new points are lattice-edge crossings.
+- **In Chromium, the full build:**
+  - takes 38.8 s on the default and 147 s on the umbel;
+  - **crashes the page on the mophead** (out of memory; generation memory binds before the output does);
+  - **its count differs from Node's** (84 triangles on the default, 6,214 on the umbel — `Math.cos`/`Math.sin` on the
+    ring points; an engine-agreed construction is owed before shipping).
+- **The 1.5 M cap derives from nothing measured.** Its own comment says "slack by design".
+  - The page's real output ceiling is ~14.9 M (V8's array length; `tools/bloom-budget-limits.mjs`).
+  - No print-service upload limit is recorded anywhere, so the cap is NOT moved and Eva is asked.
+- **H 2.5 is UNVALIDATED for powder removal.** The smallest pores are 4.2–4.8× deeper than they are wide, and the
+  help text says so.
+  - Print at H 0.4 and 2.5: 9 shells, 0 open edges, 5 span-0 tangencies; 1 sampled gap closes at 2.5.
+- **The nib is not smooth by curvature at 0.4** (pores 0.70 mm from the apex). No mask added.
+- **Gate:** `node tools/verify-bloom-bone2.mjs [--control]` (B2a–B2f, ten witnessed mutants; not in CI).
+  - B2e1's junction reach is RESTATED in the gate; reading it from the module silenced its mutant.
+- Measure: `node tools/bloom-texture-bone2b-measure.mjs`. Browser: `node tools/bloom-texture-bone2b-browser.mjs`.
+- Sheet: `node tools/shot-bloom-texture-bone2b.mjs docs/img/bloom-texture-bone-v2b.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
