@@ -218,19 +218,23 @@ if (SECTIONS.includes('print')) {
   const { census } = await import(pathToFileURL(path.join(ROOT, 'tools/bloom-self-intersection.mjs')).href);
   const out = data.print || [];
   for (const H of (arg('--heights', '0.4,2.5')).split(',').map(Number)) {
+    const tp = Date.now(), lg = (m) => console.log(`print H ${H} … ${m} (${((Date.now() - tp) / 1000).toFixed(0)} s)`);
     const r = await B.bone2Bloom(B.bone2State(DEFAULTS, { textureHeight: H }), { mode: 'hybrid' });
+    lg(`built ${r.acc.triangleCount}`);
     const c = census(new Float64Array(r.acc.positions));
+    lg('census');
     const pos = r.acc.positions, key = (i) => `${Math.fround(pos[i])},${Math.fround(pos[i + 1])},${Math.fround(pos[i + 2])}`;
     const em = new Map();
     for (let t = 0; t < pos.length; t += 9) { const k = [key(t), key(t + 3), key(t + 6)]; for (let q = 0; q < 3; q++) { const e = k[q] + '>' + k[(q + 1) % 3]; em.set(e, (em.get(e) || 0) + 1); } }
     let open = 0, dup = 0; for (const [e, n] of em) { const [a, b] = e.split('>'); if (!em.has(b + '>' + a)) open++; if (n > 1) dup++; }
     const row = { H, tris: r.acc.triangleCount, withinPairs: c.within, worstSpanMm: r3(c.worstSpanMm), crossPairs: c.cross, shells: c.shells, openDirected: open, doubledDirected: dup, withdrawn: r.stats.coincidentWithdrawn, consFail: r.stats.hybrid.consFail };
+    { const at = out.findIndex((q) => q.H === H); if (at >= 0) out[at] = { ...row }; else out.push({ ...row }); data.print = out; save(); lg('census saved'); }
     /* printable gaps newly closed between PARTS: the same mesh built with nothing raised (noRelief), paired vertex
        for vertex; every relieved vertex of a sheet organ (every 5th triangle) against every OTHER range's triangles */
     {
       const { triGrid, nearest } = await import(pathToFileURL(path.join(ROOT, 'tools/bloom-inflo-approach.mjs')).href);
       const u = await B.bone2Bloom(B.bone2State(DEFAULTS, { textureHeight: H }), { mode: 'hybrid', noRelief: true });
-      const same = u.acc.triangleCount === r.acc.triangleCount;
+      const same = u.acc.triangleCount === r.acc.triangleCount; lg(`twin built, same mesh ${same}`);
       const owners = (rs, tc) => { const o = []; let cur = 0; rs.forEach((q, k) => { if (q.from > cur) o.push({ lo: cur * 9, hi: q.from * 9, owner: 'rest' + k }); o.push({ lo: q.from * 9, hi: q.to * 9, owner: q.organ + '#' + k }); cur = q.to; }); if (cur < tc) o.push({ lo: cur * 9, hi: tc * 9, owner: 'tail' }); return o; };
       const oU = owners(r.stats.ranges, u.acc.triangleCount), gU = triGrid(u.acc.positions, oU), gT = triGrid(r.acc.positions, oU);
       let n = 0, closed = 0, touch = 0, minT = Infinity, minU = Infinity;
