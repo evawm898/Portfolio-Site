@@ -1602,6 +1602,34 @@ MOVED** (Nov 2, Eva's Nov 1 rulings — read §13–§22 of `docs/bloom-surface-
 - Measure: `node tools/bloom-texture-bone2b-measure.mjs`. Browser: `node tools/bloom-texture-bone2b-browser.mjs`.
 - Sheet: `node tools/shot-bloom-texture-bone2b.mjs docs/img/bloom-texture-bone-v2b.png`.
 
+**BONE v2 SHIPS: THE v2 FIELD, THE HYBRID MESHER, COARSE LIVE / FULL ON EXPORT, AN ALLOCATOR THAT SPENDS FULL
+DETAIL WHERE IT SHOWS, AND ONE PROVISIONAL 2.0 M EXPORT CAP** (Nov 2, Eva's rulings of Nov 1-2 — read
+`docs/bloom-surface-texture-bone-v2-shipped.md` before touching `bone2Field`, `bone2HybridOrganMesh`,
+`bone2FullWrite`, `bone2Exposure`, `EXPORT_TRI_CAP`, `MeshBuilder`'s `boneDetail`, `#boneFullDetail`, TXB8-TXB15 or
+block 79 / 82).
+- **One cap**: `EXPORT_TRI_CAP` = 2,000,000 (~100 MB binary STL, Eva's PreForm ruling, PROVISIONAL until her
+  ladder test); `EXPORT_TRI_BUDGET` is the same number. Every reader moves with it: the texture edge cap, the
+  depth-2 umbel clamp, the tip-row ramp hold. So PEBBLE / CELLULAR designs that were over 1.5 M build finer now
+  — flagged as question 1; every row under 1.5 M holds to the bit (the byte partition). Block 79 is redefined to
+  heavier states that still bind at 2.0 M.
+- **Coarse / full**: `MeshBuilder({ boneDetail })` defaults FULL in export mode and COARSE live. The page's live view
+  and release build are COARSE (v1's exact count); the **Full detail** button and the STL export are FULL. Any
+  instrument that builds export mode for something other than the file (the coverage rasters) must pass
+  `boneDetail: 'coarse'` or it pays a full build and miscounts against its parts.
+- **The allocator**: cells (an organ's porous triangles in a cube of 2 x the largest pore), ranked by EXPOSURE
+  (T5's escape rays over 32 directions of the +z hemisphere, cos-weighted, on the UNRELIEVED stream — no organ
+  list), bought at their exact hybrid price until the cap, up to four give-back passes. The stream is rebuilt
+  per organ run and every record range is REMAPPED (`bone2RangeMap`).
+- **Engine agreement**: arithmetic-only `esincos` / `ecbrt` / `elog` / `eexp` / `epow` / `elen` in the BONE v2
+  block (TXB15 refuses `Math.cos(` ...), mesher inputs snapped to 2^-20; Node and Chromium agree on count and
+  float32 bytes (`tools/bloom-texture-bone-v2-browser.mjs`).
+- **Gates**: TXB8-TXB15 (`boneFullClauses`) on two FULL rows of `tools/verify-bloom-bone.mjs` (13 witnessed
+  mutants, spawned by the defaults bar in the preflight), TXB13 on every BONE row's exported file;
+  byte partition `--movers-predicate bone-v2`; `frozen/phase93` = the 1,653 rows at `986fd96`.
+- **Measurements, sheet, ladder**: `node tools/bloom-texture-bone-v2-measure.mjs`,
+  `node tools/shot-bloom-texture-bone-v2-shipped.mjs docs/img/bloom-texture-bone-v2-shipped.png`,
+  `node tools/bloom-preform-ladder.mjs <dir>` (only the cap varies; the STLs are committed NOWHERE).
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

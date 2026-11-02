@@ -14407,10 +14407,16 @@ export function bone2Field(params, seed = BONE2_SEED) {
    the RINGS' radii are laid at the profile's own breakpoints. */
 export function bone2WallU() { return bone2LevelU(0.8) - bone2LevelU(0.2); }
 /* every snap / merge distance: a point this close to an edge is ON it, this
-   close to another point IS it. 1e-3 mm is 13% of the closest two rings ever
-   come (u 0.97 / 1.0 at the smallest pore, 0.0075 mm) and 10^6 times the
-   degeneracy bar's square root, so neither a ring nor a sliver is made by it */
-export const BONE2_HY_SNAP_MM = 1e-3;
+   close to another point IS it. 3e-3 mm is 40% of the closest two rings ever
+   come (u 0.97 / 1.0 at the smallest pore, 0.0075 mm) — the seam clearance's
+   own fraction (BONE2_HY_SEAM_CLEAR) — so no ring is merged into another.
+   SHIPPING SESSION (Nov 2): the prototype's 1e-3 left SLIVERS — a ring point
+   2.2 um from a lattice-edge crossing on a 6 mm stem — and the relief (steep
+   at a pore's lip, displaced along the organ's own normals, which tilt off a
+   lattice triangle's plane on a curved organ) flipped them: 12 within-shell
+   pairs at 0.107 mm on every 60 mm-stem BONE row, 0 at 3e-3 (measured by the
+   census on the full build). */
+export const BONE2_HY_SNAP_MM = 3e-3;
 /* the integer chart across a lattice triangle's longest edge */
 export const BONE2_HY_CHART_N = 2048;
 /* a ring crossing a lattice edge leaves its point; a SEAM point keeps this
@@ -14991,7 +14997,7 @@ export function bone2HybridOrganMesh(M, discs, opts) {
   for (const k of kind) { if (k === BONE2_HY_KIND.junction) stats.junctionPts = (stats.junctionPts || 0) + 1; else if (k === BONE2_HY_KIND.seam) stats.seamPts++; else if (k === BONE2_HY_KIND.seamCross) stats.seamCross++; else if (k === BONE2_HY_KIND.cross) stats.crossPts++; else if (k === BONE2_HY_KIND.ring || k === BONE2_HY_KIND.nested || k === BONE2_HY_KIND.centre) stats.ringPts++; }
 
   /* ---- per triangle: count or triangulate ---- */
-  const outTri = [];
+  const outTri = [], outSrc = [];   // outSrc: each emitted triangle's source lattice triangle (the fold check's key)
   let count = 0;
   /* the count PER LATTICE TRIANGLE (the allocator's exact cost: each lattice
      triangle is triangulated on its own, so its count is local) */
@@ -15014,13 +15020,13 @@ export function bone2HybridOrganMesh(M, discs, opts) {
   for (let t = 0; t < nT; t++) {
     const { loop, side } = loopOf(t);
     const ins = reMesh(t) ? (interior.get(t) || []) : [];
-    if (loop.length === 3 && !ins.length) { count++; perTri[t] = 1; stats.keptTris++; if (!countOnly) outTri.push(tri[t * 3], tri[t * 3 + 1], tri[t * 3 + 2]); continue; }
+    if (loop.length === 3 && !ins.length) { count++; perTri[t] = 1; stats.keptTris++; if (!countOnly) { outTri.push(tri[t * 3], tri[t * 3 + 1], tri[t * 3 + 2]); outSrc.push(t); } continue; }
     if (!reMesh(t)) {
       /* a transition: the centroid fan over the boundary points */
       count += loop.length; perTri[t] = loop.length; stats.fanTris += loop.length;
       if (!countOnly) {
         const g = newPt([0, 1, 2].map((q) => (P[tri[t * 3] * 3 + q] + P[tri[t * 3 + 1] * 3 + q] + P[tri[t * 3 + 2] * 3 + q]) / 3), t, [1 / 3, 1 / 3, 1 / 3], BONE2_HY_KIND.steiner);
-        for (let q = 0; q < loop.length; q++) outTri.push(loop[q], loop[(q + 1) % loop.length], g);
+        for (let q = 0; q < loop.length; q++) { outTri.push(loop[q], loop[(q + 1) % loop.length], g); outSrc.push(t); }
       }
       continue;
     }
@@ -15036,11 +15042,12 @@ export function bone2HybridOrganMesh(M, discs, opts) {
     stats.consFail += R.fail;
     if (R.fail && opts.debug) { (stats.failSites = stats.failSites || []).push({ t, failed: R.failed.map(([a, b]) => ({ a, b, da: a >= nV0 ? ptDisc[a - nV0] : -1, db: b >= nV0 ? ptDisc[b - nV0] : -1, ka: a >= nV0 ? kind[a - nV0] : 0, kb: b >= nV0 ? kind[b - nV0] : 0 })), blockers: R.blockers.map(([a, b]) => ({ da: a >= nV0 ? ptDisc[a - nV0] : -1, db: b >= nV0 ? ptDisc[b - nV0] : -1, ka: a >= nV0 ? kind[a - nV0] : 0, kb: b >= nV0 ? kind[b - nV0] : 0 })), pos: R.failed.concat(R.blockers).flat().map(posOf), pairs: pairs.filter((pr) => R.failed.concat(R.blockers).flat().some((id) => id >= nV0 && (ptDisc[id - nV0] === pr.i || ptDisc[id - nV0] === pr.j))).map((pr) => ({ i: pr.i, j: pr.j, sd: R.failed.concat(R.blockers).flat().map((id) => bone2PairSd(pr, posOf(id))), band: pr.band })) }); }
     for (const q of R.tris) outTri.push(q);
+    for (let q = 0; q < R.tris.length / 3; q++) outSrc.push(t);
     if (R.tris.length / 3 !== loop.length + 2 * pts.length - 2) stats.countMismatch = (stats.countMismatch || 0) + 1;
   }
   stats.count = count;
   if (countOnly) { const edgePts = new Int32Array(EA.length); for (let e = 0; e < EA.length; e++) edgePts[e] = EPTS[e] ? EPTS[e].length : 0; return { count, perTri, stats, triE, ET0: Int32Array.from(ET0), ET1: Int32Array.from(ET1), edgePts }; }
-  return { P: Array.from(P).concat(NP), tri: outTri, src: { t: srcT, b: srcB }, kind, attach, ptDisc, nV0, stats, pairs, discs, perTri };
+  return { P: Array.from(P).concat(NP), tri: outTri, outSrc, faceN, src: { t: srcT, b: srcB }, kind, attach, ptDisc, nV0, stats, pairs, discs, perTri };
 }
 
 /* ====================== THE CONSTRAINED DELAUNAY OF ONE LATTICE TRIANGLE --- */
@@ -15445,7 +15452,7 @@ function bone2FullWrite(acc, T, per, G, capability) {
   for (let i = 0; i < built.pos.length; i += 3) for (let k = 0; k < 3; k++) { const x = built.pos[i + k]; if (x < acc.lo[k]) acc.lo[k] = x; if (x > acc.hi[k]) acc.hi[k] = x; }
   for (const C of cells) if (C.selected) { rec.selectedCells++; rec.fullAreaMm2 += C.area; }
   rec.fullShare = rec.porousAreaMm2 > 0 ? rec.fullAreaMm2 / rec.porousAreaMm2 : 0;
-  Object.assign(rec, { tris: built.count, withdrawn: built.withdrawn, consFail: built.HS.consFail, aborted: built.HS.aborted, countMismatch: built.HS.countMismatch, discs: built.HS.discs, free: built.HS.free, merged: built.HS.merged, junctions: built.HS.junctions, kinds: built.HS.kinds, runs: built.runs });
+  Object.assign(rec, { tris: built.count, withdrawn: built.withdrawn, flipWithdrawn: built.flipWithdrawn, flipsLeft: built.flipsLeft, consFail: built.HS.consFail, aborted: built.HS.aborted, countMismatch: built.HS.countMismatch, discs: built.HS.discs, free: built.HS.free, merged: built.HS.merged, junctions: built.HS.junctions, kinds: built.HS.kinds, runs: built.runs });
   rec.fits = built.count <= capTris;
   /* the cells as recorded (for the read-out's share, the TXB clauses and the heat-map sheet) */
   rec.cellList = cells.map((C) => ({ key: C.key, organ: C.organ, area: C.area, cost: C.cost, E: C.E, rank: C.rank, selected: C.selected, p: C.sample.p, n: C.sample.n, t: C.sample.t, tris: C.tris.length }));
@@ -15494,14 +15501,13 @@ function bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capab
         s = l[0] * X.clr[c[0]] + l[1] * X.clr[c[1]] + l[2] * X.clr[c[2]];
         if (m > 0) { const mp = T.mp(p); if (mp > 0) s += m * (mp * (H * T.f(p, n))); }
       }
-      if (capability && capability.boneNoRelief) s = 0;
       for (let k = 0; k < 3; k++) D[i * 3 + k] = p[k] + (s > 0 ? n[k] * s : 0);
     }
     return D;
   };
   const keyOf = (D, v) => `${f32(D[v * 3])}|${f32(D[v * 3 + 1])}|${f32(D[v * 3 + 2])}`;
   const Ds = plans.map((pl, i) => (results[i] ? displaced(pl, results[i].R) : null));
-  let withdrawn = 0;
+  let withdrawn = 0, flipWithdrawn = 0, flipsLeft = 0;
   for (let pass = 0; pass < 6; pass++) {
     const seen = new Map();
     plans.forEach((pl, i) => {
@@ -15513,6 +15519,31 @@ function bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capab
       const r = results[i]; if (!r) return;
       const nV = pl.X.nV; let hit = false;
       for (let v = nV; v < Ds[i].length / 3; v++) if (seen.get(keyOf(Ds[i], v)) === -1) { for (const t of r.R.attach[v - nV]) if (pl.porous[t]) { pl.porous[t] = 0; pl.porousTris--; withdrawn++; } hit = true; }
+      /* THE FOLD CHECK (shipping session, Nov 2). The full points lie on each
+         lattice triangle's PLANE and are displaced along the organ's own
+         interpolated normals, which tilt off that plane on a curved organ; at
+         a pore's lip the relief changes by up to H x the profile's slope over
+         a few microns, and that tilt then FLIPS a refined triangle (measured:
+         the rods and the bead at curvature max, 0.22 mm). On a relief that is
+         a height field over the triangle's plane no emitted triangle can face
+         against that plane, so one that does is a fold: its source lattice
+         triangle goes back to COARSE (a transition fan's flip withdraws the
+         refined triangles round it) and the run is re-meshed. Derived from the
+         emitted mesh's own orientation, never from an organ or a curvature
+         threshold. */
+      const R = r.R, D = Ds[i], fN = R.faceN, src = R.outSrc, tri = pl.X.O.tri;
+      let byV = null;
+      for (let j = 0; j < src.length; j++) {
+        const a = R.tri[j * 3], b = R.tri[j * 3 + 1], c = R.tri[j * 3 + 2], t = src[j];
+        const ux = D[b * 3] - D[a * 3], uy = D[b * 3 + 1] - D[a * 3 + 1], uz = D[b * 3 + 2] - D[a * 3 + 2];
+        const vx = D[c * 3] - D[a * 3], vy = D[c * 3 + 1] - D[a * 3 + 1], vz = D[c * 3 + 2] - D[a * 3 + 2];
+        const d = (uy * vz - uz * vy) * fN[t * 3] + (uz * vx - ux * vz) * fN[t * 3 + 1] + (ux * vy - uy * vx) * fN[t * 3 + 2];
+        if (d > 0) continue;
+        hit = true;
+        if (pl.porous[t]) { pl.porous[t] = 0; pl.porousTris--; withdrawn++; flipWithdrawn++; continue; }
+        if (!byV) { byV = new Map(); for (let q = 0; q < tri.length / 3; q++) for (let k = 0; k < 3; k++) { const v = tri[q * 3 + k]; let L = byV.get(v); if (!L) byV.set(v, (L = [])); L.push(q); } }
+        for (let k = 0; k < 3; k++) for (const q of byV.get(tri[t * 3 + k]) || []) if (pl.porous[q]) { pl.porous[q] = 0; pl.porousTris--; withdrawn++; flipWithdrawn++; }
+      }
       if (hit) redo.push(i);
     });
     if (!redo.length) break;
@@ -15538,7 +15569,9 @@ function bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capab
   });
   /* the stream rebuilt: each re-meshed organ's run replaced, in place */
   const repl = [];
-  plans.forEach((pl, i) => { const O = pl.X.O; if (!results[i]) return; const R = results[i].R, D = Ds[i]; const out = new Float64Array(R.tri.length * 3); for (let j = 0; j < R.tri.length; j++) for (let k = 0; k < 3; k++) out[j * 3 + k] = D[R.tri[j] * 3 + k]; repl.push({ from: O.from, to: O.to, out }); });
+  /* (`boneNoRelief`, a measurement lever: every decision above is the relieved
+     build's — the same mesh — and the stream is written UNDISPLACED) */
+  plans.forEach((pl, i) => { const O = pl.X.O; if (!results[i]) return; const R = results[i].R, D = capability && capability.boneNoRelief ? R.P : Ds[i]; const out = new Float64Array(R.tri.length * 3); for (let j = 0; j < R.tri.length; j++) for (let k = 0; k < 3; k++) out[j * 3 + k] = D[R.tri[j] * 3 + k]; repl.push({ from: O.from, to: O.to, out }); });
   repl.sort((a, b) => a.from - b.from);
   const pos = [], nrm = oldN ? [] : null;
   let cur = 0;
@@ -15558,7 +15591,9 @@ function bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capab
     cur = r.to;
   }
   pushOld(cur, old.length / 9);
-  return { pos, nrm, count: pos.length / 9, runs, withdrawn, HS, discList, kindsOut };
+  /* the flips no pass removed (reported, and TXB10's census sees what they do) */
+  results.forEach((r, i) => { if (!r) return; const R = r.R, D = Ds[i], fN = R.faceN, src = R.outSrc; for (let j = 0; j < src.length; j++) { const a = R.tri[j * 3], b = R.tri[j * 3 + 1], c = R.tri[j * 3 + 2], t = src[j]; const ux = D[b * 3] - D[a * 3], uy = D[b * 3 + 1] - D[a * 3 + 1], uz = D[b * 3 + 2] - D[a * 3 + 2], vx = D[c * 3] - D[a * 3], vy = D[c * 3 + 1] - D[a * 3 + 1], vz = D[c * 3 + 2] - D[a * 3 + 2]; if (!((uy * vz - uz * vy) * fN[t * 3] + (uz * vx - ux * vz) * fN[t * 3 + 1] + (ux * vy - uy * vx) * fN[t * 3 + 2] > 0)) flipsLeft++; } });
+  return { pos, nrm, count: pos.length / 9, runs, withdrawn, flipWithdrawn, flipsLeft, HS, discList, kindsOut };
 }
 
 function boneReliefPass(acc, T, organs, capability = null) {

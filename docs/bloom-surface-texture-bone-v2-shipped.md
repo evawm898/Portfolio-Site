@@ -92,6 +92,46 @@ each measured in Node, EXPORT:
 | the whole bloom 40 × 3 + **40** sepals + leaf | 2,104,092 | 0.42 mm, 1,899,024 |
 | 40 × 3 on 60 × 24 mm petals | 3,006,104 | 0.50, 2,224,952 — REFUSED (`EXPORT_REFUSED_XFAIL`) |
 
+## 3b. Two folds the prototype's mesher made, and what clears them
+
+The census was run on the FULL export of every BONE row before anything was
+declared. On the prototype's mesher as ported, three classes folded where the
+COARSE build of the same state reads 0:
+
+| class | pairs, worst span | mechanism |
+|---|---|---|
+| every row with a 60 mm stem | 12, 0.107 mm | a ring point 2.2 µm from a lattice-edge crossing (just over the 1 µm snap) left a SLIVER; the relief flipped it |
+| the default bloom | 2, span 0 | the same sliver class on a petal (tangencies) |
+| the rods and the bead at `boneCurvature` max | 163, 0.220 mm | refined triangles on strongly curved parts flipped |
+
+**The mechanism is one**: the full points lie on each lattice triangle's
+PLANE, but are displaced along the organ's own interpolated NORMALS, which tilt
+off that plane on a curved organ (a 6 mm stem, a 1.2 mm rod, a 0.45 mm bead);
+the relief at a pore's lip changes by up to H × the profile's slope over a few
+microns, and the tilt turns that into a lateral shift that flips a sliver or a
+small triangle. On a relief that is a height field over the triangle's plane no
+emitted triangle can face against that plane — so one that does is a fold.
+
+**Two changes, both derived:**
+
+1. `BONE2_HY_SNAP_MM` 1e-3 → **3e-3 mm**: 40 % of the closest two rings ever
+   come (0.0075 mm at the smallest pore), the seam clearance's own fraction, so
+   no ring merges into another. It alone takes the stem rows 12 → 0.
+2. **The fold check** in `bone2BuildFull`'s withdrawal loop: any emitted
+   triangle whose displaced normal faces against its source lattice
+   triangle's face normal sends that lattice triangle back to COARSE (a
+   transition fan's flip, the refined triangles round it), and the run is
+   re-meshed — the loop the cross-part coincidence withdrawal already ran.
+   Measured, full export: the curvature-max stamens 163 → **0** (11,154 lattice
+   triangles withdrawn, 4 flips left that the census does not see as a
+   contact), the default 2 → **0** (1,009 withdrawn), the 60 mm stem → **0**.
+   **TXB16** holds it (the full build's census at most the coarse build's) and
+   `the-fold-check-is-removed` is its mutant, witnessed on `full-rods` (15
+   pairs at 0.025 mm without the check at a 500 k cap).
+
+The cost is time (a withdrawal re-meshes that organ's run) and a little
+share; §8 has the figures.
+
 ## 4. "Where it shows": the measure, ranked, rendered
 
 The brief asks the measure to be proposed, rendered and ranked. **The measure
@@ -182,5 +222,65 @@ and compares the count and an FNV hash of every float32: §8.
 ## 9. The PreForm ladder
 
 ## 10. Questions for Eva
+
+**1. THE CAP AND THE RETIRED PATTERNS (the contradiction, §3).** One named
+cap moves every reader of the old budget, so PEBBLE / CELLULAR designs that
+were over 1.5 M build at a finer lattice edge now (and the umbel's depth-2
+clamp and the tip-row ramp move with it); everything under 1.5 M is
+byte-identical. Options:
+- (a) keep ONE cap for everything (what this PR does);
+- (b) BONE reads `EXPORT_TRI_CAP` 2.0 M and every older reader keeps a
+  `LEGACY_TRI_BUDGET` 1.5 M — two numbers, both named, and the retired patterns
+  hold to the bit everywhere;
+- (c) keep one cap and accept the old patterns' over-budget designs moving,
+  but restore block 79's old states as rows too (they then read as fitting).
+
+**2. A MINIMUM WALL (§11.6 / question F, re-asked with numbers, §8).** Walls
+between merging pores on the shipped field: see §8's wall table and the count
+under 0.7 mm. Proposed, NOT built: a rule on the field — two pores whose
+mid-height wall would be under a minimum *w* either MERGE (the wall is dropped:
+one wider pore) or the smaller is NOT ADMITTED. Options: (a) merge below *w*;
+(b) drop the smaller below *w*; (c) no rule (thin walls are a look, and SLS
+resolves ~0.35–0.4 mm). If (a) or (b), what *w* — 0.7 mm, or the 1.0 mm
+`MIN_FEATURE_MM`?
+
+**3. THE LADDER'S UPPER RUNGS (§9).** The default bloom's full build saturates
+at its all-full count (~2.3 M), so 3.0 / 4.5 / 6.0 M cannot be reached by the
+cap alone on that design. I used the umbel (head ON, 60 mm stem) for the upper
+rungs, the cap still the only thing varied on it. Options: (a) fine; (b) a
+different design for the upper rungs (name it); (c) only the default's rungs.
+
+**4. WHERE THE LADDER LIVES (§9).** Neither offered route works without
+breaking a rule: GitHub release assets need an upload API this session does not
+have (and `gh` is search-only here), and a Netlify deploy-preview page needs the
+STLs committed to the branch, which the brief forbids. What I did: §9.
+
+**5. THE FOLD CHECK (§3b).** It sends a lattice triangle back to coarse where
+the full mesh would fold, which lowers the full-detail share on strongly curved
+parts (the rods and beads at `boneCurvature` max: 11,154 triangles back to
+coarse). Options: (a) accept; (b) a later session lays the full points on the
+organ's own curved surface (a chart per organ — round 2's question D) so the
+check rarely binds.
+
+**6. "WHERE IT SHOWS" (§4).** Exposure over the +z hemisphere, cos-weighted,
+escape rays. Options: (a) accept; (b) the whole sphere (the bloom turned in the
+hand); (c) a named viewing direction (front, top).
+
+**§21 of round 2, carried forward:**
+- **A the cap** — answered by the Nov 2 ruling (2.0 M provisional, the ladder
+  decides); question 1 is what it moved.
+- **B the coarse look** — RULED (coarse where it does not show). Nothing open.
+- **C the full build's time** — measured in §8; open: (a) accept, (b) an
+  optimisation session (the re-mesh after a withdrawal re-meshes the organ's
+  whole run; a worker).
+- **D the closure's cost** — unchanged (lattice-edge crossings); tied to 5(b).
+- **E nested pits** — open, unchanged (§11.5's options).
+- **F a printable wall** — question 2.
+- **G the controls** — the provisional ranges shipped (smallest pore 0.5–1.0,
+  default 0.5; spread 1.5–3, default 3; density default 0.9; height 0.4–2.5,
+  default 0.4). Confirm or name others.
+- **H the fade at height** — open, unchanged (§11.9's options).
+- **I the engines** — ANSWERED: arithmetic-only construction, counts and bytes
+  agree (§6, §8).
 
 ## 11. What is NOT done, named

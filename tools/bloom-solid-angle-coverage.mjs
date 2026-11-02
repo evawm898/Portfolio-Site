@@ -348,7 +348,12 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     }
 
     /* ---------------- THE BUILD, AND THE CENTRE ---------------- */
-    const accFull = new mod.MeshBuilder({ exportMode: true });
+    /* (BONE v2, Nov 2: COARSE, never FULL — an export-mode accumulator builds
+       BONE at full detail by default, whose allocator rebuilds the stream and
+       whose count R1's parts cannot sum to; the coverage is about where the
+       petals stand, which the detail does not move. Every accumulator here
+       says so, so the parts and the whole agree on one detail.) */
+    const accFull = new mod.MeshBuilder({ exportMode: true, boneDetail: 'coarse' });
     const builtFull = mod.buildBloomInto(accFull, ui, { below: null, capability, scopes });
     /* THE TEXTURE EDGE CAP (Oct 23): the whole build may have DERIVED a lattice
        edge coarser than the ruled 0.4 mm; every part re-emitted below must be
@@ -359,7 +364,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     const edgeUsed = builtFull.texture && builtFull.texture.edgeCap && !builtFull.texture.edgeCap.pinned && builtFull.texture.edgeCap.usedMm !== builtFull.texture.edgeCap.askedMm ? builtFull.texture.edgeCap.usedMm : null;
     const capParts = edgeUsed ? { ...(capability || {}), textureEdgeMm: edgeUsed } : capability;
     const hub = builtFull.hub;
-    const accHC = new mod.MeshBuilder({ exportMode: true });
+    const accHC = new mod.MeshBuilder({ exportMode: true, boneDetail: 'coarse' });
     const frHC = mod.footRing(ui, accHC, { scopes });
     mod.buildHubInto(accHC, ui, frHC.hub);
     /* THE ANDROECIUM (session 21) — a third accumulator, counted in R1 and
@@ -367,7 +372,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
        measure is the petal canopy's solid angle, and a stamen is not a petal.
        Under SPHERE, the only head this instrument asserts on, there are no
        stamens at all (hidden and inert). */
-    const accST = new mod.MeshBuilder({ exportMode: true });
+    const accST = new mod.MeshBuilder({ exportMode: true, boneDetail: 'coarse' });
     if (frHC.androecium) {
       const A = frHC.androecium;
       mod.buildWhorlInto({ count: A.count, radius: (i) => A.stamens[i].radius, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0,
@@ -477,7 +482,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
              set is empty and this line is the shipped one. */
           if (omittedHere.has(slot.index)) return;
           petalsBuilt++;
-          const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
+          const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals, boneDetail: 'coarse' });
           if (scopes) { const turn = Math.floor(fr.rings[slot.index].lambda); slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: turn, slot: slot.index - turn * fr.slotCount, n: fr.slotCount, state: ui }); }
           const p = mod.buildPetalInto(acc, ui, fr.rings[slot.index], slot, capParts, petalsBuilt === 1);
           petalAccs.push(acc); petalSites.push({ p, ring: fr.rings[slot.index], slot, cap: capParts });
@@ -498,7 +503,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
           blade: (slot) => {
             petalsBuilt++;
             const d = slotsFor[slot.index];
-            const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
+            const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals, boneDetail: 'coarse' });
             if (scopes) slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: fr.slotCount, state: ui });
             if (mod.fanSlotMirrored(slot.index, fr.slotCount, ui)) slot.fanMirrored = true;
             const p = mod.buildPetalInto(acc, ui, d, slot, capParts);

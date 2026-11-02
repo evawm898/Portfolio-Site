@@ -6040,6 +6040,10 @@ export function boneRecordClauses(ui, T, readout = null, rec = null) {
             from its own sample with a ray caster of this file's (the viewing
             hemisphere's 32 directions restated), over the UNRELIEVED lattice;
             the ranks follow it — a typed list of organs cannot pass
+     TXB16  NO FOLD THE RE-MESH MAKES: the full build's within-shell census
+            is at most the coarse build's (the shipping session's fold check:
+            a refined triangle that faces against its lattice triangle's plane
+            withdraws that lattice triangle to coarse)
      TXB15  ENGINE-AGREED ARITHMETIC: the geometry's BONE v2 block calls no
             Math.cos / sin / tan / atan / atan2 / hypot / cbrt / exp / log / pow
             (a static scan of the source — the cross-engine half is X0 on the
@@ -6116,6 +6120,14 @@ export function boneFullClauses(ui, recFull, accFull, recCoarse, accCoarse, accU
     for (let i = 0; i < nC * 3; i++) { const k = `${f32(Pc[i * 3])},${f32(Pc[i * 3 + 1])},${f32(Pc[i * 3 + 2])}`; let v = vc.get(k); if (v === undefined) { v = vc.size; vc.set(k, v); } Tc[i] = v; }
     const sF = shells(T, N), sC = shells(Tc, vc.size);
     if (sF !== sC) bad.push(`TXB10: the full build has ${sF} shells and the coarse build ${sC} — the re-mesh welded or split a part`);
+  }
+  /* TXB16 — the full build folds nothing it does not fold coarse: the
+     within-shell census on the full build against the same census on the
+     COARSE build of the same state (a different owner: the coarse lattice is
+     v1's, which the full build's re-mesh does not write) */
+  {
+    const cf = selfIntersectionCensus(Float64Array.from(accFull.positions)), cc = selfIntersectionCensus(Float64Array.from(accCoarse.positions));
+    if (cf.within > cc.within) bad.push(`TXB16: the full build reads ${cf.within} within-shell pair(s) (worst span ${cf.worstSpanMm.toFixed(4)} mm) where the coarse build of the same state reads ${cc.within} — the re-mesh folded a sheet the lattice does not (the fold check withdraws such a lattice triangle to coarse; ${F.flipWithdrawn || 0} withdrawn, ${F.flipsLeft || 0} flips left)`);
   }
   /* TXB12 (b) and TXB11 — outside the runs the stream is the coarse build's;
      the full runs' new positions appear nowhere else */

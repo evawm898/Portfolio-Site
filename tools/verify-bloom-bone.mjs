@@ -105,6 +105,10 @@ export const MUTANTS = [
 export const FULL_ROWS = {
   'full-default': { state: {}, cap: 700000 },
   'full-sepals': { state: { stemLength: 60, sepalCount: 5 }, cap: 900000 },
+  /* the rods and the bead at the curvature maximum: the one row whose full
+     build FOLDS without the fold check (15 pairs at 0.025 mm at this cap,
+     measured; 0 with it) — TXB16's witness row */
+  'full-rods': { state: { stamenCount: 12, gynoecium: 'STYLE', boneCurvature: 4 }, cap: 500000 },
 };
 export const FULL_MUTANTS = [
   { id: 'the-cap-is-ignored', row: 'full-default', names: /^TXB13:/,
@@ -132,6 +136,9 @@ export const FULL_MUTANTS = [
   { id: 'engine-unsafe-trig-restored', row: 'full-default', names: /^TXB15:/,
     edits: [['      const at = (a) => { const x = cx + r * ecos(a), y = cy + r * esin(a);', '      const at = (a) => { const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);']],
     witness: null },
+  { id: 'the-fold-check-is-removed', row: 'full-rods', names: /^TXB16:/,
+    edits: [['        if (d > 0) continue;\n        hit = true;', '        continue;\n        hit = true;']],
+    witness: (F, Fc) => (F.flipWithdrawn === 0 && Fc.flipWithdrawn > 0 ? null : `the mutated module withdrew ${F.flipWithdrawn} lattice triangle(s) for a fold (clean ${Fc.flipWithdrawn}) — the check still runs`) },
 ];
 function fullBuilds(G, row, extraCap = {}) {
   const R = FULL_ROWS[row], ui = { ...DEFAULTS, petalTexture: 'BONE', ...R.state }, o = { below: null, scopes: null };
