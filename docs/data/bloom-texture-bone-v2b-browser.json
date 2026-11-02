@@ -45,6 +45,20 @@
     "tris": 530634,
     "heapMB": 310,
     "warmed": true
+   },
+   "full": {
+    "ms": 147075,
+    "tris": 6201432,
+    "heapMB": 2272,
+    "warmed": false
+   }
+  },
+  "mophead": {
+   "preview": {
+    "ms": 1126,
+    "tris": 1265418,
+    "heapMB": 514,
+    "warmed": true
    }
   }
  }
