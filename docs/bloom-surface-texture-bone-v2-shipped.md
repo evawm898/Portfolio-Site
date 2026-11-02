@@ -136,7 +136,8 @@ share; §8 has the figures.
 
 The brief asks the measure to be proposed, rendered and ranked. **The measure
 is EXPOSURE**: for each CELL (one organ's porous triangles whose centroids
-share a cube of 2 × the largest pore — 3 mm at the defaults), the share of a
+share a cube of 2 × the largest pore — 3 mm at the defaults — AND a facing:
+the face normal's dominant axis and sign), the share of a
 hemisphere of viewing directions above the bloom (32 directions on a Fibonacci
 spiral about +z, each weighted by cos to the cell's own face normal) along
 which a ray from the cell escapes every part of the bloom — T5's own escape
@@ -158,6 +159,20 @@ The cells are ranked by exposure (ties by key, engine-agreed) and bought
 highest first at their exact marginal price (the hybrid's own per-lattice-
 triangle count, the transition fans included), then built; up to four passes
 give back what a build's count overran. The heat-map is cell A of the sheet.
+
+**THE FACING BIN WAS FOUND BY THE SHEET, NOT BY A GATE.** The first allocator
+keyed a cell on its cube alone, and a 3 mm cube holds a 1.2 mm sheet's top AND
+its underside. The cell's one exposure sample is the triangle nearest its
+centroid, so whether a cell read high or low depended on which skin the cube
+grid happened to put nearer its middle — and the heat-map drew every petal in
+3 mm stripes of high and low exposure, the allocator buying undersides and
+leaving tops coarse. Measured on the default before the fix: **266 of 752
+cells mixed both facings, 26.3 % of the porous area faced against the sample
+that ranked it**; after it, 0 of 1,158 and 0 %. Nothing in TXB could see it:
+every clause asks whether the allocator did what it decided, and a cell
+ranked on the wrong skin is a perfectly consistent decision. Re-measured
+everything after it (§8); the counts moved by a few thousand triangles and
+the default's full share from 87.3 to 87.5 %.
 
 **Ranking by organ** (EXPORT, Node, the full build's own cell list; mean
 exposure is area-weighted over the organ's porous cells, the full share is the
@@ -256,11 +271,11 @@ bounds, not CI's).
 
 | state | COARSE | FULL | full-detail share of the porous area | cells full / all | full build |
 |---|---|---|---|---|---|
-| the default | 158,912 · 7.9 MB · 7.9 % | **1,978,546 · 98.9 MB · 98.9 %** | **87.3 %** | 664 / 752 | 114 s |
-| the whole bloom (stem, leaf, 5 sepals, 12 stamens, style) | 289,008 · 14.5 MB · 14.5 % | 1,958,496 · 97.9 MB · 97.9 % | 51.2 % | 681 / 1,279 | 178 s |
-| the umbel, head ON | 530,634 · 26.5 MB · 26.5 % | 1,983,462 · 99.2 MB · 99.2 % | 26.1 % | 612 / 2,332 | 157 s |
-| the mophead (depth 2's defaults) | 1,762,254 · 88.1 MB · 88.1 % | 1,994,016 · 99.7 MB · 99.7 % | **1.7 %** | 138 / 7,991 | 190 s |
-| 40 × 3 whorls | 1,614,436 · 80.7 MB · 80.7 % | 1,992,750 · 99.6 MB · 99.6 % | 2.2 % | 174 / 7,182 | 150 s |
+| the default | 158,912 · 7.9 MB · 7.9 % | **1,977,368 · 98.9 MB · 98.9 %** | **87.5 %** | 1,020 / 1,158 | 102 s |
+| the whole bloom (stem, leaf, 5 sepals, 12 stamens, style) | 289,008 · 14.5 MB · 14.5 % | 1,962,658 · 98.1 MB · 98.1 % | 51.9 % | 999 / 1,937 | 134 s |
+| the umbel, head ON | 530,634 · 26.5 MB · 26.5 % | 1,981,752 · 99.1 MB · 99.1 % | 26.7 % | 855 / 3,958 | 136 s |
+| the mophead (depth 2's defaults) | 1,762,254 · 88.1 MB · 88.1 % | 1,993,780 · 99.7 MB · 99.7 % | **1.6 %** | 333 / 14,635 | 160 s |
+| 40 × 3 whorls | 1,614,436 · 80.7 MB · 80.7 % | 1,991,820 · 99.6 MB · 99.6 % | 2.2 % | 284 / 11,350 | 118 s |
 
 Every FULL build: 0 open and 0 doubled directed edges, 0 degenerate
 triangles on the float32s, the coarse build's shell count. The default's
