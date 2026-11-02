@@ -291,11 +291,11 @@ lattice (88 % / 81 %), so the allocator can buy little: the read-out says so.
 | state | detail | triangles | AGREE (count + float32 hash) | Node | Chromium | Chromium heap at the end |
 |---|---|---|---|---|---|---|
 | default | coarse | 158,912 | yes `f11217d4` | 3.1 s | 2.1 s | 0.08 GB |
-| default | full | 1,978,546 | yes `146ed032` | 131 s | 90 s | 0.90 GB |
+| default | full | 1,977,368 | yes `bbc18378` | 100 s | 66 s | 1.16 GB |
 | umbel | coarse | 530,634 | yes `bd2d4f52` | 11 s | 8 s | 0.27 GB |
-| umbel | full | 1,983,462 | yes `4a8fe00d` | 179 s | 152 s | 2.01 GB |
+| umbel | full | 1,981,752 | yes `fd589e27` | 146 s | 91 s | 1.24 GB |
 | mophead | coarse | 1,762,254 | yes `1119c8a8` | 95 s | 81 s | 0.87 GB |
-| mophead | full | 1,994,016 | yes `13598152` | 188 s | 134 s | 1.75 GB |
+| mophead | full | 1,993,780 | yes `51c4a249` | 174 s | 126 s | 1.98 GB |
 
 **Round 2's mophead crash is gone** (it ran out of memory generating 11.7 M
 triangles; the allocator now stops at the cap). The heap is what the page holds
@@ -328,8 +328,8 @@ triangle.
 
 | height | triangles | shells | open / doubled / degenerate | within-shell pairs (folds) | cross-shell pairs | sampled vertices | printable gaps newly closed | newly touching |
 |---|---|---|---|---|---|---|---|---|
-| 0.4 mm | 1,978,546 | 9 | 0 / 0 / 0 | **0** | 17,010 | 20,770 | 1 | 0 |
-| 2.5 mm | 1,986,076 | 9 | 0 / 0 / 0 | **0** | 17,012 | 64,102 | 0 | 0 |
+| 0.4 mm | 1,977,368 | 9 | 0 / 0 / 0 | **0** | 17,008 | 20,526 | 1 | 0 |
+| 2.5 mm | 1,985,794 | 9 | 0 / 0 / 0 | **0** | 17,010 | 63,785 | 0 | 0 |
 
 The full build folds nothing at either end (the fold check, §3b); the
 cross-shell pairs are the petals' and the hub's by-design overlaps, the export
@@ -473,7 +473,7 @@ hand); (c) a named viewing direction (front, top).
 - **The final cap.** 2.0 M is provisional until the ladder is printed through
   PreForm (§9).
 - **The full build's time** is not optimised: a fold-check withdrawal re-meshes
-  the whole run of that organ; 90–150 s in Chromium for the states measured.
+  the whole run of that organ; 66–126 s in Chromium for the states measured.
   The page builds FULL only on the button and the export.
 - **A minimum wall** (question 2) is proposed, not built.
 - **The full points stay on the lattice planes** (no chart per organ); the fold

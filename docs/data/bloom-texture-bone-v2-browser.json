@@ -19,24 +19,6 @@
    "agree": true
   },
   {
-   "key": "default",
-   "name": "the default",
-   "detail": "full",
-   "node": {
-    "tris": 1978546,
-    "hash": "146ed032",
-    "s": 131.4,
-    "share": 0.873
-   },
-   "chromium": {
-    "tris": 1978546,
-    "hash": "146ed032",
-    "s": 90.2,
-    "heapEndGB": 0.9
-   },
-   "agree": true
-  },
-  {
    "key": "umbel",
    "name": "the umbel, head ON (60 mm stem)",
    "detail": "coarse",
@@ -51,24 +33,6 @@
     "hash": "bd2d4f52",
     "s": 8.4,
     "heapEndGB": 0.27
-   },
-   "agree": true
-  },
-  {
-   "key": "umbel",
-   "name": "the umbel, head ON (60 mm stem)",
-   "detail": "full",
-   "node": {
-    "tris": 1983462,
-    "hash": "4a8fe00d",
-    "s": 179.4,
-    "share": 0.261
-   },
-   "chromium": {
-    "tris": 1983462,
-    "hash": "4a8fe00d",
-    "s": 152.3,
-    "heapEndGB": 2.01
    },
    "agree": true
   },
@@ -91,20 +55,56 @@
    "agree": true
   },
   {
+   "key": "default",
+   "name": "the default",
+   "detail": "full",
+   "node": {
+    "tris": 1977368,
+    "hash": "bbc18378",
+    "s": 100.2,
+    "share": 0.875
+   },
+   "chromium": {
+    "tris": 1977368,
+    "hash": "bbc18378",
+    "s": 66.2,
+    "heapEndGB": 1.16
+   },
+   "agree": true
+  },
+  {
+   "key": "umbel",
+   "name": "the umbel, head ON (60 mm stem)",
+   "detail": "full",
+   "node": {
+    "tris": 1981752,
+    "hash": "fd589e27",
+    "s": 145.8,
+    "share": 0.267
+   },
+   "chromium": {
+    "tris": 1981752,
+    "hash": "fd589e27",
+    "s": 90.6,
+    "heapEndGB": 1.24
+   },
+   "agree": true
+  },
+  {
    "key": "mophead",
    "name": "the mophead (depth 2's ruled defaults)",
    "detail": "full",
    "node": {
-    "tris": 1994016,
-    "hash": "13598152",
-    "s": 188,
-    "share": 0.017
+    "tris": 1993780,
+    "hash": "51c4a249",
+    "s": 173.8,
+    "share": 0.016
    },
    "chromium": {
-    "tris": 1994016,
-    "hash": "13598152",
-    "s": 133.5,
-    "heapEndGB": 1.75
+    "tris": 1993780,
+    "hash": "51c4a249",
+    "s": 126.2,
+    "heapEndGB": 1.98
    },
    "agree": true
   }
