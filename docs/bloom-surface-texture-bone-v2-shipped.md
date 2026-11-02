@@ -301,6 +301,30 @@ Almost every wall the merging field leaves is under 0.7 mm at the ruled
 defaults — a wall is what is left between two pores that nearly merge, so it is
 thin by construction. Question 2 proposes a rule; none is built.
 
+### 8d. Print: the FULL default at the two ends of the height range
+
+`--section print`, EXPORT, the default bloom, FULL detail under the 2.0 M cap.
+"Closed gaps" compares each sampled vertex's nearest OTHER part before and
+after the relief, on the SAME mesh (the `boneNoRelief` lever writes the stream
+undisplaced with every decision taken on the relieved build), every 20th
+triangle.
+
+| height | triangles | shells | open / doubled / degenerate | within-shell pairs (folds) | cross-shell pairs | sampled vertices | printable gaps newly closed | newly touching |
+|---|---|---|---|---|---|---|---|---|
+| 0.4 mm | 1,978,546 | 9 | 0 / 0 / 0 | **0** | 17,010 | 20,770 | 1 | 0 |
+| 2.5 mm | 1,986,076 | 9 | 0 / 0 / 0 | **0** | 17,012 | 64,102 | 0 | 0 |
+
+The full build folds nothing at either end (the fold check, §3b); the
+cross-shell pairs are the petals' and the hub's by-design overlaps, the export
+contract's own. The two counts differ because the allocator decides per height
+(a taller relief costs the same lattice but moves which cells fold back to
+coarse). **The gap sweep is a SAMPLE** — every 20th triangle; the first run at
+every 3rd did not finish in 30 minutes — so "1 newly closed at 0.4 mm" is a
+sampled count, not the bloom's. Round 2's prototype found one sampled gap
+closing at 2.5 mm; on the shipped build it is the other way round, and both
+are single samples. The 2.5 mm relief remains **UNVALIDATED for powder
+removal** (the help text says so).
+
 ## 9. The PreForm ladder
 
 `node tools/bloom-preform-ladder.mjs <dir> --design default|umbel --caps …`

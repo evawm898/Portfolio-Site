@@ -287,5 +287,49 @@
     "medianMm": 0.3518966238363025
    }
   }
+ ],
+ "print": [
+  {
+   "H": 0.4,
+   "tris": 1978546,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 17010,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 20,
+    "sampled": 20770,
+    "newlyClosedPrintableGaps": 1,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0,
+    "nearestRaisedMm": 0
+   }
+  },
+  {
+   "H": 2.5,
+   "tris": 1986076,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 17012,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 20,
+    "sampled": 64102,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0,
+    "nearestRaisedMm": 0
+   }
+  }
  ]
 }
