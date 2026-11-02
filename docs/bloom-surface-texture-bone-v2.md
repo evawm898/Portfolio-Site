@@ -553,6 +553,105 @@ coarse build's disc list (`discs: true`) and the full build's are the same pores
 
 The prototype's `bone2Bloom` modes are `'coarse'` and `'hybrid'`, and the browser times are §19.
 
+<!-- §16 -->
+
+## 17. What the 1.5 M cap protects — the investigation (ruling 5)
+
+**THE CAP'S OWN STATED REASON IS THAT IT HAS NONE YET.** `EXPORT_TRI_BUDGET` lives in `bloom-geometry.js:4773`.
+`bloom.js:24–31` says why it exists:
+
+> Cap the OUTPUT, never an input proxy … Phase-1 geometry peaks near 60k export tris at petalCount 40, so the
+> cap is slack by design — it exists so the refusal path is real before it is ever needed.
+
+So 1.5 M was set at 25× the largest model of its day, so that the refusal path existed. It was not derived from
+any measured limit. Every candidate limit the ruling names, measured here:
+
+| candidate | what it gives | the triangle count it binds at |
+|---|---|---|
+| **STL file size** at 50 bytes a triangle (84-byte header) | 1.5 M → **75 MB**; 3 M → 150 MB; 6 M → 300 MB; 12 M → 600 MB | only through a limit someone else sets on MB (below) |
+| **Chromium, the page's own accumulator** (`MeshBuilder.positions` is a plain JS array, 9 numbers a triangle) | builds, uploads, exports and renders at 1.5 / 3 / 6 / 12 M; **throws `Invalid array length` at 15 M** — V8's array ceiling, ~134 M elements | **~14.9 M** (between 12 and 15 M measured) |
+| **Chromium heap** | 0.23 / 0.57 / 0.81 / 2.00 GB after the STL at 1.5 / 3 / 6 / 12 M, of a 4.4 GB limit | above the array ceiling; not reached |
+| **Export time** (three's STLExporter, binary, then a Blob) | 0.5 / 2.3 / 2.9 / 7.5 s at 1.5 / 3 / 6 / 12 M | none hard; a stall bar of 120 s was never approached |
+| **First render** (software GL in this container) | 1.1 / 1.8 / 2.9 / 3.5 s | none hard |
+| **A print-service upload limit** | **not recorded.** The repo names Shapeways only for build volume (`flower.js:3316`) and JLC3DP only for escape-hole sizes (`docs/bloom-hydrangea-discovery.md:364`); neither gives an upload size | — |
+
+`node tools/bloom-budget-limits.mjs` produces these numbers (`docs/data/bloom-budget-limits.json`). It builds a
+synthetic sheet of N triangles in a real Chromium page through the same steps the bloom takes: a JS array of 9N
+numbers, a `Float32BufferAttribute`, `STLExporter` binary to a Blob, one render. **The synthetic mesh is not the
+bloom's geometry builder.** The real full build's own cost is in §19, where generation, not export, is the long pole.
+
+**THE DECISION RULE'S ANSWER: STOP.** Nothing measurable here binds near 1.5 M:
+- the browser holds 8× that;
+- the export of 12 M takes 7.5 s;
+- the heap is half used at 12 M.
+
+The only limit that could reasonably bind is an external one: the upload limit of the service the STL goes to. The
+repo does not record it. **The cap is not moved.** Question A asks Eva.
+
+For scale against the measured hybrid builds (§16): the default bloom's full build is 2.31 M (115 MB of STL), the
+whole bloom 3.70 M (185 MB), the umbel 6.22 M (311 MB). All are under the browser's ceiling, and every one is over
+the cap.
+
+## 18. Print, the nib and depth (EXPORT, the default bloom, the FULL build)
+
+**Print.** The census is `tools/bloom-self-intersection.mjs` on the exported doubles. The directed-edge count is on
+the float32 keys the STL stores. Gaps come from the same mesh built twice: once relieved, once with nothing raised
+(`noRelief`, a lab-only option), paired vertex for vertex.
+
+| H | triangles | shells | open / doubled directed edges | within-shell contacts (worst span) | gaps newly closed under 1 mm / newly touching (sampled) |
+|---|---|---|---|---|---|
+| 0.4 | 2,304,580 | **9** | 0 / 0 | 5 (0.000 mm) | 0 / 0 of 9,696 |
+| 2.5 | 2,304,580 | **9** | 0 / 0 | 5 (0.000 mm) | **1** / 0 of 32,850 |
+
+- **Shells stay 9.** The coincidence withdrawal (#481's rule) withdrew 0 triangles here and 2 on the planted fixture
+  (B2e4).
+- **The five contacts are tangencies, not folds.** Their span is exactly 0, the same five at both heights. They come
+  from a point landing within the 1e-3 mm snap of a neighbouring pore's chord.
+- **One gap closes at 2.5 mm.** It is one sampled vertex (every 41st triangle of a sheet, within 1 + H of another
+  part) whose gap was at least 1 mm unrelieved and under 1 mm relieved. Round 1 read 0 at 2.5 on the 0.1 mm grid
+  over 21,367 lattice-sampled vertices, so the denser mesh found a site the coarser sample did not. It is the
+  ruled maximum's cost and is reported, not chased (question F).
+- **Walls.** Thinnest 0.006 mm, p10 0.046, median 0.270 mm, over 289 adjacent pairs (160 merged). They are measured
+  on the field at H 1.0 on the plate, and no mesh changes them: the hybrid DRAWS a 0.006 mm wall as closely as it is
+  asked for, so it prints exactly as thin (question F).
+- **11 constraint recoveries fail** (two arcs crossing at a lens end). They cost a ring segment's roundness and
+  nothing in closure.
+
+**The nib — curvature decides, no mask (ruling 6).** Petal 0's apex, vertices within 1.2 mm of it:
+
+| H | build | vertices | raised > 0.05 mm | a fade's tail (< 0.05) | max relief | nearest raised point to the apex | fade width |
+|---|---|---|---|---|---|---|---|
+| 0.4 | coarse | 296 | 14 | 114 | 0.399 mm | 0.702 mm | 0.75 |
+| 0.4 | FULL | 556 | 84 | 260 | 0.400 mm | 0.702 mm | 0.75 |
+| 2.5 | coarse | 296 | 1 | 125 | 0.098 mm | 1.185 mm | 4.69 |
+| 2.5 | FULL | 556 | 16 | 326 | 0.101 mm | 1.080 mm | 4.69 |
+
+- **At H 0.4 the nib is NOT smooth by curvature**, as round 1 found (§10): pores reach 0.70 mm from the apex at
+  full height. The full build draws more of them (84 raised vertices against the coarse build's 14), because it
+  draws the same pores closer.
+- **At 2.5 the derived fade (H × 15/8 = 4.69 mm) is wider than the nib**, so the apex is smooth by the fade, not by
+  curvature (§11.9, question H).
+- No mask was added. The sheet's cell C shows it.
+
+**Depth over diameter** (the pore's drawn depth over its rim diameter, 39 pores in the plate window; the smallest
+pores are the 0.5 mm band):
+
+| H | median | p90 | max | the smallest pores (median / max) | the largest pore |
+|---|---|---|---|---|---|
+| 0.4 | 0.50 | 0.67 | 0.76 | 0.67 / 0.76 | 0.30 |
+| 1.0 | 1.24 | 1.67 | 1.90 | 1.67 / 1.90 | 0.75 |
+| 1.5 | 1.87 | 2.51 | 2.86 | 2.50 / 2.86 | 1.12 |
+| 2.5 | 3.11 | 4.18 | 4.76 | 4.17 / 4.76 | 1.87 |
+
+**THE 2.5 mm MAXIMUM IS UNVALIDATED FOR POWDER REMOVAL**, and the slider's help text says so (`B2_HEIGHT_HELP`):
+- at 2.5 the smallest pores are blind wells 4.2–4.8× deeper than they are wide;
+- nothing this deep has been printed here;
+- SLS powder in a 0.5 mm well five times its width deep may not come out.
+
+The help text's figure moved from round 1's "up to 3.4" (an estimate) to the measured 4.8.
+
+<!-- §19 -->
+
 ## 20. The gate: B2 extended (`node tools/verify-bloom-bone2.mjs [--control]`)
 
 Still local only: the prototype is not shipped and nothing here is in CI. B2a–B2c are round 1's. The new

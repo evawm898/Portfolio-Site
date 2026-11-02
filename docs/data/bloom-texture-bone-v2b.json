@@ -6,7 +6,7 @@
    "methods": {
     "lattice (= coarse)": {
      "trisPerMm2": 13,
-     "ms": 17,
+     "ms": 16,
      "free": {
       "n": 1,
       "median": 28.838,
@@ -28,7 +28,7 @@
     },
     "grid 0.1": {
      "trisPerMm2": 340,
-     "ms": 65,
+     "ms": 72,
      "free": {
       "n": 1,
       "median": 11.153,
@@ -50,7 +50,7 @@
     },
     "rings": {
      "trisPerMm2": 189,
-     "ms": 161,
+     "ms": 176,
      "free": {
       "n": 1,
       "median": 2.251,
@@ -71,8 +71,8 @@
      }
     },
     "HYBRID": {
-     "trisPerMm2": 432,
-     "ms": 1014,
+     "trisPerMm2": 430,
+     "ms": 1168,
      "free": {
       "n": 1,
       "median": 2.187,
@@ -105,14 +105,14 @@
        "nested": 3454,
        "seam": 1066,
        "seamCross": 609,
-       "junction": 1461,
+       "junction": 1387,
        "steiner": 66
       }
      }
     },
     "coarse-rings": {
      "trisPerMm2": 82,
-     "ms": 231,
+     "ms": 174,
      "free": {
       "n": 1,
       "median": 24.752,
@@ -196,7 +196,7 @@
     },
     "rings": {
      "trisPerMm2": 172,
-     "ms": 169,
+     "ms": 136,
      "free": {
       "n": 2,
       "median": 4.502,
@@ -217,8 +217,8 @@
      }
     },
     "HYBRID": {
-     "trisPerMm2": 399,
-     "ms": 731,
+     "trisPerMm2": 398,
+     "ms": 827,
      "free": {
       "n": 2,
       "median": 3.755,
@@ -250,15 +250,15 @@
        "centre": 219,
        "nested": 3297,
        "seam": 979,
-       "seamCross": 562,
-       "junction": 1126,
+       "seamCross": 559,
+       "junction": 1047,
        "steiner": 60
       }
      }
     },
     "coarse-rings": {
      "trisPerMm2": 79,
-     "ms": 127,
+     "ms": 140,
      "free": {
       "n": 2,
       "median": 27.074,
@@ -330,7 +330,7 @@
      "maxMm": 0.789,
      "rmsMm": 0.125
     },
-    "ms": 1979
+    "ms": 2376
    },
    "grid 0.1": {
     "trisPerMm2": 367,
@@ -352,7 +352,7 @@
      "maxMm": 0.507,
      "rmsMm": 0.067
     },
-    "ms": 3405
+    "ms": 3999
    },
    "rings": {
     "trisPerMm2": 138,
@@ -374,10 +374,10 @@
      "maxMm": 0.507,
      "rmsMm": 0.071
     },
-    "ms": 2471
+    "ms": 2880
    },
    "HYBRID": {
-    "trisPerMm2": 271,
+    "trisPerMm2": 270,
     "free": {
      "n": 1,
      "median": 1.903,
@@ -396,7 +396,7 @@
      "maxMm": 0.507,
      "rmsMm": 0.066
     },
-    "ms": 3534
+    "ms": 3785
    },
    "coarse-rings": {
     "trisPerMm2": 72,
@@ -418,7 +418,7 @@
      "maxMm": 0.699,
      "rmsMm": 0.086
     },
-    "ms": 2164
+    "ms": 2263
    }
   }
  },
