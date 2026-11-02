@@ -15217,7 +15217,19 @@ function bone2Cells(O, porous, cellMm, oi) {
     if (!porous[t]) continue;
     const a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2];
     const cx = (P[a * 3] + P[b * 3] + P[c * 3]) / 3, cy = (P[a * 3 + 1] + P[b * 3 + 1] + P[c * 3 + 1]) / 3, cz = (P[a * 3 + 2] + P[b * 3 + 2] + P[c * 3 + 2]) / 3;
-    const key = `${oi}|${Math.floor(cx / cellMm)},${Math.floor(cy / cellMm)},${Math.floor(cz / cellMm)}`;
+    /* THE FACING BIN: a cell is a cube AND a facing (the face normal's dominant
+       axis and sign — six bins, nothing named). Without it a 3 mm cube holds a
+       1.2 mm sheet's top AND its underside, the cell's one exposure sample is
+       whichever skin sits nearer its centroid, and the allocator bought the
+       petals in 3 mm stripes — undersides full, tops coarse (measured on the
+       default: 266 of 752 cells mixed, 26.3 % of the porous area facing
+       against the sample that ranked it). */
+    const fx = (P[b * 3 + 1] - P[a * 3 + 1]) * (P[c * 3 + 2] - P[a * 3 + 2]) - (P[b * 3 + 2] - P[a * 3 + 2]) * (P[c * 3 + 1] - P[a * 3 + 1]);
+    const fy = (P[b * 3 + 2] - P[a * 3 + 2]) * (P[c * 3] - P[a * 3]) - (P[b * 3] - P[a * 3]) * (P[c * 3 + 2] - P[a * 3 + 2]);
+    const fz = (P[b * 3] - P[a * 3]) * (P[c * 3 + 1] - P[a * 3 + 1]) - (P[b * 3 + 1] - P[a * 3 + 1]) * (P[c * 3] - P[a * 3]);
+    const ax = Math.abs(fx), ay = Math.abs(fy), az = Math.abs(fz);
+    const face = ax >= ay && ax >= az ? (fx >= 0 ? 'x' : 'X') : ay >= az ? (fy >= 0 ? 'y' : 'Y') : (fz >= 0 ? 'z' : 'Z');
+    const key = `${oi}|${Math.floor(cx / cellMm)},${Math.floor(cy / cellMm)},${Math.floor(cz / cellMm)}|${face}`;
     let C = map.get(key);
     if (!C) { C = { key, oi, organ: O.organ, tris: [], area: 0, sx: 0, sy: 0, sz: 0, cost: 0, E: 0, sample: null, selected: false }; map.set(key, C); list.push(C); }
     const ux = P[b * 3] - P[a * 3], uy = P[b * 3 + 1] - P[a * 3 + 1], uz = P[b * 3 + 2] - P[a * 3 + 2], vx = P[c * 3] - P[a * 3], vy = P[c * 3 + 1] - P[a * 3 + 1], vz = P[c * 3 + 2] - P[a * 3 + 2];
