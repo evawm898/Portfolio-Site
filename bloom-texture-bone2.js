@@ -54,6 +54,11 @@ export const B2_SPREAD_DEFAULT = 3;
    the doc's §3 derives what "depth comparable to diameter" gives, and it is
    NOT 2.5 for the ruled pores: it is a question) */
 export const B2_HEIGHT_RANGE = Object.freeze([0.4, 2.5]);
+/* RULED (Nov 1, round 2): the maximum IS 2.5 mm (depth up to ~3.4x the
+   diameter at the smallest pores). It has never been printed, and a blind pit
+   that deep may keep its powder — the slider's help text must say so, word for
+   word what a shipping registry row carries: */
+export const B2_HEIGHT_HELP = 'Relief height, 0.4 to 2.5 mm. Above about 1.5 mm the smallest pores become blind wells up to about 4.8 times deeper than they are wide (measured at 2.5 mm): UNVALIDATED for powder removal (nothing this deep has been printed).';
 export const B2_HEIGHT_DEFAULT = 0.4;
 export const B2_DENSITY_DEFAULT = 0.9;
 
@@ -92,6 +97,8 @@ export function bone2Params(state = {}) {
   const density = clamp(num('bonePoreDensity', B2_DENSITY_DEFAULT), [0.2, 1]);
   return { D, spread, Dmax: D * spread, H, density, packing: state.bone2Packing === 'hardcore' || state.bone2Packing === 'overlap' ? state.bone2Packing : B2_PACKING };
 }
+
+import { hybridOrganMesh, organDiscs, HYBRID_LAYOUTS } from './bloom-texture-bone2-hybrid.js';
 
 /* ------------------------------------------------------------- hashing --- */
 function hash3(x, y, z, s) {
@@ -589,6 +596,27 @@ function bisectCount(la, lb, lc, e, depth = 0) {
   const m = Math.sqrt(Math.max(0, (2 * la * la + 2 * lb * lb - lc * lc) / 4));
   return bisectCount(la, m, lc / 2, e, depth + 1) + bisectCount(lc / 2, m, lb, e, depth + 1);
 }
+/* THE PETAL CAPTURE (round 2's instrument, docs §14): one organ's emitted
+   mesh inside a window, UNDISPLACED, with the field evaluated at every vertex
+   on its own normal — so a contour of F on it is the DRAWN mid-wall, measured
+   in each pore's own tangent chart, the plate's instrument carried to a real
+   sheet. `cap` = { organ, centre, normal, radiusMm }. */
+function captureMesh(stats, T, P, N, tri, nrmAt = null, reliefAt = null) {
+  const cap = stats.capture; if (!cap) return;
+  const c0 = cap.centre, R2 = cap.radiusMm * cap.radiusMm;
+  const near = (v) => { const dx = P[v * 3] - c0[0], dy = P[v * 3 + 1] - c0[1], dz = P[v * 3 + 2] - c0[2]; return dx * dx + dy * dy + dz * dz <= R2; };
+  const keep = [], idx = new Map(), Pc = [], Fc = [], Rc = [];
+  const id = (v) => { let k = idx.get(v); if (k !== undefined) return k; k = Pc.length / 3; idx.set(v, k); const p = [P[v * 3], P[v * 3 + 1], P[v * 3 + 2]]; let n = nrmAt ? nrmAt(v) : [N[v * 3], N[v * 3 + 1], N[v * 3 + 2]]; const L = Math.hypot(n[0], n[1], n[2]) || 1; n = [n[0] / L, n[1] / L, n[2] / L]; Pc.push(...p); Fc.push(T.f(p, n)); Rc.push(reliefAt ? reliefAt(v) : null); return k; };
+  for (let t = 0; t < tri.length / 3; t++) { const a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2]; if (near(a) && near(b) && near(c)) keep.push(id(a), id(b), id(c)); }
+  cap.mesh = { P: Pc, F: Fc, tri: keep, relief: Rc };
+}
+/* the plan a capture reads: the first organ of the asked kind with a vertex
+   at the window's centre, facing its normal */
+function capturePlan(stats, plans) {
+  const cap = stats.capture; if (!cap) return -1;
+  return plans.findIndex((pl) => { const O = pl.X.O; if (O.organ !== cap.organ) return false; for (let v = 0; v < pl.X.nV; v++) { const d = Math.hypot(O.P[v * 3] - cap.centre[0], O.P[v * 3 + 1] - cap.centre[1], O.P[v * 3 + 2] - cap.centre[2]); if (d < 0.6 && O.N[v * 3] * cap.normal[0] + O.N[v * 3 + 1] * cap.normal[1] + O.N[v * 3 + 2] * cap.normal[2] > 0.8) return true; } return false; });
+}
+
 /* THE RINGS ON A REAL SHEET, IN A FOCUS WINDOW (the sheet's close-up; §6 of
    the doc says what porting them to every organ takes). The window's
    triangles of one organ are cut out; the hole is re-meshed in the tangent
@@ -708,6 +736,15 @@ function ringsWindowOrgan(X, mw, focus, T, FIELD, layout, stats) {
   }
   void ccw;
   stats.ringsWindow = { cut: nIn, loop: loop.length, ringed, edgeSkipped, nestedRinged, points: pts.length, patchTris: kept.length / 3, missingBoundaryEdges: missing, dropped };
+  if (stats.capture) {
+    /* the window's own patch, undisplaced, plus the lattice around it */
+    const Pu = [], Nu = [];
+    pts.forEach((q, i) => { if (ids[i] >= 0) { const v = ids[i]; Pu.push(O.P[v * 3], O.P[v * 3 + 1], O.P[v * 3 + 2]); Nu.push(O.N[v * 3], O.N[v * 3 + 1], O.N[v * 3 + 2]); } else { const at = carry(q[0], q[1]); if (at) { Pu.push(...at.p); Nu.push(...at.n); } else { Pu.push(0, 0, 0); Nu.push(0, 0, 1); } } });
+    const base = Pu.length / 3, triC = [];
+    for (let i = 0; i < kept.length; i++) triC.push(kept[i]);
+    for (let t = 0; t < nT; t++) if (!inWin[t]) for (let k = 0; k < 3; k++) { const v = O.tri[t * 3 + k]; Pu.push(O.P[v * 3], O.P[v * 3 + 1], O.P[v * 3 + 2]); Nu.push(O.N[v * 3], O.N[v * 3 + 1], O.N[v * 3 + 2]); triC.push(base + triC.length - kept.length); }
+    captureMesh(stats, T, Pu, Nu, triC);
+  }
   return new Float64Array(out);
 }
 /* THE HOOK: `mode` 'lattice' (the v2 field on the shipped lattice — the
@@ -780,7 +817,11 @@ export function bone2Hook({ mode = 'grid', edgeMm = null, stats = {}, focus = nu
         plans.push({ X, mw, porous, porousTris });
       }
       stats.junctionTris = junctionTris;
-      if (mode === 'count' || mode === 'lattice') { stats.passMs = performance.now() - t0; return null; }
+      /* COARSE (the release preview, round 2's ruling 4) IS the v2 field on the
+         shipped lattice: no point added, so its cost is v1's to the triangle,
+         and its pores are the full build's (one field) drawn at the lattice */
+      if (mode === 'count' || mode === 'lattice' || mode === 'coarse') { stats.passMs = performance.now() - t0; { const ci = capturePlan(stats, plans); if (ci >= 0) { const O = plans[ci].X.O, X = plans[ci].X; captureMesh(stats, T, O.P, O.N, O.tri, null, (v) => Math.max(0, X.s[v] + X.clr[v])); stats.capture.lattice = { P: Array.from(O.P), N: Array.from(O.N), tri: Array.from(O.tri), porous: Array.from(plans[ci].porous) }; } } if (mode === 'coarse' && stats.wantDiscs) stats.coarseDiscs = coarseDiscList(plans, FIELD); return null; }
+      if (mode === 'hybrid' || mode === 'coarse-rings' || mode === 'hybrid-count' || mode === 'coarse-rings-count') return hybridWrite(acc, T, per, plans, FIELD, mode, stats, t0);
       if (mode === 'rings' && !focus) throw new Error('bone2: the rings run in a FOCUS window only (a charted patch) — see the doc §6');
       /* GRID: refine each organ's porous triangles; rebuild the stream */
       const H = T.heightMm;
@@ -824,6 +865,8 @@ export function bone2Hook({ mode = 'grid', edgeMm = null, stats = {}, focus = nu
           refineAll(redo);
         }
         stats.coincidentWithdrawn = withdrawn;
+        const ci = capturePlan(stats, plans);
+        if (ci >= 0) { const R = refined.get(ci), O = plans[ci].X.O; if (R) captureMesh(stats, T, R.P, R.attrs[0].v, R.tri); else captureMesh(stats, T, O.P, O.N, O.tri); }
       }
       for (const [pi, { X, mw, porous, porousTris }] of plans.entries()) {
         const O = X.O, nV = X.nV;
@@ -888,11 +931,144 @@ export function bone2Hook({ mode = 'grid', edgeMm = null, stats = {}, focus = nu
     },
   };
 }
+/* ============================= ROUND 2: THE HYBRID IN THE RELIEF PASS --- */
+/* Every organ with a porous triangle is re-meshed by `hybridOrganMesh` (the
+   hybrid module's header says how) from the field's own discs cut by that
+   organ; the new points take the organ's attributes by their lattice
+   triangle's barycentrics and are relieved by the one field. 'hybrid' is the
+   FULL build (the export and the full-detail button), 'coarse' the release
+   preview (every length the lattice's own); '-count' counts exactly
+   (b + 2i - 2 a triangle) without triangulating. The coincidence rule of
+   round 1 is kept: a new vertex whose float32 key another organ also emits
+   withdraws the lattice triangles it belongs to, and that organ is re-meshed
+   (at most six passes). */
+/* the pores a coarse build draws: the same discs the full build would mesh,
+   from the same field and the same porous triangles (B2f compares the two) */
+function coarseDiscList(plans, FIELD) {
+  const out = [];
+  for (const pl of plans) if (pl.porousTris) for (const d of organDiscs(pl.X.O.P, pl.X.O.N, pl.X.O.tri, pl.porous, FIELD)) out.push({ key: d.key, c: d.c, rho: d.rho });
+  return out;
+}
+export { hybridWrite as __hybridWrite };   // the gate's planted-coincidence fixture calls it on two synthetic organs
+function hybridWrite(acc, T, per, plans, FIELD, mode, stats, t0) {
+  const full = mode.startsWith('hybrid'), countOnly = mode.endsWith('-count');   // 'coarse-rings': the measured alternative to the lattice coarse (doc §15)
+  const layout = HYBRID_LAYOUTS[full ? 'full' : 'coarse'], wallU = bone2WallU();
+  const H = T.heightMm, f32 = Math.fround;
+  stats.hybrid = { mode, organs: 0, count: 0, discs: 0, pairs: 0, free: 0, merged: 0, junctions: 0, kinds: {}, consFail: 0, aborted: 0, countMismatch: 0, withdrawn: 0, discList: [] };
+  const HS = stats.hybrid;
+  const run = (pl) => {
+    const O = pl.X.O;
+    const discs = organDiscs(O.P, O.N, O.tri, pl.porous, FIELD);
+    const R = hybridOrganMesh({ P: O.P, tri: O.tri, porous: pl.porous }, discs, { layout, wallU, countOnly, debug: !!stats.debugHybrid });
+    if (stats.debugHybrid && R.stats.failSites) (stats.failSites = stats.failSites || []).push(...R.stats.failSites.map((f) => ({ ...f, organ: O.organ, discs: [...new Set(f.failed.flatMap((q) => [q.da, q.db]).concat(f.blockers.flatMap((q) => [q.da, q.db])))].filter((x) => x >= 0).map((x) => ({ x, key: discs[x].key, rho: discs[x].rho, c: discs[x].c, n: discs[x].n })) })));
+    return { discs, R };
+  };
+  const results = plans.map((pl) => (pl.porousTris ? run(pl) : null));
+  let total = 0;
+  for (const [i, pl] of plans.entries()) total += results[i] ? results[i].R.stats.count : pl.X.O.tri.length / 3;
+  const tally = () => {
+    for (const r of results) {
+      if (!r) continue;
+      HS.organs++; HS.discs += r.discs.length; const st = r.R.stats;
+      for (const [k2, v] of Object.entries(st)) if (k2.startsWith('abort_')) HS[k2] = (HS[k2] || 0) + v;
+      HS.pairs += st.pairs; HS.free += st.free; HS.merged += st.merged; HS.junctions += st.junctions || 0; HS.consFail += st.consFail; HS.aborted += st.aborted; HS.countMismatch += st.countMismatch || 0;
+      for (const d of r.discs) HS.discList.push({ key: d.key, c: d.c, rho: d.rho });
+      if (r.R.kind) for (const k of r.R.kind) HS.kinds[k] = (HS.kinds[k] || 0) + 1;
+      else for (const [k2, v] of Object.entries({ ring: st.ringPts, cross: st.crossPts, seam: st.seamPts, seamCross: st.seamCross, junction: st.junctionPts || 0 })) HS.kinds[k2] = (HS.kinds[k2] || 0) + v;
+    }
+  };
+  if (countOnly) {
+    /* every organ outside the plans (none: plans covers per) plus the stream outside the relief pass */
+    let inPass = 0; for (const pl of plans) inPass += pl.X.O.tri.length / 3;
+    HS.count = acc.triangleCount - inPass + total;
+    tally();
+    stats.passMs = performance.now() - t0;
+    return null;
+  }
+  /* the displaced positions of an organ's (old + new) vertices */
+  const displaced = (pl, R) => {
+    const X = pl.X, O = X.O, nV = X.nV, nN = R.P.length / 3;
+    const D = new Float64Array(nN * 3);
+    for (let i = 0; i < nN; i++) {
+      let s, p, n;
+      if (i < nV) { s = X.s[i] + X.clr[i]; p = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]]; n = [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]]; }
+      else {
+        const j = i - nV, t = R.src.t[j], l = [R.src.b[j * 3], R.src.b[j * 3 + 1], R.src.b[j * 3 + 2]], c = [O.tri[t * 3], O.tri[t * 3 + 1], O.tri[t * 3 + 2]];
+        p = [R.P[i * 3], R.P[i * 3 + 1], R.P[i * 3 + 2]];
+        n = [0, 1, 2].map((k) => l[0] * O.N[c[0] * 3 + k] + l[1] * O.N[c[1] * 3 + k] + l[2] * O.N[c[2] * 3 + k]);
+        const L = Math.hypot(n[0], n[1], n[2]) || 1; n = [n[0] / L, n[1] / L, n[2] / L];
+        const m = l[0] * pl.mw[c[0]] + l[1] * pl.mw[c[1]] + l[2] * pl.mw[c[2]];
+        s = l[0] * X.clr[c[0]] + l[1] * X.clr[c[1]] + l[2] * X.clr[c[2]];
+        if (m > 0) { const mp = T.mp(p); if (mp > 0) s += m * mp * H * T.f(p, n); }
+      }
+      if (stats.noRelief) s = 0;   // the lab's undisplaced twin: the same mesh, nothing raised (the gap census pairs it with the relieved build)
+      for (let k = 0; k < 3; k++) D[i * 3 + k] = p[k] + (s > 0 ? n[k] * s : 0);
+    }
+    return D;
+  };
+  const keyOf = (D, v) => `${f32(D[v * 3])}|${f32(D[v * 3 + 1])}|${f32(D[v * 3 + 2])}`;
+  let Ds = plans.map((pl, i) => (results[i] ? displaced(pl, results[i].R) : null));
+  for (let pass = 0; pass < 6; pass++) {
+    const seen = new Map();
+    plans.forEach((pl, i) => {
+      const n = results[i] ? Ds[i].length / 3 : pl.X.nV;
+      for (let v = 0; v < n; v++) {
+        let k;
+        if (results[i]) k = keyOf(Ds[i], v);
+        else { const X = pl.X, O = X.O, s = X.s[v] + X.clr[v]; k = `${f32(O.P[v * 3] + (s > 0 ? O.N[v * 3] * s : 0))}|${f32(O.P[v * 3 + 1] + (s > 0 ? O.N[v * 3 + 1] * s : 0))}|${f32(O.P[v * 3 + 2] + (s > 0 ? O.N[v * 3 + 2] * s : 0))}`; }
+        const o = seen.get(k); if (o === undefined) seen.set(k, i); else if (o !== i) seen.set(k, -1);
+      }
+    });
+    const redo = [];
+    plans.forEach((pl, i) => {
+      const r = results[i]; if (!r) return;
+      const R = r.R, nV = pl.X.nV; let hit = false;
+      for (let v = nV; v < Ds[i].length / 3; v++) if (seen.get(keyOf(Ds[i], v)) === -1) { for (const t of R.attach[v - nV]) if (pl.porous[t]) { pl.porous[t] = 0; pl.porousTris--; HS.withdrawn++; } hit = true; }
+      if (hit) redo.push(i);
+    });
+    if (!redo.length) break;
+    for (const i of redo) { results[i] = plans[i].porousTris ? run(plans[i]) : null; Ds[i] = results[i] ? displaced(plans[i], results[i].R) : null; }
+  }
+  stats.coincidentWithdrawn = HS.withdrawn;
+  { const ci = capturePlan(stats, plans); if (ci >= 0 && results[ci]) { const R = results[ci].R, O = plans[ci].X.O, nV = plans[ci].X.nV, Dc = Ds[ci]; captureMesh(stats, T, R.P, null, R.tri, (v) => { if (v < nV) return [O.N[v * 3], O.N[v * 3 + 1], O.N[v * 3 + 2]]; const j = v - nV, t = R.src.t[j], l = [R.src.b[j * 3], R.src.b[j * 3 + 1], R.src.b[j * 3 + 2]], c = [O.tri[t * 3], O.tri[t * 3 + 1], O.tri[t * 3 + 2]]; return [0, 1, 2].map((k) => l[0] * O.N[c[0] * 3 + k] + l[1] * O.N[c[1] * 3 + k] + l[2] * O.N[c[2] * 3 + k]); }, (v) => Math.hypot(Dc[v * 3] - R.P[v * 3], Dc[v * 3 + 1] - R.P[v * 3 + 1], Dc[v * 3 + 2] - R.P[v * 3 + 2])); stats.capture.discs = results[ci].discs; } }
+  tally();
+  /* the stream rebuilt: each re-meshed organ's range replaced */
+  const repl = [];
+  plans.forEach((pl, i) => { const O = pl.X.O; if (!results[i]) return; const R = results[i].R, D = Ds[i]; const out = new Float64Array(R.tri.length * 3); for (let j = 0; j < R.tri.length; j++) for (let k = 0; k < 3; k++) out[j * 3 + k] = D[R.tri[j] * 3 + k]; repl.push({ from: O.from, to: O.to, X: pl.X, out }); });
+  /* organs with no porous triangle: their base displacement, as the pass writes it */
+  plans.forEach((pl, i) => { if (results[i]) return; const X = pl.X, O = X.O; const out = new Float64Array(O.tri.length * 3); for (let j = 0; j < O.tri.length; j++) { const v = O.tri[j], s = stats.noRelief ? 0 : X.s[v] + X.clr[v]; for (let k = 0; k < 3; k++) out[j * 3 + k] = O.P[v * 3 + k] + (s > 0 ? O.N[v * 3 + k] * s : 0); } repl.push({ from: O.from, to: O.to, X, out }); });
+  repl.sort((a, b) => a.from - b.from);
+  const old = acc.positions, oldN = acc.normals;
+  const pos = [], nrm = oldN ? [] : null;
+  let cur = 0;
+  const pushOld = (a, b) => { for (let i = a * 9; i < b * 9; i++) pos.push(old[i]); if (nrm) for (let i = a * 9; i < b * 9; i++) nrm.push(oldN[i]); };
+  stats.ranges = [];
+  for (const r of repl) {
+    if (r.from < cur) continue;
+    pushOld(cur, r.from);
+    const outFrom = pos.length / 9, out = r.out;
+    for (let i = 0; i < out.length; i++) pos.push(out[i]);
+    if (nrm) for (let t = 0; t < out.length / 9; t++) {
+      const b = t * 9; const ux = out[b + 3] - out[b], uy = out[b + 4] - out[b + 1], uz = out[b + 5] - out[b + 2], vx = out[b + 6] - out[b], vy = out[b + 7] - out[b + 1], vz = out[b + 8] - out[b + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, L = Math.hypot(nx, ny, nz) || 1;
+      for (let c = 0; c < 3; c++) nrm.push(nx / L, ny / L, nz / L);
+    }
+    stats.ranges.push({ organ: r.X.O.organ, from: outFrom, to: pos.length / 9, refined: true });
+    cur = r.to;
+  }
+  pushOld(cur, old.length / 9);
+  acc.positions = pos; if (nrm) acc.normals = nrm;
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { const x = pos[i + k]; if (x < acc.lo[k]) acc.lo[k] = x; if (x > acc.hi[k]) acc.hi[k] = x; }
+  HS.count = pos.length / 9;
+  stats.passMs = performance.now() - t0;
+  return {};
+}
+
 /* one bloom under v1 (the hook off), the v2 field on the lattice, or the
    grid; returns the accumulator, the record and the hook's stats */
-export async function bone2Bloom(state, { mode = 'grid', edgeMm = null, exportMode = true, captureNormals = false, capability = null, focus = null, countEdges = [] } = {}) {
+export async function bone2Bloom(state, { mode = "grid", edgeMm = null, exportMode = true, captureNormals = false, capability = null, focus = null, countEdges = [], discs: wantDiscs = false, capture = null, noRelief = false } = {}) {
   const G = await bone2Geometry();
-  const stats = {};
+  const stats = { debugHybrid: !!globalThis.__B2_DEBUG_HYBRID, noRelief, wantDiscs, capture: capture ? { ...capture } : null };
   G.__setBone2(mode === 'v1' ? null : bone2Hook({ mode, edgeMm, stats, focus, countEdges }));
   try {
     const acc = new G.MeshBuilder({ exportMode, captureNormals });

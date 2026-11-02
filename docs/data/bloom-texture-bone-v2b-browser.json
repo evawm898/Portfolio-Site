@@ -1,0 +1,81 @@
+{
+ "box": "headless Chromium (Playwright), software GL, this container; geometry build only, EXPORT, a fresh page per build",
+ "states": {
+  "default": {
+   "preview": {
+    "ms": 66,
+    "tris": 24688,
+    "heapMB": 21,
+    "warmed": true
+   },
+   "v1": {
+    "ms": 713,
+    "tris": 158912,
+    "heapMB": 175,
+    "warmed": true
+   },
+   "coarse": {
+    "ms": 1103,
+    "tris": 158912,
+    "heapMB": 95,
+    "warmed": true
+   },
+   "full": {
+    "ms": 38797,
+    "tris": 2304496,
+    "heapMB": 1236,
+    "warmed": false
+   }
+  },
+  "umbel": {
+   "preview": {
+    "ms": 570,
+    "tris": 134182,
+    "heapMB": 88,
+    "warmed": true
+   },
+   "v1": {
+    "ms": 3575,
+    "tris": 530634,
+    "heapMB": 216,
+    "warmed": true
+   },
+   "coarse": {
+    "ms": 4714,
+    "tris": 530634,
+    "heapMB": 310,
+    "warmed": true
+   },
+   "full": {
+    "ms": 147075,
+    "tris": 6201432,
+    "heapMB": 2272,
+    "warmed": false
+   }
+  },
+  "mophead": {
+   "preview": {
+    "ms": 1126,
+    "tris": 1265418,
+    "heapMB": 514,
+    "warmed": true
+   },
+   "v1": {
+    "ms": 29446,
+    "tris": 1240446,
+    "heapMB": 574,
+    "warmed": true
+   },
+   "coarse": {
+    "ms": 31005,
+    "tris": 1240446,
+    "heapMB": 701,
+    "warmed": true
+   },
+   "full": {
+    "error": "page.evaluate: Target crashed ",
+    "crashed": true
+   }
+  }
+ }
+}

@@ -52,3 +52,7 @@ bloom-geometry.__mutant_*.js
 bloom-file.__mutant_*.js
 _frame-*-mutant-*.js
 _frame-mutant-*.js
+
+# verify-bloom-bone2 --control writes these and removes them
+.bone2-mutant-*
+tools/.bone2-mutant-*

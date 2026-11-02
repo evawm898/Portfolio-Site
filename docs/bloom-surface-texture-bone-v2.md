@@ -1,4 +1,10 @@
-# Bloom surface texture — BONE v2: finer, rounder, deeper pores (prototype, Nov 1)
+# Bloom surface texture — BONE v2: finer, rounder, deeper pores (prototype, Nov 1; round 2, Nov 2)
+
+> **Round 2 (Nov 2) is §13 onward, and it is what the rulings of Nov 1 asked for:** the HYBRID mesher (rings
+> where a pore stands apart, fine points only along merge seams and wall junctions), the COARSE / FULL split
+> of the live view, the investigation of what the 1.5 M export cap protects, and the nib. It is a prototype
+> and a sheet (`docs/img/bloom-texture-bone-v2b.png`); **no shipped file changed**, and the cap did not move.
+> §21 carries §11's questions forward under the rulings. Round 1 (§1–§12) is kept as it was written.
 
 **Status: PROTOTYPE AND SHEET, NOT SHIPPED. WAITING ON EVA.** No shipped file changed: `bloom-geometry.js`,
 `bloom-registry.js`, `bloom.js`, `bloom.html` and every gate are byte-identical to `main` at `2cc6d56`. So no byte
@@ -418,3 +424,453 @@ the uncontended run.
 - `node tools/bloom-texture-bone2-browser.mjs` — the browser timings.
 - `node tools/verify-bloom-bone2.mjs [--control]` — B2a–B2d.
 - `node tools/shot-bloom-texture-bone2.mjs docs/img/bloom-texture-bone-v2.png` — the sheet.
+
+---
+
+# Round 2 (Nov 2): the hybrid mesh, the budget's real limit, and the live/full split
+
+## 13. The rulings this round builds on (Nov 1, after #481)
+
+- **Packing: pores MERGE** (the references' look). Walled-only packing and per-part layout are dropped.
+- **Meshing: HYBRID.** Pore-conforming rings where a pore stands apart; fine refinement ONLY along merge seams and wall
+  junctions; never a regular fine grid over whole patches; both derived from the pore field, no typed edge.
+- **Depth:** the height's maximum is **2.5 mm** (depth up to 4.76× the diameter at the smallest pores, measured in §18),
+  **UNVALIDATED for powder removal** — said here (§18) and in the slider's help text (`B2_HEIGHT_HELP` in the
+  prototype, the words a shipping registry row carries).
+- **Live view:** release builds COARSE pores (v1-weight cost); a "full detail" button and the export build the FULL
+  pores; dragging keeps the light preview; the button's state and the read-out say which is shown (§15).
+- **Budget:** find out what the 1.5 M cap protects before anyone moves it (§17). The cap did not move.
+- **Nib:** curvature decides; report it with renders; no nib mask (§18).
+
+**No shipped file changed.** `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`, `bloom.html` and every gate are
+byte-identical to `main` at `b596994`. The prototype is three files: `bloom-texture-bone2.js` (round 1's field and
+refiners, plus the hook's round-2 modes), `bloom-texture-bone2-hybrid.js` (the hybrid mesher, new) and the tools.
+
+## 14. The hybrid mesher (`bloom-texture-bone2-hybrid.js`)
+
+**Why it needs no chart per organ.** Round 1's rings ran in a focus window because they needed a near-isometric
+2D chart (§6). The hybrid instead re-triangulates EACH LATTICE TRIANGLE on its own. A lattice triangle is planar, so
+its own plane is an exact chart. Closure against the 0.4 mm lattice is by construction, not by a repair: every
+point on a lattice edge is registered once per EDGE, and both triangles that share the edge read the same list.
+
+**The construction**, in order:
+
+1. **The discs.** Every pore of the field, cut by the organ's own surface (`organDiscs`): the foot is the closest
+   point of the surface to the sphere's centre (grouped per skin, so a sphere cutting both skins of a thin petal
+   gives two discs); the normal is the interpolated vertex normal there; the disc is the field's own `discOf`.
+   One generator, two readers, as in round 1.
+2. **Free and merged.** Two discs on one skin whose OUTER rings (u = 1.15) overlap are a merged pair.
+3. **The crease.** The split of a pair is the field's own crease, where the two cups sit at the SAME normalised
+   radius (`u_i = u_j`, an Apollonius sphere of the world). It is measured as a length:
+   `sd(x) = (u_i − u_j) / (1/ρ_i + 1/ρ_j)`, negative on i's side. That is the same set seen from either disc, so
+   the two sides cannot disagree.
+4. **The rings.** Every pore lays #481's ring layout (the profile's breakpoints u 0.45 / 0.75 / 0.9 / 0.97 / 1.0
+   / 1.07 / 1.15, 16 sides), with consecutive rings staggered by half a side and each pore at its own hashed
+   rotation. A ring vertex is KEPT only where it is on its own side of every pair's crease by at least the pair's
+   band.
+   - The band is half the DERIVED EDGE `h`, where `h` is half the lip's drawn width at the smaller pore (round
+     1's grid edge, read at the pair's own smaller pore).
+   - A cut arc ends ON its circle, at an angle bisected to the band's edge.
+   - The clip is judged at the arc's point ON THE SURFACE, so two discs with different normals judge the same
+     point.
+   - **A free pore keeps every ring whole.**
+5. **The seams.** Along each merged pair's crease, one row of points ON the crease (`sd = 0`), spaced at the
+   smaller pore's own rim side (the rings' angular resolution), inside the pair's lens only.
+6. **The wall junctions.** Where three mutually merged pores' outer discs share the point of equal normalised
+   radius (solved by Gauss–Newton), a patch of points at spacing `h` within `2h` of it. This is the field's
+   three-way wall end, which the rows alone drew as a blunt stub.
+7. **Carrying onto the surface.** Every point is carried onto the organ along its disc's normal (an affine
+   projection onto the lattice triangle it lands in). Every ring CHORD that crosses a lattice edge leaves a point
+   ON that edge, at the parameter where the chord's projection meets it (a walk through the triangles in the
+   disc's chart).
+8. **One constrained Delaunay per lattice triangle** (`cdtInLatticeTriangle`).
+   - The triangle's own three edges, with their points, are the boundary.
+   - The ring vertices and seam points that landed in it are the interior.
+   - The ring chords inside it are the CONSTRAINTS, so a ring is a ring of edges in the output whichever
+     triangles it crosses.
+   - The chart is an integer lattice of 2,048 units across the triangle's longest edge, so orientation and
+     in-circle are exact in doubles.
+   - A lattice triangle with nothing in it is kept verbatim. A non-porous triangle whose edge received points is
+     fanned from its centroid (round 1's transition rule).
+9. **The count is exact without building.** A triangulated polygon with b boundary and i interior points has
+   b + 2i − 2 triangles. Measured on the default bloom: count 2,310,010, built 2,310,010.
+
+**The coincidence rule of #481 is kept.** A new vertex whose float32 key another organ also emits withdraws the
+lattice triangles it belongs to, and that organ is re-meshed (at most six passes). On the default bloom it
+withdrew nothing: the hybrid's points sit at ring crossings, never at the midpoints that welded round 1's grid. A
+planted fixture proves the rule still acts (B2e4, §20). **The jittered fill of #481 has no counterpart:** the
+hybrid lays no fill lattice; its only regular points are the junction patches, which are jittered by
+construction (the hashed pore rotations).
+
+**Measured choices (the plate, the merging field, H 1.0; `__hySeam` is the measurement's lever, never a control):**
+
+| band (in h) | rows (in h) | tris/mm² | merged pores off their circle (median / p90) | seam error RMS / max (mm) |
+|---|---|---|---|---|
+| 2 | −1, 0, +1 | 353 | 9.0% / 17.7% | 0.068 / 0.706 |
+| 1 | 0 | 376 | 1.9% / 1.9% | 0.054 / 0.647 |
+| 1 | −0.5, 0, +0.5 | 420 | 1.9% / 2.2% | 0.050 / 0.647 |
+| **0.5** | **0** | 410 → **432** with the junctions | **1.9% / 1.9%** | **0.034 / 0.362** |
+
+**Four defects found before the numbers, each by measuring:**
+
+- **The split was first the radical plane of the two OUTER discs.** That plane crosses the crease for unequal
+  pores, and a thin wall between two barely merged pores fell between the two clipped ring sets: 0.78 mm of relief
+  missing at H 1.0, seen on a rendered wireframe. The crease (equal u) replaced it.
+- **A band of two lip widths clipped the outer rings off most merged pores** (9.0% off their circle; a wireframe
+  showed one ring a pore left). Half an `h` keeps them.
+- **The outer rings of a merged pair CROSS at the lens's two ends**, where the two outer circles meet. Clipping
+  only inside the other pore's outer disc left 1,146 crossing constraints on the default bloom. A pair now clips
+  one band past the other's outer ring: 11 left, recorded (`consFail`), with no open edge from them (§18).
+- **Two nested pits in one floor overlap as often as not** (every two-pit pore on the default plate), and their
+  rings crossed. They clip at their own crease too.
+
+## 15. Coarse and full
+
+**FULL** is the hybrid on every organ (the export and the "full detail" button).
+
+**COARSE** (the release preview) is **the v2 field on the shipped lattice**: no point is added, so its cost is v1's
+to the triangle (158,912 on the default, exactly v1's count). Its pores are the full build's pores, one field drawn
+at the lattice's vertices.
+
+**The derivation.** "v1-weight" means the shipped lattice's own triangles, and the only build that adds none is the
+field sampled at the lattice. Its price is the look v1 was criticised for: pores drawn at 0.4 mm edges, 17–28% off
+their circle (§16).
+
+**The alternative, measured and NOT chosen:** coarse RINGS at the lattice's own edge (sides 0.4 mm long, never under
+6; only the floor-edge and rim rings; no seams).
+
+- They are 3.5× v1's count on the default (557,656, 37% of the budget) and took 12 s in Node, against 1.1 s.
+- They are 14% off the circle against the lattice's 18%: barely rounder, for 3.5× the cost and 10× the time.
+- Question 3 of §21 asks whether a cheaper-looking coarse is wanted at that price.
+
+**The same pores.** Coarse and full read one field and one disc list. B2f holds that on a bloom window: the
+coarse build's disc list (`discs: true`) and the full build's are the same pores at the same centres, to the bit.
+
+**The button and the read-out** are the shipping session's (no page here). What they must say is ruled:
+
+- the button names which build is on screen ("coarse preview" / "full detail");
+- the read-out prints the shown build's triangle count beside its name.
+
+The prototype's `bone2Bloom` modes are `'coarse'` and `'hybrid'`, and the browser times are §19.
+
+## 16. Measurements: roundness, density, seams, and the budget
+
+Every figure below is in `docs/data/bloom-texture-bone-v2b.json`, from `node tools/bloom-texture-bone2b-measure.mjs`
+run on the final tree.
+- Roundness is the drawn rim's RMS radial deviation from its own best-fit circle, as a share of the radius.
+- A MERGED pore is measured over the outline it OWNS (no neighbour's lip within reach), and only when that outline
+  is at least a quarter of its circumference. A FREE pore has no overlapping neighbour.
+- The seam error is the drawn surface's height error against the field along every merged pair's crease (RMS and
+  max in mm).
+- Coarse is the lattice (§15).
+
+**plate, H 1 mm** (the merging field; roundness = the drawn rim's RMS radial deviation from its own best circle, over the outline a pore owns):
+
+| mesh | tris / mm² | merged pores off round | free pores off round | seam RMS / max (mm) | build ms |
+|---|---|---|---|---|---|
+| lattice (= coarse) | 13 | 17.735% (p90 24.566%, n 9) | 28.838% (p90 28.838%, n 1) | 0.164 / 0.856 | 16 |
+| grid 0.1 | 340 | 6.733% (p90 9.427%, n 23) | 11.153% (p90 11.153%, n 1) | 0.044 / 0.518 | 72 |
+| rings | 189 | 7.628% (p90 9.569%, n 23) | 2.251% (p90 2.251%, n 1) | 0.05 / 0.502 | 176 |
+| HYBRID | 430 | 1.903% (p90 1.917%, n 25) | 2.187% (p90 2.187%, n 1) | 0.034 / 0.362 | 1,168 |
+| coarse-rings | 82 | 14.03% (p90 21.936%, n 21) | 24.752% (p90 24.752%, n 1) | 0.099 / 0.673 | 174 |
+
+**cylinder R6, H 1 mm** (the merging field; roundness = the drawn rim's RMS radial deviation from its own best circle, over the outline a pore owns):
+
+| mesh | tris / mm² | merged pores off round | free pores off round | seam RMS / max (mm) | build ms |
+|---|---|---|---|---|---|
+| lattice (= coarse) | 13 | 20.101% (p90 24.426%, n 9) | 27.074% (p90 27.074%, n 2) | 0.157 / 0.745 | 5 |
+| grid 0.1 | 340 | 8.176% (p90 10.592%, n 30) | 10.243% (p90 10.243%, n 2) | 0.036 / 0.425 | 67 |
+| rings | 172 | 6.433% (p90 9.782%, n 28) | 4.502% (p90 4.502%, n 2) | 0.041 / 0.453 | 136 |
+| HYBRID | 398 | 2.131% (p90 3.227%, n 29) | 3.755% (p90 3.755%, n 2) | 0.034 / 0.473 | 827 |
+| coarse-rings | 79 | 13.796% (p90 21.738%, n 25) | 27.074% (p90 27.074%, n 2) | 0.083 / 0.642 | 140 |
+
+**A real petal (petal 0, a 3 mm window at the most open spot), H 1 mm:**
+
+| mesh | tris / mm² | merged pores off round | free pores off round | seam RMS / max (mm) |
+|---|---|---|---|---|
+| lattice (= coarse) | 21 | 25.524% (p90 28.02%, n 6) | 25.388% (p90 25.388%, n 1) | 0.125 / 0.789 |
+| grid 0.1 | 367 | 6.856% (p90 8.349%, n 13) | 6.336% (p90 6.336%, n 1) | 0.067 / 0.507 |
+| rings | 138 | 7.498% (p90 12.102%, n 12) | 2.251% (p90 2.251%, n 1) | 0.071 / 0.507 |
+| HYBRID | 270 | 1.903% (p90 4.314%, n 13) | 1.903% (p90 1.903%, n 1) | 0.066 / 0.507 |
+| coarse-rings | 72 | 17.789% (p90 25.524%, n 10) | 21.839% (p90 21.839%, n 1) | 0.086 / 0.699 |
+
+**The budget (EXPORT, 1,500,000 = 100 %; v1 is the shipped BONE at its derived edge):**
+
+| state | v1 | v2 COARSE | v2 FULL (hybrid) | coarse-rings (the alternative) | discs (free / merged) | junctions |
+|---|---|---|---|---|---|---|
+| the default | 158,912 (10.6 %) | 158,912 (10.6 %) | **2,304,580 (153.6 %)** | 557,656 (37.2 %) | 8,598 (262 / 8,336) | 5,756 |
+| whole bloom (60 mm stem, a leaf, 5 sepals, 12 stamens, the style) | 289,008 (19.3 %) | 289,008 (19.3 %) | **3,694,142 (246.3 %)** | 930,796 (62.1 %) | 13,745 (467 / 13,278) | 8,971 |
+| umbel, head ON | 530,634 (35.4 %) | 530,634 (35.4 %) | **6,207,646 (413.8 %)** | 1,625,076 (108.3 %) | 22,965 (822 / 22,143) | 15,390 |
+| the mophead (depth 2) | 1,240,446 (82.7 %) | 1,240,446 (82.7 %) | **11,743,184 (782.9 %)** | 3,314,010 (220.9 %) | 45,913 (1,897 / 44,016) | 29,420 |
+| 40 x 3 whorls | 1,442,144 (96.1 %, edge 0.42) | 1,442,144 (96.1 %) | **18,533,948 (1235.6 %)** | 4,636,118 (309.1 %) | 70,559 (2,472 / 68,087) | 46,882 |
+
+What the tables say:
+- **The hybrid is the only mesh that draws a merged pore round.** It reads 1.9–2.1 % off its circle against the
+  0.1 mm grid's 6.7–8.2 %, on the plate, the cylinder and the petal alike. A free pore is about 2 % off in both the
+  hybrid and the plain rings (the rings were always good where pores stand apart, §5).
+- **It costs about 1.3× the 0.1 mm grid's density on a plate and about 0.7× on the petal.** It spends triangles only
+  on the porous patches, and on the petal the patches are interrupted by the ramp and the masks; the grid refines
+  the whole porous area.
+- **The seam is the hybrid's smallest error on the plate** (0.034 mm RMS, 0.362 max). On the petal the max (0.507)
+  is the same in every refined mesh: the one site none of them refines (§22).
+- **Coarse is v1's count exactly** on every state, because it is the same lattice. Its pores are 17–26 % off round
+  (question B).
+- **The full build exceeds the cap on every state measured**: 1.5× the default, 2.5× the whole bloom, 4.1× the
+  umbel, 7.8× the mophead, 12.4× 40 × 3. **40 × 3's 18.5 M is past what the page can hold at all** (§17's ~14.9 M
+  array ceiling), so it cannot be built at full detail in the browser.
+- **About 39 % of the hybrid's new points lie ON lattice edges** (the default: 389,125 ring-chord crossings plus
+  27,120 seam-chord crossings, of 1,062,945). That is what closing against the 0.4 mm lattice costs
+  (question D).
+- **Visual seam quality:** the sheet's cells A and B (§19 points to them).
+
+## 17. What the 1.5 M cap protects — the investigation (ruling 5)
+
+**THE CAP'S OWN STATED REASON IS THAT IT HAS NONE YET.** `EXPORT_TRI_BUDGET` lives in `bloom-geometry.js:4773`.
+`bloom.js:24–31` says why it exists:
+
+> Cap the OUTPUT, never an input proxy … Phase-1 geometry peaks near 60k export tris at petalCount 40, so the
+> cap is slack by design — it exists so the refusal path is real before it is ever needed.
+
+So 1.5 M was set at 25× the largest model of its day, so that the refusal path existed. It was not derived from
+any measured limit. Every candidate limit the ruling names, measured here:
+
+| candidate | what it gives | the triangle count it binds at |
+|---|---|---|
+| **STL file size** at 50 bytes a triangle (84-byte header) | 1.5 M → **75 MB**; 3 M → 150 MB; 6 M → 300 MB; 12 M → 600 MB | only through a limit someone else sets on MB (below) |
+| **Chromium, the page's own accumulator** (`MeshBuilder.positions` is a plain JS array, 9 numbers a triangle) | builds, uploads, exports and renders at 1.5 / 3 / 6 / 12 / 13.5 M; **throws `Invalid array length` at 15 M** — V8's array ceiling, ~134 M elements | **~14.9 M** (between 13.5 and 15 M measured) |
+| **Chromium heap** | 0.23 / 0.57 / 0.81 / 2.00 / 2.13 GB after the STL at 1.5 / 3 / 6 / 12 / 13.5 M, of a 4.4 GB limit | above the array ceiling; not reached |
+| **The hybrid's own generation memory in the page** (§19) | 1.24 GB at 2.3 M, 2.27 GB at 6.2 M; the mophead's 11.7 M full build CRASHED the page | between 6.2 M and 11.7 M for this unoptimised mesher; not a property of the output |
+| **Export time** (three's STLExporter, binary, then a Blob) | 0.2 / 0.4 / 0.9 / 1.8 / 1.9 s at 1.5 / 3 / 6 / 12 / 13.5 M | none hard; a stall bar of 120 s was never approached |
+| **First render** (software GL in this container) | 0.5 / 0.8 / 1.5 / 2.8 / 3.2 s | none hard |
+| **A print-service upload limit** | **not recorded.** The repo names Shapeways only for build volume (`flower.js:3316`) and JLC3DP only for escape-hole sizes (`docs/bloom-hydrangea-discovery.md:364`); neither gives an upload size | — |
+
+`node tools/bloom-budget-limits.mjs` produces these numbers (`docs/data/bloom-budget-limits.json`). It builds a
+synthetic sheet of N triangles in a real Chromium page through the same steps the bloom takes: a JS array of 9N
+numbers, a `Float32BufferAttribute`, `STLExporter` binary to a Blob, one render. **The synthetic mesh is not the
+bloom's geometry builder.** The real full build's own cost is in §19, where generation, not export, is the long pole.
+
+**THE DECISION RULE'S ANSWER: STOP.** Nothing measurable here binds near 1.5 M:
+- the browser holds 8× that;
+- the export of 12 M takes 1.8 s;
+- the heap is half used at 12 M.
+
+The only limit that could reasonably bind is an external one: the upload limit of the service the STL goes to. The
+repo does not record it. **The cap is not moved.** Question A asks Eva.
+
+For scale against the measured hybrid builds (§16): the default bloom's full build is 2.30 M (115 MB of STL), the
+whole bloom 3.69 M (185 MB), the umbel 6.21 M (310 MB), the mophead 11.74 M (587 MB) and 40 × 3 18.53 M (927 MB,
+past the ceiling). All but 40 × 3 are under the browser's ceiling; every one is over the cap.
+
+## 18. Print, the nib and depth (EXPORT, the default bloom, the FULL build)
+
+**Print.** The census is `tools/bloom-self-intersection.mjs` on the exported doubles. The directed-edge count is on
+the float32 keys the STL stores. Gaps come from the same mesh built twice: once relieved, once with nothing raised
+(`noRelief`, a lab-only option), paired vertex for vertex.
+
+| H | triangles | shells | open / doubled directed edges | within-shell contacts (worst span) | gaps newly closed under 1 mm / newly touching (sampled) |
+|---|---|---|---|---|---|
+| 0.4 | 2,304,580 | **9** | 0 / 0 | 5 (0.000 mm) | 0 / 0 of 9,696 |
+| 2.5 | 2,304,580 | **9** | 0 / 0 | 5 (0.000 mm) | **1** / 0 of 32,850 |
+
+- **Shells stay 9.** The coincidence withdrawal (#481's rule) withdrew 0 triangles here and 2 on the planted fixture
+  (B2e4).
+- **The five contacts are tangencies, not folds.** Their span is exactly 0, the same five at both heights. They come
+  from a point landing within the 1e-3 mm snap of a neighbouring pore's chord.
+- **One gap closes at 2.5 mm.** It is one sampled vertex (every 41st triangle of a sheet, within 1 + H of another
+  part) whose gap was at least 1 mm unrelieved and under 1 mm relieved. Round 1 read 0 at 2.5 on the 0.1 mm grid
+  over 21,367 lattice-sampled vertices, so the denser mesh found a site the coarser sample did not. It is the
+  ruled maximum's cost and is reported, not chased (question F).
+- **Walls.** Thinnest 0.006 mm, p10 0.046, median 0.270 mm, over 289 adjacent pairs (160 merged). They are measured
+  on the field at H 1.0 on the plate, and no mesh changes them: the hybrid DRAWS a 0.006 mm wall as closely as it is
+  asked for, so it prints exactly as thin (question F).
+- **11 constraint recoveries fail** (two arcs crossing at a lens end). They cost a ring segment's roundness and
+  nothing in closure.
+
+**The nib — curvature decides, no mask (ruling 6).** Petal 0's apex, vertices within 1.2 mm of it:
+
+| H | build | vertices | raised > 0.05 mm | a fade's tail (< 0.05) | max relief | nearest raised point to the apex | fade width |
+|---|---|---|---|---|---|---|---|
+| 0.4 | coarse | 296 | 14 | 114 | 0.399 mm | 0.702 mm | 0.75 |
+| 0.4 | FULL | 556 | 84 | 260 | 0.400 mm | 0.702 mm | 0.75 |
+| 2.5 | coarse | 296 | 1 | 125 | 0.098 mm | 1.185 mm | 4.69 |
+| 2.5 | FULL | 556 | 16 | 326 | 0.101 mm | 1.080 mm | 4.69 |
+
+- **At H 0.4 the nib is NOT smooth by curvature**, as round 1 found (§10): pores reach 0.70 mm from the apex at
+  full height. The full build draws more of them (84 raised vertices against the coarse build's 14), because it
+  draws the same pores closer.
+- **At 2.5 the derived fade (H × 15/8 = 4.69 mm) is wider than the nib**, so the apex is smooth by the fade, not by
+  curvature (§11.9, question H).
+- No mask was added. The sheet's cell C shows it.
+
+**Depth over diameter** (the pore's drawn depth over its rim diameter, 39 pores in the plate window; the smallest
+pores are the 0.5 mm band):
+
+| H | median | p90 | max | the smallest pores (median / max) | the largest pore |
+|---|---|---|---|---|---|
+| 0.4 | 0.50 | 0.67 | 0.76 | 0.67 / 0.76 | 0.30 |
+| 1.0 | 1.24 | 1.67 | 1.90 | 1.67 / 1.90 | 0.75 |
+| 1.5 | 1.87 | 2.51 | 2.86 | 2.50 / 2.86 | 1.12 |
+| 2.5 | 3.11 | 4.18 | 4.76 | 4.17 / 4.76 | 1.87 |
+
+**THE 2.5 mm MAXIMUM IS UNVALIDATED FOR POWDER REMOVAL**, and the slider's help text says so (`B2_HEIGHT_HELP`):
+- at 2.5 the smallest pores are blind wells 4.2–4.8× deeper than they are wide;
+- nothing this deep has been printed here;
+- SLS powder in a 0.5 mm well five times its width deep may not come out.
+
+The help text's figure moved from round 1's "up to 3.4" (an estimate) to the measured 4.8.
+
+## 19. Browser time: release (coarse) and full detail
+
+`node tools/bloom-texture-bone2b-browser.mjs` (`docs/data/bloom-texture-bone-v2b-browser.json`). Headless Chromium
+on this box (4 cores, software GL), EXPORT, the geometry build alone, each build in a fresh page. The page's own
+overheads (normals, upload, read-outs) are not included; `docs/bloom-page-profile-outcome.md` measures those.
+
+| state | preview (held slider, untextured) | v1 (today's release) | **COARSE (round 2's release)** | **FULL (full detail and export)** |
+|---|---|---|---|---|
+| the default | 0.07 s · 24,688 | 0.71 s · 158,912 | **1.10 s** · 158,912 | **38.8 s** · 2,304,496 · 1.24 GB heap |
+| umbel, head ON | 0.57 s · 134,182 | 3.6 s · 530,634 | **4.7 s** · 530,634 | **147 s** · 6,201,432 · 2.27 GB heap |
+| the mophead | 1.1 s · 1,265,418 | 29.4 s · 1,240,446 | **31.0 s** · 1,240,446 | **THE PAGE CRASHED** (out of memory) |
+
+- **Coarse costs what v1 costs, as ruled:** 1.3–1.5× v1's time, the same triangles.
+- **Full detail is 35× the coarse build on the default and 31× on the umbel.** The mophead cannot be built at full
+  detail in the browser at all. Its 11.7 M triangles are under §17's 14.9 M output ceiling, but the hybrid's working
+  memory (2.27 GB already at 6.2 M) passes Chromium's ~4.4 GB heap first.
+  - **So for THIS mesher the browser's binding limit is its generation memory, not the output's size.** It falls
+    between 6.2 M and 11.7 M output triangles.
+  - It is a property of an unoptimised prototype (one JS object per chart point, a Map per lattice edge), not of
+    the output. Question C.
+- **THE TWO ENGINES DISAGREE ON THE FULL BUILD'S COUNT:**
+  - the default is 2,304,496 in Chromium against 2,304,580 in Node (84 triangles);
+  - the umbel is 6,201,432 against 6,207,646 (6,214).
+  - The ring points are placed with `Math.cos` / `Math.sin`, which are not correctly rounded and differ between V8
+    builds in the last bits. A snap or a constraint decision lands on that difference: the T1/T2 class this repo
+    has met before (CLAUDE.md, the texture blocks).
+  - Coarse and v1 agree to the triangle.
+  - A shipping mesher owes an engine-agreed construction, quantised as T2 did (2^-20) or with exact rational ring
+    angles. Not done here. Question I.
+
+## 20. The gate: B2 extended (`node tools/verify-bloom-bone2.mjs [--control]`)
+
+Still local only: the prototype is not shipped and nothing here is in CI. B2a–B2c are round 1's. The new
+clauses RESTATE what the hybrid claims, from the discs (the field's own pores) and the restated profile, never from
+the mesher's own pairs:
+
+- **B2d (extended)** — the hybrid on the MERGING plate. Free and merged pores alike must be within 5% of their
+  circle (median), with at least 24 segments a circumference.
+- **B2e1 — no regular grid in a patch interior.** Every fine point (seam row, seam crossing, junction patch) must lie
+  within one `h` of a restated crease, or within `2.5 h` of a restated triple junction (equal radii, solved in the
+  gate). The `2` is RESTATED in the gate, and the gate refuses to load if `HY_JUNCTION_H` moves.
+- **B2e2 — seams only where pores merge.** Every fine point must lie inside a restated merged lens (plus one `h`),
+  and no free pore's outer disc may hold one.
+- **B2e3 — zero open edges.** On a bloom window (the default bloom, every organ's triangles within 3 mm of petal 0's
+  most porous spot), every directed edge of the emitted file (float32 keys) must be matched by its reverse, none
+  doubled. The exact count must equal the built count.
+- **B2e4 — no cross-part coincident vertex.** It is checked in two places:
+  - on the bloom window, no float32 position may be emitted by two organs;
+  - on a PLANTED fixture, a second organ is given a vertex exactly on one the hybrid emits in the first organ. The
+    rule must withdraw (≥ 1 triangle) and leave none shared.
+  - The planted fixture is owed: on the default bloom the hybrid withdraws nothing, so without it the clause would be
+    vacuous.
+- **B2f — coarse and full are the same pores.** On the bloom window, the coarse build's disc list and the full
+  build's must be the same pores at the same centres, to the bit.
+
+**The first clean run found the mesher's own defect, not the clause's.** Five junction-patch points sat outside
+every merged lens: a patch centred at a lens end reached past the outer discs onto a pore's plateau. A junction
+point is now kept only inside at least two of its three outer discs (one lens).
+
+**THE NEGATIVE CONTROL FOUND THE SECOND, AND IT WAS THE GATE'S.** `the-junction-patch-covers-the-pores` (the
+patch radius 2 → 12) went MISSED. B2e1 had read its junction reach from `H2.HY_JUNCTION_H`, the module under test,
+so the mutation widened the clause with the patch. That is the fourth durable rule failing in the instrument
+written for this round. It now restates the reach.
+
+**Result: clean PASS, and 10 of 10 mutants fire the clause they claim.**
+
+| mutant | clause | witness on the mutated module |
+|---|---|---|
+| refinement-leaks-into-smooth-areas | B2b | a smooth triangle emits 64 triangles (a closing fan is ≤ 8) |
+| a-pore-floor-below-the-sheet | B2a | the field at a pore centre reads −0.436 |
+| a-typed-refinement-edge | B2c | the edge reads 0.05 mm at both pore sizes |
+| pores-revert-to-grid-aligned | B2d | axis vs diagonal differ by 0.478 at one radius |
+| merged-rings-are-clipped-away | B2d | ring vertices 6,757 → 2,152 |
+| the-junction-patch-covers-the-pores | B2e1 | junction points 554 → 9,695 |
+| seam-rows-run-outside-the-lens | B2e2 (and B2e1) | seam points 490 → 599 |
+| a-transition-fan-ignores-its-edge-points | B2e3 | unmatched directed edges 82 → 1,739 |
+| the-weld-withdrawal-is-removed | B2e4 | planted coincidence: 0 withdrawn, 5 shared |
+| the-coarse-build-moves-the-pores | B2f | coarse and full fields differ by up to 1.000 |
+
+## 21. Questions for Eva — §11 carried forward under the rulings, and the new ones
+
+**§11 under the rulings:**
+
+- **§11.1 meshing** — RULED (hybrid) and BUILT. Its consequence is question A.
+- **§11.2 packing** — RULED (merging). Nothing open.
+- **§11.3 the budget and the cap** — re-asked as **question A**, with the investigation it asked for (§17).
+- **§11.4 the height's maximum** — RULED 2.5 mm. The UNVALIDATED note is in §18 and in `B2_HEIGHT_HELP`.
+- **§11.5 nested pits** — still open, unchanged. **Question E.**
+- **§11.6 a printable wall** — still open. The walls are the field's and the hybrid does not change them (§18).
+  **Question F.**
+- **§11.7 the controls** — still open: smallest pore 0.5–1.0 mm (default 0.5), spread 1.5–3 (default 3), height
+  0.4–2.5 (ruled), density default 0.9. **Question G.**
+- **§11.8 the release build** — answered in kind by ruling 4 (release builds COARSE). What is left is how long FULL
+  may take. **Question C.**
+- **§11.9 the fade at height** — still open, unchanged. **Question H.**
+
+**The questions:**
+
+- **A. THE CAP (the brief's STOP).** §17 measures what the 1.5 M cap could protect.
+  - **(a)** It derives from nothing measured: its own comment says it is "slack by design … so the refusal path is
+    real before it is ever needed".
+  - **(b)** The browser's real ceiling is far above it (§17).
+  - **(c)** No print-service upload limit is recorded anywhere in the repository.
+  - So the only limit that could reasonably bind is an external one. **Which print service will these be ordered
+    from, and what STL size (or triangle count) does it accept?** Options:
+    - (i) give the service and its limit, and the cap is derived from it (triangles = MB / 50 bytes);
+    - (ii) keep 1.5 M and make the full build fit it (coarsen the pores' resolution past the budget, told);
+    - (iii) set the cap at the browser's measured ceiling less a margin.
+- **B. THE COARSE LOOK.** Coarse is the v2 field on the lattice: v1's exact cost, and pores drawn 17–28% off their
+  circle (§16). Options:
+  - (a) keep it;
+  - (b) coarse rings at the lattice's own edge: 3.5× v1's count, 12 s in Node against 1.1 s, still 14% off;
+  - (c) no coarse at all — release builds full when it fits the budget.
+- **C. THE FULL BUILD'S TIME** (§19). Options:
+  - (a) accept;
+  - (b) an optimisation session before shipping: the walk's point location, the per-disc charts, typed arrays,
+    a worker. None of it is optimised here.
+- **D. THE CLOSURE'S COST.** Points ON lattice edges (the chords' crossings) are about 39 % of the hybrid's new
+  points (§16). A chart per organ (the sheets' own row law) would remove them, but it is the porting work round
+  1 named. Options:
+  - (a) accept the cost;
+  - (b) a charting session (sheets first).
+- **I. THE TWO ENGINES DISAGREE** on the full build's triangle count (84 triangles on the default, 6,214 on the
+  umbel, §19), through `Math.cos`/`Math.sin` on the ring points. Options:
+  - (a) quantise the ring points and decide counts on engine-agreed quantities, as T2 did;
+  - (b) exact rational ring angles.
+  - Owed before anything ships either way; not done here.
+- **E. NESTED PITS** — §11.5's options, unchanged.
+- **F. A PRINTABLE WALL** — §11.6's options, unchanged; the walls are now drawn closely, so a thin one prints as thin.
+- **G. THE CONTROLS** — §11.7's proposal, height ruled.
+- **H. THE FADE AT HEIGHT** — §11.9's options, unchanged.
+
+**Ambiguities in the brief, read one way and said so:**
+
+1. "Budget % … under hybrid, coarse and full": the FULL build IS the hybrid, so the table has two v2 columns —
+   coarse and full (hybrid) — plus v1 and the coarse-rings alternative.
+2. "Roundness (merged and free pores)": a merged pore is measured over the outline it OWNS (no neighbour's lip within
+   reach), counted when that is at least a quarter of its circumference. A free pore is one with no overlapping
+   neighbour. On the merging field free pores are rare (262 of 8,598 discs on the default bloom), so the free medians
+   rest on one or two pores per window.
+3. "Seams refined only where pores merge" was read with the junction patches as part of the seams (the ruling's
+   "wall junctions").
+
+## 22. What is NOT done, named
+
+- Nothing ships: no registry row, no control, no "full detail" button, no read-out line, no TXB clause, no byte
+  partition.
+- The hybrid is not optimised (§19): its full build exceeds the budget on every state measured (§17), crashes the
+  page on the mophead, and its count differs between Chromium and Node (question I).
+- 11 constraint recoveries fail on the default bloom (two arcs crossing at a lens end). They cost a ring segment's
+  roundness there and nothing in closure (B2e3).
+- The census reads **5 within-shell contacts, every one of span exactly 0** (tangencies) on the default at H 0.4.
+  They come from points just over the 1e-3 mm snap. Not chased.
+- One pore in the petal window reads 25.5% off in EVERY mesh alike: its lattice triangles are refined by none of
+  them (the window's facing test or the junction rule). Recorded, not chased.
