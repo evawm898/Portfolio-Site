@@ -699,5 +699,19 @@
     "fadeMm": 4.688
    }
   }
+ ],
+ "print": [
+  {
+   "H": 0.4,
+   "tris": 2304580,
+   "withinPairs": 5,
+   "worstSpanMm": 0,
+   "crossPairs": 21495,
+   "shells": 9,
+   "openDirected": 0,
+   "doubledDirected": 0,
+   "withdrawn": 0,
+   "consFail": 11
+  }
  ]
 }

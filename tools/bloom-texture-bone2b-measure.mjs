@@ -245,14 +245,16 @@ if (SECTIONS.includes('print')) {
           const o = t * 9 + cc * 3, P0 = u.acc.positions, P1 = r.acc.positions;
           const pu = [P0[o], P0[o + 1], P0[o + 2]], pt = [P1[o], P1[o + 1], P1[o + 2]];
           if (pu[0] === pt[0] && pu[1] === pt[1] && pu[2] === pt[2]) continue;
-          const dU = nearest(gU, pu, me, 4), dT = nearest(gT, pt, me, 4);
-          if (!(dU < 4)) continue;
-          n++; if (dT < minT) minT = dT; if (dU < minU) minU = dU;
+          /* a gap that closes under 1 mm was under 1 + H before the relief (a vertex moves at most H), so that is the reach */
+          const R = 1 + H + 0.01, dU = nearest(gU, pu, me, R);
+          if (!(dU < R)) continue;
+          const dT = nearest(gT, pt, me, R);
+          n++; if (dT < minT) minT = dT; if (dU < minU) minU = dU; if (n % 50000 === 0) lg(`gaps: ${n} near vertices so far`);
           if (dU >= 1.0 && dT < 1.0) closed++;
           if (dU > 1e-6 && dT <= 1e-6) touch++;
         }
       });
-      row.gaps = { sameMesh: same, sampledRelievedVerticesNearAnotherPart: n, newlyClosedPrintableGaps: closed, newlyTouching: touch, nearestUnraisedMm: r3(minU), nearestRaisedMm: r3(minT) };
+      row.gaps = { sameMesh: same, sampledRelievedVerticesWithin1PlusHOfAnotherPart: n, newlyClosedPrintableGaps: closed, newlyTouching: touch, nearestUnraisedMm: r3(minU), nearestRaisedMm: r3(minT) };
     }
     const at = out.findIndex((q) => q.H === H); if (at >= 0) out[at] = row; else out.push(row);
     console.log(`print H ${H}: ${JSON.stringify(row)}`);
