@@ -15989,8 +15989,12 @@ export function stemTopClauses(positions, m, ui, row = null) {
      the Node export rebuild's own — remapped by the full write — whenever the
      two streams' counts differ */
   const fullFile = String(ui.petalTexture) === 'BONE' && Number.isFinite(m.liveTris) && positions && positions.length / 9 !== m.liveTris;
-  const mE = fullFile ? exportBuildOf(ui, row).built : m;
-  const S = m.stem, R = mE.stem && mE.stem.triRanges, D = m.hubBuilt && m.hubBuilt.dome;
+  /* the page hook's ranges are `bloom.js`'s own {hub: [petalTriEnd, hubTriEnd],
+     stem: [hubTriEnd, stemTriEnd]} off the builder's record; the Node rebuild
+     carries the same three ends, remapped by the full write */
+  const bE = fullFile ? exportBuildOf(ui, row).built : null;
+  const R = bE ? { hub: [bE.petalTriEnd, bE.hubTriEnd], stem: [bE.hubTriEnd, bE.stemTriEnd] } : (m.stem && m.stem.triRanges);
+  const S = m.stem, D = m.hubBuilt && m.hubBuilt.dome;
   if (!S || !S.lengthMm) return bad;
   if (!R || !Array.isArray(R.stem) || !Array.isArray(R.hub)) { bad.push('ST13: the hook reports no stream ranges for the hub and the stem — the file cannot be read by part'); return bad; }
   if (!(positions && positions.length / 9 >= R.stem[1])) { bad.push(`ST13: the exported file holds ${positions ? positions.length / 9 : 0} triangles and the stem's range ends at ${R.stem[1]}`); return bad; }
