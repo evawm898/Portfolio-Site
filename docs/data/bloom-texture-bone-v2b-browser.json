@@ -26,6 +26,26 @@
     "heapMB": 1236,
     "warmed": false
    }
+  },
+  "umbel": {
+   "preview": {
+    "ms": 570,
+    "tris": 134182,
+    "heapMB": 88,
+    "warmed": true
+   },
+   "v1": {
+    "ms": 3575,
+    "tris": 530634,
+    "heapMB": 216,
+    "warmed": true
+   },
+   "coarse": {
+    "ms": 4714,
+    "tris": 530634,
+    "heapMB": 310,
+    "warmed": true
+   }
   }
  }
 }
