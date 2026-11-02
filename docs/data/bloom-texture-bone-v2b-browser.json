@@ -65,6 +65,12 @@
     "tris": 1240446,
     "heapMB": 574,
     "warmed": true
+   },
+   "coarse": {
+    "ms": 31005,
+    "tris": 1240446,
+    "heapMB": 701,
+    "warmed": true
    }
   }
  }
