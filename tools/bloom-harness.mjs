@@ -6185,7 +6185,7 @@ export function boneFullClauses(ui, recFull, accFull, recCoarse, accCoarse, accU
       const fn = (x, y) => { const p = to3(x, y), u0 = uOf(Q[0], p); return [u0 - uOf(Q[1], p), u0 - uOf(Q[2], p)]; };
       let x = 0, y = 0; const W = Q.reduce((s2, q) => s2 + q.rho, 0); for (const q of Q) { const v = q.c.map((z, k) => z - d0.c[k]); x += ((v[0] * d0.t1[0] + v[1] * d0.t1[1] + v[2] * d0.t1[2]) * q.rho) / W; y += ((v[0] * d0.t2[0] + v[1] * d0.t2[1] + v[2] * d0.t2[2]) * q.rho) / W; }
       for (let it = 0; it < 30; it++) { const f = fn(x, y), e = 1e-6, fx = fn(x + e, y), fy = fn(x, y + e); const J = [[(fx[0] - f[0]) / e, (fy[0] - f[0]) / e], [(fx[1] - f[1]) / e, (fy[1] - f[1]) / e]]; const det = J[0][0] * J[1][1] - J[0][1] * J[1][0]; if (!(Math.abs(det) > 1e-12)) break; x -= (f[0] * J[1][1] - f[1] * J[0][1]) / det; y -= (J[0][0] * f[1] - J[1][0] * f[0]) / det; }
-      junctions.push({ p: to3(x, y), h: (wallU * Math.min(...Q.map((q) => q.rho))) / 2 });
+      junctions.push({ p: to3(x, y), h: (wallU * Math.min(...Q.map((q) => q.rho))) / 2, d0, x, y });
     } }
     for (let j = 0; j < o.kind.length; j++) {
       const k = o.kind[j]; if (k !== 5 && k !== 6 && k !== 8) continue;
@@ -6198,10 +6198,17 @@ export function boneFullClauses(ui, recFull, accFull, recCoarse, accCoarse, accU
          on the default, all on the crease to 0.00 h) */
       const lensM = (pr) => Math.max(pr.h, 0.15 * Math.min(D[pr.a].rho, D[pr.b].rho));
       const nearCrease = pairs.some((pr) => Math.abs(sd(pr, x)) <= pr.h * 1.0001 + 1e-9 && inOuter(D[pr.a], x, lensM(pr)) && inOuter(D[pr.b], x, lensM(pr)));
-      const nearJ = junctions.some((J) => Math.hypot(x[0] - J.p[0], x[1] - J.p[1], x[2] - J.p[2]) <= TXB_JUNCTION_REACH_H * J.h);
+      /* the patch is laid within reach of the junction IN DISC a's CHART (its
+         tangent-plane projection — the geometry's own law), so the reach is
+         measured there: in 3-D a point on a strongly curved sheet (the nib's
+         bead) stands off the tangent plane by the sagitta, which is not the
+         patch's reach (found when the facing bin moved the rods row's
+         selection onto a nib: 13 points at up to 7.68 h in 3-D) */
+      const chartD = (J) => { const v = [x[0] - J.d0.c[0], x[1] - J.d0.c[1], x[2] - J.d0.c[2]]; return Math.hypot(v[0] * J.d0.t1[0] + v[1] * J.d0.t1[1] + v[2] * J.d0.t1[2] - J.x, v[0] * J.d0.t2[0] + v[1] * J.d0.t2[1] + v[2] * J.d0.t2[2] - J.y); };
+      const nearJ = junctions.some((J) => chartD(J) <= TXB_JUNCTION_REACH_H * J.h);
       const inLens = pairs.some((pr) => inOuter(D[pr.a], x, lensM(pr)) && inOuter(D[pr.b], x, lensM(pr)));
       const inFree = D.some((d, i) => !merged[i] && inOuter(d, x));
-      if (!(nearCrease || nearJ) || !inLens || inFree) { bad9++; if (!ex9) { const jd = junctions.length ? Math.min(...junctions.map((J) => Math.hypot(x[0] - J.p[0], x[1] - J.p[1], x[2] - J.p[2]) / J.h)) : Infinity; const cs = pairs.length ? Math.min(...pairs.map((pr) => Math.abs(sd(pr, x)) / pr.h)) : Infinity; ex9 = { x, nearCrease, nearJ, inLens, inFree, kind: k, jd, cs }; } }
+      if (!(nearCrease || nearJ) || !inLens || inFree) { bad9++; if (!ex9) { const jd = junctions.length ? Math.min(...junctions.map((J) => chartD(J) / J.h)) : Infinity; const cs = pairs.length ? Math.min(...pairs.map((pr) => Math.abs(sd(pr, x)) / pr.h)) : Infinity; ex9 = { x, nearCrease, nearJ, inLens, inFree, kind: k, jd, cs }; } }
     }
     /* TXB12 (a): every disc is a pore of the restated field — its centre at most at its shelf */
     for (const d of D) {
