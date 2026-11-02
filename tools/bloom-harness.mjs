@@ -15723,8 +15723,7 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
   const rachisPast = !!cpR && rootFactorRestated(Number(ui.leafLength)) !== null;
   if (!(out && out.force) && !anyRing && hubF === null && !sepalTapers && !leafTapers && !rachisPast) return bad;
   if (out) out.readings = [];
-  const acc = new GEOMETRY.MeshBuilder({ exportMode: true });
-  const rec = GEOMETRY.buildBloomInto(acc, ui, { below: null, capability: row.capability || null, scopes });
+  const { acc, built: rec } = exportBuildOf(ui, row);
   const look = fileVertexIndex(positions);
   const sheetX = Math.max(Number(ui.sheetThickness), MIN_FEATURE_MM);
   const thin = Number(ui.tipThinning) || 0;
@@ -15966,10 +15965,32 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
    no head skin (UM3 holds the knot), and a head NOT WIDER than the stem keeps
    the apex by declaration (its silhouette is the stem's; the root band's).
    =================================================================== */
-export function stemTopClauses(positions, m, ui) {
+/* ONE NODE EXPORT REBUILD PER ROW, SHARED (BONE v2, Nov 2). X0 (the file
+   against a Node rebuild), the root taper's records and ST13's stream ranges
+   under BONE's FULL detail all read the EXPORT build of the row's own state;
+   under BONE that is a full-detail build of up to ~2 minutes, so it is built
+   once and handed to each (read-only — no caller writes it). Keyed on the
+   whole state, the capability and the scopes; one entry. */
+let exportBuildMemo = null;
+export function exportBuildOf(ui, row) {
+  const scopes = row ? rowScopesForBuild(row) : null;
+  const key = JSON.stringify([ui, (row && row.capability) || null, scopes]);
+  if (exportBuildMemo && exportBuildMemo.key === key) return exportBuildMemo;
+  const acc = new GEOMETRY.MeshBuilder({ exportMode: true });
+  const built = GEOMETRY.buildBloomInto(acc, ui, { below: null, capability: (row && row.capability) || null, scopes });
+  exportBuildMemo = { key, acc, built };
+  return exportBuildMemo;
+}
+export function stemTopClauses(positions, m, ui, row = null) {
   const bad = [];
   if (!m || !(Number(ui.stemLength) > 0) || m.headAbsent === true) return bad;
-  const S = m.stem, R = m.stem && m.stem.triRanges, D = m.hubBuilt && m.hubBuilt.dome;
+  /* (BONE v2) under FULL detail the exported FILE is the full build while the
+     page's metrics describe its LIVE (coarse) build, so the stream ranges are
+     the Node export rebuild's own — remapped by the full write — whenever the
+     two streams' counts differ */
+  const fullFile = String(ui.petalTexture) === 'BONE' && Number.isFinite(m.liveTris) && positions && positions.length / 9 !== m.liveTris;
+  const mE = fullFile ? exportBuildOf(ui, row).built : m;
+  const S = m.stem, R = mE.stem && mE.stem.triRanges, D = m.hubBuilt && m.hubBuilt.dome;
   if (!S || !S.lengthMm) return bad;
   if (!R || !Array.isArray(R.stem) || !Array.isArray(R.hub)) { bad.push('ST13: the hook reports no stream ranges for the hub and the stem — the file cannot be read by part'); return bad; }
   if (!(positions && positions.length / 9 >= R.stem[1])) { bad.push(`ST13: the exported file holds ${positions ? positions.length / 9 : 0} triangles and the stem's range ends at ${R.stem[1]}`); return bad; }
@@ -16042,7 +16063,7 @@ export function stemChannelAssertions(positions, row, m, ui) {
      UM3 the knot's place on the stem's top end). */
   const onSphere = m && m.sphereMode === true && m.headAbsent !== true;
   const asked = Number(ui.stemLength) > 0;
-  bad.push(...stemTopClauses(positions, m, ui));
+  bad.push(...stemTopClauses(positions, m, ui, row));
   if (!onSphere || !asked) return bad;      // no stem, or not a sphere — nothing to claim
   const outerR = Number(ui.stemDiameter) / 2;
   const boreR = boreExpected(outerR);
@@ -16620,7 +16641,8 @@ export async function exportRefusalAssertion(page, row, gotStl) {
      reason it declares" from "the export broke", which is the distinction the
      bare `no STL download` could not make. */
   const txt = await page.evaluate(() => document.getElementById('readout')?.textContent || '');
-  const m = /export refused:\s*([\d,]+)\s*tris \(export\) exceeds the\s*([\d,]+)\s*budget/.exec(txt);
+  /* (BONE v2: the page names the one EXPORT_TRI_CAP — "exceeds the 2,000,000 cap (provisional …)" — where it said "budget") */
+  const m = /export refused:\s*([\d,]+)\s*tris \(export\) exceeds the\s*([\d,]+)\s*(?:budget|cap)/.exec(txt);
   if (!declared) {
     if (m) bad.push(`XR2: no STL download and this row is not declared in EXPORT_REFUSED_XFAIL — the generator REFUSED the export (${m[1]} tris against the ${m[2]} budget). A NEW over-budget configuration: declare it with its measured count, or bring the count down.`);
     else bad.push(`XR2: no STL download, this row is not declared in EXPORT_REFUSED_XFAIL, and the read-out shows no budget refusal either — so the export BROKE rather than being refused. Read-out was: ${txt.replace(/\s+/g, ' ').trim().slice(0, 240)}`);
@@ -17353,8 +17375,7 @@ export function footVertexClauses(file, built) {
 export async function selfIntersectionAssertions(page, buf, row) {
   const bad = [];
   const ui = await page.evaluate(() => window.__bloomUIState());
-  const acc = new GEOMETRY.MeshBuilder({ exportMode: true });
-  const built = GEOMETRY.buildBloomInto(acc, ui, { below: null, capability: row.capability || null, scopes: rowScopesForBuild(row) });
+  const { acc, built } = exportBuildOf(ui, row);
   const positions = new Float64Array(acc.positions);
   const file = stlPositions(buf);
   if (file.length !== positions.length) { bad.push(`X0: the STL holds ${file.length / 9} triangles, the builder rebuilt from the page's own state holds ${positions.length / 9} — the census would read a different solid from the one exported`); return { bad, r: null }; }

@@ -1605,8 +1605,8 @@ MOVED** (Nov 2, Eva's Nov 1 rulings — read §13–§22 of `docs/bloom-surface-
 **BONE v2 SHIPS: THE v2 FIELD, THE HYBRID MESHER, COARSE LIVE / FULL ON EXPORT, AN ALLOCATOR THAT SPENDS FULL
 DETAIL WHERE IT SHOWS, AND ONE PROVISIONAL 2.0 M EXPORT CAP** (Nov 2, Eva's rulings of Nov 1-2 — read
 `docs/bloom-surface-texture-bone-v2-shipped.md` before touching `bone2Field`, `bone2HybridOrganMesh`,
-`bone2FullWrite`, `bone2Exposure`, `EXPORT_TRI_CAP`, `MeshBuilder`'s `boneDetail`, `#boneFullDetail`, TXB8-TXB15 or
-block 79 / 82).
+`bone2FullWrite`, `bone2Exposure`, `EXPORT_TRI_CAP`, `MeshBuilder`'s `boneDetail`, `#boneFullDetail`, TXB8-TXB16,
+`BONE2_HY_SNAP_MM`, the fold check in `bone2BuildFull`, `exportBuildOf` or block 79 / 82).
 - **One cap**: `EXPORT_TRI_CAP` = 2,000,000 (~100 MB binary STL, Eva's PreForm ruling, PROVISIONAL until her
   ladder test); `EXPORT_TRI_BUDGET` is the same number. Every reader moves with it: the texture edge cap, the
   depth-2 umbel clamp, the tip-row ramp hold. So PEBBLE / CELLULAR designs that were over 1.5 M build finer now
@@ -1620,6 +1620,14 @@ block 79 / 82).
   (T5's escape rays over 32 directions of the +z hemisphere, cos-weighted, on the UNRELIEVED stream — no organ
   list), bought at their exact hybrid price until the cap, up to four give-back passes. The stream is rebuilt
   per organ run and every record range is REMAPPED (`bone2RangeMap`).
+- **The full points sit on the lattice planes and are displaced along INTERPOLATED normals, so a sliver can
+  flip.** Two fixes, both measured: the mesher's snap is `BONE2_HY_SNAP_MM` = 3 um (the prototype's 1 um left
+  slivers: 12 within-shell pairs on 60 mm stem rows), and THE FOLD CHECK withdraws any lattice triangle whose
+  displaced full triangles face against it back to coarse (a fan flip withdraws its porous neighbours). TXB16
+  asserts the full build folds no more than the coarse one; `the-fold-check-is-removed` must fire it.
+- **A FULL file is not the LIVE build's stream.** ST13 and every Node clause that reads stream ranges against
+  a BONE file read the Node EXPORT rebuild's remapped ranges (`exportBuildOf`, one memo), and XR1 reads
+  "exceeds the 2,000,000 cap".
 - **Engine agreement**: arithmetic-only `esincos` / `ecbrt` / `elog` / `eexp` / `epow` / `elen` in the BONE v2
   block (TXB15 refuses `Math.cos(` ...), mesher inputs snapped to 2^-20; Node and Chromium agree on count and
   float32 bytes (`tools/bloom-texture-bone-v2-browser.mjs`).
