@@ -1,0 +1,511 @@
+{
+ "plate": [
+  {
+   "domain": "plate",
+   "H": 1,
+   "methods": {
+    "lattice (= coarse)": {
+     "trisPerMm2": 13,
+     "ms": 17,
+     "free": {
+      "n": 1,
+      "median": 28.838,
+      "p90": 28.838,
+      "max": 28.838
+     },
+     "merged": {
+      "n": 9,
+      "median": 17.735,
+      "p90": 24.566,
+      "max": 24.566
+     },
+     "edgesMedian": 15,
+     "seam": {
+      "lenses": 72,
+      "maxMm": 0.856,
+      "rmsMm": 0.164
+     }
+    },
+    "grid 0.1": {
+     "trisPerMm2": 340,
+     "ms": 65,
+     "free": {
+      "n": 1,
+      "median": 11.153,
+      "p90": 11.153,
+      "max": 11.153
+     },
+     "merged": {
+      "n": 23,
+      "median": 6.733,
+      "p90": 9.427,
+      "max": 11.95
+     },
+     "edgesMedian": 73,
+     "seam": {
+      "lenses": 72,
+      "maxMm": 0.518,
+      "rmsMm": 0.044
+     }
+    },
+    "rings": {
+     "trisPerMm2": 189,
+     "ms": 161,
+     "free": {
+      "n": 1,
+      "median": 2.251,
+      "p90": 2.251,
+      "max": 2.251
+     },
+     "merged": {
+      "n": 23,
+      "median": 7.628,
+      "p90": 9.569,
+      "max": 9.956
+     },
+     "edgesMedian": 58,
+     "seam": {
+      "lenses": 72,
+      "maxMm": 0.502,
+      "rmsMm": 0.05
+     }
+    },
+    "HYBRID": {
+     "trisPerMm2": 432,
+     "ms": 1014,
+     "free": {
+      "n": 1,
+      "median": 2.187,
+      "p90": 2.187,
+      "max": 2.187
+     },
+     "merged": {
+      "n": 25,
+      "median": 1.903,
+      "p90": 1.917,
+      "max": 2.865
+     },
+     "edgesMedian": 75,
+     "seam": {
+      "lenses": 72,
+      "maxMm": 0.362,
+      "rmsMm": 0.034
+     },
+     "hybrid": {
+      "discs": 236,
+      "free": 11,
+      "merged": 225,
+      "pairs": 422,
+      "junctions": 203,
+      "consFail": 0,
+      "points": {
+       "ring": 15326,
+       "cross": 9763,
+       "centre": 235,
+       "nested": 3454,
+       "seam": 1066,
+       "seamCross": 609,
+       "junction": 1461,
+       "steiner": 66
+      }
+     }
+    },
+    "coarse-rings": {
+     "trisPerMm2": 82,
+     "ms": 231,
+     "free": {
+      "n": 1,
+      "median": 24.752,
+      "p90": 24.752,
+      "max": 24.752
+     },
+     "merged": {
+      "n": 21,
+      "median": 14.03,
+      "p90": 21.936,
+      "max": 27.231
+     },
+     "edgesMedian": 47,
+     "seam": {
+      "lenses": 72,
+      "maxMm": 0.673,
+      "rmsMm": 0.099
+     },
+     "hybrid": {
+      "discs": 236,
+      "free": 11,
+      "merged": 225,
+      "pairs": 422,
+      "consFail": 0,
+      "points": {
+       "ring": 2426,
+       "cross": 2583,
+       "steiner": 268
+      }
+     }
+    }
+   }
+  },
+  {
+   "domain": "cylinder R6",
+   "H": 1,
+   "methods": {
+    "lattice (= coarse)": {
+     "trisPerMm2": 13,
+     "ms": 5,
+     "free": {
+      "n": 2,
+      "median": 27.074,
+      "p90": 27.074,
+      "max": 27.074
+     },
+     "merged": {
+      "n": 9,
+      "median": 20.101,
+      "p90": 24.426,
+      "max": 24.426
+     },
+     "edgesMedian": 15,
+     "seam": {
+      "lenses": 89,
+      "maxMm": 0.745,
+      "rmsMm": 0.157
+     }
+    },
+    "grid 0.1": {
+     "trisPerMm2": 340,
+     "ms": 67,
+     "free": {
+      "n": 2,
+      "median": 10.243,
+      "p90": 10.243,
+      "max": 10.243
+     },
+     "merged": {
+      "n": 30,
+      "median": 8.176,
+      "p90": 10.592,
+      "max": 10.913
+     },
+     "edgesMedian": 63,
+     "seam": {
+      "lenses": 89,
+      "maxMm": 0.425,
+      "rmsMm": 0.036
+     }
+    },
+    "rings": {
+     "trisPerMm2": 172,
+     "ms": 169,
+     "free": {
+      "n": 2,
+      "median": 4.502,
+      "p90": 4.502,
+      "max": 4.502
+     },
+     "merged": {
+      "n": 28,
+      "median": 6.433,
+      "p90": 9.782,
+      "max": 10.409
+     },
+     "edgesMedian": 46,
+     "seam": {
+      "lenses": 89,
+      "maxMm": 0.453,
+      "rmsMm": 0.041
+     }
+    },
+    "HYBRID": {
+     "trisPerMm2": 399,
+     "ms": 731,
+     "free": {
+      "n": 2,
+      "median": 3.755,
+      "p90": 3.755,
+      "max": 3.755
+     },
+     "merged": {
+      "n": 29,
+      "median": 2.131,
+      "p90": 3.227,
+      "max": 3.986
+     },
+     "edgesMedian": 69,
+     "seam": {
+      "lenses": 89,
+      "maxMm": 0.473,
+      "rmsMm": 0.034
+     },
+     "hybrid": {
+      "discs": 211,
+      "free": 7,
+      "merged": 204,
+      "pairs": 357,
+      "junctions": 129,
+      "consFail": 0,
+      "points": {
+       "ring": 13969,
+       "cross": 9260,
+       "centre": 219,
+       "nested": 3297,
+       "seam": 979,
+       "seamCross": 562,
+       "junction": 1126,
+       "steiner": 60
+      }
+     }
+    },
+    "coarse-rings": {
+     "trisPerMm2": 79,
+     "ms": 127,
+     "free": {
+      "n": 2,
+      "median": 27.074,
+      "p90": 27.074,
+      "max": 27.074
+     },
+     "merged": {
+      "n": 25,
+      "median": 13.796,
+      "p90": 21.738,
+      "max": 27.541
+     },
+     "edgesMedian": 42,
+     "seam": {
+      "lenses": 89,
+      "maxMm": 0.642,
+      "rmsMm": 0.083
+     },
+     "hybrid": {
+      "discs": 211,
+      "free": 7,
+      "merged": 204,
+      "pairs": 357,
+      "consFail": 0,
+      "points": {
+       "ring": 2305,
+       "cross": 2448,
+       "steiner": 298
+      }
+     }
+    }
+   }
+  }
+ ],
+ "petal": {
+  "focus": {
+   "centre": [
+    26.274,
+    0.352,
+    9.23
+   ],
+   "normal": [
+    -0.423,
+    -0.01,
+    0.906
+   ],
+   "score": 0.313
+  },
+  "H": 1,
+  "windowMm": 3,
+  "methods": {
+   "lattice (= coarse)": {
+    "trisPerMm2": 21,
+    "free": {
+     "n": 1,
+     "median": 25.388,
+     "p90": 25.388,
+     "max": 25.388
+    },
+    "merged": {
+     "n": 6,
+     "median": 25.524,
+     "p90": 28.02,
+     "max": 28.02
+    },
+    "edgesMedian": 17,
+    "seam": {
+     "lenses": 26,
+     "maxMm": 0.789,
+     "rmsMm": 0.125
+    },
+    "ms": 1979
+   },
+   "grid 0.1": {
+    "trisPerMm2": 367,
+    "free": {
+     "n": 1,
+     "median": 6.336,
+     "p90": 6.336,
+     "max": 6.336
+    },
+    "merged": {
+     "n": 13,
+     "median": 6.856,
+     "p90": 8.349,
+     "max": 25.524
+    },
+    "edgesMedian": 83,
+    "seam": {
+     "lenses": 26,
+     "maxMm": 0.507,
+     "rmsMm": 0.067
+    },
+    "ms": 3405
+   },
+   "rings": {
+    "trisPerMm2": 138,
+    "free": {
+     "n": 1,
+     "median": 2.251,
+     "p90": 2.251,
+     "max": 2.251
+    },
+    "merged": {
+     "n": 12,
+     "median": 7.498,
+     "p90": 12.102,
+     "max": 25.524
+    },
+    "edgesMedian": 45,
+    "seam": {
+     "lenses": 26,
+     "maxMm": 0.507,
+     "rmsMm": 0.071
+    },
+    "ms": 2471
+   },
+   "HYBRID": {
+    "trisPerMm2": 271,
+    "free": {
+     "n": 1,
+     "median": 1.903,
+     "p90": 1.903,
+     "max": 1.903
+    },
+    "merged": {
+     "n": 13,
+     "median": 1.903,
+     "p90": 4.314,
+     "max": 25.524
+    },
+    "edgesMedian": 83,
+    "seam": {
+     "lenses": 26,
+     "maxMm": 0.507,
+     "rmsMm": 0.066
+    },
+    "ms": 3534
+   },
+   "coarse-rings": {
+    "trisPerMm2": 72,
+    "free": {
+     "n": 1,
+     "median": 21.839,
+     "p90": 21.839,
+     "max": 21.839
+    },
+    "merged": {
+     "n": 10,
+     "median": 17.789,
+     "p90": 25.524,
+     "max": 25.524
+    },
+    "edgesMedian": 48,
+    "seam": {
+     "lenses": 26,
+     "maxMm": 0.699,
+     "rmsMm": 0.086
+    },
+    "ms": 2164
+   }
+  }
+ },
+ "budget": [
+  {
+   "name": "the default",
+   "v1Tris": 158912,
+   "v1Pct": 10.6,
+   "v1EdgeMm": 0.4,
+   "v1Ms": 1210,
+   "coarseTris": 158912,
+   "coarsePct": 10.6,
+   "coarseMs": 1436,
+   "coarseEdgeMm": 0.4,
+   "hybridTris": 2310010,
+   "hybridPct": 154,
+   "hybridCountMs": 31090,
+   "discs": 8598,
+   "free": 262,
+   "merged": 8336,
+   "pairs": 15203,
+   "junctions": 5756,
+   "points": {
+    "ring": 572498,
+    "cross": 389125,
+    "seam": 33784,
+    "seamCross": 27151,
+    "junction": 43103
+   },
+   "coarseRingsTris": 557656,
+   "coarseRingsPct": 37.2
+  },
+  {
+   "name": "whole bloom (60 mm stem, a leaf, 5 sepals, 12 stamens, the style)",
+   "v1Tris": 289008,
+   "v1Pct": 19.3,
+   "v1EdgeMm": 0.4,
+   "v1Ms": 3107,
+   "coarseTris": 289008,
+   "coarsePct": 19.3,
+   "coarseMs": 3563,
+   "coarseEdgeMm": 0.4,
+   "hybridTris": 3702392,
+   "hybridPct": 246.8,
+   "hybridCountMs": 53120,
+   "discs": 13745,
+   "free": 467,
+   "merged": 13278,
+   "pairs": 23983,
+   "junctions": 8971,
+   "points": {
+    "ring": 896492,
+    "cross": 629137,
+    "seam": 52581,
+    "seamCross": 43628,
+    "junction": 66670
+   },
+   "coarseRingsTris": 930796,
+   "coarseRingsPct": 62.1
+  },
+  {
+   "name": "umbel, head ON",
+   "v1Tris": 530634,
+   "v1Pct": 35.4,
+   "v1EdgeMm": 0.4,
+   "v1Ms": 4990,
+   "coarseTris": 530634,
+   "coarsePct": 35.4,
+   "coarseMs": 6820,
+   "coarseEdgeMm": 0.4,
+   "hybridTris": 6221742,
+   "hybridPct": 414.8,
+   "hybridCountMs": 110805,
+   "discs": 22965,
+   "free": 822,
+   "merged": 22143,
+   "pairs": 40229,
+   "junctions": 15390,
+   "points": {
+    "ring": 1458703,
+    "cross": 1082692,
+    "seam": 84706,
+    "seamCross": 74804,
+    "junction": 109824
+   },
+   "coarseRingsTris": 1625076,
+   "coarseRingsPct": 108.3
+  }
+ ]
+}
