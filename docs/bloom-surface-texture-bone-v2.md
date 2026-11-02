@@ -637,11 +637,11 @@ any measured limit. Every candidate limit the ruling names, measured here:
 | candidate | what it gives | the triangle count it binds at |
 |---|---|---|
 | **STL file size** at 50 bytes a triangle (84-byte header) | 1.5 M → **75 MB**; 3 M → 150 MB; 6 M → 300 MB; 12 M → 600 MB | only through a limit someone else sets on MB (below) |
-| **Chromium, the page's own accumulator** (`MeshBuilder.positions` is a plain JS array, 9 numbers a triangle) | builds, uploads, exports and renders at 1.5 / 3 / 6 / 12 M; **throws `Invalid array length` at 15 M** — V8's array ceiling, ~134 M elements | **~14.9 M** (between 12 and 15 M measured) |
-| **Chromium heap** | 0.23 / 0.57 / 0.81 / 2.00 GB after the STL at 1.5 / 3 / 6 / 12 M, of a 4.4 GB limit | above the array ceiling; not reached |
+| **Chromium, the page's own accumulator** (`MeshBuilder.positions` is a plain JS array, 9 numbers a triangle) | builds, uploads, exports and renders at 1.5 / 3 / 6 / 12 / 13.5 M; **throws `Invalid array length` at 15 M** — V8's array ceiling, ~134 M elements | **~14.9 M** (between 13.5 and 15 M measured) |
+| **Chromium heap** | 0.23 / 0.57 / 0.81 / 2.00 / 2.13 GB after the STL at 1.5 / 3 / 6 / 12 / 13.5 M, of a 4.4 GB limit | above the array ceiling; not reached |
 | **The hybrid's own generation memory in the page** (§19) | 1.24 GB at 2.3 M, 2.27 GB at 6.2 M; the mophead's 11.7 M full build CRASHED the page | between 6.2 M and 11.7 M for this unoptimised mesher; not a property of the output |
-| **Export time** (three's STLExporter, binary, then a Blob) | 0.5 / 2.3 / 2.9 / 7.5 s at 1.5 / 3 / 6 / 12 M | none hard; a stall bar of 120 s was never approached |
-| **First render** (software GL in this container) | 1.1 / 1.8 / 2.9 / 3.5 s | none hard |
+| **Export time** (three's STLExporter, binary, then a Blob) | 0.2 / 0.4 / 0.9 / 1.8 / 1.9 s at 1.5 / 3 / 6 / 12 / 13.5 M | none hard; a stall bar of 120 s was never approached |
+| **First render** (software GL in this container) | 0.5 / 0.8 / 1.5 / 2.8 / 3.2 s | none hard |
 | **A print-service upload limit** | **not recorded.** The repo names Shapeways only for build volume (`flower.js:3316`) and JLC3DP only for escape-hole sizes (`docs/bloom-hydrangea-discovery.md:364`); neither gives an upload size | — |
 
 `node tools/bloom-budget-limits.mjs` produces these numbers (`docs/data/bloom-budget-limits.json`). It builds a
@@ -651,7 +651,7 @@ bloom's geometry builder.** The real full build's own cost is in §19, where gen
 
 **THE DECISION RULE'S ANSWER: STOP.** Nothing measurable here binds near 1.5 M:
 - the browser holds 8× that;
-- the export of 12 M takes 7.5 s;
+- the export of 12 M takes 1.8 s;
 - the heap is half used at 12 M.
 
 The only limit that could reasonably bind is an external one: the upload limit of the service the STL goes to. The
