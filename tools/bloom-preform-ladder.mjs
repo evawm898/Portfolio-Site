@@ -39,7 +39,7 @@ const { DEFAULTS } = await import(path.join(ROOT, 'bloom-registry.js'));
 const argv = process.argv.slice(2);
 const argOf = (k, d = null) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
 const OUT = argv[0] && !argv[0].startsWith('--') ? argv[0] : null;
-if (!OUT) { console.error('usage: node tools/bloom-preform-ladder.mjs <outdir> [--design default|umbel] [--caps a,b,...] [--manifest f]'); process.exit(2); }
+if (!OUT && !argOf('--census')) { console.error('usage: node tools/bloom-preform-ladder.mjs <outdir> [--design default|umbel] [--caps a,b,...] [--manifest f]'); process.exit(2); }
 const DESIGNS = {
   default: { name: 'default', set: {} },
   umbel: { name: 'umbel', set: { inflorescence: 'UMBEL', umbelHead: 'ON', stemLength: 60 } },
@@ -47,24 +47,44 @@ const DESIGNS = {
 const design = DESIGNS[argOf('--design', 'default')];
 if (!design) { console.error(`--design: one of ${Object.keys(DESIGNS).join(', ')}`); process.exit(2); }
 const caps = (argOf('--caps', '1500000,2000000,3000000,4500000,6000000')).split(',').map(Number);
-fs.mkdirSync(OUT, { recursive: true });
+if (OUT) fs.mkdirSync(OUT, { recursive: true });
 
+/* The directed-edge census on SORTED TYPED ARRAYS, never a Map: a Map holds at
+   most ~16.7 M entries and the 6.0 M rung has 17.8 M directed edges (it threw
+   there). A key is u * 2^26 + v, exact in a double for under 67 M vertices. */
 function census(P) {
   const nT = P.length / 9, f = Math.fround;
   const vid = new Map(); const T = new Int32Array(nT * 3);
   for (let i = 0; i < nT * 3; i++) { const k = `${f(P[i * 3])},${f(P[i * 3 + 1])},${f(P[i * 3 + 2])}`; let v = vid.get(k); if (v === undefined) { v = vid.size; vid.set(k, v); } T[i] = v; }
-  const de = new Map(); let degen = 0;
+  const nV = vid.size; vid.clear();
+  const K = 67108864;
+  const E = new Float64Array(nT * 3); let degen = 0;
   for (let t = 0; t < nT; t++) {
     const a = T[t * 3], b = T[t * 3 + 1], c = T[t * 3 + 2];
     if (a === b || b === c || a === c) degen++;
-    for (const [u, v] of [[a, b], [b, c], [c, a]]) { const k = u * 4e7 + v; de.set(k, (de.get(k) || 0) + 1); }
+    E[t * 3] = a * K + b; E[t * 3 + 1] = b * K + c; E[t * 3 + 2] = c * K + a;
   }
+  E.sort();
+  const countOf = (k) => { let lo = 0, hi = E.length; while (lo < hi) { const m = (lo + hi) >> 1; if (E[m] < k) lo = m + 1; else hi = m; } let n = 0; while (lo + n < E.length && E[lo + n] === k) n++; return n; };
   let open = 0, doubled = 0;
-  for (const [k, n] of de) { const u = Math.floor(k / 4e7), v = k % 4e7; if (n > 1) doubled++; if ((de.get(v * 4e7 + u) || 0) !== n) open++; }
-  const par = new Int32Array(vid.size).map((_, i) => i); const fd = (x) => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+  for (let i = 0; i < E.length;) {
+    let j = i; while (j < E.length && E[j] === E[i]) j++;
+    const n = j - i, k = E[i], u = Math.floor(k / K), v = k - u * K;
+    if (n > 1) doubled++; if (countOf(v * K + u) !== n) open++;
+    i = j;
+  }
+  const par = new Int32Array(nV).map((_, i) => i); const fd = (x) => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
   for (let t = 0; t < nT; t++) { const a = fd(T[t * 3]), b = fd(T[t * 3 + 1]); par[b] = a; par[fd(T[t * 3 + 2])] = a; }
   const roots = new Set(); for (let t = 0; t < nT; t++) roots.add(fd(T[t * 3]));
   return { shells: roots.size, open, doubled, degen };
+}
+
+/* --census <file.stl>: the census of a binary STL already written, no build */
+if (argOf('--census')) {
+  const buf = fs.readFileSync(argOf('--census')); const nT = buf.readUInt32LE(80); const P = new Float64Array(nT * 9);
+  for (let t = 0; t < nT; t++) { const o = 84 + t * 50; for (let j = 0; j < 9; j++) P[t * 9 + j] = buf.readFloatLE(o + 12 + j * 4); }
+  console.log(JSON.stringify({ file: path.basename(argOf('--census')), tris: nT, mb: +(buf.length / 1e6).toFixed(2), ...census(P) }));
+  process.exit(0);
 }
 
 const manifest = [];

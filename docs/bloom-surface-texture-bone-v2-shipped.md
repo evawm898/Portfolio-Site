@@ -315,10 +315,26 @@ census on the written float32s is printed beside it.
 | default | 2.0 M | `bloom-bone-v2-default-1978546tris-98.9MB.stl` | 1,978,546 | 98.9 | 87.3 % | 9 / 0 / 0 |
 | default | 3.0 M (its ceiling) | `bloom-bone-v2-default-2232724tris-111.6MB.stl` | 2,232,724 | 111.6 | 100 % | 9 / 0 / 0 |
 
-**The default bloom cannot reach 3.0 / 4.5 / 6.0 M by the cap**: with every
-porous cell full it is 2.23 M (the fold check gives back a little of the
-2.26 M all-full count). The upper rungs therefore come from the umbel (head ON,
-60 mm stem) — question 3.
+| umbel, head ON, 60 mm stem | 3.0 M | `bloom-bone-v2-umbel-2968138tris-148.4MB.stl` | 2,968,138 | 148.4 | 43.5 % | 53 / 0 / 0 |
+| umbel, head ON, 60 mm stem | 4.5 M | `bloom-bone-v2-umbel-4449542tris-222.5MB.stl` | 4,449,542 | 222.5 | 70.5 % | 53 / 0 / 0 |
+| umbel, head ON, 60 mm stem | 6.0 M | `bloom-bone-v2-umbel-5931524tris-296.6MB.stl` | 5,931,524 | 296.6 | — (see below) | 53 / 0 / 0 |
+
+Every rung: 0 doubled directed edges as well. **The default bloom cannot reach
+3.0 / 4.5 / 6.0 M by the cap**: with every porous cell full it is 2.23 M (the
+fold check gives back a little of the 2.26 M all-full count). The upper rungs
+therefore come from the umbel (head ON, 60 mm stem) — a second design, and
+question 3. The 6.0 M rung's census first threw (a JS `Map` holds ~16.7 M
+entries and that file has 17.8 M directed edges); the census is on sorted typed
+arrays now and `--census <file.stl>` re-reads a written file, which is how its
+row was taken — so its full share was not recorded (the cap binds there: the
+umbel's all-full count is ~6.2 M). Build times on this box: 3.8 / 5.4 / ~8 min.
+
+**Where they are:** the six STLs were handed to Eva as session attachments
+(the session's own file delivery), not committed and not on the deploy
+preview. A release asset needs a tool this session does not have, and the
+deploy preview serves only what is committed, so `/tmp-preform/` would have
+meant committing 852 MB — which the brief forbids. To regenerate any rung:
+`node tools/bloom-preform-ladder.mjs <dir> --design default|umbel --caps <n>`.
 
 ## 10. Questions for Eva
 
