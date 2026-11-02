@@ -1,0 +1,291 @@
+{
+ "budget": [
+  {
+   "key": "default",
+   "name": "the default",
+   "coarseTris": 158912,
+   "coarseMB": 7.9,
+   "coarsePct": 7.9,
+   "coarseMs": 2588,
+   "fullTris": 1978546,
+   "fullMB": 98.9,
+   "fullPct": 98.9,
+   "fullMs": 114325,
+   "share": 0.873,
+   "cells": 752,
+   "selectedCells": 664,
+   "allFullTris": 2257476,
+   "passes": 1,
+   "porousAreaMm2": 4424,
+   "fullAreaMm2": 3860,
+   "discs": 8598,
+   "free": 260,
+   "merged": 8338,
+   "junctions": 5756,
+   "timing": {
+    "countMs": 17641.669444,
+    "rankMs": 207.68525200000022,
+    "buildMs": [
+     90997.20287899999
+    ],
+    "counts": 9,
+    "discMs": 2276.6140030000006,
+    "selectMs": 48.707603999999264
+   },
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "whole",
+   "name": "the whole bloom (60 mm stem, a 30 mm leaf, 5 sepals, 12 stamens, the style)",
+   "coarseTris": 289008,
+   "coarseMB": 14.5,
+   "coarsePct": 14.5,
+   "coarseMs": 6165,
+   "fullTris": 1958496,
+   "fullMB": 97.9,
+   "fullPct": 97.9,
+   "fullMs": 177712,
+   "share": 0.512,
+   "cells": 1279,
+   "selectedCells": 681,
+   "allFullTris": null,
+   "passes": 1,
+   "porousAreaMm2": 6956,
+   "fullAreaMm2": 3560,
+   "discs": 13637,
+   "free": 440,
+   "merged": 13197,
+   "junctions": 8919,
+   "timing": {
+    "countMs": 26065.059653000004,
+    "rankMs": 422.13143700000364,
+    "buildMs": [
+     141990.54456100002
+    ],
+    "counts": 18,
+    "discMs": 3167.552544999984,
+    "selectMs": 57.38180800000555
+   },
+   "shells": 49,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "umbel",
+   "name": "the umbel, head ON (60 mm stem)",
+   "coarseTris": 530634,
+   "coarseMB": 26.5,
+   "coarsePct": 26.5,
+   "coarseMs": 8294,
+   "fullTris": 1983462,
+   "fullMB": 99.2,
+   "fullPct": 99.2,
+   "fullMs": 156686,
+   "share": 0.261,
+   "cells": 2332,
+   "selectedCells": 612,
+   "allFullTris": null,
+   "passes": 1,
+   "porousAreaMm2": 11349,
+   "fullAreaMm2": 2965,
+   "discs": 14479,
+   "free": 488,
+   "merged": 13991,
+   "junctions": 9728,
+   "timing": {
+    "countMs": 29808.969097000023,
+    "rankMs": 823.3703850000165,
+    "buildMs": [
+     112118.97886700003
+    ],
+    "counts": 42,
+    "discMs": 4350.539786999987,
+    "selectMs": 89.99864100001287
+   },
+   "shells": 53,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "mophead",
+   "name": "the mophead (depth 2's ruled defaults)",
+   "coarseTris": 1762254,
+   "coarseMB": 88.1,
+   "coarsePct": 88.1,
+   "coarseMs": 101583,
+   "fullTris": 1994016,
+   "fullMB": 99.7,
+   "fullPct": 99.7,
+   "fullMs": 189897,
+   "share": 0.017,
+   "cells": 7991,
+   "selectedCells": 138,
+   "allFullTris": null,
+   "passes": 1,
+   "porousAreaMm2": 28099,
+   "fullAreaMm2": 467,
+   "discs": 4917,
+   "free": 241,
+   "merged": 4676,
+   "junctions": 2901,
+   "timing": {
+    "countMs": 12229.987153999973,
+    "rankMs": 6237.918845999986,
+    "buildMs": [
+     52833.40107299993
+    ],
+    "counts": 53,
+    "discMs": 12111.012694999925,
+    "selectMs": 22.61606800009031
+   },
+   "shells": 458,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "40x3",
+   "name": "40 petals x 3 whorls",
+   "coarseTris": 1614436,
+   "coarseMB": 80.7,
+   "coarsePct": 80.7,
+   "coarseMs": 19233,
+   "fullTris": 1992750,
+   "fullMB": 99.6,
+   "fullPct": 99.6,
+   "fullMs": 149607,
+   "share": 0.022,
+   "cells": 7182,
+   "selectedCells": 174,
+   "allFullTris": null,
+   "passes": 1,
+   "porousAreaMm2": 35267,
+   "fullAreaMm2": 759,
+   "discs": 10155,
+   "free": 406,
+   "merged": 9749,
+   "junctions": 6582,
+   "timing": {
+    "countMs": 26350.808554999996,
+    "rankMs": 2591.9141989999916,
+    "buildMs": [
+     75697.41298000002
+    ],
+    "counts": 45,
+    "discMs": 16988.926378999953,
+    "selectMs": 22.49446800001897
+   },
+   "shells": 121,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  }
+ ],
+ "walls": [
+  {
+   "label": "the ruled defaults (0.5 mm, spread 3, density 0.9)",
+   "D": 0.5,
+   "spread": 3,
+   "density": 0.9,
+   "pairs": 395,
+   "merged": 222,
+   "walls": {
+    "n": 173,
+    "min": 0.006,
+    "median": 0.278,
+    "p90": 0.583,
+    "max": 0.884
+   },
+   "underMm": 0.7,
+   "under": 166,
+   "underShare": 0.96,
+   "check": {
+    "pairs": 395,
+    "merged": 222,
+    "thinnestMm": 0.0059953980212783635,
+    "p10Mm": 0.04394222292751023,
+    "medianMm": 0.27760244183818306
+   }
+  },
+  {
+   "label": "smallest pores 1.0 mm",
+   "D": 1,
+   "spread": 3,
+   "density": 0.9,
+   "pairs": 144,
+   "merged": 83,
+   "walls": {
+    "n": 61,
+    "min": 0.008,
+    "median": 0.588,
+    "p90": 1.281,
+    "max": 1.748
+   },
+   "underMm": 0.7,
+   "under": 34,
+   "underShare": 0.557,
+   "check": {
+    "pairs": 144,
+    "merged": 83,
+    "thinnestMm": 0.007996124056437421,
+    "p10Mm": 0.0819700959850351,
+    "medianMm": 0.5879756959698756
+   }
+  },
+  {
+   "label": "spread 1.5",
+   "D": 0.5,
+   "spread": 1.5,
+   "density": 0.9,
+   "pairs": 1643,
+   "merged": 1094,
+   "walls": {
+    "n": 549,
+    "min": 0.002,
+    "median": 0.136,
+    "p90": 0.302,
+    "max": 0.442
+   },
+   "underMm": 0.7,
+   "under": 549,
+   "underShare": 1,
+   "check": {
+    "pairs": 1643,
+    "merged": 1094,
+    "thinnestMm": 0.0019940983878642044,
+    "p10Mm": 0.03598736361778888,
+    "medianMm": 0.13587899342504364
+   }
+  },
+  {
+   "label": "density 0.2",
+   "D": 0.5,
+   "spread": 3,
+   "density": 0.2,
+   "pairs": 16,
+   "merged": 4,
+   "walls": {
+    "n": 12,
+    "min": 0.162,
+    "median": 0.352,
+    "p90": 0.424,
+    "max": 0.526
+   },
+   "underMm": 0.7,
+   "under": 12,
+   "underShare": 1,
+   "check": {
+    "pairs": 16,
+    "merged": 4,
+    "thinnestMm": 0.1619868197617192,
+    "p10Mm": 0.20581146249809448,
+    "medianMm": 0.3518966238363025
+   }
+  }
+ ]
+}

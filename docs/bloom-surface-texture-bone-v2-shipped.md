@@ -216,8 +216,61 @@ and compares the count and an FNV hash of every float32: §8.
 
 ## 8. Measurements
 
-(filled from `docs/data/bloom-texture-bone-v2-shipped.json` and
-`docs/data/bloom-texture-bone-v2-browser.json`)
+From `docs/data/bloom-texture-bone-v2-shipped.json`
+(`node tools/bloom-texture-bone-v2-measure.mjs`) and
+`docs/data/bloom-texture-bone-v2-browser.json`
+(`node tools/bloom-texture-bone-v2-browser.mjs`). EXPORT, Node 22, this box
+(4 cores, shared with the byte partition while measured: the times are upper
+bounds, not CI's).
+
+### 8a. Budget: triangles / MB of binary STL / % of the 2.0 M cap
+
+| state | COARSE | FULL | full-detail share of the porous area | cells full / all | full build |
+|---|---|---|---|---|---|
+| the default | 158,912 · 7.9 MB · 7.9 % | **1,978,546 · 98.9 MB · 98.9 %** | **87.3 %** | 664 / 752 | 114 s |
+| the whole bloom (stem, leaf, 5 sepals, 12 stamens, style) | 289,008 · 14.5 MB · 14.5 % | 1,958,496 · 97.9 MB · 97.9 % | 51.2 % | 681 / 1,279 | 178 s |
+| the umbel, head ON | 530,634 · 26.5 MB · 26.5 % | 1,983,462 · 99.2 MB · 99.2 % | 26.1 % | 612 / 2,332 | 157 s |
+| the mophead (depth 2's defaults) | 1,762,254 · 88.1 MB · 88.1 % | 1,994,016 · 99.7 MB · 99.7 % | **1.7 %** | 138 / 7,991 | 190 s |
+| 40 × 3 whorls | 1,614,436 · 80.7 MB · 80.7 % | 1,992,750 · 99.6 MB · 99.6 % | 2.2 % | 174 / 7,182 | 150 s |
+
+Every FULL build: 0 open and 0 doubled directed edges, 0 degenerate
+triangles on the float32s, the coarse build's shell count. The default's
+all-full count is 2,257,476 — over the cap, so the allocator binds even on the
+plain bloom. The mophead and 40 × 3 spend almost the whole cap on their COARSE
+lattice (88 % / 81 %), so the allocator can buy little: the read-out says so.
+
+
+### 8b. Engines, time and heap (Node 22 / the page's own module in Chromium)
+
+| state | detail | triangles | AGREE (count + float32 hash) | Node | Chromium | Chromium heap at the end |
+|---|---|---|---|---|---|---|
+| default | coarse | 158,912 | yes `f11217d4` | 3.1 s | 2.1 s | 0.08 GB |
+| default | full | 1,978,546 | yes `146ed032` | 131 s | 90 s | 0.90 GB |
+| umbel | coarse | 530,634 | yes `bd2d4f52` | 11 s | 8 s | 0.27 GB |
+| umbel | full | 1,983,462 | yes `4a8fe00d` | 179 s | 152 s | 2.01 GB |
+| mophead | coarse | 1,762,254 | yes `1119c8a8` | 95 s | 81 s | 0.87 GB |
+| mophead | full | 1,994,016 | yes `13598152` | 188 s | 134 s | 1.75 GB |
+
+**Round 2's mophead crash is gone** (it ran out of memory generating 11.7 M
+triangles; the allocator now stops at the cap). The heap is what the page holds
+at the END of the build, with the result referenced — the build is synchronous,
+so nothing can sample it during; it is a floor on the peak, not the peak. The
+full build's TIME is the cost of the fold check's re-mesh passes and the
+exposure rays, on a box shared with the byte partition: an upper bound, and
+question §21 C (an optimisation session) stands.
+
+### 8c. Walls between adjacent pores (the shipped field, mid-height)
+
+| state | adjacent pairs | merged at mid-height | walls: thinnest / median / p90 / thickest | under 0.7 mm |
+|---|---|---|---|---|
+| the ruled defaults (0.5 mm, spread 3, density 0.9) | 395 | 222 | 0.006 / 0.278 / 0.583 / 0.884 mm | **166 of 173 (96 %)** |
+| smallest pores 1.0 mm | 144 | 83 | 0.008 / 0.588 / 1.281 / 1.748 mm | 34 of 61 (56 %) |
+| spread 1.5 | 1,643 | 1,094 | 0.002 / 0.136 / 0.302 / 0.442 mm | 549 of 549 (100 %) |
+| density 0.2 | 16 | 4 | 0.162 / 0.352 / 0.424 / 0.526 mm | 12 of 12 (100 %) |
+
+Almost every wall the merging field leaves is under 0.7 mm at the ruled
+defaults — a wall is what is left between two pores that nearly merge, so it is
+thin by construction. Question 2 proposes a rule; none is built.
 
 ## 9. The PreForm ladder
 
@@ -284,3 +337,17 @@ hand); (c) a named viewing direction (front, top).
   agree (§6, §8).
 
 ## 11. What is NOT done, named
+
+- **The final cap.** 2.0 M is provisional until the ladder is printed through
+  PreForm (§9).
+- **The full build's time** is not optimised: a fold-check withdrawal re-meshes
+  the whole run of that organ; 90–150 s in Chromium for the states measured.
+  The page builds FULL only on the button and the export.
+- **A minimum wall** (question 2) is proposed, not built.
+- **The full points stay on the lattice planes** (no chart per organ); the fold
+  check is what makes that safe, at the cost of the full share on strongly
+  curved parts (question 5).
+- **Nested pits and the fade at height** are unchanged (§21 E, H).
+- **The heap figures are a floor** on the peak (§8b).
+- **The prototype modules** (`bloom-texture-bone2*.js`, the round-1/2 tools)
+  stay as the reference and are not imported by anything shipped.

@@ -35,6 +35,7 @@ const details = arg('--detail', 'both') === 'both' ? ['coarse', 'full'] : [arg('
 const OUT = arg('--out', path.join(ROOT, 'docs/data/bloom-texture-bone-v2-browser.json'));
 const hashF32 = (P) => { const f = new Float32Array(P.length); for (let i = 0; i < P.length; i++) f[i] = P[i]; const u = new Uint32Array(f.buffer); let h = 2166136261 >>> 0; for (let i = 0; i < u.length; i++) { h ^= u[i]; h = Math.imul(h, 16777619) >>> 0; } return h.toString(16); };
 const srv = http.createServer((q, r) => {
+  if (q.url === '/__blank') { r.writeHead(200, { 'content-type': 'text/html' }); return r.end('<!doctype html><title>bone v2</title>'); }
   const p = path.join(ROOT, decodeURIComponent(q.url.split('?')[0]));
   if (!p.startsWith(ROOT) || !fs.existsSync(p) || fs.statSync(p).isDirectory()) { r.writeHead(404); return r.end(); }
   r.writeHead(200, { 'content-type': p.endsWith('.js') || p.endsWith('.mjs') ? 'text/javascript' : 'text/html' }); r.end(fs.readFileSync(p));
@@ -46,7 +47,7 @@ for (const [key, name, extra] of STATES) {
   if (!want.includes(key)) continue;
   for (const detail of details) {
     const page = await browser.newPage();
-    await page.goto(`http://localhost:${port}/robots.txt`).catch(() => {});
+    await page.goto(`http://localhost:${port}/__blank`, { waitUntil: 'load' });
     const st = { ...DEFAULTS, petalTexture: 'BONE', ...extra };
     const t0 = performance.now();
     const acc = new G.MeshBuilder({ exportMode: true, boneDetail: detail });
