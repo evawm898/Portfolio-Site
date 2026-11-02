@@ -1,0 +1,31 @@
+{
+ "box": "headless Chromium (Playwright), software GL, this container; geometry build only, EXPORT, a fresh page per build",
+ "states": {
+  "default": {
+   "preview": {
+    "ms": 66,
+    "tris": 24688,
+    "heapMB": 21,
+    "warmed": true
+   },
+   "v1": {
+    "ms": 713,
+    "tris": 158912,
+    "heapMB": 175,
+    "warmed": true
+   },
+   "coarse": {
+    "ms": 1103,
+    "tris": 158912,
+    "heapMB": 95,
+    "warmed": true
+   },
+   "full": {
+    "ms": 38797,
+    "tris": 2304496,
+    "heapMB": 1236,
+    "warmed": false
+   }
+  }
+ }
+}

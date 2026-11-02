@@ -553,7 +553,75 @@ coarse build's disc list (`discs: true`) and the full build's are the same pores
 
 The prototype's `bone2Bloom` modes are `'coarse'` and `'hybrid'`, and the browser times are §19.
 
-<!-- §16 -->
+## 16. Measurements: roundness, density, seams, and the budget
+
+Every figure below is in `docs/data/bloom-texture-bone-v2b.json`, from `node tools/bloom-texture-bone2b-measure.mjs`
+run on the final tree.
+- Roundness is the drawn rim's RMS radial deviation from its own best-fit circle, as a share of the radius.
+- A MERGED pore is measured over the outline it OWNS (no neighbour's lip within reach), and only when that outline
+  is at least a quarter of its circumference. A FREE pore has no overlapping neighbour.
+- The seam error is the drawn surface's height error against the field along every merged pair's crease (RMS and
+  max in mm).
+- Coarse is the lattice (§15).
+
+**plate, H 1 mm** (the merging field; roundness = the drawn rim's RMS radial deviation from its own best circle, over the outline a pore owns):
+
+| mesh | tris / mm² | merged pores off round | free pores off round | seam RMS / max (mm) | build ms |
+|---|---|---|---|---|---|
+| lattice (= coarse) | 13 | 17.735% (p90 24.566%, n 9) | 28.838% (p90 28.838%, n 1) | 0.164 / 0.856 | 16 |
+| grid 0.1 | 340 | 6.733% (p90 9.427%, n 23) | 11.153% (p90 11.153%, n 1) | 0.044 / 0.518 | 72 |
+| rings | 189 | 7.628% (p90 9.569%, n 23) | 2.251% (p90 2.251%, n 1) | 0.05 / 0.502 | 176 |
+| HYBRID | 430 | 1.903% (p90 1.917%, n 25) | 2.187% (p90 2.187%, n 1) | 0.034 / 0.362 | 1,168 |
+| coarse-rings | 82 | 14.03% (p90 21.936%, n 21) | 24.752% (p90 24.752%, n 1) | 0.099 / 0.673 | 174 |
+
+**cylinder R6, H 1 mm** (the merging field; roundness = the drawn rim's RMS radial deviation from its own best circle, over the outline a pore owns):
+
+| mesh | tris / mm² | merged pores off round | free pores off round | seam RMS / max (mm) | build ms |
+|---|---|---|---|---|---|
+| lattice (= coarse) | 13 | 20.101% (p90 24.426%, n 9) | 27.074% (p90 27.074%, n 2) | 0.157 / 0.745 | 5 |
+| grid 0.1 | 340 | 8.176% (p90 10.592%, n 30) | 10.243% (p90 10.243%, n 2) | 0.036 / 0.425 | 67 |
+| rings | 172 | 6.433% (p90 9.782%, n 28) | 4.502% (p90 4.502%, n 2) | 0.041 / 0.453 | 136 |
+| HYBRID | 398 | 2.131% (p90 3.227%, n 29) | 3.755% (p90 3.755%, n 2) | 0.034 / 0.473 | 827 |
+| coarse-rings | 79 | 13.796% (p90 21.738%, n 25) | 27.074% (p90 27.074%, n 2) | 0.083 / 0.642 | 140 |
+
+**A real petal (petal 0, a 3 mm window at the most open spot), H 1 mm:**
+
+| mesh | tris / mm² | merged pores off round | free pores off round | seam RMS / max (mm) |
+|---|---|---|---|---|
+| lattice (= coarse) | 21 | 25.524% (p90 28.02%, n 6) | 25.388% (p90 25.388%, n 1) | 0.125 / 0.789 |
+| grid 0.1 | 367 | 6.856% (p90 8.349%, n 13) | 6.336% (p90 6.336%, n 1) | 0.067 / 0.507 |
+| rings | 138 | 7.498% (p90 12.102%, n 12) | 2.251% (p90 2.251%, n 1) | 0.071 / 0.507 |
+| HYBRID | 270 | 1.903% (p90 4.314%, n 13) | 1.903% (p90 1.903%, n 1) | 0.066 / 0.507 |
+| coarse-rings | 72 | 17.789% (p90 25.524%, n 10) | 21.839% (p90 21.839%, n 1) | 0.086 / 0.699 |
+
+**The budget (EXPORT, 1,500,000 = 100 %; v1 is the shipped BONE at its derived edge):**
+
+| state | v1 | v2 COARSE | v2 FULL (hybrid) | coarse-rings (the alternative) | discs (free / merged) | junctions |
+|---|---|---|---|---|---|---|
+| the default | 158,912 (10.6 %) | 158,912 (10.6 %) | **2,304,580 (153.6 %)** | 557,656 (37.2 %) | 8,598 (262 / 8,336) | 5,756 |
+| whole bloom (60 mm stem, a leaf, 5 sepals, 12 stamens, the style) | 289,008 (19.3 %) | 289,008 (19.3 %) | **3,694,142 (246.3 %)** | 930,796 (62.1 %) | 13,745 (467 / 13,278) | 8,971 |
+| umbel, head ON | 530,634 (35.4 %) | 530,634 (35.4 %) | **6,207,646 (413.8 %)** | 1,625,076 (108.3 %) | 22,965 (822 / 22,143) | 15,390 |
+| the mophead (depth 2) | 1,240,446 (82.7 %) | 1,240,446 (82.7 %) | **11,743,184 (782.9 %)** | 3,314,010 (220.9 %) | 45,913 (1,897 / 44,016) | 29,420 |
+| 40 x 3 whorls | 1,442,144 (96.1 %, edge 0.42) | 1,442,144 (96.1 %) | **18,533,948 (1235.6 %)** | 4,636,118 (309.1 %) | 70,559 (2,472 / 68,087) | 46,882 |
+
+What the tables say:
+- **The hybrid is the only mesh that draws a merged pore round.** It reads 1.9–2.1 % off its circle against the
+  0.1 mm grid's 6.7–8.2 %, on the plate, the cylinder and the petal alike. A free pore is about 2 % off in both the
+  hybrid and the plain rings (the rings were always good where pores stand apart, §5).
+- **It costs about 1.3× the 0.1 mm grid's density on a plate and about 0.7× on the petal.** It spends triangles only
+  on the porous patches, and on the petal the patches are interrupted by the ramp and the masks; the grid refines
+  the whole porous area.
+- **The seam is the hybrid's smallest error on the plate** (0.034 mm RMS, 0.362 max). On the petal the max (0.507)
+  is the same in every refined mesh: the one site none of them refines (§22).
+- **Coarse is v1's count exactly** on every state, because it is the same lattice. Its pores are 17–26 % off round
+  (question B).
+- **The full build exceeds the cap on every state measured**: 1.5× the default, 2.5× the whole bloom, 4.1× the
+  umbel, 7.8× the mophead, 12.4× 40 × 3. **40 × 3's 18.5 M is past what the page can hold at all** (§17's ~14.9 M
+  array ceiling), so it cannot be built at full detail in the browser.
+- **About 39 % of the hybrid's new points lie ON lattice edges** (the default: 389,125 ring-chord crossings plus
+  27,120 seam-chord crossings, of 1,062,945). That is what closing against the 0.4 mm lattice costs
+  (question D).
+- **Visual seam quality:** the sheet's cells A and B (§19 points to them).
 
 ## 17. What the 1.5 M cap protects — the investigation (ruling 5)
 
@@ -588,9 +656,9 @@ bloom's geometry builder.** The real full build's own cost is in §19, where gen
 The only limit that could reasonably bind is an external one: the upload limit of the service the STL goes to. The
 repo does not record it. **The cap is not moved.** Question A asks Eva.
 
-For scale against the measured hybrid builds (§16): the default bloom's full build is 2.31 M (115 MB of STL), the
-whole bloom 3.70 M (185 MB), the umbel 6.22 M (311 MB). All are under the browser's ceiling, and every one is over
-the cap.
+For scale against the measured hybrid builds (§16): the default bloom's full build is 2.30 M (115 MB of STL), the
+whole bloom 3.69 M (185 MB), the umbel 6.21 M (310 MB), the mophead 11.74 M (587 MB) and 40 × 3 18.53 M (927 MB,
+past the ceiling). All but 40 × 3 are under the browser's ceiling; every one is over the cap.
 
 ## 18. Print, the nib and depth (EXPORT, the default bloom, the FULL build)
 
@@ -719,8 +787,8 @@ point is now kept only inside at least two of its three outer discs (one lens).
   - (a) accept;
   - (b) an optimisation session before shipping: the walk's point location, the per-disc charts, typed arrays,
     a worker. None of it is optimised here.
-- **D. THE CLOSURE'S COST.** Points ON lattice edges (the ring chords' crossings) are about a third of the hybrid's
-  new points (§16). A chart per organ (the sheets' own row law) would remove them, but it is the porting work round
+- **D. THE CLOSURE'S COST.** Points ON lattice edges (the chords' crossings) are about 39 % of the hybrid's new
+  points (§16). A chart per organ (the sheets' own row law) would remove them, but it is the porting work round
   1 named. Options:
   - (a) accept the cost;
   - (b) a charting session (sheets first).
