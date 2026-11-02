@@ -1873,7 +1873,7 @@ export const SMOKE_BLOCKS = [
   },
   {
     n: 79, title: 'the texture edge cap (Oct 23)',
-    anchor: 'TEXTURE CAP: PEBBLE x 40 petals x 3 whorls (1,542,832 tris at 0.40 mm — the edge coarsens to the finest rung that fits)',
+    anchor: 'TEXTURE CAP: PEBBLE x 40 petals x 3 whorls on a 50 mm petal (2,036,036 tris at 0.40 mm — the edge coarsens to the finest rung that fits)',
     /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
        budget-derived lattice edge (the bisection between the ruled 0.4 and the
        0.5 cap on real trial builds) and the refusal past the cap. The anchor
@@ -1883,7 +1883,7 @@ export const SMOKE_BLOCKS = [
        the heaviest junction the flood fill reads. */
     conn: true,
     rows: [
-      { label: 'TEXTURE CAP: past 0.50 mm — 40 x 3 x 40 sepals x 4 tiers x whorled leaves on a 120 mm stem (REFUSED at the cap, told)',
+      { label: 'TEXTURE CAP: past 0.50 mm — 40 x 3 on 60 x 24 mm petals (REFUSED at the cap, told)',
         path: "TX9 the build standing at the cap with fits false against the builder's tally, the read-out saying DOES NOT FIT, XR1 the declared refusal at its count" },
     ],
   },
@@ -1950,7 +1950,7 @@ export const SMOKE_BLOCKS = [
   },
   {
     n: 82, title: 'the BONE texture — the one world field under a curvature and a patch mask (Oct 28)',
-    anchor: 'BONE: the ruled defaults (the provisional look: 2.0 mm pores, craters 2.5x, 60% in patches, smooth past 1/mm)',
+    anchor: 'BONE: the ruled defaults (v2: merging pores 0.5-1.5 mm with nested pits, 60% in patches, smooth past 1/mm; the live build COARSE, the export FULL under the cap)',
     /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
        deferred pass over every part (`boneReliefPass`), the sheets' capture,
        the rods' capture and their curvature decision (on the export twin when
@@ -1964,6 +1964,8 @@ export const SMOKE_BLOCKS = [
        any join, and the voxel fill is that witness. */
     conn: true,
     rows: [
+      { label: 'BONE: x 40 petals x 3 whorls (the coarse lattice fits the 2.0 M cap at 0.4; the full build\'s allocator binds: the best-exposed cells full, the rest coarse)',
+        path: "TXB13 the exported FILE's count is the full record's and under the 2.0 M cap (the allocator binds here: 2% of the porous area full), XR2 in its silent direction (the full export is not refused). The allocator's other families are Node-side and run on the full rows of tools/verify-bloom-bone.mjs in the export preflight — named here because this is the row that comes nearest: TXB8 refinement only inside the pore patches, TXB9 the hybrid structure (rings at their pores, crease rows on the crease, junction patches), TXB10 the full/coarse boundary fanned (no T-junction, no open edge), TXB11 no cross-part coincident vertex, TXB12 coarse and full share every pore centre, TXB14 exposure derived from the geometry, TXB15 the construction engine-agreed" },
       { label: 'BONE: x 8 sepals at the join\'s top (their feet cover the hub: the Oct 26 ruling)',
         path: "TX12 the hub under the SEPAL feet as under the petal feet covered and unmoved, TXB2 the law on the sepal sheets, TXB0 the controls" },
       { label: 'BONE: x 12 stamens and the style x boneCurvature max (the rods take the field)',

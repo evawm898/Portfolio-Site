@@ -94,12 +94,68 @@ export const MUTANTS = [
     edits: [['    for (let c = 0; c < l.length; c += 2) per[l[c]].s[l[c + 1]] = ok ? sMin : 0;', '    for (let c = 2; c < l.length; c += 2) per[l[c]].s[l[c + 1]] = 0;']],
     witness: null },
 ];
+/* ===================================================================
+   BONE v2's FULL BUILD (Nov 2) — TXB8-TXB15 on rows of their own, the
+   allocator BOUND by the gate's cap lever (`boneFullCapTris`) so a partial
+   selection, its fans and its coarse remainder are all on the file; the
+   points record asked for through `boneFullPoints` (a gate lever: a full
+   build makes millions of points). Each mutant names its clause and a
+   witness asked of the mutated module's own build.
+   =================================================================== */
+export const FULL_ROWS = {
+  'full-default': { state: {}, cap: 700000 },
+  'full-sepals': { state: { stemLength: 60, sepalCount: 5 }, cap: 900000 },
+};
+export const FULL_MUTANTS = [
+  { id: 'the-cap-is-ignored', row: 'full-default', names: /^TXB13:/,
+    edits: [['  const capTris = capability && capability.boneFullCapTris > 0 ? capability.boneFullCapTris : EXPORT_TRI_CAP;', '  const capTris = Infinity;']],
+    witness: (F) => (F.tris > FULL_ROWS['full-default'].cap ? null : 'the mutated module still stops at the lever') },
+  { id: 'exposure-from-a-typed-organ-list', row: 'full-sepals', names: /^TXB14:/,
+    edits: [['    C.E = Math.round(bone2Exposure(G, C.sample.p, C.sample.n) / BONE2_QUANT) * BONE2_QUANT;', "    C.E = C.organ === 'petal' ? 1 : 0;"]],
+    witness: (F) => (F.cellList.every((c) => c.E === 0 || c.E === 1) ? null : 'the mutated module still ranks by a measured exposure') },
+  { id: 'the-boundary-is-not-fanned', row: 'full-default', names: /^TXB10:/,
+    edits: [['    if (loop.length === 3 && !ins.length) { count++;', '    if ((loop.length === 3 && !ins.length) || (!reMesh(t) && !countOnly)) { count++;']],
+    /* (the witness is the COUNT: a fanned transition is loop-length triangles
+       and an unfanned one is one, so the mutated build is smaller — steiner
+       points (kind 7) are also the empty re-meshed triangles' centres, so
+       their count cannot say whether the transitions were fanned) */
+    witness: (F, Fc) => (F.tris < Fc.tris ? null : `the mutated module built ${F.tris} triangles against the clean ${Fc.tris} — the boundary is still fanned`) },
+  { id: 'refinement-leaks-outside-the-patches', row: 'full-default', names: /^TXB8:/,
+    edits: [['      if (!((mw[a] > 0 && X.mpv[a] > 0) || (mw[b] > 0 && X.mpv[b] > 0) || (mw[c] > 0 && X.mpv[c] > 0))) continue;', '']],
+    witness: (F, Fc) => (F.porousAreaMm2 > 1.2 * Fc.porousAreaMm2 ? null : 'the mutated module refines no more area than the patches hold') },
+  { id: 'the-junction-patch-covers-the-pores', row: 'full-default', names: /^TXB9:/,
+    edits: [['export const BONE2_HY_JUNCTION_H = 2;', 'export const BONE2_HY_JUNCTION_H = 12;']],
+    witness: (F, Fc) => ((F.kinds[8] || 0) > 2 * (Fc.kinds[8] || 0) ? null : 'the mutated module lays no more junction points') },
+  { id: 'a-disc-is-moved-off-its-pore', row: 'full-default', names: /^TXB12:/,
+    edits: [['      discs.push({ key: pore.key, sphere: pore.centre, S: pore.S, c: disc.centre,', '      discs.push({ key: pore.key, sphere: pore.centre, S: pore.S, c: [0, 1, 2].map((k) => disc.centre[k] + 0.6 * disc.rho * fr.t1[k]),']],
+    witness: (F, Fc) => (F.tris !== Fc.tris ? null : 'the mutated module meshes the same count — the discs did not move') },
+  { id: 'engine-unsafe-trig-restored', row: 'full-default', names: /^TXB15:/,
+    edits: [['      const at = (a) => { const x = cx + r * ecos(a), y = cy + r * esin(a);', '      const at = (a) => { const x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);']],
+    witness: null },
+];
+function fullBuilds(G, row, extraCap = {}) {
+  const R = FULL_ROWS[row], ui = { ...DEFAULTS, petalTexture: 'BONE', ...R.state }, o = { below: null, scopes: null };
+  const accF = new G.MeshBuilder({ exportMode: true, boneDetail: 'full' });
+  const recF = G.buildBloomInto(accF, ui, { ...o, capability: { boneFullCapTris: R.cap, boneFullPoints: true, ...extraCap } });
+  const accC = new G.MeshBuilder({ exportMode: true, boneDetail: 'coarse' });
+  const recC = G.buildBloomInto(accC, ui, { ...o, capability: null });
+  const accU = new G.MeshBuilder({ exportMode: true, boneDetail: 'coarse' });
+  G.buildBloomInto(accU, ui, { ...o, capability: { organReliefOff: true } });
+  return { ui, accF, recF, accC, recC, accU, F: recF.texture.bone.full };
+}
+function fullClauses(G, row, src) {
+  const B = fullBuilds(G, row);
+  const F = B.F;
+  if (F) Object.defineProperty(F, 'kindsOut', { value: Object.getOwnPropertyDescriptor(F, 'kindsOut') ? F.kindsOut : [], enumerable: false, configurable: true });
+  const bad = H.boneFullClauses(B.ui, B.recF, B.accF, B.recC, B.accC, B.accU, { capTris: FULL_ROWS[row].cap, src });
+  return { bad, F, B };
+}
 const REORDER = ['  const styles = [];\n  if (fr.gynoecium && !headOff) styles.push(boneRodGroup(acc, \'style\', () => buildStyleInto(acc, fr.gynoecium)));', ''];
 const REORDER_INTO = "  if (fr.androecium && !headOff) {\n    const A = fr.androecium;";
 
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
 const failures = [];
-for (const mu of MUTANTS) for (const [from] of mu.edits) { const n = SRC.split(from).length - 1; if (n !== 1) failures.push(`${mu.id}: its anchor matches ${n} times in bloom-geometry.js (must be exactly once)`); }
+for (const mu of [...MUTANTS, ...FULL_MUTANTS]) for (const [from] of mu.edits) { const n = SRC.split(from).length - 1; if (n !== 1) failures.push(`${mu.id}: its anchor matches ${n} times in bloom-geometry.js (must be exactly once)`); }
 for (const a of [REORDER[0], REORDER_INTO]) { const n = SRC.split(a).length - 1; if (n !== 1) failures.push(`the reorder control's anchor matches ${n} times`); }
 if (failures.length) { for (const f of failures) console.error(`FAIL ${f}`); process.exit(1); }
 
@@ -113,12 +169,16 @@ async function moduleWith(tag, edits) {
 }
 const CLEAN = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 const stateOf = (row) => ({ ...DEFAULTS, petalTexture: 'BONE', ...ROWS[row] });
-function build(G, ui, cap = null) { const acc = new G.MeshBuilder({ exportMode: true }); const rec = G.buildBloomInto(acc, ui, { below: null, capability: cap, scopes: null }); return { acc, rec }; }
+/* the lattice clauses (TXB0-TXB7, TX12) read the COARSE export build — the
+   v2 field on the shipped lattice, the relief and the masks every full build
+   starts from; the FULL build's own clauses (TXB8-TXB14) run below on rows of
+   their own */
+function build(G, ui, cap = null, boneDetail = 'coarse') { const acc = new G.MeshBuilder({ exportMode: true, boneDetail }); const rec = G.buildBloomInto(acc, ui, { below: null, capability: cap, scopes: null }); return { acc, rec }; }
 /* every clause the browser gates carry, on a Node build of module G */
 function clauses(G, row) {
   const ui = stateOf(row), opts = { below: null, capability: null, scopes: null };
   const { acc, rec } = build(G, ui);
-  const twin = new G.MeshBuilder({ exportMode: true });
+  const twin = new G.MeshBuilder({ exportMode: true, boneDetail: 'coarse' });
   const recU = G.buildBloomInto(twin, { ...ui, petalTexture: 'NONE' }, opts);
   const bad = [...H.boneRecordClauses(ui, rec.texture, null, rec),
     ...H.textureOrganClauses(ui, opts, true, rec.texture.organs, rec, acc, recU, twin, H.textureControlsRestated(ui), rec.texture.edgeMm, null),
@@ -139,7 +199,10 @@ function fixture(G) {
   };
   const A = sheet(0), B = sheet(4);   // A's last column is B's first: 11 shared positions
   const run = (order) => {
-    const acc = new G.MeshBuilder({ exportMode: true });
+    /* COARSE: the owner rule decides the LATTICE's relief; the full build
+       re-meshes each sheet and would renumber the stream this fixture reads by
+       index (the full build's own closure is TXB10's) */
+    const acc = new G.MeshBuilder({ exportMode: true, boneDetail: 'coarse' });
     const organs = [];
     for (const S of [A, B]) {
       const from = acc.triangleCount;
@@ -202,6 +265,12 @@ try {
     const rc = await reorderControl();
     for (const b of rc) failures.push(`reorder control: ${b}`);
     console.log(`reorder control (the style emitted before the stamens): ${rc.length ? 'FINDINGS' : 'the same triangles, the texture unmoved'}`);
+    for (const row of Object.keys(FULL_ROWS)) {
+      const t0 = Date.now();
+      const { bad, F } = fullClauses(CLEAN, row, SRC);
+      for (const b of bad) failures.push(`clean ${row}: ${b}`);
+      console.log(`clean ${row} (FULL, cap ${FULL_ROWS[row].cap}): ${bad.length ? `${bad.length} finding(s)` : 'silent'} — ${F ? `${F.tris} tris, ${F.selectedCells} of ${F.cells} cells full (${(100 * F.fullShare).toFixed(1)}% of the porous area)` : 'no full record'} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+    }
   } else {
     for (const mu of MUTANTS) {
       if (ONLY.length && !ONLY.includes(mu.id)) continue;
@@ -217,6 +286,21 @@ try {
       const hit = bad.filter((b) => mu.names.test(b.replace(/^\(Node rebuild\) /, '')));
       console.log(`${mu.id}: ${hit.length ? `FIRED ${hit[0].slice(0, 150)}` : 'MISSED'}`);
       if (!hit.length) failures.push(`${mu.id}: its clause (${mu.names}) stayed silent${bad.length ? ` — other findings: ${bad.slice(0, 2).join(' | ')}` : ''}`);
+    }
+    let cleanFull = {};
+    for (const mu of FULL_MUTANTS) {
+      if (ONLY.length && !ONLY.includes(mu.id)) continue;
+      const M = await moduleWith(mu.id, mu.edits);
+      let msrc = SRC; for (const [from, to] of mu.edits) msrc = msrc.replace(from, to);
+      const res = fullClauses(M, mu.row, msrc);
+      if (mu.witness) {
+        if (!cleanFull[mu.row]) cleanFull[mu.row] = fullBuilds(CLEAN, mu.row).F;
+        const w = res.F ? mu.witness(res.F, cleanFull[mu.row]) : 'the mutated module builds no full record';
+        if (w) { failures.push(`${mu.id}: WITNESS — ${w} (the mutation is inert; its clause's silence would say nothing)`); continue; }
+      }
+      const hit = res.bad.filter((b) => mu.names.test(b));
+      console.log(`${mu.id}: ${hit.length ? `FIRED ${hit[0].slice(0, 150)}` : 'MISSED'}`);
+      if (!hit.length) failures.push(`${mu.id}: its clause (${mu.names}) stayed silent${res.bad.length ? ` — other findings: ${res.bad.slice(0, 2).join(' | ')}` : ''}`);
     }
   }
 } finally { fs.rmSync(WDIR, { recursive: true, force: true }); }

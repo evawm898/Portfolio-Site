@@ -14479,7 +14479,11 @@ export function bone2OrganDiscs(P, N, tri, porous, FIELD, { hashCell = 0.6 } = {
       const q = bone2ClosestOnTri(pore.centre, A, Bv, C);
       const d = elen(q.p[0] - pore.centre[0], q.p[1] - pore.centre[1], q.p[2] - pore.centre[2]);
       if (d >= pore.S) continue;
-      const n = b2nrm([0, 1, 2].map((k) => q.l[0] * N[a * 3 + k] + q.l[1] * N[b * 3 + k] + q.l[2] * N[c * 3 + k]));
+      const nRaw = [0, 1, 2].map((k) => q.l[0] * N[a * 3 + k] + q.l[1] * N[b * 3 + k] + q.l[2] * N[c * 3 + k]);
+      /* a foot with no normal (a corner the emitter handed none: the stem's
+         cut face, a cavity) cuts no disc — its frame would be NaN */
+      if (!(nRaw[0] * nRaw[0] + nRaw[1] * nRaw[1] + nRaw[2] * nRaw[2] > 0.25)) continue;
+      const n = b2nrm(nRaw);
       feet.push({ t, p: q.p, n, d });
     }
     feet.sort((x, y) => x.d - y.d || x.t - y.t);
@@ -14896,7 +14900,11 @@ export function bone2HybridOrganMesh(M, discs, opts) {
     const g1 = b2dot(d.t1, pr.m), g2 = b2dot(d.t2, pr.m), gg = g1 * g1 + g2 * g2;
     if (!(gg > 0.25)) continue;   // the centres' line is nearly normal to the disc: no seam across it
     const to3s = (x, y) => [d.c[0] + x * d.t1[0] + y * d.t2[0], d.c[1] + x * d.t1[1] + y * d.t2[1], d.c[2] + x * d.t1[2] + y * d.t2[2]];
-    const sdAt = (x, y) => bone2PairSd(pr, to3s(x, y));
+    /* the crease is found ON THE SURFACE (the chart point carried onto the
+       organ, as every clip is judged): solved in the tangent plane, a row was
+       carried off the crease by the sheet's own sagitta — measured 1.7 h on
+       the default petal, by TXB9's restated crease */
+    const sdAt = (x, y) => bone2PairSd(pr, ch.surf(x, y, to3s(x, y)));
     const onRow = (x, y, r) => {
       for (let it = 0; it < 8; it++) {
         const e = 1e-6, f = sdAt(x, y) - r, fx = (sdAt(x + e, y) - sdAt(x - e, y)) / (2 * e), fy = (sdAt(x, y + e) - sdAt(x, y - e)) / (2 * e), gq = fx * fx + fy * fy;
@@ -15296,6 +15304,7 @@ function bone2RemapRecords(root, map) {
    `capability.boneFullCapTris` (a lever no control reaches: the PreForm
    ladder and the gate) replaces the cap. */
 export const BONE2_FULL_PASSES = 4;
+export const BONE2_DENSITY_PRIOR = 500;   // triangles a mm2 of porous area: sizes the FIRST candidate batch only (the count decides)
 /* THE MESHER'S INPUTS ARE QUANTISED (engine agreement, the T2 rule). The
    lattice's positions and normals are themselves built with trigonometry, so
    Chromium and Node hand the mesher doubles that differ in the last bits —
@@ -15335,32 +15344,55 @@ function bone2FullWrite(acc, T, per, G, capability) {
     return { X, mw, porous, all: porous.slice(), porousTris: n, discs: null, perTri: null, Q: n ? { P: bone2Snap(O.P), N: bone2SnapNormals(O.N) } : null };
   });
   if (!plans.some((pl) => pl.porousTris)) { rec.tris = acc.triangleCount; rec.ms = performance.now() - t0; return rec; }
-  /* 2. the exact count, organ by organ */
-  rec.timing = { countMs: 0, rankMs: 0, buildMs: [] };
+  rec.timing = { countMs: 0, rankMs: 0, buildMs: [], counts: 0 };
   let tc = performance.now();
-  let allFull = acc.triangleCount;
-  plans.forEach((pl) => {
-    if (!pl.porousTris) return;
-    const O = pl.X.O;
-    pl.discs = bone2OrganDiscs(pl.Q.P, pl.Q.N, O.tri, pl.porous, FIELD);
-    const R = bone2HybridOrganMesh({ P: pl.Q.P, tri: O.tri, porous: pl.porous }, pl.discs, { layout, wallU, countOnly: true });
-    pl.perTri = R.perTri; pl.topo = { triE: R.triE, ET0: R.ET0, ET1: R.ET1, edgePts: R.edgePts };
-    allFull += R.count - O.tri.length / 3;
-  });
-  rec.allFullTris = allFull;
-  rec.timing.countMs = performance.now() - tc; tc = performance.now();
-  /* 3. the cells, ranked */
+  /* 2. the cells, ranked — the ranking needs no count */
   const cells = [];
-  plans.forEach((pl, oi) => { if (pl.porousTris) for (const C of bone2Cells({ P: pl.Q.P, tri: pl.X.O.tri, organ: pl.X.O.organ }, pl.porous, rec.cellMm, oi)) cells.push(C); });
+  plans.forEach((pl, oi) => { if (pl.porousTris) for (const C of bone2Cells({ P: pl.Q.P, tri: pl.X.O.tri, organ: pl.X.O.organ }, pl.all, rec.cellMm, oi)) cells.push(C); });
   for (const C of cells) {
     rec.porousAreaMm2 += C.area;
-    for (const t of C.tris) C.cost += plans[C.oi].perTri[t] - 1;
     C.E = Math.round(bone2Exposure(G, C.sample.p, C.sample.n) / BONE2_QUANT) * BONE2_QUANT;
   }
   cells.sort((a, b) => b.E - a.E || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   cells.forEach((C, r) => { C.rank = r; });
   rec.cells = cells.length;
-  const allFits = allFull <= capTris;
+  rec.timing.rankMs = performance.now() - tc; tc = performance.now();
+  /* 3. THE DISCS ONCE PER ORGAN, FROM EVERY POROUS TRIANGLE — so a pore is
+     the same pore whichever cells end up full (a disc found from the selected
+     triangles alone would take its foot on the nearest SELECTED triangle and
+     move); each mesher run is handed the discs that reach its triangles */
+  plans.forEach((pl) => { if (pl.porousTris) pl.discs = bone2OrganDiscs(pl.Q.P, pl.Q.N, pl.X.O.tri, pl.all, FIELD); });
+  rec.timing.discMs = performance.now() - tc; tc = performance.now();
+  /* 4. THE CANDIDATES AND THEIR EXACT COUNT. Counting every porous triangle
+     costs what a full build of all of them costs — 18.5 M triangles' worth on
+     the 40 x 3 corner, where 0.56 M fit — so only the top-ranked cells are
+     counted: enough that, at a density of BONE2_DENSITY_PRIOR triangles a mm2,
+     they would fill the room with a quarter to spare; if they do not fill it,
+     the density they MEASURED sizes the next batch. The prior only sizes the
+     first batch (round 2 measured the hybrid at 270-432 / mm2); the count
+     decides everything. */
+  for (const pl of plans) if (pl.porousTris) { pl.cand = new Uint8Array(pl.all.length); pl.perTri = null; }
+  let room0 = capTris - acc.triangleCount, nc = 0, kappa = BONE2_DENSITY_PRIOR, candCost = 0, candArea = 0;
+  for (let round = 0; round < 6; round++) {
+    let est = 0; const grew = new Set();
+    for (const C of cells.slice(0, nc)) est += C.area * kappa;
+    while (nc < cells.length && est < 1.25 * room0) { const C = cells[nc++]; est += C.area * kappa; grew.add(C.oi); for (const t of C.tris) plans[C.oi].cand[t] = 1; }
+    for (const oi of grew) {
+      const pl = plans[oi], O = pl.X.O;
+      const R = bone2HybridOrganMesh({ P: pl.Q.P, tri: O.tri, porous: pl.cand }, bone2DiscsNear(pl.discs, pl.Q.P, O.tri, pl.cand, rec.cellMm), { layout, wallU, countOnly: true });
+      pl.perTri = R.perTri; pl.topo = { triE: R.triE, ET0: R.ET0, ET1: R.ET1, edgePts: R.edgePts }; pl.candCount = R.count;
+      rec.timing.counts++;
+    }
+    candCost = 0; candArea = 0;
+    for (const pl of plans) if (pl.perTri) candCost += pl.candCount - pl.X.O.tri.length / 3;
+    for (const C of cells.slice(0, nc)) candArea += C.area;
+    if (candCost >= room0 || nc === cells.length) break;
+    kappa = candArea > 0 ? Math.max(candCost / candArea, 1) : kappa;
+  }
+  rec.candidateCells = nc;
+  rec.allFullTris = nc === cells.length ? acc.triangleCount + candCost : null;
+  const allFits = nc === cells.length && candCost <= room0;
+  rec.timing.countMs = performance.now() - tc; tc = performance.now();
   /* THE EXACT PRICE OF A CELL, FANS INCLUDED. A lattice triangle drawn FULL
      costs its own count (each is triangulated on its own, so `perTri` does not
      depend on its neighbours); one left COARSE costs 1, or — where a full
@@ -15370,6 +15402,7 @@ function bone2FullWrite(acc, T, per, G, capability) {
      priced a cell by its own triangles alone and the fans pushed the default
      past the cap on the first build: a second build, 72 s). */
   for (const pl of plans) if (pl.perTri) { pl.inS = new Uint8Array(pl.perTri.length); pl.cost = new Int32Array(pl.perTri.length).fill(1); }
+  for (const C of cells.slice(nc)) C.cost = null;   // never counted: past the candidates
   const costOf = (pl, t) => {
     if (pl.inS[t]) return pl.perTri[t];
     const { triE, ET0, ET1, edgePts } = pl.topo;
@@ -15379,7 +15412,7 @@ function bone2FullWrite(acc, T, per, G, capability) {
   };
   const touched = (pl, tris) => { const A = new Set(tris); const { triE, ET0, ET1 } = pl.topo; for (const t of tris) for (let k = 0; k < 3; k++) { const e = triE[t * 3 + k]; const nb = ET0[e] === t ? ET1[e] : ET0[e]; if (nb >= 0) A.add(nb); } return [...A]; };
   let room = capTris - acc.triangleCount;
-  for (const C of cells) {
+  for (const C of cells.slice(0, nc)) {
     const pl = plans[C.oi], A = touched(pl, C.tris);
     let before = 0; for (const t of A) before += pl.cost[t];
     for (const t of C.tris) pl.inS[t] = 1;
@@ -15390,7 +15423,7 @@ function bone2FullWrite(acc, T, per, G, capability) {
     else for (const t of C.tris) pl.inS[t] = 0;
   }
   rec.predictedTris = capTris - room;
-  rec.timing.rankMs = performance.now() - tc;
+  rec.timing.selectMs = performance.now() - tc;
   /* 4-5. build, check, give back */
   const old = acc.positions, oldN = acc.normals;
   let built = null;
@@ -15399,7 +15432,7 @@ function bone2FullWrite(acc, T, per, G, capability) {
     for (const pl of plans) { pl.porous = new Uint8Array(pl.all.length); pl.porousTris = 0; }
     for (const C of cells) if (C.selected) for (const t of C.tris) { plans[C.oi].porous[t] = 1; plans[C.oi].porousTris++; }
     tc = performance.now();
-    built = bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capability);
+    built = bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capability, rec.cellMm);
     rec.timing.buildMs.push(performance.now() - tc);
     if (built.count <= capTris) break;
     /* over: give back the lowest-ranked selected cells until the excess is covered */
@@ -15424,12 +15457,25 @@ function bone2FullWrite(acc, T, per, G, capability) {
 }
 /* one full build of the stream from the selected porous triangles (the
    prototype's `hybridWrite`, with the coincidence rule of #481 kept) */
-function bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capability) {
+/* the discs that can reach a set of triangles: a disc is kept when a
+   triangle of the set lies within its outer ring plus one allocation cell
+   (so a merged partner of a kept pore is kept too, and its crease and seam
+   are drawn); the rest would only be walked to be thrown away */
+function bone2DiscsNear(discs, P, tri, porous, cellMm) {
+  const g = 1, S = new Set();
+  for (let t = 0; t < porous.length; t++) if (porous[t]) { const a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2]; S.add(`${Math.floor((P[a * 3] + P[b * 3] + P[c * 3]) / 3 / g)},${Math.floor((P[a * 3 + 1] + P[b * 3 + 1] + P[c * 3 + 1]) / 3 / g)},${Math.floor((P[a * 3 + 2] + P[b * 3 + 2] + P[c * 3 + 2]) / 3 / g)}`); }
+  return discs.filter((d) => {
+    const R = BONE2_HY_OUTER_U * d.rho + cellMm + g;
+    for (let i = Math.floor((d.c[0] - R) / g); i <= Math.floor((d.c[0] + R) / g); i++) for (let j = Math.floor((d.c[1] - R) / g); j <= Math.floor((d.c[1] + R) / g); j++) for (let k = Math.floor((d.c[2] - R) / g); k <= Math.floor((d.c[2] + R) / g); k++) if (S.has(`${i},${j},${k}`)) return true;
+    return false;
+  });
+}
+function bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capability, cellMm) {
   const f32 = Math.fround;
   const HS = { discs: 0, free: 0, merged: 0, junctions: 0, consFail: 0, aborted: 0, countMismatch: 0, kinds: {} };
   const run = (pl) => {
     const O = pl.X.O;
-    const discs = bone2OrganDiscs(pl.Q.P, pl.Q.N, O.tri, pl.porous, FIELD);
+    const discs = bone2DiscsNear(pl.discs, pl.Q.P, O.tri, pl.porous, cellMm);
     return { discs, R: bone2HybridOrganMesh({ P: pl.Q.P, tri: O.tri, porous: pl.porous }, discs, { layout, wallU, countOnly: false }) };
   };
   const results = plans.map((pl) => (pl.porousTris ? run(pl) : null));
@@ -15485,7 +15531,9 @@ function bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capab
     if (capability && capability.boneFullPoints) {
       const nV = plans[i].X.nV, O = plans[i].X.O, nk = r.R.kind.length;
       const pts = new Float64Array(nk * 3); for (let j = 0; j < nk * 3; j++) pts[j] = r.R.P[nV * 3 + j];
-      kindsOut.push({ organ: O.organ, from: O.from, kind: Uint8Array.from(r.R.kind), disc: Int32Array.from(r.R.ptDisc), pts, discs: r.discs.map((d) => ({ c: d.c, n: d.n, rho: d.rho, t1: d.t1, t2: d.t2 })) });
+      const pl = plans[i], mpos = new Uint8Array(nV); for (let v = 0; v < nV; v++) mpos[v] = pl.mw[v] > 0 && pl.X.mpv[v] > 0 ? 1 : 0;
+      kindsOut.push({ organ: O.organ, from: O.from, to: O.to, kind: Uint8Array.from(r.R.kind), disc: Int32Array.from(r.R.ptDisc), srcT: Int32Array.from(r.R.src.t), pts, P: pl.Q.P, tri: O.tri, porousAll: pl.all, selected: pl.porous, maskPos: mpos,
+        discs: r.discs.map((d) => ({ c: d.c, n: d.n, rho: d.rho, a: d.a, t1: d.t1, t2: d.t2, key: d.key })) });
     }
   });
   /* the stream rebuilt: each re-meshed organ's run replaced, in place */
@@ -15691,12 +15739,16 @@ function boneReliefPass(acc, T, organs, capability = null) {
     if (O.rod) rec.rod = { shippedTris: O.shippedTris, refinedTris: O.refinedTris, kappaMin: O.kappaMin, triRange: [O.from, O.to] };
     const pos = acc.positions;
     if (off) rec.bone.reliefOff = true;
+    /* (a measurement lever, reached by no control: `boneNoRelief` leaves the
+       coarse stream UNRELIEVED as the full writes are (s = 0) — the print
+       instrument's twin, the same mesh with nothing raised) */
+    else if (capability && capability.boneNoRelief) { /* the stream keeps O.P */ }
     else for (let t = 0; t < O.tri.length / 3; t++) for (let c = 0; c < 3; c++) {
       const v = O.tri[t * 3 + c], o = (O.from + t) * 9 + c * 3;
       pos[o] = disp[v * 3]; pos[o + 1] = disp[v * 3 + 1]; pos[o + 2] = disp[v * 3 + 2];
       for (let k = 0; k < 3; k++) { const x = pos[o + k]; if (x < acc.lo[k]) acc.lo[k] = x; if (x > acc.hi[k]) acc.hi[k] = x; }
     }
-    if (acc.normals && !off) for (let t = O.from; t < O.to; t++) {
+    if (acc.normals && !off && !(capability && capability.boneNoRelief)) for (let t = O.from; t < O.to; t++) {
       const b = t * 9;
       const ux = pos[b + 3] - pos[b], uy = pos[b + 4] - pos[b + 1], uz = pos[b + 5] - pos[b + 2], vx = pos[b + 6] - pos[b], vy = pos[b + 7] - pos[b + 1], vz = pos[b + 8] - pos[b + 2];
       let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;

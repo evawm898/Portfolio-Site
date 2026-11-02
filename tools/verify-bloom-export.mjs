@@ -440,6 +440,10 @@ for (const [rowIndex, row] of rows.entries()) {
        change topology. `liveTris` comes from the app's last LIVE build;
        `tris` is parsed from the exported STL's own header. */
     liveTris: fm.liveTris,
+    /* BONE v2: the export is the FULL build and the page's live build the
+       COARSE one; the topology claim is made against the full build's own
+       coarse base (the summary reads it) */
+    boneFull: sx.r && sx.r.boneFull ? sx.r.boneFull : null,
     /* THE THICKNESS NUMBERS TRAVEL WITH THE ROW, so a green run is a record
        of where the clamps bound rather than only that nothing broke — and
        every figure carries its mode, because live and export geometry are no

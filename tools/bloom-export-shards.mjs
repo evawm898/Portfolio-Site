@@ -99,7 +99,7 @@ export function matrixHash(labels) {
 export function slimResult(r) {
   const sag = r.sagitta;
   return {
-    label: r.label, boundary: r.boundary, liveTris: r.liveTris, tris: r.tris, degenerate: r.degenerate,
+    label: r.label, boundary: r.boundary, liveTris: r.liveTris, tris: r.tris, degenerate: r.degenerate, boneFull: r.boneFull || null,
     crowded: !!(r.crowding && r.crowding.crowded),
     orientationOk: r.orientation.inward === r.orientation.declaredInward,
     sagitta: !sag ? null : sag.skipped ? { skipped: true }
@@ -122,7 +122,7 @@ export function summarize({ results, refused, attempted, validity, matrixLevel, 
   const failures = [], countMoved = [], degenerates = [];
   for (const r of results) {
     if (r.boundary !== 0) failures.push(r);
-    if (r.liveTris !== r.tris) countMoved.push(r);
+    if (r.liveTris !== (r.boneFull ? r.boneFull.baseTris : r.tris) || (r.boneFull && r.boneFull.tris !== r.tris)) countMoved.push(r);
     if (r.degenerate !== 0) degenerates.push(r);
   }
   if (matrixLevel) validity.push(...exportRefusedCoverage(attempted), ...infloOvertopCoverage(attempted), ...infloApproachCoverage(attempted));
