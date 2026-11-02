@@ -732,7 +732,23 @@
    "openDirected": 0,
    "doubledDirected": 0,
    "withdrawn": 0,
-   "consFail": 11
+   "consFail": 11,
+   "gaps": {
+    "sameMesh": true,
+    "everyNthTriangle": 41,
+    "sampledRelievedVerticesWithin1PlusHOfAnotherPart": 32850,
+    "newlyClosedPrintableGaps": 1,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0,
+    "nearestRaisedMm": 0
+   }
   }
- ]
+ ],
+ "walls": {
+  "pairs": 289,
+  "merged": 160,
+  "thinnestMm": 0.0059953980212783635,
+  "p10Mm": 0.04591688408904741,
+  "medianMm": 0.2697827989974217
+ }
 }
