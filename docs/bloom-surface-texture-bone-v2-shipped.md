@@ -180,22 +180,24 @@ fraction of that area the cap bought full detail for):
 
 | state | organ | cells | porous area | mean exposure | full share |
 |---|---|---|---|---|---|
+| the default | petals | 1,127 | 4,277 mm² | 0.247 | 88.7 % |
 | the default | hub (top, not under a foot) | 31 | 147 mm² | 0.243 | 52.4 % |
-| the default | petals | 721 | 4,277 mm² | 0.224 | 88.5 % |
-| the whole bloom | petals | 721 | 4,277 mm² | 0.210 | 46.2 % |
-| the whole bloom | stem | 86 | 819 mm² | 0.185 | 59.4 % |
-| the whole bloom | petiole | 25 | 67 mm² | 0.177 | 48.8 % |
-| the whole bloom | leaf | 457 | 2,120 mm² | 0.150 | 43.6 % |
+| the whole bloom | petals | 1,127 | 4,277 mm² | 0.232 | 51.4 % |
+| the whole bloom | stem | 173 | 819 mm² | 0.186 | 47.1 % |
+| the whole bloom | petiole | 60 | 67 mm² | 0.170 | 53.0 % |
+| the whole bloom | leaf | 717 | 2,120 mm² | 0.147 | 40.7 % |
 | the whole bloom | hub | 31 | 116 mm² | 0.121 | 29.7 % |
-| the whole bloom | sepals | 218 | 773 mm² | **0.041** | **3.6 %** |
+| the whole bloom | sepals | 243 | 773 mm² | **0.041** | **3.2 %** |
 
 The ranking is what the measure says, not a list: the sepals, under the petals
 and facing down, come last and get almost nothing; the stem, seen from the
-side, outranks the leaf, whose underside faces away. The default's hub ranks
-first by MEAN and is half full because its cells are few and mixed — the open
-ring between the feet reads high, the ring right under the petal roots low. The
+side, outranks the leaf, whose underside faces away. The default's hub is
+only half full: the open ring between the feet reads high, the ring right
+under the petal roots low. The
 cells are bought one by one by their OWN exposure, so an organ's mean is a
-summary, never the decision.
+summary, never the decision. Before the facing bin (below) the hub ranked
+first by mean (petals 0.224); with it the petals' tops outrank it and the petals take more of the whole bloom's cap (46.2 %
+before it, 51.4 % after) while the stem, seen half from below, takes less.
 
 ## 5. The page
 
@@ -380,13 +382,13 @@ census on the written float32s is printed beside it.
 
 | design | cap asked | file | triangles | MB | full share | shells / open / degenerate |
 |---|---|---|---|---|---|---|
-| default | 1.5 M | `bloom-bone-v2-default-1484338tris-74.2MB.stl` | 1,484,338 | 74.2 | 62.8 % | 9 / 0 / 0 |
-| default | 2.0 M | `bloom-bone-v2-default-1978546tris-98.9MB.stl` | 1,978,546 | 98.9 | 87.3 % | 9 / 0 / 0 |
+| default | 1.5 M | `bloom-bone-v2-default-1482616tris-74.1MB.stl` | 1,482,616 | 74.1 | 63.6 % | 9 / 0 / 0 |
+| default | 2.0 M | `bloom-bone-v2-default-1977368tris-98.9MB.stl` | 1,977,368 | 98.9 | 87.5 % | 9 / 0 / 0 |
 | default | 3.0 M (its ceiling) | `bloom-bone-v2-default-2232724tris-111.6MB.stl` | 2,232,724 | 111.6 | 100 % | 9 / 0 / 0 |
 
-| umbel, head ON, 60 mm stem | 3.0 M | `bloom-bone-v2-umbel-2968138tris-148.4MB.stl` | 2,968,138 | 148.4 | 43.5 % | 53 / 0 / 0 |
-| umbel, head ON, 60 mm stem | 4.5 M | `bloom-bone-v2-umbel-4449542tris-222.5MB.stl` | 4,449,542 | 222.5 | 70.5 % | 53 / 0 / 0 |
-| umbel, head ON, 60 mm stem | 6.0 M | `bloom-bone-v2-umbel-5931524tris-296.6MB.stl` | 5,931,524 | 296.6 | — (see below) | 53 / 0 / 0 |
+| umbel, head ON, 60 mm stem | 3.0 M | `bloom-bone-v2-umbel-2965760tris-148.3MB.stl` | 2,965,760 | 148.3 | 44.4 % | 53 / 0 / 0 |
+| umbel, head ON, 60 mm stem | 4.5 M | `bloom-bone-v2-umbel-4446272tris-222.3MB.stl` | 4,446,272 | 222.3 | 70.8 % | 53 / 0 / 0 |
+| umbel, head ON, 60 mm stem | 6.0 M | `bloom-bone-v2-umbel-5931324tris-296.6MB.stl` | 5,931,324 | 296.6 | 98.5 % (all-full 6,079,026) | 53 / 0 / 0 |
 
 Every rung: 0 doubled directed edges as well. **The default bloom cannot reach
 3.0 / 4.5 / 6.0 M by the cap**: with every porous cell full it is 2.23 M (the
@@ -394,9 +396,8 @@ fold check gives back a little of the 2.26 M all-full count). The upper rungs
 therefore come from the umbel (head ON, 60 mm stem) — a second design, and
 question 3. The 6.0 M rung's census first threw (a JS `Map` holds ~16.7 M
 entries and that file has 17.8 M directed edges); the census is on sorted typed
-arrays now and `--census <file.stl>` re-reads a written file, which is how its
-row was taken — so its full share was not recorded (the cap binds there: the
-umbel's all-full count is ~6.2 M). Build times on this box: 3.8 / 5.4 / ~8 min.
+arrays now, and `--census <file.stl>` re-reads a written file. Every rung was
+re-built after the facing bin (§4). Build times on this box: 1.5 / 1.7 / 1.8 min (default), 3.8 / 5.0 / 6.3 min (umbel).
 
 **Where they are:** the six STLs were handed to Eva as session attachments
 (the session's own file delivery), not committed and not on the deploy
