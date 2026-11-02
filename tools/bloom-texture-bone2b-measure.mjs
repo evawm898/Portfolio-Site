@@ -214,6 +214,8 @@ if (SECTIONS.includes('nib')) {
 }
 
 /* ----------------------------------------------------------- PRINT --- */
+/* every 41st triangle of a sheet organ (prime, so no lattice period aliases it): about 10^4 vertices near another part, round 1's own sample size */
+const GAP_STRIDE = 41;
 if (SECTIONS.includes('print')) {
   const { census } = await import(pathToFileURL(path.join(ROOT, 'tools/bloom-self-intersection.mjs')).href);
   const out = data.print || [];
@@ -230,7 +232,7 @@ if (SECTIONS.includes('print')) {
     const row = { H, tris: r.acc.triangleCount, withinPairs: c.within, worstSpanMm: r3(c.worstSpanMm), crossPairs: c.cross, shells: c.shells, openDirected: open, doubledDirected: dup, withdrawn: r.stats.coincidentWithdrawn, consFail: r.stats.hybrid.consFail };
     { const at = out.findIndex((q) => q.H === H); if (at >= 0) out[at] = { ...row }; else out.push({ ...row }); data.print = out; save(); lg('census saved'); }
     /* printable gaps newly closed between PARTS: the same mesh built with nothing raised (noRelief), paired vertex
-       for vertex; every relieved vertex of a sheet organ (every 5th triangle) against every OTHER range's triangles */
+       for vertex; every relieved vertex of a sheet organ (every GAP_STRIDE-th triangle) against every OTHER range's triangles */
     {
       const { triGrid, nearest } = await import(pathToFileURL(path.join(ROOT, 'tools/bloom-inflo-approach.mjs')).href);
       const u = await B.bone2Bloom(B.bone2State(DEFAULTS, { textureHeight: H }), { mode: 'hybrid', noRelief: true });
@@ -241,7 +243,7 @@ if (SECTIONS.includes('print')) {
       if (same) r.stats.ranges.forEach((q, k) => {
         if (!/petal|sepal|leaf|floret/.test(q.organ)) return;
         const me = q.organ + '#' + k;
-        for (let t = q.from; t < q.to; t += 5) for (let cc = 0; cc < 3; cc++) {
+        for (let t = q.from; t < q.to; t += GAP_STRIDE) for (let cc = 0; cc < 3; cc++) {
           const o = t * 9 + cc * 3, P0 = u.acc.positions, P1 = r.acc.positions;
           const pu = [P0[o], P0[o + 1], P0[o + 2]], pt = [P1[o], P1[o + 1], P1[o + 2]];
           if (pu[0] === pt[0] && pu[1] === pt[1] && pu[2] === pt[2]) continue;
@@ -254,7 +256,7 @@ if (SECTIONS.includes('print')) {
           if (dU > 1e-6 && dT <= 1e-6) touch++;
         }
       });
-      row.gaps = { sameMesh: same, sampledRelievedVerticesWithin1PlusHOfAnotherPart: n, newlyClosedPrintableGaps: closed, newlyTouching: touch, nearestUnraisedMm: r3(minU), nearestRaisedMm: r3(minT) };
+      row.gaps = { sameMesh: same, everyNthTriangle: GAP_STRIDE, sampledRelievedVerticesWithin1PlusHOfAnotherPart: n, newlyClosedPrintableGaps: closed, newlyTouching: touch, nearestUnraisedMm: r3(minU), nearestRaisedMm: r3(minT) };
     }
     const at = out.findIndex((q) => q.H === H); if (at >= 0) out[at] = row; else out.push(row);
     console.log(`print H ${H}: ${JSON.stringify(row)}`);
