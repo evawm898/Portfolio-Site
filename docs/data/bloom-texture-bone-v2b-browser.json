@@ -59,6 +59,12 @@
     "tris": 1265418,
     "heapMB": 514,
     "warmed": true
+   },
+   "v1": {
+    "ms": 29446,
+    "tris": 1240446,
+    "heapMB": 574,
+    "warmed": true
    }
   }
  }
