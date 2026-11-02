@@ -534,6 +534,170 @@
    },
    "coarseRingsTris": 3314010,
    "coarseRingsPct": 220.9
+  },
+  {
+   "name": "40 x 3 whorls",
+   "v1Tris": 1442144,
+   "v1Pct": 96.1,
+   "v1EdgeMm": 0.42,
+   "v1Ms": 39326,
+   "coarseTris": 1442144,
+   "coarsePct": 96.1,
+   "coarseMs": 44765,
+   "coarseEdgeMm": 0.42,
+   "hybridTris": 18533948,
+   "hybridPct": 1235.6,
+   "hybridCountMs": 414182,
+   "discs": 70559,
+   "free": 2472,
+   "merged": 68087,
+   "pairs": 122984,
+   "junctions": 46882,
+   "points": {
+    "ring": 4528222,
+    "cross": 3125078,
+    "seam": 266153,
+    "seamCross": 217251,
+    "junction": 321182
+   },
+   "coarseRingsTris": 4636118,
+   "coarseRingsPct": 309.1
+  }
+ ],
+ "depth": [
+  {
+   "H": 0.4,
+   "depthOverDiameter": {
+    "n": 39,
+    "median": 0.497,
+    "p90": 0.669,
+    "max": 0.762
+   },
+   "smallestPores": {
+    "n": 10,
+    "median": 0.668,
+    "p90": 0.762,
+    "max": 0.762
+   },
+   "largestPores": {
+    "n": 1,
+    "median": 0.299,
+    "p90": 0.299,
+    "max": 0.299
+   }
+  },
+  {
+   "H": 1,
+   "depthOverDiameter": {
+    "n": 39,
+    "median": 1.244,
+    "p90": 1.672,
+    "max": 1.904
+   },
+   "smallestPores": {
+    "n": 10,
+    "median": 1.67,
+    "p90": 1.904,
+    "max": 1.904
+   },
+   "largestPores": {
+    "n": 1,
+    "median": 0.747,
+    "p90": 0.747,
+    "max": 0.747
+   }
+  },
+  {
+   "H": 1.5,
+   "depthOverDiameter": {
+    "n": 39,
+    "median": 1.865,
+    "p90": 2.508,
+    "max": 2.856
+   },
+   "smallestPores": {
+    "n": 10,
+    "median": 2.504,
+    "p90": 2.856,
+    "max": 2.856
+   },
+   "largestPores": {
+    "n": 1,
+    "median": 1.12,
+    "p90": 1.12,
+    "max": 1.12
+   }
+  },
+  {
+   "H": 2.5,
+   "depthOverDiameter": {
+    "n": 39,
+    "median": 3.109,
+    "p90": 4.18,
+    "max": 4.761
+   },
+   "smallestPores": {
+    "n": 10,
+    "median": 4.174,
+    "p90": 4.761,
+    "max": 4.761
+   },
+   "largestPores": {
+    "n": 1,
+    "median": 1.867,
+    "p90": 1.867,
+    "max": 1.867
+   }
+  }
+ ],
+ "nib": [
+  {
+   "H": 0.4,
+   "apex": [
+    40.712,
+    -0.016,
+    14.696
+   ],
+   "coarse": {
+    "verticesWithin1_2mm": 296,
+    "raisedOver005": 14,
+    "tailUnder005": 114,
+    "maxMm": 0.399,
+    "nearestRaisedToApexMm": 0.702,
+    "fadeMm": 0.75
+   },
+   "hybrid": {
+    "verticesWithin1_2mm": 556,
+    "raisedOver005": 84,
+    "tailUnder005": 260,
+    "maxMm": 0.4,
+    "nearestRaisedToApexMm": 0.702,
+    "fadeMm": 0.75
+   }
+  },
+  {
+   "H": 2.5,
+   "apex": [
+    40.712,
+    -0.016,
+    14.696
+   ],
+   "coarse": {
+    "verticesWithin1_2mm": 296,
+    "raisedOver005": 1,
+    "tailUnder005": 125,
+    "maxMm": 0.098,
+    "nearestRaisedToApexMm": 1.185,
+    "fadeMm": 4.688
+   },
+   "hybrid": {
+    "verticesWithin1_2mm": 556,
+    "raisedOver005": 16,
+    "tailUnder005": 326,
+    "maxMm": 0.101,
+    "nearestRaisedToApexMm": 1.08,
+    "fadeMm": 4.688
+   }
   }
  ]
 }

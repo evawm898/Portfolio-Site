@@ -58,7 +58,7 @@ export const B2_HEIGHT_RANGE = Object.freeze([0.4, 2.5]);
    diameter at the smallest pores). It has never been printed, and a blind pit
    that deep may keep its powder — the slider's help text must say so, word for
    word what a shipping registry row carries: */
-export const B2_HEIGHT_HELP = 'Relief height, 0.4 to 2.5 mm. Above about 1.5 mm the smallest pores become blind wells up to 3.4 times deeper than they are wide: UNVALIDATED for powder removal (nothing this deep has been printed).';
+export const B2_HEIGHT_HELP = 'Relief height, 0.4 to 2.5 mm. Above about 1.5 mm the smallest pores become blind wells up to about 4.8 times deeper than they are wide (measured at 2.5 mm): UNVALIDATED for powder removal (nothing this deep has been printed).';
 export const B2_HEIGHT_DEFAULT = 0.4;
 export const B2_DENSITY_DEFAULT = 0.9;
 
@@ -1001,6 +1001,7 @@ function hybridWrite(acc, T, per, plans, FIELD, mode, stats, t0) {
         s = l[0] * X.clr[c[0]] + l[1] * X.clr[c[1]] + l[2] * X.clr[c[2]];
         if (m > 0) { const mp = T.mp(p); if (mp > 0) s += m * mp * H * T.f(p, n); }
       }
+      if (stats.noRelief) s = 0;   // the lab's undisplaced twin: the same mesh, nothing raised (the gap census pairs it with the relieved build)
       for (let k = 0; k < 3; k++) D[i * 3 + k] = p[k] + (s > 0 ? n[k] * s : 0);
     }
     return D;
@@ -1035,7 +1036,7 @@ function hybridWrite(acc, T, per, plans, FIELD, mode, stats, t0) {
   const repl = [];
   plans.forEach((pl, i) => { const O = pl.X.O; if (!results[i]) return; const R = results[i].R, D = Ds[i]; const out = new Float64Array(R.tri.length * 3); for (let j = 0; j < R.tri.length; j++) for (let k = 0; k < 3; k++) out[j * 3 + k] = D[R.tri[j] * 3 + k]; repl.push({ from: O.from, to: O.to, X: pl.X, out }); });
   /* organs with no porous triangle: their base displacement, as the pass writes it */
-  plans.forEach((pl, i) => { if (results[i]) return; const X = pl.X, O = X.O; const out = new Float64Array(O.tri.length * 3); for (let j = 0; j < O.tri.length; j++) { const v = O.tri[j], s = X.s[v] + X.clr[v]; for (let k = 0; k < 3; k++) out[j * 3 + k] = O.P[v * 3 + k] + (s > 0 ? O.N[v * 3 + k] * s : 0); } repl.push({ from: O.from, to: O.to, X, out }); });
+  plans.forEach((pl, i) => { if (results[i]) return; const X = pl.X, O = X.O; const out = new Float64Array(O.tri.length * 3); for (let j = 0; j < O.tri.length; j++) { const v = O.tri[j], s = stats.noRelief ? 0 : X.s[v] + X.clr[v]; for (let k = 0; k < 3; k++) out[j * 3 + k] = O.P[v * 3 + k] + (s > 0 ? O.N[v * 3 + k] * s : 0); } repl.push({ from: O.from, to: O.to, X, out }); });
   repl.sort((a, b) => a.from - b.from);
   const old = acc.positions, oldN = acc.normals;
   const pos = [], nrm = oldN ? [] : null;
@@ -1065,9 +1066,9 @@ function hybridWrite(acc, T, per, plans, FIELD, mode, stats, t0) {
 
 /* one bloom under v1 (the hook off), the v2 field on the lattice, or the
    grid; returns the accumulator, the record and the hook's stats */
-export async function bone2Bloom(state, { mode = "grid", edgeMm = null, exportMode = true, captureNormals = false, capability = null, focus = null, countEdges = [], discs: wantDiscs = false, capture = null } = {}) {
+export async function bone2Bloom(state, { mode = "grid", edgeMm = null, exportMode = true, captureNormals = false, capability = null, focus = null, countEdges = [], discs: wantDiscs = false, capture = null, noRelief = false } = {}) {
   const G = await bone2Geometry();
-  const stats = { debugHybrid: !!globalThis.__B2_DEBUG_HYBRID, wantDiscs, capture: capture ? { ...capture } : null };
+  const stats = { debugHybrid: !!globalThis.__B2_DEBUG_HYBRID, noRelief, wantDiscs, capture: capture ? { ...capture } : null };
   G.__setBone2(mode === 'v1' ? null : bone2Hook({ mode, edgeMm, stats, focus, countEdges }));
   try {
     const acc = new G.MeshBuilder({ exportMode, captureNormals });

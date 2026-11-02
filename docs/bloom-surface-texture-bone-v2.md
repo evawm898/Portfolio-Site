@@ -434,7 +434,7 @@ the uncontended run.
 - **Packing: pores MERGE** (the references' look). Walled-only packing and per-part layout are dropped.
 - **Meshing: HYBRID.** Pore-conforming rings where a pore stands apart; fine refinement ONLY along merge seams and wall
   junctions; never a regular fine grid over whole patches; both derived from the pore field, no typed edge.
-- **Depth:** the height's maximum is **2.5 mm** (depth up to ~3.4× the diameter at the smallest pores),
+- **Depth:** the height's maximum is **2.5 mm** (depth up to 4.76× the diameter at the smallest pores, measured in §18),
   **UNVALIDATED for powder removal** — said here (§18) and in the slider's help text (`B2_HEIGHT_HELP` in the
   prototype, the words a shipping registry row carries).
 - **Live view:** release builds COARSE pores (v1-weight cost); a "full detail" button and the export build the FULL
