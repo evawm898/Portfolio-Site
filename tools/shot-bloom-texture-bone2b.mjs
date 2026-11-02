@@ -39,7 +39,7 @@ const readJ = (f) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) 
 const DATA = readJ(arg('--data', path.join(ROOT, 'docs/data/bloom-texture-bone-v2b.json'))) || {};
 const BR = readJ(arg('--browser', path.join(ROOT, 'docs/data/bloom-texture-bone-v2b-browser.json')));
 const LIM = readJ(arg('--limits', path.join(ROOT, 'docs/data/bloom-budget-limits.json')));
-const W = 360, Hc = 360, CAP = 66, COLS = 4;
+const W = 360, Hc = 360, CAP = 90, COLS = 4;
 const RAKE = { light1: [0.95, -0.15, 0.25], light2: [-0.3, 0.4, 0.3] };
 const fmt = (n) => (n === undefined || n === null ? '-' : n.toLocaleString('en-US'));
 const norm = (v) => { const L = Math.hypot(...v); return v.map((x) => x / L); };
@@ -204,7 +204,7 @@ const SW = W * COLS, SH = rows.length * (Hc + CAP) + 40;
 const sheet = Buffer.alloc(SW * SH * 3, 18);
 text(sheet, SW, SH, 10, 10, 'BONE v2 ROUND 2 (PROTOTYPE): the HYBRID mesh, COARSE vs FULL, the nib, depth. EXPORT, Node builds, soft render.', [240, 200, 120], 2);
 const wrap = (lines, cols) => { const out = []; for (const l of lines) { if (!l) continue; let cur = ''; for (const w of l.split(' ')) { if (cur && (cur + ' ' + w).length > cols) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } if (cur) out.push(cur); } return out; };
-rows.forEach((r, ri) => { let x = 0; for (const c of r) { const w = (c.wide || 1) * W; blit(sheet, SW, SH, c.img, w, Hc, x, 40 + ri * (Hc + CAP)); const cap = wrap(c.caption, Math.floor((w - 12) / 6)); if (cap.length > 5) throw new Error(`a caption needs ${cap.length} lines: ${cap.join(' / ')}`); cap.forEach((l, k) => text(sheet, SW, SH, x + 6, 40 + ri * (Hc + CAP) + Hc + 4 + k * 12, l, [220, 220, 210], 1)); x += w; } });
+rows.forEach((r, ri) => { let x = 0; for (const c of r) { const w = (c.wide || 1) * W; blit(sheet, SW, SH, c.img, w, Hc, x, 40 + ri * (Hc + CAP)); const cap = wrap(c.caption, Math.floor((w - 12) / 6)); if (cap.length > 7) throw new Error(`a caption needs ${cap.length} lines: ${cap.join(' / ')}`); cap.forEach((l, k) => text(sheet, SW, SH, x + 6, 40 + ri * (Hc + CAP) + Hc + 4 + k * 12, l, [220, 220, 210], 1)); x += w; } });
 fs.mkdirSync(path.dirname(path.resolve(OUT)), { recursive: true });
 writePng(OUT, SW, SH, sheet);
 console.log(`wrote ${OUT} (${SW}x${SH})`);
