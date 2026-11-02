@@ -159,7 +159,28 @@ highest first at their exact marginal price (the hybrid's own per-lattice-
 triangle count, the transition fans included), then built; up to four passes
 give back what a build's count overran. The heat-map is cell A of the sheet.
 
-**Ranking by organ (default, mean exposure of its cells):** see §8.
+**Ranking by organ** (EXPORT, Node, the full build's own cell list; mean
+exposure is area-weighted over the organ's porous cells, the full share is the
+fraction of that area the cap bought full detail for):
+
+| state | organ | cells | porous area | mean exposure | full share |
+|---|---|---|---|---|---|
+| the default | hub (top, not under a foot) | 31 | 147 mm² | 0.243 | 52.4 % |
+| the default | petals | 721 | 4,277 mm² | 0.224 | 88.5 % |
+| the whole bloom | petals | 721 | 4,277 mm² | 0.210 | 46.2 % |
+| the whole bloom | stem | 86 | 819 mm² | 0.185 | 59.4 % |
+| the whole bloom | petiole | 25 | 67 mm² | 0.177 | 48.8 % |
+| the whole bloom | leaf | 457 | 2,120 mm² | 0.150 | 43.6 % |
+| the whole bloom | hub | 31 | 116 mm² | 0.121 | 29.7 % |
+| the whole bloom | sepals | 218 | 773 mm² | **0.041** | **3.6 %** |
+
+The ranking is what the measure says, not a list: the sepals, under the petals
+and facing down, come last and get almost nothing; the stem, seen from the
+side, outranks the leaf, whose underside faces away. The default's hub ranks
+first by MEAN and is half full because its cells are few and mixed — the open
+ring between the feet reads high, the ring right under the petal roots low. The
+cells are bought one by one by their OWN exposure, so an organ's mean is a
+summary, never the decision.
 
 ## 5. The page
 
