@@ -105,6 +105,20 @@ export function meshPatch(method, dom, field, params, { x0, x1, y0, y1 }, opts =
     const bx = [x0 - margin, y0 - margin, x1 + margin, y1 + margin];
     const Mx = B.ringsMeshChart({ pores: chartPores, layout: opts.layout || 'full', fill: { spacing: en, inside: (x, y) => x >= bx[0] && x <= bx[2] && y >= bx[1] && y <= bx[3], clearOf: () => Infinity, bbox: bx } });
     chartXY = Mx.xy; tri = Mx.tri;
+  } else if (method === 'shipped') {
+    /* THE SHIPPED MESHER (bloom-geometry.js's `bone2HybridOrganMesh`, its own
+       full layout and wall), handed the generator module as `opts.G` — so the
+       shipped port, its 3 um snap included, is measured on the same plate as
+       the prototype it came from */
+    const SG = opts.G;
+    const L = latticeChart(x0 - margin, x1 + margin, y0 - margin, y1 + margin, 0.4);
+    const P3 = []; for (let i = 0; i < L.xy.length / 2; i++) P3.push(L.xy[i * 2], L.xy[i * 2 + 1], 0);
+    const discs = chartDiscs(dom, field, params, { x0: x0 - margin, x1: x1 + margin, y0: y0 - margin, y1: y1 + margin });
+    ringPores = discs.length;
+    const HM = SG.bone2HybridOrganMesh({ P: P3, N: null, tri: L.tri, porous: new Uint8Array(L.tri.length / 3).fill(1) }, discs, { layout: SG.BONE2_LAYOUTS.full, wallU: SG.bone2WallU() });
+    chartXY = []; for (let i = 0; i < HM.P.length / 3; i++) chartXY.push(HM.P[i * 3], HM.P[i * 3 + 1]);
+    tri = HM.tri;
+    opts.hybrid = HM;
   } else if (method === 'hybrid' || method === 'coarse') {
     /* the HYBRID (round 2): the 0.4 mm lattice, re-meshed per lattice triangle
        with every pore's rings (clipped at each merged neighbour's radical

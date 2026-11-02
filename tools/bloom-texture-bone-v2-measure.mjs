@@ -39,7 +39,11 @@ const { DEFAULTS } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.
 const args = process.argv.slice(2);
 const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const RUN = !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-const SECTIONS = RUN ? arg('--section', 'budget,print,walls,round').split(',') : [];
+/* `round` is NOT in the default set: on the shipped default it measured 0 of 220
+   pores (the merging field leaves no pore isolated at mid-height; see §8e of the
+   doc). Roundness is measured on the plate instead (bloom-texture-bone2-plate's
+   `shipped` method). */
+const SECTIONS = RUN ? arg('--section', 'budget,print,walls').split(',') : [];
 const OUT = arg('--out', path.join(ROOT, 'docs/data/bloom-texture-bone-v2-shipped.json'));
 const data = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, 'utf8')) : {};
 const save = () => { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, JSON.stringify(data, null, 1)); };

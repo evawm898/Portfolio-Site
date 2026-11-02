@@ -325,6 +325,36 @@ closing at 2.5 mm; on the shipped build it is the other way round, and both
 are single samples. The 2.5 mm relief remains **UNVALIDATED for powder
 removal** (the help text says so).
 
+### 8e. Roundness: full against coarse
+
+On round 2's own plate (`tools/bloom-texture-bone2-plate.mjs`, an 8 x 8 mm
+window, H 1.0, the merging field; each pore's drawn mid-wall against its true
+circle over the outline it owns), with a `shipped` method that runs
+`bloom-geometry.js`'s own `bone2HybridOrganMesh` — the 3 um snap included —
+beside the prototype it was ported from:
+
+| domain | mesh | triangles / mm² | FREE pores: median off round | MERGED pores: median / p90 / max |
+|---|---|---|---|---|
+| flat plate | lattice (= COARSE) | 13 | 28.8 % (n 1) | 17.7 / 24.6 / 24.6 % (n 9) |
+| flat plate | prototype hybrid | 430 | 2.19 % (n 1) | 1.90 / 1.92 / 2.86 % (n 25) |
+| flat plate | **SHIPPED hybrid (FULL)** | 423 | **1.90 %** (n 1) | **1.90 / 1.93 / 2.86 %** (n 25) |
+| 6 mm cylinder | lattice (= COARSE) | 13 | 27.1 % (n 2) | 20.1 / 24.4 / 24.4 % (n 9) |
+| 6 mm cylinder | prototype hybrid | 398 | 3.76 % (n 2) | 2.13 / 3.23 / 3.99 % (n 29) |
+| 6 mm cylinder | **SHIPPED hybrid (FULL)** | 393 | **3.76 %** (n 2) | **2.13 / 3.23 / 3.99 %** (n 29) |
+
+The port matches the prototype everywhere it was measured; the coarser snap
+costs 7 triangles a mm² on the plate and moves no merged-pore figure. The COARSE
+build draws a pore 18–29 % off round, which is what the allocator spends the
+cap to replace where it shows.
+
+**The per-bloom instrument (`--section round`) measured NOTHING and is not
+quoted:** on the default's FULL build it counted 0 of 220 isolated refined
+pores on both meshes. Every level crossing it found lay 6–11 pore radii from
+the disc it was measuring — the neighbours' walls — because the merging field
+leaves almost no pore isolated at mid-height, and the isolation test (centre
+distance against 1.15 × the two radii) does not see the field's lips. It is
+left in the tool, marked broken, rather than tuned until it reports a number.
+
 ## 9. The PreForm ladder
 
 `node tools/bloom-preform-ladder.mjs <dir> --design default|umbel --caps …`

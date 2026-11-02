@@ -331,5 +331,101 @@
     "nearestRaisedMm": 0
    }
   }
- ]
+ ],
+ "roundPlate": {
+  "plate": {
+   "lattice (= coarse)": {
+    "trisPerMm2": 13,
+    "free": {
+     "n": 1,
+     "median": 28.84,
+     "p90": 28.84,
+     "max": 28.84
+    },
+    "merged": {
+     "n": 9,
+     "median": 17.73,
+     "p90": 24.57,
+     "max": 24.57
+    }
+   },
+   "prototype hybrid": {
+    "trisPerMm2": 430,
+    "free": {
+     "n": 1,
+     "median": 2.19,
+     "p90": 2.19,
+     "max": 2.19
+    },
+    "merged": {
+     "n": 25,
+     "median": 1.9,
+     "p90": 1.92,
+     "max": 2.86
+    }
+   },
+   "SHIPPED hybrid": {
+    "trisPerMm2": 423,
+    "free": {
+     "n": 1,
+     "median": 1.9,
+     "p90": 1.9,
+     "max": 1.9
+    },
+    "merged": {
+     "n": 25,
+     "median": 1.9,
+     "p90": 1.93,
+     "max": 2.86
+    }
+   }
+  },
+  "cylinder R6": {
+   "lattice (= coarse)": {
+    "trisPerMm2": 13,
+    "free": {
+     "n": 2,
+     "median": 27.07,
+     "p90": 27.07,
+     "max": 27.07
+    },
+    "merged": {
+     "n": 9,
+     "median": 20.1,
+     "p90": 24.43,
+     "max": 24.43
+    }
+   },
+   "prototype hybrid": {
+    "trisPerMm2": 398,
+    "free": {
+     "n": 2,
+     "median": 3.76,
+     "p90": 3.76,
+     "max": 3.76
+    },
+    "merged": {
+     "n": 29,
+     "median": 2.13,
+     "p90": 3.23,
+     "max": 3.99
+    }
+   },
+   "SHIPPED hybrid": {
+    "trisPerMm2": 393,
+    "free": {
+     "n": 2,
+     "median": 3.76,
+     "p90": 3.76,
+     "max": 3.76
+    },
+    "merged": {
+     "n": 29,
+     "median": 2.13,
+     "p90": 3.23,
+     "max": 3.99
+    }
+   }
+  }
+ }
 }
