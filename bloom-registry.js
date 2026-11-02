@@ -46,7 +46,7 @@ import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WA
   INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
 import { BONE_PORE_RANGE, BONE_PORE_STEP, BONE_PORE_DEFAULT, BONE_PORE_FLOOR_MM, BONE_DENSITY_RANGE, BONE_DENSITY_STEP, BONE_DENSITY_DEFAULT, BONE_RATIO_RANGE, BONE_RATIO_STEP, BONE_RATIO_DEFAULT,
   BONE_COVERAGE_RANGE, BONE_COVERAGE_STEP, BONE_COVERAGE_DEFAULT, BONE_CURVATURE_RANGE, BONE_CURVATURE_STEP, BONE_CURVATURE_DEFAULT, TEXTURE_TYPES_HIDDEN, bonePoreReadsMm } from './bloom-geometry.js';
-import { TEXTURE_TYPES, TEXTURE_HEIGHT_RANGE, TEXTURE_HEIGHT_STEP, TEXTURE_HEIGHT_DEFAULT, TEXTURE_SIZE_RANGE, TEXTURE_SIZE_STEP, TEXTURE_SIZE_DEFAULT, TEXTURE_EDGE_MM, TEXTURE_LATTICE_BAR } from './bloom-geometry.js';
+import { TEXTURE_TYPES, TEXTURE_HEIGHT_RANGE, TEXTURE_HEIGHT_STEP, TEXTURE_HEIGHT_DEFAULT, TEXTURE_SIZE_RANGE, TEXTURE_SIZE_STEP, TEXTURE_SIZE_DEFAULT, TEXTURE_EDGE_MM, TEXTURE_LATTICE_BAR, TEXTURE_HEIGHT_HELP } from './bloom-geometry.js';
 import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE, STAMEN_COIL_RADIUS_RANGE, STAMEN_COIL_TURNS_RANGE, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_TURNS_DEFAULT } from './bloom-geometry.js';
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, sepalOutlineWidthScale, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE, SEPAL_TIER_RANGE, SEPAL_TIER_DEFAULT } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
@@ -2695,10 +2695,14 @@ export const CONTROLS = [
       const h = Number(v);
       const T = shown && shown.texture;
       const floor = h <= TEXTURE_HEIGHT_RANGE[0] + 1e-9 ? ' — the floor, an unvalidated guess at what SLS resolves' : '';
-      if (!T || T.refused) return `${h.toFixed(2)} mm peak to valley${floor}`;
+      /* the help text's own warning (BONE v2, ruled Nov 1): past 1.5 mm the
+         smallest pores are deep blind wells, UNVALIDATED for powder removal */
+      const deep = h > 1.5 + 1e-9 ? ' — DEEP: the smallest pores are blind wells up to ~4.8x deeper than wide at 2.5 mm, UNVALIDATED for powder removal' : '';
+      if (!T || T.refused) return `${h.toFixed(2)} mm peak to valley${floor}${deep}`;
       const mx = Math.max(0, ...Object.values(T.organs || {}).map((q) => q.reliefMaxMm));
-      return `${h.toFixed(2)} mm peak to valley${floor} · the sheet stands up to ${mx.toFixed(3)} mm proud, never thinner`;
+      return `${h.toFixed(2)} mm peak to valley${floor}${deep} · the sheet stands up to ${mx.toFixed(3)} mm proud, never thinner`;
     },
+    help: TEXTURE_HEIGHT_HELP,
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'texturePresent' } },
   /* THE FEATURE SIZE: its floor is four lattice edges (λ >= 4e, §10 T3). */
   { id: 'textureSize', section: 'texture', kind: 'slider',
@@ -2708,29 +2712,29 @@ export const CONTROLS = [
        Eva's Oct 23 ruling), the ruled constant where no build is shown */
     fmt: (v, ui, shown) => { const e = (shown && shown.texture && shown.texture.edgeMm) || TEXTURE_EDGE_MM; return `${Number(v).toFixed(1)} mm features on a ${e.toFixed(2)} mm lattice (${(Number(v) / e).toFixed(1)} edges across one)${e !== TEXTURE_EDGE_MM ? ' — the edge is COARSENED to fit the export budget, see the read-out' : ''}`; },
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureLegacy' } },
-  /* BONE'S FIVE (Oct 28). Every range IMPORTED (the geometry owns them);
-     every DEFAULT is the prototype's and PROVISIONAL (the outcome doc). The
-     pore size's MINIMUM is the proposed, UNVALIDATED pore-diameter floor:
-     the smallest pore whose floor still holds a lattice vertex at the
-     coarsest edge the budget may use (0.5 mm). */
+  /* BONE'S FIVE (Oct 28; v2, Nov 2). Every range IMPORTED (the geometry owns
+     them); every DEFAULT PROVISIONAL. v2: the pore size is the SMALLEST pore
+     (0.5-1.0 mm), the band ratio is the SPREAD (largest / smallest, 1.5-3):
+     the defaults draw Eva's ruled 0.5-1.5 mm merging pores. */
   { id: 'bonePoreSize', section: 'texture', kind: 'slider',
     min: BONE_PORE_RANGE[0], max: BONE_PORE_RANGE[1], step: BONE_PORE_STEP, default: BONE_PORE_DEFAULT,
     label: 'Pore size',
     fmt: (v, ui, shown) => {
-      const e = (shown && shown.texture && shown.texture.edgeMm) || TEXTURE_EDGE_MM;
-      const floor = Number(v) <= BONE_PORE_FLOOR_MM + 1e-9 ? ` — the floor (${BONE_PORE_FLOOR_MM.toFixed(2)} mm), unvalidated` : '';
-      return `${Number(v).toFixed(2)} mm fine pores${floor} · on this ${e.toFixed(2)} mm lattice a pore reads from ${bonePoreReadsMm(e).toFixed(2)} mm`;
+      const floor = Number(v) <= BONE_PORE_RANGE[0] + 1e-9 ? ' — the minimum, UNVALIDATED (a blind pore this small may trap SLS powder)' : '';
+      const B = shown && shown.texture && shown.texture.bone;
+      const how = B && B.detail === 'full' ? ' · FULL detail: pores drawn with their own rings where they show' : ' · the coarse preview draws them on the 0.4 mm lattice (unround); "full detail" and the export draw them round';
+      return `${Number(v).toFixed(2)} mm smallest pores (up to ${(Number(v) * Number(ui && ui.boneBandRatio || BONE_RATIO_DEFAULT)).toFixed(2)} mm)${floor}${how}`;
     },
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureBone' } },
   { id: 'bonePoreDensity', section: 'texture', kind: 'slider',
     min: BONE_DENSITY_RANGE[0], max: BONE_DENSITY_RANGE[1], step: BONE_DENSITY_STEP, default: BONE_DENSITY_DEFAULT,
     label: 'Pore density',
-    fmt: (v) => `${Math.round(Number(v) * 100)}% of the fine cells hold a pore (the craters ${Math.round(Number(v) * 45)}%)`,
+    fmt: (v) => `${Math.round(Number(v) * 100)}% of the candidate pores kept (they merge where they meet)`,
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureBone' } },
   { id: 'boneBandRatio', section: 'texture', kind: 'slider',
     min: BONE_RATIO_RANGE[0], max: BONE_RATIO_RANGE[1], step: BONE_RATIO_STEP, default: BONE_RATIO_DEFAULT,
-    label: 'Crater size',
-    fmt: (v, ui) => `the craters ${Number(v).toFixed(1)}x the fine pores (${(Number(v) * Number(ui && ui.bonePoreSize || BONE_PORE_DEFAULT)).toFixed(2)} mm)`,
+    label: 'Pore spread',
+    fmt: (v, ui) => `the largest pores ${Number(v).toFixed(1)}x the smallest (${(Number(v) * Number(ui && ui.bonePoreSize || BONE_PORE_DEFAULT)).toFixed(2)} mm), nested pits in the larger floors`,
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureBone' } },
   { id: 'bonePatchCoverage', section: 'texture', kind: 'slider',
     min: BONE_COVERAGE_RANGE[0], max: BONE_COVERAGE_RANGE[1], step: BONE_COVERAGE_STEP, default: BONE_COVERAGE_DEFAULT,
