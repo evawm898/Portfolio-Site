@@ -639,6 +639,7 @@ any measured limit. Every candidate limit the ruling names, measured here:
 | **STL file size** at 50 bytes a triangle (84-byte header) | 1.5 M → **75 MB**; 3 M → 150 MB; 6 M → 300 MB; 12 M → 600 MB | only through a limit someone else sets on MB (below) |
 | **Chromium, the page's own accumulator** (`MeshBuilder.positions` is a plain JS array, 9 numbers a triangle) | builds, uploads, exports and renders at 1.5 / 3 / 6 / 12 M; **throws `Invalid array length` at 15 M** — V8's array ceiling, ~134 M elements | **~14.9 M** (between 12 and 15 M measured) |
 | **Chromium heap** | 0.23 / 0.57 / 0.81 / 2.00 GB after the STL at 1.5 / 3 / 6 / 12 M, of a 4.4 GB limit | above the array ceiling; not reached |
+| **The hybrid's own generation memory in the page** (§19) | 1.24 GB at 2.3 M, 2.27 GB at 6.2 M; the mophead's 11.7 M full build CRASHED the page | between 6.2 M and 11.7 M for this unoptimised mesher; not a property of the output |
 | **Export time** (three's STLExporter, binary, then a Blob) | 0.5 / 2.3 / 2.9 / 7.5 s at 1.5 / 3 / 6 / 12 M | none hard; a stall bar of 120 s was never approached |
 | **First render** (software GL in this container) | 1.1 / 1.8 / 2.9 / 3.5 s | none hard |
 | **A print-service upload limit** | **not recorded.** The repo names Shapeways only for build volume (`flower.js:3316`) and JLC3DP only for escape-hole sizes (`docs/bloom-hydrangea-discovery.md:364`); neither gives an upload size | — |
@@ -718,7 +719,35 @@ pores are the 0.5 mm band):
 
 The help text's figure moved from round 1's "up to 3.4" (an estimate) to the measured 4.8.
 
-<!-- §19 -->
+## 19. Browser time: release (coarse) and full detail
+
+`node tools/bloom-texture-bone2b-browser.mjs` (`docs/data/bloom-texture-bone-v2b-browser.json`). Headless Chromium
+on this box (4 cores, software GL), EXPORT, the geometry build alone, each build in a fresh page. The page's own
+overheads (normals, upload, read-outs) are not included; `docs/bloom-page-profile-outcome.md` measures those.
+
+| state | preview (held slider, untextured) | v1 (today's release) | **COARSE (round 2's release)** | **FULL (full detail and export)** |
+|---|---|---|---|---|
+| the default | 0.07 s · 24,688 | 0.71 s · 158,912 | **1.10 s** · 158,912 | **38.8 s** · 2,304,496 · 1.24 GB heap |
+| umbel, head ON | 0.57 s · 134,182 | 3.6 s · 530,634 | **4.7 s** · 530,634 | **147 s** · 6,201,432 · 2.27 GB heap |
+| the mophead | 1.1 s · 1,265,418 | 29.4 s · 1,240,446 | **31.0 s** · 1,240,446 | **THE PAGE CRASHED** (out of memory) |
+
+- **Coarse costs what v1 costs, as ruled:** 1.3–1.5× v1's time, the same triangles.
+- **Full detail is 35× the coarse build on the default and 31× on the umbel.** The mophead cannot be built at full
+  detail in the browser at all. Its 11.7 M triangles are under §17's 14.9 M output ceiling, but the hybrid's working
+  memory (2.27 GB already at 6.2 M) passes Chromium's ~4.4 GB heap first.
+  - **So for THIS mesher the browser's binding limit is its generation memory, not the output's size.** It falls
+    between 6.2 M and 11.7 M output triangles.
+  - It is a property of an unoptimised prototype (one JS object per chart point, a Map per lattice edge), not of
+    the output. Question C.
+- **THE TWO ENGINES DISAGREE ON THE FULL BUILD'S COUNT:**
+  - the default is 2,304,496 in Chromium against 2,304,580 in Node (84 triangles);
+  - the umbel is 6,201,432 against 6,207,646 (6,214).
+  - The ring points are placed with `Math.cos` / `Math.sin`, which are not correctly rounded and differ between V8
+    builds in the last bits. A snap or a constraint decision lands on that difference: the T1/T2 class this repo
+    has met before (CLAUDE.md, the texture blocks).
+  - Coarse and v1 agree to the triangle.
+  - A shipping mesher owes an engine-agreed construction, quantised as T2 did (2^-20) or with exact rational ring
+    angles. Not done here. Question I.
 
 ## 20. The gate: B2 extended (`node tools/verify-bloom-bone2.mjs [--control]`)
 
@@ -729,8 +758,8 @@ the mesher's own pairs:
 - **B2d (extended)** — the hybrid on the MERGING plate. Free and merged pores alike must be within 5% of their
   circle (median), with at least 24 segments a circumference.
 - **B2e1 — no regular grid in a patch interior.** Every fine point (seam row, seam crossing, junction patch) must lie
-  within one `h` of a restated crease, or within `(HY_JUNCTION_H + 0.5) h` of a restated triple junction (equal
-  radii, solved in the gate).
+  within one `h` of a restated crease, or within `2.5 h` of a restated triple junction (equal radii, solved in the
+  gate). The `2` is RESTATED in the gate, and the gate refuses to load if `HY_JUNCTION_H` moves.
 - **B2e2 — seams only where pores merge.** Every fine point must lie inside a restated merged lens (plus one `h`),
   and no free pore's outer disc may hold one.
 - **B2e3 — zero open edges.** On a bloom window (the default bloom, every organ's triangles within 3 mm of petal 0's
@@ -748,6 +777,26 @@ the mesher's own pairs:
 **The first clean run found the mesher's own defect, not the clause's.** Five junction-patch points sat outside
 every merged lens: a patch centred at a lens end reached past the outer discs onto a pore's plateau. A junction
 point is now kept only inside at least two of its three outer discs (one lens).
+
+**THE NEGATIVE CONTROL FOUND THE SECOND, AND IT WAS THE GATE'S.** `the-junction-patch-covers-the-pores` (the
+patch radius 2 → 12) went MISSED. B2e1 had read its junction reach from `H2.HY_JUNCTION_H`, the module under test,
+so the mutation widened the clause with the patch. That is the fourth durable rule failing in the instrument
+written for this round. It now restates the reach.
+
+**Result: clean PASS, and 10 of 10 mutants fire the clause they claim.**
+
+| mutant | clause | witness on the mutated module |
+|---|---|---|
+| refinement-leaks-into-smooth-areas | B2b | a smooth triangle emits 64 triangles (a closing fan is ≤ 8) |
+| a-pore-floor-below-the-sheet | B2a | the field at a pore centre reads −0.436 |
+| a-typed-refinement-edge | B2c | the edge reads 0.05 mm at both pore sizes |
+| pores-revert-to-grid-aligned | B2d | axis vs diagonal differ by 0.478 at one radius |
+| merged-rings-are-clipped-away | B2d | ring vertices 6,757 → 2,152 |
+| the-junction-patch-covers-the-pores | B2e1 | junction points 554 → 9,695 |
+| seam-rows-run-outside-the-lens | B2e2 (and B2e1) | seam points 490 → 599 |
+| a-transition-fan-ignores-its-edge-points | B2e3 | unmatched directed edges 82 → 1,739 |
+| the-weld-withdrawal-is-removed | B2e4 | planted coincidence: 0 withdrawn, 5 shared |
+| the-coarse-build-moves-the-pores | B2f | coarse and full fields differ by up to 1.000 |
 
 ## 21. Questions for Eva — §11 carried forward under the rulings, and the new ones
 
@@ -792,6 +841,11 @@ point is now kept only inside at least two of its three outer discs (one lens).
   1 named. Options:
   - (a) accept the cost;
   - (b) a charting session (sheets first).
+- **I. THE TWO ENGINES DISAGREE** on the full build's triangle count (84 triangles on the default, 6,214 on the
+  umbel, §19), through `Math.cos`/`Math.sin` on the ring points. Options:
+  - (a) quantise the ring points and decide counts on engine-agreed quantities, as T2 did;
+  - (b) exact rational ring angles.
+  - Owed before anything ships either way; not done here.
 - **E. NESTED PITS** — §11.5's options, unchanged.
 - **F. A PRINTABLE WALL** — §11.6's options, unchanged; the walls are now drawn closely, so a thin one prints as thin.
 - **G. THE CONTROLS** — §11.7's proposal, height ruled.
@@ -812,7 +866,8 @@ point is now kept only inside at least two of its three outer discs (one lens).
 
 - Nothing ships: no registry row, no control, no "full detail" button, no read-out line, no TXB clause, no byte
   partition.
-- The hybrid is not optimised (§19), and its full build exceeds the budget on every state measured (§17).
+- The hybrid is not optimised (§19): its full build exceeds the budget on every state measured (§17), crashes the
+  page on the mophead, and its count differs between Chromium and Node (question I).
 - 11 constraint recoveries fail on the default bloom (two arcs crossing at a lens end). They cost a ring segment's
   roundness there and nothing in closure (B2e3).
 - The census reads **5 within-shell contacts, every one of span exactly 0** (tangencies) on the default at H 0.4.

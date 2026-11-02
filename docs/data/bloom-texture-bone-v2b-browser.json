@@ -71,6 +71,10 @@
     "tris": 1240446,
     "heapMB": 701,
     "warmed": true
+   },
+   "full": {
+    "error": "page.evaluate: Target crashed ",
+    "crashed": true
    }
   }
  }
