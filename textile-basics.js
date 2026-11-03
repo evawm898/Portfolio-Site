@@ -538,6 +538,15 @@ const nonwovenScene = {
   },
 };
 
+// The drawing primitives, for /textile-taxonomy.js (the fiber / yarn / structure panel), which
+// draws with the same strokes, halos and material. Read-only: nothing here changes a scene above.
+export const DRAW = {
+  INK, ACCENT, BG, SW, HALO, BACK, EDGE, SEED, TAU, SAMPLES,
+  rng, clamp01, seg, ease, easeOut, lerp, f1, poly, runsMarkup, splitRuns,
+  makeFibre, MATERIAL, local, fiberPose, posedPoints, yarnPoint, straightAxis, flipOf, yarnFibrePoints,
+  lineSeg, arcSeg, centreline, yarnAxisOn, fibreSlice, bandPath, pieceMarkup, yarnFibres,
+};
+
 export const SCENES = { fiber: fiberScene, yarn: yarnScene, fabric: fabricScene, knit: knitScene, woven: wovenScene, nonwoven: nonwovenScene };
 
 // ---------- playback: once on scroll-in, hold, replay on hover / tap ----------

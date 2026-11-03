@@ -274,6 +274,40 @@
   .tx-types__grid { grid-template-columns: 1fr; }
 }
 
+/* ---------- Fiber -> yarn and cord -> textile structure: three rows, read top to bottom.
+   Drawn by /textile-taxonomy.js; each cell plays once on scroll-in, holds, replays on hover /
+   tap; reduced motion shows the end frame. ---------- */
+.tx-tax { margin-top: 2.5rem; }
+.tx-tax__row + .tx-tax__row { margin-top: 0; }
+.tx-tax__head { display: flex; align-items: baseline; gap: 0.9rem; margin-bottom: 1.1rem; }
+.tx-tax__head .n { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--petrol-bright); }
+.tx-tax__head h3 {
+  margin: 0; font-family: var(--mono); font-weight: 500; font-size: 12px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink);
+}
+.tx-tax__head p { margin: 0; font-size: 12px; color: var(--ink-dim); }
+.tx-tax__grid { display: grid; gap: 1.25rem; }
+.tx-tax__grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tx-tax__grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tx-tax__grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tx-tax__cell { margin: 0; border: 1px solid var(--line); padding: 1rem 1rem 1.3rem; cursor: pointer; }
+.tx-tax__cell .tx-anim { margin-bottom: 1rem; }
+.tx-tax__cell .label { display: block; font-family: var(--serif); font-weight: 500; font-size: 1.2rem; color: var(--ink); }
+.tx-tax__cell .sub { display: block; margin-top: 0.45rem; font-size: 12px; line-height: 1.55; color: var(--ink-dim); }
+.tx-tax__flow {
+  display: flex; align-items: center; gap: 0.8rem; margin: 1.6rem 0 1.8rem;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim);
+}
+.tx-tax__flow::before { content: "\2193"; color: var(--petrol-bright); font-size: 14px; }
+.tx-tax__flow::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+@media (max-width: 1000px) {
+  .tx-tax__grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .tx-tax__grid--2, .tx-tax__grid--3, .tx-tax__grid--4 { grid-template-columns: 1fr; }
+  .tx-tax__head { flex-wrap: wrap; row-gap: 0.3rem; }
+}
+
 /* ---------- Icon grids (fiber families, cross-sections, yarn types) ---------- */
 .tx-icon-grid {
   margin-top: 3rem;
