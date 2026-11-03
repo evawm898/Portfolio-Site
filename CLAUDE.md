@@ -675,6 +675,19 @@ FOR SCOPING** (the design-file session, Oct 13; feature map §11 Q3.9 — read
 - Measured: 1,302 of 1,302 live matrix rows round-trip clean and identical; 0 matrix rows added;
   `bloom-geometry.js` untouched (sha-identical to `main`).
 
+**A SUBSET LOADS AS A NEW DESIGN; THE OLD LOAD PATH IS UNTOUCHED; A PHOTO SUBSET IS VALIDATED ON THE REAL
+PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's rulings 2 and 6; read §7 and §9 of
+`docs/bloom-photo-to-bloom-discovery.md` before touching `readNewDesign`, `composeNewDesign`, `applyDesignAsNew`,
+`#designFileNew` or the validator).
+- A subset is a `bloom-design` v1 envelope naming only some controls. `readNewDesign` composes it over DEFAULTS
+  and hands it to `readDoc` UNCHANGED; a named control HIDDEN under the built design (or a hidden option) keeps
+  its default and is told `hidden`. The page writes the complete state to every input (Reset's events).
+- `readDoc` / `applyDesign` are byte-identical; `tools/verify-bloom-load-unchanged.mjs --base <wt>` compares the
+  old path's record, state, scopes, save and STL bytes on both trees (not in CI).
+- `tools/verify-bloom-photo-subset.mjs` (V0–V6, onto a DIRTY page; `--self` eight fixtures, `--negative-control`
+  five mutants) is F16 of the design-file gate. Sidecar `<name>.bloom-photo.json`, format in §9.3. No emission is
+  built; outline and per-layer emission are S2/S3, gated on the zero-notes check.
+
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
 (Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read
 `docs/bloom-scoping-model.md` and the PARAMETER SCOPING block in `bloom-geometry.js` before touching

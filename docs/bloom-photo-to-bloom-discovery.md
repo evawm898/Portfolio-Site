@@ -18,6 +18,8 @@ CC0 photo crop and one sheet.
 
 **Eva ruled on all eight open questions on Nov 3 — §7.** The questions as asked are kept below the rulings.
 
+**S1 is built (§9):** load as new design, the subset validator, the sidecar format, and the status check that gates the staged v1 scope.
+
 ---
 
 ## 0. Premises checked before building on them
@@ -790,3 +792,109 @@ in the shape route A would now emit. The questions are illustrative (the dry run
 This example differs from §6.2's `tulip-v2` in two ways, both on purpose: it drops `placement`
 RADIAL (the default, so a subset need not name it) and the dry run's out-of-schema
 `antherElongation` 4 and `antherSize` / `stigmaLumps` at their defaults; it keeps everything else.
+
+### 9.4 The three dry-run subsets, re-run (final passes)
+
+`node tools/verify-bloom-photo-subset.mjs --wrap docs/photo-to-bloom/{daisy,tulip,double}-v2.subset.json`, each onto the dirty page:
+
+| file | as committed | its `controls` in the v1 envelope |
+|---|---|---|
+| `daisy-v2.subset.json` | **FAIL** — V0: refused, `format` reads null | **PASS** — 18 of 18 named applied, 0 notes |
+| `tulip-v2.subset.json` | **FAIL** — V0: refused, `format` reads null | **PASS** — 21 of 21 named applied, 0 notes |
+| `double-v2.subset.json` | **FAIL** — V0: refused, `format` reads null | **PASS** — 14 of 14 named applied, 0 notes |
+| `example/tulip-v2.subset.bloom-design.json` (§9.3) | **PASS** — 16 of 16 named applied, 0 notes | — |
+
+**The raw fail is the format, not a reader note, and it is reported rather than patched.** The
+discovery's `.subset.json` files are the dry-run tool's own shape — `{ views, controls, frame,
+frameZ }`, where `views` / `frame` / `frameZ` are camera hints — written before a subset format
+existed. They are not design files and the page refuses them whole, which is correct. `--wrap`
+validates their `controls` in the envelope and names what it dropped; the files are not edited.
+Inside the envelope **no reader note fires on any of the three** — no clamp, no unknown field, no
+hidden control. Two things that pass and are worth knowing:
+
+- `antherElongation` (class c, outside the §2.1 schema) is in `daisy-v2` and `tulip-v2`, and passes,
+  because the reader enforces the REGISTRY, not the photo schema. The schema is not checked by the
+  validator (see §9.7, question 2).
+- `placement` RADIAL and `layerPhase` 0.5 are written at their defaults and pass — writing a default
+  is harmless, and the validator does not flag it.
+
+### 9.5 The gates, measured
+
+- **The validator's own fixtures** (`--self`): 8 of 8 fire exactly their written-down clause sets.
+- **Its negative control** (`--negative-control`): all 5 anchors match exactly once, and every
+  mutant moves exactly the (fixture, clause) pairs it names — keeping the page's value for unnamed
+  controls, keeping the page's scopes, applying hidden controls, dropping the reader's notes, and
+  composing the subset over the page (rule 3's construction). The first run measured two mutants
+  moving MORE than they named, and both are right: the dirty page leaves Per-layer values ON, which
+  hides the fixtures' own `layerSize`, so V3 fires wherever a leftover survives. The measured sets
+  are what the table holds now. 8 m 57 s for the whole sweep on this box.
+- **The old load path is unchanged** (`node tools/verify-bloom-load-unchanged.mjs --base <worktree
+  of 6981e2f> --control`): see §9.5b.
+
+### 9.6 Status check — what gates the staged v1 scope (reported, not built)
+
+**Is petal outline curve mode on `main`? YES.**
+
+- `petalOutlineMode` (LAW / CURVE) and `petalOutlineCurve` are registry rows on `6981e2f`
+  (`bloom-registry.js:2098`, `:2106`).
+- The PRs: **#417** F6-sym, the symmetric outline (merged `1bb7c35`, Oct 17); **#418** F6-sym-2, width
+  scales the curve and CURVE works on a tube; **#420** F6-asym, two half-curves (`f63235e`, Oct 18);
+  **#421** F6-scope, the outline per scope (`169fd5b`, Oct 19).
+- **One hazard for S2, found here, not built around.** The Petal width refusal (`onWidthEdit`, a
+  window capture listener) is NOT gated on a trusted event. It reads the PREVIOUS build's petals. So a
+  load — old path or new — that writes a CURVE outline and a width could have the width silently put
+  back by the design it replaces. Nothing in the reader sees that. The validator's V2 read-back does,
+  which is why S2's acceptance must run through the validator and not through the reader alone.
+
+**Is per-layer independence on `main` for RADIAL and SPIRAL? YES, AS OFFSETS, with three owned
+exceptions.**
+
+- **#407** Scoping-b (`cde5a60`, Oct 14): the Per-layer values toggle, RADIAL.
+- **#416** the role retirement (`8d8fba1`, Oct 16): SPIRAL's turns are layer scopes
+  (`SCOPE_LAYER_PLACEMENTS = ['RADIAL', 'SPIRAL']`, `bloom-geometry.js:1954`), and Q3.5 — a layer
+  entry naming `petalLength` / `petalWidth` / `petalTilt` OWNS it.
+- **#421** (`169fd5b`) and **#423** F3-scope (`3dc8ee1`, Oct 19): a layer owns its outline and its
+  spine curve as VALUES.
+- **What "independence" means there, measured from the code:**
+  - The other 30 of the 33 scopeable sliders (`SCOPEABLE_IDS`) are DELTAS on the global, not free
+    values. `sheetThickness` is never scoped and `footDelicacy` is whole-whorl.
+  - CONTINUOUS has no layers to scope, and per-petal values are FAN only.
+  - A subset carrying per-layer values must set `scopeLayers` ON with a RADIAL or SPIRAL placement,
+    and write `overrides.layers`. Load as new reads that container through the unchanged reader;
+    S3 owes its own fixtures for it.
+
+### 9.7 Ambiguities, for Eva's ruling (none resolved here)
+
+1. **"Hidden/pinned."** Read as: a control hidden by its own `visibleWhen` under the design being
+   built, or a choice set to a hidden option. Such a control keeps its default and is told `hidden`,
+   so the validator fails. Under this reading, a subset that writes an INERT control fails even at
+   its default value (§2.2 rule 3). The narrower reading — only never-shown controls such as
+   `infillBase` — would let inert values through silently. **Which did you mean?**
+2. **The photo schema is not enforced.** The validator fails on reader notes, as briefed. A
+   registry-valid control outside the 46-row schema (`antherElongation`) passes. Should the
+   validator also fail on an out-of-schema control (route A's only enforcement point)?
+3. **Confidence** is a three-level enum (`high` / `medium` / `low`) rather than a number, because §3
+   asks a question "when confidence is low" and a chat model's 0.62 is not a measurement. Number
+   instead?
+4. **Names.** `<name>.subset.bloom-design.json` for the subset and `<name>.bloom-photo.json` for the
+   sidecar. Drag-and-drop still goes to the OLD path whatever the name. Should a dropped `*.subset.*`
+   file go to Load as new instead?
+5. **The committed dry-run `.subset.json` files** stay in their pre-format shape (§9.4). Rewrite them
+   as envelopes, or leave them as the discovery's record?
+
+### 9.8 Reproduce
+
+```
+npm i --no-save three@0.161.0 playwright-core
+export CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium     # this container: chrome-linux64/, which findChromium() does not look under
+node tools/verify-bloom-photo-subset.mjs --self
+node tools/verify-bloom-photo-subset.mjs --negative-control
+node tools/verify-bloom-photo-subset.mjs --wrap docs/photo-to-bloom/{daisy,tulip,double}-v2.subset.json
+git worktree add /tmp/base 6981e2f && ln -s "$PWD/node_modules" /tmp/base/node_modules
+node tools/verify-bloom-load-unchanged.mjs --base /tmp/base --control
+```
+
+The validator rides in CI as the design-file gate's F16 (`bloom-panel.yml`, no workflow edit).
+**`tools/verify-bloom-photo-subset.mjs` is not in that workflow's path filter**, so a change to it
+alone runs no gate — the other spawned gates' declared gap, repeated. The old-path compare takes a
+worktree and is not in CI.
