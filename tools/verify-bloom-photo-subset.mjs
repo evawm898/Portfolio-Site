@@ -103,7 +103,9 @@ const MUTANTS = [
     id: 'the-new-design-keeps-the-page-value', file: 'bloom.js',
     from: '  selectScope(null);\n  for (const c of CONTROLS) {\n    inputs[c.id].value = r.doc.controls[c.id];',
     to: '  selectScope(null);\n  for (const c of CONTROLS) {\n    if (!r.applied.includes(c.id)) continue;\n    inputs[c.id].value = r.doc.controls[c.id];',
-    breaks: ['CLEAN:V2', 'UNKNOWN_FIELD:V2', 'SIDECAR_INSIDE:V2'],
+    /* V2 on the fixtures whose V2 did not already fire; V3 wherever the subset
+       names layerSize — the dirty page's leftover Per-layer values (ON) hides it */
+    breaks: ['CLEAN:V2', 'CLEAN:V3', 'HIDDEN_OPTION:V3', 'OFF_STEP:V3', 'OUT_OF_RANGE:V3', 'SIDECAR_INSIDE:V2', 'SIDECAR_INSIDE:V3', 'UNKNOWN_FIELD:V2', 'UNKNOWN_FIELD:V3'],
   },
   {
     id: 'the-scopes-survive-a-new-design', file: 'bloom.js',
@@ -123,7 +125,11 @@ const MUTANTS = [
   {
     id: 'the-subset-is-composed-over-the-page', file: 'bloom.js',
     from: '  const r = readNewDesign(obj);', to: '  const r = readNewDesign({ ...obj, controls: { ...readUI(), ...(obj.controls || {}) } });',
-    breaks: [],   // measured, then written down — see below
+    /* rule 3's construction — the obvious wrong implementation: every page
+       leftover becomes a NAMED control, so the hidden rule talks (V1/V5 on the
+       clean file), the leftovers stay (V2) and the leftover Per-layer values
+       hides the named layerSize (V3) */
+    breaks: ['CLEAN:V1', 'CLEAN:V2', 'CLEAN:V3', 'CLEAN:V5', 'HIDDEN_OPTION:V3', 'OFF_STEP:V3', 'OUT_OF_RANGE:V3', 'SIDECAR_INSIDE:V2', 'SIDECAR_INSIDE:V3', 'UNKNOWN_FIELD:V2', 'UNKNOWN_FIELD:V3'],
   },
 ];
 
