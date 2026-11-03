@@ -244,48 +244,54 @@ const stapleScene = {
 
 // ---------- filament: one continuous strand, extruded from a spinneret and wound onto a spool.
 // It runs from the orifice, through a traverse guide that slides up and down, onto the turning
-// package, so it is attached at both ends and never shows a free one. The package is the
-// filament's own helix seen side-on: each point keeps the height and radius it was laid at and
-// turns with the spool, so the wraps cross-wind into the diamond pattern of a real bobbin. ----------
-const SP = { cx: 238, yT: 66, yB: 172, frx: 46, fry: 9, rb: 13, rMax: 33, passes: 20, perPass: 3.37, gx: 164, ox: 30, oy: 119, samples: 22, sw: 0.9, halo: 0.55 };
-SP.W = SP.passes * SP.perPass;                                     // wraps laid in the whole animation. perPass is irrational-ish on purpose: a whole-number ratio of wraps to traverses would lay every cycle exactly on top of the last
-const spY0 = SP.yT + 9, spY1 = SP.yB - 9;
+// package, so it is attached at both ends and never shows a free one. The package is drawn as
+// a wound body — shaded like a cylinder, with clean edges — and on it the last few traverses of
+// filament, each point at the height it was laid and turned with the spool since, so the top
+// layer lies in close, even wraps like thread on a spool, crossing the fainter layer beneath. ----------
+const SP = { cx: 238, yT: 66, yB: 172, frx: 46, fry: 9, rb: 13, rMax: 33, passes: 6, perPass: 12.37, gx: 164, ox: 30, oy: 119, samples: 30, sw: 0.95, layer: 1.6 };
+SP.W = SP.passes * SP.perPass;   // wraps laid in all. perPass is not a whole number on purpose: a whole-number ratio of wraps to traverses lays every cycle exactly on the last
+const spY0 = SP.yT + 4, spY1 = SP.yB - 4;
 const spTrav = w => { const p = w / SP.perPass, k = Math.floor(p), u = p - k; return k % 2 === 0 ? lerp(spY0, spY1, u) : lerp(spY1, spY0, u); };
 const spR = w => SP.rb + (SP.rMax - SP.rb) * Math.min(1, w / SP.W);
-function spoolWraps(n) {
-  // every wound point, w in [0, n] wraps, at its current angle from the landing point
-  const runs = [], steps = Math.ceil(n * SP.samples);
+// the top layer: the last SP.layer traverses, every point on the package's CURRENT surface (radius
+// r), at its angle from the landing point; older wraps fade into the body beneath
+function spoolWraps(n, r) {
+  const from = Math.max(0, n - SP.layer * SP.perPass), runs = [], steps = Math.ceil((n - from) * SP.samples);
   let cur = null;
+  const flush = () => { if (cur && cur.pts.length > 1) runs.push(cur); cur = null; };
   for (let j = 0; j <= steps; j++) {
-    const w = n * j / Math.max(1, steps), th = TAU * (n - w), m = ((th % TAU) + TAU) % TAU;
-    if (m <= Math.PI) { const r = spR(w); (cur || (cur = [])).push({ x: SP.cx - r * Math.cos(m), y: spTrav(w) }); }
-    else if (cur) { if (cur.length > 1) runs.push(cur); cur = null; }
+    const w = from + (n - from) * j / Math.max(1, steps), th = TAU * (n - w), m = ((th % TAU) + TAU) % TAU;
+    if (m <= Math.PI) {
+      if (!cur) cur = { pts: [], age: (n - w) / (SP.layer * SP.perPass) };
+      cur.pts.push({ x: SP.cx - r * Math.cos(m), y: spTrav(w) });
+    } else flush();
   }
-  if (cur && cur.length > 1) runs.push(cur);
+  flush();
   return runs;                                                      // oldest first: later wraps draw on top
 }
 const filamentScene = {
   viewBox: `0 ${FIBER_VB.y} ${VIEW.w} ${FIBER_VB.h}`, duration: 7000,
   markup(t) {
-    const n = SP.W * ease(seg(t, 0.04, 0.96)), y = spTrav(n), r = spR(n), phi = TAU * n;
-    const ell = (yy, fill, sop) => `<ellipse cx="${SP.cx}" cy="${yy}" rx="${SP.frx}" ry="${SP.fry}" fill="${fill}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="${sop}"/>`;
-    let s = ell(SP.yB, BG, 0.5);
-    // the barrel, then the package wound on it
-    s += `<rect x="${SP.cx - SP.rb}" y="${SP.yT}" width="${2 * SP.rb}" height="${SP.yB - SP.yT}" fill="${BG}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.35"/>`;
-    s += `<rect x="${f1(SP.cx - r)}" y="${spY0 - 2}" width="${f1(2 * r)}" height="${spY1 - spY0 + 4}" fill="${BG}"/>`;
-    for (const run of spoolWraps(n)) s += `<path d="${poly(run)}" stroke="${BG}" stroke-width="${SP.sw + 2 * SP.halo}"/><path d="${poly(run)}" stroke="${ACCENT}" stroke-width="${SP.sw}" stroke-opacity="0.85"/>`;
-    s += ell(SP.yT, BG, 0.6) + `<circle cx="${SP.cx}" cy="${SP.yT}" r="3" fill="${BG}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.6"/>`;
+    const n = SP.W * ease(seg(t, 0.04, 0.96)), y = spTrav(n), r = spR(n), full = smooth(n / (1.5 * SP.perPass));
+    const ell = (yy, sop) => `<ellipse cx="${SP.cx}" cy="${yy}" rx="${SP.frx}" ry="${SP.fry}" fill="${BG}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="${sop}"/>`;
+    const shade = `<defs><linearGradient id="tt-sp-g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${ACCENT}" stop-opacity="0.06"/><stop offset="0.38" stop-color="${ACCENT}" stop-opacity="0.32"/><stop offset="1" stop-color="${ACCENT}" stop-opacity="0.04"/></linearGradient></defs>`;
+    let s = shade + ell(SP.yB, 0.5);
+    // the bare barrel, then the package wound over it: one body between the flanges
+    s += `<rect x="${SP.cx - SP.rb}" y="${SP.yT}" width="${2 * SP.rb}" height="${SP.yB - SP.yT}" fill="${BG}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="${f1(0.4 * (1 - full) * 100) / 100}"/>`;
+    s += `<rect x="${f1(SP.cx - r)}" y="${SP.yT}" width="${f1(2 * r)}" height="${SP.yB - SP.yT}" fill="${BG}"/><rect x="${f1(SP.cx - r)}" y="${SP.yT}" width="${f1(2 * r)}" height="${SP.yB - SP.yT}" fill="url(#tt-sp-g)" fill-opacity="${f1(full * 100) / 100}"/>`;
+    for (const run of spoolWraps(n, r)) {
+      const d = poly(run.pts), o = 0.9 * (1 - 0.7 * run.age);
+      s += `<path d="${d}" stroke="${ACCENT}" stroke-width="${SP.sw}"${op(o)}/>`;   // no halo: on the shaded body it would draw dark lines
+    }
+    s += `<path d="M${f1(SP.cx - r)},${SP.yT}V${SP.yB}M${f1(SP.cx + r)},${SP.yT}V${SP.yB}" stroke="${ACCENT}" stroke-width="${SW}"${op(0.75 * full)}/>`;
+    s += ell(SP.yT, 0.6) + `<circle cx="${SP.cx}" cy="${SP.yT}" r="3" fill="${BG}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.6"/>`;
     // the traverse guide on its rail, and the strand: orifice -> guide -> package
     s += `<path d="M${SP.gx},${SP.yT - 4}V${SP.yB + 4}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.18"/>`;
-    const land = { x: SP.cx - r, y }, g = { x: SP.gx, y };
-    const strand = [];
+    const g = { x: SP.gx, y }, strand = [];
     for (let j = 0; j <= 24; j++) { const u = j / 24, sag = 4 * Math.sin(Math.PI * u); strand.push({ x: lerp(SP.ox, g.x, u), y: lerp(SP.oy, g.y, u) + sag }); }
-    strand.push(land);
-    // draw-down: the strand leaves the orifice thick and is drawn fine within a few widths
-    let taper = '';
-    for (let k = 0; k < 5; k++) { const e = lerp(SP.ox, g.x, (5 - k) / 5 * 0.12), y0 = SP.oy, y1 = lerp(SP.oy, g.y, (5 - k) / 5 * 0.12); taper += `<path d="M${SP.ox},${y0}L${f1(e)},${f1(y1)}" stroke="${ACCENT}" stroke-width="${f1(SW + 2.4 * (k + 1) / 5)}"/>`; }
-    s += `<path d="${poly(strand)}" stroke="${BG}" stroke-width="${SW + 2 * HALO}"/><path d="${poly(strand)}" stroke="${ACCENT}" stroke-width="${SW}"/>${taper}`;
-    s += `<circle cx="${g.x}" cy="${f1(g.y)}" r="3.2" fill="none" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.7"/>`;
+    strand.push({ x: SP.cx - r, y });
+    s += `<path d="${poly(strand)}" stroke="${BG}" stroke-width="${SW + 2 * HALO}"/><path d="${poly(strand)}" stroke="${ACCENT}" stroke-width="${SW}"/>`;
+    s += `<circle cx="${g.x}" cy="${f1(g.y)}" r="3.2" fill="${BG}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.7"/><circle cx="${g.x}" cy="${f1(g.y)}" r="0.9" fill="${ACCENT}"/>`;
     return spinneret(SP.ox, SP.oy, 34, 2.4) + group(s);
   },
 };
