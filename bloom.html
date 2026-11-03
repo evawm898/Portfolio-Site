@@ -124,6 +124,12 @@
             title="Download this design as JSON (every control, verbatim)">Save design &darr;</button>
     <label class="bl-btn bl-btn--file" for="designFile" title="Load a design saved from this page (or drop the .json anywhere on the page)">Load design &uarr;
       <input type="file" id="designFile" accept=".json,application/json"></label>
+    <!-- LOAD AS NEW (photo-to-bloom S1): every control back to its default, then
+         the file applied — for a SUBSET (a photo-to-bloom file names only the
+         controls it read). Load design above keeps the page's value for any
+         control a file omits; this does not. -->
+    <label class="bl-btn bl-btn--file" for="designFileNew" title="Load a design as a NEW one: every control reset to its default first, then the file applied (for a partial file, such as a photo-to-bloom subset)">Load as new &uarr;
+      <input type="file" id="designFileNew" accept=".json,application/json"></label>
   </div>
   <div id="designStatus" class="bl-readout bl-design-status" aria-live="polite" hidden></div>
   <div id="readout" class="bl-readout" aria-live="polite"></div>

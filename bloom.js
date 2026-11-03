@@ -16,7 +16,7 @@ import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
-import { composeDoc, readDoc, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, SCOPEABLE_TIER_IDS, scopeExclusionReason, scopeOffsetRefusal, composeControls, readControls, fieldFor } from './bloom-file.js';
+import { composeDoc, readDoc, readNewDesign, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, SCOPEABLE_TIER_IDS, scopeExclusionReason, scopeOffsetRefusal, composeControls, readControls, fieldFor } from './bloom-file.js';
 import { cloneCurve, curveSamples, pointsOf, proposeEdit, quantise, nearestOnCurve, sampleCurve, curveShapeRefusal, curveSpecProblems, curveEquals, switchMode } from './bloom-curve.js';
 import { leafBladeState, leafletBladeState, leafOutlineWidthScale, leafletOutlineWidthScale, compoundLeafLayout as compoundLeafLayoutForSeed } from './bloom-geometry.js';
 import { scopeOffsetsFor, scopeSlotKey, resolvePetalTerms, resolvePetalValues, SCOPE_VALUE_IDS, SCOPE_VALUE_GROUPS, SEPAL_SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_GROUPS, seedSpineCurve, seedOutlineCurve, sepalBladeState, sepalOutlineWidthScale, scopeValueGroup, SCOPE_LAYER_OWNED, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
@@ -5668,7 +5668,9 @@ function writeDesignStatus() {
   if (d.action === 'saved') { designStatus.textContent = `saved ${d.name} — ${d.count} controls, version ${d.version}`; return; }
   if (d.action === 'refused') { designStatus.innerHTML = `<span class="bl-err">could not load ${esc(d.name)}: ${esc(d.error)}</span>`; return; }
   const sc = d.scopes ? ` and ${d.scopes.layers} layer / ${d.scopes.petals} petal offset entr${d.scopes.layers + d.scopes.petals === 1 ? 'y' : 'ies'}${d.scopes.tiers ? ` and ${d.scopes.tiers} sepal tier entr${d.scopes.tiers === 1 ? 'y' : 'ies'}` : ''}${d.scopes.strands ? ` and ${d.scopes.strands} strand entr${d.scopes.strands === 1 ? 'y' : 'ies'}` : ''}` : '';
-  const head = `loaded ${d.name} — ${d.applied} of ${d.fields} controls set${sc}`;
+  const head = d.asNew
+    ? `loaded ${d.name} as a NEW design — every control reset to its default, then ${d.applied} of the ${d.named} the file names applied${sc}`
+    : `loaded ${d.name} — ${d.applied} of ${d.fields} controls set${sc}`;
   if (!d.notes.length) { designStatus.textContent = `${head}; every field read clean, nothing to report`; return; }
   designStatus.innerHTML = `${esc(head)}; ${d.notes.length} note${d.notes.length === 1 ? '' : 's'}:\n`
     + d.notes.map((n) => `<span class="${n.kind === 'invalid' || n.kind === 'retired' || n.kind === 'dropped' ? 'bl-err' : ''}">[${esc(n.kind)}] ${esc(n.text)}</span>`).join('\n');
@@ -5732,6 +5734,50 @@ function applyDesign(text, name = '(inline)') {
   writeDesignStatus();
   return lastDesign;
 }
+/* LOAD AS A NEW DESIGN (photo-to-bloom S1, Eva's ruling 2 of Nov 3; read
+   bloom-file.js's LOAD AS A NEW DESIGN block and §9 of
+   docs/bloom-photo-to-bloom-discovery.md). A SEPARATE entry point: the
+   applyDesign above is untouched. `readNewDesign` hands back the COMPLETE
+   state (DEFAULTS with the subset on top, hidden controls kept at their
+   default and told), and it is written to EVERY input with the same real
+   events Reset fires, so the page cannot keep a leftover from the design it
+   held. The pick ends first and the scopes record is the file's (a subset with
+   no overrides is a design with no scopes). Untrusted events, so nothing a hand
+   gesture seeds (the curve seed, the depth-2 overlay) is written. */
+function applyDesignAsNew(text, name = '(inline)') {
+  let obj;
+  try { obj = JSON.parse(text); } catch (e) {
+    lastDesign = { action: 'refused', name, error: `it is not JSON — ${(e && e.message) || e}`, notes: [], asNew: true };
+    writeDesignStatus(); return lastDesign;
+  }
+  const r = readNewDesign(obj);
+  if (!r.ok) { lastDesign = { action: 'refused', name, error: r.error, notes: [], asNew: true }; writeDesignStatus(); return lastDesign; }
+  selectScope(null);
+  for (const c of CONTROLS) {
+    inputs[c.id].value = r.doc.controls[c.id];
+    inputs[c.id].dispatchEvent(new Event('input', { bubbles: true }));
+    inputs[c.id].dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  const had = scopes;
+  const next = {};
+  for (const k of ['layers', 'petals', 'tiers', 'strands']) next[k] = r.doc.overrides[k] || [];
+  scopes = scopesAreEmpty(next) ? null : next;
+  if (had !== null || scopes !== null) regenerate();
+  lastDesign = { action: 'loaded', asNew: true, name, applied: r.applied.length, named: r.named.length, appliedIds: r.applied.slice(), fields: CONTROLS.length, version: r.doc.version, notes: r.notes.slice(), scopes: scopes ? { layers: scopes.layers.length, petals: scopes.petals.length, tiers: scopes.tiers.length, strands: (scopes.strands || []).length } : null };
+  writeDesignStatus();
+  return lastDesign;
+}
+async function loadDesignFileAsNew(file) {
+  try { applyDesignAsNew(await file.text(), file.name); } catch (e) {
+    lastDesign = { action: 'refused', name: file.name, error: `could not read the file — ${(e && e.message) || e}`, notes: [], asNew: true };
+    writeDesignStatus();
+  }
+}
+document.getElementById('designFileNew').addEventListener('change', (ev) => {
+  const f = ev.target.files && ev.target.files[0];
+  if (f) loadDesignFileAsNew(f);
+  ev.target.value = '';
+});
 async function loadDesignFile(file) {
   try { applyDesign(await file.text(), file.name); } catch (e) {
     lastDesign = { action: 'refused', name: file.name, error: `could not read the file — ${(e && e.message) || e}`, notes: [] };
@@ -5756,6 +5802,7 @@ window.addEventListener('drop', (ev) => {
 window.__bloomDesign = {
   save: () => saveDesignText(),
   load: (text, name = '(inline)') => applyDesign(text, name),
+  loadAsNew: (text, name = '(inline)') => applyDesignAsNew(text, name),
   last: () => lastDesign,
   /* THE SCOPES RECORD the page holds (Scoping-a) and the notes its last
      hook-set record produced — read by the scopes gate. */

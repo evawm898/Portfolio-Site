@@ -1,0 +1,6 @@
+{ "format": "bloom-design", "version": 1,
+  "controls": { "petalCount": 3, "layerCount": 2, "layerSize": 0.9, "layerTilt": 6,
+                "petalLength": 45, "petalWidth": 36, "petalBaseTaper": 0.6, "petalTipShape": 2,
+                "petalTilt": 62, "petalCup": 0.8, "petalSpineCurl": 25,
+                "stamenCount": 6, "stamenLength": 12, "gynoecium": "STYLE", "styleLength": 10,
+                "stigmaSize": 3 } }
