@@ -58,7 +58,8 @@ if (has('sheet')) {
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...cells.flatMap(c => ['-i', c]), '-filter_complex', `${cells.map((_, i) => `[${i}]scale=520:-2,pad=530:ih:5:0:color=0x232727[c${i}]`).join(';')};${cells.map((_, i) => `[c${i}]`).join('')}hstack=inputs=${cells.length}`, row]);
     rows.push(row);
   }
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...rows.flatMap(r => ['-i', r]), '-filter_complex', `${rows.map((_, i) => `[${i}]pad=iw:ih+6:0:0:color=0x232727[r${i}]`).join(';')};${rows.map((_, i) => `[r${i}]`).join('')}vstack=inputs=${rows.length}`, path.join(out, 'sheet.png')]);
+  if (rows.length === 1) fs.copyFileSync(rows[0], path.join(out, 'sheet.png'));
+  else execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...rows.flatMap(r => ['-i', r]), '-filter_complex', `${rows.map((_, i) => `[${i}]pad=iw:ih+6:0:0:color=0x232727[r${i}]`).join(';')};${rows.map((_, i) => `[r${i}]`).join('')}vstack=inputs=${rows.length}`, path.join(out, 'sheet.png')]);
   fs.rmSync(dir, { recursive: true, force: true });
   console.log('sheet.png written');
 }

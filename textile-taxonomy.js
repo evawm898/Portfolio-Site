@@ -105,54 +105,145 @@ const twistFront = (x, t, a = 0.12, b = 0.92, band = 90) => smooth((lerp(-band, 
 // FIBER
 // =====================================================================================
 
-// ---------- staple: the textile-basics material drifting, then drafted into an overlapping
-// roving that has just begun to twist. Its end frame is spun staple's first frame. ----------
-const STAPLE_DRIFT = 0.42, ROVING_TT = 0.6;      // at tt 0.6 the yarn scene's twist is 0.09
+// ---------- the staple material: short, crimped, soft fibres, frayed at the tips ----------
+// Shorter than textile-basics' (15–35 units, a fifth to a tenth of the yarn), crimped tighter,
+// not every one full white, and each end splits into one to three fine wisps. Spun staple and
+// the corespun sheath are made of the same fibres, so the staple card feeds them both.
+const STAPLE_N = 150, STAPLE_TEAL = 37, FIB_SW = 1.15, WISP_SW = 0.7, SOFT_HALO = 0.85;
+function makeStaple(r, i, accent) {
+  const len = accent ? 44 : 15 + r() * 20;
+  return {
+    i, accent, len,
+    camp: 0.45 + r() * 0.6,                   // crimp amplitude: a soft wave, not a zig-zag
+    waves: len / (9 + r() * 5),               // a wave every 9–14 units
+    cph: r() * TAU,
+    rho: accent ? 0.97 : 0.3 + 0.7 * Math.sqrt(r()),
+    phi: r() * TAU,
+    delay: r() * 0.14,
+    op: accent ? 1 : 0.45 + 0.55 * r(),
+    fray: [0, 1].map(() => ({ n: 1 + Math.floor(r() * 2.7), a: 0.3 + r() * 0.45, l: 2.6 + r() * 3.6, s: r() < 0.5 ? -1 : 1 })),
+    hairEnd: (v => v < 0.2 ? 0 : v < 0.38 ? 1 : v < 0.46 ? 2 : -1)(r()),   // spun staple: which end stands proud
+  };
+}
+const STAPLE = (() => {
+  const r = rng(SEED + 900), out = [], slots = [...Array(STAPLE_N).keys()];
+  for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
+  for (let i = 0; i < STAPLE_N; i++) {
+    const accent = i === STAPLE_TEAL, f = makeStaple(r, i, accent);
+    f.c = accent ? YARN.XC : YARN.X0 + 4 + (slots[i] + r()) / STAPLE_N * (YARN.X1 - YARN.X0 - 8);
+    if (accent) f.phi = Math.PI / 2;
+    f.x = -30 + r() * 380; f.y = 10 + r() * 200; f.ang = r() * Math.PI;
+    if (accent) { f.x = 150; f.y = 104; f.ang = 0.3; }
+    f.vx = (r() - 0.5) * 20; f.vy = (r() - 0.5) * 12 + 2; f.spin = (r() - 0.5) * 0.8;
+    f.z = accent ? 2 : r();
+    out.push(f);
+  }
+  return out;
+})();
+// the wisps at a fibre's two ends, splaying from its end tangent
+function frayRuns(f, pts, frontOp, backOp, runs) {
+  const n = pts.length - 1;
+  [0, 1].forEach(e => {
+    const p = e ? pts[n] : pts[0], q = e ? pts[n - 2] : pts[2], L = Math.hypot(p.x - q.x, p.y - q.y) || 1;
+    const dx = (p.x - q.x) / L, dy = (p.y - q.y) / L, F = f.fray[e];
+    const angs = F.n === 1 ? [F.s * F.a] : F.n === 2 ? [F.a, -0.7 * F.a] : [F.a, 0.1 * F.s, -F.a];
+    angs.forEach((a, k) => {
+      const l = F.l * (1 - 0.18 * k), w = [];
+      for (let j = 0; j <= 3; j++) {
+        const g = a * j / 3, c = Math.cos(g), s = Math.sin(g), r = l * j / 3;
+        w.push({ x: p.x + (dx * c - dy * s) * r, y: p.y + (dx * s + dy * c) * r });
+      }
+      runs.push({ pts: w, depth: p.d + (f.accent && p.d >= 0 ? 100 : 0), color: f.accent ? ACCENT : INK, op: (p.d >= 0 ? frontOp : backOp) * 0.7, sw: WISP_SW });
+    });
+  });
+}
+// the soft fibres' renderer: runs sorted by depth into a few layers; each layer is one halo
+// under its fibre bodies, then the bodies (smoothed into curves) and their wisps, merged by
+// colour and opacity. Occlusion is exact between layers and lost only within one, which keeps a
+// frame of 150 fibres to a few dozen paths.
+// A short fibre twisted into a yarn needs half the points DRAW.yarnFibrePoints gives a long one.
+const thin = pts => pts.filter((p, i) => i % 2 === 0 || i === pts.length - 1);
+const SOFT_LAYERS = 7;
+function softMarkup(runs) {
+  runs.sort((a, b) => a.depth - b.depth);
+  let out = '';
+  const per = Math.ceil(runs.length / SOFT_LAYERS) || 1;
+  for (let L = 0; L < runs.length; L += per) {
+    const layer = runs.slice(L, L + per), body = layer.filter(r => !r.sw), wisp = layer.filter(r => r.sw);
+    const dOf = r => poly(r.pts);
+    if (body.length) out += `<path d="${body.map(dOf).join('')}" stroke="${BG}" stroke-width="${f1(FIB_SW + 2 * SOFT_HALO)}" stroke-linecap="butt"/>`;
+    const groups = new Map();
+    for (const r of layer) { const k = `${r.color}|${Math.round(r.op * 10)}|${r.sw || FIB_SW}`; if (!groups.has(k)) groups.set(k, { r, d: '' }); groups.get(k).d += dOf(r); }
+    for (const { r, d } of groups.values()) out += `<path d="${d}" stroke="${r.color}" stroke-width="${r.sw || FIB_SW}"${op(Math.round(r.op * 10) / 10)}/>`;
+  }
+  return group(out);
+}
+// one staple fibre's runs at a pose: body (split by depth) + frayed tips
+function stapleRuns(f, pts, frontK, backK, runs) {
+  splitRuns(pts, f.accent ? ACCENT : INK, f.op * frontK, f.op * backK, runs);
+  frayRuns(f, pts, f.op * frontK, f.op * backK, runs);
+}
+
+// ---------- staple: the fibres drifting loose, then drafted into an overlapping roving that has
+// just begun to twist. Its end frame is spun staple's first frame. ----------
+const STAPLE_DRIFT = 0.42, ROVING_TT = 0.6;      // at tt 0.6 the twist (DRAW.yarnFibrePoints) is 0.09
 const stapleScene = {
   viewBox: `0 ${FIBER_VB.y} ${VIEW.w} ${FIBER_VB.h}`, duration: 7600,
-  markup: t => t < STAPLE_DRIFT ? BASIC.fiber.markup(t / STAPLE_DRIFT) : BASIC.yarn.markup(ROVING_TT * seg(t, STAPLE_DRIFT, 1)),
+  markup(t) {
+    const runs = [];
+    for (const f of STAPLE) {
+      if (t < STAPLE_DRIFT) stapleRuns(f, posedPoints(f, fiberPose(f, t / STAPLE_DRIFT), f.z), 1, 1, runs);
+      else { const { pts, yarnness } = yarnFibrePoints(f, ROVING_TT * seg(t, STAPLE_DRIFT, 1)); stapleRuns(f, thin(pts), 1, lerp(1, BACK, yarnness), runs); }
+    }
+    return softMarkup(runs);
+  },
 };
 
-// ---------- filament: one continuous strand from a spinneret. The camera pulls back from the
-// orifice to show it running on, in long loops, out of the frame — no free end is ever in
-// view: at the start the strand leaves the zoomed frame, at the end it leaves the card. ----------
-const FIL_PTS = [[24, 50], [70, 48], [150, 52], [236, 60], [290, 78], [292, 104], [246, 118], [160, 114], [88, 120],
-  [48, 138], [46, 160], [90, 174], [180, 177], [268, 172], [330, 164], [420, 156]];
-function catmull(P, per) {
-  const out = [];
-  for (let i = 0; i < P.length - 1; i++) {
-    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
-    for (let k = 0; k < per; k++) {
-      const t = k / per, t2 = t * t, t3 = t2 * t;
-      const c = j => 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3);
-      out.push({ x: c(0), y: c(1) });
-    }
+// ---------- filament: one continuous strand, extruded from a spinneret and wound onto a spool.
+// It runs from the orifice, through a traverse guide that slides up and down, onto the turning
+// package, so it is attached at both ends and never shows a free one. The package is the
+// filament's own helix seen side-on: each point keeps the height and radius it was laid at and
+// turns with the spool, so the wraps cross-wind into the diamond pattern of a real bobbin. ----------
+const SP = { cx: 238, yT: 66, yB: 172, frx: 46, fry: 9, rb: 13, rMax: 33, passes: 20, perPass: 3.37, gx: 164, ox: 30, oy: 119, samples: 22, sw: 0.9, halo: 0.55 };
+SP.W = SP.passes * SP.perPass;                                     // wraps laid in the whole animation. perPass is irrational-ish on purpose: a whole-number ratio of wraps to traverses would lay every cycle exactly on top of the last
+const spY0 = SP.yT + 9, spY1 = SP.yB - 9;
+const spTrav = w => { const p = w / SP.perPass, k = Math.floor(p), u = p - k; return k % 2 === 0 ? lerp(spY0, spY1, u) : lerp(spY1, spY0, u); };
+const spR = w => SP.rb + (SP.rMax - SP.rb) * Math.min(1, w / SP.W);
+function spoolWraps(n) {
+  // every wound point, w in [0, n] wraps, at its current angle from the landing point
+  const runs = [], steps = Math.ceil(n * SP.samples);
+  let cur = null;
+  for (let j = 0; j <= steps; j++) {
+    const w = n * j / Math.max(1, steps), th = TAU * (n - w), m = ((th % TAU) + TAU) % TAU;
+    if (m <= Math.PI) { const r = spR(w); (cur || (cur = [])).push({ x: SP.cx - r * Math.cos(m), y: spTrav(w) }); }
+    else if (cur) { if (cur.length > 1) runs.push(cur); cur = null; }
   }
-  const e = P[P.length - 1]; out.push({ x: e[0], y: e[1] });
-  let s = 0; out.forEach((p, i) => { if (i) s += Math.hypot(p.x - out[i - 1].x, p.y - out[i - 1].y); p.s = s; });
-  out.forEach((p, i) => { const a = out[Math.max(0, i - 1)], b = out[Math.min(out.length - 1, i + 1)], L = Math.hypot(b.x - a.x, b.y - a.y) || 1; p.nx = -(b.y - a.y) / L; p.ny = (b.x - a.x) / L; });
-  return out;
-}
-const FIL = catmull(FIL_PTS, 14);
-const FIL_ZOOM = 2.6, FIL_C0 = { x: 66, y: 52 }, FIL_C1 = { x: VIEW.w / 2, y: FIBER_VB.y + FIBER_VB.h / 2 };
-function filamentView(t) {
-  const k = ease(seg(t, 0.08, 0.86)), z = lerp(FIL_ZOOM, 1, k), w = VIEW.w / z, h = FIBER_VB.h / z;
-  const cx = lerp(FIL_C0.x, FIL_C1.x, k), cy = lerp(FIL_C0.y, FIL_C1.y, k);
-  return `${f1(cx - w / 2)} ${f1(cy - h / 2)} ${f1(w)} ${f1(h)}`;
+  if (cur && cur.length > 1) runs.push(cur);
+  return runs;                                                      // oldest first: later wraps draw on top
 }
 const filamentScene = {
-  viewBox: filamentView(1), duration: 6400, view: filamentView,
+  viewBox: `0 ${FIBER_VB.y} ${VIEW.w} ${FIBER_VB.h}`, duration: 7000,
   markup(t) {
-    // the strand sways as it is pulled away: a wave travelling downstream, damped to rest
-    const sec = t * this.duration / 1000, amp = 3.2 * (1 - ease(seg(t, 0.55, 1)));
-    const pts = FIL.map(p => { const e = smooth(p.s / 50), o = amp * e * Math.sin(TAU * (p.s / 130 - 0.55 * sec)); return { x: p.x + p.nx * o, y: p.y + p.ny * o }; });
+    const n = SP.W * ease(seg(t, 0.04, 0.96)), y = spTrav(n), r = spR(n), phi = TAU * n;
+    const ell = (yy, fill, sop) => `<ellipse cx="${SP.cx}" cy="${yy}" rx="${SP.frx}" ry="${SP.fry}" fill="${fill}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="${sop}"/>`;
+    let s = ell(SP.yB, BG, 0.5);
+    // the barrel, then the package wound on it
+    s += `<rect x="${SP.cx - SP.rb}" y="${SP.yT}" width="${2 * SP.rb}" height="${SP.yB - SP.yT}" fill="${BG}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.35"/>`;
+    s += `<rect x="${f1(SP.cx - r)}" y="${spY0 - 2}" width="${f1(2 * r)}" height="${spY1 - spY0 + 4}" fill="${BG}"/>`;
+    for (const run of spoolWraps(n)) s += `<path d="${poly(run)}" stroke="${BG}" stroke-width="${SP.sw + 2 * SP.halo}"/><path d="${poly(run)}" stroke="${ACCENT}" stroke-width="${SP.sw}" stroke-opacity="0.85"/>`;
+    s += ell(SP.yT, BG, 0.6) + `<circle cx="${SP.cx}" cy="${SP.yT}" r="3" fill="${BG}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.6"/>`;
+    // the traverse guide on its rail, and the strand: orifice -> guide -> package
+    s += `<path d="M${SP.gx},${SP.yT - 4}V${SP.yB + 4}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.18"/>`;
+    const land = { x: SP.cx - r, y }, g = { x: SP.gx, y };
+    const strand = [];
+    for (let j = 0; j <= 24; j++) { const u = j / 24, sag = 4 * Math.sin(Math.PI * u); strand.push({ x: lerp(SP.ox, g.x, u), y: lerp(SP.oy, g.y, u) + sag }); }
+    strand.push(land);
     // draw-down: the strand leaves the orifice thick and is drawn fine within a few widths
     let taper = '';
-    for (let k = 0; k < 6; k++) {
-      const sub = pts.filter((p, i) => FIL[i].s <= 4 + k * 5);
-      if (sub.length > 1) taper += `<path d="${poly(sub)}" stroke="${ACCENT}" stroke-width="${f1(SW + 2.4 * (1 - k / 6))}"/>`;
-    }
-    return spinneret(24, 50, 34, 2.4) + group(`<path d="${poly(pts)}" stroke="${BG}" stroke-width="${SW + 2 * HALO}"/><path d="${poly(pts)}" stroke="${ACCENT}" stroke-width="${SW}"/>${taper}`);
+    for (let k = 0; k < 5; k++) { const e = lerp(SP.ox, g.x, (5 - k) / 5 * 0.12), y0 = SP.oy, y1 = lerp(SP.oy, g.y, (5 - k) / 5 * 0.12); taper += `<path d="M${SP.ox},${y0}L${f1(e)},${f1(y1)}" stroke="${ACCENT}" stroke-width="${f1(SW + 2.4 * (k + 1) / 5)}"/>`; }
+    s += `<path d="${poly(strand)}" stroke="${BG}" stroke-width="${SW + 2 * HALO}"/><path d="${poly(strand)}" stroke="${ACCENT}" stroke-width="${SW}"/>${taper}`;
+    s += `<circle cx="${g.x}" cy="${f1(g.y)}" r="3.2" fill="none" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.7"/>`;
+    return spinneret(SP.ox, SP.oy, 34, 2.4) + group(s);
   },
 };
 
@@ -162,14 +253,9 @@ const filamentScene = {
 
 // ---------- spun staple: the staple card's roving, twisted tight. A third of the fibres keep an
 // end proud of the surface as the twist packs them in — the hairiness a filament yarn never has.
-const HAIRY = (() => {
-  const r = rng(SEED + 40), m = new Map();
-  for (let i = 0; i < YARN.N; i++) { const v = r(); m.set(i, v < 0.2 ? 0 : v < 0.38 ? 1 : v < 0.46 ? 2 : -1); }   // 0 lead end, 1 tail end, 2 both
-  return m;
-})();
-const HAIR_U = 0.2, HAIR_L = 13;
+const HAIR_U = 0.24, HAIR_L = 9;
 function hairy(f, pts, k) {
-  const which = HAIRY.get(f.i); if (k <= 0 || which < 0 || f.accent) return pts;
+  const which = f.hairEnd; if (k <= 0 || which < 0 || f.accent) return pts;
   const n = pts.length - 1, out = pts.map(p => ({ ...p }));
   const ends = which === 2 ? [0, 1] : [which];
   for (const e of ends) {
@@ -179,7 +265,7 @@ function hairy(f, pts, k) {
       const u = j / n, w = e ? (u - (1 - HAIR_U)) / HAIR_U : (HAIR_U - u) / HAIR_U;
       if (w <= 0) continue;
       out[j].y -= side * k * HAIR_L * Math.pow(w, 1.5);
-      out[j].x += (e ? 1 : -1) * k * 3 * w * w;
+      out[j].x += (e ? 1 : -1) * k * 2 * w * w;
     }
   }
   return out;
@@ -188,11 +274,8 @@ const spunScene = {
   viewBox: YARN_VB, duration: 6000,
   markup(t) {
     const tt = lerp(ROVING_TT, 1, t), hk = ease(seg(t, 0.25, 0.95)), runs = [];
-    for (const f of DRAW.MATERIAL) {
-      const { pts } = yarnFibrePoints(f, tt);
-      splitRuns(hairy(f, pts, hk), f.accent ? ACCENT : INK, 1, BACK, runs);
-    }
-    return group(runsMarkup(runs));
+    for (const f of STAPLE) { const { pts } = yarnFibrePoints(f, tt); stapleRuns(f, hairy(f, thin(pts), hk), 1, BACK, runs); }
+    return softMarkup(runs);
   },
 };
 
@@ -262,14 +345,14 @@ const pliedScene = {
 // into a sheath that stops short, so the bare core runs on out of the yarn's end ----------
 const CORE = { r: 6, sheathEnd: 222 };
 const CORE_FIB = (() => {
-  const r = rng(SEED + 70), out = [], n = 60;
+  const r = rng(SEED + 70), out = [], n = 120;
   for (let i = 0; i < n; i++) {
-    const f = makeFibre(r, 300 + i, i === 23);
+    const f = makeStaple(r, 300 + i, i === 47);
     f.c = -18 + (i + r()) / n * (CORE.sheathEnd + 18);
-    if (f.accent) { f.len = 80; f.c = 150; }
+    if (f.accent) f.c = 150;
     f.rho = 0.44 + 0.56 * Math.sqrt(r()); f.phi = r() * TAU;
-    // loose staple around the core before it is gathered (the card's flurry, near the core)
-    f.x = f.c + (r() - 0.5) * 70; f.y = YARN.Y + (r() < 0.5 ? -1 : 1) * (34 + r() * 52); f.ang = r() * Math.PI;
+    // loose staple around the core before it is gathered
+    f.x = f.c + (r() - 0.5) * 70; f.y = YARN.Y + (r() < 0.5 ? -1 : 1) * (30 + r() * 40); f.ang = r() * Math.PI;
     f.vx = (r() - 0.5) * 18; f.vy = (r() - 0.5) * 10; f.spin = (r() - 0.5) * 0.6; f.z = r(); f.delay = r() * 0.12;
     out.push(f);
   }
@@ -279,11 +362,11 @@ const coreScene = {
   viewBox: YARN_VB, duration: 7200,
   markup(t) {
     const coreTip = lerp(-12, 370, ease(seg(t, 0, 0.24))), tt = seg(t, 0.14, 1), runs = [];
-    for (const f of CORE_FIB) { const { pts, yarnness } = yarnFibrePoints(f, tt); splitRuns(pts, f.accent ? ACCENT : INK, 1, lerp(1, BACK, yarnness), runs); }
+    for (const f of CORE_FIB) { const { pts, yarnness } = yarnFibrePoints(f, tt); stapleRuns(f, thin(pts), 1, lerp(1, BACK, yarnness), runs); }
     // back of the sheath, the core, the front of the sheath
     const back = runs.filter(r => r.depth < 0), front = runs.filter(r => r.depth >= 0);
     const core = rod('tt-core-g', -12, coreTip, YARN.Y, () => CORE.r, coreTip < VIEW.w + 20);
-    return group(runsMarkup(back) + core + runsMarkup(front));
+    return softMarkup(back) + group(core) + softMarkup(front);
   },
 };
 
@@ -355,44 +438,61 @@ const wovenScene = {
 };
 
 // ---------- braid: a tubular braid, the way it comes off a braiding machine — two sets of strands
-// on the bias, each over two and under two (a regular braid), wound round a cylinder seen from
-// the side, so the strands crowd and turn away at its edges. The fell climbs as it is made. ----------
+// on the bias, each over two and under two (a regular braid), on a cylinder seen from the side,
+// so the strands crowd and turn away at its edges. The braid is LAID strand by strand, the two
+// sets alternating, so each new strand is seen passing over two and under two as it arrives.
 // A strand is a straight line in the UNROLLED cylinder (u along the circumference, y up); on
 // screen u becomes x = cx + Rc sin(u / Rc). Crossings and the over / under rule are found in the
-// unrolled plane, where they are exact; only the near half (|u| < LIM) is drawn.
-const BR = { beta: 33 * Math.PI / 180, gap: 26, yB: 316, yT: 14, cx: 230, Rc: 168 };
+// unrolled plane, where they are exact; only the near half (|u| < LIM) is drawn. A crossing
+// cuts the strand underneath only once the strand on top has been laid that far. ----------
+const BR = { beta: 33 * Math.PI / 180, gap: 26, yB: 316, yT: 14, cx: 230, Rc: 168, lay: 0.2 };
 BR.sp = BR.gap / Math.cos(BR.beta); BR.tan = Math.tan(BR.beta); BR.H = BR.yB - BR.yT; BR.LIM = 1.46 * BR.Rc;
-BR.A = []; for (let u = -BR.LIM - BR.H * BR.tan; u <= BR.LIM; u += BR.sp) BR.A.push(u);      // set A climbs to the right
-BR.B = []; for (let u = -BR.LIM + 0.5 * BR.sp; u <= BR.LIM + BR.H * BR.tan; u += BR.sp) BR.B.push(u);
-const BR_TEAL = Math.floor(BR.A.length / 2);
 const brX = u => BR.cx + BR.Rc * Math.sin(u / BR.Rc);
-function brStrand(u0, dir) {                     // dir +1: set A, -1: set B
-  const pts = [];
-  for (let y = BR.yB; y >= BR.yT - 0.01; y -= 3) { const u = u0 + dir * (BR.yB - y) * BR.tan; if (Math.abs(u) <= BR.LIM) pts.push({ x: brX(u), y }); }
-  return pts;
-}
+const BRAID = (() => {
+  const A = [], B = [];
+  for (let u = -BR.LIM - BR.H * BR.tan; u <= BR.LIM; u += BR.sp) A.push(u);           // set A climbs to the right
+  for (let u = -BR.LIM + 0.5 * BR.sp; u <= BR.LIM + BR.H * BR.tan; u += BR.sp) B.push(u);
+  const strand = (u0, dir, set, idx) => {
+    const pts = [];
+    for (let y = BR.yB; y >= BR.yT - 0.01; y -= 3) { const u = u0 + dir * (BR.yB - y) * BR.tan; if (Math.abs(u) <= BR.LIM) pts.push({ x: brX(u), y }); }
+    const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k].x - pts[k - 1].x, pts[k].y - pts[k - 1].y));
+    return { u0, dir, set, idx, pts, cum, len: cum[cum.length - 1], d: poly(pts) };
+  };
+  const SA = A.map((u, i) => strand(u, 1, 'A', i)).filter(s => s.pts.length > 1);
+  const SB = B.map((u, j) => strand(u, -1, 'B', j)).filter(s => s.pts.length > 1);
+  // fraction of a strand's drawn length at height y (its points run bottom to top)
+  const fracAt = (s, y) => { for (let k = 1; k < s.pts.length; k++) if (s.pts[k].y <= y) { const a = s.pts[k - 1], b = s.pts[k], u = (a.y - y) / (a.y - b.y); return (s.cum[k - 1] + u * (s.cum[k] - s.cum[k - 1])) / s.len; } return 1; };
+  // lay order: A left to right and B right to left, alternating, so the two sets sweep through each other
+  const order = []; const ra = SA.slice().sort((p, q) => p.u0 - q.u0), rb = SB.slice().sort((p, q) => q.u0 - p.u0);
+  for (let k = 0; k < Math.max(ra.length, rb.length); k++) { if (ra[k]) order.push(ra[k]); if (rb[k]) order.push(rb[k]); }
+  order.forEach((s, k) => { s.start = 0.03 + k * (0.97 - BR.lay - 0.03) / (order.length - 1); });
+  const cross = [];
+  for (const a of SA) for (const b of SB) {
+    const h = (b.u0 - a.u0) / (2 * BR.tan), u = a.u0 + h * BR.tan; if (h <= 0 || h >= BR.H || Math.abs(u) > BR.LIM) continue;
+    const y = BR.yB - h, c = Math.cos(u / BR.Rc), L = Math.hypot(BR.tan * c, 1);
+    cross.push({ a, b, x: brX(u), y, aOver: ((a.idx + b.idx) % 4) < 2, ax: BR.tan * c / L, ay: -1 / L, fa: fracAt(a, y), fb: fracAt(b, y) });
+  }
+  const teal = SA.slice().sort((p, q) => Math.abs(p.u0 + BR.H * BR.tan / 2) - Math.abs(q.u0 + BR.H * BR.tan / 2))[0];
+  return { order, cross, teal };
+})();
 const braidScene = {
-  viewBox: TVB, duration: 6200,
+  viewBox: TVB, duration: 8600,
   markup(t) {
-    const cross = [];
-    BR.A.forEach((a, i) => BR.B.forEach((b, j) => {
-      const h = (b - a) / (2 * BR.tan), u = a + h * BR.tan; if (h <= 0 || h >= BR.H || Math.abs(u) > BR.LIM) return;
-      const c = Math.cos(u / BR.Rc), L = Math.hypot(BR.tan * c, 1);
-      cross.push({ i, j, x: brX(u), y: BR.yB - h, aOver: ((i + j) % 4) < 2, ax: BR.tan * c / L, ay: -1 / L });
-    }));
-    const strands = [];
-    BR.A.forEach((a, i) => { const pts = brStrand(a, 1); if (pts.length > 1) strands.push({ d: poly(pts), color: i === BR_TEAL ? ACCENT : INK, op: 1,
-      notches: cross.filter(c => c.i === i && !c.aOver).map(c => [c.x, c.y, -c.ax, c.ay]) }); });
-    BR.B.forEach((b, j) => { const pts = brStrand(b, -1); if (pts.length > 1) strands.push({ d: poly(pts), color: INK, op: 0.55,
-      notches: cross.filter(c => c.j === j && c.aOver).map(c => [c.x, c.y, c.ax, c.ay]) }); });
-    // the fell: everything below it is braided; it climbs from the bottom of the window
-    const fell = lerp(TV.y + TV.h + 30, TV.y - 40, ease(seg(t, 0.04, 0.94)));
-    const reveal = `<linearGradient id="tt-br-rg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000"/><stop offset="1" stop-color="#fff"/></linearGradient><mask id="tt-br-rv" maskUnits="userSpaceOnUse" x="0" y="0" width="${KP.w}" height="${KP.h}"><rect x="0" y="${f1(fell - 24)}" width="${KP.w}" height="24" fill="url(#tt-br-rg)"/><rect x="0" y="${f1(fell)}" width="${KP.w}" height="${KP.h}" fill="#fff"/></mask>`;
+    const p = s => ease(seg(t, s.start, s.start + BR.lay));
+    const strands = BRAIDS_DRAW(p);
     // the cylinder turns away at its sides: strands fade toward the silhouette
     const xl = brX(-BR.LIM), xr = brX(BR.LIM), shade = `<linearGradient id="tt-br-sg" gradientUnits="userSpaceOnUse" x1="${f1(xl)}" y1="0" x2="${f1(xr)}" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0.2"/><stop offset="0.2" stop-color="#fff"/><stop offset="0.8" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0.2"/></linearGradient><mask id="tt-br-sh" maskUnits="userSpaceOnUse" x="0" y="0" width="${KP.w}" height="${KP.h}"><rect width="${KP.w}" height="${KP.h}" fill="url(#tt-br-sg)"/></mask>`;
-    return tubes('tt-br', strands, reveal + shade).replace(/<g mask="url\(#tt-br-fade\)">/, '<g mask="url(#tt-br-fade)"><g mask="url(#tt-br-rv)"><g mask="url(#tt-br-sh)">') + '</g></g>';
+    return tubes('tt-br', strands, shade).replace(/<g mask="url\(#tt-br-fade\)">/, '<g mask="url(#tt-br-fade)"><g mask="url(#tt-br-sh)">') + '</g>';
   },
 };
+function BRAIDS_DRAW(p) {
+  // a crossing notches the strand underneath once the strand on top has reached it
+  return BRAID.order.map(s => ({
+    d: s.d, color: s === BRAID.teal ? ACCENT : INK, op: s.set === 'A' ? 1 : 0.55, dash: p(s),
+    notches: BRAID.cross.filter(c => (s.set === 'A' ? c.a === s && !c.aOver : c.b === s && c.aOver) && p(c.aOver ? c.a : c.b) >= (c.aOver ? c.fa : c.fb))
+      .map(c => c.aOver ? [c.x, c.y, c.ax, c.ay] : [c.x, c.y, -c.ax, c.ay]),
+  }));
+}
 
 export const SCENES = {
   staple: stapleScene, filament: filamentScene,
