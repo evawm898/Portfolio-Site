@@ -16,8 +16,7 @@ CC0 photo crop and one sheet.
 | `docs/photo-to-bloom/*.bloom-design.json` | the complete `bloom-design` v1 files those compose to (loadable on `/bloom` as they are) |
 | `docs/img/photo-to-bloom-dry-run.png` | the sheet (the tulip photos are placeholders — §6.1) |
 
-**Every open question for Eva is collected in §7.** Contradictions found while working are recorded
-there, not resolved.
+**Eva ruled on all eight open questions on Nov 3 — §7.** The questions as asked are kept below the rulings.
 
 ---
 
@@ -350,6 +349,8 @@ What is **not** in v1, on purpose:
 
 ### 2.3 Why the file is complete and not the subset
 
+**[Ruled Nov 3, §7 ruling 2: the page gets a "load as new design" mode and route A emits SUBSETS — construction (ii) below.]**
+
 A subset loaded onto a page that already holds a design inherits that design's leftovers (rule 3,
 above). There are two ways out:
 
@@ -381,7 +382,7 @@ The order is by how much a wrong guess cost in the dry run (§6).
 
 | # | question | resolves | ask when | default if unanswered |
 |---|---|---|---|---|
-| Q-scale | "About how big should the printed flower be? (petal length or overall width in mm)" | `petalLength` (the scale anchor; every other size is read as a ratio against it) | always, unless a size was given with the photo; a photo never carries scale | 35 mm (the registry default) |
+| Q-scale | "About how big should the printed flower be? (petal length or overall width in mm)" | `petalLength` (the scale anchor; every other size is read as a ratio against it) | **[Ruled Nov 3, ruling 1: only when the proportions look wrong at 35 mm]** ~~always, unless a size was given with the photo~~; a photo never carries scale | 35 mm (the registry default) |
 | Q-profile | "Seen from the side, is it flat, a shallow bowl, a deep cup, a closed globe, or reflexed (petals bending back)?" | `petalTilt`, `petalSpineCurl`, `layerTilt` | no side or low view, and the face-on silhouette fits more than one profile. **Tilt and spine curl trade against each other in a 3/4 view** — the double tulip overshot both ways (§6) | the profile class the photo suggests, at middle values |
 | Q-focal | "There are several flowers — which one?" (or "the open one or the bud?") | the whole design | more than one flower in focus, or flowers at different stages (the tulip photo: an open bloom and a closed one) | the largest, sharpest flower |
 | Q-layers | "Is it single, semi-double or fully double?" | `layerCount`, `layerSize` | inner petals hidden or the centre not visible | from the visible rings |
@@ -406,7 +407,7 @@ Two meta-rules for the route:
 The output carries a list of what the photo shows that the bloom cannot build. Each entry names the
 feature, and the nearest thing the design did instead (or "nothing").
 
-**Where the list lives is Q6.** The design file's reader reports any unknown top-level key as an
+**[Ruled Nov 3, §7 ruling 6: in a sidecar file beside the design file; the reader is untouched.]** **Where the list lives was Q6.** The design file's reader reports any unknown top-level key as an
 `unknown` note and drops it. So `unmapped` cannot ride inside a v1 file without breaking §2.4's
 zero-note check.
 
@@ -428,6 +429,8 @@ zero-note check.
 ---
 
 ## 5. Two delivery routes — side by side, not chosen
+
+**[Ruled Nov 3, §7 ruling 3: route A for v1; route B deferred, no key, no Function work. The B column stays as its costing.]**
 
 |  | **A. Chat-side** | **B. In-site** |
 |---|---|---|
@@ -530,7 +533,57 @@ makes Q-profile the most valuable question after scale.
 
 ---
 
-## 7. Open questions for Eva
+## 7. Rulings (Eva, Nov 3)
+
+The eight questions as they were asked are kept below the rulings, so each ruling can be read
+against the question it answers.
+
+1. **Scale.** The default is **35 mm `petalLength`**. Ask only when the flower's proportions look
+   wrong at that scale. This supersedes §3's "Q-scale: always, unless a size was given": Q-scale is
+   now a low-confidence question like the others.
+2. **Partial files.** The page gets a **"load as new design" mode**: reset to `DEFAULTS`, then apply
+   the subset. **Route A emits SUBSETS, not complete 201-control files.** This supersedes §2.3's
+   construction (i) and emission rule 1 of §2.2 for the feature.
+   - The dry run's complete files remain what a subset composes to today. They stay valid and
+     loadable through the existing Load button.
+   - The new mode is a page change and is not built here.
+3. **Route A for v1. Route B is deferred**: no API key, no Netlify Function work. §5's route-B
+   column stays as the costing for whenever it is reopened.
+4. **v1 scope, STAGED.** Globals, then the traced petal outline (`petalOutlineCurve`), then
+   per-layer values. **The globals must pass the zero-notes load check (§2.4) on test photos
+   before the outline is added; the outline must pass before per-layer values are added.**
+5. **Disc florets.** Reported as **unmapped** (§4 stands: never approximated with stamens).
+   **Logged as a new bloom backlog item, the disc-floret feature, NOT scheduled** — see the entry
+   below.
+6. **Confidences and the unmapped list** live in a **sidecar file beside the design file**. **The
+   reader is untouched**: no new top-level field, so the zero-notes check stands. The sidecar's
+   name and shape are the building session's to propose. A natural one is
+   `<name>.bloom-photo.json`, holding each emitted control's value, confidence and source, the
+   questions asked and answered, and the unmapped list.
+7. **Test photos: Eva supplies her own.** No network access for future sessions. The tulip
+   placeholders on the committed sheet therefore stay placeholders. The real test set arrives with
+   the building session.
+8. **Second photo: an optional first-class input** (side, underneath, or the whole plant). A
+   single photo still works. §3's "a second photo is a better question than a word answer" becomes
+   an offer the route makes, not a requirement.
+
+### 7.1 The backlog entry (ruling 5)
+
+The bloom backlog lives **outside this repository** (the state-of-play docs say so, and this session
+cannot reach it). The item is written here so it can be pasted in as it stands:
+
+> **Disc florets on the hub (bloom backlog — logged Nov 3, not scheduled).** A composite's centre
+> (daisy, sunflower, aster) is a domed disc of tightly packed tiny florets. The bloom's hub is a
+> smooth cap. The nearest existing approximation, an androecium on `stamenLayout` DISC at the
+> 5 mm filament floor, reads as BRISTLES, not florets (photo-to-bloom dry run, `daisy-v2`, §6 of
+> `docs/bloom-photo-to-bloom-discovery.md`). It is not cheap either: that row reads 280,496 export
+> triangles against `daisy-v1`'s 138,184, though the stamens' own share was not measured apart from
+> the other v2 changes. Until built, photo-to-bloom reports disc florets
+> as unmapped. Open: whether it is a hub surface treatment (a relief field like BONE's on the
+> hub), a new centre part beside the androecium, or a third androecium layout. Each has a
+> different owner.
+
+### 7.2 The questions as asked
 
 1. **Q1 — scale.** Default 35 mm `petalLength` when unasked, or always ask? A real daisy ray (≈8 mm)
    prints at ≈4× life at the 20 mm floor. Is "life size where possible" a goal at all?
