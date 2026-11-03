@@ -829,7 +829,14 @@ hidden control. Two things that pass and are worth knowing:
   hides the fixtures' own `layerSize`, so V3 fires wherever a leftover survives. The measured sets
   are what the table holds now. 8 m 57 s for the whole sweep on this box.
 - **The old load path is unchanged** (`node tools/verify-bloom-load-unchanged.mjs --base <worktree
-  of 6981e2f> --control`): see §9.5b.
+  of 6981e2f> --control`): **25 of 25 samples identical** between the base and this tree on all five
+  things it compares — the load record (every note), `readUI()`, the scopes, the page's own save
+  (savedAt stripped) and the exported STL's sha256. The sample is the six dry-run complete files,
+  DEFAULTS, fifteen live matrix rows (one per feature family, a scoped row included), and four files
+  that make the reader talk: a subset onto a dirty page (182 `missing` notes on both trees — rule 3,
+  unchanged), a clamp (1), an unknown key plus an unknown top-level field (2), and a retired id with
+  its exact migration (1). The control (`petalCup` + 0.05 on the head side only) moved the state, the
+  save and the STL, so the comparison can see a change.
 
 ### 9.6 Status check — what gates the staged v1 scope (reported, not built)
 
