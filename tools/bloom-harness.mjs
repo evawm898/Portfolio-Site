@@ -11833,10 +11833,15 @@ export function lobedLeafClauses(ui, m, L, builtNodes, bladesR) {
        0.1750 of the pitch (ruling 3's measured point, re-measured
        when the shoulder tangents were held clear of the crest — was 0.1754);
      * on the WHORLED-8 COST CORNER (block 56's row: 8 whorled nodes, arch
-       180, cup 1.2, on the 90 mm stem): 192,874 triangles, 12.9% of
-       `EXPORT_TRI_BUDGET`. */
+       180, cup 1.2, on the 90 mm stem): 192,874 triangles. That was 12.9% of
+       the 1.5 M budget it was ruled against; against the provisional 2.0 M
+       `EXPORT_TRI_CAP` (Eva, Nov 2) the same corner is 9.64%. The PERCENTAGE
+       pin is retired with the old budget, because the cap is provisional and
+       moves again with the PreForm ladder test; the TRIANGLE COUNT is what was
+       ruled and is still pinned exactly (it reddened on the cap change and
+       nothing else, which is the count clause doing its job). */
 export const LOBED_RULED_PINS = Object.freeze({ rows: 130, perLobe: 4, roundness: 0.12, teethAsked: 28, teethBuilt: 28, teethDrawn: 26, split: Object.freeze([3, 4, 4, 4]),
-  leafTris: 6916, saturatesAt: 0.1750, cornerTris: 192874, cornerBudgetPct: 12.9 });
+  leafTris: 6916, saturatesAt: 0.1750, cornerTris: 192874 });
 if (GEOMETRY.LOBED_BLADE_ROWS !== LOBED_RULED_PINS.rows) throw new Error(`LF31: LOBED_BLADE_ROWS is ${GEOMETRY.LOBED_BLADE_ROWS}, the ruled ${LOBED_RULED_PINS.rows} (Eva, Oct 9) — a row change moves the ruled 28 of 28 teeth; re-rule it, then re-pin`);
 if (Number(DEFAULTS.lobedToothCount) !== LOBED_RULED_PINS.perLobe) throw new Error(`LF31: the lobed tooth default is ${DEFAULTS.lobedToothCount} a lobe, the ruled ${LOBED_RULED_PINS.perLobe}`);
 if (Number(DEFAULTS.lobedRound) !== LOBED_RULED_PINS.roundness) throw new Error(`LF31: the sinus roundness default is ${DEFAULTS.lobedRound}, the ruled ${LOBED_RULED_PINS.roundness}`);
@@ -11858,9 +11863,7 @@ export function lobedRuledPinClauses(ui, m, L, LB) {
   if (!(Number.isFinite(sat) && Math.abs(sat - P.saturatesAt) < 5e-5)) bad.push(`LF31: the ruled default leaf's roundness saturates at ${sat} — measured and told at ${P.saturatesAt} (ruling 3)`);
   const corner = Number(ui.leafNodes) === 8 && String(ui.leafPhyllotaxy) === 'whorled' && Number(ui.leafArch) === 180 && Number(ui.leafCup) === 1.2 && Number(ui.stemLength) === 90 && Number(ui.stemDiameter) === 6;
   if (corner && m.liveTris !== null && m.liveTris !== undefined) {
-    if (m.liveTris !== P.cornerTris) bad.push(`LF31: the whorled-8 cost corner builds ${m.liveTris} triangles — ruled: ${P.cornerTris}`);
-    const pct = (100 * m.liveTris) / GEOMETRY.EXPORT_TRI_BUDGET;
-    if (Math.abs(pct - P.cornerBudgetPct) >= 0.05) bad.push(`LF31: the cost corner is ${pct.toFixed(2)}% of the export budget — ruled: ${P.cornerBudgetPct}%`);
+    if (m.liveTris !== P.cornerTris) bad.push(`LF31: the whorled-8 cost corner builds ${m.liveTris} triangles — ruled: ${P.cornerTris} (${(100 * P.cornerTris / GEOMETRY.EXPORT_TRI_CAP).toFixed(2)}% of the ${GEOMETRY.EXPORT_TRI_CAP} cap)`);
   }
   return bad;
 }
@@ -15170,7 +15173,9 @@ export async function inflorescenceAssertions(page, row) {
 export const INFLO_APPROACH_BAND_MM = 5e-4;
 export function infloApproachAssertions(positions, row, m, ui) {
   const bad = [];
-  const P = m && m.inflorescence, B = m && m.inflorescenceBuilt, S = m && m.stem;
+  /* a FULL file's floret blocks are the Node export rebuild's (fullFileBuild) */
+  const bE = fullFileBuild(positions, m, ui, row);
+  const P = m && m.inflorescence, B = bE ? bE.inflorescenceBuilt : (m && m.inflorescenceBuilt), S = m && m.stem;
   const decl = INFLO_APPROACH_XFAIL[row.label];
   /* THE ENTRY IS THE PLAN'S OWN PRESENCE AND NOTHING ELSE — the first cut
      also tested a `present` flag on the STEM projection, which that
@@ -15988,6 +15993,16 @@ export function exportBuildOf(ui, row) {
   exportBuildMemo = { key, acc, built };
   return exportBuildMemo;
 }
+/* (BONE v2) THE FULL FILE'S OWN RECORD, OR NULL. Under FULL detail the
+   exported file is the full build while the page's metrics describe its LIVE
+   (coarse) build, so any clause that reads a STREAM RANGE against the file
+   reads it off the Node export rebuild — whose ranges the full write remapped —
+   whenever the two streams' counts differ. ST13 found it first; ST9 and ID10
+   met it on the BONE sphere-stem and raceme rows in CI. */
+export function fullFileBuild(positions, m, ui, row = null) {
+  const full = String(ui.petalTexture) === 'BONE' && m && Number.isFinite(m.liveTris) && positions && positions.length / 9 !== m.liveTris;
+  return full ? exportBuildOf(ui, row).built : null;
+}
 export function stemTopClauses(positions, m, ui, row = null) {
   const bad = [];
   if (!m || !(Number(ui.stemLength) > 0) || m.headAbsent === true) return bad;
@@ -16059,6 +16074,8 @@ export function stemTopClauses(positions, m, ui, row = null) {
 
 export function stemChannelAssertions(positions, row, m, ui) {
   const bad = [];
+  const bE = fullFileBuild(positions, m, ui, row);
+  const IB = bE ? bE.inflorescenceBuilt : (m && m.inflorescenceBuilt);
   /* ST9 ENTERS ON THE SPHERE AND THE CONTROL, NEVER ON THE CHANNEL'S OWN
      RECORD, and that is the whole point of this clause existing beside ST7.
      It shipped guarded on `m.stemOmission` — the very object a broken channel
@@ -16202,8 +16219,8 @@ export function stemChannelAssertions(positions, row, m, ui) {
      petiole, so every pre-S3 row reads the identical list. */
   const rods = [
     ...(m && m.leaf && Array.isArray(m.leaf.rodAxes) ? m.leaf.rodAxes : (m && m.leaf && Array.isArray(m.leaf.petioleAxes) ? m.leaf.petioleAxes : [])),
-    ...(m && m.inflorescenceBuilt && Array.isArray(m.inflorescenceBuilt.placed)
-      ? m.inflorescenceBuilt.placed.map((q) => q && q.pedicelAxis) : []),
+    ...(IB && Array.isArray(IB.placed)
+      ? IB.placed.map((q) => q && q.pedicelAxis) : []),
   ].filter((a) => a && Array.isArray(a.inner) && Array.isArray(a.outer) && Number.isFinite(a.radiusMm) && a.radiusMm > 0);
   const onAPetiole = (x, y, z) => {
     for (const a of rods) {
@@ -16237,8 +16254,8 @@ export function stemChannelAssertions(positions, row, m, ui) {
      CHECKED here rather than trusted — disjoint, in range, and totalling
      exactly the tally ID1 has already tied to the plan — because a block
      range that swallowed the head would silence the clause entirely. */
-  const blocks = (m && m.inflorescenceBuilt && Array.isArray(m.inflorescenceBuilt.placed)
-    ? m.inflorescenceBuilt.placed : [])
+  const blocks = (IB && Array.isArray(IB.placed)
+    ? IB.placed : [])
     .map((q) => ({ lo: q.at, hi: q.at + q.tris * 9 }))
     .filter((b) => Number.isFinite(b.lo) && Number.isFinite(b.hi) && b.hi > b.lo)
     .sort((a, b) => a.lo - b.lo);
@@ -16247,14 +16264,17 @@ export function stemChannelAssertions(positions, row, m, ui) {
      would skip the check and silently disable the exclusion. Measured: that
      is exactly what happened the first time this ran, and only the count
      staying at 144 said so. */
-  if (m && m.inflorescenceBuilt && m.inflorescenceBuilt.count > 0) {
-    const B = m.inflorescenceBuilt;
+  if (IB && IB.count > 0) {
+    const B = IB;
     if (blocks.length !== B.count) bad.push(`ST9: the build placed ${B.count} floret(s) and ${blocks.length} usable block range(s) reached this clause — an unparseable range silently widens the channel's subject`);
     const span = blocks.reduce((n, b) => n + (b.hi - b.lo), 0);
     /* PER UNIT (the node-laws session): each placement's own floret build's
        tally, summed — `count x unitTris` where there is one build. */
     const want = B.placed.reduce((n, q) => n + (Array.isArray(B.units) && B.units[q.unit] ? B.units[q.unit].tris : NaN) * 9, 0);
-    if (span !== want) bad.push(`ST9: the ${blocks.length} declared floret block(s) span ${span} floats and ${B.count} florets of their own units' triangles is ${want} — a block range that is not the florets' own would silence this clause`);
+    /* a FULL file's florets were refined in the parent's pass, so a block is
+       no longer its unit's own count; the remapped blocks are still checked
+       disjoint and in range below */
+    if (!bE && span !== want) bad.push(`ST9: the ${blocks.length} declared floret block(s) span ${span} floats and ${B.count} florets of their own units' triangles is ${want} — a block range that is not the florets' own would silence this clause`);
     if (blocks[0].lo < 0 || blocks[blocks.length - 1].hi > positions.length) bad.push(`ST9: a declared floret block runs outside the exported stream's ${positions.length} floats`);
     for (let i = 1; i < blocks.length; i++) if (blocks[i].lo < blocks[i - 1].hi) { bad.push('ST9: two declared floret blocks overlap — the excluded region is larger than the florets'); break; }
     if (bad.length) return bad;
@@ -16263,7 +16283,7 @@ export function stemChannelAssertions(positions, row, m, ui) {
      junction every pedicel roots in sits on the stem by design, so its own
      triangles — the builder's declared `triRange` over the same stream — are
      excused as a part, and nothing else near the stem is. */
-  const KN = m && m.inflorescenceBuilt && m.inflorescenceBuilt.knot;
+  const KN = IB && IB.knot;
   const knotLo = KN && Array.isArray(KN.triRange) ? KN.triRange[0] * 9 : -1;
   const knotHi = KN && Array.isArray(KN.triRange) ? KN.triRange[1] * 9 : -1;
   if (KN && !(knotHi > knotLo && knotLo >= 0 && knotHi <= positions.length)) { bad.push(`ST9: the umbel's knot declares triangle range ${JSON.stringify(KN.triRange)}, which is not a range of the exported stream — an unparseable range would silence this clause`); return bad; }
@@ -16283,7 +16303,8 @@ export function stemChannelAssertions(positions, row, m, ui) {
      subject, outward along the stem's own normal; untextured the ranges are
      empty and nothing changes */
   const organRanges = [];
-  if (relH > 0 && m.texture && m.texture.organs) for (const k of ['hub', 'stem']) { const o = m.texture.organs[k]; if (o && o.organ) for (const rg of (o.organ.triRanges || [o.organ.triRange])) organRanges.push([rg[0] * 9, rg[1] * 9]); }
+  const TXo = bE ? bE.texture : m.texture;
+  if (relH > 0 && TXo && TXo.organs) for (const k of ['hub', 'stem']) { const o = TXo.organs[k]; if (o && o.organ) for (const rg of (o.organ.triRanges || [o.organ.triRange])) organRanges.push([rg[0] * 9, rg[1] * 9]); }
   const inAnOrgan = (i) => organRanges.some(([lo, hi]) => i >= lo && i < hi);
   let intruders = 0, excused = 0, florets = 0, worst = Infinity, worstAt = null, floretWorst = Infinity;
   for (let i = 0; i < positions.length; i += 3) {

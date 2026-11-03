@@ -81,7 +81,8 @@ now (finer). Every design under 1.5 M — every one the matrix holds but the
 redefined block-79 rows — is byte-identical, and the byte partition proves
 it (§7). I applied the single cap (the brief's first sentence is the ruling it
 names; the second is about the retired patterns' LAW, which is untouched) and
-**ask** (question 1) whether the old patterns should keep their own 1.5 M.
+asked (question 1) whether the old patterns should keep their own 1.5 M —
+**RULED Nov 2: no, one cap for everything** (§10).
 
 **Block 79 is redefined** so its rows still exercise the three arms at 2.0 M,
 each measured in Node, EXPORT:
@@ -258,7 +259,8 @@ and compares the count and an FNV hash of every float32: §8.
   0.5 mm on both trees and holds. **Every PEBBLE / CELLULAR row, every umbel
   and mophead row (the depth-2 clamp included) and the shipping default hold to
   the bit** — so in the matrix the cap moved nothing but block 79; question 1
-  is about saved designs over 1.5 M, which the matrix does not hold.
+  was about saved designs over 1.5 M, which the matrix does not hold — ruled
+  (a), one cap: those designs build finer, accepted (§10).
 
 ## 8. Measurements
 
@@ -408,7 +410,16 @@ meant committing 852 MB — which the brief forbids. To regenerate any rung:
 
 ## 10. Questions for Eva
 
-**1. THE CAP AND THE RETIRED PATTERNS (the contradiction, §3).** One named
+**1. THE CAP AND THE RETIRED PATTERNS — RULED (Eva, Nov 2): (a) ONE CAP FOR
+EVERYTHING.** `EXPORT_TRI_CAP` = 2.0 M (provisional) applies to every pattern.
+Retired PEBBLE / CELLULAR designs that were over 1.5 M build finer; that is
+accepted, and it SUPERSEDES "byte-identical" for those designs only (every
+PEBBLE / CELLULAR design under 1.5 M still builds to the bit — the byte
+partition). Block 79's old states are NOT restored as rows. The cap's final
+value comes from the PreForm ladder test (§9) as a one-line follow-up. The
+question as it was asked, kept so the ruling reads against it:
+
+One named
 cap moves every reader of the old budget, so PEBBLE / CELLULAR designs that
 were over 1.5 M build at a finer lattice edge now (and the umbel's depth-2
 clamp and the tip-row ramp move with it); everything under 1.5 M is
@@ -453,7 +464,7 @@ hand); (c) a named viewing direction (front, top).
 
 **§21 of round 2, carried forward:**
 - **A the cap** — answered by the Nov 2 ruling (2.0 M provisional, the ladder
-  decides); question 1 is what it moved.
+  decides); question 1 is what it moved, and is RULED (a).
 - **B the coarse look** — RULED (coarse where it does not show). Nothing open.
 - **C the full build's time** — measured in §8; open: (a) accept, (b) an
   optimisation session (the re-mesh after a withdrawal re-meshes the organ's

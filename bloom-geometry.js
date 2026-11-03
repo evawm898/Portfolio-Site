@@ -28711,7 +28711,21 @@ function boneApply(acc, built, T, organs, smoothRods, capability) {
   if (T.bone2) {
     const F = T.bone2.full;
     if (built.texture && built.texture.bone) { built.texture.bone.detail = F ? 'full' : 'coarse'; built.texture.bone.full = F; }
-    if (F && F.runs && F.runs.length) { const n = bone2RemapRecords(built, bone2RangeMap(F.runs)); F.remapped = n; }
+    if (F && F.runs && F.runs.length) {
+      const map = bone2RangeMap(F.runs);
+      let n = bone2RemapRecords(built, map);
+      /* A PLACED FLORET'S BLOCK is `at` (a FLOAT offset) and `tris` (a count),
+         neither a range key, so the walk above cannot see it: mapped here, in
+         triangle units, or ST9 and ID10 read a full file's florets at the
+         coarse build's offsets (CI found it on the BONE raceme row) */
+      const IB = built.inflorescenceBuilt;
+      if (IB && Array.isArray(IB.placed)) for (const q of IB.placed) {
+        if (!Number.isFinite(q.at) || !Number.isFinite(q.tris)) continue;
+        const a = q.at / 9, b = map(a), e = map(a + q.tris);
+        q.at = b * 9; q.tris = e - b; n += 2;
+      }
+      F.remapped = n;
+    }
   }
   built.t5 = { organs: organs.map((O) => O.organ) };
   delete built.boneCapture;

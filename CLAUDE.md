@@ -1502,7 +1502,8 @@ follow-ups of Oct 26; read `docs/bloom-surface-texture-bone-outcome.md` before t
 `boneApply` / `boneRunPending`, `textureVertexCoveredAny`, `BONE_*`, TXB0–TXB7 or block 82).
 - **The dropdown is NONE / BONE.** PEBBLE and CELLULAR keep their ids as `hidden: true` options, and a loaded
   design keeps and builds them **byte-identically** (T3/T5's path, by branch). 34 live rows and 125 frozen rows
-  over 5 phases use them; their long-term loading is open.
+  over 5 phases use them; their long-term loading is open. **[Nov 2: a design OVER 1.5 M builds finer under the one
+  2.0 M cap — ruled, accepted; byte-identical holds under 1.5 M only. The BONE v2 block below.]**
 - **The law is `s = w0 · mc · mp · H · f`:**
   - **f** is two pore bands (D and `ratio × D`), merged by a smooth minimum with rounded rims. It is exactly 0 on
     a pore floor, so the floor sits ON the sheet: outward only.
@@ -1609,9 +1610,11 @@ DETAIL WHERE IT SHOWS, AND ONE PROVISIONAL 2.0 M EXPORT CAP** (Nov 2, Eva's ruli
 `BONE2_HY_SNAP_MM`, the fold check in `bone2BuildFull`, `exportBuildOf` or block 79 / 82).
 - **One cap**: `EXPORT_TRI_CAP` = 2,000,000 (~100 MB binary STL, Eva's PreForm ruling, PROVISIONAL until her
   ladder test); `EXPORT_TRI_BUDGET` is the same number. Every reader moves with it: the texture edge cap, the
-  depth-2 umbel clamp, the tip-row ramp hold. So PEBBLE / CELLULAR designs that were over 1.5 M build finer now
-  — flagged as question 1; every row under 1.5 M holds to the bit (the byte partition). Block 79 is redefined to
-  heavier states that still bind at 2.0 M.
+  depth-2 umbel clamp, the tip-row ramp hold. **RULED Nov 2 (Eva, question 1 (a)): ONE CAP FOR EVERYTHING.**
+  Retired PEBBLE / CELLULAR designs that were over 1.5 M build finer — accepted, and it SUPERSEDES "byte-identical"
+  for those designs only; every design under 1.5 M holds to the bit (the byte partition). Block 79 is redefined to
+  heavier states that still bind at 2.0 M; its old states are NOT restored as rows. The cap's final value is a
+  one-line follow-up from the PreForm ladder test.
 - **Coarse / full**: `MeshBuilder({ boneDetail })` defaults FULL in export mode and COARSE live. The page's live view
   and release build are COARSE (v1's exact count); the **Full detail** button and the STL export are FULL. Any
   instrument that builds export mode for something other than the file (the coverage rasters) must pass
