@@ -82,7 +82,7 @@ const full = JSON.parse(toText(composeDoc(DEFAULTS, { savedAt: SAVED })));
 samples.push({ name: 'a clamp (petalLength 140)', text: JSON.stringify({ ...full, controls: { ...full.controls, petalLength: 140 } }) });
 samples.push({ name: 'an unknown key', text: JSON.stringify({ ...full, controls: { ...full.controls, petalColour: 'red' }, sidecar: 1 }) });
 const ret = { ...full.controls }; delete ret.stemNodeSwelling; delete ret.stemNodeKink;
-samples.push({ name: 'a retired id (stemNodeProminence 0.48)', text: JSON.stringify({ ...full, controls: { ...ret, stemNodeProminence: 0.48, stemLength: 100 } }) });
+samples.push({ name: 'a retired id (stemNodeProminence 0.48)', text: JSON.stringify({ ...full, controls: { ...ret, 'stemNodeProminence': 0.48, stemLength: 100 } }) });
 
 const strip = (t) => t.replace(/"savedAt": "[^"]*"/, '"savedAt": "-"');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-load-unchanged-'));
