@@ -1,0 +1,24 @@
+{
+  "views": [
+    "threequarter",
+    "side"
+  ],
+  "controls": {
+    "placement": "RADIAL",
+    "petalCount": 8,
+    "layerCount": 5,
+    "layerSize": 0.86,
+    "layerPhase": 0.5,
+    "layerTilt": 5,
+    "petalLength": 40,
+    "petalWidth": 32,
+    "petalTipShape": 2.5,
+    "petalTilt": 72,
+    "petalCup": 0.7,
+    "buckleAmp": 0.15,
+    "buckleFreq": 3,
+    "petalSpineCurl": 40
+  },
+  "frame": 1.3,
+  "frameZ": 0.18
+}

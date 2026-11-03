@@ -1,0 +1,28 @@
+{
+  "views": [
+    "front",
+    "threequarter"
+  ],
+  "controls": {
+    "petalCount": 20,
+    "layerCount": 2,
+    "layerSize": 0.9,
+    "layerPhase": 0.5,
+    "layerTilt": 4,
+    "petalLength": 35,
+    "petalWidth": 11,
+    "petalTipShape": 2.6,
+    "petalTilt": 6,
+    "petalCup": 0.1,
+    "spread": 2.4,
+    "headRise": 0.4,
+    "stamenCount": 120,
+    "stamenLayout": "DISC",
+    "stamenLength": 5,
+    "stamenSpread": 6,
+    "antherSize": 1.2,
+    "antherElongation": 1.0
+  },
+  "frame": 1.0,
+  "frameZ": 0.04
+}
