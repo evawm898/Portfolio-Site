@@ -161,17 +161,22 @@ function staplePosed(f, pose, depth) {
   }
   return pts;
 }
-function stapleYarnPoint(f, u, T, R, crimpK, sgn, axis) {
-  const rho = f.rho * R, alpha = Math.atan(TAU * rho * T / YARN.P);
-  const s = f.c + sgn * (u - 0.5) * f.len * Math.cos(alpha), th = f.phi + TAU * T * (s - YARN.XC) / YARN.P;
+function stapleYarnPoint(f, u, T, R, crimpK, sgn, axis, P) {
+  const rho = f.rho * R, alpha = Math.atan(TAU * rho * T / P);
+  const s = f.c + sgn * (u - 0.5) * f.len * Math.cos(alpha), th = f.phi + TAU * T * (s - YARN.XC) / P;
   return axis(s, rho * Math.cos(th) - sgn * crimpK * stapleCrimp(f, u), rho * Math.sin(th));
 }
-function stapleFibrePoints(f, t) {
+// A spun staple yarn packs its short fibres tight: it twists down to SPUN.R1, well inside the
+// textile-basics yarn's 18, at the same surface twist angle (40 degrees). The corespun sheath keeps 18,
+// so it clears its core.
+const SPUN = { R1: 12, P: TAU * 12 / Math.tan(40 * Math.PI / 180), crimp: 0.2 };
+const SHEATH = { R1: YARN.R1, P: YARN.P, crimp: 0.3 };
+function stapleFibrePoints(f, t, Y = SPUN) {
   const start = fiberPose(f, 1);
   const g = ease(seg(t, f.delay, f.delay + 0.32)), st = ease(seg(t, 0.38, 0.52)), T = ease(seg(t, 0.52, 0.95));
-  const R = lerp(YARN.R0, YARN.R1, T), crimpK = lerp(1, 0.3, st), sgn = flipOf(f), n = stapleN(f);
+  const R = lerp(YARN.R0, Y.R1, T), crimpK = lerp(1, Y.crimp, st), sgn = flipOf(f), n = stapleN(f);
   let pts;
-  if (T > 0) { pts = []; for (let j = 0; j <= n; j++) pts.push(stapleYarnPoint(f, j / n, T, R, crimpK, sgn, straightAxis(YARN.Y))); }
+  if (T > 0) { pts = []; for (let j = 0; j <= n; j++) pts.push(stapleYarnPoint(f, j / n, T, R, crimpK, sgn, straightAxis(YARN.Y), Y.P)); }
   else {
     let a0 = start.ang; if (sgn < 0) a0 -= Math.PI;
     a0 = Math.atan2(Math.sin(a0), Math.cos(a0));
@@ -302,7 +307,7 @@ const filamentScene = {
 
 // ---------- spun staple: the staple card's roving, twisted tight. A third of the fibres keep an
 // end proud of the surface as the twist packs them in — the hairiness a filament yarn never has.
-const HAIR_U = 0.26, HAIR_L = 5.5;
+const HAIR_U = 0.26, HAIR_L = 4.5;
 function hairy(f, pts, k) {
   const which = f.hairEnd; if (k <= 0 || which < 0 || f.accent) return pts;
   const n = pts.length - 1, out = pts.map(p => ({ ...p }));
@@ -324,19 +329,7 @@ const spunScene = {
   markup(t) {
     const tt = lerp(ROVING_TT, 1, t), hk = ease(seg(t, 0.25, 0.95)), runs = [];
     for (const f of STAPLE) { const { pts } = stapleFibrePoints(f, tt); stapleRuns(f, hairy(f, thin(pts), hk), 1, BACK, runs); }
-    // the yarn's body: as the twist packs the fibres, a shaded round strand forms under them, with
-    // a faint edge each side, fading out at the yarn's two ragged ends (stapleFibrePoints' own twist)
-    const T = ease(seg(tt, 0.52, 0.95)), E = seg(T, 0.35, 1), R = lerp(YARN.R0, YARN.R1, T);
-    let body = '';
-    if (E > 0) {
-      const x0 = YARN.X0 + 4, x1 = YARN.X1 - 4, y0 = YARN.Y - R, h = 2 * R;
-      body = `<defs><linearGradient id="tt-spun-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${INK}" stop-opacity="0.05"/><stop offset="0.35" stop-color="${INK}" stop-opacity="0.2"/><stop offset="1" stop-color="${INK}" stop-opacity="0.03"/></linearGradient>`
-        + `<linearGradient id="tt-spun-e" gradientUnits="userSpaceOnUse" x1="${x0}" y1="0" x2="${x1}" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.1" stop-color="#fff"/><stop offset="0.9" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`
-        + `<mask id="tt-spun-m" maskUnits="userSpaceOnUse" x="0" y="0" width="${VIEW.w}" height="${VIEW.h}"><rect x="${x0}" y="0" width="${x1 - x0}" height="${VIEW.h}" fill="url(#tt-spun-e)"/></mask></defs>`
-        + `<g mask="url(#tt-spun-m)" opacity="${f1(E * 100) / 100}"><rect x="${x0}" y="${f1(y0)}" width="${x1 - x0}" height="${f1(h)}" fill="url(#tt-spun-g)"/>`
-        + `<path d="M${x0},${f1(y0 - 0.4)}H${x1}M${x0},${f1(y0 + h + 0.4)}H${x1}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.24" fill="none"/></g>`;
-    }
-    return body + softMarkup(runs);
+    return softMarkup(runs);
   },
 };
 
@@ -423,7 +416,7 @@ const coreScene = {
   viewBox: YARN_VB, duration: 7200,
   markup(t) {
     const coreTip = lerp(-12, 370, ease(seg(t, 0, 0.24))), tt = seg(t, 0.14, 1), runs = [];
-    for (const f of CORE_FIB) { const { pts, yarnness } = stapleFibrePoints(f, tt); stapleRuns(f, thin(pts), 1, lerp(1, BACK, yarnness), runs); }
+    for (const f of CORE_FIB) { const { pts, yarnness } = stapleFibrePoints(f, tt, SHEATH); stapleRuns(f, thin(pts), 1, lerp(1, BACK, yarnness), runs); }
     // back of the sheath, the core, the front of the sheath
     const back = runs.filter(r => r.depth < 0), front = runs.filter(r => r.depth >= 0);
     const core = rod('tt-core-g', -12, coreTip, YARN.Y, () => CORE.r, coreTip < VIEW.w + 20);
