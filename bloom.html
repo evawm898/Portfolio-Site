@@ -109,6 +109,10 @@
          not a control; it is deliberately the non-primary button. -->
     <button id="exportGrid" class="bl-btn" type="button"
             title="Download the per-petal surface grid as glTF (.glb, millimetres) — line strips along and across each petal, plus each petal's attachment point. Not printable geometry.">Get grid &darr;</button>
+    <!-- BONE v2's FULL DETAIL (Nov 2): page chrome, shown only under BONE. The
+         released preview is COARSE; this asks for one full build (the export's
+         own). Never saved, not a registry row. -->
+    <button id="boneFullDetail" class="bl-btn" type="button" hidden aria-pressed="false">Full detail</button>
   </div>
   <!-- THE DESIGN FILE (bloom-file.js). Save downloads every registry control
        verbatim as JSON; Load (the file input, or a .json dropped anywhere on

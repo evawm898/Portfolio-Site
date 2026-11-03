@@ -1,71 +1,112 @@
 {
- "box": "headless Chromium (Playwright), software GL, this container",
- "states": {
-  "default": {
-   "export": {
-    "previewMs": 61,
-    "previewTris": 24688,
-    "v1Ms": 711,
-    "v1Tris": 158912,
-    "v2LatticeMs": 1149,
-    "v2LatticeTris": 158912,
-    "porousAreaMm2": 4424,
-    "v2RingsEstMs": {
-     "overlap": 4885,
-     "hardcore": 2932
-    },
-    "v2Grid01Ms": 11464,
-    "v2Grid01Tris": 2856784
+ "rows": [
+  {
+   "key": "default",
+   "name": "the default",
+   "detail": "coarse",
+   "node": {
+    "tris": 158912,
+    "hash": "f11217d4",
+    "s": 3.1,
+    "share": null
    },
-   "live": {
-    "previewMs": 49,
-    "previewTris": 24688,
-    "v1Ms": 705,
-    "v1Tris": 158912,
-    "v2LatticeMs": 843,
-    "v2LatticeTris": 158912,
-    "porousAreaMm2": 4424,
-    "v2RingsEstMs": {
-     "overlap": 4580,
-     "hardcore": 2627
-    },
-    "v2Grid01Ms": 15964,
-    "v2Grid01Tris": 2856784
-   }
+   "chromium": {
+    "tris": 158912,
+    "hash": "f11217d4",
+    "s": 2.1,
+    "heapEndGB": 0.08
+   },
+   "agree": true
   },
-  "umbel": {
-   "export": {
-    "previewMs": 488,
-    "previewTris": 134182,
-    "v1Ms": 3743,
-    "v1Tris": 530634,
-    "v2LatticeMs": 4280,
-    "v2LatticeTris": 530634,
-    "porousAreaMm2": 11349,
-    "v2RingsEstMs": {
-     "overlap": 13866,
-     "hardcore": 8856
-    }
-   }
+  {
+   "key": "umbel",
+   "name": "the umbel, head ON (60 mm stem)",
+   "detail": "coarse",
+   "node": {
+    "tris": 530634,
+    "hash": "bd2d4f52",
+    "s": 10.7,
+    "share": null
+   },
+   "chromium": {
+    "tris": 530634,
+    "hash": "bd2d4f52",
+    "s": 8.4,
+    "heapEndGB": 0.27
+   },
+   "agree": true
   },
-  "mophead": {
-   "export": {
-    "previewMs": 1549,
-    "previewTris": 1265418,
-    "v1Ms": 28961,
-    "v1Tris": 1240446,
-    "v2LatticeMs": 31102,
-    "v2LatticeTris": 1240446,
-    "porousAreaMm2": 20724,
-    "v2RingsEstMs": {
-     "overlap": 48608,
-     "hardcore": 39458
-    }
-   }
+  {
+   "key": "mophead",
+   "name": "the mophead (depth 2's ruled defaults)",
+   "detail": "coarse",
+   "node": {
+    "tris": 1762254,
+    "hash": "1119c8a8",
+    "s": 94.8,
+    "share": null
+   },
+   "chromium": {
+    "tris": 1762254,
+    "hash": "1119c8a8",
+    "s": 80.7,
+    "heapEndGB": 0.87
+   },
+   "agree": true
+  },
+  {
+   "key": "default",
+   "name": "the default",
+   "detail": "full",
+   "node": {
+    "tris": 1977368,
+    "hash": "bbc18378",
+    "s": 100.2,
+    "share": 0.875
+   },
+   "chromium": {
+    "tris": 1977368,
+    "hash": "bbc18378",
+    "s": 66.2,
+    "heapEndGB": 1.16
+   },
+   "agree": true
+  },
+  {
+   "key": "umbel",
+   "name": "the umbel, head ON (60 mm stem)",
+   "detail": "full",
+   "node": {
+    "tris": 1981752,
+    "hash": "fd589e27",
+    "s": 145.8,
+    "share": 0.267
+   },
+   "chromium": {
+    "tris": 1981752,
+    "hash": "fd589e27",
+    "s": 90.6,
+    "heapEndGB": 1.24
+   },
+   "agree": true
+  },
+  {
+   "key": "mophead",
+   "name": "the mophead (depth 2's ruled defaults)",
+   "detail": "full",
+   "node": {
+    "tris": 1993780,
+    "hash": "51c4a249",
+    "s": 173.8,
+    "share": 0.016
+   },
+   "chromium": {
+    "tris": 1993780,
+    "hash": "51c4a249",
+    "s": 126.2,
+    "heapEndGB": 1.98
+   },
+   "agree": true
   }
- },
- "ringsMsPerMm2": {
-  "overlap": 0.844676776565324,
-  "hardcore": 0.403188240773805
- }
+ ]
 }

@@ -217,6 +217,23 @@ const ROW_DEF_MOVED_BY_PRED = {
     },
   },
   bone: { added: 20, rows: {} },
+  /* BONE v2 (Nov 2): no row added; block 79's three TEXTURE CAP rows are
+     redefined (their states no longer reach the 2.0 M cap) and block 82's
+     ruled-defaults, maxima, minima, 40 x 3 and two GATED rows take v2's ranges. */
+  'bone-v2': {
+    added: 0,
+    rows: {
+      'TEXTURE CAP: PEBBLE x 40 petals x 3 whorls on a 50 mm petal (2,036,036 tris at 0.40 mm — the edge coarsens to the finest rung that fits)': 'redefined: 40 x 3 on the shipping petal (1,614,436 at 0.4) fits the 2.0 M cap, so the corner is the same head on a 50 mm petal',
+      'TEXTURE CAP: the WHOLE bloom x 40 x 3 + 40 sepals + a 60 mm leaf on a 60 mm stem (every organ on the one coarsened edge)': 'redefined: with 8 sepals the whole bloom (1,802,556 at 0.4) fits the 2.0 M cap; 40 sepals take it over',
+      'TEXTURE CAP: past 0.50 mm — 40 x 3 on 60 x 24 mm petals (REFUSED at the cap, told)': 'redefined: the old refused state lands on 0.48 mm (1,964,656) under the 2.0 M cap and exports; 40 x 3 on 60 x 24 mm petals stands at 0.5 (2,224,952) and is refused',
+      'BONE: the ruled defaults (v2: merging pores 0.5-1.5 mm with nested pits, 60% in patches, smooth past 1/mm; the live build COARSE, the export FULL under the cap)': 'relabelled, the same set: v2',
+      'BONE: the maxima — height 2.5 (UNVALIDATED for powder), smallest pores 1.0 mm x spread 3, density 1, coverage 1': "v2's ranges (height 2.5, pores 0.5-1.0, spread 1.5-3)",
+      'BONE: the minima — height 0.4, smallest pores 0.5 mm, spread 1.5, density 0.2, coverage 0.1, curvature 0.2': "v2's ranges",
+      'BONE: x 40 petals x 3 whorls (the coarse lattice fits the 2.0 M cap at 0.4; the full build\'s allocator binds: the best-exposed cells full, the rest coarse)': 'relabelled, the same set: under the 2.0 M cap the coarse lattice fits at 0.4',
+      'BONE: GATED — the five at their extremes under NONE (hidden AND inert)': "v2's ranges (the extremes moved; still inert)",
+      'BONE: GATED — the five at their extremes under the retired PEBBLE (hidden AND inert; a saved PEBBLE design builds as before)': "v2's ranges (the extremes moved; still inert)",
+    },
+  },
   'root-support': {
     added: 21,
     rows: {
@@ -345,6 +362,39 @@ const PREDICATE_MOVERS = {
      PEBBLE / CELLULAR take their shipped expressions by branch. Written from
      the CONTROLS, never from either tree's guard. */
   bone: (st) => String(st.petalTexture) === 'BONE' && String(st.petalInfill ?? 'NONE') === 'NONE',
+  /* BONE v2 (Nov 2) — the v2 field, the hybrid mesher, coarse/full, and the
+     ONE export cap (EXPORT_TRI_CAP, 2,000,000, provisional, Eva's PreForm
+     ruling) replacing the 1,500,000 budget. A row moves iff (a) its texture is
+     BONE with the infill off (the v2 field reaches every BONE row in both
+     modes), or (b) the BASE tree's own build took a decision on its
+     1,500,000 budget that the 2,000,000 cap decides differently — read off the
+     base builder's records, never this tree's: a textured build over the base
+     budget at 0.4 mm whose 0.4 build fits 2.0 M or whose base rung is not the
+     cap (the edge-cap ladder), a depth-2 umbel the base clamp cut whose next
+     floret would fit 2.0 M, or a held tip-row ramp whose prediction fits
+     2.0 M. Everything else — PEBBLE and CELLULAR under 1.5 M, every untextured
+     row — must hold to the bit. */
+  'bone-v2': (st, row) => {
+    if (String(st.petalTexture) === 'BONE' && String(st.petalInfill ?? 'NONE') === 'NONE') return true;
+    const CAP = 2000000;
+    const acc = new base.MeshBuilder({ exportMode: true });
+    const b = base.buildBloomInto(acc, { ...st }, { below: null, capability: row.capability ?? null, scopes: baseScopes(harness.rowScopesForBuild(row)) });
+    const E = b.texture && b.texture.edgeCap;
+    if (E && Array.isArray(E.trials) && E.trials.length) {
+      const t04 = E.trials.find((t) => t.edgeMm === 0.4);
+      if (t04 && t04.tris > base.EXPORT_TRI_BUDGET) {
+        if (t04.tris <= CAP) return true;
+        const fitsNew = E.trials.filter((t) => t.tris <= CAP).map((t) => t.edgeMm);
+        if (!fitsNew.length) return false;            // refused at 0.5 on both trees
+        return Math.min(...fitsNew) !== E.usedMm || !E.fits;
+      }
+    }
+    const C = b.inflorescence && b.inflorescence.budgetClamp;
+    if (C && C.clamped && C.predictedTotal + C.rays * C.floretTris <= CAP) return true;
+    const R = b.tipRowBudget;
+    if (R && R.held && R.predictedTris != null && R.predictedTris <= CAP && R.baselineTris <= CAP) return true;
+    return false;
+  },
   /* SURFACE TEXTURE (T3, Oct 22). A row moves iff its texture choice is not
      NONE and the infill is NONE (with the infill on the texture is REFUSED
      and nothing moves — Q9); written from the CONTROLS, the choice guard's own

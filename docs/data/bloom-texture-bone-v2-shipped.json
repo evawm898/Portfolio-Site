@@ -1,0 +1,431 @@
+{
+ "budget": [
+  {
+   "key": "default",
+   "name": "the default",
+   "coarseTris": 158912,
+   "coarseMB": 7.9,
+   "coarsePct": 7.9,
+   "coarseMs": 1673,
+   "fullTris": 1977368,
+   "fullMB": 98.9,
+   "fullPct": 98.9,
+   "fullMs": 102060,
+   "share": 0.875,
+   "cells": 1158,
+   "selectedCells": 1020,
+   "allFullTris": 2257476,
+   "passes": 1,
+   "porousAreaMm2": 4424,
+   "fullAreaMm2": 3870,
+   "discs": 8598,
+   "free": 260,
+   "merged": 8338,
+   "junctions": 5756,
+   "timing": {
+    "countMs": 13310.015576999998,
+    "rankMs": 261.87263600000006,
+    "buildMs": [
+     84648.048273
+    ],
+    "counts": 9,
+    "discMs": 1882.634709,
+    "selectMs": 37.549268999999185
+   },
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "whole",
+   "name": "the whole bloom (60 mm stem, a 30 mm leaf, 5 sepals, 12 stamens, the style)",
+   "coarseTris": 289008,
+   "coarseMB": 14.5,
+   "coarsePct": 14.5,
+   "coarseMs": 3426,
+   "fullTris": 1962658,
+   "fullMB": 98.1,
+   "fullPct": 98.1,
+   "fullMs": 133785,
+   "share": 0.519,
+   "cells": 1937,
+   "selectedCells": 999,
+   "allFullTris": null,
+   "passes": 1,
+   "porousAreaMm2": 6956,
+   "fullAreaMm2": 3608,
+   "discs": 13609,
+   "free": 440,
+   "merged": 13169,
+   "junctions": 8892,
+   "timing": {
+    "countMs": 19486.072073000003,
+    "rankMs": 592.072874000005,
+    "buildMs": [
+     107745.90484999999
+    ],
+    "counts": 18,
+    "discMs": 2018.7590439999913,
+    "selectMs": 50.1408179999853
+   },
+   "shells": 49,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "umbel",
+   "name": "the umbel, head ON (60 mm stem)",
+   "coarseTris": 530634,
+   "coarseMB": 26.5,
+   "coarsePct": 26.5,
+   "coarseMs": 6347,
+   "fullTris": 1981752,
+   "fullMB": 99.1,
+   "fullPct": 99.1,
+   "fullMs": 136137,
+   "share": 0.267,
+   "cells": 3958,
+   "selectedCells": 855,
+   "allFullTris": null,
+   "passes": 1,
+   "porousAreaMm2": 11349,
+   "fullAreaMm2": 3026,
+   "discs": 14259,
+   "free": 473,
+   "merged": 13786,
+   "junctions": 9590,
+   "timing": {
+    "countMs": 25353.30671700003,
+    "rankMs": 1295.968751999957,
+    "buildMs": [
+     98010.85210999998
+    ],
+    "counts": 42,
+    "discMs": 3726.5822229999467,
+    "selectMs": 39.070570999989286
+   },
+   "shells": 53,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "mophead",
+   "name": "the mophead (depth 2's ruled defaults)",
+   "coarseTris": 1762254,
+   "coarseMB": 88.1,
+   "coarsePct": 88.1,
+   "coarseMs": 71093,
+   "fullTris": 1993780,
+   "fullMB": 99.7,
+   "fullPct": 99.7,
+   "fullMs": 159784,
+   "share": 0.016,
+   "cells": 14635,
+   "selectedCells": 333,
+   "allFullTris": null,
+   "passes": 1,
+   "porousAreaMm2": 28099,
+   "fullAreaMm2": 462,
+   "discs": 7677,
+   "free": 374,
+   "merged": 7303,
+   "junctions": 4539,
+   "timing": {
+    "countMs": 15222.782285000081,
+    "rankMs": 9070.880112000043,
+    "buildMs": [
+     44633.13819800003
+    ],
+    "counts": 97,
+    "discMs": 9715.616544999997,
+    "selectMs": 16.436452000052668
+   },
+   "shells": 458,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "40x3",
+   "name": "40 petals x 3 whorls",
+   "coarseTris": 1614436,
+   "coarseMB": 80.7,
+   "coarsePct": 80.7,
+   "coarseMs": 14298,
+   "fullTris": 1991820,
+   "fullMB": 99.6,
+   "fullPct": 99.6,
+   "fullMs": 118428,
+   "share": 0.022,
+   "cells": 11350,
+   "selectedCells": 284,
+   "allFullTris": null,
+   "passes": 1,
+   "porousAreaMm2": 35267,
+   "fullAreaMm2": 762,
+   "discs": 10962,
+   "free": 454,
+   "merged": 10508,
+   "junctions": 7151,
+   "timing": {
+    "countMs": 22211.577768000076,
+    "rankMs": 3050.818196999957,
+    "buildMs": [
+     59001.21404200001
+    ],
+    "counts": 55,
+    "discMs": 13206.375483000069,
+    "selectMs": 19.241002000053413
+   },
+   "shells": 121,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  }
+ ],
+ "walls": [
+  {
+   "label": "the ruled defaults (0.5 mm, spread 3, density 0.9)",
+   "D": 0.5,
+   "spread": 3,
+   "density": 0.9,
+   "pairs": 395,
+   "merged": 222,
+   "walls": {
+    "n": 173,
+    "min": 0.006,
+    "median": 0.278,
+    "p90": 0.583,
+    "max": 0.884
+   },
+   "underMm": 0.7,
+   "under": 166,
+   "underShare": 0.96,
+   "check": {
+    "pairs": 395,
+    "merged": 222,
+    "thinnestMm": 0.0059953980212783635,
+    "p10Mm": 0.04394222292751023,
+    "medianMm": 0.27760244183818306
+   }
+  },
+  {
+   "label": "smallest pores 1.0 mm",
+   "D": 1,
+   "spread": 3,
+   "density": 0.9,
+   "pairs": 144,
+   "merged": 83,
+   "walls": {
+    "n": 61,
+    "min": 0.008,
+    "median": 0.588,
+    "p90": 1.281,
+    "max": 1.748
+   },
+   "underMm": 0.7,
+   "under": 34,
+   "underShare": 0.557,
+   "check": {
+    "pairs": 144,
+    "merged": 83,
+    "thinnestMm": 0.007996124056437421,
+    "p10Mm": 0.0819700959850351,
+    "medianMm": 0.5879756959698756
+   }
+  },
+  {
+   "label": "spread 1.5",
+   "D": 0.5,
+   "spread": 1.5,
+   "density": 0.9,
+   "pairs": 1643,
+   "merged": 1094,
+   "walls": {
+    "n": 549,
+    "min": 0.002,
+    "median": 0.136,
+    "p90": 0.302,
+    "max": 0.442
+   },
+   "underMm": 0.7,
+   "under": 549,
+   "underShare": 1,
+   "check": {
+    "pairs": 1643,
+    "merged": 1094,
+    "thinnestMm": 0.0019940983878642044,
+    "p10Mm": 0.03598736361778888,
+    "medianMm": 0.13587899342504364
+   }
+  },
+  {
+   "label": "density 0.2",
+   "D": 0.5,
+   "spread": 3,
+   "density": 0.2,
+   "pairs": 16,
+   "merged": 4,
+   "walls": {
+    "n": 12,
+    "min": 0.162,
+    "median": 0.352,
+    "p90": 0.424,
+    "max": 0.526
+   },
+   "underMm": 0.7,
+   "under": 12,
+   "underShare": 1,
+   "check": {
+    "pairs": 16,
+    "merged": 4,
+    "thinnestMm": 0.1619868197617192,
+    "p10Mm": 0.20581146249809448,
+    "medianMm": 0.3518966238363025
+   }
+  }
+ ],
+ "print": [
+  {
+   "H": 0.4,
+   "tris": 1977368,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 17008,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 20,
+    "sampled": 20526,
+    "newlyClosedPrintableGaps": 1,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0,
+    "nearestRaisedMm": 0
+   }
+  },
+  {
+   "H": 2.5,
+   "tris": 1985794,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 17010,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 20,
+    "sampled": 63785,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0,
+    "nearestRaisedMm": 0
+   }
+  }
+ ],
+ "roundPlate": {
+  "plate": {
+   "lattice (= coarse)": {
+    "trisPerMm2": 13,
+    "free": {
+     "n": 1,
+     "median": 28.84,
+     "p90": 28.84,
+     "max": 28.84
+    },
+    "merged": {
+     "n": 9,
+     "median": 17.73,
+     "p90": 24.57,
+     "max": 24.57
+    }
+   },
+   "prototype hybrid": {
+    "trisPerMm2": 430,
+    "free": {
+     "n": 1,
+     "median": 2.19,
+     "p90": 2.19,
+     "max": 2.19
+    },
+    "merged": {
+     "n": 25,
+     "median": 1.9,
+     "p90": 1.92,
+     "max": 2.86
+    }
+   },
+   "SHIPPED hybrid": {
+    "trisPerMm2": 423,
+    "free": {
+     "n": 1,
+     "median": 1.9,
+     "p90": 1.9,
+     "max": 1.9
+    },
+    "merged": {
+     "n": 25,
+     "median": 1.9,
+     "p90": 1.93,
+     "max": 2.86
+    }
+   }
+  },
+  "cylinder R6": {
+   "lattice (= coarse)": {
+    "trisPerMm2": 13,
+    "free": {
+     "n": 2,
+     "median": 27.07,
+     "p90": 27.07,
+     "max": 27.07
+    },
+    "merged": {
+     "n": 9,
+     "median": 20.1,
+     "p90": 24.43,
+     "max": 24.43
+    }
+   },
+   "prototype hybrid": {
+    "trisPerMm2": 398,
+    "free": {
+     "n": 2,
+     "median": 3.76,
+     "p90": 3.76,
+     "max": 3.76
+    },
+    "merged": {
+     "n": 29,
+     "median": 2.13,
+     "p90": 3.23,
+     "max": 3.99
+    }
+   },
+   "SHIPPED hybrid": {
+    "trisPerMm2": 393,
+    "free": {
+     "n": 2,
+     "median": 3.76,
+     "p90": 3.76,
+     "max": 3.76
+    },
+    "merged": {
+     "n": 29,
+     "median": 2.13,
+     "p90": 3.23,
+     "max": 3.99
+    }
+   }
+  }
+ }
+}

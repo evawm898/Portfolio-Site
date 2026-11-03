@@ -810,7 +810,12 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
     for (const exportMode of [false, true]) {
       let acc, built;
       try {
-        acc = new G.MeshBuilder({ exportMode, captureRim: true });
+        /* COARSE IN BOTH MODES (BONE v2): an export-mode builder defaults to the
+           FULL hybrid mesh, whose count is the allocator's and is not the live
+           build's, so E5 read every BONE row as mode-dependent. Every relieved
+           part is out of this family by declaration (below), so the coarse
+           export is the same subject; the file's own count is TXB's. */
+        acc = new G.MeshBuilder({ exportMode, captureRim: true, boneDetail: 'coarse' });
         built = G.buildBloomInto(acc, st, { below: null, capability: row.capability || null, scopes: scopesFor(row) });
       } catch (e) { check('E0', false, `${row.label} [${exportMode ? 'export' : 'live'}]: build threw — ${e.message}`); continue; }
       const mesh = meshOf(acc.positions);

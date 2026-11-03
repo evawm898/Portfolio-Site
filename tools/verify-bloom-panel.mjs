@@ -4839,9 +4839,9 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
           if (r.notBuilt) p.push('the read-out says NOT BUILT while the builder relieved the sheet');
           const o = r.T.organs && r.T.organs.petal;
           if (isBone) {
-            if (!/^BONE:/.test(r.line[1])) p.push(`the TEXTURE line does not name BONE: "${r.line[1].slice(0, 80)}"`);
+            if (!/^BONE v2:/.test(r.line[1])) p.push(`the TEXTURE line does not name BONE v2: "${r.line[1].slice(0, 80)}"`);
             if (!o || !o.bone || !new RegExp(`petal: ${o.bone.displaced} of ${o.bone.vertices} vertices raised`).test(r.line[1])) p.push(`the BONE line does not carry the petal's own raised count ${o && o.bone && o.bone.displaced} of ${o && o.bone && o.bone.vertices}`);
-            if (!/pore floors on the sheet/.test(r.line[1]) || !/reads round from/.test(r.line[1])) p.push('the BONE line does not say the pore floors sit on the sheet and what reads round');
+            if (!/pore floors on the sheet/.test(r.line[1]) || !/COARSE PREVIEW|FULL DETAIL/.test(r.line[1])) p.push('the BONE line does not say the pore floors sit on the sheet and which view (coarse preview / full detail) is showing');
           } else {
           if (!o || !new RegExp(`\\b${o.skinTris}\\b`).test(r.line[1])) p.push(`the TEXTURE line does not carry the petal lattice's own skin count ${o && o.skinTris}: "${r.line[1].slice(0, 120)}"`);
           if (!/x its floor/.test(r.line[1])) p.push('the TEXTURE line does not state the lattice against its floor');

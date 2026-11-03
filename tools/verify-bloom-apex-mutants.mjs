@@ -798,8 +798,11 @@ function capFacts(G, st) {
     return { tris: acc.triangleCount, edge: T.edgeMm, cap: T.edgeCap || null, budget: G.EXPORT_TRI_BUDGET };
   } catch (e) { return { threw: String(e && e.message || e) }; }
 }
-const CAP_CORNER = { petalCount: 40, layerCount: 3, petalTexture: 'PEBBLE' };
-const CAP_PAST = { petalCount: 40, layerCount: 3, sepalCount: 40, sepalTiers: 4, stemLength: 120, leafLength: 60, leafNodes: 8, leafPhyllotaxy: 'whorled', petalTexture: 'PEBBLE' };
+/* BONE v2 (Nov 2): the cap is 2.0 M now (EXPORT_TRI_CAP), so the corner is 40 x 3 on a
+   50 mm petal (2,036,036 at 0.4, lands on 0.41) and the past-the-cap state 40 x 3 on
+   60 x 24 mm petals (2,224,952 at 0.5) — block 79's redefined rows. */
+const CAP_CORNER = { petalCount: 40, layerCount: 3, petalLength: 50, petalTexture: 'PEBBLE' };
+const CAP_PAST = { petalCount: 40, layerCount: 3, petalLength: 60, petalWidth: 24, petalTexture: 'PEBBLE' };
 /* the texture facts a witness reads off a MUTATED module's own build */
 function texFacts(G, st) {
   try {
@@ -3362,7 +3365,7 @@ const MUTANTS = [
      witnessed on the MUTATED module's own edge-cap record, scoped to
      `CAP_ROWS` (the corner builds take the refused rows' settle allowance).
      =================================================================== */
-  { id: 'the-edge-cap-is-removed', rows: CAP_ROWS, why: "the cap's switch is off: every textured build stays on the ruled 0.4 mm edge, so the 40 x 3 corner builds 1,542,832 triangles, over the export budget, and the export is refused where the ruling says the edge coarsens to the finest rung that fits (0.41 mm, 1,478,672)",
+  { id: 'the-edge-cap-is-removed', rows: CAP_ROWS, why: "the cap's switch is off: every textured build stays on the ruled 0.4 mm edge, so the 40 x 3 corner on a 50 mm petal builds 2,036,036 triangles, over the 2.0 M cap, and the export is refused where the ruling says the edge coarsens to the finest rung that fits (0.41 mm, 1,970,596)",
     find: "    const capOn = true;   // the cap's own switch: the mutant table turns it off",
     into: "    const capOn = false;   // the cap's own switch: the mutant table turns it off", names: ['TX9'],
     witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, ...CAP_CORNER }; const m = capFacts(M, st), c = capFacts(C, st);
@@ -4530,12 +4533,12 @@ const ROWS = [
   /* THE EDGE CAP (Oct 23): the corner the ruling is about and a state past
      the cap, scoped to the cap mutants; the shipped PEBBLE row above also
      runs under them (CAP_ROWS) for the typed-edge mutant. */
-  { label: 'texture edge cap — PEBBLE x 40 petals x 3 whorls (over the budget at 0.4 mm, lands on 0.41)', for: CAP_MUTANTS,
-    set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }] },
+  { label: 'texture edge cap — PEBBLE x 40 petals x 3 whorls on a 50 mm petal (over the cap at 0.4 mm, lands on 0.41)', for: CAP_MUTANTS,
+    set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }, { id: 'petalLength', value: '50' }] },
   /* the past-the-cap row carries the MATRIX row's own label: TX9 asks that a
      build which does not fit at the cap be a DECLARED refusal, by label */
-  { label: 'TEXTURE CAP: past 0.50 mm — 40 x 3 x 40 sepals x 4 tiers x whorled leaves on a 120 mm stem (REFUSED at the cap, told)', for: CAP_MUTANTS,
-    set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }, { id: 'sepalCount', value: '40' }, { id: 'sepalTiers', value: '4' }, { id: 'stemLength', value: '120' }, { id: 'leafLength', value: '60' }, { id: 'leafNodes', value: '8' }, { id: 'leafPhyllotaxy', value: 'whorled' }] },
+  { label: 'TEXTURE CAP: past 0.50 mm — 40 x 3 on 60 x 24 mm petals (REFUSED at the cap, told)', for: CAP_MUTANTS,
+    set: [{ id: 'petalTexture', value: 'PEBBLE' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }, { id: 'petalLength', value: '60' }, { id: 'petalWidth', value: '24' }] },
   { label: 'an asymmetric outline curve — a LOPSIDED blade (the right half narrower)', for: ASYM_MUTANTS,
     set: [{ id: 'petalOutlineMode', value: 'CURVE' }, { id: 'petalOutlineCurve', value: JSON.stringify(ASYM_LOPSIDED) }] },
   { label: 'an asymmetric outline curve — a PINWHEEL x 5 petals', for: ASYM_MUTANTS,

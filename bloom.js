@@ -679,6 +679,9 @@ for (const c of CONTROLS) {
   const input = makeInput(c);
   input.id = c.id;
   input.value = c.default;
+  /* a row's HELP TEXT (BONE v2's relief height carries the first: the 2.5 mm
+     maximum is UNVALIDATED for powder removal, and the hover says so) */
+  if (c.help) { wrap.title = c.help; input.title = c.help; }
   wrap.append(label, input);
   sectionEls[c.section].append(wrap);
   inputs[c.id] = input; valSpans[c.id] = val; wrappers[c.id] = wrap;
@@ -1896,8 +1899,11 @@ const SMOOTH_SHADING_CREASE_DEG = 60;
    pass it. */
 /* `deferReports` (the page profile) — the held-slider build's report deferral,
    passed by regenerate() on a light build and by nothing else. */
-function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false, override = null, deferReports = false }) {
-  const acc = new MeshBuilder({ exportMode, captureGrid, captureNormals });
+/* `boneDetail` (BONE v2): 'coarse' the released preview, 'full' the "Full
+   detail" button; unasked, the accumulator's own default (an EXPORT build is
+   FULL — the STL handler passes nothing). */
+function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false, override = null, deferReports = false, boneDetail = null }) {
+  const acc = new MeshBuilder({ exportMode, captureGrid, captureNormals, boneDetail });
   const uiForBuild = override ? { ...readUI(), ...override } : readUI();
   const built = buildBloomInto(acc, uiForBuild, { below: null, capability, scopes: scopesForBuild(scopes), ...(deferReports ? { deferReports: true } : {}) });   // 'stem' | 'branch' | null — null is phase 1's only state
   if (record) {
@@ -2779,7 +2785,13 @@ function boneLine(T) {
       ? `on a ${C.usedMm.toFixed(2)} mm lattice — COARSENED from the ruled ${C.askedMm.toFixed(2)} mm to fit the ${fmtTris(C.budget)} export budget (${C.trials.map((t) => `${t.edgeMm.toFixed(2)} mm: ${fmtTris(t.tris)}`).join(', ')}; the finest edge that fits, never past ${C.capMm.toFixed(2)})${C.fits ? '' : ` — EVEN ${C.capMm.toFixed(2)} mm DOES NOT FIT (${fmtTris(C.trials[C.trials.length - 1].tris)} tris): the export will be REFUSED`}`
       : `on a ${T.edgeMm.toFixed(2)} mm lattice`;
   const clamp = (T.heightClamped ? ' · height CLAMPED to its range' : '') + (B.clamped && B.clamped.length ? ` · ${B.clamped.join(', ')} CLAMPED to range` : '');
-  return `TEXTURE BONE: ${T.heightMm.toFixed(2)} mm peak to valley, pores ${Number(B.poreMm).toFixed(2)} and ${Number(B.largePoreMm).toFixed(2)} mm (the floor ${Number(B.floorMm).toFixed(2)} mm, unvalidated; a pore reads round from ${Number(B.readsAtEdgeMm).toFixed(2)} mm on this lattice${Number(B.poreMm) < Number(B.readsAtEdgeMm) - 1e-9 ? ' — the fine pores are UNDER it here and draw faceted' : ''}), ${edgeWords}${clamp}, outward only, pore floors on the sheet — ${parts.join(' · ') || 'no organ carries it'}${smWords}. Smooth where the surface curves tighter than ${(1 / B.curvature).toFixed(2)} mm and outside the patches; the relief fades in over ${Number(B.fadeMm).toFixed(2)} mm.\n`;
+  /* BONE v2 (Nov 2): WHICH VIEW IS SHOWING, and under FULL what share of the
+     porous area got full detail (Eva's ruling: the read-out says so) */
+  const F = B.full;
+  const detail = B.detail === 'full' && F
+    ? `FULL DETAIL — ${fmtTris(F.tris)} tris, ${(100 * F.tris / F.capTris).toFixed(1)}% of the ${fmtTris(F.capTris)} cap (provisional); full pores on ${(100 * F.fullShare).toFixed(1)}% of the porous area (${F.selectedCells} of ${F.cells} cells, ranked by their exposure to the viewing hemisphere — where the surface shows), the rest COARSE${F.allFullTris <= F.capTris ? ' (everything fits: no cell left coarse)' : ` (all full would be ${fmtTris(F.allFullTris)})`}${F.fits ? '' : ' — DOES NOT FIT'}`
+    : 'COARSE PREVIEW — the pores drawn at the 0.4 mm lattice\'s own vertices (unround, v1\'s cost); "Full detail" and the export draw them round with their own rings where they show';
+  return `TEXTURE BONE v2: ${detail}. ${T.heightMm.toFixed(2)} mm peak to valley${T.heightMm > 1.5 + 1e-9 ? ' (DEEP: the smallest pores are blind wells, UNVALIDATED for powder removal)' : ''}, merging pores ${Number(B.poreMm).toFixed(2)} to ${Number(B.largePoreMm).toFixed(2)} mm with nested pits, ${edgeWords}${clamp}, outward only, pore floors on the sheet — ${parts.join(' · ') || 'no organ carries it'}${smWords}. Smooth where the surface curves tighter than ${(1 / B.curvature).toFixed(2)} mm and outside the patches; the relief fades in over ${Number(B.fadeMm).toFixed(2)} mm.\n`;
 }
 function infillLine(petals) {
   const F = petals && petals[0] && petals[0].infill;
@@ -3868,7 +3880,15 @@ function regenerate() {
      own, so a live build asks for none (they were computed and thrown away —
      every append on the mophead paid for both). Moves no position: the
      channel is shading only (MeshBuilder's captureNormals note). */
-  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true, captureNormals: mode === 'export', override: light ? DRAG_LIGHT_OVERRIDE : null, deferReports: light });
+  /* BONE v2's DETAIL (Eva's Nov 2 ruling): a release builds COARSE; the
+     "Full detail" button asks for ONE full build, and the next rebuild (any
+     control) is coarse again — a full build is a minute, never a drag's
+     price. The button's own state says which is on screen. */
+  const boneDetail = boneFullAsked && !light ? 'full' : 'coarse';
+  boneFullAsked = false;
+  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true, captureNormals: mode === 'export', override: light ? DRAG_LIGHT_OVERRIDE : null, deferReports: light, boneDetail });
+  boneDetailShown = !light && built.texture && built.texture.bone && built.texture.bone.detail ? built.texture.bone.detail : null;
+  syncBoneDetailButton();
   lightOnScreen = light;
   if (light) lightBuildCount++;
   /* THE READ-OUT SPANS AND THE CAP MARK, AFTER THE BUILD (session 23) — they
@@ -4275,6 +4295,23 @@ for (const c of CONTROLS) {
    registry control uses — no visibility pass, because it is not a control
    and no predicate reads it. */
 if (printPreviewInput) printPreviewInput.addEventListener('change', scheduleRegen);
+/* BONE v2's "Full detail" (Eva's Nov 2 ruling) — page chrome like the print
+   preview: not a registry row, never saved, invisible to readUI(). Shown only
+   while BONE is the texture. A press asks for one FULL build (the allocator:
+   full pores where the surface shows, until the cap); the button then reads
+   what is on screen, and the next rebuild returns to the coarse preview. */
+let boneFullAsked = false, boneDetailShown = null;
+const boneDetailBtn = document.getElementById('boneFullDetail');
+function syncBoneDetailButton() {
+  if (!boneDetailBtn) return;
+  const on = !!boneDetailShown;
+  boneDetailBtn.hidden = !on;
+  boneDetailBtn.setAttribute('aria-pressed', boneDetailShown === 'full' ? 'true' : 'false');
+  boneDetailBtn.textContent = boneDetailShown === 'full' ? 'Showing full detail' : 'Full detail';
+  boneDetailBtn.title = boneDetailShown === 'full' ? 'On screen: the FULL build (the export\'s own). Any change returns to the coarse preview.' : 'On screen: the COARSE preview. Build the full pores where they show (as the export does) — about a minute.';
+}
+if (boneDetailBtn) boneDetailBtn.addEventListener('click', () => { if (boneDetailShown === 'full') return; boneFullAsked = true; boneDetailBtn.textContent = 'Building full detail…'; scheduleRegen(); });
+window.__bloomBoneDetail = () => ({ shown: boneDetailShown, asked: boneFullAsked });
 
 /* THE DRAG / RELEASE SPLIT (F7) — see dragLight() for the three rules. All
    capture-phase on the document or window, so they run BEFORE the control's
@@ -4445,7 +4482,7 @@ document.getElementById('exportStl').addEventListener('click', () => {
   const exportTris = acc.triangleCount;   // the accumulator owns the count, in both modes
   if (exportTris > EXPORT_TRI_BUDGET) {
     geo.dispose();
-    readout.innerHTML = `<span class="bl-err">export refused: ${exportTris.toLocaleString('en-US')} tris (export) exceeds the ${EXPORT_TRI_BUDGET.toLocaleString('en-US')} budget</span>`;
+    readout.innerHTML = `<span class="bl-err">export refused: ${exportTris.toLocaleString('en-US')} tris (export) exceeds the ${EXPORT_TRI_BUDGET.toLocaleString('en-US')} cap (provisional: about 100 MB of STL, the size PreForm treats as safe)</span>`;
     return;
   }
   const stl = new STLExporter().parse(new THREE.Mesh(geo, material), { binary: true });

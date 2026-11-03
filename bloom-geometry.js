@@ -1349,8 +1349,15 @@ export const MAX_FAN_PER_SIDE = 8;
    from the flower's MeshAccumulator idea: the one behavior that matters here
    is the export-mode thickness floor. */
 export class MeshBuilder {
-  constructor({ exportMode = false, captureGrid = false, captureLamina = false, captureRim = false, captureNormals = false } = {}) {
+  constructor({ exportMode = false, captureGrid = false, captureLamina = false, captureRim = false, captureNormals = false, boneDetail = null } = {}) {
     this.exportMode = !!exportMode;
+    /* BONE v2's DETAIL (Eva's rulings of Nov 1-2): 'coarse' is the v2 field on
+       the shipped lattice (v1's cost, the release preview), 'full' runs the
+       allocator and the hybrid mesher (the "full detail" button and the
+       export). Unasked, an EXPORT build is the object and is FULL, a live
+       build is COARSE. It decides nothing on any other texture or with BONE
+       off. The page asks for 'coarse' explicitly for its released preview. */
+    this.boneDetail = boneDetail === 'full' || boneDetail === 'coarse' ? boneDetail : (this.exportMode ? 'full' : 'coarse');
     /* SHADING NORMALS, AND THEY REACH NO BYTE OF THE EXPORT — Eva's ruling
        (the edge-profile session): "smooth (averaged) normals across the
        bead". OFF by default, set by the VIEWER's live build alone. An STL
@@ -4769,8 +4776,22 @@ export function bladeRowsFor(petalTipShape) {
 /* THE EXPORT TRIANGLE BUDGET — ONE OWNER, imported by `bloom.js` rather than
    restated there (it used to be a bare `bloom.js` constant with nothing
    else reading it; the tip-row budget cap is the first thing IN THE
-   GEOMETRY that needs to know it, so it moves here). */
-export const EXPORT_TRI_BUDGET = 1_500_000;
+   GEOMETRY that needs to know it, so it moves here).
+   THE CAP IS 2,000,000 AND IT IS PROVISIONAL (Eva, Nov 2, BONE v2). Where the
+   number came from: the print target is Formlabs Fuse through PreForm, which
+   has NO hard file limit — the ceiling is the machine PreForm runs on — and
+   2.0 M triangles is about 100 MB of binary STL (50 bytes a triangle), the
+   size PreForm's own guidance treats as safe. The 1.5 M it replaces was set at
+   25x the largest model of its day so that the refusal path existed (it
+   derived from nothing measured: docs/bloom-surface-texture-bone-v2.md §17).
+   The FINAL value comes from Eva's PreForm ladder test (the largest STL that
+   loads, repairs, slices and sends cleanly). ONE NAMED CAP: every decision
+   that reads a budget reads this (the export refusal, the texture edge cap,
+   the umbel and mophead clamps, the tip-row ramp, and BONE's full-detail
+   allocator); `EXPORT_TRI_BUDGET` is the same number under its old name, kept
+   so the tools that import it keep one owner. */
+export const EXPORT_TRI_CAP = 2_000_000;
+export const EXPORT_TRI_BUDGET = EXPORT_TRI_CAP;
 
 /* ===================================================================
    WHERE THE BLADE ROWS SIT — the turning-rate ladder (Eva, session 32).
@@ -12818,7 +12839,12 @@ export function textureIsBone(state) { return String(state.petalTexture ?? 'NONE
    SLS Nylon 12 White's resolvable detail. It is the slider's MINIMUM, so 0 is
    not reachable and NONE is the choice guard's job. The default is the floor
    itself (ruling 3: never a default that assumes it prints). */
-export const TEXTURE_HEIGHT_RANGE = Object.freeze([0.4, 1.5]);
+/* (BONE v2, RULED Nov 1) the MAXIMUM is 2.5 mm, UNVALIDATED for powder
+   removal: at 2.5 the smallest pores are blind wells up to 4.8 times deeper
+   than they are wide (measured, the v2 doc §18). The retired PEBBLE and
+   CELLULAR read the same range; a saved design's height is unchanged by it. */
+export const TEXTURE_HEIGHT_RANGE = Object.freeze([0.4, 2.5]);
+export const TEXTURE_HEIGHT_HELP = 'Relief height, 0.4 to 2.5 mm. Above about 1.5 mm the smallest pores become blind wells up to about 4.8 times deeper than they are wide (measured at 2.5 mm): UNVALIDATED for powder removal (nothing this deep has been printed).';
 export const TEXTURE_HEIGHT_STEP = 0.05;
 export const TEXTURE_HEIGHT_DEFAULT = 0.4;
 /* THE LATTICE EDGE — ruled 0.4 mm, a constant and never a control. */
@@ -13409,13 +13435,13 @@ function organLatticeInto(acc, from, cap, { organ, edgeMm, decide = null, sink =
 
 /* THE VISIBILITY GRID — every triangle the build emitted, in a dense CSR
    uniform grid, for the escape rays */
-function t5Grid(pos) {
+function t5Grid(pos, hFixed = 0) {
   const nT = pos.length / 9;
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { const x = pos[i + k]; if (x < lo[k]) lo[k] = x; if (x > hi[k]) hi[k] = x; }
   for (let k = 0; k < 3; k++) { lo[k] -= 1; hi[k] += 1; }
   const ext = [hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]];
-  const h = Math.max(0.5, Math.cbrt((ext[0] * ext[1] * ext[2]) / 400000));
+  const h = hFixed > 0 ? hFixed : Math.max(0.5, Math.cbrt((ext[0] * ext[1] * ext[2]) / 400000));
   const nx = Math.max(1, Math.ceil(ext[0] / h)), ny = Math.max(1, Math.ceil(ext[1] / h)), nz = Math.max(1, Math.ceil(ext[2] / h));
   const cellOf = (x, k, n) => { const c = Math.floor((x - lo[k]) / h); return c < 0 ? 0 : c >= n ? n - 1 : c; };
   const count = new Int32Array(nx * ny * nz + 1);
@@ -13801,16 +13827,20 @@ export const BONE_PORE_STEP = 0.05;
 export function bonePoreFloorVertexMm(edgeMm) { return (Math.SQRT1_2 * edgeMm) / (0.5 - BONE_RIM_FRAC / 4); }
 export function bonePoreReadsMm(edgeMm) { return (4 * edgeMm) / BONE_RIM_FRAC; }
 export const BONE_PORE_FLOOR_MM = Math.round(Math.ceil(bonePoreReadsMm(TEXTURE_EDGE_MM) / BONE_PORE_STEP - 1e-9) * BONE_PORE_STEP * 100) / 100;
-export const BONE_PORE_RANGE = Object.freeze([BONE_PORE_FLOOR_MM, 4]);
-/* PROVISIONAL: the prototype's 1.6 mm lifted to the floor (it does not read
-   round at the ruled edge — a question for Eva) */
-export const BONE_PORE_DEFAULT = BONE_PORE_FLOOR_MM;
+/* BONE v2 (Nov 2): the pore-size slider is the SMALLEST pore's diameter,
+   0.5-1.0 mm, default 0.5 (Eva's ruled 0.5-1.5 mm pores at the default spread
+   of 3) — the RANGE is PROVISIONAL (question G of the v2 doc). The v1 floor
+   above (2.0 mm, "reads round on the 0.4 mm lattice") no longer bounds the
+   control: the FULL build conforms each pore with its own rings, and the
+   COARSE preview draws the same pores on the lattice, unround, as ruled. */
+export const BONE_PORE_RANGE = Object.freeze([0.5, 1]);
+export const BONE_PORE_DEFAULT = 0.5;
 export const BONE_DENSITY_RANGE = Object.freeze([0.2, 1]);
 export const BONE_DENSITY_STEP = 0.05;
-export const BONE_DENSITY_DEFAULT = 0.95;
-export const BONE_RATIO_RANGE = Object.freeze([1.5, 4]);
+export const BONE_DENSITY_DEFAULT = 0.9;
+export const BONE_RATIO_RANGE = Object.freeze([1.5, 3]);   // v2: the SPREAD (largest / smallest pore), PROVISIONAL
 export const BONE_RATIO_STEP = 0.1;
-export const BONE_RATIO_DEFAULT = 2.5;
+export const BONE_RATIO_DEFAULT = 3;
 export const BONE_COVERAGE_RANGE = Object.freeze([0.1, 1]);
 export const BONE_COVERAGE_STEP = 0.05;
 export const BONE_COVERAGE_DEFAULT = 0.6;
@@ -13891,8 +13921,13 @@ function boneTextureFor(state, cap, heightMm, hAsked, refused) {
   const bone = { poreMm: b.pore, largePoreMm: b.pore * b.ratio, density: b.density, ratio: b.ratio, coverage: b.coverage, curvature: b.curvature, patchScaleMm, rimMm: BONE_RIM_FRAC * (b.pore / 2),
     floorMm: BONE_PORE_FLOOR_MM, readsAtEdgeMm: bonePoreReadsMm(edgeMm), fadeMm: textureFadeWidthMm(heightMm, edgeMm),
     clamped: Object.keys(a).filter((key) => a[key] !== b[key]) };
+  /* v2 (Nov 2): the field is BONE v2's, read on each point's own normal */
+  const params = bone2Params({ bonePoreSize: b.pore, boneBandRatio: b.ratio, bonePoreDensity: b.density, textureHeight: heightMm });
+  const field = refused ? null : bone2Field(params);
+  bone.v2 = true; bone.largestPoreMm = params.Dmax; bone.cellMm = BONE2_ALLOC_CELL_K * params.Dmax;
   return { type: 'BONE', heightMm, sizeMm: b.pore, edgeMm, heightClamped: heightMm !== hAsked, sizeClamped: a.pore !== b.pore, refused, bone,
-    f: refused ? null : boneField(b.pore, b.ratio, b.density), mp: refused ? null : bonePatchField(b.coverage, patchScaleMm) };
+    bone2: refused ? null : { field, params, full: null },
+    f: refused ? null : (p, n) => field.F(p, n), mp: refused ? null : bonePatchField(b.coverage, patchScaleMm) };
 }
 
 /* THE SHEET'S CAPTURE (a petal, a sepal, a leaf or a leaflet under BONE): its
@@ -14009,6 +14044,1572 @@ function boneOrganKeyCmp(A, B) {
   for (let k = 0; k < 3; k++) if (A.O.P[k] !== B.O.P[k]) return A.O.P[k] - B.O.P[k];
   return 0;
 }
+/* ---- ENGINE-AGREED ARITHMETIC (BONE v2, Nov 2 ruling): every number the
+   field and the hybrid mesher decide on is built from + - * / and sqrt
+   alone (IEEE correctly rounded, so Node's V8 and Chromium's agree to the
+   bit), never from Math.cos / sin / hypot / cbrt / exp / log / pow, which
+   are not correctly rounded and differ between V8 builds in the last bits.
+   Round 2 measured that difference deciding the full build's COUNT (84
+   triangles on the default, 6,214 on the umbel). Each function here is a
+   fixed sequence of arithmetic: a range reduction by exact powers of two (or
+   a floor in turns), then a fixed-degree series. Accuracy ~1e-16 relative;
+   what matters is that it is the SAME double in every engine. */
+export function elen(a, b, c = 0) { return Math.sqrt(a * a + b * b + c * c); }
+const ETAU = 6.283185307179586, EINV_TAU = 0.15915494309189535;
+/* sin and cos of x radians: reduced to turns in [0, 1) by a floor, then to
+   an octant, then Taylor to x^17 on |r| <= pi/4 (last term < 5e-17) */
+function eTaylor(r) {
+  const r2 = r * r;
+  const s = r * (1 + r2 * (-1 / 6 + r2 * (1 / 120 + r2 * (-1 / 5040 + r2 * (1 / 362880 + r2 * (-1 / 39916800 + r2 * (1 / 6227020800 + r2 * (-1 / 1307674368000 + r2 * (1 / 355687428096000)))))))));
+  const c = 1 + r2 * (-1 / 2 + r2 * (1 / 24 + r2 * (-1 / 720 + r2 * (1 / 40320 + r2 * (-1 / 3628800 + r2 * (1 / 479001600 + r2 * (-1 / 87178291200 + r2 * (1 / 20922789888000))))))));
+  return [s, c];
+}
+export function esincos(x) {
+  let t = x * EINV_TAU; t -= Math.floor(t);          // turns in [0, 1)
+  const q8 = Math.floor(t * 8);                       // the octant
+  const k = (q8 + 1) >> 1;                            // the nearest quarter turn (0..4)
+  const r = (t - k * 0.25) * ETAU;                    // |r| <= pi/4
+  const [s, c] = eTaylor(r);
+  switch (k & 3) { case 0: return [s, c]; case 1: return [c, -s]; case 2: return [-s, -c]; default: return [-c, s]; }
+}
+export function esin(x) { return esincos(x)[0]; }
+export function ecos(x) { return esincos(x)[1]; }
+/* the cube root, by exact power-of-eight scaling to [1/8, 1] and a fixed
+   six Newton steps from a linear guess (quadratic: 1e-2 -> below the ulp) */
+export function ecbrt(w) {
+  if (!(w > 0)) return w === 0 ? 0 : -ecbrt(-w);
+  let sc = 1;
+  while (w < 0.125) { w *= 8; sc *= 0.5; }
+  while (w > 1) { w *= 0.125; sc *= 2; }
+  let y = 0.4 + 0.6 * w;
+  for (let i = 0; i < 6; i++) y -= (y * y * y - w) / (3 * y * y);
+  return y * sc;
+}
+/* the natural log and exp, for the pore sizes' log-uniform draw only:
+   log by exact halving to m in [1, 2) and 2 atanh((m-1)/(m+1)) to z^39;
+   exp by k ln2 + r, |r| <= ln2/2, Taylor to r^22, then exact doublings */
+const ELN2 = 0.6931471805599453;
+export function elog(x) {
+  if (!(x > 0)) return x === 0 ? -Infinity : NaN;
+  let e = 0;
+  while (x >= 2) { x *= 0.5; e++; }
+  while (x < 1) { x *= 2; e--; }
+  const z = (x - 1) / (x + 1), z2 = z * z;
+  let sum = 0, term = z;
+  for (let k = 1; k <= 39; k += 2) { sum += term / k; term *= z2; }
+  return 2 * sum + e * ELN2;
+}
+export function eexp(x) {
+  const k = Math.floor(x / ELN2 + 0.5), r = x - k * ELN2;
+  let sum = 1, term = 1;
+  for (let i = 1; i <= 22; i++) { term *= r / i; sum += term; }
+  let out = sum;
+  if (k > 0) for (let i = 0; i < k; i++) out *= 2; else for (let i = 0; i < -k; i++) out *= 0.5;
+  return out;
+}
+export function epow(b, t) { return t === 0 ? 1 : eexp(elog(b) * t); }
+
+/* ===================================================================
+   BONE v2 — FINER, ROUNDER, DEEPER PORES (shipped Nov 2; the prototype was
+   bloom-texture-bone2.js / bloom-texture-bone2-hybrid.js, #481 and #482).
+   Read docs/bloom-surface-texture-bone-v2.md (rounds 1-2) and
+   docs/bloom-surface-texture-bone-v2-shipped.md before changing anything here.
+
+   Eva's rulings in force: attachment B (one world-space field), OUTWARD
+   ONLY, MERGING pores 0.5-1.5 mm with nested pits, the HYBRID mesher (rings
+   for free pores, fine points only on merge seams and wall junctions, derived,
+   never a regular fine grid), height 0.4-2.5 mm (UNVALIDATED for powder),
+   curvature mask x patch field, curvature decides (no nib mask), ships OFF.
+   Nov 2: the release preview is COARSE (the field on the shipped lattice);
+   the "full detail" button and the export run the ALLOCATOR, which spends the
+   hybrid where the surface SHOWS (derived, `bone2Exposure`) until the one
+   cap (`EXPORT_TRI_CAP`), and leaves the rest coarse. Pores are the same pores
+   in both: coarse and full read ONE field.
+
+   THE PROTOTYPE WAS PORTED TERM FOR TERM except for ENGINE AGREEMENT: every
+   Math.hypot / cos / sin / cbrt / exp / log became the arithmetic-only
+   functions above (`elen`, `esincos`, `ecbrt`, `epow`), because round 2
+   measured Math.cos/sin deciding the full build's COUNT differently in Node
+   and Chromium. The CDT's decisions were already exact integer predicates.
+   =================================================================== */
+/* ------------------------------------------------- the look's constants */
+/* PROVISIONAL, like v1's: tuned on renders, none decides a count. */
+export const BONE2_BANDS = 3;                       // log-spaced size bands between D and spread x D
+export const BONE2_CELL_K = 1.0;                   // a band's cell, in its own LARGEST sphere diameters
+export const BONE2_BAND_OCC = Object.freeze([1, 1, 1]);   // the candidates' occupancy per band (x density); the packing thins them
+export const BONE2_ADMIT_FULL = 0.85;               // a sphere's cut is a full pore while its disc is at least this of the sphere's radius ...
+export const BONE2_ADMIT_ZERO = 0.70;               // ... and no pore under this (a barely-cut cap is no pore)
+export const BONE2_CUP_M = 3;                       // the cup: a superellipse 1 - (1 - u^m)^(1/m) — flat floor, steep wall
+export const BONE2_LIP_K = 0.5;                     // the lip's smooth-minimum radius (height fraction)
+export const BONE2_LIP_SLOPE = 3.5;                 // the cup carried past its rim, so the smooth minimum rounds the lip
+export const BONE2_NEST_P = 0.55;                   // a pore large enough carries nested pits with this chance
+export const BONE2_NEST_FRAC = 0.32;                // a nested pit's diameter, of its pore's
+export const BONE2_NEST_MIN_MM = 0.25;              // no nested pit under this (UNVALIDATED; SLS resolves ~0.35-0.4)
+export const BONE2_NEST_SHELF = 0.4;                // a pore with nested pits floors at this fraction of its depth
+export const BONE2_NEST_FLOOR_U = 0.55;             // nested pits sit inside this fraction of the pore's radius
+export const BONE2_SEED = 23;
+/* HARD-CORE: a pore is kept only if no pore of higher priority (a hash, so the
+   size mix is untouched) comes within (1 + BONE2_WALL_K) x the sum of their radii
+   — Matérn's type II, a local rule over the pore's own neighbours, so it is a
+   pure function of position (no order, no state). It is what leaves a WALL
+   between every two pores (the references' thin rounded walls) and what lets a
+   pore carry its own rings: 0.2 keeps the lip's outermost ring (1.15 R) of
+   two neighbours apart. */
+export const BONE2_WALL_K = 0.2;
+
+/* the controls as read, clamped (one owner of the ranges: the BONE_* row
+   constants above, which the registry imports) */
+export function bone2Params(state = {}) {
+  const clamp = (x, r) => (x < r[0] ? r[0] : x > r[1] ? r[1] : x);
+  const num = (k, d) => { const v = Number(state[k]); return Number.isFinite(v) ? v : d; };
+  const D = clamp(num('bonePoreSize', BONE_PORE_DEFAULT), BONE_PORE_RANGE);
+  const spread = clamp(num('boneBandRatio', BONE_RATIO_DEFAULT), BONE_RATIO_RANGE);
+  const H = clamp(num('textureHeight', TEXTURE_HEIGHT_DEFAULT), TEXTURE_HEIGHT_RANGE);
+  const density = clamp(num('bonePoreDensity', BONE_DENSITY_DEFAULT), BONE_DENSITY_RANGE);
+  return { D, spread, Dmax: D * spread, H, density, packing: BONE2_PACKING };
+}
+/* ------------------------------------------------------------- hashing --- */
+function b2hash3(x, y, z, s) {
+  let h = (x * 374761393 + y * 668265263 + z * 2147483647 + s * 1274126177) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return h >>> 0;
+}
+const b2u10 = (h, k) => ((h >>> (10 * k)) & 1023) / 1023;
+/* the polynomial smooth minimum — engine-exact */
+function b2smin(a, b, k) {
+  const m = a < b ? a : b;
+  const h = k - (a > b ? a - b : b - a);
+  return h > 0 ? m - (h * h) / (4 * k) : m;
+}
+
+/* ---------------------------------------------------------- the profile */
+/* THE CUP, in its own normalised radius u = r / R: 0 at the centre, 1 at the
+   rim, a superellipse — flat floor, steep wall (vertical at the rim before
+   the lip rounds it). Past the rim it is carried on up at a fixed slope, so
+   the smooth minimum against the network's top ROUNDS THE LIP rather than
+   leaving a knife edge. */
+export function bone2Cup(u) {
+  if (u >= 1) return 1 + BONE2_LIP_SLOPE * (u - 1);
+  const w = 1 - u * u * u;          // CUP_M = 3, written out: no Math.pow
+  return 1 - ecbrt(w);
+}
+/* the radius (in u) at which the lip-rounded profile crosses a level — for
+   the instruments (the drawn mid-wall must sit here) */
+export function bone2LevelU(level, shelf = 0) {
+  let lo = 0, hi = 1.5;
+  const at = (u) => { const c = shelf + (1 - shelf) * bone2Cup(u); return b2smin(1, c, BONE2_LIP_K); };
+  for (let i = 0; i < 80; i++) { const m = (lo + hi) / 2; if (at(m) < level) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+
+/* ------------------------------------------------------------ the field --- */
+/* The pores are SPHERES of the world (attachment B), packed HARD-CORE: per
+   band a jittered cell lattice holds BONE2_CANDIDATES candidate spheres a cell
+   (radius drawn log-uniform in the band's slice), and a candidate SURVIVES iff
+   no SURVIVING candidate of higher priority (a hash) overlaps it within
+   (1 + BONE2_WALL_K) x the sum of their radii — random sequential packing,
+   decided locally by recursion up the priority chain (a pure function of
+   position: no order, no state). Disjoint balls cut any surface in disjoint
+   discs, so every surface carries pores that keep a WALL between them — the
+   references' thin rounded walls — and every pore is one disc the ring mesher
+   can lay its own rings in. (Merging is given up for it: the doc's §2 and
+   question 4.)
+   A surface meets a sphere in a disc of radius rho = sqrt(S^2 - d^2), d the
+   centre's distance from the surface (read along the query's own normal); the
+   cup is laid on THAT disc, so a pore is cup-shaped however the surface cuts
+   it. A cut is ADMITTED fully while rho >= BONE2_ADMIT_FULL x S, fades to nothing
+   at BONE2_ADMIT_ZERO x S (a shallower pore), and a barely-cut cap is no pore —
+   so no surface carries a sliver pit under the ruled size. Its depth is the
+   whole relief H times its admission (its deepest point on the original sheet);
+   one with nested pits floors on a SHELF at BONE2_NEST_SHELF of that depth and
+   its pits go the rest of the way. */
+/* PACKING: 'overlap' (pores merge where they meet, v1's ruling) or 'hardcore'
+   (a wall between every two; sparse — the doc's §2) */
+export const BONE2_PACKING = 'overlap';
+export const BONE2_CANDIDATES = 1;
+/* a shrunk sphere is kept down to this of the smallest drawn (its fully
+   admitted cut is then still at least the ruled smallest pore x this) */
+export const BONE2_SHRINK_FLOOR = 1.0;
+export function bone2Field(params, seed = BONE2_SEED) {
+  const { D, spread, density } = params;
+  /* the sphere radii: a FULLY admitted cut is at least the asked smallest pore */
+  const Smin = D / 2 / BONE2_ADMIT_FULL, Smax = (spread * D) / 2;
+  const bands = [];
+  for (let b = 0; b < BONE2_BANDS; b++) {
+    const lo = Smin * epow(Smax / Smin, b / BONE2_BANDS), hi = Smin * epow(Smax / Smin, (b + 1) / BONE2_BANDS);
+    bands.push({ b, lo, hi, cell: 2 * BONE2_CELL_K * hi, occK: Math.floor(BONE2_BAND_OCC[b] * density * 1024), s: seed + 31 * b });
+  }
+  const SmaxAll = bands[bands.length - 1].hi;
+  /* the candidates of a cell — ONE OWNER of a pore */
+  const candMemo = new Map();
+  const cands = (band, cx, cy, cz) => {
+    const mk = (((band.b * 20011 + cx + 10000) * 20011 + cy + 10000) * 20011 + cz + 10000);
+    let list = candMemo.get(mk);
+    if (list) return list;
+    list = [];
+    const c = band.cell;
+    for (let m = 0; m < BONE2_CANDIDATES; m++) {
+      const h = b2hash3(cx + 7919 * m, cy, cz, band.s);
+      if ((h & 1023) >= band.occK) continue;
+      const h2 = b2hash3(cx + 7919 * m, cy, cz, band.s + 7), h3 = b2hash3(cx + 7919 * m, cy, cz, band.s + 13);
+      const S = band.lo * epow(band.hi / band.lo, b2u10(h, 1));
+      const pore = { band: band.b, key: `${band.b}:${cx},${cy},${cz}:${m}`, centre: [(cx + b2u10(h2, 0)) * c, (cy + b2u10(h2, 1)) * c, (cz + b2u10(h2, 2)) * c], S, S0: S, R: S, D: 2 * S, nested: [], priority: b2hash3(cx + 7919 * m, cy, cz, band.s + 59) };
+      const dn = BONE2_NEST_FRAC * 2 * S;
+      if (dn >= BONE2_NEST_MIN_MM && b2u10(h3, 0) < BONE2_NEST_P) {
+        const count = 1 + (b2u10(h3, 1) < 0.35 ? 1 : 0);
+        for (let k = 0; k < count; k++) {
+          const hk = b2hash3(cx + 17 * k + 7919 * m, cy, cz, band.s + 41);
+          const rr = (dn / 2) * (0.85 + 0.3 * b2u10(hk, 2));
+          let ox = b2u10(hk, 0) * 2 - 1, oy = b2u10(hk, 1) * 2 - 1;
+          const L2 = ox * ox + oy * oy;
+          if (L2 > 1) { const L = Math.sqrt(L2); ox /= L; oy /= L; }
+          /* the offset is a FRACTION of the room on the disc's floor, laid at
+             query time on the cut disc's own radius */
+          pore.nested.push({ fx: ox, fy: oy, fr: rr / S });
+        }
+      }
+      list.push(pore);
+    }
+    if (candMemo.size > 3000000) { candMemo.clear(); alive.clear(); }
+    candMemo.set(mk, list);
+    return list;
+  };
+  /* survival: a candidate keeps its radius if no SURVIVING candidate of higher
+     priority comes within the hard core; otherwise it SHRINKS to fit beside
+     them (so the packing fills its gaps with smaller pores, as bone does) and
+     dies only if that leaves it under the smallest sphere. `S` is the size
+     the survivor is built at (the drawn size is `S0`). */
+  const alive = new Map();
+  const survives = (p) => {
+    if (params.packing === 'overlap') return true;
+    let v = alive.get(p.key);
+    if (v !== undefined) return v;
+    let S = p.S0;
+    for (const b2 of bands) {
+      const c = b2.cell, reach = (1 + BONE2_WALL_K) * (p.S0 + b2.hi);
+      const x0 = Math.floor((p.centre[0] - reach) / c), x1 = Math.floor((p.centre[0] + reach) / c);
+      const y0 = Math.floor((p.centre[1] - reach) / c), y1 = Math.floor((p.centre[1] + reach) / c);
+      const z0 = Math.floor((p.centre[2] - reach) / c), z1 = Math.floor((p.centre[2] + reach) / c);
+      for (let zi = z0; zi <= z1; zi++) for (let yi = y0; yi <= y1; yi++) for (let xi = x0; xi <= x1; xi++) for (const q of cands(b2, xi, yi, zi)) {
+        if (q === p || q.priority < p.priority || (q.priority === p.priority && q.key <= p.key)) continue;
+        const dx = q.centre[0] - p.centre[0], dy = q.centre[1] - p.centre[1], dz = q.centre[2] - p.centre[2];
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist >= (1 + BONE2_WALL_K) * (S + q.S0)) continue;   // clear even of q at its largest
+        if (!survives(q)) continue;
+        const fit = dist / (1 + BONE2_WALL_K) - q.S;
+        if (fit < S) S = fit;
+      }
+    }
+    v = S >= Smin * BONE2_SHRINK_FLOOR;
+    if (v) { p.S = S; p.R = S; p.D = 2 * S; }
+    alive.set(p.key, v);
+    return v;
+  };
+  /* the cut: the disc a surface through p with normal n meets this sphere in,
+     and its admission */
+  const cut = (pore, p, n) => {
+    const d = [p[0] - pore.centre[0], p[1] - pore.centre[1], p[2] - pore.centre[2]];
+    const dn = d[0] * n[0] + d[1] * n[1] + d[2] * n[2];
+    const rho2 = pore.S * pore.S - dn * dn;
+    if (!(rho2 > 0)) return null;
+    const rho = Math.sqrt(rho2), k = rho / pore.S;
+    if (k <= BONE2_ADMIT_ZERO) return null;
+    let a = 1;
+    if (k < BONE2_ADMIT_FULL) { const t = (k - BONE2_ADMIT_ZERO) / (BONE2_ADMIT_FULL - BONE2_ADMIT_ZERO); a = t * t * (3 - 2 * t); }
+    return { d, dn, rho, a };
+  };
+  const admission = (pore, p, n) => { const c = cut(pore, p, n); return c ? c.a : 0; };
+  /* a tangent frame at n — one owner (no trigonometry) */
+  const frame = (n) => {
+    const ax = Math.abs(n[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    let t1 = [ax[1] * n[2] - ax[2] * n[1], ax[2] * n[0] - ax[0] * n[2], ax[0] * n[1] - ax[1] * n[0]];
+    const L = Math.sqrt(t1[0] * t1[0] + t1[1] * t1[1] + t1[2] * t1[2]);
+    t1 = [t1[0] / L, t1[1] / L, t1[2] / L];
+    const t2 = [n[1] * t1[2] - n[2] * t1[1], n[2] * t1[0] - n[0] * t1[2], n[0] * t1[1] - n[1] * t1[0]];
+    return { t1, t2 };
+  };
+  /* a nested pit's centre (offset from the cut disc's centre, in the tangent
+     frame) and radius, on a disc of radius rho */
+  const nestedOn = (q, rho) => { const r = q.fr * rho; const room = Math.max(0, BONE2_NEST_FLOOR_U * rho - r); return { ox: q.fx * room, oy: q.fy * room, R: r }; };
+  const lipReach = 1 + BONE2_LIP_K / BONE2_LIP_SLOPE + 0.01;
+  /* every surviving pore whose sphere reaches p */
+  const each = (p, fn) => {
+    for (const band of bands) {
+      const c = band.cell, reach = band.hi * lipReach;
+      const x0 = Math.floor((p[0] - reach) / c), x1 = Math.floor((p[0] + reach) / c);
+      const y0 = Math.floor((p[1] - reach) / c), y1 = Math.floor((p[1] + reach) / c);
+      const z0 = Math.floor((p[2] - reach) / c), z1 = Math.floor((p[2] + reach) / c);
+      for (let zi = z0; zi <= z1; zi++) for (let yi = y0; yi <= y1; yi++) for (let xi = x0; xi <= x1; xi++) for (const q of cands(band, xi, yi, zi)) {
+        const dx = p[0] - q.centre[0], dy = p[1] - q.centre[1], dz = p[2] - q.centre[2];
+        if (dx * dx + dy * dy + dz * dz > (q.S * lipReach) ** 2) continue;
+        if (survives(q)) fn(q);
+      }
+    }
+  };
+  /* THE FIELD. F in [0, 1]: 1 the network's top, 0 the deepest floor */
+  const F = (p, n) => {
+    let v = 1;
+    let fr = null;
+    each(p, (pore) => {
+      const c = cut(pore, p, n);
+      if (!c) return;
+      const { d, dn, rho, a } = c;
+      const tx = d[0] - dn * n[0], ty = d[1] - dn * n[1], tz = d[2] - dn * n[2];
+      const u = Math.sqrt(tx * tx + ty * ty + tz * tz) / rho;
+      if (u > lipReach) return;
+      const floor = 1 - a;                                   // a fully admitted pore floors on the sheet
+      const shelf = pore.nested.length ? floor + a * BONE2_NEST_SHELF : floor;
+      v = b2smin(v, shelf + (1 - shelf) * bone2Cup(u), BONE2_LIP_K);
+      if (pore.nested.length && u < BONE2_NEST_FLOOR_U + 0.05) {
+        if (!fr) fr = frame(n);
+        for (const q0 of pore.nested) {
+          const q = nestedOn(q0, rho);
+          const ex = tx - (q.ox * fr.t1[0] + q.oy * fr.t2[0]), ey = ty - (q.ox * fr.t1[1] + q.oy * fr.t2[1]), ez = tz - (q.ox * fr.t1[2] + q.oy * fr.t2[2]);
+          const un = Math.sqrt(ex * ex + ey * ey + ez * ez) / q.R;
+          v = b2smin(v, floor + (shelf - floor) * bone2Cup(un), BONE2_LIP_K * (shelf - floor));
+        }
+      }
+    });
+    return v < 0 ? 0 : v > 1 ? 1 : v;
+  };
+  /* THE SAME PORES, for the ring mesher and the instruments: every surviving
+     pore whose sphere reaches a box */
+  const poresIn = (lo, hi) => {
+    const out = [];
+    for (const band of bands) {
+      const c = band.cell, r = band.hi;
+      for (let zi = Math.floor((lo[2] - r) / c); zi <= Math.floor((hi[2] + r) / c); zi++)
+        for (let yi = Math.floor((lo[1] - r) / c); yi <= Math.floor((hi[1] + r) / c); yi++)
+          for (let xi = Math.floor((lo[0] - r) / c); xi <= Math.floor((hi[0] + r) / c); xi++)
+            for (const q of cands(band, xi, yi, zi)) if (survives(q)) out.push(q);
+    }
+    return out;
+  };
+  /* the cut disc of a pore on a surface through p with normal n, for a mesher:
+     its centre on the surface, its radius, its admission, its nested pits */
+  const discOf = (pore, p, n) => {
+    const c = cut(pore, p, n);
+    if (!c) return null;
+    const centre = [pore.centre[0] + c.dn * n[0], pore.centre[1] + c.dn * n[1], pore.centre[2] + c.dn * n[2]];
+    return { centre, rho: c.rho, a: c.a, nested: pore.nested.map((q) => nestedOn(q, c.rho)) };
+  };
+  void SmaxAll;
+  return { F, poresIn, admission, discOf, frame, bands, params, survives };
+}
+
+/* ------------------------------------------- THE DERIVED EDGES (§4) --- */
+/* THE LIP'S DRAWN WIDTH, from the profile alone: the radial distance (in u)
+   over which the lip-rounded wall climbs from 20% to 80% of the relief. The
+   wall is what the eye reads as the pore's edge, so a mesh must put vertices
+   ACROSS it: the GRID's edge is half of it at the SMALLEST pore (v1's own
+   "the rim spans at least two edges", applied to the steeper v2 wall), and
+   the RINGS' radii are laid at the profile's own breakpoints. */
+export function bone2WallU() { return bone2LevelU(0.8) - bone2LevelU(0.2); }
+/* every snap / merge distance: a point this close to an edge is ON it, this
+   close to another point IS it. 3e-3 mm is 40% of the closest two rings ever
+   come (u 0.97 / 1.0 at the smallest pore, 0.0075 mm) — the seam clearance's
+   own fraction (BONE2_HY_SEAM_CLEAR) — so no ring is merged into another.
+   SHIPPING SESSION (Nov 2): the prototype's 1e-3 left SLIVERS — a ring point
+   2.2 um from a lattice-edge crossing on a 6 mm stem — and the relief (steep
+   at a pore's lip, displaced along the organ's own normals, which tilt off a
+   lattice triangle's plane on a curved organ) flipped them: 12 within-shell
+   pairs at 0.107 mm on every 60 mm-stem BONE row, 0 at 3e-3 (measured by the
+   census on the full build). */
+export const BONE2_HY_SNAP_MM = 3e-3;
+/* the integer chart across a lattice triangle's longest edge */
+export const BONE2_HY_CHART_N = 2048;
+/* a ring crossing a lattice edge leaves its point; a SEAM point keeps this
+   fraction of its own spacing clear of every point already there */
+export const BONE2_HY_SEAM_CLEAR = 0.4;
+
+/* THE LAYOUTS. `full` is #481's ring layout (the profile's breakpoints, 16
+   sides) with consecutive rings STAGGERED by half a side (a constrained
+   Delaunay needs no aligned strip, and staggered rings are not co-circular).
+   The COARSE build is not a ring layout: it is the field on the shipped
+   lattice (no point added; the doc's §15, ruled). */
+export const BONE2_LAYOUTS = Object.freeze({
+  full: Object.freeze({ name: 'full', u: Object.freeze([0.45, 0.75, 0.9, 0.97, 1.0, 1.07, 1.15]), shelfFrom: 0.75, sides: () => 16, nestedU: Object.freeze([0.45, 0.75, 0.9, 1.0, 1.1]), nestedSides: 12, centre: true, seams: true }),
+});
+export const BONE2_HY_OUTER_U = 1.15;   // the outermost ring of the full layout: the overlap test's radius, in BOTH layouts (same pairs)
+/* THE SEAM: each pore's rings end BONE2_HY_BAND_H x h short of the crease (h the
+   derived edge at the smaller pore: half the lip's drawn width there), and a
+   row of seam points runs ON the crease (BONE2_HY_SEAM_ROWS x h). Measured on the
+   default plate (doc §14): a band of two h with rows at -h/0/+h clipped the
+   outer rings off most merged pores (merged pores 9.0% off their circle,
+   seam RMS 0.068 mm at H 1); one h, 1.9% / 0.054; half an h with the crease
+   row alone, 1.9% / 0.036 (the shipped choice). */
+export const BONE2_HY_BAND_H = 0.5;
+export const BONE2_HY_SEAM_ROWS = Object.freeze([0]);
+/* how far past the other pore's outer ring a pair still clips, in bands: at
+   the lens's two ends the two outer rings CROSS, so each must stop short of the
+   other there (0 left 340 crossing constraints on the default bloom) */
+export const BONE2_HY_CLIP_REACH = 1;
+
+/* point kinds, recorded per new vertex (B2e reads them back against the field) */
+export const BONE2_HY_KIND = Object.freeze({ ring: 1, cross: 2, centre: 3, nested: 4, seam: 5, seamCross: 6, steiner: 7, junction: 8 });
+/* a wall junction's patch reaches this many h from the junction point */
+export const BONE2_HY_JUNCTION_H = 2;
+
+const b2sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const b2dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const b2crs = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const b2nrm = (a) => { const L = elen(a[0], a[1], a[2]) || 1; return [a[0] / L, a[1] / L, a[2] / L]; };
+
+/* ============================================ the discs on one organ --- */
+/* Every pore whose sphere reaches the organ's porous triangles, cut by the
+   organ's own surface: the foot is the closest point of the surface to the
+   sphere's centre (per skin: feet are grouped by normal and proximity, so a
+   sphere that cuts both skins of a thin sheet gives two discs), the normal
+   the interpolated vertex normal there, the disc the field's own `discOf`. */
+export function bone2OrganDiscs(P, N, tri, porous, FIELD, { hashCell = 0.6 } = {}) {
+  const nT = tri.length / 3;
+  const H = new Map();
+  const ck = (i, j, k) => `${i},${j},${k}`;
+  let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let t = 0; t < nT; t++) {
+    if (!porous[t]) continue;
+    const bl = [Infinity, Infinity, Infinity], bh = [-Infinity, -Infinity, -Infinity];
+    for (let c = 0; c < 3; c++) { const v = tri[t * 3 + c]; for (let k = 0; k < 3; k++) { bl[k] = Math.min(bl[k], P[v * 3 + k]); bh[k] = Math.max(bh[k], P[v * 3 + k]); } }
+    for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], bl[k]); hi[k] = Math.max(hi[k], bh[k]); }
+    for (let i = Math.floor(bl[0] / hashCell); i <= Math.floor(bh[0] / hashCell); i++) for (let j = Math.floor(bl[1] / hashCell); j <= Math.floor(bh[1] / hashCell); j++) for (let k = Math.floor(bl[2] / hashCell); k <= Math.floor(bh[2] / hashCell); k++) { const key = ck(i, j, k); let L = H.get(key); if (!L) H.set(key, (L = [])); L.push(t); }
+  }
+  if (!Number.isFinite(lo[0])) return [];
+  const near = (c, r) => { const out = new Set(); for (let i = Math.floor((c[0] - r) / hashCell); i <= Math.floor((c[0] + r) / hashCell); i++) for (let j = Math.floor((c[1] - r) / hashCell); j <= Math.floor((c[1] + r) / hashCell); j++) for (let k = Math.floor((c[2] - r) / hashCell); k <= Math.floor((c[2] + r) / hashCell); k++) { const L = H.get(ck(i, j, k)); if (L) for (const t of L) out.add(t); } return out; };
+  const discs = [];
+  for (const pore of FIELD.poresIn(lo, hi)) {
+    const feet = [];
+    for (const t of near(pore.centre, pore.S)) {
+      const a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2];
+      const A = [P[a * 3], P[a * 3 + 1], P[a * 3 + 2]], Bv = [P[b * 3], P[b * 3 + 1], P[b * 3 + 2]], C = [P[c * 3], P[c * 3 + 1], P[c * 3 + 2]];
+      const q = bone2ClosestOnTri(pore.centre, A, Bv, C);
+      const d = elen(q.p[0] - pore.centre[0], q.p[1] - pore.centre[1], q.p[2] - pore.centre[2]);
+      if (d >= pore.S) continue;
+      const nRaw = [0, 1, 2].map((k) => q.l[0] * N[a * 3 + k] + q.l[1] * N[b * 3 + k] + q.l[2] * N[c * 3 + k]);
+      /* a foot with no normal (a corner the emitter handed none: the stem's
+         cut face, a cavity) cuts no disc — its frame would be NaN */
+      if (!(nRaw[0] * nRaw[0] + nRaw[1] * nRaw[1] + nRaw[2] * nRaw[2] > 0.25)) continue;
+      const n = b2nrm(nRaw);
+      feet.push({ t, p: q.p, n, d });
+    }
+    feet.sort((x, y) => x.d - y.d || x.t - y.t);
+    const groups = [];
+    for (const f of feet) { if (groups.some((g) => b2dot(g.n, f.n) > 0.5 && elen(g.p[0] - f.p[0], g.p[1] - f.p[1], g.p[2] - f.p[2]) < pore.S)) continue; groups.push(f); }
+    for (const g of groups) {
+      const disc = FIELD.discOf(pore, g.p, g.n);
+      if (!disc || !(disc.a > 0)) continue;
+      const fr = FIELD.frame(g.n);
+      discs.push({ key: pore.key, sphere: pore.centre, S: pore.S, c: disc.centre, n: g.n, t1: fr.t1, t2: fr.t2, rho: disc.rho, a: disc.a, nested: disc.nested, rot: ((pore.priority >>> 0) & 1023) / 1024, foot: g.t });
+    }
+  }
+  return discs;
+}
+function bone2ClosestOnTri(p, a, b, c) {
+  /* Ericson's closest point on a triangle, with its barycentrics */
+  const ab = b2sub(b, a), ac = b2sub(c, a), ap = b2sub(p, a);
+  const d1 = b2dot(ab, ap), d2 = b2dot(ac, ap);
+  if (d1 <= 0 && d2 <= 0) return { p: a, l: [1, 0, 0] };
+  const bp = b2sub(p, b), d3 = b2dot(ab, bp), d4 = b2dot(ac, bp);
+  if (d3 >= 0 && d4 <= d3) return { p: b, l: [0, 1, 0] };
+  const vc = d1 * d4 - d3 * d2;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) { const v = d1 / (d1 - d3); return { p: [a[0] + v * ab[0], a[1] + v * ab[1], a[2] + v * ab[2]], l: [1 - v, v, 0] }; }
+  const cp = b2sub(p, c), d5 = b2dot(ab, cp), d6 = b2dot(ac, cp);
+  if (d6 >= 0 && d5 <= d6) return { p: c, l: [0, 0, 1] };
+  const vb = d5 * d2 - d1 * d6;
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) { const w = d2 / (d2 - d6); return { p: [a[0] + w * ac[0], a[1] + w * ac[1], a[2] + w * ac[2]], l: [1 - w, 0, w] }; }
+  const va = d3 * d6 - d5 * d4;
+  if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) { const w = (d4 - d3) / (d4 - d3 + (d5 - d6)); return { p: [b[0] + w * (c[0] - b[0]), b[1] + w * (c[1] - b[1]), b[2] + w * (c[2] - b[2])], l: [0, 1 - w, w] }; }
+  const den = 1 / (va + vb + vc), v = vb * den, w = vc * den;
+  return { p: [a[0] + ab[0] * v + ac[0] * w, a[1] + ab[1] * v + ac[1] * w, a[2] + ab[2] * v + ac[2] * w], l: [1 - v - w, v, w] };
+}
+
+/* ======================================= the merged pairs and their planes */
+/* Two discs MERGE when their outer rings overlap on one skin. Their split is
+   the field's own crease: where the two cups are at the SAME normalised
+   radius, u_i = u_j (an Apollonius sphere of the world; a plane when the two
+   are equal). Measured as a length: sd(x) = (u_i - u_j) / (1/rho_i + 1/rho_j)
+   (the gradient's own magnitude where the two radii point apart), negative on
+   i's side, the same set seen from either disc. The radical plane of the
+   OUTER discs was the first cut and is wrong for unequal pores: it crosses
+   the crease, and a thin wall between two barely merged pores fell between
+   the two clipped ring sets (measured: 0.78 mm of relief missing at H 1.0).
+   `band` is the lip's drawn width at the smaller pore. */
+export const bone2PairSd = (pr, x) => (elen(x[0] - pr.ci[0], x[1] - pr.ci[1], x[2] - pr.ci[2]) / pr.ri - elen(x[0] - pr.cj[0], x[1] - pr.cj[1], x[2] - pr.cj[2]) / pr.rj) * pr.k;
+export function bone2MergedPairs(discs, wallU) {
+  const pairs = [];
+  const cell = 3.5, G = new Map();
+  discs.forEach((d, i) => { const k = `${Math.floor(d.c[0] / cell)},${Math.floor(d.c[1] / cell)},${Math.floor(d.c[2] / cell)}`; let L = G.get(k); if (!L) G.set(k, (L = [])); L.push(i); });
+  discs.forEach((d, i) => {
+    const gx = Math.floor(d.c[0] / cell), gy = Math.floor(d.c[1] / cell), gz = Math.floor(d.c[2] / cell);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
+      const L = G.get(`${gx + a},${gy + b},${gz + c}`); if (!L) continue;
+      for (const j of L) {
+        if (j <= i) continue;
+        const e = discs[j];
+        if (b2dot(d.n, e.n) <= 0.5) continue;
+        const v = b2sub(e.c, d.c), dist = elen(v[0], v[1], v[2]);
+        const Ri = BONE2_HY_OUTER_U * d.rho, Rj = BONE2_HY_OUTER_U * e.rho;
+        if (!(dist < Ri + Rj) || dist < 1e-9) continue;
+        const m = [v[0] / dist, v[1] / dist, v[2] / dist];
+        const h = (wallU * Math.min(d.rho, e.rho)) / 2;
+        pairs.push({ i, j, m, ci: d.c, cj: e.c, ri: d.rho, rj: e.rho, k: 1 / (1 / d.rho + 1 / e.rho), h, band: BONE2_HY_BAND_H * h, dist, Ri, Rj });
+      }
+    }
+  });
+  return pairs;
+}
+
+/* =========================================== THE ORGAN MESHER (hybrid) --- */
+/* M: { P (flat xyz), N (flat), tri, porous (per triangle) }. discs from
+   `bone2OrganDiscs` (or a charted domain's own). opts: { layout, wallU,
+   countOnly }. Returns, when building: { P (old + new), tri, src (per new
+   vertex: its lattice triangle and barycentrics, for interpolating the
+   organ's attributes), kind, nV0, stats }; when counting: { count, stats }. */
+export function bone2HybridOrganMesh(M, discs, opts) {
+  const L = opts.layout, wallU = opts.wallU, countOnly = !!opts.countOnly;
+  const { P, tri, porous } = M;
+  const nV0 = P.length / 3, nT = tri.length / 3;
+  const stats = { discs: discs.length, pairs: 0, free: 0, merged: 0, arcs: 0, ringPts: 0, crossPts: 0, seamPts: 0, seamCross: 0, aborted: 0, cdtTris: 0, keptTris: 0, fanTris: 0, consFail: 0, steiner: 0, seamDropped: 0 };
+  /* ---- topology ---- */
+  const edgeIdx = new Map();
+  const EA = [], EB = [], ET0 = [], ET1 = [], EPTS = [];   // edge endpoints (a < b), adjacent triangles, points
+  const triE = new Int32Array(nT * 3);
+  const ek = (a, b) => (a < b ? a * 4294967296 + b : b * 4294967296 + a);
+  for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) {
+    const a = tri[t * 3 + k], b = tri[t * 3 + (k + 1) % 3];
+    const key = ek(a, b);
+    let e = edgeIdx.get(key);
+    if (e === undefined) { e = EA.length; edgeIdx.set(key, e); EA.push(Math.min(a, b)); EB.push(Math.max(a, b)); ET0.push(t); ET1.push(-1); EPTS.push(null); }
+    else ET1[e] = t;
+    triE[t * 3 + k] = e;
+  }
+  const V = (v) => [P[v * 3], P[v * 3 + 1], P[v * 3 + 2]];
+  const faceN = new Float64Array(nT * 3), maxEdge = new Float64Array(nT), snapT = new Float64Array(nT);
+  for (let t = 0; t < nT; t++) {
+    const A = V(tri[t * 3]), Bv = V(tri[t * 3 + 1]), C = V(tri[t * 3 + 2]);
+    const f = b2nrm(b2crs(b2sub(Bv, A), b2sub(C, A)));
+    faceN[t * 3] = f[0]; faceN[t * 3 + 1] = f[1]; faceN[t * 3 + 2] = f[2];
+    maxEdge[t] = Math.max(elen(...b2sub(Bv, A)), elen(...b2sub(C, Bv)), elen(...b2sub(A, C)));
+    snapT[t] = Math.max(BONE2_HY_SNAP_MM, (3 * maxEdge[t]) / BONE2_HY_CHART_N);
+  }
+  const edgeSnap = (e) => Math.max(snapT[ET0[e]], ET1[e] >= 0 ? snapT[ET1[e]] : 0);
+  const reMesh = (t) => t >= 0 && !!porous[t];
+  /* spatial hash of every triangle (the walk crosses non-porous ones too) */
+  const cell = 0.6, H = new Map();
+  const ck = (i, j, k) => `${i},${j},${k}`;
+  for (let t = 0; t < nT; t++) {
+    const bl = [Infinity, Infinity, Infinity], bh = [-Infinity, -Infinity, -Infinity];
+    for (let c = 0; c < 3; c++) { const v = tri[t * 3 + c]; for (let k = 0; k < 3; k++) { bl[k] = Math.min(bl[k], P[v * 3 + k]); bh[k] = Math.max(bh[k], P[v * 3 + k]); } }
+    for (let i = Math.floor(bl[0] / cell); i <= Math.floor(bh[0] / cell); i++) for (let j = Math.floor(bl[1] / cell); j <= Math.floor(bh[1] / cell); j++) for (let k = Math.floor(bl[2] / cell); k <= Math.floor(bh[2] / cell); k++) { const key = ck(i, j, k); let Ls = H.get(key); if (!Ls) H.set(key, (Ls = [])); Ls.push(t); }
+  }
+  const trisNear = (c, r) => { const out = new Set(); for (let i = Math.floor((c[0] - r) / cell); i <= Math.floor((c[0] + r) / cell); i++) for (let j = Math.floor((c[1] - r) / cell); j <= Math.floor((c[1] + r) / cell); j++) for (let k = Math.floor((c[2] - r) / cell); k <= Math.floor((c[2] + r) / cell); k++) { const Ls = H.get(ck(i, j, k)); if (Ls) for (const t of Ls) out.add(t); } return out; };
+
+  /* ---- the point store (new vertices) ---- */
+  const NP = [], srcT = [], srcB = [], kind = [];
+  const interior = new Map();   // t -> [ids]
+  const cons = new Map();       // t -> [[a, b], ...]
+  const posOf = (id) => (id < nV0 ? V(id) : [NP[(id - nV0) * 3], NP[(id - nV0) * 3 + 1], NP[(id - nV0) * 3 + 2]]);
+  const attach = [];   // per new point: the lattice triangles it belongs to (one inside, two on an edge)
+  const ptDisc = [];   // per new point: the disc whose ring or seam made it (-1 none) — the diagnosis of a failed constraint
+  let curDisc = -1;
+  const newPt = (x, t, l, k, at = null) => { const id = nV0 + kind.length; NP.push(x[0], x[1], x[2]); srcT.push(t); srcB.push(l[0], l[1], l[2]); kind.push(k); attach.push(at || [t]); ptDisc.push(curDisc); return id; };
+  const isSeamKind = (k) => k === BONE2_HY_KIND.seam || k === BONE2_HY_KIND.seamCross || k === BONE2_HY_KIND.junction;
+  /* a point ON edge e at parameter s from its lower vertex */
+  const regEdge = (e, s, k, clear = 0) => {
+    const a = EA[e], b = EB[e], A = V(a), Bv = V(b);
+    const len = elen(Bv[0] - A[0], Bv[1] - A[1], Bv[2] - A[2]);
+    const sn = edgeSnap(e);
+    if (s * len < Math.max(sn, clear)) return clear && s * len >= sn ? -1 : a;
+    if ((1 - s) * len < Math.max(sn, clear)) return clear && (1 - s) * len >= sn ? -1 : b;
+    let L = EPTS[e];
+    if (!L) EPTS[e] = L = [];
+    for (const q of L) { const d = Math.abs(q.s - s) * len; if (d < sn) return q.id; if (clear && d < clear) return -1; }
+    const x = [A[0] + s * (Bv[0] - A[0]), A[1] + s * (Bv[1] - A[1]), A[2] + s * (Bv[2] - A[2])];
+    /* its source triangle (for attributes): either neighbour, the barycentrics on the shared edge */
+    const t = reMesh(ET0[e]) || ET1[e] < 0 ? ET0[e] : ET1[e];
+    const l = [0, 0, 0];
+    for (let c = 0; c < 3; c++) { const v = tri[t * 3 + c]; if (v === a) l[c] = 1 - s; else if (v === b) l[c] = s; }
+    const id = newPt(x, t, l, k, ET1[e] >= 0 ? [ET0[e], ET1[e]] : [ET0[e]]);
+    L.push({ s, id, k });
+    return id;
+  };
+  /* a point IN triangle t with barycentrics l (snapped onto an edge or a
+     corner within the triangle's snap distance) */
+  const regIn = (t, l, k, clear = 0) => {
+    const c3 = [tri[t * 3], tri[t * 3 + 1], tri[t * 3 + 2]], Cs = c3.map(V);
+    const x = [0, 1, 2].map((q) => l[0] * Cs[0][q] + l[1] * Cs[1][q] + l[2] * Cs[2][q]);
+    const area2 = elen(...b2crs(b2sub(Cs[1], Cs[0]), b2sub(Cs[2], Cs[0])));
+    const sn = snapT[t];
+    /* distance to the edge opposite corner q is l[q] x its altitude */
+    const dist = [0, 1, 2].map((q) => { const e1 = Cs[(q + 1) % 3], e2 = Cs[(q + 2) % 3]; const len = elen(...b2sub(e2, e1)); return (l[q] * area2) / (len || 1); });
+    const small = [0, 1, 2].filter((q) => dist[q] < sn);
+    if (small.length >= 2) { const q = [0, 1, 2].find((z) => !small.includes(z)); return clear ? -1 : c3[q]; }
+    if (small.length === 1) {
+      const q = small[0], ca = (q + 1) % 3, cb = (q + 2) % 3;   // the edge from corner ca to cb (triE index ca)
+      const e = triE[t * 3 + ca], sAB = l[cb] / (l[ca] + l[cb]);
+      const s = c3[ca] === EA[e] ? sAB : 1 - sAB;
+      return regEdge(e, s, k === BONE2_HY_KIND.seam || k === BONE2_HY_KIND.junction ? BONE2_HY_KIND.seamCross : k === BONE2_HY_KIND.ring || k === BONE2_HY_KIND.nested ? BONE2_HY_KIND.cross : k, clear);
+    }
+    let Ls = interior.get(t);
+    if (!Ls) interior.set(t, (Ls = []));
+    for (const id of Ls) { const q = posOf(id); const d = elen(q[0] - x[0], q[1] - x[1], q[2] - x[2]); if (d < sn) return id; if (clear && d < clear) return -1; }
+    if (clear) {
+      for (let c = 0; c < 3; c++) { if (elen(...b2sub(Cs[c], x)) < clear) return -1; const pl = EPTS[triE[t * 3 + c]]; if (pl) for (const q of pl) { const p2 = posOf(q.id); if (elen(p2[0] - x[0], p2[1] - x[1], p2[2] - x[2]) < clear) return -1; } }
+    }
+    const id = newPt(x, t, l, k);
+    Ls.push(id);
+    return id;
+  };
+  const addCons = (t, a, b) => { if (a === b || a < 0 || b < 0 || !reMesh(t)) return; let Ls = cons.get(t); if (!Ls) cons.set(t, (Ls = [])); Ls.push([a, b]); };
+
+  /* ---- pairs ---- */
+  const pairs = bone2MergedPairs(discs, wallU);
+  stats.pairs = pairs.length;
+  const pairsOf = discs.map(() => []);
+  for (const pr of pairs) { pairsOf[pr.i].push({ pr, sign: 1 }); pairsOf[pr.j].push({ pr, sign: -1 }); }
+  discs.forEach((d, i) => { if (pairsOf[i].length) stats.merged++; else stats.free++; });
+  /* the signed margin of x on disc i's side of every one of its planes
+     (negative = kept): max over its pairs of (sd + band), sd oriented toward
+     the neighbour */
+  /* a pair clips only INSIDE the other pore's outer disc: past its outer ring
+     the other cup is the plateau and there is no crease to keep clear of
+     (clipping there opened a gap in the lip at the lens's ends, where neither
+     a ring nor a seam row reached: 0.36 mm of relief missing at H 1.0) */
+  const clipOf = (i, x) => { let g = -Infinity; for (const { pr, sign } of pairsOf[i]) { const o = sign > 0 ? pr.cj : pr.ci, ro = sign > 0 ? pr.Rj : pr.Ri; if (elen(x[0] - o[0], x[1] - o[1], x[2] - o[2]) >= ro + BONE2_HY_CLIP_REACH * pr.band) continue; const sd = sign * bone2PairSd(pr, x); g = Math.max(g, sd + pr.band); } return g; };
+
+  /* ---- one disc's chart, the location of a point, the walk ---- */
+  const chartOf = (d) => {
+    const near = trisNear(d.c, BONE2_HY_OUTER_U * d.rho + 0.8);
+    const front = new Set();
+    for (const t of near) if (faceN[t * 3] * d.n[0] + faceN[t * 3 + 1] * d.n[1] + faceN[t * 3 + 2] * d.n[2] >= 0.3) front.add(t);
+    const cv = new Map();
+    const cxy = (v) => { let q = cv.get(v); if (!q) { const x = b2sub(V(v), d.c); q = [b2dot(x, d.t1), b2dot(x, d.t2)]; cv.set(v, q); } return q; };
+    const bary = (t, x, y) => {
+      const A = cxy(tri[t * 3]), Bq = cxy(tri[t * 3 + 1]), C = cxy(tri[t * 3 + 2]);
+      const det = (Bq[0] - A[0]) * (C[1] - A[1]) - (C[0] - A[0]) * (Bq[1] - A[1]);
+      if (!(Math.abs(det) > 1e-18)) return null;
+      const l1 = ((Bq[0] - x) * (C[1] - y) - (C[0] - x) * (Bq[1] - y)) / det, l2 = ((C[0] - x) * (A[1] - y) - (A[0] - x) * (C[1] - y)) / det;
+      return [l1, l2, 1 - l1 - l2];
+    };
+    const inside = (l) => l && l[0] >= -1e-12 && l[1] >= -1e-12 && l[2] >= -1e-12;
+    /* a uniform grid over the front triangles' chart boxes (each bucket in
+       the front's own order, so the first triangle found is the one a scan of
+       the whole front finds first: the same answer, without the scan that
+       was 41 s of the default bloom's full build) */
+    const GC = 0.3, gb = new Map();
+    for (const t of front) {
+      const A = cxy(tri[t * 3]), Bq = cxy(tri[t * 3 + 1]), C = cxy(tri[t * 3 + 2]), e = 1e-6;
+      const i0 = Math.floor((Math.min(A[0], Bq[0], C[0]) - e) / GC), i1 = Math.floor((Math.max(A[0], Bq[0], C[0]) + e) / GC);
+      const j0 = Math.floor((Math.min(A[1], Bq[1], C[1]) - e) / GC), j1 = Math.floor((Math.max(A[1], Bq[1], C[1]) + e) / GC);
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const k = i * 100003 + j; let L = gb.get(k); if (!L) gb.set(k, (L = [])); L.push(t); }
+    }
+    const locate = (x, y, hint = -1) => {
+      if (hint >= 0 && front.has(hint)) { const l = bary(hint, x, y); if (inside(l)) return { t: hint, l }; }
+      const L = gb.get(Math.floor(x / GC) * 100003 + Math.floor(y / GC));
+      if (L) for (const t of L) { const l = bary(t, x, y); if (inside(l)) return { t, l }; }
+      return null;
+    };
+    /* the walk from (x0,y0) in t0 to (x1,y1): its edge crossings and the end triangle */
+    const walk = (t0, x0, y0, x1, y1) => {
+      const out = [];
+      let cur = t0, prevE = -1, sPrev = 0;
+      for (let step = 0; step < 80; step++) {
+        const l = bary(cur, x1, y1);
+        if (inside(l)) return { crossings: out, t: cur, l };
+        let best = null;
+        for (let k = 0; k < 3; k++) {
+          const e = triE[cur * 3 + k];
+          if (e === prevE) continue;
+          const A = cxy(EA[e]), Bq = cxy(EB[e]);
+          const rx = x1 - x0, ry = y1 - y0, ex = Bq[0] - A[0], ey = Bq[1] - A[1];
+          const den = rx * ey - ry * ex;
+          if (Math.abs(den) < 1e-18) continue;
+          const wx = A[0] - x0, wy = A[1] - y0;
+          const s = (wx * ey - wy * ex) / den, u = (wx * ry - wy * rx) / den;
+          if (s > sPrev - 1e-12 && s <= 1 + 1e-12 && u >= -1e-12 && u <= 1 + 1e-12 && (!best || s < best.s)) best = { e, s, u: Math.min(1, Math.max(0, u)) };
+        }
+        if (!best) return { crossings: out, t: -1, aborted: 'noexit' };
+        const next = ET0[best.e] === cur ? ET1[best.e] : ET0[best.e];
+        out.push({ e: best.e, u: best.u, from: cur, to: next });
+        if (next < 0 || !front.has(next)) return { crossings: out, t: -1, aborted: next < 0 ? 'border' : 'leaves' };
+        cur = next; prevE = best.e; sPrev = best.s;
+      }
+      return { crossings: out, t: -1, aborted: 'steps' };
+    };
+    /* the SURFACE point under a chart point (the projection along the disc's
+       normal onto the lattice triangle it lands in): every clip is judged
+       there, so two discs with different normals judge the same point */
+    let lastT = -1;
+    const surf = (x, y, fallback) => {
+      const at = locate(x, y, lastT);
+      if (!at) return fallback;
+      lastT = at.t;
+      const a = tri[at.t * 3], b = tri[at.t * 3 + 1], c = tri[at.t * 3 + 2];
+      return [0, 1, 2].map((k) => at.l[0] * P[a * 3 + k] + at.l[1] * P[b * 3 + k] + at.l[2] * P[c * 3 + k]);
+    };
+    return { locate, walk, bary, inside, surf };
+  };
+
+  /* ---- an arc (a polyline of points on the disc's plane, in its chart), walked
+     and registered. `closed`: the last point joins the first. `constrain`:
+     its chords are constraints (rings) or not (seam rows). */
+  const runArc = (ch, pts, closed, k, constrain, clear = 0, drop = null) => {
+    const kx = k === BONE2_HY_KIND.seam ? BONE2_HY_KIND.seamCross : BONE2_HY_KIND.cross;
+    let prev = null;   // { id, t (the triangle the next sub-segment starts in), x, y }
+    const first = { done: false };
+    const visit = (x, y, hint) => {
+      const at = ch.locate(x, y, hint);
+      if (!at) return null;
+      return at;
+    };
+    const ids = [];
+    let at0 = null;
+    const seq = closed ? [...pts, pts[0]] : pts;
+    for (let i = 0; i < seq.length; i++) {
+      const [x, y, x3] = seq[i];
+      let at;
+      if (prev && prev.t >= 0) {
+        const W = ch.walk(prev.t, prev.x, prev.y, x, y);
+        let cur = { id: prev.id, t: prev.t };
+        for (const c of W.crossings) {
+          const s = c.u, e = c.e;
+          const pa = EA[e];
+          /* u is from the edge's corner in walk order (EA -> EB as stored), so s is from EA */
+          void pa;
+          let id = -1;
+          if (reMesh(c.from) || reMesh(c.to)) {
+            const xq = posOf(EA[e]), xb = posOf(EB[e]);
+            const xm = [xq[0] + s * (xb[0] - xq[0]), xq[1] + s * (xb[1] - xq[1]), xq[2] + s * (xb[2] - xq[2])];
+            if (!drop || !drop(xm)) id = regEdge(e, s, kx, clear);
+          }
+          if (constrain && cur.id >= 0 && id >= 0) addCons(c.from, cur.id, id);
+          cur = { id, t: c.to };
+        }
+        if (W.aborted) { stats.aborted++; stats['abort_' + W.aborted] = (stats['abort_' + W.aborted] || 0) + 1; at = visit(x, y, -1); prev = null; if (!at) { continue; } }
+        else {
+          at = { t: W.t, l: W.l };
+          const id = reMesh(at.t) && (!drop || !drop(x3)) ? regIn(at.t, at.l, k, clear) : -1;
+          if (constrain && cur.id >= 0 && id >= 0) addCons(at.t, cur.id, id);
+          prev = { id, t: at.t, x, y };
+          ids.push(id);
+          continue;
+        }
+      } else at = visit(x, y, at0 ? at0.t : -1);
+      if (!at) { prev = null; continue; }
+      if (!at0) at0 = at;
+      const id = reMesh(at.t) && (!drop || !drop(x3)) ? regIn(at.t, at.l, k, clear) : -1;
+      prev = { id, t: at.t, x, y };
+      ids.push(id);
+    }
+    void first;
+    return ids;
+  };
+
+  /* ---- every disc's rings ---- */
+  const charts = discs.map((d) => chartOf(d));
+  discs.forEach((d, i) => {
+    curDisc = i;
+    const ch = charts[i];
+    const to3 = (x, y) => [d.c[0] + x * d.t1[0] + y * d.t2[0], d.c[1] + x * d.t1[1] + y * d.t2[1], d.c[2] + x * d.t1[2] + y * d.t2[2]];
+    /* the clip: the disc's own planes, plus (for a nested pit) the radical
+       lines against the pore's other nested pits, which overlap as often as
+       not (measured: every two-pit pore on the default plate) */
+    const ringArcs = (cx, cy, r, sides, phase, extra = null) => {
+      const th = (q) => phase + (2 * Math.PI * q) / sides;
+      const at = (a) => { const x = cx + r * ecos(a), y = cy + r * esin(a); return [x, y, ch.surf(x, y, to3(x, y))]; };
+      const clip = (p) => Math.max(clipOf(i, p[2]), extra ? extra(p[0], p[1]) : -Infinity);
+      const keep = [];
+      for (let q = 0; q < sides; q++) keep.push(clip(at(th(q))) < 0);
+      /* a chord between two kept vertices is kept only if it stays on the
+         pore's side too: the larger pore's kept region is the OUTSIDE of the
+         crease (an Apollonius sphere wraps the smaller pore), which is not
+         convex, so a chord between two kept vertices can cut into the smaller
+         pore's arcs (measured: 1,146 failed constraints on the default bloom,
+         every one two discs' arcs) */
+      const chordOK = (q) => { const a0 = th(q), a1 = th(q + 1), x0 = cx + r * ecos(a0), y0 = cy + r * esin(a0), x1 = cx + r * ecos(a1), y1 = cy + r * esin(a1); for (const f of [0.25, 0.5, 0.75]) { const x = x0 + f * (x1 - x0), y = y0 + f * (y1 - y0); if (!(clip([x, y, ch.surf(x, y, to3(x, y))]) < 0)) return false; } return true; };
+      const link = [];
+      for (let q = 0; q < sides; q++) { const a = keep[q], b = keep[(q + 1) % sides]; link.push(a && b ? (chordOK(q) ? 'full' : 'none') : a ? 'cutA' : b ? 'cutB' : 'none'); }
+      if (link.every((k) => k === 'full')) return [{ closed: true, pts: Array.from({ length: sides }, (_, q) => at(th(q))) }];
+      if (!keep.some(Boolean)) return [];
+      /* the arc's end ON the circle where the binding band edge is met */
+      const edgeAt = (aIn, aOut) => { let lo = aIn, hi = aOut; for (let it = 0; it < 40; it++) { const m = (lo + hi) / 2; if (clip(at(m)) < 0) lo = m; else hi = m; } return at(lo); };
+      const arcs = [];
+      let cur = null;
+      const flush = () => { if (cur && cur.length) arcs.push({ closed: false, pts: cur }); cur = null; };
+      const start = link.findIndex((k) => k !== 'full');
+      for (let k = 0; k < sides; k++) {
+        const j = (start + k) % sides, st = link[j];
+        if (st === 'full') { if (!cur) cur = [at(th(j))]; cur.push(at(th(j + 1))); }
+        else if (st === 'cutA') { if (!cur) cur = [at(th(j))]; cur.push(edgeAt(th(j), th(j + 1))); flush(); }
+        else if (st === 'cutB') { flush(); cur = [edgeAt(th(j + 1), th(j)), at(th(j + 1))]; }
+        else { if (!cur && keep[j]) cur = [at(th(j))]; flush(); }
+      }
+      flush();
+      return arcs;
+    };
+    const shelved = d.nested && d.nested.length && L.nestedU;
+    const sides = L.sides(d.rho);
+    L.u.forEach((u, ri) => {
+      if (shelved && u < L.shelfFrom) return;
+      const phase = 2 * Math.PI * (d.rot + (ri % 2) * 0.5) / sides;
+      for (const arc of ringArcs(0, 0, u * d.rho, sides, phase)) { runArc(ch, arc.pts, arc.closed, BONE2_HY_KIND.ring, true); stats.arcs++; }
+    });
+    if (L.centre && !shelved) { const x3 = d.c; if (clipOf(i, x3) < 0) runArc(ch, [[0, 0, x3]], false, BONE2_HY_KIND.centre, false); }
+    if (shelved) d.nested.forEach((q, qi) => {
+      /* the nested pit's offset is in the field's frame at the disc's normal, which IS this disc's frame */
+      const cx = q.ox, cy = q.oy;
+      const Ro = L.nestedU[L.nestedU.length - 1];
+      const others = d.nested.filter((o, oi) => oi !== qi && elen(o.ox - cx, o.oy - cy) < Ro * (o.R + q.R));
+      const extra = others.length ? (x, y) => { let g = -Infinity; for (const o of others) { const dx = o.ox - cx, dy = o.oy - cy, dd = elen(dx, dy) || 1e-12, Ra = Ro * q.R, Rb = Ro * o.R; const rad = (dd * dd + Ra * Ra - Rb * Rb) / (2 * dd); const sdv = ((x - cx) * dx + (y - cy) * dy) / dd - rad; g = Math.max(g, sdv + wallU * Math.min(q.R, o.R)); } return g; } : null;
+      L.nestedU.forEach((u, ri) => {
+        const phase = 2 * Math.PI * (d.rot + (ri % 2) * 0.5) / L.nestedSides;
+        for (const arc of ringArcs(cx, cy, u * q.R, L.nestedSides, phase, extra)) { runArc(ch, arc.pts, arc.closed, BONE2_HY_KIND.nested, true); stats.arcs++; }
+      });
+      const x3 = to3(cx, cy); if (clipOf(i, x3) < 0 && !(extra && extra(cx, cy) >= 0)) runArc(ch, [[cx, cy, x3]], false, BONE2_HY_KIND.centre, false);
+    });
+  });
+
+  /* ---- the seam bands ---- */
+  /* a point a THIRD disc keeps (inside its outer disc and on its side of all
+     its planes) is that disc's, and a seam point there is dropped */
+  const keptByOtherSet = (x, own, margin) => {
+    const cand = new Set(); for (const o of own) for (const { pr } of pairsOf[o]) cand.add(pr.i === o ? pr.j : pr.i);
+    for (const k of cand) {
+      if (own.includes(k)) continue;
+      const d = discs[k]; const dx = x[0] - d.c[0], dy = x[1] - d.c[1], dz = x[2] - d.c[2];
+      const R = BONE2_HY_OUTER_U * d.rho + margin;
+      if (dx * dx + dy * dy + dz * dz > R * R) continue;
+      if (clipOf(k, x) < margin) return true;
+    }
+    return false;
+  };
+  const keptByOther = (x, i, j, margin) => {
+    /* a third disc whose outer disc reaches the seam overlaps i's or j's, so
+       it is one of their own merged neighbours */
+    const cand = new Set(); for (const { pr } of pairsOf[i]) cand.add(pr.i === i ? pr.j : pr.i); for (const { pr } of pairsOf[j]) cand.add(pr.i === j ? pr.j : pr.i);
+    for (const k of cand) {
+      if (k === i || k === j) continue;
+      const d = discs[k]; const dx = x[0] - d.c[0], dy = x[1] - d.c[1], dz = x[2] - d.c[2];
+      const R = BONE2_HY_OUTER_U * d.rho + margin;
+      if (dx * dx + dy * dy + dz * dz > R * R) continue;
+      if (Math.abs(dx * d.n[0] + dy * d.n[1] + dz * d.n[2]) > R) continue;
+      if (clipOf(k, x) < margin) return true;
+    }
+    return false;
+  };
+  if (L.seams) for (const pr of pairs) {
+    const d = discs[pr.i], ch = charts[pr.i];
+    const h = pr.h;
+    /* the crease in disc i's chart: a row at sd = r is found by Newton along
+       sd's own gradient from points spaced along the line through the crease
+       across the centres (the radical direction) */
+    const g1 = b2dot(d.t1, pr.m), g2 = b2dot(d.t2, pr.m), gg = g1 * g1 + g2 * g2;
+    if (!(gg > 0.25)) continue;   // the centres' line is nearly normal to the disc: no seam across it
+    const to3s = (x, y) => [d.c[0] + x * d.t1[0] + y * d.t2[0], d.c[1] + x * d.t1[1] + y * d.t2[1], d.c[2] + x * d.t1[2] + y * d.t2[2]];
+    /* the crease is found ON THE SURFACE (the chart point carried onto the
+       organ, as every clip is judged): solved in the tangent plane, a row was
+       carried off the crease by the sheet's own sagitta — measured 1.7 h on
+       the default petal, by TXB9's restated crease */
+    const sdAt = (x, y) => bone2PairSd(pr, ch.surf(x, y, to3s(x, y)));
+    const onRow = (x, y, r) => {
+      for (let it = 0; it < 8; it++) {
+        const e = 1e-6, f = sdAt(x, y) - r, fx = (sdAt(x + e, y) - sdAt(x - e, y)) / (2 * e), fy = (sdAt(x, y + e) - sdAt(x, y - e)) / (2 * e), gq = fx * fx + fy * fy;
+        if (!(gq > 0)) return null;
+        x -= (f * fx) / gq; y -= (f * fy) / gq;
+        if (Math.abs(f) < 1e-9) break;
+      }
+      return [x, y];
+    };
+    /* the crease crosses the centres' line where u_i = u_j: at t = rho_i/(rho_i + rho_j) of the way */
+    const cjx = b2dot(b2sub(discs[pr.j].c, d.c), d.t1), cjy = b2dot(b2sub(discs[pr.j].c, d.c), d.t2);
+    const tC = d.rho / (d.rho + discs[pr.j].rho);
+    const sd0x = tC * cjx, sd0y = tC * cjy;
+    const wx = -g2 / Math.sqrt(gg), wy = g1 / Math.sqrt(gg);
+    const near3 = (x) => keptByOther(x, pr.i, pr.j, h * 0.5);
+    for (const r of BONE2_HY_SEAM_ROWS.map((q) => q * h)) {
+      const px = sd0x, py = sd0y;
+      const pts = [];
+      /* along the seam, the RIM'S OWN SIDE at the smaller pore (the rings'
+         angular resolution); across it, three rows h apart (h half the lip's
+         drawn width there, the derived grid edge) */
+      const rmin = Math.min(d.rho, discs[pr.j].rho), step = (2 * Math.PI * rmin) / L.sides(rmin), Lr = pr.Ri;
+      for (let s = -Lr; s <= Lr + 1e-12; s += step) {
+        const q = onRow(px + s * wx, py + s * wy, r);
+        if (!q) continue;
+        const [x, y] = q;
+        const x3 = to3s(x, y);
+        const ci = discs[pr.i].c, cj = discs[pr.j].c;
+        const di = elen(x3[0] - ci[0], x3[1] - ci[1], x3[2] - ci[2]), dj = elen(x3[0] - cj[0], x3[1] - cj[1], x3[2] - cj[2]);
+        if (di < pr.Ri && dj < pr.Rj) pts.push([x, y, x3]);
+        else if (pts.length) { runArc(ch, pts.splice(0), false, BONE2_HY_KIND.seam, false, BONE2_HY_SEAM_CLEAR * h, near3); }
+      }
+      if (pts.length) runArc(ch, pts, false, BONE2_HY_KIND.seam, false, BONE2_HY_SEAM_CLEAR * h, near3);
+    }
+  }
+  /* ---- the wall junctions: where three mutually merged pores meet, the
+     creases end in a wall's sharp end (the field's three-way smooth minimum).
+     The junction is the point where the three normalised radii are EQUAL,
+     found by Gauss-Newton in disc i's chart; a patch of points at the derived
+     edge h (the smallest pore's) is laid within BONE2_HY_JUNCTION_H x h of it. */
+  if (L.seams) {
+    const nb = discs.map(() => new Set());
+    for (const pr of pairs) { nb[pr.i].add(pr.j); nb[pr.j].add(pr.i); }
+    for (let i = 0; i < discs.length; i++) for (const j of nb[i]) { if (j <= i) continue; for (const k of nb[j]) {
+      if (k <= j || !nb[i].has(k)) continue;
+      const D3 = [discs[i], discs[j], discs[k]], d = D3[0], ch = charts[i];
+      const to3s = (x, y) => [d.c[0] + x * d.t1[0] + y * d.t2[0], d.c[1] + x * d.t1[1] + y * d.t2[1], d.c[2] + x * d.t1[2] + y * d.t2[2]];
+      const uOf = (q, x3) => elen(x3[0] - q.c[0], x3[1] - q.c[1], x3[2] - q.c[2]) / q.rho;
+      const fn = (x, y) => { const x3 = to3s(x, y), a = uOf(D3[0], x3); return [a - uOf(D3[1], x3), a - uOf(D3[2], x3)]; };
+      /* start at the radius-weighted centroid */
+      const W = D3.reduce((s2, q) => s2 + q.rho, 0);
+      let x = 0, y = 0; for (const q of D3) { const v = b2sub(q.c, d.c); x += (b2dot(v, d.t1) * q.rho) / W; y += (b2dot(v, d.t2) * q.rho) / W; }
+      let ok = false;
+      for (let it = 0; it < 20; it++) {
+        const f = fn(x, y), e = 1e-6, fx = fn(x + e, y), fy = fn(x, y + e);
+        const J = [[(fx[0] - f[0]) / e, (fy[0] - f[0]) / e], [(fx[1] - f[1]) / e, (fy[1] - f[1]) / e]];
+        const det = J[0][0] * J[1][1] - J[0][1] * J[1][0];
+        if (!(Math.abs(det) > 1e-12)) break;
+        const dx = (f[0] * J[1][1] - f[1] * J[0][1]) / det, dy = (J[0][0] * f[1] - J[1][0] * f[0]) / det;
+        x -= dx; y -= dy;
+        if (elen(dx, dy) < 1e-9) { ok = true; break; }
+      }
+      if (!ok) continue;
+      const x3 = to3s(x, y);
+      if (D3.some((q) => uOf(q, x3) >= BONE2_HY_OUTER_U)) continue;   // the three outer discs do not share the point
+      const h = (wallU * Math.min(...D3.map((q) => q.rho))) / 2, R = BONE2_HY_JUNCTION_H * h;
+      const near3 = (p3) => { for (let z = 0; z < discs.length; z++) { if (z === i || z === j || z === k) continue; } return keptByOtherSet(p3, [i, j, k], h * 0.5); };
+      const pts = [];
+      const hy = h * Math.sqrt(3) / 2;
+      for (let r = -Math.ceil(R / hy), rr = 0; r <= Math.ceil(R / hy); r++, rr++) for (let c = -Math.ceil(R / h) - 1; c <= Math.ceil(R / h) + 1; c++) {
+        const px = x + (c + (r & 1) * 0.5) * h, py = y + r * hy;
+        if (elen(px - x, py - y) > R) continue;
+        /* a junction point is a MERGE's: inside at least two of the three
+           outer discs (one lens), never on a pore's plateau beyond them */
+        const p3 = to3s(px, py);
+        if (D3.filter((q) => elen(p3[0] - q.c[0], p3[1] - q.c[1], p3[2] - q.c[2]) < BONE2_HY_OUTER_U * q.rho).length < 2) continue;
+        pts.push([px, py, p3]);
+      }
+      for (const q of pts) runArc(ch, [q], false, BONE2_HY_KIND.junction, false, BONE2_HY_SEAM_CLEAR * h, near3);
+      stats.junctions = (stats.junctions || 0) + 1;
+    } }
+  }
+  stats.ringPts = 0; stats.crossPts = 0; stats.seamPts = 0; stats.seamCross = 0;
+  for (const k of kind) { if (k === BONE2_HY_KIND.junction) stats.junctionPts = (stats.junctionPts || 0) + 1; else if (k === BONE2_HY_KIND.seam) stats.seamPts++; else if (k === BONE2_HY_KIND.seamCross) stats.seamCross++; else if (k === BONE2_HY_KIND.cross) stats.crossPts++; else if (k === BONE2_HY_KIND.ring || k === BONE2_HY_KIND.nested || k === BONE2_HY_KIND.centre) stats.ringPts++; }
+
+  /* ---- per triangle: count or triangulate ---- */
+  const outTri = [], outSrc = [];   // outSrc: each emitted triangle's source lattice triangle (the fold check's key)
+  let count = 0;
+  /* the count PER LATTICE TRIANGLE (the allocator's exact cost: each lattice
+     triangle is triangulated on its own, so its count is local) */
+  const perTri = new Int32Array(nT);
+  const loopOf = (t) => {
+    /* the boundary loop: corner 0, edge 0's points, corner 1, ... (corner k to k+1) */
+    const loop = [], side = [];
+    for (let k = 0; k < 3; k++) {
+      const a = tri[t * 3 + k], b = tri[t * 3 + (k + 1) % 3], e = triE[t * 3 + k];
+      loop.push(a); side.push((1 << k) | (1 << ((k + 2) % 3)));
+      const pl = EPTS[e];
+      if (pl && pl.length) {
+        const sorted = pl.slice().sort((p, q) => p.s - q.s);
+        const fwd = a === EA[e];
+        for (const q of fwd ? sorted : sorted.reverse()) { loop.push(q.id); side.push(1 << k); }
+      }
+    }
+    return { loop, side };
+  };
+  for (let t = 0; t < nT; t++) {
+    const { loop, side } = loopOf(t);
+    const ins = reMesh(t) ? (interior.get(t) || []) : [];
+    if (loop.length === 3 && !ins.length) { count++; perTri[t] = 1; stats.keptTris++; if (!countOnly) { outTri.push(tri[t * 3], tri[t * 3 + 1], tri[t * 3 + 2]); outSrc.push(t); } continue; }
+    if (!reMesh(t)) {
+      /* a transition: the centroid fan over the boundary points */
+      count += loop.length; perTri[t] = loop.length; stats.fanTris += loop.length;
+      if (!countOnly) {
+        const g = newPt([0, 1, 2].map((q) => (P[tri[t * 3] * 3 + q] + P[tri[t * 3 + 1] * 3 + q] + P[tri[t * 3 + 2] * 3 + q]) / 3), t, [1 / 3, 1 / 3, 1 / 3], BONE2_HY_KIND.steiner);
+        for (let q = 0; q < loop.length; q++) { outTri.push(loop[q], loop[(q + 1) % loop.length], g); outSrc.push(t); }
+      }
+      continue;
+    }
+    const ni = ins.length || 1;
+    if (!ins.length) stats.steiner++;
+    count += loop.length + 2 * ni - 2;
+    perTri[t] = loop.length + 2 * ni - 2;
+    stats.cdtTris += loop.length + 2 * ni - 2;
+    if (countOnly) continue;
+    let pts = ins;
+    if (!ins.length) { const g = newPt([0, 1, 2].map((q) => (P[tri[t * 3] * 3 + q] + P[tri[t * 3 + 1] * 3 + q] + P[tri[t * 3 + 2] * 3 + q]) / 3), t, [1 / 3, 1 / 3, 1 / 3], BONE2_HY_KIND.steiner); pts = [g]; }
+    const R = bone2CdtInTriangle(posOf, loop, side, pts, cons.get(t) || [], [V(tri[t * 3]), V(tri[t * 3 + 1]), V(tri[t * 3 + 2])], maxEdge[t]);
+    stats.consFail += R.fail;
+    if (R.fail && opts.debug) { (stats.failSites = stats.failSites || []).push({ t, failed: R.failed.map(([a, b]) => ({ a, b, da: a >= nV0 ? ptDisc[a - nV0] : -1, db: b >= nV0 ? ptDisc[b - nV0] : -1, ka: a >= nV0 ? kind[a - nV0] : 0, kb: b >= nV0 ? kind[b - nV0] : 0 })), blockers: R.blockers.map(([a, b]) => ({ da: a >= nV0 ? ptDisc[a - nV0] : -1, db: b >= nV0 ? ptDisc[b - nV0] : -1, ka: a >= nV0 ? kind[a - nV0] : 0, kb: b >= nV0 ? kind[b - nV0] : 0 })), pos: R.failed.concat(R.blockers).flat().map(posOf), pairs: pairs.filter((pr) => R.failed.concat(R.blockers).flat().some((id) => id >= nV0 && (ptDisc[id - nV0] === pr.i || ptDisc[id - nV0] === pr.j))).map((pr) => ({ i: pr.i, j: pr.j, sd: R.failed.concat(R.blockers).flat().map((id) => bone2PairSd(pr, posOf(id))), band: pr.band })) }); }
+    for (const q of R.tris) outTri.push(q);
+    for (let q = 0; q < R.tris.length / 3; q++) outSrc.push(t);
+    if (R.tris.length / 3 !== loop.length + 2 * pts.length - 2) stats.countMismatch = (stats.countMismatch || 0) + 1;
+  }
+  stats.count = count;
+  if (countOnly) { const edgePts = new Int32Array(EA.length); for (let e = 0; e < EA.length; e++) edgePts[e] = EPTS[e] ? EPTS[e].length : 0; return { count, perTri, stats, triE, ET0: Int32Array.from(ET0), ET1: Int32Array.from(ET1), edgePts }; }
+  return { P: Array.from(P).concat(NP), tri: outTri, outSrc, faceN, src: { t: srcT, b: srcB }, kind, attach, ptDisc, nV0, stats, pairs, discs, perTri };
+}
+
+/* ====================== THE CONSTRAINED DELAUNAY OF ONE LATTICE TRIANGLE --- */
+/* posOf(id) -> 3D; loop: the boundary ids CCW (as the organ winds the
+   triangle), side: per loop entry, the bitmask of the lattice sides it lies
+   on; ins: interior ids; consIds: [[a, b]] chords; C: the three corners;
+   returns { tris: global ids, CCW as the triangle, fail }. */
+export function bone2CdtInTriangle(posOf, loop, side, ins, consIds, C, maxEdge) {
+  /* the integer chart: corner 0 at the origin, corner 1 on +x, corner 2 at +y */
+  const e1 = b2nrm(b2sub(C[1], C[0]));
+  const nT = b2nrm(b2crs(b2sub(C[1], C[0]), b2sub(C[2], C[0])));
+  const e2 = b2crs(nT, e1);
+  const S = BONE2_HY_CHART_N / maxEdge;
+  const ids = loop.concat(ins);
+  const X = new Float64Array(ids.length), Y = new Float64Array(ids.length);
+  ids.forEach((id, i) => { const q = b2sub(posOf(id), C[0]); X[i] = Math.round(b2dot(q, e1) * S); Y[i] = Math.round(b2dot(q, e2) * S); });
+  const sideOf = new Int32Array(ids.length);
+  for (let i = 0; i < loop.length; i++) sideOf[i] = side[i];
+  const loc = new Map(); ids.forEach((id, i) => { if (!loc.has(id)) loc.set(id, i); });
+  const cons = [];
+  for (const [a, b] of consIds) { const ia = loc.get(a), ib = loc.get(b); if (ia === undefined || ib === undefined || ia === ib) continue; if (sideOf[ia] & sideOf[ib]) continue; cons.push([ia, ib]); }
+  const R = bone2Cdt(X, Y, loop.length, sideOf, cons);
+  return { tris: R.tris.map((i) => ids[i]), fail: R.fail, failed: R.failed.map(([a, b]) => [ids[a], ids[b]]), blockers: R.blockers.map(([a, b]) => [ids[a], ids[b]]) };
+}
+
+/* the CDT core, in exact integer coordinates. 0..nb-1 the boundary loop CCW
+   (never flipped), nb.. interior points (inserted by Lawson), cons local
+   pairs (recovered by Sloan's flips). A triangle whose three vertices share a
+   lattice side is never made (it would be a zero-area sliver ON an edge). */
+export function bone2Cdt(X, Y, nb, sideOf, cons) {
+  const n = X.length;
+  const orient = (a, b, c) => (X[b] - X[a]) * (Y[c] - Y[a]) - (Y[b] - Y[a]) * (X[c] - X[a]);
+  const inCirc = (a, b, c, d) => { const adx = X[a] - X[d], ady = Y[a] - Y[d], bdx = X[b] - X[d], bdy = Y[b] - Y[d], cdx = X[c] - X[d], cdy = Y[c] - Y[d]; return (adx * adx + ady * ady) * (bdx * cdy - cdx * bdy) - (bdx * bdx + bdy * bdy) * (adx * cdy - cdx * ady) + (cdx * cdx + cdy * cdy) * (adx * bdy - bdx * ady); };
+  const T = [];           // [a, b, c] or null
+  const E = new Map();    // directed edge a*65536+b -> triangle
+  const dk = (a, b) => a * 65536 + b;
+  const uk = (a, b) => (a < b ? a * 65536 + b : b * 65536 + a);
+  const locked = new Set();
+  for (let i = 0; i < nb; i++) locked.add(uk(i, (i + 1) % nb));
+  const add = (a, b, c) => { const t = T.length; T.push([a, b, c]); E.set(dk(a, b), t); E.set(dk(b, c), t); E.set(dk(c, a), t); return t; };
+  const del = (t) => { const [a, b, c] = T[t]; if (E.get(dk(a, b)) === t) E.delete(dk(a, b)); if (E.get(dk(b, c)) === t) E.delete(dk(b, c)); if (E.get(dk(c, a)) === t) E.delete(dk(c, a)); T[t] = null; };
+  const sameSide = (a, b, c) => (sideOf[a] & sideOf[b] & sideOf[c]) !== 0;
+  const third = (t, a, b) => { const q = T[t]; for (const v of q) if (v !== a && v !== b) return v; return -1; };
+  /* flip edge (a, b): triangles (a, b, c) and (b, a, d) -> (a, d, c), (d, b, c) */
+  const canFlip = (a, b) => {
+    const t1 = E.get(dk(a, b)), t2 = E.get(dk(b, a));
+    if (t1 === undefined || t2 === undefined) return null;
+    const c = third(t1, a, b), d = third(t2, b, a);
+    if (orient(a, d, c) <= 0 || orient(d, b, c) <= 0) return null;
+    if (sameSide(a, d, c) || sameSide(d, b, c)) return null;
+    return { t1, t2, c, d };
+  };
+  const flip = (a, b, f) => { del(f.t1); del(f.t2); add(a, f.d, f.c); add(f.d, b, f.c); };
+  const legalize = (stack) => {
+    let guard = 0;
+    while (stack.length && guard++ < 200000) {
+      const [a, b] = stack.pop();
+      if (locked.has(uk(a, b))) continue;
+      const t1 = E.get(dk(a, b)), t2 = E.get(dk(b, a));
+      if (t1 === undefined || t2 === undefined) continue;
+      const c = third(t1, a, b), d = third(t2, b, a);
+      if (!(inCirc(a, b, c, d) > 0)) continue;
+      const f = canFlip(a, b);
+      if (!f) continue;
+      flip(a, b, f);
+      stack.push([a, f.d], [f.d, b], [b, f.c], [f.c, a]);
+    }
+  };
+  /* the initial fan from the first interior point */
+  const g = nb;
+  for (let i = 0; i < nb; i++) add(g, i, (i + 1) % nb);
+  const st0 = []; for (let i = 0; i < nb; i++) st0.push([g, i]);
+  legalize(st0);
+  for (let p = nb + 1; p < n; p++) {
+    let found = -1, onEdge = -1;
+    for (let t = 0; t < T.length; t++) {
+      const q = T[t]; if (!q) continue;
+      const o1 = orient(q[0], q[1], p), o2 = orient(q[1], q[2], p), o3 = orient(q[2], q[0], p);
+      if (o1 >= 0 && o2 >= 0 && o3 >= 0) { found = t; onEdge = o1 === 0 ? 0 : o2 === 0 ? 1 : o3 === 0 ? 2 : -1; break; }
+    }
+    if (found < 0) continue;   // outside (cannot happen for a point inside the triangle)
+    const [a, b, c] = T[found];
+    if (onEdge < 0) { del(found); add(a, b, p); add(b, c, p); add(c, a, p); legalize([[a, b], [b, c], [c, a]]); continue; }
+    const [u, v, w] = onEdge === 0 ? [a, b, c] : onEdge === 1 ? [b, c, a] : [c, a, b];
+    const t2 = E.get(dk(v, u));
+    if (t2 === undefined || locked.has(uk(u, v))) { del(found); add(v, w, p); add(w, u, p); legalize([[v, w], [w, u]]); continue; }
+    const x = third(t2, v, u);
+    del(found); del(t2);
+    add(v, w, p); add(w, u, p); add(u, x, p); add(x, v, p);
+    legalize([[v, w], [w, u], [u, x], [x, v]]);
+  }
+  /* the constraints, by flips */
+  let fail = 0;
+  const failed = [], blockers = [];
+  const crosses = (u, v, x, y) => { if (x === u || x === v || y === u || y === v) return false; const o1 = orient(u, v, x), o2 = orient(u, v, y), o3 = orient(x, y, u), o4 = orient(x, y, v); return ((o1 > 0 && o2 < 0) || (o1 < 0 && o2 > 0)) && ((o3 > 0 && o4 < 0) || (o3 < 0 && o4 > 0)); };
+  const queue = [...cons];
+  let qguard = 0;
+  while (queue.length && qguard++ < 20000) {
+    const [u, v] = queue.shift();
+    if (E.has(dk(u, v)) || E.has(dk(v, u))) { locked.add(uk(u, v)); continue; }
+    /* a vertex ON the segment splits the constraint */
+    let mid = -1;
+    for (let w = 0; w < n; w++) { if (w === u || w === v || orient(u, v, w) !== 0) continue; const dx = X[v] - X[u], dy = Y[v] - Y[u], s = (X[w] - X[u]) * dx + (Y[w] - Y[u]) * dy; if (s > 0 && s < dx * dx + dy * dy) { mid = w; break; } }
+    if (mid >= 0) { queue.push([u, mid], [mid, v]); continue; }
+    const cross = [];
+    for (const [key] of E) { const a = Math.floor(key / 65536), b = key % 65536; if (a < b && crosses(u, v, a, b)) cross.push([a, b]); }
+    if (cross.some(([a, b]) => locked.has(uk(a, b)))) { fail++; failed.push([u, v]); blockers.push(cross.find(([a, b]) => locked.has(uk(a, b)))); if (bone2Cdt.why) { const blk = cross.find(([a, b]) => locked.has(uk(a, b))); const bnd = blk[0] < nb && blk[1] < nb && (Math.abs(blk[0] - blk[1]) === 1 || Math.abs(blk[0] - blk[1]) === nb - 1); const key = (bnd ? 'boundary' : 'constraint') + (u < nb ? '-uB' : '-uI') + (v < nb ? '-vB' : '-vI'); bone2Cdt.why[key] = (bone2Cdt.why[key] || 0) + 1; } continue; }
+    let guard = 0;
+    while (cross.length && guard++ < 5000) {
+      const [a, b] = cross.shift();
+      if (!E.has(dk(a, b)) && !E.has(dk(b, a))) continue;
+      const aa = E.has(dk(a, b)) ? a : b, bb = aa === a ? b : a;
+      const f = canFlip(aa, bb);
+      if (!f) { cross.push([a, b]); continue; }
+      flip(aa, bb, f);
+      if (crosses(u, v, f.c, f.d)) cross.push([f.c, f.d]);
+    }
+    if (E.has(dk(u, v)) || E.has(dk(v, u))) locked.add(uk(u, v)); else { fail++; if (bone2Cdt.why) bone2Cdt.why.flips = (bone2Cdt.why.flips || 0) + 1; }
+  }
+  /* restore Delaunay about the constraints */
+  const st = []; for (const [key] of E) { const a = Math.floor(key / 65536), b = key % 65536; if (a < b) st.push([a, b]); }
+  legalize(st);
+  const tris = [];
+  for (const q of T) if (q) tris.push(q[0], q[1], q[2]);
+  return { tris, fail, failed, blockers };
+}
+
+/* ================================ BONE v2: THE FULL BUILD AND ITS ALLOCATOR */
+/* WHERE THE SURFACE SHOWS — DERIVED FROM THE GEOMETRY, NEVER A LIST OF PARTS
+   (Eva's Nov 2 ruling: full pores where they show, coarse elsewhere, the cap
+   deciding the split). The measure is the surface's EXPOSURE TO THE VIEWING
+   HEMISPHERE: a bloom is looked at from its face side (+z, the head's own
+   axis; the stem hangs below), so a point's exposure is the cosine-weighted
+   share of BONE2_VIEW_DIRS (a Fibonacci set over the +z hemisphere) along
+   which a ray from just outside it escapes everything the build emitted:
+     E = (1/K) sum_k max(0, n . d_k) x escapes(p + 1e-4 n, d_k).
+   It is ambient visibility restricted to where a viewer stands: a petal's top
+   face scores high, its underside low (it faces away from every direction
+   above), a crowded inner whorl lower than the outer (its rays meet the outer
+   petals), the stem's wall middling, the hub under the feet nothing. Every
+   term is arithmetic and the rays are T5's own Moller-Trumbore (products and
+   quotients), so the ranking is the same double in every engine.
+   It is evaluated per CELL, not per lattice triangle: a cell is one organ's
+   porous triangles whose centroids share a cube of BONE2_ALLOC_CELL_K x the largest
+   pore (2 x 1.5 = 3 mm at the defaults) — so full and coarse meet along cell
+   boundaries rather than salt-and-pepper, and the rays cost thousands, not a
+   ray per triangle. The cell's sample is its triangle nearest the cell's own
+   area-weighted centroid, along that triangle's own outward face normal. */
+export const BONE2_VIEW_K = 32;
+export const BONE2_VIEW_DIRS = Object.freeze(Array.from({ length: BONE2_VIEW_K }, (_, k) => {
+  const z = (k + 0.5) / BONE2_VIEW_K, r = Math.sqrt(1 - z * z);
+  const [s, c] = esincos(k * 2.399963229728653);   // the golden angle, radians
+  return Object.freeze([r * c, r * s, z]);
+}));
+export const BONE2_ALLOC_CELL_K = 2;
+export function bone2Exposure(G, p, n, dirs = BONE2_VIEW_DIRS) {
+  const o = [p[0] + n[0] * TEXTURE_VISIBILITY_OFFSET_MM, p[1] + n[1] * TEXTURE_VISIBILITY_OFFSET_MM, p[2] + n[2] * TEXTURE_VISIBILITY_OFFSET_MM];
+  let sum = 0;
+  for (const d of dirs) { const w = d[0] * n[0] + d[1] * n[1] + d[2] * n[2]; if (w > 0 && t5Escapes(G, o, d)) sum += w; }
+  return sum / dirs.length;
+}
+/* the cells of one organ's porous triangles, with their exposure sample */
+function bone2Cells(O, porous, cellMm, oi) {
+  const P = O.P, tri = O.tri, nT = tri.length / 3;
+  const map = new Map(), list = [];
+  for (let t = 0; t < nT; t++) {
+    if (!porous[t]) continue;
+    const a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2];
+    const cx = (P[a * 3] + P[b * 3] + P[c * 3]) / 3, cy = (P[a * 3 + 1] + P[b * 3 + 1] + P[c * 3 + 1]) / 3, cz = (P[a * 3 + 2] + P[b * 3 + 2] + P[c * 3 + 2]) / 3;
+    /* THE FACING BIN: a cell is a cube AND a facing (the face normal's dominant
+       axis and sign — six bins, nothing named). Without it a 3 mm cube holds a
+       1.2 mm sheet's top AND its underside, the cell's one exposure sample is
+       whichever skin sits nearer its centroid, and the allocator bought the
+       petals in 3 mm stripes — undersides full, tops coarse (measured on the
+       default: 266 of 752 cells mixed, 26.3 % of the porous area facing
+       against the sample that ranked it). */
+    const fx = (P[b * 3 + 1] - P[a * 3 + 1]) * (P[c * 3 + 2] - P[a * 3 + 2]) - (P[b * 3 + 2] - P[a * 3 + 2]) * (P[c * 3 + 1] - P[a * 3 + 1]);
+    const fy = (P[b * 3 + 2] - P[a * 3 + 2]) * (P[c * 3] - P[a * 3]) - (P[b * 3] - P[a * 3]) * (P[c * 3 + 2] - P[a * 3 + 2]);
+    const fz = (P[b * 3] - P[a * 3]) * (P[c * 3 + 1] - P[a * 3 + 1]) - (P[b * 3 + 1] - P[a * 3 + 1]) * (P[c * 3] - P[a * 3]);
+    const ax = Math.abs(fx), ay = Math.abs(fy), az = Math.abs(fz);
+    const face = ax >= ay && ax >= az ? (fx >= 0 ? 'x' : 'X') : ay >= az ? (fy >= 0 ? 'y' : 'Y') : (fz >= 0 ? 'z' : 'Z');
+    const key = `${oi}|${Math.floor(cx / cellMm)},${Math.floor(cy / cellMm)},${Math.floor(cz / cellMm)}|${face}`;
+    let C = map.get(key);
+    if (!C) { C = { key, oi, organ: O.organ, tris: [], area: 0, sx: 0, sy: 0, sz: 0, cost: 0, E: 0, sample: null, selected: false }; map.set(key, C); list.push(C); }
+    const ux = P[b * 3] - P[a * 3], uy = P[b * 3 + 1] - P[a * 3 + 1], uz = P[b * 3 + 2] - P[a * 3 + 2], vx = P[c * 3] - P[a * 3], vy = P[c * 3 + 1] - P[a * 3 + 1], vz = P[c * 3 + 2] - P[a * 3 + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, A2 = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    C.tris.push(t); C.area += A2 / 2; C.sx += cx * A2; C.sy += cy * A2; C.sz += cz * A2;
+  }
+  for (const C of list) {
+    const W = 2 * C.area, g = [C.sx / W, C.sy / W, C.sz / W];
+    let best = -1, bd = Infinity, bp = null;
+    for (const t of C.tris) {
+      const a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2];
+      const p = [(P[a * 3] + P[b * 3] + P[c * 3]) / 3, (P[a * 3 + 1] + P[b * 3 + 1] + P[c * 3 + 1]) / 3, (P[a * 3 + 2] + P[b * 3 + 2] + P[c * 3 + 2]) / 3];
+      const d = (p[0] - g[0]) ** 2 + (p[1] - g[1]) ** 2 + (p[2] - g[2]) ** 2;
+      if (d < bd) { bd = d; best = t; bp = p; }
+    }
+    const a = tri[best * 3], b = tri[best * 3 + 1], c = tri[best * 3 + 2];
+    const ux = P[b * 3] - P[a * 3], uy = P[b * 3 + 1] - P[a * 3 + 1], uz = P[b * 3 + 2] - P[a * 3 + 2], vx = P[c * 3] - P[a * 3], vy = P[c * 3 + 1] - P[a * 3 + 1], vz = P[c * 3 + 2] - P[a * 3 + 2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const L = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1; nx /= L; ny /= L; nz /= L;
+    C.sample = { t: best, p: bp, n: [nx, ny, nz] };
+    delete C.sx; delete C.sy; delete C.sz;
+  }
+  return list;
+}
+/* the grid the exposure rays walk: T5's, at an engine-agreed cell size */
+function bone2Grid(pos0) {
+  const pos = bone2Snap(pos0);
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { const x = pos[i + k]; if (x < lo[k]) lo[k] = x; if (x > hi[k]) hi[k] = x; }
+  const ext = [hi[0] - lo[0] + 2, hi[1] - lo[1] + 2, hi[2] - lo[2] + 2];
+  return t5Grid(pos, Math.max(0.5, ecbrt((ext[0] * ext[1] * ext[2]) / 400000)));
+}
+
+/* THE RANGES A FULL BUILD MOVES: each re-meshed organ's triangles stay one
+   contiguous run, so a stream index maps by the runs before it; every record
+   of the build that names a triangle range is mapped onto the stream the file
+   holds (the keys below are every range field the builder writes) */
+const BONE2_RANGE_KEYS = new Set(['triRange', 'triRanges', 'triFrom', 'triTo', 'triStart', 'petalTriEnd', 'hubTriEnd', 'stemTriEnd', 'emittedTriRange', 'cover']);
+export function bone2RangeMap(runs) {
+  /* runs: [{ from, to, newFrom, newTo }] sorted by from */
+  return (x) => {
+    let shift = 0;
+    for (const r of runs) {
+      if (x < r.from) break;
+      if (x === r.from) return r.newFrom;
+      if (x < r.to) return Math.min(r.newFrom + (x - r.from), r.newTo);
+      shift = r.newTo - r.to;
+    }
+    return x + shift;
+  };
+}
+function bone2RemapRecords(root, map) {
+  const seen = new Set();
+  let n = 0;
+  const pair = (v) => Array.isArray(v) && v.length === 2 && typeof v[0] === 'number' && typeof v[1] === 'number';
+  const fix = (v) => {
+    if (typeof v === 'number') { n++; return map(v); }
+    if (pair(v)) { n++; return [map(v[0]), map(v[1])]; }
+    if (Array.isArray(v) && v.every(pair)) { n += v.length; return v.map((q) => [map(q[0]), map(q[1])]); }
+    return v;
+  };
+  const walk = (o, depth) => {
+    if (!o || typeof o !== 'object' || depth > 14 || seen.has(o) || ArrayBuffer.isView(o)) return;
+    seen.add(o);
+    if (Array.isArray(o)) { if (o.length && typeof o[0] === 'number') return; for (const x of o) walk(x, depth + 1); return; }
+    for (const k of Object.keys(o)) {
+      const v = o[k];
+      if (BONE2_RANGE_KEYS.has(k)) { const w = fix(v); if (w !== v) o[k] = w; continue; }
+      if (v && typeof v === 'object') walk(v, depth + 1);
+    }
+  };
+  walk(root, 0);
+  return n;
+}
+
+/* THE FULL WRITE. `per` is the relief pass's own per-organ table (the masks,
+   the relief and the owner rule already decided on the shipped lattice, and
+   already WRITTEN into the stream: the coarse build). Steps:
+     1. the porous triangles: any corner with weight and patch (refinement ONLY
+        inside the patches), never one carrying a position two organs emit;
+     2. the exact count of the hybrid on every porous triangle, per lattice
+        triangle (`perTri`), organ by organ (each organ's working memory is
+        released before the next: the mophead's full build crashed the page
+        when every organ's was held at once, round 2 §19);
+     3. if it fits the cap, everything is full; otherwise the cells are ranked
+        by exposure (ties by key) and taken whole, best first, while their
+        extra triangles fit what the coarse build leaves of the cap;
+     4. the hybrid on the selected triangles; a coarse triangle that meets a
+        full one is fanned over the full side's edge points (no T-junction);
+     5. the count is checked against the cap and, if a fan pushed it over,
+        the lowest-ranked selected cells are given back and it is rebuilt.
+   `capability.boneFullCapTris` (a lever no control reaches: the PreForm
+   ladder and the gate) replaces the cap. */
+export const BONE2_FULL_PASSES = 4;
+export const BONE2_DENSITY_PRIOR = 500;   // triangles a mm2 of porous area: sizes the FIRST candidate batch only (the count decides)
+/* THE MESHER'S INPUTS ARE QUANTISED (engine agreement, the T2 rule). The
+   lattice's positions and normals are themselves built with trigonometry, so
+   Chromium and Node hand the mesher doubles that differ in the last bits —
+   measured, the full default built 1,999,022 triangles in Chromium against
+   1,999,024 in Node with every mesher function arithmetic-only. A count is a
+   discrete decision, so the mesher, the cells and the exposure rays read every
+   coordinate snapped to BONE2_QUANT (2^-20 mm, or 2^-20 of a unit normal):
+   last-bit differences sit 10^8 times under the step and can only flip a
+   value lying within ulps of a half-step. The OUTPUT keeps the lattice's own
+   doubles at its own vertices (so an organ still meets its neighbours where
+   it did) and places the new points from the snapped ones. */
+export const BONE2_QUANT = 2 ** -20;
+function bone2Snap(A) { const out = new Float64Array(A.length); for (let i = 0; i < A.length; i++) out[i] = Math.round(A[i] / BONE2_QUANT) * BONE2_QUANT; return out; }
+function bone2SnapNormals(A) { const out = bone2Snap(A); for (let i = 0; i < out.length; i += 3) { const L = Math.sqrt(out[i] * out[i] + out[i + 1] * out[i + 1] + out[i + 2] * out[i + 2]) || 1; out[i] /= L; out[i + 1] /= L; out[i + 2] /= L; } return out; }
+function bone2FullWrite(acc, T, per, G, capability) {
+  const capTris = capability && capability.boneFullCapTris > 0 ? capability.boneFullCapTris : EXPORT_TRI_CAP;
+  const t0 = performance.now();
+  const FIELD = T.bone2.field, params = T.bone2.params, H = T.heightMm, layout = BONE2_LAYOUTS.full, wallU = bone2WallU();
+  const f32 = Math.fround;
+  const rec = { capTris, baseTris: acc.triangleCount, allFullTris: null, tris: null, cells: 0, selectedCells: 0, porousAreaMm2: 0, fullAreaMm2: 0, fullShare: 0, passes: 0, withdrawn: 0, consFail: 0, aborted: 0, countMismatch: 0, discs: 0, free: 0, merged: 0, junctions: 0, kinds: {}, fits: true, runs: [], cellMm: BONE2_ALLOC_CELL_K * params.Dmax, ms: 0, cellList: [] };
+  /* 1. the porous triangles */
+  const owners = new Map();
+  per.forEach((X, oi) => { for (let i = 0; i < X.nV; i++) { const k = `${f32(X.O.P[i * 3])}|${f32(X.O.P[i * 3 + 1])}|${f32(X.O.P[i * 3 + 2])}`; const o = owners.get(k); if (o === undefined) owners.set(k, oi); else if (o !== oi) owners.set(k, -1); } });
+  const junction = (O, v) => owners.get(`${f32(O.P[v * 3])}|${f32(O.P[v * 3 + 1])}|${f32(O.P[v * 3 + 2])}`) === -1;
+  const plans = per.map((X) => {
+    const O = X.O, nV = X.nV, nT = O.tri.length / 3;
+    const mw = new Float64Array(nV);
+    for (let i = 0; i < nV; i++) mw[i] = X.w0[i] > 0 && X.mc[i] > 0 ? X.w0[i] * X.mc[i] : 0;
+    const porous = new Uint8Array(nT);
+    let n = 0;
+    for (let t = 0; t < nT; t++) {
+      const a = O.tri[t * 3], b = O.tri[t * 3 + 1], c = O.tri[t * 3 + 2];
+      if (!((mw[a] > 0 && X.mpv[a] > 0) || (mw[b] > 0 && X.mpv[b] > 0) || (mw[c] > 0 && X.mpv[c] > 0))) continue;
+      if (junction(O, a) || junction(O, b) || junction(O, c)) continue;
+      porous[t] = 1; n++;
+    }
+    return { X, mw, porous, all: porous.slice(), porousTris: n, discs: null, perTri: null, Q: n ? { P: bone2Snap(O.P), N: bone2SnapNormals(O.N) } : null };
+  });
+  if (!plans.some((pl) => pl.porousTris)) { rec.tris = acc.triangleCount; rec.ms = performance.now() - t0; return rec; }
+  rec.timing = { countMs: 0, rankMs: 0, buildMs: [], counts: 0 };
+  let tc = performance.now();
+  /* 2. the cells, ranked — the ranking needs no count */
+  const cells = [];
+  plans.forEach((pl, oi) => { if (pl.porousTris) for (const C of bone2Cells({ P: pl.Q.P, tri: pl.X.O.tri, organ: pl.X.O.organ }, pl.all, rec.cellMm, oi)) cells.push(C); });
+  for (const C of cells) {
+    rec.porousAreaMm2 += C.area;
+    C.E = Math.round(bone2Exposure(G, C.sample.p, C.sample.n) / BONE2_QUANT) * BONE2_QUANT;
+  }
+  cells.sort((a, b) => b.E - a.E || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  cells.forEach((C, r) => { C.rank = r; });
+  rec.cells = cells.length;
+  rec.timing.rankMs = performance.now() - tc; tc = performance.now();
+  /* 3. THE DISCS ONCE PER ORGAN, FROM EVERY POROUS TRIANGLE — so a pore is
+     the same pore whichever cells end up full (a disc found from the selected
+     triangles alone would take its foot on the nearest SELECTED triangle and
+     move); each mesher run is handed the discs that reach its triangles */
+  plans.forEach((pl) => { if (pl.porousTris) pl.discs = bone2OrganDiscs(pl.Q.P, pl.Q.N, pl.X.O.tri, pl.all, FIELD); });
+  rec.timing.discMs = performance.now() - tc; tc = performance.now();
+  /* 4. THE CANDIDATES AND THEIR EXACT COUNT. Counting every porous triangle
+     costs what a full build of all of them costs — 18.5 M triangles' worth on
+     the 40 x 3 corner, where 0.56 M fit — so only the top-ranked cells are
+     counted: enough that, at a density of BONE2_DENSITY_PRIOR triangles a mm2,
+     they would fill the room with a quarter to spare; if they do not fill it,
+     the density they MEASURED sizes the next batch. The prior only sizes the
+     first batch (round 2 measured the hybrid at 270-432 / mm2); the count
+     decides everything. */
+  for (const pl of plans) if (pl.porousTris) { pl.cand = new Uint8Array(pl.all.length); pl.perTri = null; }
+  let room0 = capTris - acc.triangleCount, nc = 0, kappa = BONE2_DENSITY_PRIOR, candCost = 0, candArea = 0;
+  for (let round = 0; round < 6; round++) {
+    let est = 0; const grew = new Set();
+    for (const C of cells.slice(0, nc)) est += C.area * kappa;
+    while (nc < cells.length && est < 1.25 * room0) { const C = cells[nc++]; est += C.area * kappa; grew.add(C.oi); for (const t of C.tris) plans[C.oi].cand[t] = 1; }
+    for (const oi of grew) {
+      const pl = plans[oi], O = pl.X.O;
+      const R = bone2HybridOrganMesh({ P: pl.Q.P, tri: O.tri, porous: pl.cand }, bone2DiscsNear(pl.discs, pl.Q.P, O.tri, pl.cand, rec.cellMm), { layout, wallU, countOnly: true });
+      pl.perTri = R.perTri; pl.topo = { triE: R.triE, ET0: R.ET0, ET1: R.ET1, edgePts: R.edgePts }; pl.candCount = R.count;
+      rec.timing.counts++;
+    }
+    candCost = 0; candArea = 0;
+    for (const pl of plans) if (pl.perTri) candCost += pl.candCount - pl.X.O.tri.length / 3;
+    for (const C of cells.slice(0, nc)) candArea += C.area;
+    if (candCost >= room0 || nc === cells.length) break;
+    kappa = candArea > 0 ? Math.max(candCost / candArea, 1) : kappa;
+  }
+  rec.candidateCells = nc;
+  rec.allFullTris = nc === cells.length ? acc.triangleCount + candCost : null;
+  const allFits = nc === cells.length && candCost <= room0;
+  rec.timing.countMs = performance.now() - tc; tc = performance.now();
+  /* THE EXACT PRICE OF A CELL, FANS INCLUDED. A lattice triangle drawn FULL
+     costs its own count (each is triangulated on its own, so `perTri` does not
+     depend on its neighbours); one left COARSE costs 1, or — where a full
+     neighbour left points on their shared edge — the fan over them, 3 plus
+     those points. So taking a cell changes its own triangles and their
+     neighbours, and that change is computed, not estimated (the first cut
+     priced a cell by its own triangles alone and the fans pushed the default
+     past the cap on the first build: a second build, 72 s). */
+  for (const pl of plans) if (pl.perTri) { pl.inS = new Uint8Array(pl.perTri.length); pl.cost = new Int32Array(pl.perTri.length).fill(1); }
+  for (const C of cells.slice(nc)) C.cost = null;   // never counted: past the candidates
+  const costOf = (pl, t) => {
+    if (pl.inS[t]) return pl.perTri[t];
+    const { triE, ET0, ET1, edgePts } = pl.topo;
+    let pts = 0;
+    for (let k = 0; k < 3; k++) { const e = triE[t * 3 + k], nb = ET0[e] === t ? ET1[e] : ET0[e]; if (nb >= 0 && pl.inS[nb] && edgePts[e] > 0) pts += edgePts[e]; }
+    return pts ? 3 + pts : 1;
+  };
+  const touched = (pl, tris) => { const A = new Set(tris); const { triE, ET0, ET1 } = pl.topo; for (const t of tris) for (let k = 0; k < 3; k++) { const e = triE[t * 3 + k]; const nb = ET0[e] === t ? ET1[e] : ET0[e]; if (nb >= 0) A.add(nb); } return [...A]; };
+  let room = capTris - acc.triangleCount;
+  for (const C of cells.slice(0, nc)) {
+    const pl = plans[C.oi], A = touched(pl, C.tris);
+    let before = 0; for (const t of A) before += pl.cost[t];
+    for (const t of C.tris) pl.inS[t] = 1;
+    let after = 0; const nc = A.map((t) => { const c = costOf(pl, t); after += c; return c; });
+    const delta = after - before;
+    C.cost = delta;
+    if (allFits || delta <= room) { C.selected = true; room -= delta; A.forEach((t, i) => { pl.cost[t] = nc[i]; }); }
+    else for (const t of C.tris) pl.inS[t] = 0;
+  }
+  rec.predictedTris = capTris - room;
+  rec.timing.selectMs = performance.now() - tc;
+  /* 4-5. build, check, give back */
+  const old = acc.positions, oldN = acc.normals;
+  let built = null;
+  for (let pass = 0; pass < BONE2_FULL_PASSES; pass++) {
+    rec.passes = pass + 1;
+    for (const pl of plans) { pl.porous = new Uint8Array(pl.all.length); pl.porousTris = 0; }
+    for (const C of cells) if (C.selected) for (const t of C.tris) { plans[C.oi].porous[t] = 1; plans[C.oi].porousTris++; }
+    tc = performance.now();
+    built = bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capability, rec.cellMm);
+    rec.timing.buildMs.push(performance.now() - tc);
+    if (built.count <= capTris) break;
+    /* over: give back the lowest-ranked selected cells until the excess is covered */
+    let excess = built.count - capTris;
+    for (let i = cells.length - 1; i >= 0 && excess > 0; i--) if (cells[i].selected) { cells[i].selected = false; excess -= cells[i].cost; }
+    built = null;
+  }
+  if (!built) { rec.fits = false; rec.tris = acc.triangleCount; rec.ms = performance.now() - t0; return rec; }
+  acc.positions = built.pos; if (oldN) acc.normals = built.nrm;
+  for (let i = 0; i < built.pos.length; i += 3) for (let k = 0; k < 3; k++) { const x = built.pos[i + k]; if (x < acc.lo[k]) acc.lo[k] = x; if (x > acc.hi[k]) acc.hi[k] = x; }
+  for (const C of cells) if (C.selected) { rec.selectedCells++; rec.fullAreaMm2 += C.area; }
+  rec.fullShare = rec.porousAreaMm2 > 0 ? rec.fullAreaMm2 / rec.porousAreaMm2 : 0;
+  Object.assign(rec, { tris: built.count, withdrawn: built.withdrawn, flipWithdrawn: built.flipWithdrawn, flipsLeft: built.flipsLeft, consFail: built.HS.consFail, aborted: built.HS.aborted, countMismatch: built.HS.countMismatch, discs: built.HS.discs, free: built.HS.free, merged: built.HS.merged, junctions: built.HS.junctions, kinds: built.HS.kinds, runs: built.runs });
+  rec.fits = built.count <= capTris;
+  /* the cells as recorded (for the read-out's share, the TXB clauses and the heat-map sheet) */
+  rec.cellList = cells.map((C) => ({ key: C.key, organ: C.organ, area: C.area, cost: C.cost, E: C.E, rank: C.rank, selected: C.selected, p: C.sample.p, n: C.sample.n, t: C.sample.t, tris: C.tris.length }));
+  /* each cell's triangles as indices into the BASE (coarse) stream — a cell's
+     own `tris` are local to its organ (O.tri), which starts at O.from */
+  Object.defineProperty(rec, 'cellTris', { value: cells.map((C) => { const from = plans[C.oi].X.O.from; return C.tris.map((t) => from + t); }), enumerable: false, configurable: true });
+  Object.defineProperty(rec, 'discList', { value: built.discList, enumerable: false, configurable: true });
+  Object.defineProperty(rec, 'kindsOut', { value: built.kindsOut, enumerable: false, configurable: true });
+  rec.ms = performance.now() - t0;
+  return rec;
+}
+/* one full build of the stream from the selected porous triangles (the
+   prototype's `hybridWrite`, with the coincidence rule of #481 kept) */
+/* the discs that can reach a set of triangles: a disc is kept when a
+   triangle of the set lies within its outer ring plus one allocation cell
+   (so a merged partner of a kept pore is kept too, and its crease and seam
+   are drawn); the rest would only be walked to be thrown away */
+function bone2DiscsNear(discs, P, tri, porous, cellMm) {
+  const g = 1, S = new Set();
+  for (let t = 0; t < porous.length; t++) if (porous[t]) { const a = tri[t * 3], b = tri[t * 3 + 1], c = tri[t * 3 + 2]; S.add(`${Math.floor((P[a * 3] + P[b * 3] + P[c * 3]) / 3 / g)},${Math.floor((P[a * 3 + 1] + P[b * 3 + 1] + P[c * 3 + 1]) / 3 / g)},${Math.floor((P[a * 3 + 2] + P[b * 3 + 2] + P[c * 3 + 2]) / 3 / g)}`); }
+  return discs.filter((d) => {
+    const R = BONE2_HY_OUTER_U * d.rho + cellMm + g;
+    for (let i = Math.floor((d.c[0] - R) / g); i <= Math.floor((d.c[0] + R) / g); i++) for (let j = Math.floor((d.c[1] - R) / g); j <= Math.floor((d.c[1] + R) / g); j++) for (let k = Math.floor((d.c[2] - R) / g); k <= Math.floor((d.c[2] + R) / g); k++) if (S.has(`${i},${j},${k}`)) return true;
+    return false;
+  });
+}
+function bone2BuildFull(acc, old, oldN, plans, T, FIELD, H, layout, wallU, capability, cellMm) {
+  const f32 = Math.fround;
+  const HS = { discs: 0, free: 0, merged: 0, junctions: 0, consFail: 0, aborted: 0, countMismatch: 0, kinds: {} };
+  const run = (pl) => {
+    const O = pl.X.O;
+    const discs = bone2DiscsNear(pl.discs, pl.Q.P, O.tri, pl.porous, cellMm);
+    return { discs, R: bone2HybridOrganMesh({ P: pl.Q.P, tri: O.tri, porous: pl.porous }, discs, { layout, wallU, countOnly: false }) };
+  };
+  const results = plans.map((pl) => (pl.porousTris ? run(pl) : null));
+  const displaced = (pl, R) => {
+    const X = pl.X, O = X.O, nV = X.nV, nN = R.P.length / 3;
+    const D = new Float64Array(nN * 3);
+    for (let i = 0; i < nN; i++) {
+      let s, p, n;
+      if (i < nV) { s = X.s[i] + X.clr[i]; p = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]]; n = [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]]; }
+      else {
+        const j = i - nV, t = R.src.t[j], l = [R.src.b[j * 3], R.src.b[j * 3 + 1], R.src.b[j * 3 + 2]], c = [O.tri[t * 3], O.tri[t * 3 + 1], O.tri[t * 3 + 2]];
+        p = [R.P[i * 3], R.P[i * 3 + 1], R.P[i * 3 + 2]];
+        n = [0, 1, 2].map((k) => l[0] * O.N[c[0] * 3 + k] + l[1] * O.N[c[1] * 3 + k] + l[2] * O.N[c[2] * 3 + k]);
+        const L = elen(n[0], n[1], n[2]) || 1; n = [n[0] / L, n[1] / L, n[2] / L];
+        const m = l[0] * pl.mw[c[0]] + l[1] * pl.mw[c[1]] + l[2] * pl.mw[c[2]];
+        s = l[0] * X.clr[c[0]] + l[1] * X.clr[c[1]] + l[2] * X.clr[c[2]];
+        if (m > 0) { const mp = T.mp(p); if (mp > 0) s += m * (mp * (H * T.f(p, n))); }
+      }
+      for (let k = 0; k < 3; k++) D[i * 3 + k] = p[k] + (s > 0 ? n[k] * s : 0);
+    }
+    return D;
+  };
+  const keyOf = (D, v) => `${f32(D[v * 3])}|${f32(D[v * 3 + 1])}|${f32(D[v * 3 + 2])}`;
+  const Ds = plans.map((pl, i) => (results[i] ? displaced(pl, results[i].R) : null));
+  let withdrawn = 0, flipWithdrawn = 0, flipsLeft = 0;
+  for (let pass = 0; pass < 6; pass++) {
+    const seen = new Map();
+    plans.forEach((pl, i) => {
+      if (results[i]) { const n = Ds[i].length / 3; for (let v = 0; v < n; v++) { const k = keyOf(Ds[i], v); const o = seen.get(k); if (o === undefined) seen.set(k, i); else if (o !== i) seen.set(k, -1); } return; }
+      const O = pl.X.O; for (let t = 0; t < O.to - O.from; t++) for (let c = 0; c < 3; c++) { const o9 = (O.from + t) * 9 + c * 3; const k = `${f32(old[o9])}|${f32(old[o9 + 1])}|${f32(old[o9 + 2])}`; const w = seen.get(k); if (w === undefined) seen.set(k, i); else if (w !== i) seen.set(k, -1); }
+    });
+    const redo = [];
+    plans.forEach((pl, i) => {
+      const r = results[i]; if (!r) return;
+      const nV = pl.X.nV; let hit = false;
+      for (let v = nV; v < Ds[i].length / 3; v++) if (seen.get(keyOf(Ds[i], v)) === -1) { for (const t of r.R.attach[v - nV]) if (pl.porous[t]) { pl.porous[t] = 0; pl.porousTris--; withdrawn++; } hit = true; }
+      /* THE FOLD CHECK (shipping session, Nov 2). The full points lie on each
+         lattice triangle's PLANE and are displaced along the organ's own
+         interpolated normals, which tilt off that plane on a curved organ; at
+         a pore's lip the relief changes by up to H x the profile's slope over
+         a few microns, and that tilt then FLIPS a refined triangle (measured:
+         the rods and the bead at curvature max, 0.22 mm). On a relief that is
+         a height field over the triangle's plane no emitted triangle can face
+         against that plane, so one that does is a fold: its source lattice
+         triangle goes back to COARSE (a transition fan's flip withdraws the
+         refined triangles round it) and the run is re-meshed. Derived from the
+         emitted mesh's own orientation, never from an organ or a curvature
+         threshold. */
+      const R = r.R, D = Ds[i], fN = R.faceN, src = R.outSrc, tri = pl.X.O.tri;
+      let byV = null;
+      for (let j = 0; j < src.length; j++) {
+        const a = R.tri[j * 3], b = R.tri[j * 3 + 1], c = R.tri[j * 3 + 2], t = src[j];
+        const ux = D[b * 3] - D[a * 3], uy = D[b * 3 + 1] - D[a * 3 + 1], uz = D[b * 3 + 2] - D[a * 3 + 2];
+        const vx = D[c * 3] - D[a * 3], vy = D[c * 3 + 1] - D[a * 3 + 1], vz = D[c * 3 + 2] - D[a * 3 + 2];
+        const d = (uy * vz - uz * vy) * fN[t * 3] + (uz * vx - ux * vz) * fN[t * 3 + 1] + (ux * vy - uy * vx) * fN[t * 3 + 2];
+        if (d > 0) continue;
+        hit = true;
+        if (pl.porous[t]) { pl.porous[t] = 0; pl.porousTris--; withdrawn++; flipWithdrawn++; continue; }
+        if (!byV) { byV = new Map(); for (let q = 0; q < tri.length / 3; q++) for (let k = 0; k < 3; k++) { const v = tri[q * 3 + k]; let L = byV.get(v); if (!L) byV.set(v, (L = [])); L.push(q); } }
+        for (let k = 0; k < 3; k++) for (const q of byV.get(tri[t * 3 + k]) || []) if (pl.porous[q]) { pl.porous[q] = 0; pl.porousTris--; withdrawn++; flipWithdrawn++; }
+      }
+      if (hit) redo.push(i);
+    });
+    if (!redo.length) break;
+    for (const i of redo) { results[i] = plans[i].porousTris ? run(plans[i]) : null; Ds[i] = results[i] ? displaced(plans[i], results[i].R) : null; }
+  }
+  const discList = [], kindsOut = [];
+  results.forEach((r, i) => {
+    if (!r) return;
+    const st = r.R.stats;
+    HS.discs += r.discs.length; HS.free += st.free; HS.merged += st.merged; HS.junctions += st.junctions || 0; HS.consFail += st.consFail; HS.aborted += st.aborted; HS.countMismatch += st.countMismatch || 0;
+    for (const d of r.discs) discList.push({ key: d.key, c: d.c, rho: d.rho, n: d.n, organ: plans[i].X.O.organ });
+    for (const k of r.R.kind) HS.kinds[k] = (HS.kinds[k] || 0) + 1;
+    /* the new points with their kind and disc, UNDISPLACED (the gate's B2e
+       clauses read them back against the discs; a lever no control reaches,
+       because a full build makes millions of them) */
+    if (capability && capability.boneFullPoints) {
+      const nV = plans[i].X.nV, O = plans[i].X.O, nk = r.R.kind.length;
+      const pts = new Float64Array(nk * 3); for (let j = 0; j < nk * 3; j++) pts[j] = r.R.P[nV * 3 + j];
+      const pl = plans[i], mpos = new Uint8Array(nV); for (let v = 0; v < nV; v++) mpos[v] = pl.mw[v] > 0 && pl.X.mpv[v] > 0 ? 1 : 0;
+      kindsOut.push({ organ: O.organ, from: O.from, to: O.to, kind: Uint8Array.from(r.R.kind), disc: Int32Array.from(r.R.ptDisc), srcT: Int32Array.from(r.R.src.t), pts, P: pl.Q.P, tri: O.tri, porousAll: pl.all, selected: pl.porous, maskPos: mpos,
+        discs: r.discs.map((d) => ({ c: d.c, n: d.n, rho: d.rho, a: d.a, t1: d.t1, t2: d.t2, key: d.key })) });
+    }
+  });
+  /* the stream rebuilt: each re-meshed organ's run replaced, in place */
+  const repl = [];
+  /* (`boneNoRelief`, a measurement lever: every decision above is the relieved
+     build's — the same mesh — and the stream is written UNDISPLACED) */
+  plans.forEach((pl, i) => { const O = pl.X.O; if (!results[i]) return; const R = results[i].R, D = capability && capability.boneNoRelief ? R.P : Ds[i]; const out = new Float64Array(R.tri.length * 3); for (let j = 0; j < R.tri.length; j++) for (let k = 0; k < 3; k++) out[j * 3 + k] = D[R.tri[j] * 3 + k]; repl.push({ from: O.from, to: O.to, out }); });
+  repl.sort((a, b) => a.from - b.from);
+  const pos = [], nrm = oldN ? [] : null;
+  let cur = 0;
+  const pushOld = (a, b) => { for (let i = a * 9; i < b * 9; i++) pos.push(old[i]); if (nrm) for (let i = a * 9; i < b * 9; i++) nrm.push(oldN[i]); };
+  const runs = [];
+  for (const r of repl) {
+    if (r.from < cur) continue;
+    pushOld(cur, r.from);
+    const newFrom = pos.length / 9, out = r.out;
+    for (let i = 0; i < out.length; i++) pos.push(out[i]);
+    if (nrm) for (let t = 0; t < out.length / 9; t++) {
+      const b = t * 9; const ux = out[b + 3] - out[b], uy = out[b + 4] - out[b + 1], uz = out[b + 5] - out[b + 2], vx = out[b + 6] - out[b], vy = out[b + 7] - out[b + 1], vz = out[b + 8] - out[b + 2];
+      const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, L = elen(nx, ny, nz) || 1;
+      for (let c = 0; c < 3; c++) nrm.push(nx / L, ny / L, nz / L);
+    }
+    runs.push({ from: r.from, to: r.to, newFrom, newTo: pos.length / 9 });
+    cur = r.to;
+  }
+  pushOld(cur, old.length / 9);
+  /* the flips no pass removed (reported, and TXB10's census sees what they do) */
+  results.forEach((r, i) => { if (!r) return; const R = r.R, D = Ds[i], fN = R.faceN, src = R.outSrc; for (let j = 0; j < src.length; j++) { const a = R.tri[j * 3], b = R.tri[j * 3 + 1], c = R.tri[j * 3 + 2], t = src[j]; const ux = D[b * 3] - D[a * 3], uy = D[b * 3 + 1] - D[a * 3 + 1], uz = D[b * 3 + 2] - D[a * 3 + 2], vx = D[c * 3] - D[a * 3], vy = D[c * 3 + 1] - D[a * 3 + 1], vz = D[c * 3 + 2] - D[a * 3 + 2]; if (!((uy * vz - uz * vy) * fN[t * 3] + (uz * vx - ux * vz) * fN[t * 3 + 1] + (ux * vy - uy * vx) * fN[t * 3 + 2] > 0)) flipsLeft++; } });
+  return { pos, nrm, count: pos.length / 9, runs, withdrawn, flipWithdrawn, flipsLeft, HS, discList, kindsOut };
+}
+
 function boneReliefPass(acc, T, organs, capability = null) {
   const off = !!(capability && capability.organReliefOff);
   if (!organs.length) return {};
@@ -14018,6 +15619,10 @@ function boneReliefPass(acc, T, organs, capability = null) {
   const B = T.bone, H = T.heightMm;
   const Lam = capability && capability.textureFadeWidthMm > 0 ? capability.textureFadeWidthMm : textureFadeWidthMm(T.heightMm, T.edgeMm);
   const G = list.some((O) => !O.sheet) ? t5Grid(acc.positions) : null;
+  /* (BONE v2, FULL) the exposure rays walk the UNRELIEVED stream, decided
+     before any relief is written */
+  const full = !!(T.bone2 && acc.boneDetail === 'full' && !off);
+  const G2 = full ? bone2Grid(acc.positions) : null;
   /* ---- per organ: its weight w0, its curvature mask, its relief ---- */
   const per = list.map((O) => {
     const nV = O.P.length / 3;
@@ -14063,7 +15668,7 @@ function boneReliefPass(acc, T, organs, capability = null) {
       const mp = T.mp(q);
       mpv[i] = mp;
       if (!(mp > 0)) continue;
-      const f = T.f(q);
+      const f = T.f(q, [O.N[i * 3], O.N[i * 3 + 1], O.N[i * 3 + 2]]);
       fv[i] = f;
       s[i] = w0[i] * (mc[i] * (mp * (H * f)));
     }
@@ -14183,12 +15788,16 @@ function boneReliefPass(acc, T, organs, capability = null) {
     if (O.rod) rec.rod = { shippedTris: O.shippedTris, refinedTris: O.refinedTris, kappaMin: O.kappaMin, triRange: [O.from, O.to] };
     const pos = acc.positions;
     if (off) rec.bone.reliefOff = true;
+    /* (a measurement lever, reached by no control: `boneNoRelief` leaves the
+       coarse stream UNRELIEVED as the full writes are (s = 0) — the print
+       instrument's twin, the same mesh with nothing raised) */
+    else if (capability && capability.boneNoRelief) { /* the stream keeps O.P */ }
     else for (let t = 0; t < O.tri.length / 3; t++) for (let c = 0; c < 3; c++) {
       const v = O.tri[t * 3 + c], o = (O.from + t) * 9 + c * 3;
       pos[o] = disp[v * 3]; pos[o + 1] = disp[v * 3 + 1]; pos[o + 2] = disp[v * 3 + 2];
       for (let k = 0; k < 3; k++) { const x = pos[o + k]; if (x < acc.lo[k]) acc.lo[k] = x; if (x > acc.hi[k]) acc.hi[k] = x; }
     }
-    if (acc.normals && !off) for (let t = O.from; t < O.to; t++) {
+    if (acc.normals && !off && !(capability && capability.boneNoRelief)) for (let t = O.from; t < O.to; t++) {
       const b = t * 9;
       const ux = pos[b + 3] - pos[b], uy = pos[b + 4] - pos[b + 1], uz = pos[b + 5] - pos[b + 2], vx = pos[b + 6] - pos[b], vy = pos[b + 7] - pos[b + 1], vz = pos[b + 8] - pos[b + 2];
       let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const L = Math.hypot(nx, ny, nz) || 1; nx /= L; ny /= L; nz /= L;
@@ -14219,6 +15828,9 @@ function boneReliefPass(acc, T, organs, capability = null) {
     }
     if (rec.rod && r.rod) { r.rod.shippedTris += rec.rod.shippedTris; r.rod.refinedTris += rec.rod.refinedTris; r.rod.kappaMin = Math.min(r.rod.kappaMin, rec.rod.kappaMin); }
   });
+  /* (BONE v2) the FULL build replaces the re-meshed organs' runs of the coarse
+     stream just written; the COARSE build IS that stream */
+  if (T.bone2) T.bone2.full = full ? bone2FullWrite(acc, T, per, G2, capability) : null;
   return recs;
 }
 /* the pass itself, for the gate's hardest-case fixture (TXB6): no shipped
@@ -27094,6 +28706,27 @@ function boneApply(acc, built, T, organs, smoothRods, capability) {
     }
     built.texture.bone = { ...T.bone, smoothRods: smoothRods.map((r) => ({ organ: r.organ, tris: r.tris, kappaMin: r.kappaMin, triRange: [r.from, r.to] })) };
   }
+  /* (BONE v2) the detail this build drew, and — on a FULL build — every range
+     record mapped onto the stream the file holds */
+  if (T.bone2) {
+    const F = T.bone2.full;
+    if (built.texture && built.texture.bone) { built.texture.bone.detail = F ? 'full' : 'coarse'; built.texture.bone.full = F; }
+    if (F && F.runs && F.runs.length) {
+      const map = bone2RangeMap(F.runs);
+      let n = bone2RemapRecords(built, map);
+      /* A PLACED FLORET'S BLOCK is `at` (a FLOAT offset) and `tris` (a count),
+         neither a range key, so the walk above cannot see it: mapped here, in
+         triangle units, or ST9 and ID10 read a full file's florets at the
+         coarse build's offsets (CI found it on the BONE raceme row) */
+      const IB = built.inflorescenceBuilt;
+      if (IB && Array.isArray(IB.placed)) for (const q of IB.placed) {
+        if (!Number.isFinite(q.at) || !Number.isFinite(q.tris)) continue;
+        const a = q.at / 9, b = map(a), e = map(a + q.tris);
+        q.at = b * 9; q.tris = e - b; n += 2;
+      }
+      F.remapped = n;
+    }
+  }
   built.t5 = { organs: organs.map((O) => O.organ) };
   delete built.boneCapture;
   return built;
@@ -27111,7 +28744,7 @@ export function buildBloomInto(acc, state, opts = {}) {
     if (built.texture) built.texture.edgeCap = capT && !capT.refused ? { askedMm: TEXTURE_EDGE_MM, usedMm: capT.edgeMm, capMm: TEXTURE_EDGE_CAP_MM, gridMm: TEXTURE_EDGE_GRID_MM, budget: EXPORT_TRI_BUDGET, pinned: true, trials: [{ edgeMm: capT.edgeMm, tris: acc.triangleCount }], fits: acc.triangleCount <= EXPORT_TRI_BUDGET } : null;
     return built;
   }
-  const spawnLike = () => new MeshBuilder({ exportMode: acc.exportMode, captureGrid: acc.captureGrid, captureLamina: acc.captureLamina, captureRim: acc.captureRim, captureNormals: acc.captureNormals });
+  const spawnLike = () => new MeshBuilder({ exportMode: acc.exportMode, captureGrid: acc.captureGrid, captureLamina: acc.captureLamina, captureRim: acc.captureRim, captureNormals: acc.captureNormals, boneDetail: acc.boneDetail });
   const copyAccInto = (dst, src) => { dst.positions = src.positions; dst.normals = src.normals; dst.minThickness = src.minThickness; dst.lo = src.lo; dst.hi = src.hi; };
   const trials = [];
   const trial = (k, into) => {
@@ -27198,7 +28831,7 @@ function buildBloomRamped(acc, state, opts = {}) {
      a throwaway accumulator whose fields are then copied onto `acc` — bounded
      because by that point the ramped total has already been proven to fit
      under `EXPORT_TRI_BUDGET`. */
-  const spawnLike = () => new MeshBuilder({ exportMode: acc.exportMode, captureGrid: acc.captureGrid, captureLamina: acc.captureLamina, captureRim: acc.captureRim, captureNormals: acc.captureNormals });
+  const spawnLike = () => new MeshBuilder({ exportMode: acc.exportMode, captureGrid: acc.captureGrid, captureLamina: acc.captureLamina, captureRim: acc.captureRim, captureNormals: acc.captureNormals, boneDetail: acc.boneDetail });
   const copyAccInto = (dst, src) => { dst.positions = src.positions; dst.normals = src.normals; dst.minThickness = src.minThickness; dst.lo = src.lo; dst.hi = src.hi; };
   BUDGET_DECISION_ACTIVE = true;
   try {
