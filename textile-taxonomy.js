@@ -106,22 +106,22 @@ const twistFront = (x, t, a = 0.12, b = 0.92, band = 90) => smooth((lerp(-band, 
 // =====================================================================================
 
 // ---------- the staple material: short, crimped, soft fibres, frayed at the tips ----------
-// Shorter than textile-basics' (15–35 units, a fifth to a tenth of the yarn), crimped tighter,
-// not every one full white, and each end splits into one to three fine wisps. Spun staple and
+// Much shorter than textile-basics' (10–22 units), squiggly with a tight crimp, not every one
+// full white, and about a quarter of the tips split into a fine wisp. Spun staple and
 // the corespun sheath are made of the same fibres, so the staple card feeds them both.
-const STAPLE_N = 150, STAPLE_TEAL = 37, FIB_SW = 1.15, WISP_SW = 0.7, SOFT_HALO = 0.85;
+const STAPLE_N = 200, STAPLE_TEAL = 37, FIB_SW = 1.15, WISP_SW = 0.7, SOFT_HALO = 0.85;
 function makeStaple(r, i, accent) {
-  const len = accent ? 44 : 15 + r() * 20;
+  const len = accent ? 30 : 10 + r() * 12;
   return {
     i, accent, len,
-    camp: 0.45 + r() * 0.6,                   // crimp amplitude: a soft wave, not a zig-zag
-    waves: len / (9 + r() * 5),               // a wave every 9–14 units
+    camp: 0.8 + r() * 0.7,                    // crimp amplitude: squiggly
+    waves: len / (4.5 + r() * 2.5),           // a wave every 4.5–7 units
     cph: r() * TAU,
     rho: accent ? 0.97 : 0.3 + 0.7 * Math.sqrt(r()),
     phi: r() * TAU,
     delay: r() * 0.14,
     op: accent ? 1 : 0.45 + 0.55 * r(),
-    fray: [0, 1].map(() => ({ n: 1 + Math.floor(r() * 2.7), a: 0.3 + r() * 0.45, l: 2.6 + r() * 3.6, s: r() < 0.5 ? -1 : 1 })),
+    fray: [0, 1].map(() => ({ n: r() < 0.26 ? (r() < 0.8 ? 1 : 2) : 0, a: 0.3 + r() * 0.4, l: 1.8 + r() * 1.8, s: r() < 0.5 ? -1 : 1 })),
     hairEnd: (v => v < 0.2 ? 0 : v < 0.38 ? 1 : v < 0.46 ? 2 : -1)(r()),   // spun staple: which end stands proud
   };
 }
@@ -146,7 +146,8 @@ function frayRuns(f, pts, frontOp, backOp, runs) {
   [0, 1].forEach(e => {
     const p = e ? pts[n] : pts[0], q = e ? pts[n - 2] : pts[2], L = Math.hypot(p.x - q.x, p.y - q.y) || 1;
     const dx = (p.x - q.x) / L, dy = (p.y - q.y) / L, F = f.fray[e];
-    const angs = F.n === 1 ? [F.s * F.a] : F.n === 2 ? [F.a, -0.7 * F.a] : [F.a, 0.1 * F.s, -F.a];
+    if (!F.n) return;
+    const angs = F.n === 1 ? [F.s * F.a] : [F.a, -0.7 * F.a];
     angs.forEach((a, k) => {
       const l = F.l * (1 - 0.18 * k), w = [];
       for (let j = 0; j <= 3; j++) {
@@ -253,7 +254,7 @@ const filamentScene = {
 
 // ---------- spun staple: the staple card's roving, twisted tight. A third of the fibres keep an
 // end proud of the surface as the twist packs them in — the hairiness a filament yarn never has.
-const HAIR_U = 0.24, HAIR_L = 9;
+const HAIR_U = 0.28, HAIR_L = 7;
 function hairy(f, pts, k) {
   const which = f.hairEnd; if (k <= 0 || which < 0 || f.accent) return pts;
   const n = pts.length - 1, out = pts.map(p => ({ ...p }));
@@ -345,7 +346,7 @@ const pliedScene = {
 // into a sheath that stops short, so the bare core runs on out of the yarn's end ----------
 const CORE = { r: 6, sheathEnd: 222 };
 const CORE_FIB = (() => {
-  const r = rng(SEED + 70), out = [], n = 120;
+  const r = rng(SEED + 70), out = [], n = 160;
   for (let i = 0; i < n; i++) {
     const f = makeStaple(r, 300 + i, i === 47);
     f.c = -18 + (i + r()) / n * (CORE.sheathEnd + 18);
