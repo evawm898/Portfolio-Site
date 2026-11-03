@@ -1,0 +1,29 @@
+{
+  "views": [
+    "low",
+    "side"
+  ],
+  "controls": {
+    "placement": "RADIAL",
+    "petalCount": 3,
+    "layerCount": 2,
+    "layerSize": 0.9,
+    "layerPhase": 0.5,
+    "layerTilt": 6,
+    "petalLength": 45,
+    "petalWidth": 30,
+    "petalTipShape": 2.0,
+    "petalTilt": 65,
+    "petalCup": 0.6,
+    "stamenCount": 6,
+    "stamenLength": 12,
+    "antherSize": 1.6,
+    "antherElongation": 4,
+    "gynoecium": "STYLE",
+    "styleLength": 10,
+    "stigmaSize": 3,
+    "stigmaLumps": 3
+  },
+  "frame": 1.5,
+  "frameZ": 0.3
+}

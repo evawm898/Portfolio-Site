@@ -1,0 +1,379 @@
+{
+  "format": "bloom-design",
+  "version": 1,
+  "app": "/bloom",
+  "savedAt": "2026-11-03T00:00:00.000Z",
+  "controls": {
+    "petalCount": 8,
+    "petalLength": 40,
+    "petalWidth": 30,
+    "petalOutlineMode": "LAW",
+    "petalOutlineCurve": {
+      "mode": "symmetric",
+      "points": [
+        [
+          0,
+          0.05
+        ],
+        [
+          0.15,
+          0.16
+        ],
+        [
+          0.36,
+          0.2286
+        ],
+        [
+          0.7,
+          0.178
+        ],
+        [
+          0.9,
+          0.1
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "petalBaseTaper": 1,
+    "petalTipShape": 2.5,
+    "petalTipTaper": 1.8,
+    "petalTipEnd": 0,
+    "fringeCount": 0,
+    "fringeDepth": 0.2,
+    "lobeDepth": 0,
+    "lobeCount": 6,
+    "lobeCoverage": 0.8,
+    "petalInfill": "NONE",
+    "infillDensity": 20,
+    "infillRelax": 5,
+    "infillLaw": 0.3,
+    "infillAniso": 1.65,
+    "infillRound": 0.6,
+    "infillBase": 0,
+    "petalTexture": "NONE",
+    "textureHeight": 0.4,
+    "textureSize": 4,
+    "bonePoreSize": 0.5,
+    "bonePoreDensity": 0.9,
+    "boneBandRatio": 3,
+    "bonePatchCoverage": 0.6,
+    "boneCurvature": 1,
+    "tubeLayer1": 40,
+    "tubeLayer2": 40,
+    "tubeLayer3": 40,
+    "tubeLayer4": 40,
+    "tubeLayer5": 40,
+    "tubeLayer6": 40,
+    "tubeHeight": 0.25,
+    "tubeBlend": 1,
+    "lobeCrestShape": 2,
+    "lobeNotchShape": 2,
+    "petalCup": 0.6,
+    "petalCupGradient": 0,
+    "buckleAmp": 0.15,
+    "buckleFreq": 3,
+    "buckleEnv": 3,
+    "petalApexSweep": 0,
+    "petalTilt": 55,
+    "petalCurlMode": "SLIDER",
+    "petalSpineCurve": {
+      "mode": "single",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.5,
+          0.08
+        ],
+        [
+          1,
+          0.3
+        ]
+      ]
+    },
+    "petalSpineCurl": 0,
+    "curlBias": 0,
+    "curlStart": 0,
+    "petalRoll": 0,
+    "petalRollTaper": 0,
+    "petalTwist": 0,
+    "sheetThickness": 1.2,
+    "tipThinning": 0,
+    "footDelicacy": 1,
+    "spread": 2,
+    "hubShape": "CAP",
+    "headRise": 0,
+    "placement": "RADIAL",
+    "fanPerSide": 3,
+    "fanSpacing": 45,
+    "fanCenterPetal": "ON",
+    "scopePetals": "OFF",
+    "layerCount": 6,
+    "layerSize": 0.82,
+    "layerPhase": 0.5,
+    "layerTilt": 8,
+    "scopeLayers": "OFF",
+    "varianceSize": 0,
+    "varianceForm": 0,
+    "varianceSpacing": 0,
+    "varianceFrequency": 1,
+    "variancePhase": 0,
+    "stamenCount": 0,
+    "stamenLayout": "RING",
+    "stamenSpread": 2,
+    "stamenLength": 20,
+    "stamenLengthVariance": 0,
+    "stamenCurl": 0,
+    "stamenCoil": "NONE",
+    "stamenCoilRadius": 1.5,
+    "stamenCoilTurns": 3,
+    "antherSize": 1.6,
+    "antherElongation": 2.5,
+    "antherRoundedness": 1,
+    "antherPoints": 4,
+    "antherPinch": 1,
+    "antherLumps": 1,
+    "antherSpread": 0,
+    "stigmaSize": 1.6,
+    "stigmaElongation": 2.5,
+    "stigmaRoundedness": 1,
+    "stigmaPoints": 4,
+    "stigmaPinch": 1,
+    "stigmaLumps": 3,
+    "stigmaSpread": 40,
+    "gynoecium": "NONE",
+    "styleLength": 25,
+    "styleCurl": 0,
+    "sepalCount": 0,
+    "sepalTiers": 1,
+    "sepalScale": 0.6,
+    "sepalLength": 0,
+    "sepalWidth": 0,
+    "sepalHeight": 0.75,
+    "sepalPhase": 0.5,
+    "sepalFootBreadth": 1,
+    "sepalAngle": 0,
+    "sepalOutlineMode": "LAW",
+    "sepalOutlineCurve": {
+      "mode": "symmetric",
+      "points": [
+        [
+          0,
+          0.05
+        ],
+        [
+          0.15,
+          0.16
+        ],
+        [
+          0.36,
+          0.2286
+        ],
+        [
+          0.7,
+          0.178
+        ],
+        [
+          0.9,
+          0.1
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "sepalBaseTaper": 1,
+    "sepalTipShape": 1.7,
+    "sepalTipTaper": 1.8,
+    "sepalCup": 0,
+    "sepalCupGradient": 0,
+    "sepalBuckleAmp": 0,
+    "sepalBuckleFreq": 3,
+    "sepalBuckleEnv": 3,
+    "sepalApexSweep": 0,
+    "sepalRoll": 0,
+    "sepalRollTaper": 0,
+    "sepalCurlMode": "SLIDER",
+    "sepalSpineCurve": {
+      "mode": "single",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.5,
+          0.08
+        ],
+        [
+          1,
+          0.3
+        ]
+      ]
+    },
+    "sepalSpineCurl": 0,
+    "sepalCurlBias": 0,
+    "sepalCurlStart": 0,
+    "sepalTwist": 0,
+    "stemLength": 0,
+    "stemDiameter": 6,
+    "stemCut": "FLORIST",
+    "stemNodeSwelling": 0,
+    "stemNodeKink": 0,
+    "leafNodes": 3,
+    "leafPhyllotaxy": "alternate",
+    "leafDivergence": 180,
+    "leafNodeStart": 0.16,
+    "leafNodeEnd": 0.86,
+    "leafNodeSpacing": 0,
+    "hubStyle": "CURVED",
+    "hubShapeAmount": 0.5,
+    "hubLength": 0,
+    "leafLength": 0,
+    "leafType": "SIMPLE",
+    "leafWidth": 17,
+    "lobedWidth": 34,
+    "leafAngle": 35,
+    "leafSizeTaper": 0,
+    "leafCurlMode": "SLIDER",
+    "leafSpineCurve": {
+      "mode": "single",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0.5,
+          -0.04
+        ],
+        [
+          1,
+          -0.17
+        ]
+      ]
+    },
+    "leafArch": 0,
+    "leafCup": 0.35,
+    "leafOutlineMode": "LAW",
+    "leafOutlineCurve": {
+      "mode": "symmetric",
+      "points": [
+        [
+          0,
+          0.05
+        ],
+        [
+          0.15,
+          0.15
+        ],
+        [
+          0.425,
+          0.2125
+        ],
+        [
+          0.7,
+          0.155
+        ],
+        [
+          0.9,
+          0.065
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "leafTipShape": 1.3,
+    "leafletPairs": 2,
+    "leafletFirst": 0.15,
+    "leafletLast": 0.65,
+    "leafletAngle": 62,
+    "leafletLength": 26,
+    "leafletWidth": 17,
+    "leafletBasalRatio": 0.8,
+    "leafletTerminalLength": 30,
+    "leafletTerminalWidth": 19,
+    "leafletOutlineMode": "LAW",
+    "leafletOutlineCurve": {
+      "mode": "symmetric",
+      "points": [
+        [
+          0,
+          0.08
+        ],
+        [
+          0.12,
+          0.25
+        ],
+        [
+          0.4,
+          0.327
+        ],
+        [
+          0.7,
+          0.25
+        ],
+        [
+          0.9,
+          0.11
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    "leafletTipShape": 1.6,
+    "leafletStalk": 2.5,
+    "leafletTerminalStalk": 7,
+    "lobedLobes": 3,
+    "lobedFrom": 0.08,
+    "lobedTo": 0.8,
+    "lobedSinus": 0.55,
+    "lobedRound": 0.12,
+    "lobedShape": 0.55,
+    "lobedAngle": 22,
+    "lobedEase": 0.9,
+    "leafToothDepth": 0.26,
+    "leafletToothDepth": 0,
+    "lobedToothDepth": 0.22,
+    "lobedToothCount": 4,
+    "leafToothCount": 9,
+    "leafCrestShape": 2,
+    "leafNotchShape": 2,
+    "inflorescence": "NONE",
+    "umbelFlorets": 6,
+    "umbelHead": "OFF",
+    "umbelDepth": "1",
+    "umbelRays": 12,
+    "umbelRayLength": 40,
+    "umbelRayAngle": 50,
+    "floretNodes": 5,
+    "floretPhyllotaxy": "alternate",
+    "pedicelLength": 20,
+    "pedicelGradient": 1,
+    "pedicelCorymb": "OFF",
+    "pedicelAngle": 35,
+    "floretPetals": 5,
+    "floretScale": 0.6,
+    "nodeVariance": 0
+  },
+  "overrides": {
+    "layers": [],
+    "petals": [],
+    "tiers": [],
+    "strands": []
+  },
+  "curves": {
+    "spine": [],
+    "outline": []
+  }
+}

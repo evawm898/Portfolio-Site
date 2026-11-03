@@ -1,0 +1,22 @@
+{
+  "views": [
+    "front",
+    "threequarter"
+  ],
+  "controls": {
+    "petalCount": 22,
+    "layerCount": 2,
+    "layerSize": 0.9,
+    "layerPhase": 0.5,
+    "layerTilt": 4,
+    "petalLength": 35,
+    "petalWidth": 8,
+    "petalTipShape": 2.0,
+    "petalTilt": 6,
+    "petalCup": 0.1,
+    "spread": 3.5,
+    "headRise": 0.35
+  },
+  "frame": 1.0,
+  "frameZ": 0.04
+}
