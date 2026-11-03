@@ -292,6 +292,8 @@
 .tx-tax__grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .tx-tax__cell { margin: 0; border: 1px solid var(--line); padding: 1rem 1rem 1.3rem; cursor: pointer; }
 .tx-tax__cell .tx-anim { margin-bottom: 1rem; }
+.tx-tax__grid--2 .tx-anim { aspect-ratio: 2 / 1; }
+.tx-tax__grid--3 .tx-anim { aspect-ratio: 320 / 120; }
 .tx-tax__cell .label { display: block; font-family: var(--serif); font-weight: 500; font-size: 1.2rem; color: var(--ink); }
 .tx-tax__cell .sub { display: block; margin-top: 0.45rem; font-size: 12px; line-height: 1.55; color: var(--ink-dim); }
 .tx-tax__flow {

@@ -23,6 +23,9 @@ import { WEFT_PANEL } from './textile-knit-loops.js';
 const { INK, ACCENT, BG, SW, HALO, BACK, EDGE, SEED, TAU, rng, seg, ease, lerp, f1, poly,
   runsMarkup, splitRuns, makeFibre, yarnFibrePoints, posedPoints, fiberPose } = DRAW;
 const VB = `0 0 ${VIEW.w} ${VIEW.h}`;
+// each row crops its scenes to what they draw: fibers 2 : 1, yarns a wide strip (the CSS
+// aspect-ratio of .tx-tax__grid--2 / --3 matches these)
+const FIBER_VB = { y: 30, h: 160 }, YARN_VB = `0 50 ${VIEW.w} 120`;
 const group = inner => `<g fill="none" stroke-linecap="round" stroke-linejoin="round">${inner}</g>`;
 const smooth = v => { v = v < 0 ? 0 : v > 1 ? 1 : v; return v * v * (3 - 2 * v); };
 const op = v => v < 1 ? ` stroke-opacity="${f1(v * 100) / 100}"` : '';
@@ -106,15 +109,15 @@ const twistFront = (x, t, a = 0.12, b = 0.92, band = 90) => smooth((lerp(-band, 
 // roving that has just begun to twist. Its end frame is spun staple's first frame. ----------
 const STAPLE_DRIFT = 0.42, ROVING_TT = 0.6;      // at tt 0.6 the yarn scene's twist is 0.09
 const stapleScene = {
-  viewBox: VB, duration: 7600,
+  viewBox: `0 ${FIBER_VB.y} ${VIEW.w} ${FIBER_VB.h}`, duration: 7600,
   markup: t => t < STAPLE_DRIFT ? BASIC.fiber.markup(t / STAPLE_DRIFT) : BASIC.yarn.markup(ROVING_TT * seg(t, STAPLE_DRIFT, 1)),
 };
 
 // ---------- filament: one continuous strand from a spinneret. The camera pulls back from the
 // orifice to show it running on, in long loops, out of the frame — no free end is ever in
 // view: at the start the strand leaves the zoomed frame, at the end it leaves the card. ----------
-const FIL_PTS = [[24, 50], [70, 48], [150, 52], [236, 60], [290, 80], [292, 110], [246, 124], [160, 120], [88, 126],
-  [48, 146], [46, 172], [90, 190], [180, 194], [268, 188], [330, 178], [420, 168]];
+const FIL_PTS = [[24, 50], [70, 48], [150, 52], [236, 60], [290, 78], [292, 104], [246, 118], [160, 114], [88, 120],
+  [48, 138], [46, 160], [90, 174], [180, 177], [268, 172], [330, 164], [420, 156]];
 function catmull(P, per) {
   const out = [];
   for (let i = 0; i < P.length - 1; i++) {
@@ -131,14 +134,14 @@ function catmull(P, per) {
   return out;
 }
 const FIL = catmull(FIL_PTS, 14);
-const FIL_ZOOM = 2.6, FIL_C0 = { x: 66, y: 54 }, FIL_C1 = { x: VIEW.w / 2, y: VIEW.h / 2 };
+const FIL_ZOOM = 2.6, FIL_C0 = { x: 66, y: 52 }, FIL_C1 = { x: VIEW.w / 2, y: FIBER_VB.y + FIBER_VB.h / 2 };
 function filamentView(t) {
-  const k = ease(seg(t, 0.08, 0.86)), z = lerp(FIL_ZOOM, 1, k), w = VIEW.w / z, h = VIEW.h / z;
+  const k = ease(seg(t, 0.08, 0.86)), z = lerp(FIL_ZOOM, 1, k), w = VIEW.w / z, h = FIBER_VB.h / z;
   const cx = lerp(FIL_C0.x, FIL_C1.x, k), cy = lerp(FIL_C0.y, FIL_C1.y, k);
   return `${f1(cx - w / 2)} ${f1(cy - h / 2)} ${f1(w)} ${f1(h)}`;
 }
 const filamentScene = {
-  viewBox: VB, duration: 6400, view: filamentView,
+  viewBox: filamentView(1), duration: 6400, view: filamentView,
   markup(t) {
     // the strand sways as it is pulled away: a wave travelling downstream, damped to rest
     const sec = t * this.duration / 1000, amp = 3.2 * (1 - ease(seg(t, 0.55, 1)));
@@ -182,7 +185,7 @@ function hairy(f, pts, k) {
   return out;
 }
 const spunScene = {
-  viewBox: VB, duration: 6000,
+  viewBox: YARN_VB, duration: 6000,
   markup(t) {
     const tt = lerp(ROVING_TT, 1, t), hk = ease(seg(t, 0.25, 0.95)), runs = [];
     for (const f of DRAW.MATERIAL) {
@@ -197,7 +200,7 @@ const spunScene = {
 const MONO = { y: 110, r: 12, x0: 28 };
 const monoR = x => MONO.r + 4.5 * Math.exp(-(x - MONO.x0) / 9);          // die swell, then the drawn size
 const monoScene = {
-  viewBox: VB, duration: 4600,
+  viewBox: YARN_VB, duration: 4600,
   markup(t) {
     const tip = lerp(MONO.x0 + 2, 360, ease(seg(t, 0.06, 0.9)));
     return group(rod('tt-mono-g', MONO.x0, tip, MONO.y, monoR, true)) + spinneret(MONO.x0, MONO.y, 66, MONO.r + 4.5);
@@ -214,7 +217,7 @@ const TW_FIL = (() => {
   return out;
 })();
 const twistedScene = {
-  viewBox: VB, duration: 5600,
+  viewBox: YARN_VB, duration: 5600,
   markup(t) {
     const n = 170, xs = [], T = [];
     for (let j = 0; j <= n; j++) { const x = lerp(TW.x0, TW.x1, j / n); xs.push(x); T.push(twistFront(x, t)); }
@@ -242,7 +245,7 @@ const PLY_A = singleFibres(SEED + 60, 18, INK, 1, BACK);
 const PLY_B = singleFibres(SEED + 61, 18, INK, 0.58, 0.22);
 PLY_A[3].color = ACCENT;
 const pliedScene = {
-  viewBox: VB, duration: 6400,
+  viewBox: YARN_VB, duration: 6400,
   markup(t) {
     // the ply twist runs in from the right, pulling the singles together as it goes
     const n = 200, x0 = -14, x1 = VIEW.w + 14, xs = [], Tp = [];
@@ -273,7 +276,7 @@ const CORE_FIB = (() => {
   return out;
 })();
 const coreScene = {
-  viewBox: VB, duration: 7200,
+  viewBox: YARN_VB, duration: 7200,
   markup(t) {
     const coreTip = lerp(-12, 370, ease(seg(t, 0, 0.24))), tt = seg(t, 0.14, 1), runs = [];
     for (const f of CORE_FIB) { const { pts, yarnness } = yarnFibrePoints(f, tt); splitRuns(pts, f.accent ? ACCENT : INK, 1, lerp(1, BACK, yarnness), runs); }
@@ -291,10 +294,10 @@ const coreScene = {
 const CORD = { y: 110, rs: 7, A: 17.5, w: TAU / 118, P: TAU * 7 / Math.tan(32 * Math.PI / 180) };
 const CORD_FIB = [0, 1, 2].map(k => singleFibres(SEED + 80 + k, 10, k === 2 ? ACCENT : INK, k === 1 ? 0.55 : 1, k === 1 ? 0.2 : BACK));
 const cordScene = {
-  viewBox: VB, duration: 6400,
+  viewBox: YARN_VB, duration: 6400,
   markup(t) {
     const front = lerp(-60, VIEW.w + 100, ease(seg(t, 0.06, 0.94)));
-    const loose = [0, 1.9, -1.9];
+    const loose = [0, 1.65, -1.65];
     const centre = k => s => {
       const b = smooth((front - s) / 70), a = CORD.w * s + TAU * k / 3;
       const off = lerp(loose[k] * CORD.A, CORD.A * Math.sin(a), b), z = b * CORD.A / 2 * Math.sin(2 * a);
