@@ -126,7 +126,7 @@ function makeStaple(r, i, accent) {
     delay: r() * 0.14,
     op: accent ? 1 : 0.45 + 0.55 * r(),
     fray: [0, 1].map(() => ({ n: r() < 0.26 ? (r() < 0.8 ? 1 : 2) : 0, a: 0.3 + r() * 0.4, l: 1.8 + r() * 1.8, s: r() < 0.5 ? -1 : 1 })),
-    hairEnd: (v => v < 0.2 ? 0 : v < 0.38 ? 1 : v < 0.46 ? 2 : -1)(r()),   // spun staple: which end stands proud
+    hairEnd: (v => v < 0.11 ? 0 : v < 0.22 ? 1 : v < 0.26 ? 2 : -1)(r()),  // spun staple: which end stands proud (a quarter of them)
   };
 }
 const STAPLE = (() => {
@@ -302,7 +302,7 @@ const filamentScene = {
 
 // ---------- spun staple: the staple card's roving, twisted tight. A third of the fibres keep an
 // end proud of the surface as the twist packs them in — the hairiness a filament yarn never has.
-const HAIR_U = 0.28, HAIR_L = 7;
+const HAIR_U = 0.26, HAIR_L = 5.5;
 function hairy(f, pts, k) {
   const which = f.hairEnd; if (k <= 0 || which < 0 || f.accent) return pts;
   const n = pts.length - 1, out = pts.map(p => ({ ...p }));
@@ -324,7 +324,19 @@ const spunScene = {
   markup(t) {
     const tt = lerp(ROVING_TT, 1, t), hk = ease(seg(t, 0.25, 0.95)), runs = [];
     for (const f of STAPLE) { const { pts } = stapleFibrePoints(f, tt); stapleRuns(f, hairy(f, thin(pts), hk), 1, BACK, runs); }
-    return softMarkup(runs);
+    // the yarn's body: as the twist packs the fibres, a shaded round strand forms under them, with
+    // a faint edge each side, fading out at the yarn's two ragged ends (stapleFibrePoints' own twist)
+    const T = ease(seg(tt, 0.52, 0.95)), E = seg(T, 0.35, 1), R = lerp(YARN.R0, YARN.R1, T);
+    let body = '';
+    if (E > 0) {
+      const x0 = YARN.X0 + 4, x1 = YARN.X1 - 4, y0 = YARN.Y - R, h = 2 * R;
+      body = `<defs><linearGradient id="tt-spun-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${INK}" stop-opacity="0.05"/><stop offset="0.35" stop-color="${INK}" stop-opacity="0.2"/><stop offset="1" stop-color="${INK}" stop-opacity="0.03"/></linearGradient>`
+        + `<linearGradient id="tt-spun-e" gradientUnits="userSpaceOnUse" x1="${x0}" y1="0" x2="${x1}" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.1" stop-color="#fff"/><stop offset="0.9" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`
+        + `<mask id="tt-spun-m" maskUnits="userSpaceOnUse" x="0" y="0" width="${VIEW.w}" height="${VIEW.h}"><rect x="${x0}" y="0" width="${x1 - x0}" height="${VIEW.h}" fill="url(#tt-spun-e)"/></mask></defs>`
+        + `<g mask="url(#tt-spun-m)" opacity="${f1(E * 100) / 100}"><rect x="${x0}" y="${f1(y0)}" width="${x1 - x0}" height="${f1(h)}" fill="url(#tt-spun-g)"/>`
+        + `<path d="M${x0},${f1(y0 - 0.4)}H${x1}M${x0},${f1(y0 + h + 0.4)}H${x1}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.24" fill="none"/></g>`;
+    }
+    return body + softMarkup(runs);
   },
 };
 
