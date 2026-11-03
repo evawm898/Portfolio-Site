@@ -106,19 +106,20 @@ const twistFront = (x, t, a = 0.12, b = 0.92, band = 90) => smooth((lerp(-band, 
 // =====================================================================================
 
 // ---------- the staple material: short, crimped, soft fibres, frayed at the tips ----------
-// Much shorter than textile-basics' (13–28 units), squiggly with an IRREGULAR crimp (stapleCrimp),
+// Shorter than textile-basics' (16–34 units), squiggly with an IRREGULAR, undulating crimp (stapleCrimp),
 // not every one full white, and about a quarter of the tips split into a fine wisp. Spun staple and
 // the corespun sheath are made of the same fibres, so the staple card feeds them both.
-const STAPLE_N = 160, STAPLE_TEAL = 37, FIB_SW = 1.15, WISP_SW = 0.7, SOFT_HALO = 0.85;
+const STAPLE_N = 140, STAPLE_TEAL = 37, FIB_SW = 1.15, WISP_SW = 0.7, SOFT_HALO = 0.85;
 function makeStaple(r, i, accent) {
-  const len = accent ? 34 : 13 + r() * 15;
+  const len = accent ? 38 : 16 + r() * 18;
   return {
     i, accent, len,
     camp: 0.75 + r() * 0.65,                  // crimp amplitude: squiggly
     waves: len / (4.5 + r() * 3),             // a wave every 4.5–7.5 units, then made irregular:
     jit: 0.05 + r() * 0.09, jf: 0.6 + r() * 1.4, jp: r() * TAU,   //   the wavelength drifts along the fibre,
     af: 0.4 + r() * 1.2, ap: r() * TAU,                           //   the amplitude wavers,
-    h2: 0.2 + r() * 0.35, cph2: r() * TAU,                        //   and a second, off-beat ripple rides on it
+    h2: 0.2 + r() * 0.35, cph2: r() * TAU,                        //   and a second, off-beat ripple rides on it;
+    uw: 0.5 + r() * 0.75, ua: 0.07 + r() * 0.06, up: r() * TAU,   //   the whole body undulates, a slow bend of its own
     cph: r() * TAU,
     rho: accent ? 0.97 : 0.3 + 0.7 * Math.sqrt(r()),
     phi: r() * TAU,
@@ -148,7 +149,8 @@ const STAPLE = (() => {
 // construction (DRAW.posedPoints, DRAW.yarnPoint, DRAW.yarnFibrePoints), term for term.
 function stapleCrimp(f, u) {
   const ph = TAU * f.waves * (u + f.jit * Math.sin(TAU * f.jf * u + f.jp)) + f.cph;
-  return f.camp * (1 + 0.35 * Math.sin(TAU * f.af * u + f.ap)) * (Math.sin(ph) + f.h2 * Math.sin(2.3 * ph + f.cph2));
+  return f.camp * (1 + 0.35 * Math.sin(TAU * f.af * u + f.ap)) * (Math.sin(ph) + f.h2 * Math.sin(2.3 * ph + f.cph2))
+    + f.ua * f.len * Math.sin(TAU * f.uw * u + f.up);                       // the undulation: a fraction of the fibre's own length
 }
 const stapleN = f => Math.max(16, Math.ceil(f.len / 0.7));      // ~0.7 units a sample: a squiggle stays a curve
 function staplePosed(f, pose, depth) {
@@ -386,7 +388,7 @@ const pliedScene = {
 // into a sheath that stops short, so the bare core runs on out of the yarn's end ----------
 const CORE = { r: 6, sheathEnd: 222 };
 const CORE_FIB = (() => {
-  const r = rng(SEED + 70), out = [], n = 130;
+  const r = rng(SEED + 70), out = [], n = 115;
   for (let i = 0; i < n; i++) {
     const f = makeStaple(r, 300 + i, i === 47);
     f.c = -18 + (i + r()) / n * (CORE.sheathEnd + 18);
