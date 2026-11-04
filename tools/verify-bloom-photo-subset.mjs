@@ -38,19 +38,37 @@
      V5  the status line says the load was clean;
      V6  no page error.
 
+   WARNINGS, listed apart from the clauses and NEVER counted in the exit code
+   (Eva's ruling 2 of §9.7, Nov 4: the photo schema WARNS, it does not fail).
+   Their owner is the photo-readable schema, `SCHEMA` in
+   tools/bloom-photo-census.mjs (the 46 rows of §2.1), imported rather than
+   restated, so it has no second copy here:
+     W1  a registry control the file names that is OFF the photo schema (it
+         loads, and V1-V6 judge it, but route A should not be emitting it);
+     W2  a schema control whose value is outside the schema's OWN narrowed
+         range or values (`varianceSize` / `varianceForm` are half the slider;
+         §2.1 says why). A narrowing is a schema statement, so it warns too —
+         a reading made without a ruling, one line to drop.
+   A name that is not a control at all is V1's (`unknown`), never a warning.
+
    RUN:  node tools/verify-bloom-photo-subset.mjs <file.json> [...]
            [--wrap]   a file with no `format` (the discovery's dry-run shape,
                       `{ views, controls, frame, frameZ }`) is ALSO validated
                       with its `controls` put in the v1 envelope; the dropped
                       keys are named. The raw file is still validated as it is.
          node tools/verify-bloom-photo-subset.mjs --self
-                      the eight written-down fixtures below, each against its
-                      expected clause set (CI: spawned by the design-file gate)
+                      the ten written-down fixtures below, each against its
+                      expected clause AND warning sets, then the off-schema
+                      fixture through a SPAWNED copy of this validator: it
+                      must list W1 and exit 0 (CI: spawned by the design-file
+                      gate)
          node tools/verify-bloom-photo-subset.mjs --negative-control [--mutant=a,b]
                       the fixtures again under each mutant of bloom.js /
                       bloom-file.js; every mutant must move EXACTLY the
                       (fixture, clause) pairs it names, every anchor checked
-                      before any mutant runs
+                      before any mutant runs; then two mutants of THIS file
+                      (a warning fails the run, the W1 warning is dropped),
+                      each of which must break the spawned exit-0 leg
    Needs playwright-core and three@0.161.0 (npm i --no-save). On a container
    whose Chromium lives under chrome-linux64/, set CHROMIUM_EXECUTABLE.
    =================================================================== */
@@ -60,6 +78,9 @@ import { fileURLToPath } from 'node:url';
 import { CONTROLS, DEFAULTS, valuesEqual } from '../bloom-registry.js';
 import { composeDoc, toText } from '../bloom-file.js';
 import { serveRepo, launchPage, openBloom, settleBuild } from './bloom-harness.mjs';
+import { SCHEMA } from './bloom-photo-census.mjs';
+import { spawnSync } from 'node:child_process';
+import os from 'node:os';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -70,6 +91,23 @@ const ONLY = (argv.find((a) => a.startsWith('--mutant=')) || '').slice(9).split(
 const FILES = argv.filter((a) => !a.startsWith('--'));
 const DIRTY_MIN = 15;
 const controlOf = new Map(CONTROLS.map((c) => [c.id, c]));
+const SCHEMA_ROW = new Map(SCHEMA.map((r) => [r.id, r]));
+
+/* W1 / W2 — pure, from the file's own `controls` and the schema; no page. */
+function schemaWarnings(obj) {
+  const warned = {};
+  const named = obj && obj.controls && typeof obj.controls === 'object' ? Object.entries(obj.controls).filter(([k]) => controlOf.has(k)) : [];
+  const off = [], out = [];
+  for (const [id, v] of named) {
+    const row = SCHEMA_ROW.get(id);
+    if (!row) { off.push(`${id}=${JSON.stringify(v)}`); continue; }
+    if (row.range && typeof v === 'number' && (v < row.range[0] || v > row.range[1])) out.push(`${id} ${v} (schema ${row.range[0]}..${row.range[1]})`);
+    if (row.values && !row.values.includes(v)) out.push(`${id} ${JSON.stringify(v)} (schema ${row.values.join(' / ')})`);
+  }
+  if (off.length) warned.W1 = `off the photo schema: ${off.join(', ')}`;
+  if (out.length) warned.W2 = `outside the photo schema's own range: ${out.join(', ')}`;
+  return warned;
+}
 
 /* THE DIRTY DESIGN — complete, clean through the old path, far from DEFAULTS. */
 const DIRTY_STATE = {
@@ -82,17 +120,22 @@ const DIRTY_TEXT = toText(composeDoc(DIRTY_STATE, { savedAt: '2026-11-03T00:00:0
 
 const ENV = { format: 'bloom-design', version: 1 };
 const CLEAN = { petalCount: 12, petalTilt: 40, petalCup: 0.3, layerCount: 2, layerSize: 0.8 };
-/* THE FIXTURES, WRITTEN DOWN with the clauses each must fire — never derived
-   from the module under test. The three the brief names are OUT_OF_RANGE,
-   UNKNOWN_FIELD and HIDDEN_CONTROL; the rest close the obvious neighbours. */
+/* THE FIXTURES, WRITTEN DOWN with the clauses each must fire and the warnings
+   each must list (`warn`, default none) — never derived from the module under
+   test. The three the brief names are OUT_OF_RANGE, UNKNOWN_FIELD and
+   HIDDEN_CONTROL; the rest close the obvious neighbours. OFF_SCHEMA is the
+   dry-run's own case (`antherElongation`, which tulip-v2 and daisy-v2 carry):
+   it loads clean and only warns. */
 const FIXTURES = [
   { id: 'CLEAN', file: { ...ENV, controls: { ...CLEAN } }, expect: [] },
   { id: 'OUT_OF_RANGE', file: { ...ENV, controls: { ...CLEAN, petalLength: 140 } }, expect: ['V1', 'V2', 'V5'] },
   { id: 'UNKNOWN_FIELD', file: { ...ENV, controls: { ...CLEAN, petalColour: 'red' } }, expect: ['V1', 'V5'] },
   { id: 'HIDDEN_CONTROL', file: { ...ENV, controls: { ...CLEAN, fringeDepth: 0.3 } }, expect: ['V1', 'V2', 'V3', 'V5'] },
-  { id: 'HIDDEN_OPTION', file: { ...ENV, controls: { ...CLEAN, petalTexture: 'PEBBLE' } }, expect: ['V1', 'V2', 'V5'] },
+  { id: 'HIDDEN_OPTION', file: { ...ENV, controls: { ...CLEAN, petalTexture: 'PEBBLE' } }, expect: ['V1', 'V2', 'V5'], warn: ['W1'] },
   { id: 'OFF_STEP', file: { ...ENV, controls: { ...CLEAN, petalTilt: 40.5 } }, expect: ['V1', 'V2', 'V5'] },
   { id: 'SIDECAR_INSIDE', file: { ...ENV, controls: { ...CLEAN }, confidence: { petalCount: 0.9 } }, expect: ['V1', 'V5'] },
+  { id: 'OFF_SCHEMA', file: { ...ENV, controls: { ...CLEAN, stamenCount: 6, antherElongation: 4 } }, expect: [], warn: ['W1'] },
+  { id: 'SCHEMA_RANGE', file: { ...ENV, controls: { ...CLEAN, varianceSize: 0.4 } }, expect: [], warn: ['W2'] },
   { id: 'NO_ENVELOPE', file: { views: ['front'], controls: { ...CLEAN }, frame: 1 }, expect: ['V0', 'V1', 'V2', 'V3', 'V4', 'V5'] },   // V3: the dirty page's own layerSize hides under Per-layer values
 ];
 
@@ -105,12 +148,12 @@ const MUTANTS = [
     to: '  selectScope(null);\n  for (const c of CONTROLS) {\n    if (!r.applied.includes(c.id)) continue;\n    inputs[c.id].value = r.doc.controls[c.id];',
     /* V2 on the fixtures whose V2 did not already fire; V3 wherever the subset
        names layerSize — the dirty page's leftover Per-layer values (ON) hides it */
-    breaks: ['CLEAN:V2', 'CLEAN:V3', 'HIDDEN_OPTION:V3', 'OFF_STEP:V3', 'OUT_OF_RANGE:V3', 'SIDECAR_INSIDE:V2', 'SIDECAR_INSIDE:V3', 'UNKNOWN_FIELD:V2', 'UNKNOWN_FIELD:V3'],
+    breaks: ['CLEAN:V2', 'CLEAN:V3', 'HIDDEN_OPTION:V3', 'OFF_SCHEMA:V2', 'OFF_SCHEMA:V3', 'OFF_STEP:V3', 'OUT_OF_RANGE:V3', 'SCHEMA_RANGE:V2', 'SCHEMA_RANGE:V3', 'SIDECAR_INSIDE:V2', 'SIDECAR_INSIDE:V3', 'UNKNOWN_FIELD:V2', 'UNKNOWN_FIELD:V3'],
   },
   {
     id: 'the-scopes-survive-a-new-design', file: 'bloom.js',
     from: "next[k] = r.doc.overrides[k] || [];", to: "next[k] = (had && had[k]) || [];",
-    breaks: ['CLEAN:V4', 'OUT_OF_RANGE:V4', 'UNKNOWN_FIELD:V4', 'HIDDEN_CONTROL:V4', 'HIDDEN_OPTION:V4', 'OFF_STEP:V4', 'SIDECAR_INSIDE:V4'],
+    breaks: ['CLEAN:V4', 'OUT_OF_RANGE:V4', 'UNKNOWN_FIELD:V4', 'HIDDEN_CONTROL:V4', 'HIDDEN_OPTION:V4', 'OFF_STEP:V4', 'SIDECAR_INSIDE:V4', 'OFF_SCHEMA:V4', 'SCHEMA_RANGE:V4'],
   },
   {
     id: 'hidden-controls-are-applied', file: 'bloom-file.js',
@@ -129,7 +172,7 @@ const MUTANTS = [
        leftover becomes a NAMED control, so the hidden rule talks (V1/V5 on the
        clean file), the leftovers stay (V2) and the leftover Per-layer values
        hides the named layerSize (V3) */
-    breaks: ['CLEAN:V1', 'CLEAN:V2', 'CLEAN:V3', 'CLEAN:V5', 'HIDDEN_OPTION:V3', 'OFF_STEP:V3', 'OUT_OF_RANGE:V3', 'SIDECAR_INSIDE:V2', 'SIDECAR_INSIDE:V3', 'UNKNOWN_FIELD:V2', 'UNKNOWN_FIELD:V3'],
+    breaks: ['CLEAN:V1', 'CLEAN:V2', 'CLEAN:V3', 'CLEAN:V5', 'HIDDEN_OPTION:V3', 'OFF_SCHEMA:V1', 'OFF_SCHEMA:V2', 'OFF_SCHEMA:V3', 'OFF_SCHEMA:V5', 'OFF_STEP:V3', 'OUT_OF_RANGE:V3', 'SCHEMA_RANGE:V1', 'SCHEMA_RANGE:V2', 'SCHEMA_RANGE:V3', 'SCHEMA_RANGE:V5', 'SIDECAR_INSIDE:V2', 'SIDECAR_INSIDE:V3', 'UNKNOWN_FIELD:V2', 'UNKNOWN_FIELD:V3'],
   },
 ];
 
@@ -173,7 +216,7 @@ async function validate(page, port, text, name) {
     if (!sOk) fired.V4 = `page scopes ${JSON.stringify(after.scopes)}`;
     if (!/as a NEW design/.test(after.status) || !/every field read clean, nothing to report/.test(after.status)) fired.V5 = after.status.replace(/\s+/g, ' ').slice(0, 300);
     if (errors.length) fired.V6 = errors.join(' | ');
-    return { fired, rec, applied: rec.appliedIds || [] };
+    return { fired, warned: schemaWarnings(obj), rec, applied: rec.appliedIds || [] };
   } finally { page.off('pageerror', onErr); }
 }
 
@@ -187,6 +230,7 @@ const firedSet = (res) => new Set(Object.entries(res).flatMap(([id, r]) => Objec
 const { server, port } = await serveRepo();
 const { browser, page } = await launchPage({ viewport: { width: 900, height: 700 } });
 let failed = false;
+let warnCount = 0;
 try {
   if (FILES.length) {
     for (const f of FILES) {
@@ -201,8 +245,11 @@ try {
       for (const [name, text] of runs) {
         const r = await validate(page, port, text, name);
         const bad = Object.entries(r.fired);
-        console.log(`${bad.length ? 'FAIL' : 'PASS'}  ${name} — ${r.rec.action}${r.rec.action === 'loaded' ? `, ${r.applied.length} of ${r.rec.named} named controls applied, ${r.rec.notes.length} notes` : ''}`);
+        const warns = Object.entries(r.warned);
+        console.log(`${bad.length ? 'FAIL' : 'PASS'}  ${name} — ${r.rec.action}${r.rec.action === 'loaded' ? `, ${r.applied.length} of ${r.rec.named} named controls applied, ${r.rec.notes.length} notes` : ''}${warns.length ? `, ${warns.length} warning(s)` : ''}`);
         for (const [k, why] of bad) console.log(`        ${k}: ${why}`);
+        for (const [k, why] of warns) console.log(`        warn ${k}: ${why}`);
+        warnCount += warns.length;
         if (bad.length) failed = true;
       }
     }
@@ -211,8 +258,10 @@ try {
     const base = await runFixtures(page, port);
     for (const f of FIXTURES) {
       const got = Object.keys(base[f.id].fired).sort(), want = [...f.expect].sort();
-      const ok = JSON.stringify(got) === JSON.stringify(want);
-      console.log(`${ok ? 'ok  ' : 'FAIL'}  fixture ${f.id}: fired [${got.join(' ')}]${ok ? '' : ` — expected [${want.join(' ')}]`}`);
+      const gotW = Object.keys(base[f.id].warned).sort(), wantW = [...(f.warn || [])].sort();
+      const ok = JSON.stringify(got) === JSON.stringify(want) && JSON.stringify(gotW) === JSON.stringify(wantW);
+      console.log(`${ok ? 'ok  ' : 'FAIL'}  fixture ${f.id}: fired [${got.join(' ')}] warned [${gotW.join(' ')}]${ok ? '' : ` — expected [${want.join(' ')}] warned [${wantW.join(' ')}]`}`);
+      if (!ok) for (const [k, why] of Object.entries(base[f.id].warned)) console.log(`        warn ${k}: ${why}`);
       if (!ok) { failed = true; for (const [k, why] of Object.entries(base[f.id].fired)) console.log(`        ${k}: ${why}`); }
     }
     if (NEGATIVE && !failed) {
@@ -235,6 +284,46 @@ try {
     }
   }
 } finally { await browser.close(); server.close(); }
+
+/* THE EXIT-CODE LEG (ruling 2): the OFF_SCHEMA fixture, written to a file and
+   handed to a SPAWNED copy of this validator, must list W1 and exit 0 — the
+   exit code is the claim, and only a separate process can show it. Under
+   --negative-control two mutants of THIS file must each break the leg. */
+const SELF_MUTANTS = [
+  /* anchors joined from pieces so the definitions below do not match themselves */
+  { id: 'a-warning-fails-the-run', from: ['        if (bad.length)', ' failed = true;'].join(''), to: '        if (bad.length || warns.length) failed = true;', breaks: 'the exit code' },
+  { id: 'the-off-schema-warning-is-dropped', from: ['    if (!row) {', ' off.push('].join(''), to: '    if (!row) { if (0) off.push(', breaks: 'the W1 line' },
+];
+function exitLeg(script) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'photo-subset-'));
+  const file = path.join(dir, 'off-schema.subset.bloom-design.json');
+  fs.writeFileSync(file, JSON.stringify(FIXTURES.find((f) => f.id === 'OFF_SCHEMA').file));
+  const r = spawnSync(process.execPath, [script, file], { encoding: 'utf8', env: process.env });
+  fs.rmSync(dir, { recursive: true, force: true });
+  const out = (r.stdout || '') + (r.stderr || '');
+  return { status: r.status, w1: /^\s+warn W1: off the photo schema: antherElongation=4$/m.test(out), pass: /^PASS  off-schema/m.test(out), out };
+}
+if (SELF || NEGATIVE) {
+  const me = fileURLToPath(import.meta.url);
+  const leg = exitLeg(me);
+  const legOk = leg.status === 0 && leg.w1 && leg.pass;
+  console.log(`${legOk ? 'ok  ' : 'FAIL'}  exit-code leg: the off-schema file PASSES, lists W1 and exits ${leg.status}${legOk ? '' : `\n${leg.out.split('\n').map((l) => '        ' + l).join('\n')}`}`);
+  if (!legOk) failed = true;
+  if (NEGATIVE && legOk && (!ONLY.length || SELF_MUTANTS.some((m) => ONLY.includes(m.id)))) {
+    const src = fs.readFileSync(me, 'utf8');
+    for (const m of SELF_MUTANTS) mutate(src, { ...m, file: path.basename(me) });
+    console.log(`anchors: both validator mutants match exactly once`);
+    for (const m of SELF_MUTANTS.filter((x) => !ONLY.length || ONLY.includes(x.id))) {
+      const copy = path.join(path.dirname(me), `.photo-subset-mutant-${m.id}.mjs`);
+      fs.writeFileSync(copy, mutate(src, { ...m, file: path.basename(me) }));
+      let r; try { r = exitLeg(copy); } finally { fs.rmSync(copy, { force: true }); }
+      const broke = !(r.status === 0 && r.w1 && r.pass);
+      console.log(`${broke ? 'ok  ' : 'FAIL'}  validator mutant ${m.id}: the leg ${broke ? `broke (exit ${r.status}, W1 ${r.w1 ? 'listed' : 'absent'})` : 'still passed'} — breaks ${m.breaks}`);
+      if (!broke) failed = true;
+    }
+  }
+}
 if (!FILES.length && !SELF && !NEGATIVE) { console.log('nothing to do — give files, --self or --negative-control'); process.exit(2); }
+if (warnCount) console.log(`\n${warnCount} warning(s) — listed apart from the clauses; warnings do not change the exit code`);
 console.log(failed ? '\nPHOTO-SUBSET VALIDATOR: FAIL' : `\nPHOTO-SUBSET VALIDATOR: PASS${NEGATIVE ? ` — every mutant moved exactly the clauses it names` : ''}`);
 process.exit(failed ? 1 : 0);

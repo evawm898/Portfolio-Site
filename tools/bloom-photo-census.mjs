@@ -19,8 +19,12 @@
    behind a NEVER-TRUE predicate, or a choice value the registry marks hidden.
 
    RUN:  node tools/bloom-photo-census.mjs [--md]     (--md prints the doc tables)
+   IMPORT: `SCHEMA` is exported for tools/verify-bloom-photo-subset.mjs; importing
+           runs no census and prints nothing.
    =================================================================== */
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, predicateDrivers } from '../bloom-registry.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /* ---- the classification: one entry per control, a class and a reason ---- */
 const A = 'a', B = 'b', C = 'c', D = 'd';
@@ -138,6 +142,11 @@ export const SCHEMA = [
   { id: 'sepalCount', group: 'sepals', ask: true }, { id: 'sepalScale', group: 'sepals' }, { id: 'sepalAngle', group: 'sepals' },
 ];
 
+/* Everything below runs only when this file is RUN. The photo-subset validator
+   imports SCHEMA (one owner of the 46 rows) and must not inherit the census's
+   process.exit. */
+const IS_MAIN = !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (IS_MAIN) {
 /* ---- checks: both directions, the hidden options, the never-true gates ---- */
 const ids = new Set(CONTROLS.map((c) => c.id));
 const missing = CONTROLS.filter((c) => !CLASS[c.id]).map((c) => c.id);
@@ -183,4 +192,5 @@ for (const r of SCHEMA) {
   const c = byId[r.id];
   const rng = c.kind === 'choice' ? (r.values || c.options.filter((o) => !o.hidden).map((o) => o.value)).join(' / ') : (r.range ? `${r.range[0]}..${r.range[1]} (registry ${c.min}..${c.max})` : `${c.min}..${c.max} step ${c.step}`);
   console.log(`| ${r.group} | \`${r.id}\` | ${rng} | ${JSON.stringify(c.default)} | ${r.ask ? 'yes' : ''} | ${r.note || ''} |`);
+}
 }
