@@ -684,9 +684,15 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   its default and is told `hidden`. The page writes the complete state to every input (Reset's events).
 - `readDoc` / `applyDesign` are byte-identical; `tools/verify-bloom-load-unchanged.mjs --base <wt>` compares the
   old path's record, state, scopes, save and STL bytes on both trees (not in CI).
-- `tools/verify-bloom-photo-subset.mjs` (V0–V6, onto a DIRTY page; `--self` eight fixtures, `--negative-control`
-  five mutants) is F16 of the design-file gate. Sidecar `<name>.bloom-photo.json`, format in §9.3. No emission is
-  built; outline and per-layer emission are S2/S3, gated on the zero-notes check.
+- `tools/verify-bloom-photo-subset.mjs` (V0–V6, onto a DIRTY page; `--self` ten fixtures plus a spawned exit-code
+  leg, `--negative-control` five page mutants plus two of its own) is F16 of the design-file gate. Sidecar
+  `<name>.bloom-photo.json`, format in §9.3. No emission is built; outline and per-layer emission are S2/S3, gated
+  on the zero-notes check.
+- **§9.7 RULED (Eva, Nov 4):** the 46-row photo schema WARNS and never fails — W1 off the schema, W2 outside its
+  narrowed range, listed apart from the clauses, exit code unchanged. `SCHEMA` is imported from
+  `tools/bloom-photo-census.mjs` (one owner; its CLI is guarded so the import is silent). Hidden/pinned, the
+  confidence enum and the file names stand as built; the dry-run subsets stay as committed; a dropped file still
+  takes the normal Load.
 
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
 (Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read

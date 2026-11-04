@@ -686,13 +686,32 @@ accident. The clauses:
 
 V2 sees what V1 cannot: a value a page-side listener silently put back, and a dirty leftover.
 
-`--self` runs eight written-down fixtures against their expected clause sets: a clean subset, and
+**Warnings (Eva's ruling 2, Nov 4):** the photo schema WARNS, it does not fail. Warnings are listed
+apart from the clauses and never change the exit code. Their owner is `SCHEMA` in
+`tools/bloom-photo-census.mjs` (the 46 rows of §2.1), imported rather than restated — the census
+tool's checks and printing now run only when it is RUN, so the import is silent.
+
+| warn | what it says | owner |
+|---|---|---|
+| W1 | a registry control the file names is OFF the photo schema | `SCHEMA` |
+| W2 | a schema control's value is outside the schema's own narrowed range (`varianceSize` 0..0.25, `varianceForm` 0..0.5) or values | `SCHEMA` |
+
+W2 is a reading made without a ruling: a narrowing is a schema statement, so it warns too (one line
+to drop). A name that is not a control at all is V1's `unknown`, never a warning.
+
+`--self` runs ten written-down fixtures against their expected clause AND warning sets: a clean subset, and
 the three the brief named — **an out-of-range value** (`petalLength` 140: V1 V2 V5), **an unknown
 field** (`petalColour`: V1 V5), **a hidden control** (`fringeDepth` with no fringe: V1 V2 V3 V5) —
-plus a hidden option, an off-step value, a sidecar key put INSIDE the design file (V1 V5) and a file
-with no envelope (V0…V5). `--negative-control` runs the fixtures again under five mutants of
-`bloom.js` / `bloom-file.js`, each required to move exactly the (fixture, clause) pairs it names,
-every anchor checked before any runs (§9.5 has the run). It is spawned by the design-file gate as
+plus a hidden option (V1 V2 V5, and W1: `petalTexture` is off the schema), an off-step value, a
+sidecar key put INSIDE the design file (V1 V5), **an off-schema control** (`antherElongation` 4 with
+stamens: no clause, W1), **a value outside the schema's range** (`varianceSize` 0.4: no clause, W2)
+and a file with no envelope (V0…V5). Then the **exit-code leg**: the off-schema fixture is written to
+a file and handed to a SPAWNED copy of the validator, which must print PASS, list W1 and exit 0 —
+the exit code is the claim, and only a separate process can show it. `--negative-control` runs the
+fixtures again under five mutants of `bloom.js` / `bloom-file.js`, each required to move exactly the
+(fixture, clause) pairs it names, every anchor checked before any runs; then two mutants of the
+validator itself (a warning fails the run; the W1 warning is dropped), each of which must break the
+exit-code leg (§9.5 has the run). It is spawned by the design-file gate as
 **F16**, so it rides in `bloom-panel.yml` with no workflow edit.
 
 ### 9.3 The sidecar — `<name>.bloom-photo.json`
@@ -813,14 +832,18 @@ Inside the envelope **no reader note fires on any of the three** — no clamp, n
 hidden control. Two things that pass and are worth knowing:
 
 - `antherElongation` (class c, outside the §2.1 schema) is in `daisy-v2` and `tulip-v2`, and passes,
-  because the reader enforces the REGISTRY, not the photo schema. The schema is not checked by the
-  validator (see §9.7, question 2).
+  because the reader enforces the REGISTRY, not the photo schema. **Since ruling 2 (Nov 4) it WARNS**:
+  both wrapped files read `PASS … 0 notes, 1 warning(s)` with `warn W1: off the photo schema:
+  antherElongation=4` (tulip-v2) and `=1` (daisy-v2), and the same controls in an envelope, run on
+  their own, **exit 0**. `double-v2` and the worked example carry no off-schema control and list no
+  warning.
 - `placement` RADIAL and `layerPhase` 0.5 are written at their defaults and pass — writing a default
   is harmless, and the validator does not flag it.
 
 ### 9.5 The gates, measured
 
-- **The validator's own fixtures** (`--self`): 8 of 8 fire exactly their written-down clause sets.
+- **The validator's own fixtures** (`--self`): 10 of 10 fire exactly their written-down clause and
+  warning sets, and the exit-code leg passes (the spawned validator lists W1 and exits 0). 1 m 19 s.
 - **Its negative control** (`--negative-control`): all 5 anchors match exactly once, and every
   mutant moves exactly the (fixture, clause) pairs it names — keeping the page's value for unnamed
   controls, keeping the page's scopes, applying hidden controls, dropping the reader's notes, and
@@ -828,6 +851,10 @@ hidden control. Two things that pass and are worth knowing:
   moving MORE than they named, and both are right: the dirty page leaves Per-layer values ON, which
   hides the fixtures' own `layerSize`, so V3 fires wherever a leftover survives. The measured sets
   are what the table holds now. 8 m 57 s for the whole sweep on this box.
+  **After ruling 2 (Nov 4):** the two warning fixtures are clean loads plus one field, so three page
+  mutants move them exactly as they move `CLEAN` / `UNKNOWN_FIELD` (V2/V3, V4, V1/V2/V3/V5) — those
+  pairs were added to their lists. Both validator mutants break the exit-code leg: `a-warning-fails-the-run`
+  exits 1, `the-off-schema-warning-is-dropped` exits 0 with no W1 line. All seven behave; 7 m 5 s.
 - **The old load path is unchanged** (`node tools/verify-bloom-load-unchanged.mjs --base <worktree
   of 6981e2f> --control`): **25 of 25 samples identical** between the base and this tree on all five
   things it compares — the load record (every note), `readUI()`, the scopes, the page's own save
@@ -870,7 +897,22 @@ exceptions.**
     and write `overrides.layers`. Load as new reads that container through the unchanged reader;
     S3 owes its own fixtures for it.
 
-### 9.7 Ambiguities, for Eva's ruling (none resolved here)
+### 9.7 Ambiguities — RULED (Eva, Nov 4)
+
+1. **Hidden/pinned** means any control hidden under the design being built, or a hidden option —
+   as built. Kept.
+2. **The 46-control photo schema WARNS, it does not fail.** Warnings are listed apart from the
+   failures and do not change the exit code. Built: W1 (off the schema) and W2 (outside the
+   schema's own narrowed range), §9.2; the exit-code leg and its two validator mutants, §9.5.
+3. **Confidence** in the sidecar is the enum `low` / `medium` / `high` — as built. Kept.
+4. **File names stay as built.** Dropping a file on the page keeps using the normal Load, not
+   Load as new.
+5. **The dry-run `.subset.json` files** stay as committed. They are not rewritten into the envelope.
+
+The questions as they were asked are kept below, so each ruling can be read against what it answered.
+The rulings are numbered by the question they answer (Eva's message gave 4 and 5 the other way round).
+
+#### The questions as asked (Nov 3)
 
 1. **"Hidden/pinned."** Read as: a control hidden by its own `visibleWhen` under the design being
    built, or a choice set to a hidden option. Such a control keeps its default and is told `hidden`,
