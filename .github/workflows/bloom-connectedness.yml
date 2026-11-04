@@ -71,7 +71,7 @@ concurrency:
 # matrix with no `timeout-minutes` under GitHub's 360-minute default and its
 # recent successes took 134-204 minutes — the export gate's own shape before
 # #294 sharded it — with no instrument able to tell SLOW from HUNG. So:
-#   shard    — the matrix split FOUR ways by the export gate's own
+#   shard    — the matrix split EIGHT ways by the export gate's own
 #              `shardOf(index, n)` (one owner of membership for both gates),
 #              each shard writing a census of what it attempted and reached;
 #   verdict  — reconciles every census against its OWN buildMatrix() (every
@@ -84,10 +84,15 @@ concurrency:
 jobs:
   shard:
     runs-on: ubuntu-latest
-    # 134-204 min of matrix / 4 is 34-51 min a shard plus ~5 min of install;
-    # 150 is ~3x the slowest observed and still 210 minutes under GitHub's
-    # own limit. A shard that reaches it is a HANG declared, and the verdict
-    # job names it.
+    # EIGHT shards since Nov 4 (Eva's ruling: more shards, not a longer
+    # timeout). Four ran 150.2 / 114.2 / 147.1 / 128.7 min on main's run for
+    # #483 (shard 0 cancelled AT this timeout) and 95.4 / 143.7 / 92.0 /
+    # 133.7 on #487's — the same rows, so the spread is the runners'. Eight
+    # is 58-68 min a shard balanced; the verdict prints every row's own ms and
+    # the projected split for 6 / 8 / 10, and FLAGS (never fails) a shard past
+    # 70% of this timeout. A shard that reaches it is a HANG declared, and the
+    # verdict job names it. Changing the count is THREE edits: this list,
+    # SHARDS in both jobs, and CI_CONN_SHARDS in the tool.
     timeout-minutes: 150
     strategy:
       # Every shard runs to completion whatever another does: a shard cancelled
@@ -97,9 +102,9 @@ jobs:
       matrix:
         # MUST be 0..SHARDS-1. A shard missing from this list writes no census
         # and the verdict FAILS naming it; an extra one is refused at launch.
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
-      SHARDS: 4
+      SHARDS: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -150,7 +155,7 @@ jobs:
       actions: read
       contents: read
     env:
-      SHARDS: 4
+      SHARDS: 8
       # MUST equal the shard job's `timeout-minutes` above; the step below
       # refuses to run if the two numbers have drifted apart.
       SHARD_TIMEOUT_MIN: 150
@@ -178,5 +183,5 @@ jobs:
           test "$(grep -c "^    timeout-minutes: $SHARD_TIMEOUT_MIN$" .github/workflows/bloom-connectedness.yml)" = 1 || { echo "SHARD_TIMEOUT_MIN ($SHARD_TIMEOUT_MIN) does not match the shard job's timeout-minutes"; exit 1; }
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" > jobs.json
           node -e "const j=JSON.parse(require('fs').readFileSync('jobs.json','utf8')).jobs; for (const x of j) console.log(x.name.padEnd(12), x.status, x.conclusion)"
-      - name: Every row in exactly one shard, every shard job green and under its timeout, and ONE verdict over all of them
+      - name: Every row in exactly one shard, every shard job green and under its timeout (a shard past 70% FLAGGED), the rows' own ms and the 6/8/10 projection, and ONE verdict over all of them
         run: node tools/bloom-connectedness-shards.mjs --merge census --shards $SHARDS --jobs jobs.json --timeout-min $SHARD_TIMEOUT_MIN
