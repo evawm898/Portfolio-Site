@@ -1,12 +1,14 @@
 # textile taxonomy prototype (unlinked)
 
-Scratch page for the fiber / yarn-and-cord / textile-structure panel planned for
+Scratch page for the fiber / yarn-and-cord / textile-structure panel that is now
 `/textile-101.html#what-is-a-textile` (Eva's ruling: option A, the three columns of the
-reference stacked as three rows read top to bottom). Twelve animations, one per kind.
+reference stacked as three rows read top to bottom). Twelve animations, one per kind. The page
+carries the same markup; `verify-page.mjs textile-101.html` checks it there.
 
 The animations live in `/textile-taxonomy.js` at the repo root; the drawing primitives (fiber
-stroke, halo, the staple material, the yarn helix) are `/textile-basics.js`'s, exported as
-`DRAW`, so the panel and the existing section draw with one stroke language. Knit and nonwoven
+stroke, halo, splitting a strand by depth, the yarn helix and fibre pose) are `/textile-basics.js`'s,
+exported as `DRAW`, so every cell draws with one stroke language. The staple fibres are the panel's
+own (shorter, with an irregular, undulating crimp). Knit and nonwoven
 ARE the two `/textile-basics.js` scenes; knit's strands come from `/textile-knit-loops.js`, the
 geometry section 09 bakes.
 

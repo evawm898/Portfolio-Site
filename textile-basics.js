@@ -1,5 +1,7 @@
-// textile-basics.js — the six animations of #what-is-a-textile on /textile-101.html:
-// Fiber -> Yarn -> Fabric across the top, and Knit / Woven / Nonwoven below.
+// textile-basics.js — the fiber drawing primitives (exported as DRAW) and six scenes: Fiber -> Yarn ->
+// Fabric, and Knit / Woven / Nonwoven. /textile-101.html#what-is-a-textile is now drawn by
+// /textile-taxonomy.js, which draws with DRAW and reuses the knit and nonwoven scenes as they are;
+// the other four live on in tools/textile-basics-proto/.
 //
 // ONE MATERIAL CARRIES THROUGH. makeMaterial() builds one seeded set of staple fibers, and
 //   * the Fiber card is that set drifting (its end frame is fiberPose(f, 1));

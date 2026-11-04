@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // verify-page.mjs — NODE_PATH=/opt/node22/lib/node_modules node tools/textile-basics-proto/verify-page.mjs
-// the real page: scroll-in plays each animation once to its end, hover replays, reduced motion = end frame
+// this prototype (the section it drew is retired from the page): scroll-in plays each animation once to its end, hover replays, reduced motion = end frame
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +8,7 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const { chromium } = createRequire(REPO + '/tools/x.mjs')('playwright');
 const { findChromium } = await import(REPO + '/tools/chromium-harness.mjs');
 const server = http.createServer((q, r) => { const p = path.join(REPO, decodeURIComponent(q.url.split('?')[0])); if (!fs.existsSync(p) || fs.statSync(p).isDirectory()) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript' }[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r); }).listen(0);
-const url = `http://localhost:${server.address().port}/textile-101.html`;
+const url = `http://localhost:${server.address().port}/tools/textile-basics-proto/index.html`;   // the page itself moved to the taxonomy panel (tools/textile-taxonomy-proto/verify-page.mjs)
 const b = await chromium.launch({ executablePath: findChromium() });
 let bad = 0; const ok = (c, m) => { console.log((c ? 'ok   ' : 'FAIL ') + m); if (!c) bad++; };
 const names = ['fiber', 'yarn', 'fabric', 'knit', 'woven', 'nonwoven'];

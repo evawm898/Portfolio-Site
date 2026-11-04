@@ -207,72 +207,12 @@
   }
 }
 
-/* ---------- Fiber -> yarn -> fabric chain ---------- */
-.tx-chain {
-  margin-top: 3rem;
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
+/* a line of copy after a bullet list (#fibers' pointer to the fiber row) */
+.tx-topic-copy .project__list + p { margin-top: 1.4rem; }
 
-.tx-chain-node {
-  flex: 1;
-  text-align: center;
-  padding: 2.25rem 1rem;
-  border: 1px solid var(--line);
-}
-
-.tx-chain-node .label {
-  font-family: var(--serif);
-  font-weight: 500;
-  font-size: 1.25rem;
-  color: var(--ink);
-}
-
-.tx-chain-node .sub {
-  margin-top: 0.5rem;
-  font-size: 12px;
-  color: var(--ink-dim);
-}
-
-.tx-chain-arrow {
-  flex: 0 0 auto;
-  width: 48px;
-  display: flex;
-  justify-content: center;
-  color: var(--petrol-bright);
-  font-size: 20px;
-}
-
-@media (max-width: 700px) {
-  .tx-chain {
-    flex-direction: column;
-  }
-  .tx-chain-arrow {
-    transform: rotate(90deg);
-  }
-}
-
-/* animated chain + "Types of fabric" row: drawn by /textile-basics.js, played once on scroll-in,
-   replayed on hover / tap; reduced motion shows the end frame */
-.tx-chain-node--anim { padding: 1rem 1rem 1.6rem; cursor: pointer; }
+/* an animation cell's drawing area (the panel below sets each row's aspect ratio) */
 .tx-anim { width: 100%; aspect-ratio: 320 / 220; margin: 0 0 1.1rem; }
 .tx-anim svg { display: block; width: 100%; height: 100%; }
-.tx-types { margin-top: 3rem; }
-.tx-types__label {
-  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--ink-dim); margin-bottom: 1.1rem;
-}
-.tx-types__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; }
-.tx-type { margin: 0; border: 1px solid var(--line); padding: 1rem 1rem 1.4rem; cursor: pointer; }
-.tx-type .label { display: block; font-family: var(--serif); font-weight: 500; font-size: 1.25rem; color: var(--ink); }
-.tx-type .sub { display: block; margin-top: 0.5rem; font-size: 12px; line-height: 1.55; color: var(--ink-dim); }
-@media (max-width: 700px) {
-  .tx-chain { align-items: stretch; }
-  .tx-chain-node { flex: none; }
-  .tx-chain-arrow { align-self: center; padding: 0.6rem 0; }
-  .tx-types__grid { grid-template-columns: 1fr; }
-}
 
 /* ---------- Fiber -> yarn and cord -> textile structure: three rows, read top to bottom.
    Drawn by /textile-taxonomy.js; each cell plays once on scroll-in, holds, replays on hover /

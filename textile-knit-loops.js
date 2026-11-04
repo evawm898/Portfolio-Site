@@ -4,7 +4,7 @@
 //     bakes the #weft-warp-knit SVG once; the page itself carries no JS for it.
 //   * /textile-stretch-simulator.html — imports this in the browser and draws the knit
 //     swatch from it every frame, at whatever (W, L) the load has driven the loop to.
-//   * /textile-basics.js (the Knit tile in /textile-101.html#what-is-a-textile) — animates the
+//   * /textile-basics.js (the Knit cell of /textile-101.html#what-is-a-textile's panel) — animates the
 //     very strands the #weft-warp-knit panel bakes, through WEFT_PANEL / weftPanelCourses.
 //
 // Do not fork a copy into either page. A change here re-shapes BOTH: regenerate textile 101
@@ -34,7 +34,7 @@ export const JERSEY_REST = { coursePerWale: 52 / 62, loopPerCourse: 1.75 };
 // The textile 101 weft-knit panel (#weft-warp-knit) in its own viewBox: four courses of six
 // wales, course 0 at the TOP (the newest — wale runs up), drawn SW wide with a HALO-wide gap
 // each side of a front strand where it crosses a strand behind it. The generator bakes it, and
-// the Knit tile in #what-is-a-textile (/textile-basics.js) animates the very same strands, so
+// the Knit cell in #what-is-a-textile (/textile-basics.js) animates the very same strands, so
 // the two drawings cannot drift.
 export const WEFT_PANEL = { w: 460, h: 300, x0: 76, W: 62, H: 52, n: 6, courses: 4, top: 60, SW: 7, HALO: 2 };
 export function weftPanelCourses(P = WEFT_PANEL) {
