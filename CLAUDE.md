@@ -7367,6 +7367,29 @@ was registered by that change** (no row moved), so it owed no `TAG_PUSH_XFAIL` e
 next phase whose base commit precedes a later edit to this workflow file will be refused the
 way phase42 was; declare it in the same PR.
 
+**THE CONNECTEDNESS VERDICT READS THE RUN'S OWN JOB LIST AND EACH SHARD'S HEADROOM, BECAUSE A
+SHARD CANCELLED 146 ms AFTER WRITING A COMPLETE CENSUS PASSED IT** (Nov 4 — read
+`docs/bloom-connectedness-verdict-hole-outcome.md` before touching `jobClauses`, `headroomClauses`,
+`readCensusDir`, `SHARD_OVERHEAD_MIN`, `SHARD_TIMEOUT_MIN` in the workflow, or the census's
+`attempted[].ms`). main's push run for #483 had shard 0 cancelled at its 150-min timeout; its log
+shows the PASS line at 08:19:50.965 and the cancel at 08:19:51.111, so the census was complete and
+every row measured — the verdict was right about the rows and blind to the shard running to its
+limit. Now the verdict job fetches the run's jobs (`actions: read`) and fails on any `shard (k)` not
+`completed/success`, and fails on any census whose own elapsed is within a minute of the timeout;
+`--negative-control` plants both THROUGH THE FILES (a missing artifact, a truncated census, a
+cancelled job, a job missing from the list, a clock at the timeout) beside the nine synthetic cases.
+A local `--merge` with no `--jobs` prints `SHARD JOBS: NOT CHECKED`, never a pass. Every census row
+now carries `ms` (its whole iteration, stamped in `finally`), which is what sizes the shard count.
+**EIGHT SHARDS SINCE PR 2 (Eva's ruling, Nov 4 — more shards, not a longer timeout), chosen on
+SHARD-LEVEL evidence** (§6 of that doc): the row `ms` sit in artifacts the session proxy denies, the
+logs carry no row time (stdout flushes in one burst at exit) and triangle counts do not track shard
+time (the same rows ran 95 and 150 min on two runners). So EVERY MERGE PRINTS THE PER-ROW ms TABLE AND
+THE PROJECTED PER-SHARD TOTALS FOR 6 / 8 / 10 SHARDS (`timingReport`, `PROJECTED_SHARD_COUNTS`), and a
+shard past `SHARD_FLAG_SHARE` (70%) of the timeout is `SHARD HEADROOM FLAG` — a flag, never a fail. Read
+the projection off the latest verdict log before touching the count; changing it is THREE edits
+(`CI_CONN_SHARDS`, and `SHARDS` plus the matrix list in both workflow jobs). No main green since
+`07c2997` is in doubt (§5: one run on main in that span, under the fixed verdict).
+
 **THE NU COUPLING IS FIXED: THE LEAF, THE ROD AND THE SEPAL SCAN EACH READ THEIR OWN ROW
 COUNT** (Eva's ruling on #303 — read `docs/bloom-nu-coupling-outcome.md` before touching
 `LEAF_BLADE_ROWS`, `ROD_SPINE_ROWS`, `spineLaw`'s `rows`, `seamLatticeStep`'s `nu` or LF10).
