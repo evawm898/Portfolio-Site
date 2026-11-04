@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quantifying Comfort — Field Notes — Eva Maskalenko</title>
-<meta name="description" content="Field Notes: Quantifying Comfort — exploring how subjective textile comfort can be translated into measurable physical properties.">
+<meta name="description" content="Field Notes: Quantifying Comfort — how textile labs turn comfort into numbers: heat and moisture, then touch (hand).">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -58,7 +58,18 @@
   .qc-chain__node.is-on text { fill: var(--ink); }
   .qc-chain__node, .qc-chain__wire { opacity: 0; transition: opacity 0.45s ease; }
   .qc-chain.is-in .qc-chain__node, .qc-chain.is-in .qc-chain__wire { opacity: 1; }
-  @media (max-width: 480px) { .qc-fig__controls { grid-template-columns: 1fr; } }
+  .qc-toggle { flex-wrap: wrap; max-width: 100%; }
+  .qc-fig__canvas--touch { aspect-ratio: auto; height: 300px; cursor: pointer; }
+  .qc-part { border-bottom-color: var(--line-strong); }
+  .qc-part .project__section-title span { margin-right: 0; }
+  .qc-part__name { font-family: var(--serif); font-weight: 500; font-size: clamp(1.6rem, 3.4vw, 2.2rem); line-height: 1.1; color: var(--ink); text-transform: uppercase; letter-spacing: -0.005em; }
+  .project__section-body .qc-part__name + p { margin-top: 0.75rem; }
+  .qc-sub { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+  .qc-do { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0.9rem 0 0; }
+  .qc-do dt { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--petrol-bright); padding-top: 0.3em; }
+  .qc-do dd { color: var(--ink); }
+  .qc-orange { color: #D85A30; }
+  @media (max-width: 480px) { .qc-fig__controls { grid-template-columns: 1fr; } .qc-do { grid-template-columns: 1fr; gap: 0.1rem; } .qc-do dd { margin-bottom: 0.5rem; } }
   @media (prefers-reduced-motion: reduce) { .qc-chain__node, .qc-chain__wire { opacity: 1; transition: none; } }
 </style>
 </head>
@@ -81,21 +92,16 @@
       <span class="project__year">Field Notes</span>
     </div>
     <h1 class="project__title">Quantifying Comfort</h1>
-    <p class="project__lede">&mdash; Notes from a Hohenstein talk on how textile labs put numbers on a feeling.</p>
+    <p class="project__lede">&mdash; How textile labs put numbers on a feeling. Part one is heat and moisture, from a Hohenstein talk; part two is touch.</p>
   </div>
 
   <div class="project__body">
 
     <section class="project__section">
-      <h2 class="project__section-title"><span>01</span>The problem</h2>
+      <h2 class="project__section-title"><span>01</span>Three parts</h2>
       <div class="project__section-body">
-        <p>&ldquo;Comfortable&rdquo; is subjective. The lab does not try to measure it whole. It splits it into three:</p>
-        <ul class="project__list">
-          <li><strong>Thermo-physiological</strong> &mdash; heat and moisture.</li>
-          <li><strong>Skin-sensorial</strong> &mdash; touch.</li>
-          <li><strong>Ergonomic</strong> &mdash; fit.</li>
-        </ul>
-        <p>The influencing factors run in a chain: <strong>fiber &rarr; yarn &rarr; fabric &rarr; finishing &rarr; garment and fit &rarr; layering.</strong></p>
+        <p>&ldquo;Comfortable&rdquo; is subjective, so labs don&rsquo;t measure it whole. Comfort has three components: <strong>thermal</strong> (heat and moisture), <strong>touch</strong> (how the fabric feels) and <strong>fit</strong>. This page covers the first two.</p>
+        <p>What sets them runs in a chain: <strong>fiber &rarr; yarn &rarr; fabric &rarr; finishing &rarr; garment and fit &rarr; layering.</strong></p>
         <figure class="qc-fig qc-chain" id="qcChain" aria-labelledby="qcChainCap">
           <svg class="qc-fig__svg" viewBox="0 0 360 96" role="img" aria-label="Six nodes in a row: fiber, yarn, fabric, finishing, garment and fit, layering. Each one can undo the one before it.">
             <line class="qc-chain__wire" id="qcChainWire" x1="30" y1="40" x2="330" y2="40" stroke="var(--ink)" stroke-opacity="0.35" stroke-width="1"/>
@@ -143,6 +149,14 @@
           else reveal();
         })();
         </script>
+      </div>
+    </section>
+
+    <section class="project__section qc-part">
+      <h2 class="project__section-title"><span>Part one</span></h2>
+      <div class="project__section-body">
+        <p class="qc-part__name">Thermal</p>
+        <p>Heat and moisture: notes from a Hohenstein talk, each claim checked against its source.</p>
       </div>
     </section>
 
@@ -247,7 +261,7 @@
             <g id="qcPulses" fill="var(--petrol-bright)"></g>
             </g>
           </svg>
-          <figcaption class="qc-fig__cap" id="qcLoopCap">Sensors report in, the hypothalamus compares against its set point, and the effectors answer. About four seconds round the loop.</figcaption>
+          <figcaption class="qc-fig__cap" id="qcLoopCap">Sensors report in, the hypothalamus compares against its set point, and the effectors answer.</figcaption>
         </figure>
         <script>
         (() => {
@@ -492,7 +506,7 @@
           if (still) settle(); else requestAnimationFrame(loop);
         })();
         </script>
-        <p>Hohenstein&rsquo;s additions: <strong>F<sub>d</sub></strong> buffering, <strong>K<sub>f</sub></strong> sweat absorption, <strong>F</strong> sweat transport.</p>
+        <p>Hohenstein adds three of its own on the same instrument: <strong>F<sub>d</sub></strong>, buffering of water vapour; <strong>K<sub>f</sub></strong>, sweat absorption; <strong>F</strong>, sweat transport.</p>
         <p>Whole garments go on thermal and sweating manikins.</p>
       </div>
     </section>
@@ -573,15 +587,15 @@
       <div class="project__section-body">
         <ul class="project__list">
           <li><strong>Diffusion definition, thermoregulation, heat-balance model, ISO 11092 description:</strong> verified accurate.</li>
-          <li><strong>Sweat table:</strong> consistent with published ranges (0.5&ndash;2.5&nbsp;L/hr endurance; marathon ~2.5&nbsp;L median, up to ~6.8&nbsp;L) but marathon and Ironman run high. Ironman 20&nbsp;L is gross production over 10&ndash;17&nbsp;h, not net loss (finishers lose ~1&ndash;6% bodyweight). No primary source found; illustrative.</li>
-          <li><strong>Core-temp graphic</strong> claimed severe damage/death at &plusmn;4&nbsp;&deg;F. Hot side is close (heat stroke &asymp; 104&nbsp;&deg;F). Cold side understated: 94.6&nbsp;&deg;F is only mild hypothermia; life-threatening is below ~82&ndash;92&nbsp;&deg;F.</li>
+          <li><strong>Sweat table:</strong> in line with published sweat rates (often 0.5&ndash;2.0&nbsp;L/h in exercise) and a measured marathon median of ~2.5&nbsp;L (up to 6.8&nbsp;L), but the marathon row runs high. Ironman 20&nbsp;L would be gross production over 10&ndash;17&nbsp;h, not net loss: finishers drink through the race, and the body-mass drop at the finish is far smaller. No primary source found for the table; treat it as illustrative.</li>
+          <li><strong>Core-temp graphic</strong> claimed severe damage or death at &plusmn;4&nbsp;&deg;F. The hot side is close: heat stroke is above 104&nbsp;&deg;F. The cold side is overstated: 94.6&nbsp;&deg;F is mild hypothermia (below 95&nbsp;&deg;F); moderate starts below 89.6&nbsp;&deg;F and severe below 82.4&nbsp;&deg;F.</li>
         </ul>
         <figure class="qc-fig" id="qcCore" aria-labelledby="qcCoreCap">
           <div class="qc-fig__controls qc-fig__controls--row">
             <span class="qc-toggle__k">Core temperature</span>
             <div class="qc-toggle" role="group" aria-label="Which limits"><button type="button" data-core="slide" aria-pressed="true">As presented</button><button type="button" data-core="clinical" aria-pressed="false">Clinical</button></div>
           </div>
-          <svg class="qc-fig__svg" viewBox="0 0 360 240" role="img" aria-label="A vertical scale from 80 to 108 °F. As presented: a narrow safe band, 94.6 to 102.6, with danger on both sides. Clinical: heat danger from about 104, but cold danger not until roughly 82 to 92."></svg>
+          <svg class="qc-fig__svg" viewBox="0 0 360 240" role="img" aria-label="A vertical scale from 80 to 108 °F. As presented: a narrow safe band, 94.6 to 102.6, with danger on both sides. Clinical: heat stroke above 104; mild hypothermia below 95, moderate below 89.6, severe below 82.4."></svg>
           <figcaption class="qc-fig__cap" id="qcCoreCap">Danger hatched, safe in teal. Toggle and watch the cold edge move.</figcaption>
         </figure>
         <script>
@@ -595,7 +609,7 @@
           const y = T => bot - (T - T0) / (T1 - T0) * (bot - top);
           // lo/hi: the teal band; mild: where cold danger starts (mild hypothermia sits between mild and lo); hot: heat danger
           const STATE = { slide: { lo: 94.6, hi: 102.6, mild: 94.6, hot: 102.6, note: ['as presented: severe damage or death', 'beyond ±4 °F, both ways'] },
-                          clinical: { lo: 95, hi: 104, mild: 90, hot: 104, note: ['clinical: heat stroke ≈ 104 °F · mild hypothermia < 95 °F', 'life-threatening only below ~82–92 °F'] } };
+                          clinical: { lo: 95, hi: 104, mild: 89.6, hot: 104, note: ['clinical: heat stroke > 104 °F · mild hypothermia < 95 °F', 'moderate < 89.6 °F · severe < 82.4 °F'] } };
           let cur = { ...STATE.slide }, target = STATE.slide, raf = null;
           let ticks = '';
           for (let T = T0; T <= T1; T += 2) ticks += '<line x1="' + (X - (T % 10 ? 4 : 8)) + '" y1="' + y(T) + '" x2="' + X + '" y2="' + y(T) + '" stroke="var(--ink)" stroke-opacity="0.5"/>' + (T % 10 ? '' : '<text x="' + (X - 12) + '" y="' + (y(T) + 3) + '" class="qc-t" text-anchor="end">' + T + ' °F</text>');
@@ -639,8 +653,111 @@
       </div>
     </section>
 
+    <section class="project__section qc-part">
+      <h2 class="project__section-title"><span>Part two</span></h2>
+      <div class="project__section-body">
+        <p class="qc-part__name">Touch</p>
+        <p>How the fabric feels in the hand.</p>
+      </div>
+    </section>
+
     <section class="project__section">
-      <h2 class="project__section-title"><span>06</span>Why this matters to me</h2>
+      <h2 class="project__section-title"><span>06</span>Hand</h2>
+      <div class="project__section-body">
+        <p>The industry word for touch is <strong>hand</strong>, or <strong>handle</strong>. &ldquo;Soft&rdquo; is several physical properties blurred into one word: a smooth, low-friction surface, low bending stiffness, and compressibility, the give under your fingers.</p>
+        <p>The reference method measures each one separately: the <strong>Kawabata Evaluation System for Fabrics (KES-F)</strong>, a set of instruments for tensile and shear, bending, compression and surface. <strong>FAST</strong> (Fabric Assurance by Simple Testing, from CSIRO) is the cheaper industrial set. Instruments are calibrated against <strong>trained sensory panels</strong>: Kawabata&rsquo;s hand scales were fitted to the judgments of expert assessors from the trade.</p>
+        <p>Japanese has words for the parts: <em>koshi</em> (stiffness), <em>numeri</em> (smoothness), <em>fukurami</em> (fullness).</p>
+        <p>Five tests follow. Every curve is <strong>illustrative</strong>: the shapes are right, the values aren&rsquo;t measured. The instrument&rsquo;s output is drawn in <span class="qc-orange">orange</span>; switching fabric, or clicking a figure, reruns the test.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>07</span>Surface</h2>
+      <div class="project__section-body">
+        <p class="qc-sub">Friction and roughness</p>
+        <dl class="qc-do"><dt>Your hand</dt><dd>A fingertip slides across the cloth and feels drag and bumps.</dd><dt>The instrument</dt><dd>A probe on a light arm slides over the fabric at constant speed, logging friction and how far it rides up and down.</dd></dl>
+        <figure class="qc-fig" id="qcSurf" aria-labelledby="qcSurfCap">
+          <div class="qc-fig__controls qc-fig__controls--row">
+            <span class="qc-toggle__k">Fabric</span>
+            <div class="qc-toggle" role="group" aria-label="Fabric"><button type="button" data-fab="crepe" aria-pressed="true">Crepe</button><button type="button" data-fab="nap" aria-pressed="false">Fur &middot; with nap</button><button type="button" data-fab="anti" aria-pressed="false">Fur &middot; against nap</button></div>
+          </div>
+          <canvas class="qc-fig__canvas qc-fig__canvas--touch" role="img" aria-label="Side view of a fabric with a probe on a vertical arm sliding across it, and below it a friction trace drawn as the probe moves. Crepe gives a regular undulation; fur with the nap a low smooth trace; fur against the nap a high spiky trace."></canvas>
+          <figcaption class="qc-fig__cap" id="qcSurfCap" data-readout></figcaption>
+        </figure>
+        <p>Friction is directional: the same fur reads low one way and high the other, which is why hand tests specify the direction of travel. KES takes three surface numbers from this pass: <strong>MIU</strong>, the mean coefficient of friction; <strong>MMD</strong>, its mean deviation, the graininess you feel; and <strong>SMD</strong>, geometric roughness from the probe&rsquo;s up-and-down travel.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>08</span>Bending</h2>
+      <div class="project__section-body">
+        <p class="qc-sub">Stiffness and drape</p>
+        <dl class="qc-do"><dt>Your hand</dt><dd>You lift the fabric and feel how it falls over your fingers: crisp or limp.</dd><dt>The instrument</dt><dd>A strip slides off a flat edge until its tip drops to a line at 41.5&deg;; the overhang at that moment is the reading (ASTM D1388, cantilever).</dd></dl>
+        <figure class="qc-fig" id="qcBend" aria-labelledby="qcBendCap">
+          <div class="qc-fig__controls qc-fig__controls--row">
+            <span class="qc-toggle__k">Fabric</span>
+            <div class="qc-toggle" role="group" aria-label="Fabric"><button type="button" data-fab="denim" aria-pressed="true">Denim</button><button type="button" data-fab="poplin" aria-pressed="false">Poplin</button><button type="button" data-fab="charmeuse" aria-pressed="false">Charmeuse</button></div>
+          </div>
+          <canvas class="qc-fig__canvas qc-fig__canvas--touch" role="img" aria-label="A fabric strip slides off a table edge and droops under its own weight past a dashed 41.5 degree line; an orange dot marks where its tip first crossed the line. A chart beside it plots tip angle against overhang."></canvas>
+          <figcaption class="qc-fig__cap" id="qcBendCap" data-readout></figcaption>
+        </figure>
+        <p>The stiffer the fabric, the further it sticks out before its own weight bends it down to the line. Half that overhang is the <strong>bending length</strong>, the standard&rsquo;s measure of stiffness; the strip keeps sliding afterwards so you can see it drape. Drape testers go a step further: a circle of fabric hangs over a smaller disc, and the area of its shadow gives a drape coefficient.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>09</span>Stretch</h2>
+      <div class="project__section-body">
+        <p class="qc-sub">Extension, power, recovery</p>
+        <dl class="qc-do"><dt>Your hand</dt><dd>You pull the fabric and let go, feeling how hard it resists and whether it springs back.</dd><dt>The instrument</dt><dd>Two jaws pull a strip at a constant rate to a set load and back, logging load against extension.</dd></dl>
+        <figure class="qc-fig" id="qcStretch" aria-labelledby="qcStretchCap">
+          <div class="qc-fig__controls qc-fig__controls--row">
+            <span class="qc-toggle__k">Fabric</span>
+            <div class="qc-toggle" role="group" aria-label="Fabric"><button type="button" data-fab="jersey" aria-pressed="true">Cotton jersey</button><button type="button" data-fab="mesh" aria-pressed="false">Power mesh</button></div>
+          </div>
+          <canvas class="qc-fig__canvas qc-fig__canvas--touch" role="img" aria-label="A knit strip between two grey jaws stretches and returns; its stitches elongate and narrow. A chart plots load against extension, loading solid and unloading dashed."></canvas>
+          <figcaption class="qc-fig__cap" id="qcStretchCap" data-readout></figcaption>
+        </figure>
+        <p>The area between the loading and unloading curves is <strong>energy lost</strong> on the round trip; the gap where unloading meets zero load is <strong>growth</strong>, length the fabric keeps. ASTM D2594 covers stretch and growth of low-power knits like jersey; ASTM D4964 covers tension and elongation of elastic fabrics like power mesh.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>10</span>Squish</h2>
+      <div class="project__section-body">
+        <p class="qc-sub">Compression, fullness, resilience</p>
+        <dl class="qc-do"><dt>Your hand</dt><dd>You press the fabric between finger and thumb and feel how far it gives and how it pushes back.</dd><dt>The instrument</dt><dd>A platen presses down at a constant rate to a set pressure and lifts off, logging pressure against compression.</dd></dl>
+        <figure class="qc-fig" id="qcSquish" aria-labelledby="qcSquishCap">
+          <div class="qc-fig__controls qc-fig__controls--row">
+            <span class="qc-toggle__k">Fabric</span>
+            <div class="qc-toggle" role="group" aria-label="Fabric"><button type="button" data-fab="spacer" aria-pressed="true">Spacer mesh</button><button type="button" data-fab="fleece" aria-pressed="false">Fleece</button></div>
+          </div>
+          <canvas class="qc-fig__canvas qc-fig__canvas--touch" role="img" aria-label="A grey platen presses a fabric down and releases it. Spacer mesh: two mesh faces held apart by crossed monofilaments that bow sideways. Fleece: crimped fibres that compress. A chart plots pressure against compression with a moving dot."></canvas>
+          <figcaption class="qc-fig__cap" id="qcSquishCap" data-readout></figcaption>
+        </figure>
+        <p>KES reads three numbers from this curve: <strong>LC</strong>, how linear it is; <strong>WC</strong>, the energy it takes to compress (more reads as fuller and softer); and <strong>RC</strong>, resilience, the share of that energy given back on release. The spacer plateau is published: warp-knitted spacer fabrics compress in three stages, linear elastic, plateau and densification, the plateau coming from the monofilaments buckling (Liu &amp; Hu, 2016). Fleece just firms up steadily as its fibres pack.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>11</span>Warm or cool touch</h2>
+      <div class="project__section-body">
+        <p class="qc-sub">Contact warmth</p>
+        <dl class="qc-do"><dt>Your hand</dt><dd>You touch the fabric and, in the first moment, it feels warm or cool.</dd><dt>The instrument</dt><dd>A warmed plate is set down on the fabric and the peak heat flow out of it, <strong>q-max</strong>, is recorded (Kawabata&rsquo;s Thermo Labo, KES-F7).</dd></dl>
+        <figure class="qc-fig" id="qcWarm" aria-labelledby="qcWarmCap">
+          <div class="qc-fig__controls qc-fig__controls--row">
+            <span class="qc-toggle__k">Fabric</span>
+            <div class="qc-toggle" role="group" aria-label="Fabric"><button type="button" data-fab="fleece" aria-pressed="true">Brushed fleece</button><button type="button" data-fab="nylon" aria-pressed="false">Dense nylon</button></div>
+          </div>
+          <canvas class="qc-fig__canvas qc-fig__canvas--touch" role="img" aria-label="A warm plate drops onto the fabric; heat-flow ticks run from it into the fabric, thicker for nylon, and fade. A chart plots heat flux against time: a spike at contact, then decay. Nylon peaks much higher than fleece."></canvas>
+          <figcaption class="qc-fig__cap" id="qcWarmCap" data-readout></figcaption>
+        </figure>
+        <p>High q-max feels cool: heat leaves the skin fast. Low q-max feels warm. Brushed fleece touches the skin only at its fibre tips, with air between them; dense smooth nylon touches everywhere. It&rsquo;s the same heat transfer as part one, felt in the first half second.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>12</span>Why this matters to me</h2>
       <div class="project__section-body">
         <p class="qc-placeholder">[Two lines to come.]</p>
         <p class="qc-placeholder">[&nbsp;]</p>
@@ -648,15 +765,31 @@
     </section>
 
     <section class="project__section project__section--disclaimer">
-      <h2 class="project__section-title"><span>07</span>Sources</h2>
+      <h2 class="project__section-title"><span>13</span>Sources</h2>
       <div class="project__section-body">
+        <p>Part one &mdash; thermal</p>
         <ul class="project__list">
           <li>ISO 11092:2014, <em>Textiles &mdash; Physiological effects &mdash; Measurement of thermal and water-vapour resistance under steady-state conditions (sweating guarded-hotplate test)</em>.</li>
-          <li>Johns Hopkins Medicine, 2019 &mdash; marathon sweat and sodium loss study.</li>
-          <li>Sharwood, K. et al., 2004 &mdash; weight changes and performance in Ironman triathletes, <em>British Journal of Sports Medicine</em>.</li>
-          <li>Cleveland Clinic &mdash; hypothermia stages and core-temperature thresholds.</li>
+          <li>Hohenstein, <em>Wear comfort</em> factsheet &mdash; water-vapour buffering (F<sub>d</sub>), sweat absorption (K<sub>f</sub>), sweat transport (F).</li>
+          <li>Mansour, S.&nbsp;G. et al., 2019 &mdash; &ldquo;The role of volume regulation and thermoregulation in AKI during marathon running,&rdquo; <em>Clinical Journal of the American Society of Nephrology</em> 14(9):1297&ndash;1305. Marathon sweat: median ~2.5&nbsp;L, up to 6.8&nbsp;L.</li>
+          <li>Sawka, M.&nbsp;N. et al., 2007 &mdash; American College of Sports Medicine position stand, &ldquo;Exercise and fluid replacement,&rdquo; <em>Medicine &amp; Science in Sports &amp; Exercise</em> 39(2):377&ndash;390.</li>
+          <li>Sharwood, K. et al., 2004 &mdash; &ldquo;Weight changes, medical complications, and performance during an Ironman triathlon,&rdquo; <em>British Journal of Sports Medicine</em> 38(6):718&ndash;724.</li>
+          <li>Cleveland Clinic &mdash; &ldquo;Hypothermia&rdquo; (stages: mild below 95&nbsp;&deg;F, moderate below 89.6&nbsp;&deg;F, severe below 82.4&nbsp;&deg;F) and &ldquo;Heatstroke&rdquo; (above 104&nbsp;&deg;F).</li>
           <li>Wikipedia, &ldquo;Diffusion.&rdquo;</li>
           <li>Slides &copy; Hohenstein, [event, date TBD]. Diagrams on this page are redrawn, not reproduced.</li>
+        </ul>
+        <p>Part two &mdash; touch</p>
+        <ul class="project__list">
+          <li>Kawabata, S., 1980 &mdash; <em>The Standardization and Analysis of Hand Evaluation</em>, 2nd ed., Textile Machinery Society of Japan. KES-F; MIU, MMD, SMD; LC, WC, RC; koshi, numeri, fukurami.</li>
+          <li>Kawabata, S. and Niwa, M., 1989 &mdash; &ldquo;Fabric performance in clothing and clothing manufacture,&rdquo; <em>Journal of the Textile Institute</em> 80(1):19&ndash;50. Hand values fitted to expert panel judgments.</li>
+          <li>Minazio, P.&nbsp;G., 1995 &mdash; &ldquo;FAST &mdash; Fabric Assurance by Simple Testing,&rdquo; <em>International Journal of Clothing Science and Technology</em> 7(2/3). CSIRO&rsquo;s SiroFAST system.</li>
+          <li>ASTM D1388-23, <em>Standard Test Method for Stiffness of Fabrics</em> (cantilever, 41.5&deg;; bending length = overhang &divide; 2).</li>
+          <li>Cusick, G.&nbsp;E., 1968 &mdash; &ldquo;The measurement of fabric drape,&rdquo; <em>Journal of the Textile Institute</em> 59:T253&ndash;T260.</li>
+          <li>ASTM D2594/D2594M-21, <em>Standard Test Method for Stretch Properties of Knitted Fabrics Having Low Power</em>.</li>
+          <li>ASTM D4964-96(2020), <em>Standard Test Method for Tension and Elongation of Elastic Fabrics (Constant-Rate-of-Extension Type Tensile Testing Machine)</em>.</li>
+          <li>Liu, Y. and Hu, H., 2016 &mdash; &ldquo;Compressive mechanics of warp-knitted spacer fabrics. Part I: A constitutive model,&rdquo; <em>Textile Research Journal</em> 86(1):3&ndash;12. Linear elastic, plateau and densification stages.</li>
+          <li>Yoneda, M. and Kawabata, S., 1985 &mdash; &ldquo;Analysis of transient heat conduction and its applications, Part 2,&rdquo; <em>Journal of the Textile Machinery Society of Japan</em> 31(4):79&ndash;85. q-max and warm/cool feeling.</li>
+          <li>All touch figures are illustrative: curve shapes follow these sources; values are not measurements.</li>
         </ul>
       </div>
     </section>
@@ -685,6 +818,8 @@
     </div>
   </div>
 </footer>
+
+<script src="quantifying-comfort-touch.js" defer></script>
 
 <a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
 
