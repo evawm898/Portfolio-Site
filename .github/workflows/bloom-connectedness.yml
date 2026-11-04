@@ -138,8 +138,22 @@ jobs:
     needs: [shard]
     if: always()
     timeout-minutes: 20
+    # THE RUN'S OWN JOB LIST IS PART OF THE VERDICT (the shard-headroom session,
+    # Nov 4). On main's push run for #483 shard 0 was CANCELLED at its timeout
+    # 146 ms after writing a complete census, and the verdict passed over it:
+    # nothing in a census says its job was cancelled. So the verdict reads the
+    # run's jobs from the API (actions: read on the token) and fails on any
+    # shard job that is not completed/success, and reads each census's own
+    # elapsed against the shard timeout. The tool's --negative-control plants
+    # both through the files, the way this step reads them.
+    permissions:
+      actions: read
+      contents: read
     env:
       SHARDS: 4
+      # MUST equal the shard job's `timeout-minutes` above; the step below
+      # refuses to run if the two numbers have drifted apart.
+      SHARD_TIMEOUT_MIN: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -157,5 +171,12 @@ jobs:
           pattern: conn-census-*
           path: census/
           merge-multiple: true
-      - name: Every row in exactly one shard, and ONE verdict over all of them
-        run: node tools/bloom-connectedness-shards.mjs --merge census --shards $SHARDS
+      - name: The run's own job list, for the verdict (a cancelled shard is not a green one)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(grep -c "^    timeout-minutes: $SHARD_TIMEOUT_MIN$" .github/workflows/bloom-connectedness.yml)" = 1 || { echo "SHARD_TIMEOUT_MIN ($SHARD_TIMEOUT_MIN) does not match the shard job's timeout-minutes"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" > jobs.json
+          node -e "const j=JSON.parse(require('fs').readFileSync('jobs.json','utf8')).jobs; for (const x of j) console.log(x.name.padEnd(12), x.status, x.conclusion)"
+      - name: Every row in exactly one shard, every shard job green and under its timeout, and ONE verdict over all of them
+        run: node tools/bloom-connectedness-shards.mjs --merge census --shards $SHARDS --jobs jobs.json --timeout-min $SHARD_TIMEOUT_MIN
