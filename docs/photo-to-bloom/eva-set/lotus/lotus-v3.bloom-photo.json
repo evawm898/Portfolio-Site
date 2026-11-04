@@ -1,0 +1,199 @@
+{
+  "format": "bloom-photo",
+  "version": 1,
+  "design": "lotus-v3.subset.bloom-design.json",
+  "designSha256": "58c1af22ff744b198cdff134551d2cc06c3c1c7ed420c81de3fdfb4c648ed7e8",
+  "photos": [
+    {
+      "id": "p1",
+      "role": "three-quarter",
+      "name": "lotus/front"
+    },
+    {
+      "id": "p2",
+      "role": "side",
+      "name": "lotus/side"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-profile",
+      "asked": "LOTUS: seen from the side, is it a closed globe (bud, petals converging at the top), a deep cup open at the top, a shallow bowl, or flat open?",
+      "answer": "Closed globe / bud",
+      "resolves": [
+        "petalTilt",
+        "petalSpineCurl",
+        "layerTilt"
+      ],
+      "outcome": {
+        "petalTilt": "overridden by p2: 35 -> 45",
+        "petalSpineCurl": "overridden by p2: 30 -> 60",
+        "layerTilt": "overridden by p2: 18 -> 15"
+      }
+    }
+  ],
+  "controls": {
+    "petalCount": {
+      "value": 5,
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "layerCount": {
+      "value": 4,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "layerSize": {
+      "value": 0.9,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "layerTilt": {
+      "value": 15,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "petalWidth": {
+      "value": 28,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "petalBaseTaper": {
+      "value": 1.5,
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalTipTaper": {
+      "value": 1,
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalTipShape": {
+      "value": 2,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalTilt": {
+      "value": 45,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "petalSpineCurl": {
+      "value": 60,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "petalCup": {
+      "value": 1,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    }
+  },
+  "unmapped": [
+    {
+      "feature": "colour, colour pattern, veining, blotches",
+      "nearest": "nothing (deep pink inner, pale pink-green outer, fine veins)",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "petals differing by whorl",
+      "nearest": "one tilt step per whorl (layerTilt); the outermost whorl is SHORTER and greener in the photo, and layerSize can only shrink inward — averaged",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "petal overlap / imbrication",
+      "nearest": "drawn interpenetrating (a closed bud is all overlap)",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "a small point (mucro) at each rounded petal tip",
+      "nearest": "nothing — a rounded tip",
+      "photos": [
+        "p1"
+      ]
+    }
+  ],
+  "revisedFrom": {
+    "design": "lotus-v2.subset.bloom-design.json",
+    "why": "the render sheet (one feedback iteration)",
+    "changes": {
+      "layerTilt": {
+        "from": 25,
+        "to": 15,
+        "by": -10
+      },
+      "petalTilt": {
+        "from": 15,
+        "to": 45,
+        "by": 30
+      },
+      "petalSpineCurl": {
+        "from": 40,
+        "to": 60,
+        "by": 20
+      },
+      "petalCup": {
+        "from": 0.9,
+        "to": 1,
+        "by": 0.1
+      }
+    }
+  }
+}

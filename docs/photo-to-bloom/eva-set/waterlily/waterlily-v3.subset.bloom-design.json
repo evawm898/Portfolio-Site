@@ -1,0 +1,20 @@
+{
+  "format": "bloom-design",
+  "version": 1,
+  "controls": {
+    "petalCount": 8,
+    "layerCount": 2,
+    "layerSize": 0.9,
+    "layerTilt": 30,
+    "petalWidth": 9,
+    "petalTipShape": 1.2,
+    "petalTilt": 40,
+    "petalCup": 0.15,
+    "stamenCount": 80,
+    "stamenLayout": "DISC",
+    "stamenLength": 6,
+    "sepalCount": 4,
+    "sepalScale": 1,
+    "sepalAngle": -5
+  }
+}

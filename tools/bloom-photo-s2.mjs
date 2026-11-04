@@ -29,7 +29,7 @@
                   two subsets and DEFAULTS, never read from the sidecar.
              Exits 1 on any finding.
 
-   RENDER:   node tools/bloom-photo-s2.mjs <out-dir> [--sheet <png>] [--photos <dir>]
+   RENDER:   node tools/bloom-photo-s2.mjs <out-dir> [--sheet <png>] [--photos <dir>] [--sheet-bare <png>]
              Loads every version AS A NEW DESIGN through the page's own
              `__bloomDesign.loadAsNew` (the Load as new button's function), print
              preview ON as shipped (read back from the app's shownMode), and
@@ -42,7 +42,8 @@
              --photos <dir> holds <flower>-front.png and <flower>-side.png. The
              photos are NOT in the repository (Eva's ruling, Nov 4: they carry
              stock watermarks), so the committed sheet shows labelled
-             placeholders and the sheet with photos is sent in-session only.
+             placeholders (`--sheet-bare`, the same renders with no photo read)
+             and the sheet with photos is sent in-session only.
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -136,7 +137,7 @@ async function bbox(state) {
   return { lo, hi };
 }
 
-async function render(outDir, SHEET, PHOTOS) {
+async function render(outDir, SHEET, PHOTOS, BARE) {
   const { serveRepo, launchPage, openBloom, settleBuild, stillFrame, modeTag } = await import('./bloom-harness.mjs');
   fs.mkdirSync(outDir, { recursive: true });
   const { server, port } = await serveRepo();
@@ -160,7 +161,7 @@ async function render(outDir, SHEET, PHOTOS) {
       for (const [v, view] of Object.entries(VIEWS[it.flower])) {
         /* the radius: the bounding box's own half-extent seen across this view */
         const ext = [0, 1, 2].map((k) => (hi[k] - lo[k]) / 2);
-        const r = Math.hypot(...ext) * 0.62;
+        const r = Math.hypot(...ext) * 0.8;
         await page.evaluate(([rr, aa, vv]) => window.__bloomFrame(rr, 0, aa, vv.dir, vv.up), [r, at, view]);
         let prev = null, buf = null;
         for (let k = 0; k < 30; k++) { await page.waitForTimeout(200); buf = await page.screenshot({ clip: { x: 0, y: 0, width: 640, height: 640 } }); if (prev && buf.equals(prev)) break; prev = buf; }
@@ -180,6 +181,7 @@ async function render(outDir, SHEET, PHOTOS) {
       console.log(`${tag}: ${report[tag].load.action}, ${notes.length} notes; ${report[tag].mode}; bbox ${report[tag].bboxMm.join(' x ')} mm${report[tag].told.length ? `; told: ${report[tag].told.length}` : ''}`);
     }
     if (SHEET) await sheet(browser, report, SHEET, PHOTOS);
+    if (BARE) await sheet(browser, report, BARE, null);
   } finally {
     const slim = Object.fromEntries(Object.entries(report).map(([k, r]) => [k, { ...r, shots: Object.fromEntries(Object.entries(r.shots).map(([v, f]) => [v, path.basename(f)])) }]));
     fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify(slim, null, 2));
@@ -223,6 +225,6 @@ async function sheet(browser, report, SHEET, PHOTOS) {
 }
 
 if (flag('--check')) process.exit(check() ? 0 : 1);
-const SHEET = opt('--sheet'), PHOTOS = opt('--photos');
+const SHEET = opt('--sheet'), PHOTOS = opt('--photos'), BARE = opt('--sheet-bare');
 if (!check()) process.exit(1);
-await render(argv[0] || '/tmp/bloom-photo-s2', SHEET, PHOTOS);
+await render(argv[0] || '/tmp/bloom-photo-s2', SHEET, PHOTOS, BARE);

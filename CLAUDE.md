@@ -693,6 +693,11 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   `tools/bloom-photo-census.mjs` (one owner; its CLI is guarded so the import is silent). Hidden/pinned, the
   confidence enum and the file names stand as built; the dry-run subsets stay as committed; a dropped file still
   takes the normal Load.
+- **S2, the globals stage on Eva's photos (Nov 4), is §10 of the same doc:** route A run on a lotus, a daisy and a
+  water lily (front + side each), v1 front + Q-profile answer / v2 + side photo / v3 one render iteration, all 9 subsets
+  PASS the validator with 0 notes and 0 warnings. **The photos are NOT committed** (stock watermarks — Eva's ruling);
+  the sheet `docs/img/photo-to-bloom-s2.png` shows placeholders. `node tools/bloom-photo-s2.mjs --check` holds each
+  sidecar to its subset (S1–S6, not in CI). Whether globals PASS is Eva's ruling from the sheet; outline (S3) waits on it.
 
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
 (Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read
