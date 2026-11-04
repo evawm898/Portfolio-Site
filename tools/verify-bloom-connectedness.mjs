@@ -289,7 +289,16 @@ for (const [rowIndex, row] of rows.entries()) {
   if (ONLY && !ONLY.test(row.label)) continue;
   if (SHARD && shardOf(rowIndex, SHARD.n) !== SHARD.k) continue;
   attempted.push(row.label);
-  attemptedIdx.push({ index: rowIndex, label: row.label });
+  /* PER-ROW WALL TIME, in the census (the shard-headroom session). `ms` is
+     the whole iteration — page load, settle, export, the flood fill, the
+     flags — stamped in `finally` so a row that `continue`s out on a validity
+     failure, or is refused, still carries its cost. It is what sizes the
+     shard count: a shard's `elapsedS` alone cannot say which rows are the
+     heavy ones, and a CI log flushes every line at exit under one timestamp. */
+  const rowEntry = { index: rowIndex, label: row.label, ms: null };
+  const rowT0 = Date.now();
+  attemptedIdx.push(rowEntry);
+  try {
   await openBloom(page, port);   // fresh page per row
   const bad = await applyConfig(page, row.set, null, { settleMs: settleMsForRow(row.label) });
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
@@ -532,6 +541,7 @@ for (const [rowIndex, row] of rows.entries()) {
   const probe = { ringWidth: fm.ringWidth, ringThickness: fm.ringThickness, ringRadius: fm.ringRadius, crowding: crowd.r, orientation: ori.r };
   if (v.skipped) results.push({ label: row.label, capability: !!row.capability, ok: null, ...e, ...probe, note: `SKIPPED — grid ${v.dim.join('x')} exceeds ${MAX_VOXELS.toLocaleString('en-US')} voxels` });
   else results.push({ label: row.label, capability: !!row.capability, ok: v.comps === 1, ...e, ...v, ...probe });
+  } finally { rowEntry.ms = Date.now() - rowT0; }
 }
 await browser.close();
 server.close();

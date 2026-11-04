@@ -239,7 +239,7 @@ export function reconcile(censuses, { n, labels, only = null, select = shardOf }
   const byK = new Map();
   for (const c of censuses) {
     const tag = `shard ${c && c.shard ? `${c.shard.k}/${c.shard.n}` : '?'}`;
-    if (!c || c.version !== CENSUS_VERSION) { bad.push(`${tag}: census version ${c && c.version} is not ${CENSUS_VERSION}`); continue; }
+    if (!c || c.version !== CENSUS_VERSION) { bad.push(`${tag}: census version ${c && c.version} is not ${CENSUS_VERSION}${c && c.error ? ` — ${c.error}` : ''}`); continue; }
     if (c.complete !== true) { bad.push(`${tag}: census is INCOMPLETE — the shard did not finish writing it`); continue; }
     if (!c.shard || c.shard.n !== n) { bad.push(`${tag}: ran as one of ${c.shard && c.shard.n} shards, the merge expects ${n}`); continue; }
     if (byK.has(c.shard.k)) { bad.push(`${tag}: TWO censuses claim this shard`); continue; }

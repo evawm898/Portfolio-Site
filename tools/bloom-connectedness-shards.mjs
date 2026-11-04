@@ -31,17 +31,49 @@
      node tools/bloom-connectedness-shards.mjs --plan N
          print each shard's row count and prove the selector partitions the
          live matrix read from the harness.
-     node tools/bloom-connectedness-shards.mjs --merge <dir> --shards N [--only <re>]
+     node tools/bloom-connectedness-shards.mjs --merge <dir> --shards N [--only <re>] [--jobs <json>] [--timeout-min M]
          reconcile the N census files in <dir> and print the merged verdict.
+         `--jobs` is the run's OWN job list (`gh api .../runs/$GITHUB_RUN_ID/jobs`)
+         and `--timeout-min` the shard job's `timeout-minutes`: see THE
+         CANCELLED-AFTER-COMPLETE HOLE below.
      node tools/bloom-connectedness-shards.mjs --negative-control [--shards N]
          censuses from the SHIPPED selector with no browser, then broken —
          one row removed from one shard's selector, a row in two shards, a
          missing shard, an incomplete shard, a matrix mismatch, a dropped row,
          a TWO-PIECE row and a validity failure each hidden in a middle
          shard — every one must FAIL the shipped reconcile + summarize and
-         the unbroken set must pass.
+         the unbroken set must pass. Then THROUGH THE FILES, the way the CI
+         step reads them: a shard's artifact missing from the directory, a
+         census TRUNCATED mid-write, a shard job the run reports CANCELLED
+         with a complete census beside it, a shard whose own elapsed reads
+         past the job timeout — each must fail, and the complete set with
+         every job green must pass.
+
+   THE CANCELLED-AFTER-COMPLETE HOLE (Nov 4, the shard-headroom session).
+   main's push run for #483 (07c2997, run 41586065592) had shard 0 CANCELLED
+   at its 150-minute timeout and the verdict PASSED over all 1,653 rows.
+   Measured from the job's own log: the gate printed its `connectedness:
+   PASS — 413 of 414` line at 08:19:50.965 and the runner's `The operation
+   was canceled` at 08:19:51.111 — the census had been written, complete,
+   146 ms before the timeout hit the process in its final flush, and the
+   upload step (`if: always()`) carried it to the verdict. So the verdict
+   read four COMPLETE censuses and was right about every row; what it could
+   not see is that a shard RAN TO ITS TIMEOUT, which the workflow's own
+   comment calls a HANG DECLARED. Nothing in a census says the job was
+   cancelled, and the elapsed it carries is the gate's own clock (it starts
+   after node loads) so a shard at the limit reads a few seconds UNDER it.
+   Two clauses now, with two owners: the run's own job list (`--jobs`, the
+   runner's conclusion for each `shard (k)`, read from the API the verdict job
+   is granted `actions: read` for) must say every shard job SUCCEEDED; and
+   each census's `elapsedS` must sit under the job timeout less one minute
+   (`--timeout-min`; the minute is the step's own non-gate overhead — node
+   start and the flush — measured on that run at 13 s, bounded here rather
+   than typed exactly). Either fires on main's run shape; neither relaxes
+   what a census says about a row. A shard that finished and was cancelled
+   is a shard with NO HEADROOM, and the verdict says so instead of green.
    =================================================================== */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildMatrix, exportRefusedLine, exportRefusedCoverage, CAPABILITY_SCOPE, JUNCTION_SCOPE, STAMEN_SCOPE, GYNOECIUM_SCOPE,
@@ -164,19 +196,81 @@ export function summarizeConn({ results, refused, attempted, validity, matrixLev
 }
 
 /* THE MERGE: reconcile (imported), union (imported), then the same summary. */
-export function mergeConn(censuses, { n, labels, only = null, cell, log = console.log, err = console.error }) {
+/* THE STEP'S OWN NON-GATE OVERHEAD, in minutes: node start before the gate's
+   clock begins and the flush after it stops. Measured 13 s on run 41586065592
+   (step start 05:49:37, gate clock to the PASS line 08:19:50) and bounded at
+   a minute, so a census whose elapsed reads within a minute of the timeout
+   is a shard the runner cancelled at or after its last write. */
+export const SHARD_OVERHEAD_MIN = 1;
+
+/* THE RUN'S OWN JOB LIST against the shard count: every `shard (k)` job for
+   k in 0..n-1 present exactly once and SUCCEEDED. `jobs` is the API's
+   `{ jobs: [{ name, status, conclusion }] }` (or that array); null means the
+   caller did not supply one, which the merge REPORTS rather than passes. */
+export function jobClauses(jobs, n) {
+  const bad = [];
+  if (jobs == null) return bad;
+  const list = Array.isArray(jobs) ? jobs : jobs.jobs;
+  if (!Array.isArray(list)) { bad.push('JOBS: the job list is not a list'); return bad; }
+  for (let k = 0; k < n; k++) {
+    const mine = list.filter((j) => j && j.name === `shard (${k})`);
+    if (mine.length !== 1) { bad.push(`JOBS: shard ${k}/${n}: ${mine.length} job(s) named "shard (${k})" in the run's job list, expected exactly one`); continue; }
+    const j = mine[0];
+    if (j.status !== 'completed' || j.conclusion !== 'success') bad.push(`JOBS: shard ${k}/${n}: the runner reports its job ${j.status}/${j.conclusion ?? 'null'}, not completed/success — a CANCELLED shard with a complete census is a shard that ran to its timeout, and the verdict does not pass over it`);
+  }
+  return bad;
+}
+
+/* THE HEADROOM every complete census declares against the job timeout:
+   reported per shard, and a FINDING where the gate's own clock reaches the
+   timeout less the step overhead. */
+export function headroomClauses(censuses, timeoutMin) {
+  const bad = [];
+  if (timeoutMin == null) return bad;
+  if (!(timeoutMin > 0)) { bad.push(`HEADROOM: --timeout-min ${timeoutMin} is not a positive number`); return bad; }
+  for (const c of censuses) {
+    if (!c || c.complete !== true || !c.shard) continue;
+    if (typeof c.elapsedS !== 'number') { bad.push(`HEADROOM: shard ${c.shard.k}/${c.shard.n}: census carries no elapsedS`); continue; }
+    const min = c.elapsedS / 60;
+    if (min >= timeoutMin - SHARD_OVERHEAD_MIN) bad.push(`HEADROOM: shard ${c.shard.k}/${c.shard.n}: its gate ran ${min.toFixed(1)} min against a ${timeoutMin}-min job timeout (within ${SHARD_OVERHEAD_MIN} min of it) — a shard at its limit is the hang the workflow declares, whatever its census says`);
+  }
+  return bad;
+}
+
+export function mergeConn(censuses, { n, labels, only = null, cell, jobs = null, timeoutMin = null, log = console.log, err = console.error }) {
   const coverage = reconcile(censuses, { n, labels, only });
   const ok = censuses.filter((c) => c && c.complete === true && c.shard);
   log(`SHARDED CONNECTEDNESS GATE — ${n} shard(s) over the ${labels.length}-row matrix${only ? ` (--only ${only})` : ''}`);
   for (const c of [...ok].sort((a, b) => a.shard.k - b.shard.k)) {
     const got = new Set(c.results.map((r) => r.label)), ref = new Set(c.refused.map((r) => r.label));
     const dr = c.attempted.filter((a) => !got.has(a.label) && !ref.has(a.label));
-    log(`  shard ${c.shard.k}/${c.shard.n}: ${c.attempted.length} attempted · ${c.results.length} reached · ${c.refused.length} refused · ${dr.length} dropped · ${c.validity.length} validity · ${c.elapsedS != null ? c.elapsedS.toFixed(0) + 's' : '?'}${dr.length ? ` — DROPPED: ${dr.map((a) => a.label).join(', ')}` : ''}`);
+    const head = timeoutMin && typeof c.elapsedS === 'number' ? ` · ${(100 * c.elapsedS / 60 / timeoutMin).toFixed(0)}% of the ${timeoutMin}-min timeout` : '';
+    const timed = c.attempted.filter((a) => typeof a.ms === 'number');
+    const slowest = timed.length ? timed.reduce((a, b) => (b.ms > a.ms ? b : a)) : null;
+    log(`  shard ${c.shard.k}/${c.shard.n}: ${c.attempted.length} attempted · ${c.results.length} reached · ${c.refused.length} refused · ${dr.length} dropped · ${c.validity.length} validity · ${c.elapsedS != null ? c.elapsedS.toFixed(0) + 's' : '?'}${head}${slowest ? ` · slowest row ${(slowest.ms / 1000).toFixed(0)}s "${slowest.label}"` : ''}${dr.length ? ` — DROPPED: ${dr.map((a) => a.label).join(', ')}` : ''}`);
   }
+  const jobBad = jobClauses(jobs, n);
+  const headBad = headroomClauses(censuses, timeoutMin);
+  log(`SHARD JOBS: ${jobs == null ? 'NOT CHECKED — no --jobs list was supplied (a cancelled shard with a complete census would pass here)' : jobBad.length ? `FAILED — ${jobBad.length} finding(s)` : `every one of the ${n} shard jobs completed/success in the run's own job list`}`);
+  log(`SHARD HEADROOM: ${timeoutMin == null ? 'NOT CHECKED — no --timeout-min was supplied' : headBad.length ? `FAILED — ${headBad.length} finding(s)` : `every shard's gate clock under the ${timeoutMin}-min timeout less ${SHARD_OVERHEAD_MIN} min`}`);
   const u = unionOf(ok);
   log(`SHARD COVERAGE: ${coverage.length ? `FAILED — ${coverage.length} finding(s)` : `every one of the ${u.attempted.length} expected row(s) attempted by exactly one shard`}`);
-  const validity = [...coverage.map((c) => `SHARD COVERAGE: ${c}`), ...u.validity];
+  const validity = [...coverage.map((c) => `SHARD COVERAGE: ${c}`), ...jobBad, ...headBad, ...u.validity];
   return summarizeConn({ results: u.results, refused: u.refused, attempted: u.attempted, validity, matrixLevel: !only, elapsedS: null, cell, log, err });
+}
+
+/* THE CENSUS DIRECTORY, read the way the CI step reads it: every
+   census-*.json under <dir>, a file that does not parse carried as a census
+   with version -1 and its error, so `reconcile` names it rather than the
+   merge throwing. ONE reader for the CLI and the file-level control. */
+export function readCensusDir(dir) {
+  const files = fs.existsSync(dir) ? fs.readdirSync(dir, { recursive: true }).filter((f) => /census-.*\.json$/.test(String(f))) : [];
+  const cs = [];
+  for (const f of files) {
+    try { cs.push(JSON.parse(fs.readFileSync(path.join(dir, String(f)), 'utf8'))); }
+    catch (e) { cs.push({ version: -1, shard: null, error: `${f}: ${e.message}` }); }
+  }
+  return { files, censuses: cs };
 }
 
 /* THE NEGATIVE CONTROL — no browser; censuses from the shipped selector over
@@ -230,6 +324,37 @@ export function negativeControl(n = CI_CONN_SHARDS) {
   const f = reconcile(syntheticCensuses(labels, n, (i, m) => (i === victim ? -1 : shardOf(i, m)), null), { n, labels });
   console.log(`  the finding it prints:\n${f.map((x) => `    - ${x}`).join('\n')}`);
   if (!f.some((x) => x.includes(`${victim} "`))) { ok = false; console.log('  FAIL the finding does not name the removed row'); }
+
+  /* THROUGH THE FILES. Write the unbroken set to a directory as the shards
+     do, then break it the ways a RUN breaks it — the ways the synthetic
+     objects above cannot be broken, because they never touch disk or the
+     runner. Each case must fail through the SAME reader and merge the CI
+     step calls, and its finding must name the shard. */
+  const TIMEOUT = 150;
+  const jobsOk = () => ({ jobs: Array.from({ length: n }, (_, k) => ({ name: `shard (${k})`, status: 'completed', conclusion: 'success' })) });
+  const fileCases = [
+    ['the complete set on disk, every job green', (dir) => ({ jobs: jobsOk() }), false, null],
+    ['a shard\'s ARTIFACT MISSING from the directory', (dir) => { fs.unlinkSync(path.join(dir, `census-${mid}.json`)); return { jobs: jobsOk() }; }, true, `shard ${mid}/${n}: NO CENSUS`],
+    ['a census TRUNCATED mid-write', (dir) => { const f = path.join(dir, `census-${mid}.json`); const t = fs.readFileSync(f, 'utf8'); fs.writeFileSync(f, t.slice(0, Math.floor(t.length / 2))); return { jobs: jobsOk() }; }, true, `census-${mid}.json`],
+    ['a shard job the run reports CANCELLED beside its complete census', (dir) => { const j = jobsOk(); j.jobs[mid].conclusion = 'cancelled'; return { jobs: j }; }, true, `JOBS: shard ${mid}/${n}`],
+    ['a shard job MISSING from the run\'s job list', (dir) => { const j = jobsOk(); j.jobs.splice(mid, 1); return { jobs: j }; }, true, `JOBS: shard ${mid}/${n}`],
+    ['a shard whose gate clock reads at the job timeout (main\'s run shape, 07c2997)', (dir) => { const f = path.join(dir, `census-${mid}.json`); const c = JSON.parse(fs.readFileSync(f, 'utf8')); c.elapsedS = TIMEOUT * 60 - 10; fs.writeFileSync(f, JSON.stringify(c)); return { jobs: jobsOk() }; }, true, `HEADROOM: shard ${mid}/${n}`],
+    ['no job list supplied at all (reported, and the complete set still passes — the workflow is what supplies it)', (dir) => ({ jobs: null }), false, null],
+  ];
+  for (const [name, breakIt, mustFail, needle] of fileCases) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conn-census-'));
+    try {
+      for (const c of syntheticCensuses(labels, n)) { const { version, complete, ...rest } = c; writeCensus(path.join(dir, `census-${c.shard.k}.json`), rest); }
+      const { jobs } = breakIt(dir);
+      const { censuses } = readCensusDir(dir);
+      const lines = [];
+      const { bad } = mergeConn(censuses, { n, labels, only: '.', cell: 0.6, jobs, timeoutMin: TIMEOUT, log: (l) => lines.push(String(l)), err: (l) => lines.push(String(l)) });
+      const named = needle ? lines.some((l) => l.includes(needle)) : true;
+      const pass = bad === mustFail && named;
+      ok = ok && pass;
+      console.log(`  ${pass ? 'ok  ' : 'FAIL'} [files] ${name}: the merged verdict ${bad ? 'FAILED' : 'PASSED'}${mustFail ? ' (must fail)' : ' (must pass)'}${needle && !named ? ` — the finding does not name "${needle}"` : ''}`);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  }
   return ok;
 }
 
@@ -257,17 +382,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     await flush(bad.length ? 1 : 0);
   } else if (argv.includes('--merge')) {
     const dir = val('--merge');
-    const files = fs.existsSync(dir) ? fs.readdirSync(dir, { recursive: true }).filter((f) => /census-.*\.json$/.test(String(f))) : [];
-    const cs = [];
-    for (const f of files) {
-      try { cs.push(JSON.parse(fs.readFileSync(path.join(dir, String(f)), 'utf8'))); }
-      catch (e) { cs.push({ version: -1, shard: null, error: `${f}: ${e.message}` }); }
-    }
+    const { files, censuses: cs } = readCensusDir(dir);
     console.log(`read ${files.length} census file(s) from ${dir}`);
-    const { bad } = mergeConn(cs, { n, labels: buildMatrix().map((r) => r.label), only: val('--only') || null, cell: +(val('--cell') || 0.6) });
+    let jobs = null;
+    if (val('--jobs')) {
+      try { jobs = JSON.parse(fs.readFileSync(val('--jobs'), 'utf8')); }
+      catch (e) { jobs = { jobs: null, error: e.message }; console.log(`the job list at ${val('--jobs')} did not parse: ${e.message}`); }
+    }
+    const timeoutMin = val('--timeout-min') ? +val('--timeout-min') : null;
+    const { bad } = mergeConn(cs, { n, labels: buildMatrix().map((r) => r.label), only: val('--only') || null, cell: +(val('--cell') || 0.6), jobs, timeoutMin });
     await flush(bad ? 1 : 0);
   } else {
-    console.error('usage: --plan N | --merge <dir> --shards N [--only <re>] [--cell mm] | --negative-control [--shards N]');
+    console.error('usage: --plan N | --merge <dir> --shards N [--only <re>] [--cell mm] [--jobs <json>] [--timeout-min M] | --negative-control [--shards N]');
     await flush(2);
   }
 }
