@@ -56,46 +56,80 @@
     <div class="tx-topic-head">
       <h2>What Is a Textile?</h2>
       <div class="tx-topic-copy">
-        <p>Every textile &mdash; no matter how technical &mdash; comes from the same three-step chain. A fiber gets twisted or spun into a yarn, and that yarn becomes a fabric: woven, knit, or bonded into a nonwoven.</p>
+        <p>Every textile &mdash; no matter how technical &mdash; comes from the same three-step chain. A fiber gets twisted or spun into a yarn, and that yarn becomes a fabric: woven, braided, knit, or &mdash; skipping the yarn &mdash; bonded straight into a nonwoven.</p>
         <p class="muted">Everything downstream &mdash; strength, stretch, moisture management, durability &mdash; traces back to choices made at each of these three steps.</p>
       </div>
     </div>
 
-    <div class="tx-chain">
-      <div class="tx-chain-node tx-chain-node--anim" data-tx-anim="fiber">
-        <div class="tx-anim"><svg role="img" aria-label="Short, crimped staple fibers drifting loose; one is teal"></svg></div>
-        <div class="label">Fiber</div>
-        <div class="sub">the base ingredient</div>
+    <div class="tx-tax">
+      <div class="tx-tax__row">
+        <div class="tx-tax__head"><span class="n">01</span><h3>Fiber</h3><p>the base ingredient: short, or endless</p></div>
+        <div class="tx-tax__grid tx-tax__grid--2">
+          <figure class="tx-tax__cell" data-tx-scene="staple">
+            <div class="tx-anim"><svg role="img" aria-label="Short, crimped fibers with loose ends drift, then line up into an overlapping strand; one is teal"></svg></div>
+            <figcaption><span class="label">Staple</span><span class="sub">Short fibers with ends &mdash; cotton, wool, chopped polyester. Drafted into overlap, then twisted.</span></figcaption>
+          </figure>
+          <figure class="tx-tax__cell" data-tx-scene="filament">
+            <div class="tx-anim"><svg role="img" aria-label="One continuous strand comes out of a spinneret and runs on, in long loops, out of the picture"></svg></div>
+            <figcaption><span class="label">Filament</span><span class="sub">One continuous strand &mdash; silk from the worm, polyester and nylon from a spinneret. It has no ends.</span></figcaption>
+          </figure>
+        </div>
       </div>
-      <div class="tx-chain-arrow">&rarr;</div>
-      <div class="tx-chain-node tx-chain-node--anim" data-tx-anim="yarn">
-        <div class="tx-anim"><svg role="img" aria-label="The same fibers gather, line up, and twist into a yarn; the teal fiber spirals through it"></svg></div>
-        <div class="label">Yarn</div>
-        <div class="sub">fibers, twisted together</div>
-      </div>
-      <div class="tx-chain-arrow">&rarr;</div>
-      <div class="tx-chain-node tx-chain-node--anim" data-tx-anim="fabric">
-        <div class="tx-anim"><svg role="img" aria-label="That yarn is woven over and under a row of warp yarns, pick after pick"></svg></div>
-        <div class="label">Fabric</div>
-        <div class="sub">woven, knit, or nonwoven</div>
-      </div>
-    </div>
 
-    <div class="tx-types">
-      <div class="tx-types__label">Types of fabric</div>
-      <div class="tx-types__grid">
-        <figure class="tx-type" data-tx-anim="knit">
-          <div class="tx-anim"><svg role="img" aria-label="Loops of yarn forming course by course into jersey knit"></svg></div>
-          <figcaption><span class="label">Knit</span><span class="sub">Knits interloop a single system of yarns &mdash; stretchy, soft, flexible.</span></figcaption>
-        </figure>
-        <figure class="tx-type" data-tx-anim="woven">
-          <div class="tx-anim"><svg role="img" aria-label="Close-up of finished plain weave: yarns crossing over and under at right angles"></svg></div>
-          <figcaption><span class="label">Woven</span><span class="sub">Wovens interlace two sets of yarns at right angles &mdash; strong, stable, structured.</span></figcaption>
-        </figure>
-        <figure class="tx-type" data-tx-anim="nonwoven">
-          <div class="tx-anim"><svg role="img" aria-label="Loose fibers settle into a web, are pressed flat, and are fused at bond points"></svg></div>
-          <figcaption><span class="label">Nonwoven</span><span class="sub">Nonwovens bond fibers directly, without weaving or knitting &mdash; light, cheap, less durable.</span></figcaption>
-        </figure>
+      <div class="tx-tax__flow">spun, extruded, twisted, plied</div>
+
+      <div class="tx-tax__row">
+        <div class="tx-tax__head"><span class="n">02</span><h3>Yarn and cord</h3><p>fibers, made continuous and strong</p></div>
+        <div class="tx-tax__grid tx-tax__grid--3">
+          <figure class="tx-tax__cell" data-tx-scene="spun">
+            <div class="tx-anim"><svg role="img" aria-label="The overlapping staple fibers twist tight into a yarn; fiber ends stick out of its surface"></svg></div>
+            <figcaption><span class="label">Spun staple</span><span class="sub">Staple fibers twisted together. The ends poke out &mdash; soft, fuzzy, matte.</span></figcaption>
+          </figure>
+          <figure class="tx-tax__cell" data-tx-scene="mono">
+            <div class="tx-anim"><svg role="img" aria-label="A single thick, smooth strand is extruded straight out of a spinneret"></svg></div>
+            <figcaption><span class="label">Monofilament</span><span class="sub">A single thick filament is the whole yarn &mdash; smooth, stiff, strong. Fishing line.</span></figcaption>
+          </figure>
+          <figure class="tx-tax__cell" data-tx-scene="twisted">
+            <div class="tx-anim"><svg role="img" aria-label="A bundle of continuous filaments twists into a smooth yarn with no loose ends"></svg></div>
+            <figcaption><span class="label">Twisted filament</span><span class="sub">Many fine filaments, lightly twisted &mdash; smooth and lustrous, with no ends to fuzz.</span></figcaption>
+          </figure>
+          <figure class="tx-tax__cell" data-tx-scene="plied">
+            <div class="tx-anim"><svg role="img" aria-label="Two twisted yarns wind around each other the opposite way"></svg></div>
+            <figcaption><span class="label">Plied</span><span class="sub">Two or more yarns twisted together, the ply twist (S) opposite to the yarns&rsquo; own (Z).</span></figcaption>
+          </figure>
+          <figure class="tx-tax__cell" data-tx-scene="core">
+            <div class="tx-anim"><svg role="img" aria-label="Staple fibers wrap around a smooth core strand, which runs on bare past the end of the wrap"></svg></div>
+            <figcaption><span class="label">Corespun</span><span class="sub">A filament core &mdash; often spandex &mdash; wrapped in a sheath of staple fiber.</span></figcaption>
+          </figure>
+          <figure class="tx-tax__cell" data-tx-scene="cord">
+            <div class="tx-anim"><svg role="img" aria-label="Three strands plait over and under each other into one cord"></svg></div>
+            <figcaption><span class="label">Braided</span><span class="sub">Three or more strands interlaced into a cord &mdash; rope, shoelaces.</span></figcaption>
+          </figure>
+        </div>
+      </div>
+
+      <div class="tx-tax__flow">woven, braided, knit &mdash; or bonded, with no yarn at all</div>
+
+      <div class="tx-tax__row">
+        <div class="tx-tax__head"><span class="n">03</span><h3>Textile structure</h3><p>how the yarn becomes cloth</p></div>
+        <div class="tx-tax__grid tx-tax__grid--4">
+          <figure class="tx-tax__cell" data-tx-scene="woven">
+            <div class="tx-anim"><svg role="img" aria-label="Crosswise yarns are laid one by one, over and under a set of lengthwise yarns"></svg></div>
+            <figcaption><span class="label">Woven</span><span class="sub">Two sets of yarns interlaced at right angles &mdash; strong, stable, structured.</span></figcaption>
+          </figure>
+          <figure class="tx-tax__cell" data-tx-scene="braid">
+            <div class="tx-anim"><svg role="img" aria-label="Two sets of diagonal yarns interlace, over two and under two, as the braid grows upward"></svg></div>
+            <figcaption><span class="label">Braid</span><span class="sub">Yarns interlaced on the diagonal &mdash; tubes, sleeves, straps.</span></figcaption>
+          </figure>
+          <figure class="tx-tax__cell" data-tx-scene="knit">
+            <div class="tx-anim"><svg role="img" aria-label="Loops of yarn form course by course into jersey knit"></svg></div>
+            <figcaption><span class="label">Knit</span><span class="sub">One system of yarn, interlooped &mdash; stretchy, soft, flexible.</span></figcaption>
+          </figure>
+          <figure class="tx-tax__cell" data-tx-scene="nonwoven">
+            <div class="tx-anim"><svg role="img" aria-label="Loose fibers settle into a web, are pressed flat, and are fused at bond points"></svg></div>
+            <figcaption><span class="label">Nonwoven</span><span class="sub">Fibers bonded directly, no yarn at all &mdash; light, cheap, less durable.</span></figcaption>
+          </figure>
+        </div>
       </div>
     </div>
   </section>
@@ -110,9 +144,8 @@
         <ul class="project__list">
           <li><strong>Natural</strong> &mdash; cotton, wool, silk.</li>
           <li><strong>Synthetic</strong> &mdash; polyester, nylon, spandex.</li>
-          <li><strong>Staple fibers</strong> &mdash; short and fuzzy (cotton, wool, chopped polyester).</li>
-          <li><strong>Filament fibers</strong> &mdash; long and smooth (silk, extruded polyester).</li>
         </ul>
+        <p class="muted">The other split &mdash; short staple fibers or endless filaments &mdash; is drawn in the <a href="#what-is-a-textile">fiber row above</a>.</p>
       </div>
     </div>
 
@@ -184,39 +217,7 @@
       <h2>Yarn Construction Types</h2>
       <div class="tx-topic-copy">
         <p>Fibers become yarn in a handful of standard ways, and each construction method leaves a fingerprint on how the finished fabric feels and behaves.</p>
-      </div>
-    </div>
-
-    <div class="tx-icon-grid cols-3">
-      <div class="tx-icon-cell">
-        <svg viewBox="0 0 52 52"><path d="M8 26q4-6 6 0t6 0 6 0 6 0 6 0 6 0" fill="none" stroke="var(--ink)" stroke-width="1.2" opacity="0.9"/><path d="M8 24q4-4 6 0t6 0 6 0 6 0 6 0 6 0" fill="none" stroke="var(--ink)" stroke-width="1.2" opacity="0.5"/></svg>
-        <div class="name">Spun Staple</div>
-        <div class="desc">Short fibers twisted together &mdash; soft, fuzzy, matte.</div>
-      </div>
-      <div class="tx-icon-cell">
-        <svg viewBox="0 0 52 52"><line x1="8" y1="26" x2="44" y2="26" stroke="var(--petrol-bright)" stroke-width="2.4" stroke-linecap="round"/></svg>
-        <div class="name">Monofilament</div>
-        <div class="desc">One continuous strand &mdash; smooth, stiff, strong.</div>
-      </div>
-      <div class="tx-icon-cell">
-        <svg viewBox="0 0 52 52"><path d="M8 22q9 8 18 0t18 0" fill="none" stroke="var(--ink)" stroke-width="1.4"/><path d="M8 30q9 -8 18 0t18 0" fill="none" stroke="var(--petrol-bright)" stroke-width="1.4"/></svg>
-        <div class="name">Twisted Filament</div>
-        <div class="desc">Continuous filaments twisted for strength.</div>
-      </div>
-      <div class="tx-icon-cell">
-        <svg viewBox="0 0 52 52"><path d="M8 20q9 6 18 0t18 0" fill="none" stroke="var(--ink)" stroke-width="1.8"/><path d="M8 32q9 6 18 0t18 0" fill="none" stroke="var(--ink)" stroke-width="1.8" opacity="0.6"/></svg>
-        <div class="name">Plied</div>
-        <div class="desc">Two or more yarns twisted into one, thicker yarn.</div>
-      </div>
-      <div class="tx-icon-cell">
-        <svg viewBox="0 0 52 52"><line x1="8" y1="26" x2="44" y2="26" stroke="var(--petrol-bright)" stroke-width="2" stroke-linecap="round"/><path d="M10 20q4 6 8 0t8 0 8 0 8 0" fill="none" stroke="var(--ink)" stroke-width="1" opacity="0.7"/><path d="M10 32q4 -6 8 0t8 0 8 0 8 0" fill="none" stroke="var(--ink)" stroke-width="1" opacity="0.7"/></svg>
-        <div class="name">Corespun</div>
-        <div class="desc">Stretch core (often spandex) wrapped in another yarn.</div>
-      </div>
-      <div class="tx-icon-cell">
-        <svg viewBox="0 0 52 52"><path d="M8 14L44 26L8 38" fill="none" stroke="var(--ink)" stroke-width="1.4"/><path d="M8 38L44 26L8 14" fill="none" stroke="var(--petrol-bright)" stroke-width="1.4" opacity="0.7"/></svg>
-        <div class="name">Braided</div>
-        <div class="desc">Yarns interlaced diagonally &mdash; a rope-like structure.</div>
+        <p class="muted">The six common ones &mdash; spun staple, monofilament, twisted filament, plied, corespun and braided &mdash; are drawn in the <a href="#what-is-a-textile">yarn and cord row above</a>.</p>
       </div>
     </div>
   </section>
@@ -530,10 +531,10 @@
 
 <a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
 
-<!-- #what-is-a-textile: the Fiber / Yarn / Fabric and Knit / Woven / Nonwoven animations -->
+<!-- #what-is-a-textile: the fiber / yarn and cord / textile structure panel (twelve animations) -->
 <script type="module">
-  import { mountTextileBasics } from './textile-basics.js';
-  mountTextileBasics();
+  import { mountTaxonomy } from './textile-taxonomy.js';
+  window.__tt = mountTaxonomy();
 </script>
 
 </body>
