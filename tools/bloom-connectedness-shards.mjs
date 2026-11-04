@@ -47,7 +47,26 @@
          census TRUNCATED mid-write, a shard job the run reports CANCELLED
          with a complete census beside it, a shard whose own elapsed reads
          past the job timeout — each must fail, and the complete set with
-         every job green must pass.
+         every job green must pass; a shard past SHARD_FLAG_SHARE of the
+         timeout must be FLAGGED and not failed, and the projection must
+         read the rows' own ms.
+
+   THE SHARD COUNT IS EIGHT, RULED ON SHARD-LEVEL EVIDENCE (Eva, Nov 4, the
+   shard-headroom session — more shards, not a longer timeout). Four shards
+   measured on the same 1,653 rows: 150.2 / 114.2 / 147.1 / 128.7 min on
+   main's run for #483 (shard 0 cancelled at the limit) and 95.4 / 143.7 /
+   92.0 / 133.7 min on #487's run — the SAME rows swing 95 to 150 min between
+   runners, so no model from the rows' triangle counts holds (shard 0 carries
+   the most triangles and was both the fastest and the slowest). Balanced,
+   eight shards is 58-68 min a shard (39-45% of the timeout) against 78-90
+   (52-60%) at six, which the measured round-robin imbalance (+/-15% on
+   triangle share) puts at the 70% bar. The rows' own ms (`attempted[].ms`,
+   stamped by the gate since #487) are in every census now, so EVERY MERGE
+   PRINTS THE PER-ROW TABLE AND THE PROJECTED PER-SHARD TOTALS FOR 6 / 8 / 10
+   SHARDS from them — the next run measures what this count was chosen
+   without. A shard over SHARD_FLAG_SHARE (70%) of the timeout is a FLAG in
+   the verdict's output, by ruling, never a fail; at the timeout less a
+   minute it is the HEADROOM finding above.
 
    THE CANCELLED-AFTER-COMPLETE HOLE (Nov 4, the shard-headroom session).
    main's push run for #483 (07c2997, run 41586065592) had shard 0 CANCELLED
@@ -84,13 +103,21 @@ import { CENSUS_VERSION, shardOf, parseShard, matrixHash, writeCensus, reconcile
 export { shardOf, parseShard, matrixHash, writeCensus };
 
 /* THE SHARD COUNT CI RUNS. The workflow's matrix lists 0..N-1 and passes this
-   same N to every shard and to the merge; `--plan` prints it. Four, because the
-   single job ran 134-204 min and a shard's install + browser overhead is ~5
-   min: four keeps every shard well inside a 150-minute timeout on the slowest
-   observed runner while costing the fewest runners. Round-robin by index, so
-   the matrix's expensive blocks (ALL MAX, the INFLO and INFILL corners, the
-   448M-voxel domes) spread across shards instead of landing in one. */
-export const CI_CONN_SHARDS = 4;
+   same N to every shard and to the merge; `--plan` prints it. EIGHT since
+   Nov 4 (four ran a shard to its 150-min timeout on main — the header's
+   numbers): balanced, 58-68 min a shard on the two measured runs, so a runner
+   half again slower still sits under SHARD_FLAG_SHARE. Round-robin by index,
+   so the matrix's expensive blocks (ALL MAX, the INFLO and INFILL corners,
+   the 448M-voxel domes) spread across shards instead of landing in one.
+   Changing it is THREE edits: this constant, and `SHARDS` plus the matrix
+   list in BOTH jobs of .github/workflows/bloom-connectedness.yml. */
+export const CI_CONN_SHARDS = 8;
+
+/* THE SHARE OF THE TIMEOUT PAST WHICH A SHARD IS FLAGGED in the verdict's
+   output — a flag, never a fail (Eva, Nov 4) — and the counts the projection
+   is printed for on every merge. */
+export const SHARD_FLAG_SHARE = 0.70;
+export const PROJECTED_SHARD_COUNTS = [6, 8, 10];
 
 /* THE SLIM RESULT — exactly the fields the summary reads, and nothing JSON
    cannot carry. The two read-out lines are rendered by the gate (which holds
@@ -237,6 +264,41 @@ export function headroomClauses(censuses, timeoutMin) {
   return bad;
 }
 
+/* THE TIMING REPORT, from the rows' own ms. The table is every attempted row
+   in MATRIX order (index · the shard it ran in · its ms · its label), and the
+   projection sums the same ms by `shardOf(index, m)` for each candidate m —
+   the measured split THIS count would have made of THIS run, on this run's
+   runners (the header says how far two runs of one shard differ). A row with
+   no ms (a census older than #487) is counted and said, never read as 0. */
+export function timingReport(censuses, { n, labels, timeoutMin, counts = PROJECTED_SHARD_COUNTS, log = console.log }) {
+  const ok = censuses.filter((c) => c && c.complete === true && c.shard && Array.isArray(c.attempted));
+  const byIndex = new Map();
+  let untimed = 0;
+  for (const c of ok) for (const a of c.attempted) {
+    if (typeof a.ms === 'number' && Number.isFinite(a.ms)) byIndex.set(a.index, { ms: a.ms, shard: c.shard.k, label: a.label });
+    else untimed++;
+  }
+  const idx = [...byIndex.keys()].sort((a, b) => a - b);
+  log(`\nROW TIMINGS (ms, the gate's own clock around each row, ${idx.length} timed row(s)${untimed ? `, ${untimed} attempted row(s) carry no ms` : ''}):`);
+  for (const i of idx) { const r = byIndex.get(i); log(`  ${String(i).padStart(5)}  shard ${String(r.shard).padStart(2)}  ${String(r.ms).padStart(8)} ms  ${r.label}`); }
+  if (!idx.length) { log('  (no row carries a timing; no projection)'); return { timed: 0, untimed, projections: [] }; }
+  const total = idx.reduce((s, i) => s + byIndex.get(i).ms, 0);
+  const projections = [];
+  const sets = [...new Set([n, ...counts])].sort((a, b) => a - b);
+  log(`PROJECTED PER-SHARD TOTALS from those ms (round-robin by matrix index, this run's own rows and runners; the total is ${(total / 60000).toFixed(1)} min over ${idx.length} rows; install and browser overhead not included):`);
+  for (const m of sets) {
+    const sums = Array.from({ length: m }, () => 0);
+    for (const i of idx) sums[shardOf(i, m)] += byIndex.get(i).ms;
+    const mins = sums.map((x) => x / 60000);
+    const worst = Math.max(...mins);
+    const share = timeoutMin ? worst / timeoutMin : null;
+    const over = timeoutMin ? mins.filter((x) => x / timeoutMin > SHARD_FLAG_SHARE).length : 0;
+    projections.push({ m, mins, worst, share, over });
+    log(`  ${m} shards${m === n ? ' (this run\'s count)' : ''}: ${mins.map((x) => x.toFixed(1)).join(' / ')} min · worst ${worst.toFixed(1)}${share != null ? ` = ${(100 * share).toFixed(0)}% of the ${timeoutMin}-min timeout` : ''}${over ? ` · ${over} shard(s) would be past ${Math.round(100 * SHARD_FLAG_SHARE)}% — FLAG` : ''}`);
+  }
+  return { timed: idx.length, untimed, projections };
+}
+
 export function mergeConn(censuses, { n, labels, only = null, cell, jobs = null, timeoutMin = null, log = console.log, err = console.error }) {
   const coverage = reconcile(censuses, { n, labels, only });
   const ok = censuses.filter((c) => c && c.complete === true && c.shard);
@@ -253,6 +315,15 @@ export function mergeConn(censuses, { n, labels, only = null, cell, jobs = null,
   const headBad = headroomClauses(censuses, timeoutMin);
   log(`SHARD JOBS: ${jobs == null ? 'NOT CHECKED — no --jobs list was supplied (a cancelled shard with a complete census would pass here)' : jobBad.length ? `FAILED — ${jobBad.length} finding(s)` : `every one of the ${n} shard jobs completed/success in the run's own job list`}`);
   log(`SHARD HEADROOM: ${timeoutMin == null ? 'NOT CHECKED — no --timeout-min was supplied' : headBad.length ? `FAILED — ${headBad.length} finding(s)` : `every shard's gate clock under the ${timeoutMin}-min timeout less ${SHARD_OVERHEAD_MIN} min`}`);
+  /* THE FLAG (a flag, not a fail — Eva's ruling, Nov 4): a shard past
+     SHARD_FLAG_SHARE of the timeout is named here so the next reader sees
+     the count needs raising before a shard reaches the limit. */
+  if (timeoutMin) for (const c of [...ok].sort((a, b) => a.shard.k - b.shard.k)) {
+    if (typeof c.elapsedS !== 'number') continue;
+    const share = c.elapsedS / 60 / timeoutMin;
+    if (share > SHARD_FLAG_SHARE) log(`SHARD HEADROOM FLAG: shard ${c.shard.k}/${c.shard.n} ran ${(c.elapsedS / 60).toFixed(1)} min = ${(100 * share).toFixed(0)}% of the ${timeoutMin}-min timeout, past ${Math.round(100 * SHARD_FLAG_SHARE)}% — a flag, not a failure: raise the shard count (three edits, see CI_CONN_SHARDS) before a shard reaches the limit`);
+  }
+  timingReport(censuses, { n, labels, timeoutMin, log });
   const u = unionOf(ok);
   log(`SHARD COVERAGE: ${coverage.length ? `FAILED — ${coverage.length} finding(s)` : `every one of the ${u.attempted.length} expected row(s) attempted by exactly one shard`}`);
   const validity = [...coverage.map((c) => `SHARD COVERAGE: ${c}`), ...jobBad, ...headBad, ...u.validity];
@@ -286,7 +357,7 @@ function syntheticCensuses(labels, n, select = shardOf, only = '.') {
   for (let k = 0; k < n; k++) {
     const idx = labels.map((l, i) => i).filter((i) => select(i, n) === k);
     cs.push({ version: CENSUS_VERSION, complete: true, shard: { k, n }, only, matrix: { count: labels.length, hash },
-      attempted: idx.map((i) => ({ index: i, label: labels[i] })), results: idx.map((i) => fakeResult(labels[i])),
+      attempted: idx.map((i) => ({ index: i, label: labels[i], ms: 1000 })), results: idx.map((i) => fakeResult(labels[i])),
       refused: [], validity: [], elapsedS: 0 });
   }
   return cs;
@@ -340,6 +411,9 @@ export function negativeControl(n = CI_CONN_SHARDS) {
     ['a shard job MISSING from the run\'s job list', (dir) => { const j = jobsOk(); j.jobs.splice(mid, 1); return { jobs: j }; }, true, `JOBS: shard ${mid}/${n}`],
     ['a shard whose gate clock reads at the job timeout (main\'s run shape, 07c2997)', (dir) => { const f = path.join(dir, `census-${mid}.json`); const c = JSON.parse(fs.readFileSync(f, 'utf8')); c.elapsedS = TIMEOUT * 60 - 10; fs.writeFileSync(f, JSON.stringify(c)); return { jobs: jobsOk() }; }, true, `HEADROOM: shard ${mid}/${n}`],
     ['no job list supplied at all (reported, and the complete set still passes — the workflow is what supplies it)', (dir) => ({ jobs: null }), false, null],
+    ['a shard at 80% of the timeout: FLAGGED in the output and NOT failed (the ruling)', (dir) => { const f = path.join(dir, `census-${mid}.json`); const c = JSON.parse(fs.readFileSync(f, 'utf8')); c.elapsedS = TIMEOUT * 60 * 0.8; fs.writeFileSync(f, JSON.stringify(c)); return { jobs: jobsOk() }; }, false, `SHARD HEADROOM FLAG: shard ${mid}/${n}`],
+    ['the projection reads the rows\' own ms (every row 1000 ms here, so 8 shards project to the row counts in minutes)', (dir) => ({ jobs: jobsOk() }), false, `  8 shards${n === 8 ? ' (this run\'s count)' : ''}: ${(() => { const m = 8, sums = Array.from({ length: m }, () => 0); labels.forEach((l, i) => { sums[shardOf(i, m)] += 1000; }); return sums.map((x) => (x / 60000).toFixed(1)).join(' / '); })()} min`],
+    ['a census with NO row timings says so and projects from the rest, and still passes', (dir) => { const f = path.join(dir, `census-${mid}.json`); const c = JSON.parse(fs.readFileSync(f, 'utf8')); for (const a of c.attempted) delete a.ms; fs.writeFileSync(f, JSON.stringify(c)); return { jobs: jobsOk() }; }, false, `${labels.filter((l, i) => shardOf(i, n) === mid).length} attempted row(s) carry no ms`],
   ];
   for (const [name, breakIt, mustFail, needle] of fileCases) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'conn-census-'));

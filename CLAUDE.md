@@ -7367,6 +7367,15 @@ limit. Now the verdict job fetches the run's jobs (`actions: read`) and fails on
 cancelled job, a job missing from the list, a clock at the timeout) beside the nine synthetic cases.
 A local `--merge` with no `--jobs` prints `SHARD JOBS: NOT CHECKED`, never a pass. Every census row
 now carries `ms` (its whole iteration, stamped in `finally`), which is what sizes the shard count.
+**EIGHT SHARDS SINCE PR 2 (Eva's ruling, Nov 4 — more shards, not a longer timeout), chosen on
+SHARD-LEVEL evidence** (§6 of that doc): the row `ms` sit in artifacts the session proxy denies, the
+logs carry no row time (stdout flushes in one burst at exit) and triangle counts do not track shard
+time (the same rows ran 95 and 150 min on two runners). So EVERY MERGE PRINTS THE PER-ROW ms TABLE AND
+THE PROJECTED PER-SHARD TOTALS FOR 6 / 8 / 10 SHARDS (`timingReport`, `PROJECTED_SHARD_COUNTS`), and a
+shard past `SHARD_FLAG_SHARE` (70%) of the timeout is `SHARD HEADROOM FLAG` — a flag, never a fail. Read
+the projection off the latest verdict log before touching the count; changing it is THREE edits
+(`CI_CONN_SHARDS`, and `SHARDS` plus the matrix list in both workflow jobs). No main green since
+`07c2997` is in doubt (§5: one run on main in that span, under the fixed verdict).
 
 **THE NU COUPLING IS FIXED: THE LEAF, THE ROD AND THE SEPAL SCAN EACH READ THEIR OWN ROW
 COUNT** (Eva's ruling on #303 — read `docs/bloom-nu-coupling-outcome.md` before touching
