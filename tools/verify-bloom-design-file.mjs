@@ -64,6 +64,10 @@
      F10 THE OUTLINE WIDTH GATE (F6-sym-2), tools/verify-bloom-outline-width.mjs,
          is SPAWNED here for F6's reason: the Petal width drag in CURVE mode
          asks the outline's validator, a narrowing drag is refused and told.
+     F16 LOAD AS A NEW DESIGN (photo-to-bloom S1), tools/verify-bloom-photo-
+         subset.mjs, SPAWNED here for F6's reason: a subset file loaded as new
+         onto a dirty page fails on any reader note, a read-back off DEFAULTS,
+         a named control not shown, or a leftover scope.
      F6  THE SCOPE MODEL'S OWN GATE, tools/verify-bloom-scopes.mjs, is SPAWNED
          here (and its --negative-control under ours) so it rides in CI through
          this workflow step — the file's overrides containers are that model's
@@ -846,6 +850,17 @@ if (!ONLY.length) {
     console.log(`F12 — spawning node ${a12.map((a) => path.relative(ROOT, a) || a).join(' ')}`);
     const r12 = spawnSync(process.execPath, a12, { stdio: 'inherit' });
     if (r12.status !== 0) { console.log(`\nDESIGN FILE GATE: FAIL — F12: the equal-halves identity exited ${r12.status}`); process.exit(1); }
+  }
+  /* F16 — LOAD AS A NEW DESIGN and the photo-subset validator (photo-to-bloom
+     S1), tools/verify-bloom-photo-subset.mjs, spawned for F6's reason: eight
+     written-down fixtures loaded as new onto a dirty page, each against its
+     expected clause set (--self), and under our --negative-control its own five
+     mutants of bloom.js / bloom-file.js. Browser only. */
+  if (!NO_BROWSER) {
+    const a16 = [path.join(ROOT, 'tools/verify-bloom-photo-subset.mjs'), NEGATIVE ? '--negative-control' : '--self'];
+    console.log(`F16 — spawning node ${a16.map((a) => path.relative(ROOT, a) || a).join(' ')}`);
+    const r16 = spawnSync(process.execPath, a16, { stdio: 'inherit' });
+    if (r16.status !== 0) { console.log(`\nDESIGN FILE GATE: FAIL — F16: the photo-subset validator exited ${r16.status}`); process.exit(1); }
   }
 }
 

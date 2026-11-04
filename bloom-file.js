@@ -82,6 +82,7 @@
 import { CONTROLS, RETIRED_IDS, migrateRoles } from './bloom-registry.js';
 import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS, SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_IDS, SCOPE_STRAND_IDS } from './bloom-geometry.js';
 import { readCurveValue, cloneCurve } from './bloom-curve.js';
+import { DEFAULTS, evalPredicate } from './bloom-registry.js';   // the LOAD-AS-NEW reader only (end of file)
 
 // THE SCOPE CONTAINERS' REAL SHAPE (Scoping-a — the parameter-scoping state
 // model; bloom-geometry.js's PARAMETER SCOPING block is the law, this is the
@@ -555,3 +556,70 @@ export const scopesAreEmpty = (o) => !o || SCOPE_CONTAINERS.every((k) => !Array.
 
 /* A design file is told by its name, never by sniffing bytes (the /plot rule). */
 export const isDesignFile = (f) => /\.json$/i.test((f && f.name) || '') || (f && f.type === 'application/json');
+
+/* ---- LOAD AS A NEW DESIGN (photo-to-bloom S1, Eva's ruling 2 of Nov 3) ------
+   docs/bloom-photo-to-bloom-discovery.md §7 and §9. A SUBSET file is an
+   ordinary `bloom-design` envelope (format, version) whose `controls` names
+   only SOME controls — what route A writes from a photo. The existing Load path
+   reads it under rule 3 (a missing field keeps the PAGE's value), so a subset
+   loaded there inherits whatever the page held. THIS is the other entry point:
+   every control starts at the registry's DEFAULTS and the subset is applied on
+   top. It is a WRAPPER, not a second reader: the subset is composed over
+   DEFAULTS through the file's own writer and handed to `readDoc` UNCHANGED, so
+   every rule that reader has (clamped, snapped, invalid, unknown, retired,
+   migrated, a newer version refused) holds here word for word, and `readDoc`
+   and `applyDesign` are byte-identical to the tree before this.
+
+   WHAT DIFFERS, AND ONLY THIS:
+     - a control the subset does not name is the DEFAULT, never the page's, and
+       is not a note — a subset is short by design;
+     - an `overrides` / `curves` container the subset omits is EMPTY (a new
+       design holds no scopes), and a container naming only some of its lists
+       has the rest empty; a container that is present and malformed is passed
+       through so the reader says so;
+     - HIDDEN CONTROLS KEEP THEIR DEFAULT. A control the subset names whose own
+       `visibleWhen` is false under the design being built (emission rule 3 of
+       §2.2), or a choice set to a HIDDEN option (`petalTexture`'s PEBBLE /
+       CELLULAR), is NOT applied and is told `hidden`. Decided to a fixed point:
+       every named control hidden under the current candidate is dropped
+       together, and the candidate is re-evaluated, until none is — drops only,
+       so it terminates within as many rounds as the subset has names.
+   Returns `{ ok: false, error }` on a refusal (the reader's own), else
+   `{ ok: true, doc, notes, named, applied }` — `doc.controls` is the COMPLETE
+   state, every registry control, to be written to every input. NOTHING is
+   applied by this function. The sidecar (§9) is never read here: confidences
+   live beside the file, and a sidecar key put inside one is `unknown`. */
+const isPlain = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
+function emptyContainer(lists, src) {
+  if (src === undefined) return Object.fromEntries(lists.map((k) => [k, []]));
+  if (!isPlain(src)) return src;
+  return { ...Object.fromEntries(lists.map((k) => [k, []])), ...src };
+}
+export function composeNewDesign(obj) {
+  const base = composeControls(DEFAULTS);
+  const controls = obj.controls === undefined ? undefined : (isPlain(obj.controls) ? { ...base, ...obj.controls } : obj.controls);
+  return { ...obj, controls, overrides: emptyContainer(SCOPE_CONTAINERS, obj.overrides), curves: emptyContainer(CURVE_CONTAINERS, obj.curves) };
+}
+export function readNewDesign(obj) {
+  if (!isPlain(obj)) return { ok: false, error: 'this file is not a JSON object' };
+  const r = readDoc(composeNewDesign(obj));
+  if (!r.ok) return r;
+  const notes = r.notes.slice();
+  const named = isPlain(obj.controls) ? Object.keys(obj.controls).filter((k) => controlOf.has(k)) : [];
+  const fresh = (id) => (controlOf.get(id).kind === 'curve' ? cloneCurve(DEFAULTS[id]) : DEFAULTS[id]);
+  const state = {};
+  for (const c of CONTROLS) state[c.id] = Object.prototype.hasOwnProperty.call(r.doc.controls, c.id) ? r.doc.controls[c.id] : fresh(c.id);
+  const kept = new Set(named.filter((id) => Object.prototype.hasOwnProperty.call(r.doc.controls, id)));
+  for (;;) {
+    const drop = [];
+    for (const id of kept) {
+      const c = controlOf.get(id);
+      const opt = c.kind === 'choice' ? c.options.find((o) => o.value === String(state[id])) : null;
+      if (opt && opt.hidden) drop.push([id, `controls.${id}: ${JSON.stringify(state[id])} is a hidden option (kept only so old designs load) — a new design keeps the default ${JSON.stringify(DEFAULTS[id])}`]);
+      else if (!evalPredicate(c.visibleWhen, state)) drop.push([id, `controls.${id} is hidden under this design (the control does not show, so its value draws nothing) — a new design keeps the default ${JSON.stringify(DEFAULTS[id])}`]);
+    }
+    if (!drop.length) break;
+    for (const [id, text] of drop) { kept.delete(id); state[id] = fresh(id); notes.push(note('hidden', text)); }
+  }
+  return { ok: true, doc: { ...r.doc, controls: state }, notes, named, applied: [...kept] };
+}
