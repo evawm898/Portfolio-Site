@@ -20,6 +20,8 @@ CC0 photo crop and one sheet.
 
 **S1 is built (§9):** load as new design, the subset validator, the sidecar format, and the status check that gates the staged v1 scope.
 
+**S2 — the globals stage on Eva's own photos — is §10.** Whether the globals PASS is Eva's ruling from the sheet; this doc does not decide it.
+
 ---
 
 ## 0. Premises checked before building on them
@@ -947,3 +949,188 @@ The validator rides in CI as the design-file gate's F16 (`bloom-panel.yml`, no w
 **`tools/verify-bloom-photo-subset.mjs` is not in that workflow's path filter**, so a change to it
 alone runs no gate — the other spawned gates' declared gap, repeated. The old-path compare takes a
 worktree and is not in CI.
+
+---
+
+## 10. S2 — the globals stage on Eva's photos (Nov 4)
+
+Route A, run for real: three flowers, a FRONT and a SIDE photo each, attached by Eva to the session.
+**Globals only** (the 46-row schema); the outline curve and per-layer values are later stages.
+
+| file | what |
+|---|---|
+| `docs/photo-to-bloom/eva-set/<flower>/<flower>-v{1,2,3}.subset.bloom-design.json` | the subset route A wrote (a `bloom-design` v1 envelope, loaded with **Load as new**) |
+| `docs/photo-to-bloom/eva-set/<flower>/<flower>-v{1,2,3}.bloom-photo.json` | its sidecar (§9.3) |
+| `tools/bloom-photo-s2.mjs` | `--check`: every sidecar against its subset (S1–S6); render: loads each version as new on the real page and shoots the two photo angles; the sheet |
+| `docs/img/photo-to-bloom-s2.png` | the sheet, with the photos as placeholders (below) |
+
+**The versions.** v1 is the FRONT photo plus the answers to the questions asked; v2 adds the SIDE photo;
+v3 is the one feedback iteration after the render sheet. Every version is kept.
+
+### 10.1 The photos — not committed (Eva's ruling, Nov 4)
+
+All three images carry stock watermarks (123RF on the lotus and the daisy, Dreamstime on the water
+lily). Asked in the session, Eva ruled **don't commit**, matching §6.1's precedent for photos whose
+licence cannot be read. So `eva-set/<flower>/front|side` holds no images. The committed sheet shows
+labelled placeholders; the sheet with the photos was sent in the session only.
+
+The session still made the downscaled copies (each image cut into its front and side halves, long edge
+≤ 1600 px, `convert -strip`) and **read them back**: `identify -verbose` finds no EXIF, GPS, XMP, IPTC or
+profile on any of the six, and PIL reads `getexif()` empty and `info` empty. The originals carried no EXIF
+or GPS either — one ICC profile on the lotus `.webp`, which the strip removed.
+
+The daisy is a 3D-rendered illustration, not a photograph. The two views of each flower are a stock
+pair, and the session cannot tell whether they are one specimen.
+
+### 10.2 The questions asked (§3's bank, one per flower, before the side photo was read)
+
+| flower | asked | answer | what the side photo then said |
+|---|---|---|---|
+| daisy | Q-profile: flat / shallow bowl / deep cup / reflexed | **Flat** | a shallow bowl: rays ~22° up. **Overridden** — `petalTilt` 5 → 22, `layerTilt` 3 → 6 |
+| lotus | Q-profile: closed globe / deep cup / shallow bowl / flat open | **Closed globe / bud** | agrees (an egg-shaped bud, outer whorl splayed) |
+| water lily | Q-profile: flat star / shallow bowl / deep cup / closed globe | **Flat star** | a deep cup: outer petals ~40°, inner nearly upright. **Overridden** — `petalTilt` 10 → 40, `layerTilt` 5 → 30 |
+
+Only Q-profile was asked. The front photos pinned everything else that changes the form at medium or
+better, or left it low on something minor. Q-scale was not asked: all three read in proportion at the
+35 mm default (ruling 1). Each sidecar records the question, the answer, and (from v2) its `outcome` per
+control it was asked to resolve.
+
+**The finding worth keeping: on two of three flowers the word answer and the side photo disagreed, and
+the photo was right.** A second photo is a better answer than a word answer for the side profile — the
+claim §3 made in the abstract, here measured.
+
+### 10.3 What the side photo was worth (v1 → v2), per flower
+
+| flower | controls changed | by how much | verdict on the render |
+|---|---|---|---|
+| daisy | 4 of 12 | `petalTilt` +17°, `layerTilt` +3°, `petalCup` +0.05, `headRise` −0.05 | the flat disc becomes the photo's shallow bowl. **Worth it: the profile** |
+| lotus | 6 of 11 | `petalTilt` −20°, `layerTilt` +7°, `petalSpineCurl` +10°, `petalCup` +0.20, `petalWidth` +2 mm, `layerSize` +0.05 | **no better than v1** — still an open rosette, not a bud. The side photo's splayed outer whorl pulled `petalTilt` DOWN, and one global tilt applies that to every whorl's base (§10.5). The render, not the photo, closed it (v3). |
+| water lily | 4 of 13 | `petalTilt` +30°, `layerTilt` +25°, `layerSize` +0.10, `sepalAngle` −5° (+ 1 control added) | the flat star becomes the photo's cup, and the inner petals stop being short — the front photo foreshortened them. **Worth the most** |
+
+The second photo moved 14 control values over the three flowers. It was decisive for the profile twice
+and misleading once. It misled where the flower's whorls differ more than one global tilt step can say.
+
+### 10.4 The sheet
+
+![S2 sheet](img/photo-to-bloom-s2.png)
+
+`node tools/bloom-photo-s2.mjs <out> --sheet-bare docs/img/photo-to-bloom-s2.png [--sheet <png> --photos <dir>]`.
+
+- Every version is loaded **as a new design** through the page's own `loadAsNew`, onto a fresh page.
+- Print preview is ON, read back from `shownMode`.
+- There are two cameras per flower, matching the photo angles (daisy face-on and ~25° above side; lotus
+  ~52° from above and level side; water lily face-on and ~8° above side).
+- Each camera is framed on the EXPORT mesh's own bounding box, built in Node from the same composed state.
+- No pixel delta is quoted.
+
+| version | named | reader notes | export tris | max dim (mm) |
+|---|---|---|---|---|
+| daisy v1 / v2 / v3 | 12 / 12 / 12 | 0 / 0 / 0 | 102,852 each | 107.1 / 102.5 / 105.6 |
+| lotus v1 / v2 / v3 | 11 / 11 / 11 | 0 / 0 / 0 | 61,432 each | 73.6 / 86.9 / 53.0 |
+| water lily v1 / v2 / v3 | 13 / 14 / 14 | 0 / 0 / 0 | 106,232 each | 86.6 / 81.9 / 81.9 |
+
+The triangle count is constant within a flower because no version changes a lattice (count, layers,
+stamens). The water lily's read-out also tells a `stamenSpread` clamp (the default 2.00× held at 1.55×
+by the hub). That is the read-out's own told state, not a reader note.
+
+**The v3 iteration, in one line each:**
+
+- **daisy:** `petalWidth` 12 → 16 and `spread` 3.1 → 2.9 — the rays now overlap as in the photo. The
+  session measured the hub-to-flower radius on the export mesh to keep the disc at the photo's ≈ 0.39
+  (0.371 → 0.389). A chat-side route cannot take that measurement.
+- **lotus:** `petalTilt` 15 → 45, `layerTilt` 25 → 15, `petalSpineCurl` 40 → 60, `petalCup` 0.9 → 1.0 —
+  the open rosette closes into a cupped bud.
+- **water lily:** `stamenLength` 10 → 6 — the v1 side view showed the stamens standing as a column above
+  the flat petals.
+
+### 10.5 The validator, measured
+
+`node tools/verify-bloom-photo-subset.mjs docs/photo-to-bloom/eva-set/*/*.subset.bloom-design.json`, each
+file loaded as new onto the dirty page: **9 of 9 PASS, 0 notes, 0 warnings** (12 / 12 / 12, 11 / 11 / 11,
+13 / 14 / 14 named controls applied). No file names a control off the schema or outside its range.
+
+`node tools/bloom-photo-s2.mjs --check`: **9 versions, PASS.** Its must-fail was run by hand on a scratch
+copy of the set, with four plants: a wrong sha, an answer citing an unasked question, a sidecar value
+differing from its subset, and a dropped `revisedFrom` change. It reported exactly those four (S2, S4,
+S3, S6). The check is not in CI.
+
+### 10.6 Miss logs
+
+Classes are §6.3's:
+
+- **estimate** — my reading, wrong;
+- **photo** — the photo cannot show it;
+- **bloom** — the bloom cannot build it;
+- **schema** — the v1 schema leaves out what the bloom can do.
+
+The last column flags misses the OUTLINE stage (`petalOutlineCurve`) or the PER-LAYER stage would fix.
+
+**Daisy**
+
+| miss | class | fixed by | later stage? |
+|---|---|---|---|
+| v1 flat (rays at 5°, from the answer) against the photo's ~22° bowl | photo (front only) | v2, the side photo | — |
+| rays narrow with gaps between them (v1/v2 width 12) | estimate | v3 (16) | — |
+| rays drawn as paddles, pinched at the base, against the photo's near-parallel straps with round ends | estimate (`petalBaseTaper` 1.5) + bloom (the law's single widest point cannot draw a parallel strap) | not in v3 | **outline** |
+| the two tiers barely read apart (`layerSize` is already at its 0.9 maximum) | estimate | — | per-layer (an owned length or tilt per tier) |
+| disc florets | bloom | — (unmapped; ruling 5) | — |
+| two or three notches at each ray tip | bloom (below the lobe floor on a 35 mm ray) | — (unmapped) | no — under any print floor |
+| white rays, yellow disc | bloom (no colour) | — (unmapped) | — |
+
+**Lotus**
+
+| miss | class | fixed by | later stage? |
+|---|---|---|---|
+| v1/v2 an open rosette, not a bud | estimate (v2 took the splayed outer whorl's ~15° as the global `petalTilt`) + bloom (one tilt step cannot splay the outer whorl and close the inner ones) | v3, mostly | **per-layer** (owned tilt per layer) |
+| inner petals TALLER than the outer in the photo; `layerSize` only shrinks inward, so the bud is squat (v3: 51 × 53 × 33 mm, the photo ≈ 1.4:1 tall) | bloom (in globals) | — | **per-layer** (owned `petalLength`, Q3.5) |
+| the greenish, shorter outer whorl is sepal-like (Nelumbo's outermost tepals) and was read as petals. The schema HAS sepals (`sepalCount` / `sepalScale` / `sepalAngle`) | estimate | not tried (the one iteration was spent on the profile) | — |
+| petal count of the closed inner whorls | photo (hidden in a bud) | — | — |
+| rounded petals ending in a small point (mucro) | bloom (the law rounds it) | — (unmapped) | **outline** |
+| petals pass through each other in a closed bud | bloom (the accepted look) | — (unmapped) | — |
+| pink gradient, veins | bloom (no colour) | — (unmapped) | — |
+
+**Water lily**
+
+| miss | class | fixed by | later stage? |
+|---|---|---|---|
+| v1 a flat star (from the answer) against the photo's deep cup | photo (front only) | v2, the side photo | — |
+| v1 inner petals short (`layerSize` 0.8): the front photo foreshortens upright petals | photo | v2 (0.9) | — |
+| v1 stamens standing as a column above the petals (`stamenLength` 10) | estimate | v3 (6) | — |
+| four long outer petals between the sepals, ~10 shorter inner ones; the bloom draws 8 + 8 | bloom (`petalCount` is whole-whorl and not scopeable) | — (unmapped) | no — per-layer cannot change a count |
+| the outer petals are the longer ones in the photo; one shrink step averages it | schema | — | **per-layer** (owned `petalLength`) |
+| sepals broader and boat-shaped, drawn with the petal's outline at `sepalScale` 1 | schema (`sepalWidth` / the sepal outline curve are off the v1 schema) | — | **outline** (sepals take the curve) |
+| strap-like yellow stamens curling over the centre | bloom (straight rods with pill anthers) | — (unmapped) | — |
+| violet tips, white bases, green sepal backs | bloom (no colour) | — (unmapped) | — |
+| a stem in the side photo | schema (design choice, outside v1) | — | — |
+
+**Tally over the 23 rows** (two rows carry two classes — an estimate and a bloom limit):
+
+- 6 are my own estimates. The one iteration closed 3 (the daisy's width, the lotus profile mostly, the
+  water lily's stamens).
+- 4 are what one photo cannot show: 3 closed by the second photo, 1 open (the bud's hidden count).
+- 12 are things the bloom cannot build (including the 2 shared rows).
+- 3 are things the schema leaves out.
+
+**Seven rows are flagged for a later stage:**
+
+- per-layer would fix 4 (daisy tiers, lotus tilt, lotus length, water-lily length);
+- the outline would fix 3 (daisy straps, lotus mucro, water-lily sepals).
+
+Two per-layer-looking misses are NOT fixable there: a count per whorl, and a notch below the floor.
+
+### 10.7 Decisions made without a ruling (for Eva)
+
+1. **A control the photo READ at its default is written anyway** — the water lily's `petalCount` 8 and
+   the daisy v3's `petalWidth` 16. The subset then carries the reading and the sidecar its confidence.
+   §9.3 rule 1 says a control left at its default "is not listed". I read that as "not *informed*".
+   Writing a default is harmless (§9.4), and the validator passes it.
+2. **The sidecar gained three optional fields**, still `version` 1:
+   - `questions[].outcome` — per resolved control, "answer kept" or "overridden by p2: a -> b";
+   - `revisedFrom` — the previous version's file name, why, and `changes` with `from` / `to` / `by`;
+   - photo `name` is a label (`daisy/front`), since no photo file is committed.
+
+   S6 restates `changes` from the two subsets and DEFAULTS, never from the sidecar.
+3. **v1 / v2 were not tuned on renders.** The only render-informed version is v3, so the v1 → v2 column
+   measures the photo alone.
+4. **Q-profile was asked BEFORE the side photo was read**, as the brief ordered. So v2's changes are
+   measured against front + answer, not front alone.

@@ -1,0 +1,17 @@
+{
+  "format": "bloom-design",
+  "version": 1,
+  "controls": {
+    "petalCount": 5,
+    "layerCount": 4,
+    "layerSize": 0.85,
+    "layerTilt": 18,
+    "petalWidth": 26,
+    "petalBaseTaper": 1.5,
+    "petalTipTaper": 1,
+    "petalTipShape": 2,
+    "petalTilt": 35,
+    "petalSpineCurl": 30,
+    "petalCup": 0.7
+  }
+}

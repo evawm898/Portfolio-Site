@@ -1,0 +1,163 @@
+{
+  "format": "bloom-photo",
+  "version": 1,
+  "design": "waterlily-v1.subset.bloom-design.json",
+  "designSha256": "13e13c93002d3fee7e5906ce1b9a3f5fd2cfd6639ba820ea4a8e37a41986844b",
+  "photos": [
+    {
+      "id": "p1",
+      "role": "face",
+      "name": "waterlily/front"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-profile",
+      "asked": "WATER LILY: seen from the side, is it a flat star, a shallow bowl, a deep cup, or a closed globe?",
+      "answer": "Flat star",
+      "resolves": [
+        "petalTilt",
+        "petalSpineCurl",
+        "layerTilt"
+      ]
+    }
+  ],
+  "controls": {
+    "petalCount": {
+      "value": 8,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "layerCount": {
+      "value": 2,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "layerSize": {
+      "value": 0.8,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "layerTilt": {
+      "value": 5,
+      "confidence": "medium",
+      "source": "answer",
+      "question": "Q-profile",
+      "photos": []
+    },
+    "petalWidth": {
+      "value": 9,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "petalTipShape": {
+      "value": 1.2,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "petalTilt": {
+      "value": 10,
+      "confidence": "medium",
+      "source": "answer",
+      "question": "Q-profile",
+      "photos": []
+    },
+    "petalCup": {
+      "value": 0.15,
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "stamenCount": {
+      "value": 80,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "stamenLayout": {
+      "value": "DISC",
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "stamenLength": {
+      "value": 10,
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "sepalCount": {
+      "value": 4,
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "sepalScale": {
+      "value": 1,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    }
+  },
+  "unmapped": [
+    {
+      "feature": "colour, colour pattern, veining, blotches",
+      "nearest": "nothing (violet tips over white, green-white sepals, yellow stamens)",
+      "photos": [
+        "p1"
+      ]
+    },
+    {
+      "feature": "petals differing by whorl",
+      "nearest": "averaged: four long outer petals between the sepals, shorter inner ones — layerSize carries the length step only",
+      "photos": [
+        "p1"
+      ]
+    },
+    {
+      "feature": "petaloid, incurved stamens (yellow, strap-like, curling over the centre)",
+      "nearest": "straight round rods with pill anthers",
+      "photos": [
+        "p1"
+      ]
+    }
+  ]
+}
