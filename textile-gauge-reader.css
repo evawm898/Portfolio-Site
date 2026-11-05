@@ -1,27 +1,42 @@
 /* ---------------------------------------------------
    Automatic Textile Gauge Reader — experimental lab page
-   DARK, on the site's design system (Eva's ruling R3, Nov 5): the legacy
-   names (--black, --ink, --petrol …) come from styles.css, which aliases
-   them onto tokens.css, so this page no longer redefines them.
+   LIGHT, the way /cards is (Eva, Nov 5, replacing R3's dark reading):
+   type and the deep petrol come from tokens.css, the paper neutrals are
+   /cards' own, and --petrol-bright is /cards' #177a7a (the system petrol
+   #2fa3a3 is 2.9:1 on paper; #177a7a is its paper-legible step, 4.8:1).
+   The legacy names styles.css aliases onto tokens are redefined here, so
+   every rule on this page reads paper values.
    The lab-specific names below are for MARKS, never text (DESIGN.md
-   rule 1): a status is said in ink with a glyph or a word.
+   rule 1): a status is said in ink with a glyph or a word. Mint is too
+   pale to mark anything on paper, so an "ok" mark is the deep petrol,
+   always beside a different shape from the plum "bad" mark.
    --tgr-course-mark is the key swatch for the course-axis overlay. It
    matches COURSE_COLOR in textile-gauge-reader.js, which is drawn on the
-   fabric photo (artwork, rule 9).
+   fabric photo (artwork, rule 9). The controls that float ON the photo
+   (zoom, grid box) stay dark glass over it, in the system's dark tokens.
 --------------------------------------------------- */
 
 :root {
-  /* faint (3.07:1) is not small text (rule 4); this page sets its footnote,
-     badge and step labels in it, so it reads dim here. */
-  --ink-faint:         var(--color-dim);
+  --black:         #faf8f4;
+  --black-raised:  #ffffff;
+  --line:          #ddd8ce;
+  --line-strong:   #c2bcae;
+  --ink:           #17191a;
+  --ink-dim:       #5c6363;
+  --ink-faint:     #8b9494;
+  --petrol:        var(--color-deep);
+  --petrol-bright: #177a7a;
+  --serif:         var(--type-serif);
+  --mono:          var(--type-mono);
+
   --tgr-panel-bg:      var(--black-raised);
   --tgr-course-mark:   #a56b2e;
   --tgr-mark-bad:      var(--color-plum);
-  --tgr-mark-ok:       var(--color-mint);
+  --tgr-mark-ok:       var(--color-deep);
   --tgr-error-bg:      color-mix(in srgb, var(--color-plum) 8%, transparent);
   --tgr-error-border:  color-mix(in srgb, var(--color-plum) 45%, transparent);
-  --tgr-warn-bg:       var(--color-raised);
-  --tgr-warn-border:   var(--color-line-strong);
+  --tgr-warn-bg:       color-mix(in srgb, var(--ink) 4%, transparent);
+  --tgr-warn-border:   var(--line-strong);
 }
 
 /* ---------------------------------------------------
@@ -394,7 +409,7 @@
 }
 .tgr-radio-option:has(input:checked) {
   border-color: var(--petrol-bright);
-  background: color-mix(in srgb, var(--color-petrol) 7%, transparent);
+  background: color-mix(in srgb, var(--petrol-bright) 7%, transparent);
   color: var(--ink);
 }
 .tgr-radio-option input { margin-top: 0.2rem; }
@@ -409,7 +424,7 @@
 
 .tgr-btn {
   background: var(--petrol);
-  color: var(--ink);
+  color: var(--black-raised);
   border: none;
   padding: 0.55rem 1rem;
   border-radius: 4px;
@@ -457,7 +472,7 @@
 .tgr-roi-list__item:hover { border-color: var(--ink-dim); }
 .tgr-roi-list__item.is-selected {
   border-color: var(--petrol-bright);
-  background: color-mix(in srgb, var(--color-petrol) 8%, transparent);
+  background: color-mix(in srgb, var(--petrol-bright) 8%, transparent);
 }
 .tgr-roi-list__swatch {
   width: 18px;
@@ -470,7 +485,7 @@
   font-family: var(--mono);
   font-size: 10px;
   font-weight: 500;
-  color: var(--ink);
+  color: var(--black-raised);
   background: var(--petrol);
 }
 .tgr-roi-list__item.is-manual .tgr-roi-list__swatch { background: var(--tgr-course-mark); }
@@ -628,7 +643,7 @@
 --------------------------------------------------- */
 
 .tgr-consistency-panel {
-  border-color: color-mix(in srgb, var(--color-petrol) 35%, transparent);
+  border-color: color-mix(in srgb, var(--petrol-bright) 35%, transparent);
 }
 .tgr-consistency-panel summary { color: var(--petrol-bright); font-weight: 600; }
 .tgr-consistency-row {
@@ -644,7 +659,7 @@
 .tgr-consistency-row span:last-child { color: var(--ink); font-family: var(--mono); text-align: right; }
 .tgr-consistency-outlier {
   font-size: 11px;
-  color: var(--color-ink-2);
+  color: var(--ink-dim);
   line-height: 1.5;
   padding: 0.25rem 0;
 }
@@ -674,8 +689,8 @@
   border-radius: 3px;
   margin-left: 0.4rem;
 }
-.tgr-roi-diag-card__tag.is-included { color: var(--color-ink-2); border: 1px solid var(--tgr-mark-ok); }
-.tgr-roi-diag-card__tag.is-excluded { color: var(--color-ink-2); border: 1px dashed var(--tgr-mark-bad); }
+.tgr-roi-diag-card__tag.is-included { color: var(--ink-dim); border: 1px solid var(--tgr-mark-ok); }
+.tgr-roi-diag-card__tag.is-excluded { color: var(--ink-dim); border: 1px dashed var(--tgr-mark-bad); }
 
 /* ---------------------------------------------------
    Debug / diagnostics (loop centers, detection details)
@@ -750,7 +765,7 @@
   color: var(--ink-dim);
   line-height: 1.5;
 }
-.tgr-debug-axis__reason.is-corrected { color: var(--color-ink-2); }
+.tgr-debug-axis__reason.is-corrected { color: var(--ink-dim); }
 .tgr-debug-axis__ambiguity {
   color: var(--ink);
   background: var(--tgr-warn-bg);
@@ -802,7 +817,7 @@
 }
 .tgr-debug-candidate-card.is-selected {
   border-color: var(--petrol-bright);
-  background: color-mix(in srgb, var(--color-petrol) 6%, transparent);
+  background: color-mix(in srgb, var(--petrol-bright) 6%, transparent);
 }
 .tgr-debug-candidate-card__head {
   display: flex;
@@ -946,7 +961,7 @@
 .tgr-comparison__values { color: var(--ink); text-align: right; }
 .tgr-comparison__delta { font-weight: 500; margin-left: 0.5rem; }
 .tgr-comparison__delta.is-good { color: var(--ink); }
-.tgr-comparison__delta.is-mid { color: var(--color-ink-2); }
+.tgr-comparison__delta.is-mid { color: var(--ink-dim); }
 .tgr-comparison__delta.is-bad { color: var(--ink); }
 .tgr-comparison__delta.is-bad::before { content: '! '; }
 .tgr-comparison__id {
@@ -1102,13 +1117,13 @@
   position: fixed;
   z-index: 6;
   transform: translate(-50%, 12px);
-  background: color-mix(in srgb, var(--color-raised) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-ink) 18%, transparent);
+  background: color-mix(in srgb, var(--black-raised) 96%, transparent);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 0.6rem 0.7rem;
   min-width: 190px;
   backdrop-filter: blur(3px);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 18px rgba(23, 25, 26, 0.18);
 }
 .tgr-gridbox-panel__title {
   margin: 0 0 0.4rem;
@@ -1132,13 +1147,13 @@
   position: fixed;
   z-index: 6;
   transform: translate(-50%, 12px); /* horizontally centered under the anchor point, offset below it */
-  background: color-mix(in srgb, var(--color-raised) 94%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-ink) 18%, transparent);
+  background: color-mix(in srgb, var(--black-raised) 96%, transparent);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 0.6rem 0.7rem;
   min-width: 190px;
   backdrop-filter: blur(3px);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 18px rgba(23, 25, 26, 0.18);
 }
 .tgr-cal-popup__row {
   display: flex;
@@ -1164,10 +1179,9 @@
   margin: 0.35rem 0 0;
   font-size: 11px;
   line-height: 1.4;
-  color: var(--color-ink-2);
+  color: var(--ink-dim);
 }
-.tgr-cal-popup__spanhint:not(:empty)::before { content: '! ';
-}
+.tgr-cal-popup__spanhint:not(:empty)::before { content: '! '; }
 .tgr-cal-popup .tgr-button-row { margin: 0.5rem 0 0; }
 .tgr-cal-popup .tgr-error { margin: 0.4rem 0 0; font-size: 11px; padding: 0.4rem 0.5rem; }
 
