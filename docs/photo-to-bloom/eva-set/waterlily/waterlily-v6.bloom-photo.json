@@ -1,0 +1,511 @@
+{
+  "format": "bloom-photo",
+  "version": 1,
+  "design": "waterlily-v6.subset.bloom-design.json",
+  "designSha256": "74a90a2fb2d7d9c74364e7a5050c6bc9d1cfc678c46557642d5694a7105b65e6",
+  "photos": [
+    {
+      "id": "p1",
+      "role": "face",
+      "name": "waterlily/front"
+    },
+    {
+      "id": "p2",
+      "role": "side",
+      "name": "waterlily/side"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-profile",
+      "asked": "WATER LILY: seen from the side, is it a flat star, a shallow bowl, a deep cup, or a closed globe?",
+      "answer": "Flat star",
+      "resolves": [
+        "petalTilt",
+        "petalSpineCurl",
+        "layerTilt"
+      ],
+      "outcome": {
+        "petalTilt": "overridden by p2: 10 -> 40",
+        "petalSpineCurl": "answer kept (side photo agrees)",
+        "layerTilt": "overridden by p2: 5 -> 30"
+      }
+    }
+  ],
+  "controls": {
+    "petalCount": {
+      "value": 8,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "layerCount": {
+      "value": 2,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalWidth": {
+      "value": 9,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalTilt": {
+      "value": 40,
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "petalCup": {
+      "value": 0.15,
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "stamenCount": {
+      "value": 80,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "stamenLayout": {
+      "value": "DISC",
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "stamenLength": {
+      "value": 6,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "sepalCount": {
+      "value": 4,
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "sepalScale": {
+      "value": 1,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "sepalAngle": {
+      "value": -5,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "scopeLayers": {
+      "value": "ON",
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ],
+      "note": "the per-layer stage's switch: on because the subset writes overrides.layers"
+    },
+    "petalOutlineMode": {
+      "value": "CURVE",
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "petalOutlineCurve": {
+      "value": {
+        "mode": "symmetric",
+        "points": [
+          [
+            0,
+            0.08
+          ],
+          [
+            0.18,
+            0.17
+          ],
+          [
+            0.36,
+            0.205
+          ],
+          [
+            0.6,
+            0.175
+          ],
+          [
+            0.82,
+            0.1
+          ],
+          [
+            0.95,
+            0.035
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ],
+      "note": "front photo: widest at ~0.35, straight-sided to a sharp point (y in units of length x 16 / the layer's width: 9 and 8 mm)"
+    },
+    "sepalOutlineMode": {
+      "value": "CURVE",
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ],
+      "note": "the sepal controls (count, size, angle) are on the schema, so the sepal outline is (v3)"
+    },
+    "sepalOutlineCurve": {
+      "value": {
+        "mode": "symmetric",
+        "points": [
+          [
+            0,
+            0.1
+          ],
+          [
+            0.25,
+            0.25
+          ],
+          [
+            0.45,
+            0.28
+          ],
+          [
+            0.7,
+            0.22
+          ],
+          [
+            0.9,
+            0.1
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ],
+      "note": "front photo: the four sepals broader than the petals, boat-shaped, to a point"
+    }
+  },
+  "unmapped": [
+    {
+      "feature": "colour, colour pattern, veining, blotches",
+      "nearest": "nothing (violet tips over white, green-white sepals, yellow stamens)",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "petal COUNT differing by whorl (four long outer petals between the sepals, ~10 shorter inner ones)",
+      "nearest": "8 + 8 — petalCount is whole-whorl and not scopeable; the per-layer stage maps each whorl's length and tilt, never its count",
+      "photos": [
+        "p1"
+      ]
+    },
+    {
+      "feature": "petaloid, incurved stamens (yellow, strap-like, curling over the centre)",
+      "nearest": "straight round rods with pill anthers",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "leaves, stem, sepals visible but not classifiable from this photo",
+      "nearest": "no stem (a design choice, outside the v1 schema)",
+      "photos": [
+        "p2"
+      ]
+    }
+  ],
+  "revisedFrom": {
+    "design": "waterlily-v5.subset.bloom-design.json",
+    "why": "the outline stage (S4): the petal outline drawn from the photos — lanceolate petals to a sharp point; broader boat-shaped sepals",
+    "changes": {
+      "petalOutlineMode": {
+        "from": "LAW",
+        "to": "CURVE"
+      },
+      "petalOutlineCurve": {
+        "from": {
+          "mode": "symmetric",
+          "points": [
+            [
+              0,
+              0.05
+            ],
+            [
+              0.15,
+              0.16
+            ],
+            [
+              0.36,
+              0.2286
+            ],
+            [
+              0.7,
+              0.178
+            ],
+            [
+              0.9,
+              0.1
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        },
+        "to": {
+          "mode": "symmetric",
+          "points": [
+            [
+              0,
+              0.08
+            ],
+            [
+              0.18,
+              0.17
+            ],
+            [
+              0.36,
+              0.205
+            ],
+            [
+              0.6,
+              0.175
+            ],
+            [
+              0.82,
+              0.1
+            ],
+            [
+              0.95,
+              0.035
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        }
+      },
+      "petalTipShape": {
+        "from": 1.2,
+        "to": 1.7,
+        "by": 0.5
+      },
+      "sepalOutlineMode": {
+        "from": "LAW",
+        "to": "CURVE"
+      },
+      "sepalOutlineCurve": {
+        "from": {
+          "mode": "symmetric",
+          "points": [
+            [
+              0,
+              0.05
+            ],
+            [
+              0.15,
+              0.16
+            ],
+            [
+              0.36,
+              0.2286
+            ],
+            [
+              0.7,
+              0.178
+            ],
+            [
+              0.9,
+              0.1
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        },
+        "to": {
+          "mode": "symmetric",
+          "points": [
+            [
+              0,
+              0.1
+            ],
+            [
+              0.25,
+              0.25
+            ],
+            [
+              0.45,
+              0.28
+            ],
+            [
+              0.7,
+              0.22
+            ],
+            [
+              0.9,
+              0.1
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        }
+      }
+    },
+    "notes": "CURVE replaces the petal law: petalTipShape is hidden and dropped. The sepals take their own drawn outline. Layer entries unchanged from v5."
+  },
+  "layers": [
+    {
+      "layer": 0,
+      "whorl": "outer violet petals (between the sepals)",
+      "offsets": {
+        "petalLength": {
+          "offset": 0,
+          "value": 35,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1",
+            "p2"
+          ],
+          "reading": "the longest petals (front tips ~3.2 disc radii); kept at the anchor so the sepals (sepalScale 1) stay as long"
+        },
+        "petalTilt": {
+          "offset": -10,
+          "value": 30,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "~28-45 deg above the horizontal (side photo)"
+        },
+        "petalWidth": {
+          "offset": 0,
+          "value": 9,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "the outer petals' width (front photo); owned so its ring is R0"
+        }
+      }
+    },
+    {
+      "layer": 1,
+      "whorl": "inner violet petals",
+      "offsets": {
+        "petalLength": {
+          "offset": -5,
+          "value": 30,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1",
+            "p2"
+          ],
+          "reading": "shorter than the outer (side photo); the front photo foreshortens them"
+        },
+        "petalTilt": {
+          "offset": 25,
+          "value": 65,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "fanning 45-85 deg, mean ~65 (side photo)"
+        },
+        "petalWidth": {
+          "offset": -1,
+          "value": 8,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "a little narrower than the outer (front photo); owned to place the ring (the hidden layerSize cannot)"
+        }
+      }
+    }
+  ]
+}

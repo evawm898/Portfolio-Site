@@ -1,0 +1,79 @@
+{
+  "format": "bloom-design",
+  "version": 1,
+  "controls": {
+    "petalCount": 11,
+    "layerCount": 2,
+    "petalWidth": 16,
+    "petalTilt": 22,
+    "petalCup": 0.15,
+    "spread": 2.9,
+    "headRise": 0.25,
+    "scopeLayers": "ON",
+    "petalOutlineMode": "CURVE",
+    "petalOutlineCurve": {
+      "mode": "symmetric",
+      "points": [
+        [
+          0,
+          0.08
+        ],
+        [
+          0.12,
+          0.135
+        ],
+        [
+          0.3,
+          0.155
+        ],
+        [
+          0.7,
+          0.155
+        ],
+        [
+          0.86,
+          0.145
+        ],
+        [
+          0.92,
+          0.12
+        ],
+        [
+          0.95,
+          0.1
+        ],
+        [
+          0.975,
+          0.105
+        ],
+        [
+          1,
+          0
+        ]
+      ]
+    }
+  },
+  "overrides": {
+    "layers": [
+      {
+        "layer": 0,
+        "offsets": {
+          "petalLength": 0,
+          "petalTilt": -8,
+          "petalWidth": 0
+        }
+      },
+      {
+        "layer": 1,
+        "offsets": {
+          "petalLength": 0,
+          "petalTilt": 8,
+          "petalWidth": 0
+        }
+      }
+    ],
+    "petals": [],
+    "tiers": [],
+    "strands": []
+  }
+}

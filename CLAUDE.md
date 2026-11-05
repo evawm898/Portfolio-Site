@@ -684,7 +684,7 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   its default and is told `hidden`. The page writes the complete state to every input (Reset's events).
 - `readDoc` / `applyDesign` are byte-identical; `tools/verify-bloom-load-unchanged.mjs --base <wt>` compares the
   old path's record, state, scopes, save and STL bytes on both trees (not in CI).
-- `tools/verify-bloom-photo-subset.mjs` (V0–V7, onto a DIRTY page; `--self` fifteen fixtures plus a spawned exit-code
+- `tools/verify-bloom-photo-subset.mjs` (V0–V7, onto a DIRTY page; `--self` twenty-one fixtures plus a spawned exit-code
   leg, `--negative-control` five page mutants plus two of its own) is F16 of the design-file gate. Sidecar
   `<name>.bloom-photo.json`, format in §9.3. No emission is built; outline and per-layer emission are S2/S3, gated
   on the zero-notes check.
@@ -717,6 +717,20 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   - v4 / v5 for the three flowers: 15 of 15 subsets PASS, 0 notes, 0 warnings. Sheet
     `docs/img/photo-to-bloom-s3.png` (placeholders). Lotus body h:w 1.05 against the photo's ≈ 1.45.
   - Rulings pending (a)–(f) are in §11.8. Whether per-layer passes is Eva's ruling from the sheet.
+    **[Nov 5: RULED — per-layer PASSED; (a) adopted (Q-profile skipped with a side photo), (b) declined,
+    (c) width places the ring (#495), (d)–(f) as proposed. §11.8.]**
+- **S4, the outline stage (Nov 5), is §13; "v1 status" (what the three stages can and cannot replicate,
+  the gaps ranked) is §12.**
+  - **Schema v3** adds the petal and sepal outline (mode + curve) globally, and the outline as a layer
+    VALUE. A CURVE subset must DROP the tapers / tip shape / squared end / lobes / fringe, which hide.
+  - **Validator:**
+    - **new W2** — a curve point the BUILD lifts to the print floor, read off a Node build;
+    - six fixtures, `--self` 21 of 21;
+    - `--self --save` / `--negative-control --base` cache the base, refused on another tree.
+  - **The width-refusal hazard is LIVE:** loading as new onto a page drawing a narrow curve silently keeps
+    the old width. 0 notes; only V2 sees it. A page defect, not fixed.
+  - v6 / v7: 20 of 20 subsets PASS. The lotus body is still squat (1.05 vs ≈ 1.45): per-layer cup / curl
+    is out of every stage. Sheet `docs/img/photo-to-bloom-s4.png`.
 
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
 (Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read

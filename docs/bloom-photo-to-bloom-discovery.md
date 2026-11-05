@@ -387,7 +387,7 @@ The order is by how much a wrong guess cost in the dry run (§6).
 | # | question | resolves | ask when | default if unanswered |
 |---|---|---|---|---|
 | Q-scale | "About how big should the printed flower be? (petal length or overall width in mm)" | `petalLength` (the scale anchor; every other size is read as a ratio against it) | **[Ruled Nov 3, ruling 1: only when the proportions look wrong at 35 mm]** ~~always, unless a size was given with the photo~~; a photo never carries scale | 35 mm (the registry default) |
-| Q-profile | "Seen from the side, is it flat, a shallow bowl, a deep cup, a closed globe, or reflexed (petals bending back)?" | `petalTilt`, `petalSpineCurl`, `layerTilt` | no side or low view, and the face-on silhouette fits more than one profile. **Tilt and spine curl trade against each other in a 3/4 view** — the double tulip overshot both ways (§6) | the profile class the photo suggests, at middle values |
+| Q-profile | "Seen from the side, is it flat, a shallow bowl, a deep cup, a closed globe, or reflexed (petals bending back)?" | `petalTilt`, `petalSpineCurl`, `layerTilt` | **[Ruled Nov 5, ruling (a) of §11.8: NEVER when a side photo is attached — the side photo answers it, and on S2's evidence (§10.2) the photo beat the word answer on two flowers of three]** no side or low view, and the face-on silhouette fits more than one profile. **Tilt and spine curl trade against each other in a 3/4 view** — the double tulip overshot both ways (§6) | the profile class the photo suggests, at middle values |
 | Q-focal | "There are several flowers — which one?" (or "the open one or the bud?") | the whole design | more than one flower in focus, or flowers at different stages (the tulip photo: an open bloom and a closed one) | the largest, sharpest flower |
 | Q-layers | "Is it single, semi-double or fully double?" | `layerCount`, `layerSize` | inner petals hidden or the centre not visible | from the visible rings |
 | Q-count | "Roughly how many petals in the outer ring?" | `petalCount` | petals overlap so much the ring cannot be counted, or the flower is seen edge-on | the visible count ×(360°/visible arc) |
@@ -1373,9 +1373,26 @@ What is left is in the miss log.
   - petals passing through each other in a closed bud.
 - **Procedure, not a stage:** the lotus's green outer whorl read as petals. See ruling-pending (b).
 
-### 11.8 Rulings pending — proposed, NOT adopted
+### 11.8 Rulings — RULED (Eva, Nov 5)
 
-Each is a proposal for Eva's ruling. Nothing here was built as if it were ruled.
+**The per-layer stage PASSED (Nov 5) on the S3 sheet.**
+
+- **(a) ADOPTED.** Q-profile is skipped when a side photo is attached. The question bank (§3) says so.
+- **(b) DECLINED.** There is no sepal-whorl procedure rule. A sepal-like outer whorl stays in the petal
+  controls.
+- **(c) Width places the ring, as in v5. No page change.** The coupling is filed as a defect under Per-layer
+  values: [evawm898/Portfolio-Site#495](https://github.com/evawm898/Portfolio-Site/issues/495) — a whorl's
+  ring cannot be chosen independently of its petal width, and the hidden `layerSize` default 0.72 still
+  places the rings.
+- **(d)** The outline curves were correctly kept out of schema v2. **The outline stage (S4) adds them.**
+- **(e) V7 stays a FAIL.**
+- **(f) A zero offset counts as a layer setting its own value.**
+
+The proposals as they were put are kept below, so each ruling can be read against what it answered.
+
+#### The proposals as put (Nov 5)
+
+Each was a proposal for Eva's ruling. Nothing here was built as if it were ruled.
 
 - **(a) Skip Q-profile when a side photo is attached.**
   - On S2's evidence (§10.2) the word answer and the side photo disagreed on two of three flowers, and
@@ -1421,3 +1438,232 @@ node tools/bloom-photo-s2.mjs <out> --versions v3,v4,v5 --sheet-bare docs/img/ph
   sweep is past a foreground run's ceiling.
 - None of it is in CI except `--self`, through the design-file gate's F16, and no workflow's path
   filter names these tools.
+
+---
+
+## 12. v1 status — what the three stages together can and cannot replicate (Nov 5)
+
+Stages: globals (S2, PASSED), per-layer (S3, PASSED), outline (S4, §13 — its ruling is Eva's). This section
+records what the route can now replicate, then ranks the remaining gaps. It does not propose sessions.
+
+**Replicates, on the three test flowers:**
+
+- **The arrangement:**
+  - the petal count of a whorl;
+  - the number of whorls;
+  - the centre-to-flower proportion (the hub);
+  - the stamen ring or disc and the style, roughly;
+  - the sepals' count, size and angle.
+- **Each whorl's own length and tilt** (S3), so a splayed outer whorl beside an upright inner one, or
+  two tiers at two angles.
+- **The side profile**, from a side photo, which on S2's evidence beats a word answer.
+- **Each whorl's petal outline** (S4): a strap with a round end, a broad petal converging to a point, a
+  lanceolate petal, a blunt boat. Also the sepals' outline.
+- **Every file loads clean** (0 notes), every value is read back (V2), and every layer entry builds (V7).
+
+**Does not replicate, and why:**
+
+- colour of any kind (the print is one material);
+- disc florets (no mechanism; ruling 5);
+- a different petal **count** per whorl (`petalCount` is whole-whorl);
+- petal overlap / imbrication (petals interpenetrate);
+- tip features under ~1 mm (a daisy ray's notches, a lotus mucro's distinct point);
+- strap-like curling stamens;
+- **how much a whorl's petals cup or curl differently from the others.** Per-layer cup and curl are
+  delta-on-global sliders and have been **out of every stage so far.** This is the lotus body.
+- a whorl's ring is chosen only through its petal width
+  ([#495](https://github.com/evawm898/Portfolio-Site/issues/495), ruled (c));
+- scale (35 mm by default) and the stem and leaves (design choices).
+
+**The remaining gaps, ranked by how much they would improve the sheet:**
+
+1. **Per-layer cup and curl.** The lotus body is still squat: inner-half h:w **1.05** against the
+   photo's **≈ 1.45**. It is the largest visible miss on the sheet, and no stage can reach it.
+2. **A petal count per whorl.** This would give the water lily its four long outer petals and ~10 short
+   inner ones, where it draws 8 + 8. It is visible in both views.
+3. **Disc florets.** The daisy's centre is a third of its face, drawn as a smooth cap.
+4. **The sepals' cup** (the water lily's boat-shaped sepals). `sepalCup` exists in the generator, but
+   is off the photo schema.
+5. **Petal irregularity.** The variance controls are on the schema but were never used: a photo of one
+   flower supports "slightly irregular", and every version left it at 0.
+6. **The ring / width coupling** (#495). After the v5 workaround its visible effect is small. Its cost
+   is that a whorl's width is no longer free.
+7. **Imbrication, tip features under the floor, strap stamens.** Each is small on the sheet, and each is
+   a new geometry mechanism rather than a schema row.
+8. **Colour.** It does not show on a monochrome sheet, and a single-material print cannot carry it.
+
+**One thing that is not a gap in the replication, but that the route must carry:**
+
+- **The width-refusal hazard is LIVE (§13.3).** Loading a file as new onto a page that is drawing a
+  narrow CURVE outline can silently keep the OLD petal width: 0 notes, and the status line says clean.
+  The validator's read-back (V2) is the only thing that sees it. It is a page defect, and not fixed here
+  (no page change was in scope).
+
+---
+
+## 13. S4 — the outline stage on the S2 photos (Nov 5)
+
+The same six photos (§11.1): working copies in the scratchpad, re-checked for EXIF / GPS / XMP / IPTC /
+profiles, all empty, and none committed. Each flower starts from its S3 v5 subset (globals and per-layer
+unchanged). **No bloom page code changed** (`bloom*.js`, `bloom.html`, `bloom.css` are `main`'s).
+
+| file | what |
+|---|---|
+| `docs/photo-to-bloom/eva-set/<flower>/<flower>-v{6,7}.*` | v6: outline curves from the photos; v7: one feedback iteration (daisy and water lily only) |
+| `tools/bloom-photo-census.mjs` | schema v3 |
+| `tools/verify-bloom-photo-subset.mjs` | the outline W2 (a lifted point); six fixtures; a cached base (`--save` / `--base`) |
+| `tools/bloom-photo-s2.mjs` | caption fixes (curves, owned outline) |
+| `docs/img/photo-to-bloom-s4.png` | the sheet (placeholders for the photos) |
+
+### 13.1 Schema v3
+
+- **Global rows (4, `since: 3`):** `petalOutlineMode` (LAW / CURVE), `petalOutlineCurve`, `sepalOutlineMode`,
+  `sepalOutlineCurve`. The 46 v1 rows are unchanged.
+- **The symmetry toggle** is the curve value's own `mode` (`symmetric` / `two-sided`).
+- **Per-layer:** the outline group joins the spine group as layer VALUES. A layer owns its curve outright
+  (the Oct 11 ruling), and the list is checked at load against the geometry's spine + outline groups.
+- **The existing outline rulings are the geometry's**, and the schema only admits the controls:
+  - the curve starts above the root blend;
+  - it shapes the tip down to the 1.6 mm floor, and the round nib closes it;
+  - the drawn length fits the length slider;
+  - the tapers, tip shape, squared end, lobes and fringe hide and go inert under CURVE. **So a v3
+    subset that sets CURVE drops them.** The registry hides them, and naming one fails rule 3.
+- **The sepal outline is included** because the sepal controls (count, size, angle) are already on the
+  schema. That is a reading of the brief's "include only if sepal controls are already in the photo
+  schema", for ruling (§13.6).
+
+### 13.2 The validator
+
+**The new warning, W2:** an outline point the BUILD lifts to the print floor. It is read off a Node
+export build of the composed state with the file's scopes, through the geometry's own
+`outlineCurvePlan` record (`tipCap.outline.lifted`, both halves). The page's metrics do not expose it.
+On real data it fired on water lily v6 (two whorls' sixth point at 0.69 / 0.53 mm), and v7 clears it.
+
+**Six fixtures**, `--self` 21 of 21 plus the exit-code leg, each loaded onto the DIRTY page:
+
+| fixture | what | fires | warns |
+|---|---|---|---|
+| `OUTLINE_CURVE` | an intended global curve | — | — |
+| `OUTLINE_LAYER` | a two-sided curve owned by layer 1, Per-layer values on | — | — |
+| `OUTLINE_MODE_OFF` | a curve written with outline mode off | V1 V2 V3 V5 (hidden) | — |
+| `LOBES_UNDER_CURVE` | lobes and fringe written under CURVE | V1 V2 V3 V5 (hidden) | — |
+| `OUTLINE_LIFTED` | a curve point under the floor | — | W2 |
+| `WIDTH_REFUSED_ON_LOAD` | the hazard below | **V2** | — |
+
+**The negative control:**
+
+- All six page mutants and both validator mutants behave.
+- `hidden-controls-are-applied` now ALSO moves both outline negative controls (V1 / V2 / V5). That is
+  the evidence they rest on the hidden rule; V3 stays, because the page still hides them.
+- Four existing lists were widened to their measured sets on the new fixtures, all by the same
+  leftover-page mechanisms §11.3 names.
+- `--self --save <f>` writes the fixtures' verdicts with the sha256 of every file that decides them.
+  `--negative-control --base <f>` reuses them, so one mutant fits a foreground run (~4 min). It REFUSES a
+  base saved on another tree, naming the file, and this was tried with a planted hash. The validator is
+  hashed without its own `MUTANTS` table, because a `breaks` list decides no verdict.
+
+### 13.3 The width-refusal hazard — CONFIRMED LIVE, caught by V2
+
+§9.6 predicted it: the page's Petal width refusal (`onWidthEdit`) is not gated on a trusted event and
+reads the PREVIOUS build's petals. Measured with the file `{ petalOutlineMode: CURVE, a broad strap
+curve, petalWidth: 8 }`:
+
+| loaded as new onto | reader notes | `petalWidth` read back |
+|---|---|---|
+| a page drawing a NARROW curve at width 22 | **0** | **22** — the file's 8 silently put back |
+| a fresh page | 0 | 8 |
+
+The status line says clean, and only the read-back sees it. The fixture pins that it still does with
+outline curves on.
+
+- **A page defect, pre-existing, NOT fixed** (no page change in scope).
+- **For route A it bites when a CURVE version is loaded over another CURVE design** with a different
+  width. None of S4's versions changes a width, and the validator always loads onto its LAW dirty page.
+
+### 13.4 The versions and the sheet
+
+![S4 sheet](img/photo-to-bloom-s4.png)
+
+`node tools/bloom-photo-s2.mjs <out> --versions v5,v6,v7 --sheet-bare docs/img/photo-to-bloom-s4.png [--sheet <png> --photos <dir>]`
+
+| version | named | export tris | bbox (mm) | what changed |
+|---|---|---|---|---|
+| daisy v5 / v6 / v7 | 11 / 10 / 10 | 102,852 / **70,820** / 70,820 | 108.7×109.5×18.6 / 108.5×109.4×18.5 / 108.4×109.4×18.5 | v6: CURVE, a strap with a dip either side of the tip; tapers and tip shape dropped (hidden) · v7: a rounded end, wider (0.38 of the length), no dip |
+| lotus v5 / v6 | 10 / 9 | 61,432 / 61,432 | 65.7×65.4×43.2 / 65.5×64.9×43.2 | v6: CURVE, broad petals to a small point; the two outer whorls own a blunter boat outline (layer values) · no v7 |
+| water lily v5 / v6 / v7 | 13 / 16 / 16 | 106,232 each | 81.9×81.9×30.6 / 81.3×81.3×30.7 / 81.3×81.3×30.7 | v6: CURVE (lanceolate to a sharp point) and a broader drawn SEPAL outline · v7: one point raised to clear the floor (W2) |
+
+- **The daisy's triangle count FALLS by 32,032.** Its LAW tip shape 2.5 sat in the apex row ramp (84
+  blade rows, `bladeRowsFor(2.5)`), and a CURVE petal builds at the base 56.
+- Every version loads as new with 0 notes. The validator reads **20 of 20 PASS**. The only warning is
+  v6's W2, kept as the record of what v6 read.
+
+**Per flower, what outline changed and what it did not:**
+
+- **Daisy.**
+  - CHANGED: the paddle with a pinched base became a strap. With v7's rounded end and width, neighbouring
+    rays overlap as the photo's do.
+  - NOT: the notches. v6 drew them, but a dip the outline can carry on a 35 mm ray is ~0.5 mm, and it drew
+    as two ears on a squared end. The centre (disc florets) and the ray irregularity are untouched.
+- **Lotus.**
+  - CHANGED: the petals now converge to a point, and the two outer whorls draw blunter boats.
+  - NOT: **the body is still squat.** Inner-half h:w is **1.052** (v5 1.053) against the photo's
+    ≈ 1.45. That is how far the body petals cup and curl in, which no stage can set per layer. The
+    small mucro reads as the petal's own point, not as a distinct tip.
+- **Water lily.**
+  - CHANGED: the petals are lanceolate, close to v5's pointed law (tip shape 1.2 was already near). The
+    sepals draw their own broader outline.
+  - NOT: the sepals' boat CUP (`sepalCup` is off the schema), the 4 + ~10 count, and the strap stamens.
+
+### 13.5 Miss log — S3's rows, and what outline introduced
+
+| S3 row | now | |
+|---|---|---|
+| daisy paddles for straps (outline) | **fixed** (v7, to Eva's eye) | the round-ended strap |
+| lotus mucro (outline) | **partly fixed** | the petals converge to a point; no distinct mucro (under the floor) |
+| water lily boat-shaped sepals (outline) | **partly fixed** | the outline is broader; the boat's CUP is not outline (`sepalCup`, off the schema) |
+| lotus body still squat (S3 v5 1.05 vs 1.45) | **NOT fixed** | the outline cannot make petals wrap |
+| lotus outer whorls splay wider than the photo (1.66× vs 1.36× the body) | **not fixed** | an outline change did not touch it (whole-flower h:w 0.634) |
+
+**New misses the outline introduced, all fixed in v7:**
+
+- daisy v6's squared end with two ears (estimate);
+- daisy v6's straps narrower than the photo's (estimate);
+- water lily v6's tip point under the floor, lifted (estimate; W2).
+
+**Everything remaining, tagged:**
+
+| miss | tag |
+|---|---|
+| **lotus body squat** — the body petals cup and curl in less than the photo's | **delta slider (cup / curl per layer)** — out of every stage so far |
+| water lily sepals' boat cup | delta slider family (`sepalCup`; off the schema, not per layer) |
+| lotus outer whorls splay too wide | my estimate (L1's tilt and length) |
+| daisy rays slightly irregular | my estimate (variance left at 0) |
+| water lily 4 long + ~10 short petals | can't build (`petalCount` is whole-whorl) |
+| lotus petal count inside the bud | can't build (the photo cannot show it) |
+| daisy ray-tip notches; a distinct lotus mucro | can't build (under the 1 mm feature at this scale) |
+| disc florets | can't build (ruling 5) |
+| petals passing through each other in a closed bud | can't build (the accepted look) |
+| strap-like curling stamens | can't build |
+| colour, everywhere | can't build |
+| the lotus's green outer whorl drawn as petals | ruled (b): it stays in the petal controls |
+
+### 13.6 For Eva's ruling
+
+1. **Does the outline stage pass** on the S4 sheet?
+2. **The sepal outline in schema v3** was included because sepal count, size and angle are on the schema.
+   Was that the reading you meant?
+3. **The width-refusal hazard (§13.3)** is a live page defect, recorded and not fixed. File it as an
+   issue, as (c) was?
+4. **Section numbering:** this record is §13, and "v1 status" is §12, as the brief named it.
+
+### 13.7 Reproduce
+
+```
+export CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium
+node tools/bloom-photo-census.mjs
+node tools/bloom-photo-s2.mjs --check
+node tools/verify-bloom-photo-subset.mjs --self --save /tmp/base.json
+node tools/verify-bloom-photo-subset.mjs --negative-control --base /tmp/base.json --mutant=<id>
+node tools/verify-bloom-photo-subset.mjs docs/photo-to-bloom/eva-set/*/*.subset.bloom-design.json
+node tools/bloom-photo-s2.mjs <out> --versions v5,v6,v7 --sheet-bare docs/img/photo-to-bloom-s4.png
+```
