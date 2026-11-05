@@ -62,7 +62,10 @@ const LEN_SAMPLES = 120;      // samples per loop for the conserved yarn length
 //   KNIT_BACK_SHADE — brightness of the deepest band (heads and sinkers duck under).
 const KNIT_DRAW_FULLNESS = 0.40, KNIT_DEPTH_BANDS = 4, KNIT_BACK_SHADE = 0.75;
 const PETROL_BRIGHT = [47, 163, 163];   // --petrol-bright, the yarn's mid-tone
-const RUST_MID = [214, 132, 52];
+// "The yarn itself is straining" is an abstract state: plum (DESIGN.md), shaded the way the
+// teal yarn is — a deep body, the plum mid-tone, a pale highlight — and dashed wherever it is a
+// line on the chart, because plum beside petrol is the colour-blind pair.
+const PLUM_MID = [169, 140, 200];
 // max C/H that still interloops, at EVERY sampling the swatch may draw with (≈ 0.872),
 // so a loop the model calls interlocked always has its crossings on screen
 let INTERLOCK = 1;
@@ -71,7 +74,7 @@ const K_HAND = 0.22;          // N per px of hand–fabric gap
 const SIGMA_MAX = 60;         // N — the grip's limit
 const EPS_TABLE_MAX = 2.0;    // axial tables sampled 0..200 % extension
 const EPS_TABLE_N = 201;
-const RUST = [165, 107, 46];
+const PLUM = [104, 86, 124], PLUM_HI = [212, 200, 226];
 const TEAL = [28, 107, 107];
 const TEAL_BRIGHT = [47, 163, 163];
 
@@ -427,11 +430,11 @@ function toScreen(M, x, y) {
 
 function yarnColor(yarnStrain, P) {
   const t = P.yarnMax > 0 ? yarnStrain / P.yarnMax : 0;
-  const flip = clamp(yarnStrain / 0.01, 0, 1);              // teal -> rust over the first 1 % of yarn strain
+  const flip = clamp(yarnStrain / 0.01, 0, 1);              // teal -> plum over the first 1 % of yarn strain
   const glow = clamp(t, 0, 1);                              // then brighten toward the break
   return {
-    body: mix(mix(TEAL, RUST, flip), [214, 132, 52], glow * 0.7), hi: mix(TEAL_BRIGHT, [242, 200, 140], flip),
-    mid: mix(mix(PETROL_BRIGHT, RUST_MID, flip), [236, 160, 80], glow * 0.5),   // the knit's shaded tube
+    body: mix(mix(TEAL, PLUM, flip), PLUM_MID, glow * 0.7), hi: mix(TEAL_BRIGHT, PLUM_HI, flip),
+    mid: mix(mix(PETROL_BRIGHT, PLUM_MID, flip), PLUM_HI, glow * 0.5),   // the knit's shaded tube
   };
 }
 
@@ -705,7 +708,7 @@ function drawInset(P, E, draw) {
         strokePath(ctx, () => { ctx.moveTo(cx - Math.cos(a) * R, cy + Math.sin(a) * R); ctx.lineTo(cx + Math.cos(a) * R, cy - Math.sin(a) * R); }, dpx, col, bg);
       }
       ctx.strokeStyle = css('--petrol-bright'); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, R * 0.5, -a2, -a1); ctx.stroke();
-      ctx.strokeStyle = 'rgba(165,107,46,0.8)'; ctx.setLineDash([2, 3]); ctx.beginPath();
+      ctx.strokeStyle = rgb(PLUM_MID, 0.85); ctx.setLineDash([2, 3]); ctx.beginPath();
       const lockAng = Math.PI / 2 - P.gLock; ctx.arc(cx, cy, R * 0.62, -(bis + lockAng / 2), -(bis - lockAng / 2)); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = css('--ink-dim'); ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
       ctx.fillText('lock', cx + Math.cos(bis) * R * 0.66 + 4, cy - Math.sin(bis) * R * 0.66);
@@ -781,11 +784,12 @@ function drawChart(P) {
     const a = pts[i - 1], b = pts[i];
     if (a.f > ymax && b.f > ymax) break;
     ctx.beginPath(); ctx.moveTo(sx(a.e), sy(a.f)); ctx.lineTo(sx(b.e), sy(b.f));
-    ctx.strokeStyle = rgb(mix(TEAL_BRIGHT, RUST, b.ys > 0.002 ? 1 : 0)); ctx.stroke();
+    const strained = b.ys > 0.002;
+    ctx.strokeStyle = rgb(strained ? PLUM_MID : TEAL_BRIGHT); ctx.setLineDash(strained ? [4, 3] : []); ctx.stroke(); ctx.setLineDash([]);
   }
   if (cap < SIGMA_MAX && cap <= ymax) {
     const last = pts[pts.length - 1];
-    ctx.fillStyle = rgb(RUST); ctx.beginPath(); ctx.arc(sx(last.e), sy(last.f), 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = rgb(PLUM_MID); ctx.beginPath(); ctx.arc(sx(last.e), sy(last.f), 3, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = css('--ink-dim'); ctx.textAlign = last.e > 0.9 ? 'right' : 'left'; ctx.textBaseline = 'bottom';
     ctx.fillText('yarn break', sx(last.e) + (last.e > 0.9 ? -6 : 6), sy(last.f) - 4);
   }

@@ -25,7 +25,11 @@ const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).
 const rgb = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 const mix = (c0, c1, t) => c0.map((v, i) => Math.round(lerp(v, c1[i], clamp(t, 0, 1))));
 const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const TEAL = [47, 163, 163], INK = [233, 236, 236], DIM = [139, 148, 148], RUST = [165, 107, 46];
+const TEAL = [47, 163, 163], INK = [233, 236, 236], DIM = [139, 148, 148];
+// Companions (DESIGN.md) for ABSTRACT marks — a heating state, an oxygen atom, a broken bond,
+// UV, electrons. A real material keeps its real colour (rule 10): the dyes, merocyanine,
+// the xanthophore yellow, the chitin lamellae, the window tint and the light's own wavelength.
+const PLUM = [169, 140, 200], INDIGO = [120, 128, 216];
 
 // visible-spectrum wavelength (nm) -> RGB, the usual piecewise approximation
 function wl2rgb(l) {
@@ -228,7 +232,7 @@ const thermochromic = {
     const tx = w * 0.66, ty0 = h * 0.2, ty1 = h * 0.8;
     ctx.strokeStyle = css('--line-strong'); ctx.lineWidth = 1; ctx.strokeRect(tx - 5, ty0, 10, ty1 - ty0);
     const frac = clamp((this.T - 15) / 40, 0, 1);
-    ctx.fillStyle = this.held ? rgb(RUST) : css('--petrol-bright'); ctx.fillRect(tx - 4, ty1 - (ty1 - ty0) * frac, 8, (ty1 - ty0) * frac);
+    ctx.fillStyle = this.held ? rgb(PLUM) : css('--petrol-bright'); ctx.fillRect(tx - 4, ty1 - (ty1 - ty0) * frac, 8, (ty1 - ty0) * frac);
     const yM = ty1 - (ty1 - ty0) * clamp((31 - 15) / 40, 0, 1);
     ctx.setLineDash([2, 3]); ctx.strokeStyle = css('--ink-dim'); ctx.beginPath(); ctx.moveTo(tx - 12, yM); ctx.lineTo(tx + 12, yM); ctx.stroke(); ctx.setLineDash([]);
     c.label('31 °C melt', tx + 16, yM, 'left');
@@ -333,19 +337,19 @@ const photochromic = {
     ctx.restore();
     // the C–O bond: intact when closed, broken when open
     const ox = mx + s * 0.55, oy = my - s * 0.55;
-    ctx.beginPath(); ctx.arc(ox, oy, 3.5, 0, Math.PI * 2); ctx.fillStyle = rgb(RUST); ctx.fill(); c.label('O', ox + 8, oy - 6, 'left');
+    ctx.beginPath(); ctx.arc(ox, oy, 3.5, 0, Math.PI * 2); ctx.fillStyle = rgb(PLUM); ctx.fill(); c.label('O', ox + 8, oy - 6, 'left');
     if (open < 0.5) { ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(ox, oy); ctx.strokeStyle = 'rgba(233,236,236,0.85)'; ctx.lineWidth = 1.5; ctx.stroke(); }
-    else { ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(ox, oy); ctx.strokeStyle = 'rgba(165,107,46,0.7)'; ctx.stroke(); ctx.setLineDash([]); c.label('C–O broken', ox + 8, oy + 8, 'left', rgb(RUST)); }
+    else { ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(ox, oy); ctx.strokeStyle = rgb(PLUM, 0.8); ctx.stroke(); ctx.setLineDash([]); c.label('C–O broken', ox + 8, oy + 8, 'left'); }
     // conjugation across the open form
-    if (open > 0.5) { ctx.beginPath(); ctx.moveTo(mx - s * 1.9, my + s * 0.3); ctx.lineTo(mx + s * 2.6, my + s * 0.3); ctx.strokeStyle = rgb([200, 80, 150], 0.5 * open); ctx.lineWidth = 3; ctx.stroke(); c.label('planar · conjugated · absorbs visible light', mx + s * 0.3, my + s * 1.7, 'center', rgb([200, 80, 150])); }
+    if (open > 0.5) { ctx.beginPath(); ctx.moveTo(mx - s * 1.9, my + s * 0.3); ctx.lineTo(mx + s * 2.6, my + s * 0.3); ctx.strokeStyle = rgb([200, 80, 150], 0.5 * open); ctx.lineWidth = 3; ctx.stroke(); c.label('planar · conjugated · absorbs visible light', mx + s * 0.3, my + s * 1.7, 'center'); }
     else c.label('spiro form · halves at 90° · colourless', mx + s * 0.3, my + s * 1.7, 'center');
     c.label(open > 0.5 ? 'merocyanine' : 'spiropyran', mx + s * 0.3, my - s * 1.6, 'center', css('--ink'));
     // UV
     // the lens: a population of molecules, a fraction converted
     const lx = w * 0.74, ly = h * 0.56, LR = Math.min(w * 0.18, h * 0.34);
     if (this.held) {
-      for (let k = -2; k <= 2; k++) { const x0 = lx + k * LR * 0.35; arrow(ctx, x0 + 10, ly - LR - 44, x0, ly - LR - 8, 'rgba(160,110,255,0.9)', 1.4); }
-      c.label('UV', lx + LR * 0.9, ly - LR - 30, 'left', 'rgba(160,110,255,1)');
+      for (let k = -2; k <= 2; k++) { const x0 = lx + k * LR * 0.35; arrow(ctx, x0 + 10, ly - LR - 44, x0, ly - LR - 8, rgb(INDIGO, 0.9), 1.4); }
+      c.label('UV', lx + LR * 0.9, ly - LR - 30, 'left');
     }
     ctx.beginPath(); ctx.arc(lx, ly, LR, 0, Math.PI * 2); ctx.fillStyle = rgb([200, 80, 150], 0.05 + 0.6 * f); ctx.fill(); ctx.strokeStyle = css('--line-strong'); ctx.lineWidth = 1; ctx.stroke();
     for (const p of this.pop) { const on = p.u < f; ctx.beginPath(); ctx.arc(lx + p.x * LR, ly + p.y * LR, 1.8, 0, Math.PI * 2); ctx.fillStyle = on ? rgb([255, 140, 210], 0.95) : 'rgba(233,236,236,0.35)'; ctx.fill(); }
@@ -385,7 +389,7 @@ const chameleon = {
     // white light in, one wavelength out
     const ix = lx + lw * 0.45, iy = top - 6, rl = Math.min(80, top - h * 0.14);
     arrow(ctx, ix - rl, iy - rl, ix, iy, 'rgba(233,236,236,0.85)', 2); c.label('white light', ix - rl - 6, iy - rl - 10, 'right');
-    arrow(ctx, ix, iy, ix + rl, iy - rl, rgb(col), 3); c.label('λ ' + lam.toFixed(0) + ' nm · ' + wlName(lam), ix + rl + 6, iy - rl - 10, 'left', rgb(col));
+    arrow(ctx, ix, iy, ix + rl, iy - rl, rgb(col), 3); c.label('λ ' + lam.toFixed(0) + ' nm · ' + wlName(lam), ix + rl + 6, iy - rl - 10, 'left', css('--ink'));
     // as seen: structural colour under the yellow pigment
     const seen = mix(col, [227, 179, 65], 0.35);
     this.seen = seen;
@@ -433,7 +437,7 @@ const morpho = {
     c.label('viewing angle ' + this.angle.toFixed(0) + '°', cx - shelf - 8, top - 22, 'right');
     c.label('reflections in phase at λ = 2(n₁d₁ + n₂d₂)cos θ', w * 0.5, h - 12, 'center');
     swatch(c, w * 0.8, h * 0.22, w * 0.14, h * 0.28, rgb(col), 'wing, seen');
-    c.label('λ ' + lam.toFixed(0) + ' nm · ' + wlName(lam), w * 0.87, h * 0.62, 'center', rgb(col));
+    c.label('λ ' + lam.toFixed(0) + ' nm · ' + wlName(lam), w * 0.87, h * 0.62, 'center', css('--ink'));
     c.label('no blue pigment anywhere', w * 0.87, h * 0.7, 'center');
   },
   readout() { const lam = this.lambda(); return { state: this.wet > 0.5 ? 'wet — index contrast reduced, peak shifted to green' : this.angle > 30 ? 'tilted — shorter path, bluer' : 'dry, face-on — blue', lambda: lam.toFixed(0) + ' nm (' + wlName(lam) + ')', gap: 'n ' + this.ngap().toFixed(2) + (this.wet > 0.5 ? ' (alcohol)' : this.wet > 0.05 ? ' (evaporating)' : ' (air)') }; },
@@ -511,7 +515,7 @@ const svg = document.getElementById('ec-svg');
 if (!svg) return;
 const NS = 'http://www.w3.org/2000/svg';
 const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const RATE = 0.5, N = 10, M = 16, BLUE = '#3a5fd0', ION = 'rgba(233,236,236,0.9)', ELEC = '#e8b06e';
+const RATE = 0.5, N = 10, M = 16, BLUE = '#7880d8' /* indigo */, ION = 'rgba(233,236,236,0.9)', ELEC = '#b3dbb4' /* mint */;
 const el = (name, attrs, parent = svg) => { const n = document.createElementNS(NS, name); for (const k in attrs) n.setAttribute(k, attrs[k]); parent.appendChild(n); return n; };
 const txt = (x, y, s, anchor = 'middle') => { const t = el('text', { x, y, 'font-size': 12, 'letter-spacing': '0.06em', 'text-anchor': anchor, 'font-family': 'IBM Plex Mono, monospace', style: 'fill:var(--ink-faint)' }); t.textContent = s; return t; };
 

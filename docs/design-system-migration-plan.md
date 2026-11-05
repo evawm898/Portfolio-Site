@@ -205,3 +205,39 @@ Each batch: migrate → screenshots → PR → gates + deploy preview → link t
 Eva → merge on her sign-off → report the sha → delete the branch → next.
 No workflow file is edited in any batch (an edit to an existing workflow
 costs frozen tags).
+
+## 8. Batch 2 as built (field-note tools)
+
+- **Stretch simulator.** "Yarn itself straining" → plum, shaded like the
+  teal yarn: a deep body, the plum mid-tone, a pale highlight. Wherever it is
+  a line it is dashed: the chart segment, the lock arc, the legend and the
+  in-text key. The near-break bar is a plum hatch. The regime warning is ink
+  with `!`.
+- **Conductive trace.** Copper stays copper (rule 10). Silver → ink-2 / dim.
+  The resistance-warning family is indigo: crack edges, lost contacts,
+  sparks, the open-circuit marker, and the bar as a hatch. Copper straining
+  past its meander tints toward plum, not rust. Electron cores → mint.
+- **Color change.**
+  - Thermometer while heating → plum. The oxygen atom and the broken C–O
+    bond → plum (the bond was already dashed). UV arrows → indigo.
+  - Electrochromic `#3A5FD0` → indigo. Electrons → mint.
+  - Every coloured diagram LABEL is ink or dim now; the mark beside it keeps
+    its colour.
+  - Kept as material colours: the leuco dye, merocyanine, the xanthophore
+    yellow, the light's own wavelength, and the window tint ramps.
+- **Correction to R6's premise.** The browns are not thermochromic pigment:
+  they are the Morpho wing's **chitin lamellae**. That is still a real
+  material in its real colour and not an undyed fibre, so they are kept.
+- **Quantifying comfort.** The instrument charts were orange `#D85A30`,
+  which the Part 0 audit missed. They are abstract data, so the series are
+  now mint and the chart's words ink. Every pressed toggle's text on deep is
+  now ink (it was ground). The fabric and skin scenes are material colours
+  and are kept.
+- **Knit lab.** A failing read-out is ink with `!` (it was amber text).
+- **Found, not caused.** Both simulators' warning-text rule
+  (`.x__line.is-warn strong`) never matched, because the page toggles
+  `is-warn` on the `<strong>` itself. The rust warning text was never shown on
+  `main`; the `!` is now shown.
+- **Left and flagged.** On color-change, the gel-electrolyte label is
+  `#3c4649` text drawn on the pale substrate swatch (a depicted material, where
+  ink would not read).

@@ -6,11 +6,6 @@
    interactive notes, so none of them can restyle another.
 --------------------------------------------------- */
 
-:root {
-  --rust:        #a56b2e;
-  --rust-bright: #e8b06e;
-}
-
 /* ---------- principle bands: the site's section label, full width */
 
 .cc__principle {

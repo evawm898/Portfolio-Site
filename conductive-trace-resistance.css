@@ -8,10 +8,13 @@
 --------------------------------------------------- */
 
 :root {
-  --rust:        #a56b2e;
-  --rust-bright: #e8b06e;
-  --copper:      #c97e42;
-  --silver:      #c4cccc;
+  /* Copper is drawn in copper: a real material in its real colour is
+     content (DESIGN.md rule 10). Silver is a neutral, so it is ink-2.
+     The resistance warning is an abstract state: indigo, always hatched. */
+  --copper:   #c97e42;
+  --silver:   var(--color-ink-2);
+  --ctr-warn: var(--color-indigo);
+  --ctr-hatch: repeating-linear-gradient(135deg, var(--ctr-warn) 0 3px, transparent 3px 5px);
 }
 
 .ctr {
@@ -308,7 +311,10 @@ body.is-pulling .ctr__canvas { cursor: grabbing; }
   color: var(--ink-faint);
   margin-bottom: 0.15rem;
 }
-.ctr__line.is-warn strong { color: var(--rust-bright); }
+/* The page toggles is-warn on the <strong> itself (#ro-regime); the old
+   ".ctr__line.is-warn strong" selector never matched it, on main as here. */
+.ctr__line strong.is-warn { color: var(--color-ink); }
+.ctr__line strong.is-warn::before { content: "! "; }
 
 .ctr__bar {
   position: relative;
@@ -323,7 +329,7 @@ body.is-pulling .ctr__canvas { cursor: grabbing; }
   background: var(--petrol-bright);
   transition: width 0.08s linear;
 }
-.ctr__bar-fill.is-warn { background: var(--rust-bright); }
+.ctr__bar-fill.is-warn { background: var(--ctr-hatch); }
 
 .ctr__chart {
   display: block;
@@ -367,7 +373,7 @@ body.is-pulling .ctr__canvas { cursor: grabbing; }
 }
 .ctr-key--copper { background: var(--copper); }
 .ctr-key--silver { background: var(--silver); }
-.ctr-key--rust { background: var(--rust-bright); }
+.ctr-key--warn { background: var(--ctr-hatch); }
 
 /* ---------- responsive */
 

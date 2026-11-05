@@ -93,7 +93,8 @@
 }
 .kl__ro dt { color: var(--ink-dim); }
 .kl__ro dd { text-align: right; font-variant-numeric: tabular-nums; }
-.kl__ro dd.is-bad { color: #e8b06e; }
+.kl__ro dd.is-bad { color: var(--color-ink); }
+.kl__ro dd.is-bad::before { content: "! "; }
 
 .kl__chart {
   display: block;
