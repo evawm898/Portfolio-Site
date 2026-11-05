@@ -19,7 +19,7 @@ controls.enableDamping = false;
 
 function makeScene() {
   const s = new THREE.Scene();
-  s.background = new THREE.Color(0x0b0b0d);
+  s.background = new THREE.Color(0x060707);   // --color-ground (tokens.css)
   s.add(new THREE.HemisphereLight(0xffffff, 0x303038, 0.7));
   const k = new THREE.DirectionalLight(0xffffff, 1.9); k.position.set(-80, -60, 35); s.add(k); // raking, so a 0.3 mm relief reads
   const r = new THREE.DirectionalLight(0x9fb8ff, 0.5); r.position.set(60, 40, -30); s.add(r);

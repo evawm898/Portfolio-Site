@@ -5,8 +5,13 @@
    point of this page is white ink accumulating on black, so the viewport is
    pure #000 and the chrome sits just off it. */
 
-:root { --mono: "IBM Plex Mono", ui-monospace, monospace; color-scheme: dark; }
-html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
+:root { --mono: var(--type-mono); color-scheme: dark; }
+/* DESIGN SYSTEM (batch 9): the chrome is on tokens. The viewport ground stays
+   pure #000 — it is the drawing's own ground and the additive-ink calibration
+   rests on it (artwork). The accent stays SEAFOAM, the system's own, because
+   the selected petal is drawn in the same teal on the canvas and the panel's
+   word for it has to match. A warning or error is ink with a glyph (R1). */
+html, body { margin: 0; height: 100%; background: #000; color: var(--color-ink); }
 #plot-canvas { display: block; width: 100vw; height: 100vh; }
 
 /* The two fixed columns. Each SCROLLS, so a long read-out never pushes a
@@ -21,8 +26,8 @@ html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
 
 .panel {
   font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
-  background: rgba(6, 8, 8, 0.88); border: 1px solid #2b3333;
-  padding: 0.7rem 0.9rem; border-radius: 2px; color: #96a2a1;
+  background: color-mix(in srgb, var(--color-ground) 88%, transparent); border: 1px solid var(--color-line);
+  padding: 0.7rem 0.9rem; border-radius: 2px; color: var(--color-dim);
 }
 
 /* PANELS ARE ALWAYS PRESENT AND EACH COLLAPSES ON ITS OWN — native <details>,
@@ -30,17 +35,17 @@ html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
    the page was in the wrong state when it was looked for. Nothing here is ever
    conditionally hidden; a panel with nothing to report says so. */
 .panel > summary {
-  color: #6fb7ae; letter-spacing: 0.08em; cursor: pointer;
+  color: var(--color-seafoam); letter-spacing: 0.08em; cursor: pointer;
   list-style: none; user-select: none; display: flex; align-items: center; gap: 0.4rem;
 }
 .panel > summary::-webkit-details-marker { display: none; }
 .panel > summary::before { content: '\25be'; font-size: 0.85em; width: 0.7em; }
 .panel:not([open]) > summary::before { content: '\25b8'; }
-.panel > summary:hover { color: #8fd3ca; }
+.panel > summary:hover { color: var(--color-ink); }
 .panel[open] > summary { margin-bottom: 0.5rem; }
 
 .plot-row { display: grid; grid-template-columns: 4.2rem 1fr 5.4rem; align-items: center; gap: 0.5rem; }
-.plot-row input[type=range] { width: 100%; accent-color: #6fb7ae; margin: 0; display: block; }
+.plot-row input[type=range] { width: 100%; accent-color: var(--color-seafoam); margin: 0; display: block; }
 /* A CONTROL THAT APPLIES TO NOTHING SAYS SO. A warp belongs to its petal, so
    with none picked the two scales have nowhere to write — they are disabled
    rather than left showing the last petal's numbers, which is exactly how the
@@ -61,25 +66,27 @@ html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
   content: ""; position: absolute; pointer-events: none;
   left: 0; width: calc(8px + var(--plot-dead, 0) * (100% - 16px));
   top: 0; bottom: 0;
-  border-right: 2px solid #6fb7ae;
-  background: repeating-linear-gradient(135deg, rgba(111, 183, 174, 0.30) 0 2px,
+  border-right: 2px solid var(--color-seafoam);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-seafoam) 30%, transparent) 0 2px,
                                         transparent 2px 6px);
 }
-.plot-row output { text-align: right; color: #c8d2d1; font-size: 0.68rem; }
+.plot-row output { text-align: right; color: var(--color-ink-2); font-size: 0.68rem; }
 .plot-row select {
-  background: #0a0e0e; color: #c8d2d1; border: 1px solid #2b3333;
+  background: var(--color-raised); color: var(--color-ink-2); border: 1px solid var(--color-line);
   font: inherit; padding: 0.15rem 0.3rem; border-radius: 2px; width: 100%;
 }
-.plot-hint { margin: 0.55rem 0 0.4rem; color: #6b7776; }
+.plot-hint { margin: 0.55rem 0 0.4rem; color: var(--color-faint); }
 
 #plot-log, #plot-drawstate, #plot-framestate {
-  margin: 0.2rem 0 0; white-space: pre-wrap; font: inherit; color: #96a2a1;
+  margin: 0.2rem 0 0; white-space: pre-wrap; font: inherit; color: var(--color-dim);
 }
-#plot-drawstate { margin-top: 0.65rem; padding-top: 0.6rem; border-top: 1px solid #222a2a; }
-#plot-framestate { color: #6b7776; }
-.panel b { color: #6fb7ae; font-weight: 500; }
-.panel .err { color: #e07a6a; }
-.panel .warn { color: #d6a15c; }
+#plot-drawstate { margin-top: 0.65rem; padding-top: 0.6rem; border-top: 1px solid var(--color-line); }
+#plot-framestate { color: var(--color-faint); }
+.panel b { color: var(--color-seafoam); font-weight: 500; }
+.panel .err { color: var(--color-ink); }
+.panel .err::before { content: '\2715\00a0'; }
+.panel .warn { color: var(--color-ink); }
+.panel .warn::before { content: '! '; }
 
 /* THE COMPOSITION PANEL. A save button and a load control on one row, in the
    column that already reads and writes files. The file input is styled like
@@ -87,36 +94,36 @@ html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
    on the page you hand a file to. */
 .plot-file-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
 .plot-file-row button {
-  background: none; border: 1px solid #2b3333; color: #96a2a1;
+  background: none; border: 1px solid var(--color-line); color: var(--color-dim);
   font: inherit; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 2px;
 }
-.plot-file-row button:hover { border-color: #6fb7ae; color: #c8d2d1; }
-.plot-file-load { color: #6b7776; font-size: 0.68rem; }
+.plot-file-row button:hover { border-color: var(--color-seafoam); color: var(--color-ink-2); }
+.plot-file-load { color: var(--color-faint); font-size: 0.68rem; }
 .plot-file-load input[type=file] { display: block; margin-top: 0.3rem; max-width: 100%; font: inherit; color: inherit; }
 #plot-compstate, #plot-frameinfo, #plot-shapestate {
-  margin: 0.55rem 0 0; padding-top: 0.5rem; border-top: 1px solid #222a2a;
-  white-space: pre-wrap; font: inherit; color: #96a2a1;
+  margin: 0.55rem 0 0; padding-top: 0.5rem; border-top: 1px solid var(--color-line);
+  white-space: pre-wrap; font: inherit; color: var(--color-dim);
 }
-#plot-compstate .ok { color: #6fb7ae; }
+#plot-compstate .ok { color: var(--color-seafoam); }
 
 #plot-bundle-load input[type=file] {
   display: block; margin-top: 0.3rem; max-width: 100%; font: inherit; color: inherit;
 }
-#plot-bundle-load .hint { color: #6b7776; font-size: 0.68rem; display: block; margin-top: 0.3rem; }
+#plot-bundle-load .hint { color: var(--color-faint); font-size: 0.68rem; display: block; margin-top: 0.3rem; }
 
 /* THE BEND ROW. Two nudge buttons and a reset, sitting in the middle column of
    the same three-column row every slider uses, so the bend-point count reads as
    one more control rather than as a widget bolted under the panel. */
 .plot-bends { display: flex; align-items: center; gap: 0.3rem; }
 .plot-bends button {
-  background: none; border: 1px solid #2b3333; color: #96a2a1;
+  background: none; border: 1px solid var(--color-line); color: var(--color-dim);
   font: inherit; line-height: 1; padding: 0.15rem 0.4rem; cursor: pointer; border-radius: 2px;
 }
-.plot-bends button:hover:not(:disabled) { border-color: #6fb7ae; color: #c8d2d1; }
+.plot-bends button:hover:not(:disabled) { border-color: var(--color-seafoam); color: var(--color-ink-2); }
 .plot-bends button:disabled { opacity: 0.35; cursor: default; }
-.plot-bends #bendCount { color: #c8d2d1; min-width: 1.2em; text-align: center; }
+.plot-bends #bendCount { color: var(--color-ink-2); min-width: 1.2em; text-align: center; }
 .plot-check { display: block; margin: 0.5rem 0 0; cursor: pointer; user-select: none; }
-.plot-check input { accent-color: #6fb7ae; margin: 0 0.35rem 0 0; vertical-align: -0.1em; }
+.plot-check input { accent-color: var(--color-seafoam); margin: 0 0.35rem 0 0; vertical-align: -0.1em; }
 
 /* THE PETAL PICKER. A dropdown flanked by two steppers, in the middle column of
    the same three-column row every slider uses. Both, and in that order, because
@@ -126,39 +133,39 @@ html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
    both. The select takes the free space so a petal's name is never clipped. */
 .plot-pick { display: flex; align-items: center; gap: 0.3rem; }
 .plot-pick select {
-  background: #0a0e0e; color: #c8d2d1; border: 1px solid #2b3333;
+  background: var(--color-raised); color: var(--color-ink-2); border: 1px solid var(--color-line);
   font: inherit; padding: 0.15rem 0.3rem; border-radius: 2px; flex: 1 1 auto; min-width: 0;
 }
 .plot-pick button {
-  background: none; border: 1px solid #2b3333; color: #96a2a1;
+  background: none; border: 1px solid var(--color-line); color: var(--color-dim);
   font: inherit; line-height: 1; padding: 0.15rem 0.35rem; cursor: pointer;
   border-radius: 2px; flex: 0 0 auto;
 }
-.plot-pick button:hover:not(:disabled) { border-color: #6fb7ae; color: #c8d2d1; }
+.plot-pick button:hover:not(:disabled) { border-color: var(--color-seafoam); color: var(--color-ink-2); }
 .plot-pick button:disabled { opacity: 0.35; cursor: default; }
 
 #plot-stemstate, #plot-petalstate {
-  margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid #222a2a;
-  white-space: pre-wrap; font: inherit; color: #96a2a1;
+  margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid var(--color-line);
+  white-space: pre-wrap; font: inherit; color: var(--color-dim);
 }
 /* The selected petal is drawn in the panel's own teal on the canvas, so the
    name of it in the read-out is too — one colour means "this one" in both
    places. `.panel b` is already teal, and a second name for the same colour is
    a second thing to keep in step. */
-#plot-petalstate .sel { color: #6fb7ae; }
+#plot-petalstate .sel { color: var(--color-seafoam); }
 
 #resetView {
-  background: none; border: 1px solid #2b3333; color: #96a2a1;
+  background: none; border: 1px solid var(--color-line); color: var(--color-dim);
   font: inherit; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 2px;
 }
-#resetView:hover { border-color: #6fb7ae; color: #c8d2d1; }
+#resetView:hover { border-color: var(--color-seafoam); color: var(--color-ink-2); }
 
 #plot-dropzone-hint {
   position: fixed; inset: 0.6rem; z-index: 10; pointer-events: none;
   display: flex; align-items: center; justify-content: center;
-  border: 2px dashed #6fb7ae; border-radius: 4px;
-  background: rgba(0, 0, 0, 0.72);
-  font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.06em; color: #c8d2d1;
+  border: 2px dashed var(--color-seafoam); border-radius: 4px;
+  background: color-mix(in srgb, var(--color-ground) 72%, transparent);
+  font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.06em; color: var(--color-ink-2);
 }
 #plot-dropzone-hint[hidden] { display: none; }
 #plot-canvas.dragging { cursor: grabbing; }
