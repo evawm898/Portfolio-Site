@@ -1,11 +1,12 @@
-// dyeing.js — the DYEING section of /textile-101.html (prototype): where colour enters the
-// fiber -> yarn -> fabric chain, pigment vs dye, why the fiber decides the dye class, and one
+// textile-dyeing.js — the animations of the Dyeing field note (/dyeing.html): where colour enters
+// the fiber -> yarn -> fabric chain, pigment vs dye, why the fiber decides the dye class, and one
 // bath with two dyes (cross dyeing). Drawn in /textile-basics.js's stroke language (DRAW: a
 // fibre is a 1.3-unit line on a background-coloured halo, a strand behind a yarn is dimmed) via
-// ./dye-draw.js, which adds the fibre colour as a parameter.
+// /textile-dyeing-draw.js, which adds the fibre colour as a parameter. tools/dyeing-proto/ holds
+// the recording and checking tools.
 //
 // COLOUR HAS ONE OWNER: the section's CSS custom properties (--dye-disperse, --dye-acid,
-// --dye-reactive, --dye-undyed; see dyeing.css). DYE below holds var() references to them and
+// --dye-reactive, --dye-undyed; see /dyeing.css). DYE below holds var() references to them and
 // nothing else, so the final palette pick is a CSS edit, not a JS one.
 //
 // A scene is { viewBox, duration, build(state) -> static markup, frame(t, state) ->
@@ -18,8 +19,8 @@
 // Playback (mountDyeing): every scene plays once when scrolled into view and holds its end frame;
 // scrolled away mid-play it jumps to the end; hover / tap replays; a control (stage picker,
 // toggles) replays its scene with the new state; prefers-reduced-motion draws end frames only.
-import { DRAW, VIEW } from '../../textile-basics.js';
-import { dyedPiece, dyedWeave, yarnOn, glyph } from './dye-draw.js';
+import { DRAW, VIEW } from './textile-basics.js';
+import { dyedPiece, dyedWeave, yarnOn, glyph } from './textile-dyeing-draw.js';
 
 const { INK, BG, SW, SEED, TAU, rng, seg, ease, lerp, f1, poly, runsMarkup, makeFibre, posedPoints, lineSeg, arcSeg, centreline } = DRAW;
 
@@ -633,7 +634,7 @@ export function mountDyeing(root = document, opts = {}) {
       };
       p.raf = requestAnimationFrame(step);
     };
-    p.setState = patch => { Object.assign(p.state, patch); opts.onState?.(p); if (p.visible || reduce) p.play(); else { p.played = false; p.seek(0); } };
+    p.setState = patch => { Object.assign(p.state, patch); opts.onState?.(p); if (p.onScreen || reduce) p.play(); else { p.played = false; p.seek(0); } };
     draw(p.t);
     if (!reduce) {
       host.addEventListener('mouseenter', () => { if (p.played && !p.playing) p.play(); });
@@ -654,14 +655,16 @@ export function mountDyeing(root = document, opts = {}) {
   }
   players.forEach(p => opts.onState?.(p));
   if (!reduce && opts.autoplay !== false && typeof IntersectionObserver === 'function') {
+    // autoplay once 45% is on screen; a control press replays whenever any of it is on screen;
+    // a scene scrolled fully away mid-play jumps to its end frame
     const io = new IntersectionObserver(es => {
       for (const e of es) {
         const p = players.find(q => q.host === e.target); if (!p) continue;
-        p.visible = e.isIntersecting;
-        if (e.isIntersecting && !p.played) p.play();
-        else if (!e.isIntersecting && p.playing) p.seek(1);
+        p.onScreen = e.isIntersecting && e.intersectionRatio > 0;
+        if (e.intersectionRatio >= 0.45 && !p.played) p.play();
+        else if (!p.onScreen && p.playing) p.seek(1);
       }
-    }, { threshold: 0.45 });
+    }, { threshold: [0, 0.45] });
     players.forEach(p => io.observe(p.host));
   }
   return players;

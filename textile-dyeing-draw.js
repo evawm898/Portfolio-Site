@@ -1,11 +1,11 @@
-// tools/dyeing-proto/dye-draw.js — DYED yarns and swatches in /textile-basics.js's stroke language.
+// textile-dyeing-draw.js — DYED yarns and swatches in /textile-basics.js's stroke language.
 // pieceMarkup() there draws every fibre in INK (the teal one in ACCENT); this is the same piece —
 // fibreSlice + splitRuns + runsMarkup on a background band — with the fibre colour a parameter,
 // plus fibre KINDS so two fibres in one fabric differ by pattern, never by colour alone:
 //   staple    — cotton: short crimped fibres, twisted (DRAW's own material)
 //   filament  — polyester: continuous, near-straight filaments
 //   textured  — nylon: continuous filaments with a strong crimp
-import { DRAW, VIEW } from '../../textile-basics.js';
+import { DRAW, VIEW } from './textile-basics.js';
 const { INK, BG, SW, HALO, BACK, EDGE, SEED, TAU, rng, f1, poly, runsMarkup, splitRuns, makeFibre,
   lineSeg, centreline, fibreSlice, bandPath, yarnFibres } = DRAW;
 

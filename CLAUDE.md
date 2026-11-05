@@ -12461,3 +12461,20 @@ unshadowed; 131 once the holes stayed holes) — keep `alphaTest 0.5` on the cut
 material in lit mode; and the lamp is sized from the WALL distance (`I ∝ d²`)
 so the wall reads at any star size. Four Light sliders are view state saved
 in the design file; Folded restores every phase-1 value (`setLit(null)`).**
+
+## `/dyeing` — the Dyeing field note (pointer only)
+
+Field Notes No. 08 (`dyeing.html`, `dyeing.css`, `textile-dyeing.js`, `textile-dyeing-draw.js`; tools in
+`tools/dyeing-proto/` — read its README before touching any of it). Four parts, thirteen animations, drawn
+in `/textile-basics.js`'s `DRAW` stroke language: where colour enters the chain (a stage picker; a row of
+four, a 2 × 2 grid under 560 px), pigment vs dye, the three dye classes, and cross dyeing with Reserve and
+Reality toggles. Copy stays generic — no internal product, project or band names.
+- **Colour has one owner**: `--dye-*` on `#dyeing` in `dyeing.css` (Eva's Direction A: indigo disperse,
+  plum acid, mint reactive). The JS only writes `var(--dye-*)`; `verify-page.mjs` fails on a dye hex in
+  the markup. Indigo/plum is the closest pair and they share the cross-dyed swatch, which is why fibre
+  pattern and molecule shape also separate them — never colour alone.
+- **The poly/nylon Reality copy is Eva's (row 15) and its slot ships empty** (`[data-cross-note="reality"]`,
+  hidden while empty). Basic/cationic dye is left out by ruling. Finishes (deck slide 55) are a later
+  section of this note.
+- Gate: `node tools/dyeing-proto/verify-page.mjs` (1280 and 390). Nothing runs in CI — no workflow
+  names these files. Recordings: `node tools/dyeing-proto/shoot.mjs <dir>`.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// shoot.mjs — record the dyeing animations and the section's end frames.
+// shoot.mjs — record the Dyeing field note's animations (/dyeing.html) and its end frames.
 //   NODE_PATH=/opt/node22/lib/node_modules node tools/dyeing-proto/shoot.mjs <dir> [--only=a,b] [--sheet] [--no-video]
 // Per animation (and per interactive state: chain at three stages, cross with each toggle):
 // <name>.mp4 + <name>.gif, rendered by seeking t at 30 fps (the scene's own timing, not this
@@ -29,7 +29,7 @@ const server = http.createServer((q, r) => {
   r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); fs.createReadStream(p).pipe(r);
 }).listen(0);
 const port = server.address().port;
-const url = q => `http://localhost:${port}/tools/dyeing-proto/index.html${q || ''}`;
+const url = q => `http://localhost:${port}/dyeing.html${q || ''}`;
 
 // clip = scene + state
 const CLIPS = [

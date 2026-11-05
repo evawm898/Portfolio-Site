@@ -1,34 +1,35 @@
-# Dyeing prototype (unlinked)
+# Dyeing field note — tools
 
-This is a scratch page for section 10 of `/textile-101.html`, "Dyeing". It has four parts and thirteen animations:
+`/dyeing.html` is Field Notes No. 08, "Dyeing". It has four parts and thirteen animations:
 
-* **10.1 Where Color Enters.** A stage picker over the polymer → fiber → yarn → fabric chain. It is a row of four on wide screens, and under 560 px a 2 × 2 grid that draws its own labels. Then the three ways to dye yarn (skein, package, warp beam), and how far the dye gets into a yarn.
-* **10.2 Inside, On, or Into.** Solution-dyed, pigment printed, and dyed, each shown as a fiber cross-section.
-* **10.3 Why the Fiber Decides the Dye.** Disperse → polyester, acid → nylon, reactive → cotton.
-* **10.4 One Bath, Two Dyes — Cross Dyeing.** It has two toggles, Reserve and Reality. The poly/nylon "Reality" copy slot is left empty on purpose; that copy is Eva's to write (row 15).
+* **01 Where Color Enters.** A stage picker over the polymer → fiber → yarn → fabric chain. It is a row of four on wide screens, and under 560 px a 2 × 2 grid that draws its own labels. Then the three ways to dye yarn (skein, package, warp beam), and how far the dye gets into a yarn.
+* **02 Inside, On, or Into.** Solution-dyed, pigment printed, and dyed, each shown as a fiber cross-section.
+* **03 Why the Fiber Decides the Dye.** Disperse → polyester, acid → nylon, reactive → cotton. Basic/cationic dye is left out, by ruling.
+* **04 One Bath, Two Dyes — Cross Dyeing.** It has two toggles, Reserve and Reality. The poly/nylon "Reality" copy slot is empty on purpose and shows nothing until Eva writes that copy (row 15).
 
-The page is not linked yet. Nothing on `/textile-101.html` reads these files.
+Where the code lives:
 
-**Colour has one owner.** The dye colours are CSS custom properties on `#dyeing` in `dyeing.css`. The option 1 and option 3 values are commented next to the current ones. `dyeing.js` only ever writes `var(--dye-*)`, so the final palette pick is a three-line CSS edit. The palette is PROVISIONAL: option 2.
+* `/textile-dyeing.js` holds the scenes and the playback.
+* `/textile-dyeing-draw.js` draws dyed yarns in `/textile-basics.js`'s stroke language (`DRAW`). It adds a fibre colour parameter and three fibre kinds that are told apart by pattern (cotton staple, smooth polyester filament, crimped nylon filament).
+* `/dyeing.css` holds the page's styles. The page also uses `textile-101.css` for its section and TOC layout.
 
-Drawing goes through `/textile-basics.js`'s `DRAW`, via `dye-draw.js`. That file adds a fibre colour parameter and three fibre kinds that are told apart by pattern (cotton staple, smooth polyester filament, crimped nylon filament).
+**Colour has one owner.** The dye colours are CSS custom properties on `#dyeing` in `/dyeing.css`: indigo (disperse), plum (acid), mint (reactive). This is Eva's palette, Direction A. `textile-dyeing.js` only ever writes `var(--dye-*)`, so a palette change is a CSS edit.
 
-Each scene builds its static fibres once per state. A frame then only sets CSS colour variables on the `<svg>` and redraws one group of moving molecules.
+Each scene builds its static fibres once per state. A frame then only sets CSS colour variables on the `<svg>` and redraws one group of moving molecules. The page takes two test switches: `?still` turns off scroll-triggered autoplay (used for recording), and `?reduce` forces end frames.
 
-Files:
+Files here:
 
-* `index.html` is the section with its copy. `?still` turns off scroll-triggered autoplay; `?reduce` forces end frames.
 * `shoot.mjs <dir> [--only=a,b] [--sheet] [--no-video]` writes:
   * `<clip>.mp4` and `<clip>.gif` for each animation, and for each interactive state (the chain at three stages, the chain's 2 × 2 phone layout, cross dyeing with each toggle);
-  * `end-1280.png` and `end-390.png`, the whole section's end frames;
+  * `end-1280.png` and `end-390.png`, the page's end frames;
   * the per-frame draw cost;
   * `sheet.png` with `--sheet`, every clip at t = 0 … 1.
-* `verify-page.mjs [page]` checks, at 1280 and 390:
-  * playback: each scene plays once on scroll-in and holds its end frame; scrolled away mid-play it jumps to the end; hover and tap replay; under reduced motion it shows end frames only;
+* `verify-page.mjs [page]` (the default page is `dyeing.html`) checks, at 1280 and 390:
+  * playback: each scene plays once on scroll-in and holds its end frame; scrolled fully away mid-play it jumps to the end; hover and tap replay; under reduced motion it shows end frames only;
   * the stage buttons and the toggles;
-  * the chain's layout (a row at 1280, a 2 × 2 grid at 390 with panels at least 130 px wide), including a live resize across 560 px;
+  * the chain's two layouts, including a live resize across 560 px;
   * that no dye hex colour appears in the markup, and that changing `--dye-acid` recolours the nylon;
   * no page errors and no horizontal scroll.
-* `palette-frames.html?o=1|2|3` is the palette comparison: each option in normal vision and three colour-vision simulations.
+* `palette-frames.html?o=1|2|3` is the palette study from before Direction A: the three earlier options in normal vision and three colour-vision simulations. It's kept as a record.
 
-All the tools need `playwright` (`NODE_PATH=/opt/node22/lib/node_modules`); `shoot.mjs` also needs `ffmpeg`. Nothing here runs in CI.
+All the tools need `playwright` (`NODE_PATH=/opt/node22/lib/node_modules`); `shoot.mjs` also needs `ffmpeg`. Nothing here runs in CI: no workflow's path filter matches these files.
