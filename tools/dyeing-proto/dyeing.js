@@ -70,12 +70,32 @@ export const STAGES = [
   { id: 'solution', panel: 0 }, { id: 'fiber', panel: 1 }, { id: 'skein', panel: 2 },
   { id: 'package', panel: 2 }, { id: 'beam', panel: 2 }, { id: 'piece', panel: 3 },
 ];
+// Two layouts of the same four panels. ROW (wide screens): left to right, labels in the HTML
+// under the svg. GRID (narrow, under 560 px): a 2 x 2 "U" — polymer, fiber across the top, down to
+// yarn, back to fabric — so each panel keeps a readable size; its labels are drawn in the svg.
+// Every panel is drawn at its ROW position and moved by a translate, so the two layouts cannot
+// draw different panels.
 const PANEL_X = [80, 240, 400, 560], PANEL_Y = 88;
-function chainPanels(stage) {
+export const CHAIN_LAYOUT = {
+  row: {
+    viewBox: '0 0 640 176', at: PANEL_X.map(x => ({ x, y: PANEL_Y })),
+    arrows: [1, 2, 3].map(j => ({ x: PANEL_X[j - 1] + 80, y: PANEL_Y, ang: 0 })), labels: false,
+  },
+  grid: {
+    viewBox: '0 0 330 384', at: [{ x: 80, y: 88 }, { x: 250, y: 88 }, { x: 250, y: 282 }, { x: 80, y: 282 }],
+    arrows: [{ x: 165, y: 88, ang: 0 }, { x: 304, y: 185, ang: Math.PI / 2 }, { x: 165, y: 282, ang: Math.PI }], labels: true,
+  },
+};
+const PANEL_NAMES = ['Polymer', 'Fiber', 'Yarn', 'Fabric'];
+const shift = (L, i) => ({ dx: L.at[i].x - PANEL_X[i], dy: L.at[i].y - PANEL_Y });
+function chainPanels(stage, layout = 'row') {
+  const L = CHAIN_LAYOUT[layout], parts = chainParts(stage);
+  return parts.map((m, i) => { const { dx, dy } = shift(L, i); return dx || dy ? `<g transform="translate(${dx},${dy})">${m}</g>` : m; }).join('');
+}
+function chainParts(stage) {
   const idx = STAGES.findIndex(s => s.id === stage);
+  const parts = PANEL_X.map(cx => `<rect x="${cx - 70}" y="14" width="140" height="148" rx="6" fill="none" stroke="${LINE}" stroke-width="1"/>`);
   let s = '';
-  // panel frames
-  for (const cx of PANEL_X) s += `<rect x="${cx - 70}" y="14" width="140" height="148" rx="6" fill="none" stroke="${LINE}" stroke-width="1"/>`;
   // 0 · polymer: a melt chamber feeding a spinneret, three filaments coming out
   {
     const cx = PANEL_X[0];
@@ -88,6 +108,7 @@ function chainPanels(stage) {
       runs.push({ pts, depth: i, color: 'var(--a0)', op: 1 });
     }
     s += g(runsMarkup(runs));
+    parts[0] += s; s = '';
   }
   // 1 · fiber: a loose tuft of staple fibres
   {
@@ -98,6 +119,7 @@ function chainPanels(stage) {
       runs.push({ pts: posedPoints(f, pose, r()), depth: r(), color: 'var(--a1)', op: 1 });
     }
     s += g(runsMarkup(runs));
+    parts[1] += s; s = '';
   }
   // 2 · yarn: a twisted staple yarn
   {
@@ -108,17 +130,23 @@ function chainPanels(stage) {
     if (m === 'skein') s += `<path d="M${ix - 18},${iy - 12}H${ix + 18}" ${st}/>` + [-10, 0, 10].map(d => `<path d="M${ix + d - 3},${iy - 12}V${iy + 6}A3,3 0 0 0 ${ix + d + 3},${iy + 6}V${iy - 12}" ${st}/>`).join('');
     if (m === 'package') s += `<path d="M${ix - 9},${iy - 13}L${ix - 15},${iy + 11}H${ix + 15}L${ix + 9},${iy - 13}Z" ${st}/><path d="M${ix - 12},${iy - 1}H${ix + 12}M${ix - 10},${iy - 7}H${ix + 10}M${ix - 14},${iy + 5}H${ix + 14}" ${st} stroke-opacity="0.45"/>`;
     if (m === 'beam') s += `<rect x="${ix - 20}" y="${iy + 2}" width="40" height="9" rx="4.5" ${st}/>` + [-14, -7, 0, 7, 14].map(d => `<path d="M${ix + d},${iy + 2}V${iy - 14}" ${st}/>`).join('');
+    parts[2] += s; s = '';
   }
   // 3 · fabric: a small plain weave
   s += `<clipPath id="dy-chain-fab"><rect x="${PANEL_X[3] - 62}" y="22" width="124" height="132" rx="3"/></clipPath>`;
   s += `<g clip-path="url(#dy-chain-fab)">${dyedWeave({ cx: PANEL_X[3], cy: PANEL_Y, cols: 5, rows: 6, pitch: 26, rowPitch: 24, R: 9, ext: 30,
     warp: { kind: 'staple', color: 'var(--a3)', density: 0.45 }, weft: { kind: 'staple', color: 'var(--a3)', density: 0.45 } })}</g>`;
-  return s;
+  parts[3] += s;
+  return parts;
 }
 const chainScene = {
-  viewBox: '0 0 640 176', duration: 4600,
-  build: st => chainPanels(st.stage),
+  viewBox: CHAIN_LAYOUT.row.viewBox, duration: 4600,
+  viewBoxFor: st => CHAIN_LAYOUT[st.layout || 'row'].viewBox,
+  // the layout follows the viewport: a state key, so a change rebuilds the static markup
+  media: { query: '(max-width: 559.98px)', key: 'layout', on: 'grid', off: 'row' },
+  build: st => chainPanels(st.stage, st.layout),
   frame(t, st) {
+    const L = CHAIN_LAYOUT[st.layout || 'row'];
     const e = STAGES.find(s => s.id === st.stage).panel, vars = {}, k = [0, 0, 0, 0];
     k[e] = smooth(seg(t, 0.16, 0.5));
     for (let j = e + 1; j < 4; j++) k[j] = smooth(seg(t, 0.52 + 0.13 * (j - e - 1), 0.64 + 0.13 * (j - e - 1)));
@@ -126,15 +154,20 @@ const chainScene = {
     let dyn = '';
     // arrows between panels: lit once the colour has passed through
     for (let j = 1; j < 4; j++) {
-      const x = PANEL_X[j - 1] + 80, lit = j > e ? smooth(seg(t, 0.48 + 0.13 * (j - e - 1), 0.56 + 0.13 * (j - e - 1))) : 0;
-      const c = mixTo(DYE.colour, lit, INK);
-      dyn += `<path d="M${x - 6},${PANEL_Y}H${x + 6}" stroke="${c}" stroke-width="1.3" stroke-opacity="${f1((0.45 + 0.55 * lit) * 100) / 100}"/>` + arrowHead(x + 7, PANEL_Y, 0, 5, c, 0.45 + 0.55 * lit);
+      const A = L.arrows[j - 1], lit = j > e ? smooth(seg(t, 0.48 + 0.13 * (j - e - 1), 0.56 + 0.13 * (j - e - 1))) : 0;
+      const c = mixTo(DYE.colour, lit, INK), cs = Math.cos(A.ang), sn = Math.sin(A.ang);
+      dyn += `<path d="M${f1(A.x - 6 * cs)},${f1(A.y - 6 * sn)}L${f1(A.x + 6 * cs)},${f1(A.y + 6 * sn)}" stroke="${c}" stroke-width="1.3" stroke-opacity="${f1((0.45 + 0.55 * lit) * 100) / 100}"/>` + arrowHead(A.x + 7 * cs, A.y + 7 * sn, A.ang, 5, c, 0.45 + 0.55 * lit);
     }
+    // the GRID layout carries its own labels (the ROW layout's are HTML, under the svg)
+    if (L.labels) PANEL_NAMES.forEach((n, i) => {
+      const P = L.at[i], entry = i === e;
+      dyn += text(P.x, P.y + 74 + 14, (entry ? '\u2193 dye here \u00b7 ' : '') + n.toUpperCase(), { anchor: 'middle', size: 10, fill: entry ? DYE.colour : DIM });
+    });
     // the dye going in: drops falling into the entry panel (and, for solution dyeing, pigment into the melt)
-    const cx = PANEL_X[e], r = rng(SEED + 70 + e);
+    const { dx, dy } = shift(L, e), cx = PANEL_X[e] + dx, r = rng(SEED + 70 + e);
     for (let i = 0; i < 9; i++) {
       const t0 = 0.06 + i * 0.035, u = seg(t, t0, t0 + 0.2);
-      const x = cx + (e === 0 ? -36 + (r() - 0.5) * 30 : (r() - 0.5) * 90), y0 = 4, y1 = e === 0 ? 60 + r() * 50 : 58 + r() * 50;
+      const x = cx + (e === 0 ? -36 + (r() - 0.5) * 30 : (r() - 0.5) * 90), y0 = 4 + dy, y1 = dy + (e === 0 ? 60 + r() * 50 : 58 + r() * 50);
       if (u > 0 && u < 1) dyn += `<circle cx="${f1(x)}" cy="${f1(lerp(y0, y1, u * u))}" r="2.6" fill="${DYE.colour}"${op(1 - smooth(seg(u, 0.8, 1)))}/>`;
       if (e === 0 && u >= 1) dyn += particle(x, y1, 2.4, i, DYE.colour);
     }
@@ -574,6 +607,7 @@ export function mountDyeing(root = document, opts = {}) {
       const key = JSON.stringify(p.state);
       const f = scene.frame(t, p.state);
       if (p.built !== key) {
+        svg.setAttribute('viewBox', scene.viewBoxFor ? scene.viewBoxFor(p.state) : scene.viewBox);
         const stat = `<g class="static">${scene.build(p.state)}</g>`;
         svg.innerHTML = f.under ? `<g class="dyn"></g>${stat}` : `${stat}<g class="dyn"></g>`;
         p.built = key; p.dyn = svg.querySelector('.dyn');
@@ -583,6 +617,11 @@ export function mountDyeing(root = document, opts = {}) {
       p.dyn.innerHTML = f.dyn;
     };
     p.seek = t => { cancelAnimationFrame(p.raf); p.playing = false; p.t = t; draw(t); };
+    if (scene.media && typeof matchMedia === 'function') {
+      const mq = matchMedia(scene.media.query), apply = () => { p.state[scene.media.key] = mq.matches ? scene.media.on : scene.media.off; };
+      apply();
+      mq.addEventListener?.('change', () => { apply(); if (!p.playing) draw(p.t); });
+    }
     p.play = () => {
       if (reduce) { p.seek(1); return; }
       cancelAnimationFrame(p.raf);

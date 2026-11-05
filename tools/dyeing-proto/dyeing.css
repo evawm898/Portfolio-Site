@@ -81,6 +81,9 @@
 }
 @media (max-width: 600px) {
   .tx-dye__grid--2, .tx-dye__grid--3 { grid-template-columns: 1fr; }
-  .tx-dye__labels { font-size: 9px; letter-spacing: 0.06em; }
-  .tx-dye__labels .is-entry::before { content: "\2193\00a0"; }
+}
+/* under 560 px the chain is a 2 x 2 grid that draws its own labels (dyeing.js, CHAIN_LAYOUT.grid) */
+@media (max-width: 559.98px) {
+  .tx-dye__labels { display: none; }
+  .tx-dye__anim[data-dye-scene="chain"] { max-width: 420px; margin: 0 auto; }
 }

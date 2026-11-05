@@ -92,10 +92,33 @@ for (const [w, h] of [[1280, 900], [390, 844]]) {
     return [a, b];
   });
   ok(recolour[0] !== recolour[1] && /0, 255, 0/.test(recolour[1]), `${w}px changing --dye-acid on the section recolours the nylon (${recolour.join(' -> ')})`);
+  // the lead animation's layout: a row of four on wide screens, a 2 x 2 grid under 560 px
+  const lay = await page.evaluate(() => {
+    const p = window.__dy.find(q => q.name === 'chain'), svg = p.svg, vb = svg.viewBox.baseVal, r = svg.getBoundingClientRect();
+    const panel = r.width * 140 / vb.width;
+    const html = getComputedStyle(document.querySelector('.tx-dye__labels')).display !== 'none';
+    const svgLabels = [...svg.querySelectorAll('text')].map(t => t.textContent);
+    return { layout: p.state.layout, panel, html, svgLabels };
+  });
+  if (phone) ok(lay.layout === 'grid' && lay.panel >= 130 && !lay.html && lay.svgLabels.length === 4 && lay.svgLabels.filter(t => /dye here/.test(t)).length === 1,
+    `${w}px chain is a 2 x 2 grid: panels ${lay.panel.toFixed(0)} px wide, its own four labels (${lay.svgLabels.join(' / ')}), the HTML row hidden`);
+  else ok(lay.layout === 'row' && !lay.svgLabels.length && lay.html, `${w}px chain is one row of four (panels ${lay.panel.toFixed(0)} px), labels in the HTML row`);
+  const btnsAbove = await page.evaluate(() => document.querySelector('.tx-dye__stages').getBoundingClientRect().bottom <= document.querySelector('[data-dye-scene="chain"]').getBoundingClientRect().top);
+  ok(btnsAbove, `${w}px the stage buttons sit above the chain`);
   ok(errs.length === 0, `${w}px no page errors${errs.length ? ': ' + errs.join(' | ') : ''}`);
   const scrollW = await page.evaluate(() => document.documentElement.scrollWidth);
   ok(scrollW <= w, `${w}px no horizontal scroll (scrollWidth ${scrollW})`);
   await page.close(); await ref.close();
+}
+// resizing across 560 px switches the chain's layout in place
+{
+  const { page, errs } = await open(1280, 900);
+  const lay = () => page.evaluate(() => { const p = window.__dy.find(q => q.name === 'chain'); return p.state.layout + ' ' + p.svg.getAttribute('viewBox'); });
+  const a = await lay(); await page.setViewportSize({ width: 400, height: 900 }); await page.waitForTimeout(300);
+  const c = await lay(); await page.setViewportSize({ width: 1280, height: 900 }); await page.waitForTimeout(300);
+  const d = await lay();
+  ok(/^row 0 0 640/.test(a) && /^grid 0 0 330/.test(c) && /^row 0 0 640/.test(d) && !errs.length, `resize 1280 -> 400 -> 1280: chain ${a} -> ${c} -> ${d}`);
+  await page.close();
 }
 await b.close(); server.close();
 console.log(bad ? `${bad} FAILED` : 'all passed'); process.exit(bad ? 1 : 0);

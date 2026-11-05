@@ -2,7 +2,7 @@
 
 This is a scratch page for section 10 of `/textile-101.html`, "Dyeing". It has four parts and thirteen animations:
 
-* **10.1 Where Color Enters.** A stage picker over the polymer → fiber → yarn → fabric chain. Then the three ways to dye yarn (skein, package, warp beam), and how far the dye gets into a yarn.
+* **10.1 Where Color Enters.** A stage picker over the polymer → fiber → yarn → fabric chain. It is a row of four on wide screens, and under 560 px a 2 × 2 grid that draws its own labels. Then the three ways to dye yarn (skein, package, warp beam), and how far the dye gets into a yarn.
 * **10.2 Inside, On, or Into.** Solution-dyed, pigment printed, and dyed, each shown as a fiber cross-section.
 * **10.3 Why the Fiber Decides the Dye.** Disperse → polyester, acid → nylon, reactive → cotton.
 * **10.4 One Bath, Two Dyes — Cross Dyeing.** It has two toggles, Reserve and Reality. The poly/nylon "Reality" copy slot is left empty on purpose; that copy is Eva's to write (row 15).
@@ -19,13 +19,14 @@ Files:
 
 * `index.html` is the section with its copy. `?still` turns off scroll-triggered autoplay; `?reduce` forces end frames.
 * `shoot.mjs <dir> [--only=a,b] [--sheet] [--no-video]` writes:
-  * `<clip>.mp4` and `<clip>.gif` for each animation, and for each interactive state (the chain at three stages, cross dyeing with each toggle);
+  * `<clip>.mp4` and `<clip>.gif` for each animation, and for each interactive state (the chain at three stages, the chain's 2 × 2 phone layout, cross dyeing with each toggle);
   * `end-1280.png` and `end-390.png`, the whole section's end frames;
   * the per-frame draw cost;
   * `sheet.png` with `--sheet`, every clip at t = 0 … 1.
 * `verify-page.mjs [page]` checks, at 1280 and 390:
   * playback: each scene plays once on scroll-in and holds its end frame; scrolled away mid-play it jumps to the end; hover and tap replay; under reduced motion it shows end frames only;
   * the stage buttons and the toggles;
+  * the chain's layout (a row at 1280, a 2 × 2 grid at 390 with panels at least 130 px wide), including a live resize across 560 px;
   * that no dye hex colour appears in the markup, and that changing `--dye-acid` recolours the nylon;
   * no page errors and no horizontal scroll.
 * `palette-frames.html?o=1|2|3` is the palette comparison: each option in normal vision and three colour-vision simulations.

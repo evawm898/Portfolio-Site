@@ -33,7 +33,7 @@ const url = q => `http://localhost:${port}/tools/dyeing-proto/index.html${q || '
 
 // clip = scene + state
 const CLIPS = [
-  ['chain-package', 'chain', { stage: 'package' }], ['chain-solution', 'chain', { stage: 'solution' }], ['chain-piece', 'chain', { stage: 'piece' }],
+  ['chain-package', 'chain', { stage: 'package' }], ['chain-solution', 'chain', { stage: 'solution' }], ['chain-piece', 'chain', { stage: 'piece' }], ['chain-grid', 'chain', { stage: 'package' }, 'phone'],
   ['skein', 'skein'], ['package', 'package'], ['beam', 'beam'], ['pen-yarn', 'pen-yarn'], ['pen-piece', 'pen-piece'],
   ['solution', 'solution'], ['printed', 'printed'], ['dyed', 'dyed'],
   ['disperse', 'disperse'], ['acid', 'acid'], ['reactive', 'reactive'],
@@ -47,20 +47,28 @@ await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
 page.on('pageerror', e => errs.push(String(e)));
 await page.goto(url('?still'), { waitUntil: 'load' });
 await page.waitForFunction(() => window.__dy && window.__dy.length === 13);
-const at = (scene, state, t) => page.evaluate(([n, s, t]) => { const p = window.__dy.find(q => q.name === n); if (s) Object.assign(p.state, s); p.seek(t); }, [scene, state || null, t]);
+// a clip marked 'phone' is recorded on a 390-wide page (the chain's 2 x 2 layout follows the viewport)
+const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+await phone.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+phone.on('pageerror', e => errs.push(String(e)));
+await phone.goto(url('?still'), { waitUntil: 'load' });
+await phone.waitForFunction(() => window.__dy && window.__dy.length === 13);
+const pageFor = where => where === 'phone' ? phone : page;
+const at = (scene, state, t, where) => pageFor(where).evaluate(([n, s, t]) => { const p = window.__dy.find(q => q.name === n); if (s) Object.assign(p.state, s); p.seek(t); }, [scene, state || null, t]);
 
 const cost = {};
-for (const [clip, scene, state] of CLIPS) {
-  cost[clip] = await page.evaluate(([n, s]) => { const p = window.__dy.find(q => q.name === n); if (s) Object.assign(p.state, s); p.seek(0); let worst = 0, sum = 0; for (let j = 1; j <= 40; j++) { const a = performance.now(); p.seek(j / 40); const d = performance.now() - a; sum += d; worst = Math.max(worst, d); } return { mean: sum / 40, worst }; }, [scene, state || null]);
+for (const [clip, scene, state, where] of CLIPS) {
+  cost[clip] = await pageFor(where).evaluate(([n, s]) => { const p = window.__dy.find(q => q.name === n); if (s) Object.assign(p.state, s); p.seek(0); let worst = 0, sum = 0; for (let j = 1; j <= 40; j++) { const a = performance.now(); p.seek(j / 40); const d = performance.now() - a; sum += d; worst = Math.max(worst, d); } return { mean: sum / 40, worst }; }, [scene, state || null]);
 }
 
 if (has('sheet')) {
   const T = [0, 0.25, 0.5, 0.75, 1], dir = path.join(out, 'sheet-cells'); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir);
   const rows = [];
-  for (const [clip, scene, state] of CLIPS) {
-    const el = await page.$(`[data-dye-scene="${scene}"] svg`); await el.scrollIntoViewIfNeeded();
+  for (const [clip, scene, state, where] of CLIPS) {
+    await at(scene, state, 0, where);
+    const el = await pageFor(where).$(`[data-dye-scene="${scene}"] svg`); await el.scrollIntoViewIfNeeded();
     const cells = [];
-    for (const t of T) { await at(scene, state, t); const f = path.join(dir, `${clip}-${t}.png`); await el.screenshot({ path: f }); cells.push(f); }
+    for (const t of T) { await at(scene, state, t, where); const f = path.join(dir, `${clip}-${t}.png`); await el.screenshot({ path: f }); cells.push(f); }
     const row = path.join(dir, `${clip}.png`);
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...cells.flatMap(c => ['-i', c]), '-filter_complex', `${cells.map((_, i) => `[${i}]scale=520:-2,pad=530:ih:5:0:color=0x232727[c${i}]`).join(';')};${cells.map((_, i) => `[c${i}]`).join('')}hstack=inputs=${cells.length}`, row]);
     rows.push(row);
@@ -74,13 +82,14 @@ if (has('sheet')) {
 
 if (!has('no-video')) {
   const FPS = 30;
-  for (const [clip, scene, state] of CLIPS) {
-    const dur = await page.evaluate(n => window.__dy.find(q => q.name === n).scene.duration, scene);
+  for (const [clip, scene, state, where] of CLIPS) {
+    const dur = await pageFor(where).evaluate(n => window.__dy.find(q => q.name === n).scene.duration, scene);
     const frames = Math.round(dur / 1000 * FPS) + FPS;
     const dir = path.join(out, `${clip}-frames`); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir);
-    const el = await page.$(`[data-dye-scene="${scene}"] svg`); await el.scrollIntoViewIfNeeded();
+    await at(scene, state, 0, where);
+    const el = await pageFor(where).$(`[data-dye-scene="${scene}"] svg`); await el.scrollIntoViewIfNeeded();
     for (let f = 0; f < frames; f++) {
-      await at(scene, state, Math.min(1, f / (dur / 1000 * FPS)));
+      await at(scene, state, Math.min(1, f / (dur / 1000 * FPS)), where);
       await el.screenshot({ path: path.join(dir, `f${String(f).padStart(4, '0')}.png`) });
     }
     const mp4 = path.join(out, `${clip}.mp4`), gif = path.join(out, `${clip}.gif`);
