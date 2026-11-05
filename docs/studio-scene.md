@@ -29,6 +29,7 @@ graph, two black cats. Judged on how the cats move; nothing architectural is fin
 | `scene/studio-dev.js` | the `?dev=1` harness and overlay — the only DOM module, fenced to its container |
 | `tools/verify-scene-studio.mjs` | the gate (Node + browser; `--negative-control`, 25 mutants) |
 | `tools/shot-scene-studio.mjs` | the key-frame contact sheets → `docs/img/studio-cat-jumps.png` |
+| `tools/shot-scene-studio-style.mjs` | the silhouette on every surface in five poses (shipped modules, a still life) → `docs/img/studio-cat-style.png` |
 | `tools/record-scene-studio.mjs` | moving pictures: 60 s of the director at real speed, one leg at 240 Hz (exact frames, the shell paused; videos are NOT committed) |
 
 ## The motion, and where each rule of the brief is kept
@@ -124,6 +125,46 @@ and four defects. What changed, and where it is kept:
    SEPARATING PLANES per part (a cat is in front of a part if it is on the camera's
    side of one of the part's camera-facing faces, or above its top), so a cat on,
    beside, or behind it is drawn correctly.
+
+## The visual style (Nov 5) — a cute minimal black silhouette
+
+Eva's brief: one pure black fill, no outline, no shading; NO VISIBLE LEGS (paws only
+as nubs); large white ring eyes visible down to profile; ears as sharp triangles; three
+fine white whiskers a side; a thick tapered tail; soft rounded proportions. Only
+`drawCat` changed (plus the head reporting its own frame from the rig) — motion, the
+director, the perch graph and the IK are untouched, and the gate's motion checks read
+identically.
+
+- **The body is the spine's discs plus two DRAPES**: each the convex hull of the lower
+  half of every torso disc and one pair's paws (fore, hind). Each covers the whole torso,
+  so their union reaches the surface as one mass with a shallow arch under the belly. The
+  arch's V is rounded by a fillet (a fan of triangles from the crossing to the near arc of
+  a 3.2 cm circle). The paws are 2 cm nubs, the drape's foot 2 cm above them so they read.
+  The legs are solved and discarded at draw time; no knee or joint survives.
+- **Proportions** (all drawing-only, `CAT_STYLE` in `studio-draw.js`): spine discs ×1.1,
+  head and everything on it ×1.34 about its centre, a small muzzle (×0.8), tail 2.5 → 0.8 cm.
+- **Ears are cut from paper facing the camera**: the rig's ear is a flat triangle seen
+  edge-on head-on; the drawing keeps its base and tip but gives it its true width across
+  the screen line, the tip at least 1.35 base-widths out.
+- **Eyes**: pure white rings (1.6 cm, stroke 0.45 cm, never under 1.4 px), drawn while
+  the eye faces the camera down to 0.15 past profile — head-on, three-quarter and profile.
+  Foreshortened to no less than 0.62 of their width, kept inside the head disc; two rings
+  that would touch are one eye seen past the other and the nearer is drawn alone. Shut:
+  a white arc. **A cat with its back to the camera shows no eyes** — a decision made
+  without a ruling (the alternative is eyes on the back of the head).
+- **Whiskers**: three a side from the cheek, fanned, while that cheek faces the camera.
+- **Ink**: `#000000`, never lightened. **The same path is also stroked 1 px in the same
+  ink**: Skia's analytic antialiasing leaves a faint seam (~7 % short of full cover) along
+  an INTERNAL edge of an overlapping nonzero path — measured on a 2× headless raster, on
+  `main` too (198 seam pixels on one back-view still). The stroke takes the stills from 344
+  seam-like pixels to 40 (the remainder is whisker and eye antialiasing). One path, one
+  fill, every subpath one way and every capsule band tangent, as the gate requires.
+- **Measured**: `node tools/verify-scene-studio.mjs` 44/44, the frame-cost check reading
+  p99 3.8 ms, worst 6.9 ms over 40 s (was p99 1.2 / worst 2.1 — the hulls and the stroke;
+  the bar is 8 / 16.7). The mutant `the-silhouette-is-two-fills` was re-anchored onto the
+  new code (no mutant added). Sheets: `docs/img/studio-cat-style.png` (every surface ×
+  five poses) and `docs/img/studio-cat-jumps.png` (re-rendered: the up-jumps and the
+  down-jump through their extreme frames).
 
 ## Decisions made without a ruling
 

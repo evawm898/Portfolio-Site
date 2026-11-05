@@ -11114,6 +11114,11 @@ the step-across is walked by the gait. No linear ease exists. Gate:
 `node tools/verify-scene-studio.mjs` (`--negative-control` required before quoting a pass
 from a changed harness; one temp dir PER mutant — Node caches modules by URL and a reused
 path served the first mutant to all of them). Sheet: `node tools/shot-scene-studio.mjs <dir>`.
+**The cat's look (Nov 5, the "visual style" section of the doc):** a cute minimal black silhouette drawn by
+`drawCat` alone — the legs are still solved and DISCARDED at draw time (two convex drapes, torso to each
+pair's paws, with a filleted belly arch; paws as nubs), paper ears facing the camera, white ring eyes down to
+profile, whiskers, `#000` never lightened. The one path is also stroked 1 px in the same ink: Skia's AA leaves
+internal-edge seams in an overlapping nonzero path (on `main` too). Sheet: `node tools/shot-scene-studio-style.mjs <dir>`.
 `?dev=1` mounts the harness via the shell's `host.panel()`; `studio-dev.js` is the one DOM
 module and is excluded from `verify-scene.mjs`'s discipline list by name. Not in CI.
 **The continuity pass (Nov 5, the "Continuity pass" section of the doc):** every channel is

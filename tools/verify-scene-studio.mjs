@@ -1024,8 +1024,8 @@ const MUTANTS = [
     breaks: ['continuity/a-landing-is-set-down-not-stopped-the-forepaws-arrive-at-rest'], mayAlso: ['continuity/*', 'motion/*', 'upjump/*', 'downjump/*', 'director/*'] },
   // DRAWING. the silhouette split into two fills of one ink, which leaves the
   // hairline seam where they meet
-  { id: 'the-silhouette-is-two-fills', file: 'studio-draw.js', from: "  for (const L of rig.legs) if (near(L)) legPath(ctx, view, L);\n  disc(ctx, view, rig.head.c, rig.head.r);",
-    to: "  for (const L of rig.legs) if (near(L)) legPath(ctx, view, L);\n  ctx.fillStyle = PALETTE.cat; ctx.fill('nonzero'); ctx.beginPath();\n  disc(ctx, view, rig.head.c, rig.head.r);",
+  { id: 'the-silhouette-is-two-fills', file: 'studio-draw.js', from: "  capsule(ctx, view, S.neck.p, S.head.c, S.neck.r * 1.05, S.head.r * 0.72);\n  disc(ctx, view, S.head.c, S.head.r);",
+    to: "  capsule(ctx, view, S.neck.p, S.head.c, S.neck.r * 1.05, S.head.r * 0.72);\n  ctx.fillStyle = PALETTE.cat; ctx.fill('nonzero'); ctx.beginPath();\n  disc(ctx, view, S.head.c, S.head.r);",
     breaks: ['draw/a-cat-is-one-ink-fill-every-part-of-it-wound-the-same-way'], mayAlso: [] },
   // a capsule's band on the perpendicular rather than the true tangents
   { id: 'a-capsule-band-is-not-tangent', file: 'studio-draw.js', from: '  const s = (Ra - Rb) / L, c = Math.sqrt(Math.max(0, 1 - s * s));', to: '  const s = 0 * (Ra - Rb) / L, c = 1;',

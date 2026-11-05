@@ -13,9 +13,11 @@
 // in plan), then carried to the world. Primitives come out in world centimetres
 // and the drawing projects them, so the rig never sees a screen.
 //
-// A BLACK CAT IS A SILHOUETTE, so overlap order only matters where it can be
-// seen: the FAR legs are drawn a shade lighter than the body and before it, the
-// NEAR legs after it, and the eyes last. That is the whole depth story here.
+// THE DRAWING DOES NOT SHOW THE LEGS. studio-draw.js renders a cute minimal
+// silhouette and reads only the paws off them (and which pair each belongs
+// to); the legs are still solved in full here, because the IK is what keeps a
+// planted paw planted and gives a pose its weight. The head also reports its
+// own frame (f, s, u) for the eyes and whiskers.
 
 import { local2world, toeWorld, world2local, FOOT_NAMES } from './studio-cat.js';
 import { CAMERA } from './studio-room.js';
@@ -190,7 +192,12 @@ export function solveRig(cat) {
 
   return {
     spine: spine.map(s => ({ p: W(s.q[0], s.q[1], s.q[2]), r: s.r })),
-    head: { c: W(...head.c), r: head.r },
+    // the head's own frame, carried as differences of points (the bend is not
+    // linear): drawing only — the whiskers and the eye rings are laid on it
+    head: (() => {
+      const c0 = W(...head.c), dir = (v) => { const b = W(head.c[0] + v[0], head.c[1] + v[1], head.c[2] + v[2]); return [b[0] - c0[0], b[1] - c0[1], b[2] - c0[2]]; };
+      return { c: c0, r: head.r, f: dir(hf), s: dir(hs), u: dir(hu) };
+    })(),
     muzzle: { c: W(...muzzle.c), r: muzzle.r },
     ears: ears.map(tri => tri.map(q => W(q[0], q[1], q[2]))),
     eyes: eyes.map(ey => {
