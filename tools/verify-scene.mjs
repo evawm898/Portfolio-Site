@@ -3507,32 +3507,39 @@ async function partOne(mutant) {
 
   // --------------------------------------------------------------- registry
   setSection('registry');
-  check('there are eight slots and two are built', () => {
+  check('there are eight slots and three are built', () => {
     assert.strictEqual(M.registry.SCENES.length, M.registry.MAX_SCENES);
     assert.strictEqual(M.registry.MAX_SCENES, 8);
     M.registry.SCENES.forEach((s, i) => assert.strictEqual(s.id, i + 1));
     const built = M.registry.builtScenes();
-    assert.strictEqual(built.length, 2, `${built.length} scenes are built`);
-    assert.deepStrictEqual(built.map(b => b.id), [1, 3]);
+    assert.strictEqual(built.length, 3, `${built.length} scenes are built`);
+    assert.deepStrictEqual(built.map(b => b.id), [1, 3, 4]);
     assert.ok(built.every(b => b.title), 'a built slot has no title');
-    return `8 slots, ${built.map(b => `${b.id} "${b.title}"`).join(' + ')}, 6 stubs`;
+    return `8 slots, ${built.map(b => `${b.id} "${b.title}"`).join(' + ')}, 5 stubs`;
   });
 
   check('the random pick excludes what is showing', () => {
-    // With two built it must always move, and never to the one showing.
-    for (const u of [0, 0.49, 0.5, 0.99]) {
-      assert.strictEqual(M.registry.randomSceneId(1, () => u), 3);
-      assert.strictEqual(M.registry.randomSceneId(3, () => u), 1);
+    // With several built it must always move, never to the one showing, and
+    // reach every other one.
+    const ids = M.registry.builtScenes().map(b => b.id);
+    for (const cur of ids) {
+      const seen = new Set();
+      for (const u of [0, 0.2, 0.49, 0.5, 0.7, 0.99]) {
+        const got = M.registry.randomSceneId(cur, () => u);
+        assert.ok(got !== cur && ids.includes(got), `from ${cur} it picked ${got}`);
+        seen.add(got);
+      }
+      assert.strictEqual(seen.size, ids.length - 1, `from ${cur} it never reaches some scene`);
     }
     // And with only one it has nowhere to go, which is what disables the
     // button rather than leaving a no-op that looks broken.
-    const saved = M.registry.SCENES[2];
-    M.registry.SCENES[2] = { id: 3, title: null, load: null };
+    const saved = M.registry.SCENES.map(s => s);
+    M.registry.SCENES.forEach((s, i) => { if (s.id !== 1) M.registry.SCENES[i] = { id: s.id, title: null, load: null }; });
     try {
       assert.strictEqual(M.registry.randomSceneId(1, () => 0.5), null,
         'with one scene built there is nowhere to go');
-    } finally { M.registry.SCENES[2] = saved; }
-    return 'never the current one with two built; null with one';
+    } finally { saved.forEach((s, i) => { M.registry.SCENES[i] = s; }); }
+    return `never the current one across ${ids.length} built; null with one`;
   });
 
   check('the url names a scene and falls back when it cannot', () => {
@@ -3559,7 +3566,12 @@ async function partOne(mutant) {
                          'scene-koi.js',
                          'beach-shore.js', 'beach-swash.js', 'beach-sets.js',
                          'beach-water.js', 'beach-wave.js', 'beach-brush.js', 'beach-render.js',
-                         'scene-beach.js'];
+                         'scene-beach.js',
+                         // scene 4. studio-dev.js is NOT here on purpose: it is the ?dev=1
+                         // harness, the one DOM module in the scene, and
+                         // tools/verify-scene-studio.mjs fences it separately.
+                         'studio-room.js', 'studio-cat.js', 'studio-rig.js', 'studio-cats.js',
+                         'studio-draw.js', 'scene-studio.js'];
   const stripComments = (src) => src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
@@ -3842,15 +3854,16 @@ async function partTwo(browser, mutant, shotsDir) {
         const numbered = nav.filter(b => /^\d$/.test(b.label));
         assert.strictEqual(numbered.length, 8, `${numbered.length} numbered buttons`);
         assert.deepStrictEqual(numbered.map(b => b.label), ['1','2','3','4','5','6','7','8']);
-        assert.strictEqual(numbered.filter(b => b.disabled).length, 6, 'the wrong number are disabled');
+        assert.strictEqual(numbered.filter(b => b.disabled).length, 5, 'the wrong number are disabled');
         assert.strictEqual(numbered[0].disabled, false, 'scene 1 is disabled');
         assert.strictEqual(numbered[2].disabled, false, 'scene 3 is disabled');
+        assert.strictEqual(numbered[3].disabled, false, 'scene 4 is disabled');
         assert.strictEqual(numbered[0].active, true, 'scene 1 is not marked active');
         assert.strictEqual(numbered[0].current, 'true', 'scene 1 carries no aria-current');
         const rnd = nav.find(b => b.label === '?');
         assert.ok(rnd, 'there is no random button');
         assert.strictEqual(rnd.disabled, false, 'the random button is dead with two scenes to choose from');
-        return '2 built (1, 3), 6 disabled, ? live';
+        return '3 built (1, 3, 4), 5 disabled, ? live';
       });
 
       await checkAsync('return goes back to the site', async () => {

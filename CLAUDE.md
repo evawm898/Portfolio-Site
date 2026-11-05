@@ -11055,6 +11055,22 @@ being ruled on** — see the no-text section above.
 **Out of scope on purpose, and none of it foreclosed:** colour palettes and
 time-of-day variants, scenes 2-8 **[Oct 5 docs sweep: scene 3 has since shipped]**, sound, and any change to the other pages.
 
+## `/scene` scene 4 — the studio bay window and its two cats (pointer only)
+
+Read `docs/studio-scene.md` before touching any `scene/studio-*.js` file. A placeholder
+room (data-driven FURNITURE list), a perch graph (typed edges with declared rise/run;
+a cat reaches a surface ONLY by traversing edges — `startLeg` throws otherwise), and the
+cat locomotion the scene is judged on. There were NO sandpipers to extend (scene 3 builds
+no birds); the rig is new. Up-jumps are seven phases with a SOLVED flight (constant gravity
+per arc, apex 15–25 % of the rise above the landing surface, forepaw-first by construction,
+hind 60–100 ms later); the down-jump is its own program (peer, reach, pour, free fall);
+the step-across is walked by the gait. No linear ease exists. Gate:
+`node tools/verify-scene-studio.mjs` (`--negative-control` required before quoting a pass
+from a changed harness; one temp dir PER mutant — Node caches modules by URL and a reused
+path served the first mutant to all of them). Sheet: `node tools/shot-scene-studio.mjs <dir>`.
+`?dev=1` mounts the harness via the shell's `host.panel()`; `studio-dev.js` is the one DOM
+module and is excluded from `verify-scene.mjs`'s discipline list by name. Not in CI.
+
 ## Artist Tracker (`artist-tracker.html`)
 
 Private, single-file, client-side artist/tattoo-artist tracker for
