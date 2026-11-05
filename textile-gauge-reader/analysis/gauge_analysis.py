@@ -5236,6 +5236,44 @@ def _weighted_median(values: List[float], weights: List[float]) -> float:
     return pairs[-1][0]
 
 
+def _rollup_status(axis_label: str, contributors: List[dict]) -> Tuple[str, Optional[str]]:
+    """
+    The status a consensus may claim, given the individual status of every
+    region whose reading it combines: "confident" only when MORE THAN HALF of
+    those regions are themselves confident, else "uncertain" (a tie is
+    uncertain). One region: its own status.
+
+    Why the regions' own statuses and not their agreement. Every approved
+    region is a re-measurement of the same fabric by the same detector, so
+    regions share their systematic errors: on the teal photo every region
+    reads the wale 13% low and the regions agree with each other to 0.4%.
+    Agreement therefore measures how precisely the detector repeats itself,
+    not whether it is right, and a consensus cannot be more certain than the
+    regions that carry it -- the same principle the confidence number already
+    follows (see "agreement_factor" in _consensus_for_axis: agreement can only
+    pull confidence up TOWARD what the regions claim for themselves, never
+    manufacture what none of them earned). The status is the same principle
+    applied to the verdict: it follows the individual verdicts. "More than
+    half" is the median's own threshold -- the value is a weighted median of
+    these regions, so the verdict is their majority -- not a tuned number; one
+    confident region among several uncertain ones does not carry it, and
+    neither does half of them. A candidate with no status of its own counts
+    as confident (callers that predate the field).
+    """
+    n = len(contributors)
+    confident = sum(1 for c in contributors if c.get("status", "confident") != "uncertain")
+    if confident * 2 > n:
+        return "confident", None
+    if n == 1:
+        return "uncertain", (
+            f"The only region that produced a usable {axis_label} measurement is itself uncertain."
+        )
+    return "uncertain", (
+        f"Only {confident} of the {n} regions that agreed for {axis_label} are individually confident; "
+        "regions of one photo share the detector's bias, so their agreement is not independent evidence."
+    )
+
+
 def _consensus_for_axis(
     candidates: List[dict], axis_label: str, no_measurement_labels: Optional[List[str]] = None
 ) -> AxisConsensusResult:
@@ -5284,9 +5322,12 @@ def _consensus_for_axis(
 
     if len(candidates) == 1:
         c = candidates[0]
+        single_status, single_reason = _rollup_status(axis_label, candidates)
         return AxisConsensusResult(
             spacing_px=c["spacing_px"],
             confidence=round(c["confidence"] * CONSENSUS_SINGLE_REGION_FACTOR, 4),
+            status=single_status,
+            uncertain_reason=single_reason,
             message=(
                 f"Only region {c['label']} produced a usable {axis_label} measurement -- "
                 f"cross-region validation unavailable.{no_measurement_note}"
@@ -5389,6 +5430,8 @@ def _consensus_for_axis(
     elif relative_spread_log > CONSENSUS_LOOSE_SPREAD_LOG:
         status = "uncertain"
         uncertain_reason = f"Regions that agreed for {axis_label} still spread more than expected."
+    if status == "confident":
+        status, uncertain_reason = _rollup_status(axis_label, inliers)
 
     included_labels = [c["label"] for c in inliers]
     outlier_labels = [o.label for o in outliers]
@@ -5655,6 +5698,7 @@ def analyze_multi_roi(
             out.append({
                 "label": m.label, "spacing_px": spacing_px,
                 "confidence": confidence, "quality_score": max(m.quality_score, 0.05),
+                "status": m.wale.status,
             })
         return out
 
@@ -5682,6 +5726,7 @@ def analyze_multi_roi(
             out.append({
                 "label": m.label, "spacing_px": m.course.spacing_px,
                 "confidence": m.course.confidence, "quality_score": max(m.quality_score, 0.05),
+                "status": m.course.status,
             })
         return out
 

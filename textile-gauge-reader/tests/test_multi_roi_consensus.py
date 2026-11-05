@@ -185,6 +185,69 @@ def test_no_dominant_cluster_marks_axis_uncertain():
     assert result.spacing_px is not None  # still reports a best estimate, never nothing
 
 
+# --- the status roll-up: the consensus is only as sure as the regions that carry it ----
+# (README: "Consensus status respects each area's own doubt"). Hand-fed candidates with a
+# `status` of their own; a candidate with none counts as confident (callers that predate it).
+
+
+def _cand(label, spacing, status, confidence=0.6):
+    return {"label": label, "spacing_px": spacing, "confidence": confidence, "quality_score": 0.8, "status": status}
+
+
+def test_rollup_all_areas_uncertain_makes_the_consensus_uncertain_however_tightly_they_agree():
+    # The teal shape: every area reads the same (shared bias) and every area says it is unsure.
+    candidates = [_cand(l, 10.0 + 0.02 * i, "uncertain") for i, l in enumerate("ABCD")]
+    result = _consensus_for_axis(candidates, "wale")
+    assert result.status == "uncertain"
+    assert "not independent evidence" in (result.uncertain_reason or "")
+    assert result.included_labels == ["A", "B", "C", "D"]  # nothing is dropped or re-valued by the roll-up
+
+
+def test_rollup_one_confident_area_among_uncertain_ones_does_not_carry_the_consensus():
+    candidates = [_cand("A", 10.0, "uncertain"), _cand("B", 10.1, "uncertain"),
+                  _cand("C", 10.05, "confident"), _cand("D", 9.95, "uncertain")]
+    assert _consensus_for_axis(candidates, "wale").status == "uncertain"
+
+
+def test_rollup_a_tie_is_uncertain_and_a_strict_majority_is_confident():
+    tie = [_cand("A", 10.0, "confident"), _cand("B", 10.1, "confident"),
+           _cand("C", 10.05, "uncertain"), _cand("D", 9.95, "uncertain")]
+    assert _consensus_for_axis(tie, "wale").status == "uncertain"
+    majority = [_cand("A", 10.0, "confident"), _cand("B", 10.1, "confident"), _cand("C", 10.05, "uncertain")]
+    assert _consensus_for_axis(majority, "wale").status == "confident"
+
+
+def test_rollup_a_single_area_reports_its_own_status():
+    # The audit's "one hand-drawn uncertain area came back confident": a lone candidate is its own verdict.
+    unsure = _consensus_for_axis([_cand("A", 10.0, "uncertain")], "wale")
+    assert unsure.status == "uncertain" and unsure.uncertain_reason
+    sure = _consensus_for_axis([_cand("A", 10.0, "confident")], "wale")
+    assert sure.status == "confident" and sure.uncertain_reason is None
+
+
+def test_rollup_a_candidate_with_no_status_counts_as_confident():
+    candidates = [{"label": l, "spacing_px": 10.0, "confidence": 0.7, "quality_score": 0.8} for l in "ABC"]
+    assert _consensus_for_axis(candidates, "wale").status == "confident"
+
+
+def test_rollup_changes_the_status_only_never_the_value_or_the_confidence():
+    base = [_cand("A", 10.0, "confident"), _cand("B", 10.1, "confident"), _cand("C", 10.05, "confident")]
+    doubt = [dict(c, status="uncertain") for c in base]
+    sure, unsure = _consensus_for_axis(base, "wale"), _consensus_for_axis(doubt, "wale")
+    assert (sure.status, unsure.status) == ("confident", "uncertain")
+    for field in ("spacing_px", "confidence", "included_labels", "excluded_labels", "regional_median_px",
+                  "regional_spread_px", "message"):
+        assert getattr(sure, field) == getattr(unsure, field), field
+
+
+def test_rollup_never_upgrades_an_already_uncertain_consensus():
+    # Spread too wide for the existing rule: all-confident areas do not rescue it.
+    candidates = [_cand("A", 10.0, "confident"), _cand("B", 12.0, "confident"), _cand("C", 11.0, "confident")]
+    result = _consensus_for_axis(candidates, "wale")
+    assert result.status == "uncertain"
+    assert "spread more than expected" in (result.uncertain_reason or "")
+
+
 def test_empty_candidates_returns_no_measurement():
     result = _consensus_for_axis([], "wale")
     assert result.spacing_px is None
