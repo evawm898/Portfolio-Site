@@ -19,6 +19,8 @@
 //                            opaque. See the method for why that is not optional.
 //   width, height            live CSS pixels.
 //   reducedMotion, seed
+//   dev, panel()             `?dev=1`, and a stage-mounted container for a
+//                            scene's own tuning harness (see scene 4).
 //
 // TWO GUARANTEES MAKE A SWAP CLEAN, AND BOTH ARE STRUCTURAL RATHER THAN RULES
 // SOMEBODY HAS TO KEEP:
@@ -88,6 +90,18 @@ function makeHost(seed) {
     get height() { return h; },
     reducedMotion,
     seed,
+    // `?dev=1` — a scene MAY offer a tuning harness behind it. The shell reads
+    // the URL so no scene module has to reach for `location`.
+    dev: /(?:^|[?&])dev=1(?:&|$)/.test(window.location.search),
+    // A DOM container mounted INSIDE the stage, for a dev harness. It goes with
+    // the stage on teardown like everything else a scene puts there, and the
+    // shell binds nothing to it: whatever listens on it, listens on it alone.
+    panel() {
+      const el = document.createElement('div');
+      el.className = 'scene-dev';
+      stage.appendChild(el);
+      return el;
+    },
     // Call it once for a single-canvas scene, or once per PLANE for a
     // multiplane one. Layers are returned in DOM order, so each call sits
     // NEARER THE VIEWER than the last.

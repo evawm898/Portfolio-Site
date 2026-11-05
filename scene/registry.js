@@ -28,7 +28,11 @@ export const SCENES = [
     title: 'Beach swash line',
     load: () => import('./scene-beach.js'),
   },
-  { id: 4, title: null, load: null },
+  {
+    id: 4,
+    title: 'Studio bay window',
+    load: () => import('./scene-studio.js'),
+  },
   { id: 5, title: null, load: null },
   { id: 6, title: null, load: null },
   { id: 7, title: null, load: null },
