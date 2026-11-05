@@ -258,8 +258,9 @@ async function sheet(browser, report, SHEET, PHOTOS) {
     }
     for (const r of Object.values(report).filter((x) => x.flower === f)) {
       const sc = JSON.parse(fs.readFileSync(path.join(SET, f, `${f}-${r.v}.bloom-photo.json`), 'utf8'));
-      const ch = sc.revisedFrom ? [...Object.entries(sc.revisedFrom.changes).map(([id, c]) => `${id} ${c.from}→${c.to}`), ...((sc.revisedFrom.layerChanges || []).map((c) => `L${c.layer} ${c.field.replace(/^offsets\./, '').replace(/^values\./, '')} ${typeof c.from === 'object' && c.from ? 'curve' : c.from}→${typeof c.to === 'object' && c.to ? 'curve' : c.to}`))].join(', ') : 'first pass';
-      const own = (sc.layers || []).map((L) => `L${L.layer}: ${['petalLength', 'petalTilt'].filter((k) => L.offsets && L.offsets[k]).map((k) => `${k === 'petalLength' ? 'len' : 'tilt'} ${L.offsets[k].value}`).join(' ')}${L.values ? ' +spine curve' : ''}`).join(' · ');
+      const val = (x) => (x && typeof x === 'object' ? 'curve' : x);
+      const ch = sc.revisedFrom ? [...Object.entries(sc.revisedFrom.changes).map(([id, c]) => `${id} ${val(c.from)}→${val(c.to)}`), ...((sc.revisedFrom.layerChanges || []).map((c) => `L${c.layer} ${c.field.replace(/^offsets\./, '').replace(/^values\./, '')} ${typeof c.from === 'object' && c.from ? 'curve' : c.from}→${typeof c.to === 'object' && c.to ? 'curve' : c.to}`))].join(', ') : 'first pass';
+      const own = (sc.layers || []).map((L) => `L${L.layer}: ${['petalLength', 'petalTilt'].filter((k) => L.offsets && L.offsets[k]).map((k) => `${k === 'petalLength' ? 'len' : 'tilt'} ${L.offsets[k].value}`).join(' ')}${L.values && L.values.petalSpineCurve ? ' +spine' : ''}${L.values && L.values.petalOutlineCurve ? ' +outline' : ''}`).join(' · ');
       for (const [v, file] of Object.entries(r.shots)) {
         html += `<div style="width:${W}px"><img src="${img(file)}" style="width:${W}px;height:${W}px"><div>${r.v} · ${v} · ${r.named} named · ${(r.exportTris || 0).toLocaleString('en-US')} tris (export)</div>${v === 'front' ? `<div style="color:#9ab;font-size:10px">${ch}</div>` : `<div style="color:#cb9;font-size:10px">${own || 'no per-layer values'}${r.proportions && r.proportions.bodyHW ? ` · inner-half h:w ${r.proportions.bodyHW}` : ''} · petals h:w ${r.proportions ? r.proportions.petalsHW : '?'}</div>`}</div>`;
       }

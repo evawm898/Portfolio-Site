@@ -57,6 +57,14 @@
          range or values (`varianceSize` / `varianceForm` are half the slider;
          §2.1 says why). A narrowing is a schema statement, so it warns too —
          a reading made without a ruling, one line to drop.
+   SCHEMA v3 (S4, Nov 5) — the outline rows (global petal + sepal outline
+   mode and curve; the outline as a LAYER value): W1 no longer fires on a
+   layer outline value, and
+     W2  also: a petal or sepal OUTLINE POINT THE BUILD LIFTS to the print floor
+         (`outlineCurvePlan`'s own `lifted` record, read off a NODE build of the
+         composed state with the file's scopes — the page's metrics do not
+         expose it). The file loads clean and the build draws a different
+         curve, told only on the read-out.
    SCHEMA v2 (S3, Nov 5) — the per-layer rows, `LAYER_SCHEMA` in the census:
      W1  also: a layer entry's offset that the layer does NOT own (a delta on
          the global — petalCup, petalSpineCurl, …), a layer value off the v2
@@ -73,12 +81,18 @@
                       with its `controls` put in the v1 envelope; the dropped
                       keys are named. The raw file is still validated as it is.
          node tools/verify-bloom-photo-subset.mjs --self
-                      the fifteen written-down fixtures below (five added for schema v2, S3), each against its
+                      the twenty-one written-down fixtures below (five added for schema v2, S3; six for v3, S4), each against its
                       expected clause AND warning sets, then the off-schema
                       fixture through a SPAWNED copy of this validator: it
                       must list W1 and exit 0 (CI: spawned by the design-file
                       gate)
-         node tools/verify-bloom-photo-subset.mjs --negative-control [--mutant=a,b]
+         node tools/verify-bloom-photo-subset.mjs --self --save <base.json>
+                      as --self, and writes the fixtures' fired / warned sets with
+                      the sha256 of every file that decides them
+         node tools/verify-bloom-photo-subset.mjs --negative-control [--mutant=a,b] [--base <base.json>]
+                      --base reuses a saved base instead of re-running it (one
+                      mutant then fits a foreground run); it REFUSES a base whose
+                      recorded hashes are not this tree's
                       the fixtures again under each mutant of bloom.js /
                       bloom-file.js; every mutant must move EXACTLY the
                       (fixture, clause) pairs it names, every anchor checked
@@ -92,7 +106,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CONTROLS, DEFAULTS, valuesEqual } from '../bloom-registry.js';
-import { composeDoc, toText } from '../bloom-file.js';
+import { composeDoc, toText, readNewDesign, scopesForBuild } from '../bloom-file.js';
+import * as G from '../bloom-geometry.js';
+import crypto from 'node:crypto';
 import { serveRepo, launchPage, openBloom, settleBuild } from './bloom-harness.mjs';
 import { SCHEMA, LAYER_SCHEMA } from './bloom-photo-census.mjs';
 import { spawnSync } from 'node:child_process';
@@ -104,11 +120,36 @@ const SELF = argv.includes('--self');
 const NEGATIVE = argv.includes('--negative-control');
 const WRAP = argv.includes('--wrap');
 const ONLY = (argv.find((a) => a.startsWith('--mutant=')) || '').slice(9).split(',').filter(Boolean);
+const optVal = (k) => { const i = argv.indexOf(k); if (i < 0) return null; const v = argv[i + 1]; argv.splice(i, 2); return v; };
+const SAVE = optVal('--save'), BASE_FILE = optVal('--base');
 const FILES = argv.filter((a) => !a.startsWith('--'));
 const DIRTY_MIN = 15;
 const controlOf = new Map(CONTROLS.map((c) => [c.id, c]));
 const SCHEMA_ROW = new Map(SCHEMA.map((r) => [r.id, r]));
 
+/* THE BUILD'S OWN LIFTS (schema v3) — a NODE export build of the composed
+   state with the file's scopes; every petal's and sepal's outline plan
+   (`tipCap.outline`, both halves on a two-sided curve), deduplicated by what
+   it says. Empty on a LAW bloom and on a file the reader refuses. */
+function outlineLifts(obj) {
+  if (!obj || !obj.controls || typeof obj.controls !== 'object') return [];
+  const touches = ['petalOutlineMode', 'sepalOutlineMode'].some((k) => obj.controls[k] === 'CURVE')
+    || (((obj.overrides || {}).layers) || []).some((e) => e && e.values && e.values.petalOutlineMode === 'CURVE');
+  if (!touches) return [];
+  const r = readNewDesign(obj);
+  if (!r.ok) return [];
+  const acc = new G.MeshBuilder({ exportMode: true });
+  const b = G.buildBloomInto(acc, r.doc.controls, { below: null, scopes: scopesForBuild(r.doc.overrides) });
+  const seen = new Set();
+  const plans = (who, o) => (o ? (o.sides ? [[`${who} left`, o.sides.left], [`${who} right`, o.sides.right]] : [[who, o]]) : []);
+  const recs = [...(b.petalsAll || []).filter(Boolean).flatMap((p) => plans(`petal (layer ${p.whorl ?? '?'})`, p.tipCap && p.tipCap.outline)),
+    ...(((b.sepals || {}).built) || []).filter(Boolean).flatMap((p) => plans('sepal', p.tipCap && p.tipCap.outline))];
+  for (const [who, o] of recs) for (const f of o.lifted || []) {
+    if (f.why === 'the last point is held at 0') continue;
+    seen.add(`${who} point ${f.point} ${f.askedMm.toFixed(2)} -> ${f.builtMm.toFixed(2)} mm`);
+  }
+  return [...seen];
+}
 /* W1 / W2 — pure, from the file's own `controls` and the schema; no page. */
 function schemaWarnings(obj) {
   const warned = {};
@@ -132,6 +173,9 @@ function schemaWarnings(obj) {
     }
     for (const id of Object.keys(e.values || {})) if (!LAYER_SCHEMA.values.includes(id)) off.push(`layers[${i}].values.${id} (not a per-layer value in schema v2)`);
   });
+  /* schema v3: a petal or sepal outline point the BUILD lifts to the floor */
+  const lifted = outlineLifts(obj);
+  if (lifted.length) out.push(`outline point(s) LIFTED to the print floor by the build: ${lifted.join('; ')}`);
   for (const k of ['petals', 'tiers', 'strands']) if (Array.isArray(ov[k]) && ov[k].length) off.push(`overrides.${k} (${ov[k].length} entr${ov[k].length === 1 ? 'y' : 'ies'} — schema v2 writes layer entries only)`);
   if (off.length) warned.W1 = `off the photo schema: ${off.join(', ')}`;
   if (out.length) warned.W2 = `outside the photo schema's own range: ${out.join(', ')}`;
@@ -150,6 +194,10 @@ const DIRTY_TEXT = toText(composeDoc(DIRTY_STATE, { savedAt: '2026-11-03T00:00:0
 const ENV = { format: 'bloom-design', version: 1 };
 const CLEAN = { petalCount: 12, petalTilt: 40, petalCup: 0.3, layerCount: 2, layerSize: 0.8 };
 const SCOPED = { petalCount: 12, petalTilt: 40, petalCup: 0.3, layerCount: 2, scopeLayers: 'ON' };
+/* schema v3's curves — written down, never read from the geometry's defaults */
+const OUTLINE_STRAP = { mode: 'symmetric', points: [[0, 0.06], [0.15, 0.17], [0.5, 0.2], [0.85, 0.19], [0.96, 0.12], [1, 0]] };
+const OUTLINE_ASYM = { mode: 'two-sided', points: [[0, 0.05], [0.4, 0.2], [0.9, 0.09], [1, 0]], right: [[0, 0.05], [0.3, 0.16], [0.8, 0.12], [1, 0]] };
+const OUTLINE_NARROW = { mode: 'symmetric', points: [[0, 0.04], [0.3, 0.07], [0.7, 0.06], [0.92, 0.04], [1, 0]] };
 /* THE FIXTURES, WRITTEN DOWN with the clauses each must fire and the warnings
    each must list (`warn`, default none) — never derived from the module under
    test. The three the brief names are OUT_OF_RANGE, UNKNOWN_FIELD and
@@ -179,6 +227,23 @@ const FIXTURES = [
   { id: 'SCOPED_OWNED_RANGE', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalLength: 90 } }] } }, expect: [], warn: ['W2'] },
   /* layer entries with Per-layer values left OFF: zero notes, nothing built — V7 */
   { id: 'SCOPED_INERT', file: { ...ENV, controls: { ...CLEAN }, overrides: { layers: [{ layer: 1, offsets: { petalLength: 6 } }] } }, expect: ['V7'] },
+  /* SCHEMA v3 (S4): the OUTLINE. An intended curve passes (global, and per
+     layer two-sided); a curve written with outline mode off is HIDDEN; lobes /
+     fringe written under CURVE are HIDDEN; a curve point under the print floor
+     loads clean, is LIFTED by the build and warns W2. */
+  { id: 'OUTLINE_CURVE', file: { ...ENV, controls: { ...CLEAN, petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_STRAP } }, expect: [] },
+  { id: 'OUTLINE_LAYER', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: { petalTilt: -10 } }, { layer: 1, offsets: { petalLength: 0, petalTilt: 15 }, values: { petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_ASYM } }] } }, expect: [] },
+  { id: 'OUTLINE_MODE_OFF', file: { ...ENV, controls: { ...CLEAN, petalOutlineCurve: OUTLINE_STRAP } }, expect: ['V1', 'V2', 'V3', 'V5'] },
+  { id: 'LOBES_UNDER_CURVE', file: { ...ENV, controls: { ...CLEAN, petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_STRAP, lobeDepth: 0.3, fringeCount: 3 } }, expect: ['V1', 'V2', 'V3', 'V5'] },
+  { id: 'OUTLINE_LIFTED', file: { ...ENV, controls: { ...CLEAN, petalOutlineMode: 'CURVE', petalOutlineCurve: { mode: 'symmetric', points: [[0, 0.05], [0.5, 0.2], [0.95, 0.01], [1, 0]] } } }, expect: [], warn: ['W2'] },
+  /* THE WIDTH-REFUSAL HAZARD (§9.6): the page's Petal width refusal is not
+     gated on a trusted event and reads the PREVIOUS build's petals. Onto a
+     dirty page drawing a NARROW curve, a file that asks the minimum width (and
+     its own broad curve) has the width put back by the refusal — V2 is the
+     only clause that can see it (the reader has no note; the status says
+     clean). A LIVE PAGE DEFECT, pre-existing; the fixture pins that the
+     read-back still catches it with outline curves on. */
+  { id: 'WIDTH_REFUSED_ON_LOAD', dirty: { petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_NARROW }, file: { ...ENV, controls: { ...CLEAN, petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_STRAP, petalWidth: 8 } }, expect: ['V2'] },
   { id: 'NO_ENVELOPE', file: { views: ['front'], controls: { ...CLEAN }, frame: 1 }, expect: ['V0', 'V1', 'V2', 'V3', 'V4', 'V5'] },   // V3: the dirty page's own layerSize hides under Per-layer values
 ];
 
@@ -195,7 +260,9 @@ const MUTANTS = [
       /* S3: every scoped fixture's read-back (V2); and on SCOPED_INERT the
          dirty page's leftover Per-layer ON makes the file's inert entry LIVE,
          so V7 STOPS firing there while V2/V3 see the leftover */
-      'SCOPED_RADIAL:V2', 'SCOPED_SPIRAL:V2', 'SCOPED_DELTA:V2', 'SCOPED_OWNED_RANGE:V2', 'SCOPED_INERT:V2', 'SCOPED_INERT:V3', 'SCOPED_INERT:V7'],
+      'SCOPED_RADIAL:V2', 'SCOPED_SPIRAL:V2', 'SCOPED_DELTA:V2', 'SCOPED_OWNED_RANGE:V2', 'SCOPED_INERT:V2', 'SCOPED_INERT:V3', 'SCOPED_INERT:V7',
+      /* S4: the outline fixtures, the same two mechanisms */
+      'OUTLINE_CURVE:V2', 'OUTLINE_CURVE:V3', 'OUTLINE_LAYER:V2', 'OUTLINE_LIFTED:V2', 'OUTLINE_LIFTED:V3', 'WIDTH_REFUSED_ON_LOAD:V3'],
   },
   {
     id: 'the-scopes-survive-a-new-design', file: 'bloom.js',
@@ -203,7 +270,9 @@ const MUTANTS = [
     breaks: ['CLEAN:V4', 'OUT_OF_RANGE:V4', 'UNKNOWN_FIELD:V4', 'HIDDEN_CONTROL:V4', 'HIDDEN_OPTION:V4', 'OFF_STEP:V4', 'SIDECAR_INSIDE:V4', 'OFF_SCHEMA:V4', 'SCHEMA_RANGE:V4',
       /* S3: a scoped file's own layers are REPLACED by the leftover (layer 1) —
          V4 always, V7 wherever the file's layer set is not [1] */
-      'SCOPED_RADIAL:V4', 'SCOPED_RADIAL:V7', 'SCOPED_SPIRAL:V4', 'SCOPED_SPIRAL:V7', 'SCOPED_DELTA:V4', 'SCOPED_DELTA:V7', 'SCOPED_OWNED_RANGE:V4', 'SCOPED_INERT:V4'],
+      'SCOPED_RADIAL:V4', 'SCOPED_RADIAL:V7', 'SCOPED_SPIRAL:V4', 'SCOPED_SPIRAL:V7', 'SCOPED_DELTA:V4', 'SCOPED_DELTA:V7', 'SCOPED_OWNED_RANGE:V4', 'SCOPED_INERT:V4',
+      /* S4: V4 on every outline fixture that loads; V7 on OUTLINE_LAYER (its layers [0, 1]) */
+      'OUTLINE_CURVE:V4', 'OUTLINE_LAYER:V4', 'OUTLINE_LAYER:V7', 'OUTLINE_MODE_OFF:V4', 'LOBES_UNDER_CURVE:V4', 'OUTLINE_LIFTED:V4', 'WIDTH_REFUSED_ON_LOAD:V4'],
   },
   {
     /* S3: the page MERGES the leftover scope into the file's — the plausible
@@ -213,12 +282,17 @@ const MUTANTS = [
     /* V4 on every fixture — scoped or not, the dirty page's layer-1 entry
        survives; and V7 on SCOPED_DELTA, whose own layers are [0]: the leftover
        adds layer 1, so the BUILDER's scoped layers stop being the file's */
-    breaks: ['CLEAN:V4', 'HIDDEN_CONTROL:V4', 'HIDDEN_OPTION:V4', 'OFF_SCHEMA:V4', 'OFF_STEP:V4', 'OUT_OF_RANGE:V4', 'SCHEMA_RANGE:V4', 'SCOPED_DELTA:V4', 'SCOPED_DELTA:V7', 'SCOPED_INERT:V4', 'SCOPED_OWNED_RANGE:V4', 'SCOPED_RADIAL:V4', 'SCOPED_SPIRAL:V4', 'SIDECAR_INSIDE:V4', 'UNKNOWN_FIELD:V4'],
+    breaks: ['CLEAN:V4', 'HIDDEN_CONTROL:V4', 'HIDDEN_OPTION:V4', 'OFF_SCHEMA:V4', 'OFF_STEP:V4', 'OUT_OF_RANGE:V4', 'SCHEMA_RANGE:V4', 'SCOPED_DELTA:V4', 'SCOPED_DELTA:V7', 'SCOPED_INERT:V4', 'SCOPED_OWNED_RANGE:V4', 'SCOPED_RADIAL:V4', 'SCOPED_SPIRAL:V4', 'SIDECAR_INSIDE:V4', 'UNKNOWN_FIELD:V4',
+      /* S4: V4 on every outline fixture that loads (OUTLINE_LAYER's layers [0, 1] already hold the leftover's 1, so no V7) */
+      'OUTLINE_CURVE:V4', 'OUTLINE_LAYER:V4', 'OUTLINE_MODE_OFF:V4', 'LOBES_UNDER_CURVE:V4', 'OUTLINE_LIFTED:V4', 'WIDTH_REFUSED_ON_LOAD:V4'],
   },
   {
     id: 'hidden-controls-are-applied', file: 'bloom-file.js',
     from: '    if (!drop.length) break;', to: '    break;',
-    breaks: ['HIDDEN_CONTROL:V1', 'HIDDEN_CONTROL:V2', 'HIDDEN_CONTROL:V5', 'HIDDEN_OPTION:V1', 'HIDDEN_OPTION:V2', 'HIDDEN_OPTION:V5'],
+    breaks: ['HIDDEN_CONTROL:V1', 'HIDDEN_CONTROL:V2', 'HIDDEN_CONTROL:V5', 'HIDDEN_OPTION:V1', 'HIDDEN_OPTION:V2', 'HIDDEN_OPTION:V5',
+      /* S4: the two outline negative controls rest on THIS rule — a curve with
+         the mode off, lobes/fringe under CURVE (V3 stays: the page still hides them) */
+      'OUTLINE_MODE_OFF:V1', 'OUTLINE_MODE_OFF:V2', 'OUTLINE_MODE_OFF:V5', 'LOBES_UNDER_CURVE:V1', 'LOBES_UNDER_CURVE:V2', 'LOBES_UNDER_CURVE:V5'],
   },
   {
     id: 'a-reader-note-is-dropped', file: 'bloom-file.js',
@@ -238,7 +312,10 @@ const MUTANTS = [
          values) and stay (V2); SCOPED_INERT inherits the leftover's ON, so its
          V7 stops firing and its CLEAN-like V3 fires */
       'SCOPED_RADIAL:V1', 'SCOPED_RADIAL:V2', 'SCOPED_RADIAL:V5', 'SCOPED_SPIRAL:V1', 'SCOPED_SPIRAL:V2', 'SCOPED_SPIRAL:V5', 'SCOPED_DELTA:V1', 'SCOPED_DELTA:V2', 'SCOPED_DELTA:V5',
-      'SCOPED_OWNED_RANGE:V1', 'SCOPED_OWNED_RANGE:V2', 'SCOPED_OWNED_RANGE:V5', 'SCOPED_INERT:V1', 'SCOPED_INERT:V2', 'SCOPED_INERT:V3', 'SCOPED_INERT:V5', 'SCOPED_INERT:V7'],
+      'SCOPED_OWNED_RANGE:V1', 'SCOPED_OWNED_RANGE:V2', 'SCOPED_OWNED_RANGE:V5', 'SCOPED_INERT:V1', 'SCOPED_INERT:V2', 'SCOPED_INERT:V3', 'SCOPED_INERT:V5', 'SCOPED_INERT:V7',
+      /* S4: the outline fixtures, the same mechanism (WIDTH_REFUSED_ON_LOAD's V2 already fires) */
+      'OUTLINE_CURVE:V1', 'OUTLINE_CURVE:V2', 'OUTLINE_CURVE:V3', 'OUTLINE_CURVE:V5', 'OUTLINE_LAYER:V1', 'OUTLINE_LAYER:V2', 'OUTLINE_LAYER:V5',
+      'OUTLINE_LIFTED:V1', 'OUTLINE_LIFTED:V2', 'OUTLINE_LIFTED:V3', 'OUTLINE_LIFTED:V5', 'WIDTH_REFUSED_ON_LOAD:V1', 'WIDTH_REFUSED_ON_LOAD:V3', 'WIDTH_REFUSED_ON_LOAD:V5'],
   },
 ];
 
@@ -248,13 +325,14 @@ function mutate(src, m) {
   return src.replace(m.from, m.to);
 }
 
-async function validate(page, port, text, name) {
+async function validate(page, port, text, name, dirtyOver = null) {
   const errors = [];
   const onErr = (e) => errors.push(String(e && e.message || e));
   page.on('pageerror', onErr);
   try {
     await openBloom(page, port);
-    const d0 = await page.evaluate(([t]) => window.__bloomDesign.load(t, 'dirty.bloom-design.json'), [DIRTY_TEXT]);
+    const dirtyText = dirtyOver ? toText(composeDoc({ ...DIRTY_STATE, ...dirtyOver }, { savedAt: '2026-11-03T00:00:00.000Z', scopes: DIRTY_SCOPES })) : DIRTY_TEXT;
+    const d0 = await page.evaluate(([t]) => window.__bloomDesign.load(t, 'dirty.bloom-design.json'), [dirtyText]);
     await settleBuild(page, 120000);
     const dirty = await page.evaluate(() => ({ ui: window.__bloomUIState(), scopes: window.__bloomDesign.scopes() }));
     const off = CONTROLS.filter((c) => !valuesEqual(c, dirty.ui[c.id], DEFAULTS[c.id])).length;
@@ -296,7 +374,7 @@ async function validate(page, port, text, name) {
 
 async function runFixtures(page, port) {
   const out = {};
-  for (const f of FIXTURES) out[f.id] = await validate(page, port, JSON.stringify(f.file), `${f.id}.json`);
+  for (const f of FIXTURES) out[f.id] = await validate(page, port, JSON.stringify(f.file), `${f.id}.json`, f.dirty || null);
   return out;
 }
 const firedSet = (res) => new Set(Object.entries(res).flatMap(([id, r]) => Object.keys(r.fired).map((k) => `${id}:${k}`)));
@@ -329,7 +407,23 @@ try {
     }
   }
   if (SELF || NEGATIVE) {
-    const base = await runFixtures(page, port);
+    /* what decides a fixture's verdict: the page modules, the reader, the
+       geometry, the registry, this validator and the fixtures themselves */
+    const deciders = ['bloom.js', 'bloom-file.js', 'bloom-geometry.js', 'bloom-registry.js', 'bloom-curve.js', 'bloom.html', 'tools/verify-bloom-photo-subset.mjs', 'tools/bloom-photo-census.mjs', 'tools/bloom-harness.mjs'];
+    /* this validator is hashed WITHOUT its MUTANTS table: a mutant's `breaks`
+       list decides nothing about a fixture, and widening one must not stale
+       the base. Everything else in the file is hashed. */
+    const bytesOf = (f) => { const t = fs.readFileSync(path.join(ROOT, f), 'utf8'); if (f !== 'tools/verify-bloom-photo-subset.mjs') return t; const a = t.indexOf('const MUTANTS = ['), b = t.indexOf('\nfunction mutate('); if (a < 0 || b < a) throw new Error('the MUTANTS table cannot be located for the base hash'); return t.slice(0, a) + t.slice(b); };
+    const treeSha = Object.fromEntries(deciders.map((f) => [f, crypto.createHash('sha256').update(bytesOf(f)).digest('hex')]));
+    let base;
+    if (BASE_FILE && NEGATIVE) {
+      const saved = JSON.parse(fs.readFileSync(BASE_FILE, 'utf8'));
+      const stale = deciders.filter((f) => saved.treeSha[f] !== treeSha[f]);
+      if (stale.length) throw new Error(`--base ${BASE_FILE} was saved on another tree (${stale.join(', ')} differ) — re-run --self --save`);
+      base = Object.fromEntries(Object.entries(saved.fixtures).map(([id, r]) => [id, { fired: Object.fromEntries(r.fired.map((k) => [k, 'saved'])), warned: Object.fromEntries(r.warned.map((k) => [k, 'saved'])) }]));
+      console.log(`base: reused from ${BASE_FILE} (saved ${saved.savedAt}, every deciding file's sha256 matches)`);
+    } else base = await runFixtures(page, port);
+    if (SAVE) fs.writeFileSync(SAVE, JSON.stringify({ savedAt: new Date().toISOString(), treeSha, fixtures: Object.fromEntries(Object.entries(base).map(([id, r]) => [id, { fired: Object.keys(r.fired), warned: Object.keys(r.warned) }])) }, null, 1));
     for (const f of FIXTURES) {
       const got = Object.keys(base[f.id].fired).sort(), want = [...f.expect].sort();
       const gotW = Object.keys(base[f.id].warned).sort(), wantW = [...(f.warn || [])].sort();

@@ -144,6 +144,17 @@ export const SCHEMA = [
   { id: 'tubeLayer1', group: 'tube', ask: true }, { id: 'tubeHeight', group: 'tube', ask: true },
   // sepals (only from a second photo or an answer)
   { id: 'sepalCount', group: 'sepals', ask: true }, { id: 'sepalScale', group: 'sepals' }, { id: 'sepalAngle', group: 'sepals' },
+  /* SCHEMA v3 (S4, Nov 5 — the outline stage): the drawn outline, global. The
+     46 rows above are v1's, unchanged. CURVE replaces the whole boundary law
+     (F6-sym): the tapers, tip shape, squared end, lobes and fringe hide and go
+     inert, so a v3 subset that sets CURVE drops them. The curve value carries
+     the Symmetric / Asymmetric toggle as its own `mode`. The sepal outline is
+     included because the sepal controls (count, size, angle) are already on
+     the schema — a reading of the S4 brief, flagged in §12 of the doc. */
+  { id: 'petalOutlineMode', group: 'outline', values: ['LAW', 'CURVE'], since: 3 },
+  { id: 'petalOutlineCurve', group: 'outline', since: 3, note: 'symmetric or two-sided (the toggle); traced from a face-on petal' },
+  { id: 'sepalOutlineMode', group: 'sepals', values: ['LAW', 'CURVE'], since: 3 },
+  { id: 'sepalOutlineCurve', group: 'sepals', since: 3, note: 'symmetric or two-sided; one curve for every sepal (no FAN pairing on sepals)' },
 ];
 
 /* ---- SCHEMA VERSION 2 (photo-to-bloom S3, Nov 5): THE PER-LAYER ROWS ------
@@ -153,29 +164,31 @@ export const SCHEMA = [
      offsets  petalLength / petalWidth / petalTilt — Q3.5: a layer entry naming
               one of these OWNS it (the layer's value is global + offset, and
               the `layerSize` / `layerTilt` ramp's term is left out for it);
-     values   the spine — `petalCurlMode` / `petalSpineCurve` (F3-scope).
+     values   the spine — `petalCurlMode` / `petalSpineCurve` (F3-scope);
+              and since v3 (S4) the OUTLINE — `petalOutlineMode` /
+              `petalOutlineCurve` (F6-scope): each layer owns its curve, the
+              Oct 11 ruling, replacing the whole bloom's outright.
    NOT in v2, each a W1 when written:
      - every other offset (the ~30 delta-on-global sliders: petalCup,
        petalSpineCurl, … — a layer cannot own them, only nudge the global);
-     - the OUTLINE values (`petalOutlineMode` / `petalOutlineCurve`): the
-       outline is the NEXT stage (stage order changed Nov 5: per-layer before
-       outline), so the per-layer stage does not write a curve outline;
+     - (v2 only) the OUTLINE values — v3 adds them (ruling (d), §11.8);
      - petal / tier / strand entries (per-petal is FAN only; tiers are sepals).
    The switch: `scopeLayers` ON, under one of `placements` — the geometry's own
    SCOPE_LAYER_PLACEMENTS. The owned list is RESTATED here and checked against
    the geometry's SCOPE_LAYER_OWNED at load, both directions: importing it
    would let a quantity added to the geometry enter the photo schema silently. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 export const LAYER_SCHEMA = Object.freeze({
   switch: 'scopeLayers',
   placements: ['RADIAL', 'SPIRAL'],
   offsets: ['petalLength', 'petalWidth', 'petalTilt'],
-  values: ['petalCurlMode', 'petalSpineCurve'],
+  values: ['petalCurlMode', 'petalSpineCurve', 'petalOutlineMode', 'petalOutlineCurve'],
 });
 {
   const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
   if (!same(LAYER_SCHEMA.offsets, SCOPE_LAYER_OWNED)) throw new Error(`LAYER_SCHEMA.offsets [${LAYER_SCHEMA.offsets}] is not the geometry's SCOPE_LAYER_OWNED [${SCOPE_LAYER_OWNED}]`);
-  if (!same(LAYER_SCHEMA.values, SCOPE_VALUE_GROUPS.spine)) throw new Error(`LAYER_SCHEMA.values [${LAYER_SCHEMA.values}] is not the geometry's spine value group [${SCOPE_VALUE_GROUPS.spine}]`);
+  const owned = [...SCOPE_VALUE_GROUPS.spine, ...SCOPE_VALUE_GROUPS.outline];
+  if (!same(LAYER_SCHEMA.values, owned)) throw new Error(`LAYER_SCHEMA.values [${LAYER_SCHEMA.values}] is not the geometry's spine + outline value groups [${owned}]`);
   if (!same(LAYER_SCHEMA.placements, SCOPE_LAYER_PLACEMENTS)) throw new Error(`LAYER_SCHEMA.placements [${LAYER_SCHEMA.placements}] is not the geometry's SCOPE_LAYER_PLACEMENTS [${SCOPE_LAYER_PLACEMENTS}]`);
 }
 
@@ -216,7 +229,7 @@ const neverTrue = (c) => c.visibleWhen && JSON.stringify(c.visibleWhen).includes
 const counts = { a: 0, b: 0, c: 0, d: 0 };
 for (const c of CONTROLS) counts[CLASS[c.id][0]]++;
 if (!process.argv.includes('--md')) {
-  console.log(`CENSUS: ${CONTROLS.length} controls — a ${counts.a} · b ${counts.b} · c ${counts.c} · d ${counts.d}; schema v${SCHEMA_VERSION}: ${SCHEMA.length} global rows + per-layer (${LAYER_SCHEMA.switch} ON under ${LAYER_SCHEMA.placements.join('/')}; offsets ${LAYER_SCHEMA.offsets.join(', ')}; values ${LAYER_SCHEMA.values.join(', ')}); every control classified, every class an id`);
+  console.log(`CENSUS: ${CONTROLS.length} controls — a ${counts.a} · b ${counts.b} · c ${counts.c} · d ${counts.d}; schema v${SCHEMA_VERSION}: ${SCHEMA.length} global rows (${SCHEMA.filter((r) => !r.since).length} v1 + ${SCHEMA.filter((r) => r.since === 3).length} outline, v3) + per-layer (${LAYER_SCHEMA.switch} ON under ${LAYER_SCHEMA.placements.join('/')}; offsets ${LAYER_SCHEMA.offsets.join(', ')}; values ${LAYER_SCHEMA.values.join(', ')}); every control classified, every class an id`);
   process.exit(0);
 }
 console.log(`| control | kind | section | range / options | default | class | why |\n|---|---|---|---|---|---|---|`);
