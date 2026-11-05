@@ -1516,7 +1516,7 @@ const canvas = document.getElementById('bloom-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0c0f0e);
+scene.background = new THREE.Color(0x060707);   // --color-ground (tokens.css)
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2000);
 /* THE ORBIT AXIS BUG (Eva, Sep 2 — "feels really difficult... like it's
    fighting against me"), root-caused rather than guessed at. OrbitControls
