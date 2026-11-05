@@ -516,7 +516,7 @@ async function partOne(M) {
       moveTo(x, y) { cur = { pts: [[x, y]], arc: false }; path.push(cur); },
       lineTo(x, y) { cur.pts.push([x, y]); },
       closePath() {},
-      arc(x, y, r, a0, a1, ccw) { if (cur) { cur.arc = true; cur.ccw = !!ccw; cur.r = r; } },
+      arc(x, y, r, a0, a1, ccw) { if (cur) { cur.arc = true; cur.ccw = !!ccw; cur.r = r; cur.c = [x, y]; } },
       ellipse() { cur = { pts: [], arc: true, eye: true }; path.push(cur); },
       fill(rule) { ops.push({ fill: this._f, path, rule }); },
       save() {}, restore() {}, translate() {}, rotate() {}, scale() {}, clearRect() {}, stroke() {},
@@ -535,7 +535,17 @@ async function partOne(M) {
     return out.filter(Boolean);
   };
   check('a cat is one ink fill, every part of it wound the same way', () => {
-    let fills = 0, subpaths = 0, reversed = 0, folded = 0, cats = 0;
+    let fills = 0, subpaths = 0, reversed = 0, folded = 0, cats = 0, bands = 0, untangent = 0, worstCos = 0;
+    // a capsule is two discs and the band between them (in that order); the
+    // band's long edges must be the discs' external TANGENTS — each corner on
+    // its disc, the edge square to the radius there — or where the radii
+    // differ the band leaves a sliver outside one disc's rim (the seam this
+    // check exists for), which a winding count cannot see
+    const tangentCos = (corner, c, next) => {
+      const rx = corner[0] - c[0], ry = corner[1] - c[1], ex = next[0] - corner[0], ey = next[1] - corner[1];
+      const n = Math.hypot(rx, ry) * Math.hypot(ex, ey);
+      return n > 1e-9 ? Math.abs(rx * ex + ry * ey) / n : 0;
+    };
     const area = (P) => { let a = 0; for (let i = 0; i < P.length; i++) { const p = P[i], q = P[(i + 1) % P.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; };
     for (const c of poseSweep()) {
       const { ctx, ops } = recorder();
@@ -544,6 +554,16 @@ async function partOne(M) {
       const ink = ops.filter(o => o.fill === draw.PALETTE.cat && o.path.some(sp => !sp.eye));
       fills += ink.length;
       assert(ink.length === 1, `${ink.length} ink fills for one cat — two fills of one colour leave a hairline where they meet`);
+      for (const o of ops.filter(q => q.fill === draw.PALETTE.cat || q.fill === draw.PALETTE.catFar)) o.path.forEach((sp, k) => {
+        const A = o.path[k - 2], B = o.path[k - 1];
+        if (!sp.arc && !sp.eye && sp.pts.length === 4 && A && B && A.arc && B.arc && A.c && B.c) {
+          bands++;
+          const [a1, b1, b2, a2] = sp.pts;
+          const w = Math.max(tangentCos(a1, A.c, b1), tangentCos(b1, B.c, a1), tangentCos(b2, B.c, a2), tangentCos(a2, A.c, b2));
+          worstCos = Math.max(worstCos, w);
+          if (w > 1e-6) untangent++;
+        }
+      });
       for (const o of ops.filter(q => q.fill === draw.PALETTE.cat || q.fill === draw.PALETTE.catFar)) for (const sp of o.path) {
         if (sp.eye) continue;
         subpaths++;
@@ -560,7 +580,9 @@ async function partOne(M) {
       }
     }
     assert(!reversed && !folded, `${reversed} reversed and ${folded} folded subpaths: under the nonzero rule a reversed part CANCELS what it overlaps and opens a pale seam`);
-    return `${cats} cats, ${subpaths} subpaths, all one way, one ink fill each`;
+    assert(bands > 1000, `only ${bands} capsule bands found — the recorder no longer sees the capsules`);
+    assert(!untangent, `${untangent} of ${bands} capsule bands are not tangent to their discs (worst cos ${worstCos.toExponential(2)})`);
+    return `${cats} cats, ${subpaths} subpaths, all one way, one ink fill each; ${bands} capsule bands tangent to their discs (worst cos ${worstCos.toExponential(1)})`;
   });
   check('a cat is drawn in front of what it is in front of, and behind what is in front of it', () => {
     const at = (node, x, z, h, posture = 'sit') => { const c = K.createCat({ id: 'p', seed: 1, node, x, z, heading: h, posture }); for (let i = 0; i < 20; i++) K.stepCat(c, 1 / 60); return c; };

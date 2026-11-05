@@ -168,7 +168,13 @@ and four defects. What changed, and where it is kept:
   over 180 s, 10,798 frames: **p50 0.40 ms, p99 1.00 ms, worst 5.90 ms** a frame; frame
   interval p99 16.8 ms, 2 frames missed (worst interval 33.4 ms, while another gate
   ran on the same box). The gate holds p99 < 8 ms, worst < 16.7 ms, ≤ 1 % missed.
-- `node tools/verify-scene-studio.mjs`: GATE_LINE.
+- `node tools/verify-scene-studio.mjs`: **44/44** (Node 35 + browser 9, the frame-cost check reading
+  p99 1.20 ms, worst 2.10 ms, 0 missed over 40 s); `--negative-control`: **25/25** (23 in
+  one clean sweep; the two it missed were a mutant list short in the honest direction and a
+  real hole — the one-fill check could not see a non-tangent capsule band — both fixed and
+  re-run). `node tools/verify-scene.mjs`: **145/145**. Do not run the two gates at once
+  on one tree: verify-scene.mjs sweeps `scene/__mutant__*`, which is why this gate now
+  names its trees `__studio_mutant__*`.
 
 **Before (Phase 1, #493):**
 
