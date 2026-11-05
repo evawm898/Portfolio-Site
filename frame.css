@@ -1,9 +1,12 @@
 /* frame.css — the /frame page. Same palette and type as /bug and /bloom. */
+/* Re-pointed onto tokens.css (DESIGN.md). --dim-2 was a 3:1 grey used for text; faint is not
+   text (rule 4), so it reads dim. Any colour left as a hex below is ARTWORK: a mark drawn in the
+   editor or the exported file (rule 9/11), never text. */
 :root{
-  --ink:#0A0A0C; --ink-soft:#131316; --paper:#EDEDE8; --dim:#8A8A85; --dim-2:#5A5A56;
-  --line:rgba(237,237,232,0.10); --line-strong:rgba(237,237,232,0.22); --teal:#5FA0A0;
-  --font-display:'Playfair Display', Georgia, serif;
-  --font-mono:'Space Mono', 'IBM Plex Mono', monospace;
+  --ink:var(--color-ground); --ink-soft:var(--color-raised); --paper:var(--color-ink); --dim:var(--color-dim); --dim-2:var(--color-dim);
+  --line:var(--color-line); --line-strong:var(--color-line-strong); --teal:var(--color-petrol);
+  --font-display:var(--type-serif);
+  --font-mono:var(--type-mono);
 }
 *{box-sizing:border-box;}
 html,body{height:100%;}
@@ -18,7 +21,7 @@ body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--font-mo
 .fr-canvas3d[hidden]{display:none;}
 .fr-paper[hidden]{display:none;}
 .fr-viewtoggle{position:fixed;top:18px;right:328px;z-index:5;display:flex;gap:0;}
-.fr-viewtoggle button{background:rgba(10,10,12,.86);}
+.fr-viewtoggle button{background:color-mix(in srgb, var(--color-ground) 86%, transparent);}
 .fr-viewtoggle button + button{border-left:0;}
 
 .fr-header{position:fixed;top:20px;left:22px;z-index:4;pointer-events:none;}
@@ -28,7 +31,7 @@ body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--font-mo
 .fr-back{pointer-events:auto;color:var(--dim-2);text-decoration:none;font-size:11px;}
 .fr-back:hover{color:var(--paper);}
 
-.fr-box{background:rgba(10,10,12,.86);border:1px solid var(--line-strong);backdrop-filter:blur(6px);}
+.fr-box{background:color-mix(in srgb, var(--color-ground) 86%, transparent);border:1px solid var(--line-strong);backdrop-filter:blur(6px);}
 .fr-panel{position:fixed;top:18px;right:18px;bottom:18px;z-index:4;width:296px;overflow-y:auto;padding:14px 16px;}
 .fr-label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin:0 0 8px;}
 
@@ -52,8 +55,8 @@ details.fr-sec>summary:hover{color:var(--teal);}
 button.fr-btn{background:transparent;color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:5px 9px;cursor:pointer;}
 button.fr-btn:hover{border-color:var(--teal);color:var(--teal);}
 button.fr-btn.is-on{border-color:var(--teal);color:var(--teal);}
-button.fr-btn--solid{background:var(--teal);color:var(--ink);border-color:var(--teal);}
-button.fr-btn--solid:hover{color:var(--ink);opacity:.85;}
+button.fr-btn--solid{background:var(--color-deep);color:var(--paper);border-color:var(--color-deep);}
+button.fr-btn--solid:hover{color:var(--paper);border-color:var(--teal);}
 
 /* the profile editor lives inside the Molding section */
 .fr-editor{margin:4px 0 10px;}
@@ -64,7 +67,7 @@ button.fr-btn--solid:hover{color:var(--ink);opacity:.85;}
 
 .fr-readout{font-size:10.5px;line-height:1.6;color:var(--dim);border-top:1px solid var(--line);padding-top:10px;margin-top:6px;white-space:pre-wrap;}
 .fr-readout b{color:var(--paper);font-weight:400;}
-.fr-readout .warn{color:#d6a15c;}
+.fr-readout .warn{color:var(--paper);} .fr-readout .warn::before{content:'! ';}
 
 @media (max-width:760px){
   .fr-stage{right:0;padding:110px 10px 48vh;}
