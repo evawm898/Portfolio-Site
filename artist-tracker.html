@@ -5,23 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>EM / Ledger</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" integrity="sha256-YU3qCpj/P06tdPBJGPax0bm6Q1wltfwjsho5TR4+TYc=" crossorigin="">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" integrity="sha256-YSWCMtmNZNwqex4CEw1nQhvFub2lmU7vcCKP+XVwwXA=" crossorigin="">
 <style>
+  /* The page's own names, re-pointed onto tokens.css (DESIGN.md). --dim-2 was
+     a 3:1 grey used for text; faint is not text (rule 4), so it reads dim.
+     Category is DATA: a companion colour paired with a shape (rule 6) —
+     tattoo a filled plum disc, touring a filled indigo diamond, following an
+     ink ring with no fill. The same marks are the map pins. */
   :root{
-    --ink:#0A0A0C;
-    --ink-soft:#131316;
-    --paper:#EDEDE8;
-    --dim:#8A8A85;
-    --dim-2:#5A5A56;
-    --line: rgba(237,237,232,0.10);
-    --line-strong: rgba(237,237,232,0.22);
-    --teal:#5FA0A0;
-    --brick:#A65D4A;
-    --font-display: 'Playfair Display', Georgia, serif;
-    --font-mono: 'Space Mono', 'IBM Plex Mono', monospace;
+    --ink:var(--color-ground);
+    --ink-soft:var(--color-raised);
+    --paper:var(--color-ink);
+    --dim:var(--color-dim);
+    --dim-2:var(--color-dim);
+    --line:var(--color-line);
+    --line-strong:var(--color-line-strong);
+    --teal:var(--color-petrol);
+    --cat-tattoo:var(--color-plum);
+    --cat-touring:var(--color-indigo);
+    --font-display:var(--type-serif);
+    --font-mono:var(--type-mono);
   }
   *{box-sizing:border-box;}
   html{background:var(--ink);}
@@ -155,8 +162,8 @@
   .chip[data-active="true"]{color:var(--paper);}
   .chip[data-cat="all"][data-active="true"]{border-bottom-color:var(--paper);}
   .chip[data-cat="following"][data-active="true"]{border-bottom-color:var(--paper); color:var(--paper);}
-  .chip[data-cat="tattoo"][data-active="true"]{border-bottom-color:var(--brick); color:var(--brick);}
-  .chip[data-cat="touring"][data-active="true"]{border-bottom-color:var(--teal); color:var(--teal);}
+  .chip[data-cat="tattoo"][data-active="true"]{border-bottom-color:var(--cat-tattoo); color:var(--paper);}
+  .chip[data-cat="touring"][data-active="true"]{border-bottom-color:var(--cat-touring); color:var(--paper);}
 
   .filter-row{
     display:flex;
@@ -332,7 +339,7 @@
   .map-panel-item .entry-index{display:none;}
   .map-panel-item .entry-photo,
   .map-panel-item .entry-photo-placeholder{width:34px; height:34px; font-size:10px;}
-  .map-panel-item[data-hi="true"]{background:rgba(95,160,160,0.10);}
+  .map-panel-item[data-hi="true"]{background:color-mix(in srgb, var(--color-petrol) 10%, transparent);}
   .map-panel-notes{
     padding:0 14px;
     font-size:11px;
@@ -377,7 +384,7 @@
   }
   .leaflet-bar a:hover{background:var(--ink) !important;}
   .leaflet-control-attribution{
-    background:rgba(19,19,22,0.8) !important;
+    background:color-mix(in srgb, var(--color-raised) 80%, transparent) !important;
     color:var(--dim) !important;
   }
   .leaflet-control-attribution a{color:var(--teal) !important;}
@@ -471,7 +478,8 @@
     line-height:1.7;
     color:var(--dim);
   }
-  .import-report[data-tone="warn"]{border-left-color:var(--brick);}
+  .import-report[data-tone="warn"]{border-left-color:var(--color-plum);}
+  .import-report[data-tone="warn"] h4::before{content:'! ';}
   .import-report h4{
     margin:0 0 6px;
     font-family:var(--font-mono);
@@ -484,7 +492,7 @@
   .import-report ul{margin:6px 0 0; padding-left:18px;}
   .import-report li{margin-bottom:3px;}
   .import-report .num{color:var(--paper); font-family:var(--font-mono);}
-  .import-report .warn-num{color:var(--brick); font-family:var(--font-mono);}
+  .import-report .warn-num{color:var(--paper); font-family:var(--font-mono); font-weight:500;}
   .import-report code{
     font-family:var(--font-mono);
     background:var(--ink);
@@ -525,7 +533,7 @@
   }
   .io-choice button:hover{color:var(--paper); border-color:var(--teal);}
   .io-choice button[data-primary="true"]{color:var(--teal); border-color:var(--teal);}
-  .io-choice button[data-primary="true"]:hover{background:rgba(95,160,160,0.10);}
+  .io-choice button[data-primary="true"]:hover{background:color-mix(in srgb, var(--color-petrol) 10%, transparent);}
 
   .panel-actions{
     display:flex;
@@ -544,10 +552,10 @@
     cursor:pointer;
   }
   .btn-primary{
-    background:var(--teal);
-    border-color:var(--teal);
-    color:var(--ink);
-    font-weight:700;
+    background:var(--color-deep);
+    border-color:var(--color-deep);
+    color:var(--paper);
+    font-weight:500;
   }
   .btn:hover{border-color:var(--paper);}
   .btn-primary:hover{filter:brightness(1.1);}
@@ -561,7 +569,7 @@
     border-bottom:1px solid var(--line);
     cursor:pointer;
   }
-  .entry:hover{background:rgba(237,237,232,0.035);}
+  .entry:hover{background:color-mix(in srgb, var(--color-ink) 3.5%, transparent);}
   .entry:focus-visible{outline:1px solid var(--teal); outline-offset:-2px;}
   .entry-index{
     font-size:11px;
@@ -755,9 +763,14 @@
     letter-spacing:0.5px;
     text-transform:uppercase;
   }
-  .tag-following{color:var(--paper);}
-  .tag-tattoo{color:var(--brick);}
-  .tag-touring{color:var(--teal);}
+  .tag-following, .tag-tattoo, .tag-touring{color:var(--color-ink-2);}
+  .tag-following::before, .tag-tattoo::before, .tag-touring::before{
+    content:''; display:inline-block; width:7px; height:7px; margin-right:6px;
+    vertical-align:1px; box-sizing:border-box;
+  }
+  .tag-following::before{border:1.5px solid var(--paper); border-radius:50%;}
+  .tag-tattoo::before{background:var(--cat-tattoo); border-radius:50%;}
+  .tag-touring::before{background:var(--cat-touring); transform:rotate(45deg) scale(0.9);}
   .entry-status{font-size:13px; color:var(--paper); margin-top:6px; line-height:1.6;}
   .entry-status:empty{display:none;}
   .empty{
@@ -857,9 +870,9 @@
   .tag-toggle:hover{color:var(--dim); border-color:var(--dim-2);}
   .tag-toggle[data-on="true"]{
     border-color:var(--teal);
-    color:var(--ink);
-    background:var(--teal);
-    font-weight:700;
+    color:var(--paper);
+    background:var(--color-deep);
+    font-weight:500;
   }
   /* A tag the user typed that isn't in the starter set — same control, but
      marked so it reads as theirs rather than as one of ours. */
@@ -878,28 +891,28 @@
     color:var(--dim-2);
     margin:-12px 0 20px;
   }
-  .map-count .unplotted{color:var(--brick);}
+  .map-count .unplotted{color:var(--color-ink-2);}
   .map-count .geo-progress{color:var(--teal);}
-  .map-count .geo-paused{color:var(--brick);}
+  .map-count .geo-paused{color:var(--paper);}
   .map-count details{margin-top:6px;}
   .map-count summary{cursor:pointer;color:var(--dim-2);}
   .map-count ul{margin:4px 0 0;padding-left:18px;}
   .map-count li{color:var(--dim-2);margin:2px 0;}
-  .map-count .map-unplaced-string{color:var(--ink);}
+  .map-count .map-unplaced-string{color:var(--paper);}
   .map-count[hidden]{display:none;}
 
   /* Cluster bubbles, restyled to the page's palette — the plugin's default
      green/yellow/orange belongs to a different site. */
-  .marker-cluster{background:rgba(95,160,160,0.25);}
+  .marker-cluster{background:color-mix(in srgb, var(--color-petrol) 22%, transparent);}
   .marker-cluster div{
-    background:rgba(95,160,160,0.85);
-    color:var(--ink);
+    background:var(--color-deep);
+    color:var(--paper);
     font-family:var(--font-mono);
-    font-weight:700;
+    font-weight:500;
   }
-  .marker-cluster-medium{background:rgba(95,160,160,0.3);}
-  .marker-cluster-large{background:rgba(166,93,74,0.3);}
-  .marker-cluster-large div{background:rgba(166,93,74,0.9); color:var(--paper);}
+  .marker-cluster-medium{background:color-mix(in srgb, var(--color-petrol) 30%, transparent);}
+  /* a large cluster is marked by a ring, not by its number's colour */
+  .marker-cluster-large{background:color-mix(in srgb, var(--color-petrol) 30%, transparent); box-shadow:0 0 0 2px var(--color-seafoam);}
 
   /* --- notes, in the drawer's read-only spread --- */
   .detail-notes{white-space:pre-wrap;}
@@ -908,7 +921,7 @@
   .drawer-backdrop{
     position:fixed;
     inset:0;
-    background:rgba(10,10,12,0.66);
+    background:color-mix(in srgb, var(--color-ground) 66%, transparent);
     opacity:0;
     visibility:hidden;
     transition:opacity 280ms ease, visibility 0s linear 280ms;
@@ -1054,8 +1067,9 @@
   .detail-row dd a:hover{text-decoration:underline;}
   .detail-actions{display:flex; gap:12px;}
   .detail-actions .btn{flex:1 1 0; text-align:center;}
-  .detail-remove{color:var(--brick); border-color:rgba(166,93,74,0.45);}
-  .detail-remove:hover{border-color:var(--brick);}
+  .detail-remove{color:var(--color-ink-2); border-color:var(--line-strong);}
+  .detail-remove::before{content:'\2715\00a0';}
+  .detail-remove:hover{color:var(--paper); border-color:var(--dim);}
   .detail-ig{
     display:block;
     text-align:center;
@@ -1068,7 +1082,7 @@
     padding:11px 16px;
     text-decoration:none;
   }
-  .detail-ig:hover{background:var(--teal); color:var(--ink);}
+  .detail-ig:hover{background:var(--color-deep); color:var(--paper);}
   .detail-ig[hidden]{display:none;}
 
   /* --- paste-a-photo drop zone (edit mode) --- */
@@ -1123,7 +1137,8 @@
     color:var(--teal);
     overflow-wrap:anywhere;
   }
-  .photo-drop-state[data-error="true"]{color:var(--brick);}
+  .photo-drop-state[data-error="true"]{color:var(--paper);}
+  .photo-drop-state[data-error="true"]:not(:empty)::before{content:'\2715\00a0';}
   .photo-drop-clear{
     background:none;
     border:none;
@@ -1135,7 +1150,7 @@
     text-decoration:underline;
     cursor:pointer;
   }
-  .photo-drop-clear:hover{color:var(--brick);}
+  .photo-drop-clear:hover{color:var(--paper);}
   .photo-drop-clear[hidden]{display:none;}
 
   /* lock gate */
@@ -1201,8 +1216,9 @@
     outline:none;
   }
   .gate-field input:focus{border-bottom-color:var(--teal);}
+  .gate-error:not(:empty)::before{content:'\2715\00a0';}
   .gate-error{
-    color:var(--brick);
+    color:var(--paper);
     font-family:var(--font-mono);
     font-size:12px;
     min-height:16px;
@@ -3625,7 +3641,7 @@ another.handle"></textarea>
             const ctx = canvas.getContext('2d');
             // JPEG has no alpha channel: paint the panel background under a
             // transparent PNG screenshot so it doesn't come out black.
-            ctx.fillStyle = '#131316';
+            ctx.fillStyle = '#0c0e0e';   // --color-raised
             ctx.fillRect(0, 0, w, h);
             ctx.drawImage(img, 0, 0, w, h);
             resolve(canvas.toDataURL('image/jpeg', PHOTO_JPEG_QUALITY));
@@ -4127,10 +4143,16 @@ another.handle"></textarea>
   }
 
   function markerIconForCategory(category){
-    const color = category === 'tattoo' ? '#A65D4A' : category === 'touring' ? '#5FA0A0' : '#EDEDE8';
+    // Category is data: a companion colour AND a shape (DESIGN.md rule 6),
+    // the same marks as the list's category tags.
+    const mark = category === 'tattoo'
+      ? 'border-radius:50%;background:#a98cc8;border:2px solid #060707;'
+      : category === 'touring'
+        ? 'background:#7880d8;border:2px solid #060707;transform:rotate(45deg) scale(0.86);'
+        : 'border-radius:50%;background:#060707;border:2.5px solid #e9ecec;';
     return L.divIcon({
       className: 'map-pin',
-      html: '<span style="display:block;width:14px;height:14px;border-radius:50%;background:' + color + ';border:2px solid #0A0A0C;box-shadow:0 0 0 1px rgba(237,237,232,0.4);"></span>',
+      html: '<span style="display:block;width:14px;height:14px;box-sizing:border-box;' + mark + 'box-shadow:0 0 0 1px rgba(233,236,236,0.4);"></span>',
       iconSize: [14, 14],
       iconAnchor: [7, 7],
       popupAnchor: [0, -7],

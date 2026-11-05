@@ -311,7 +311,7 @@ check('drawer shows the date', /Oct\s*3,\s*2026/.test(dtext), dtext.match(/Oct[^
 const ig = page.locator('#detailIg');
 check('Instagram link href', await ig.getAttribute('href') === 'https://instagram.com/janedoe');
 check('Instagram link target', await ig.getAttribute('target') === '_blank');
-check('Instagram link is teal', (await ig.evaluate(el => getComputedStyle(el).color)) === 'rgb(95, 160, 160)');
+check('Instagram link is petrol (--color-petrol)', (await ig.evaluate(el => getComputedStyle(el).color)) === 'rgb(47, 163, 163)');
 
 check('list still in place behind the drawer', await page.locator('#list .entry').first().isVisible());
 const box = await drawer.boundingBox();

@@ -1,15 +1,16 @@
-/* weave.css — Weave Draft page. Standalone, on the site's own identity (the
-   bug page's grammar: Playfair Display headings, Space Mono body, ink / paper
-   / teal). Shares nothing with bloom.css or flower.css so no other page can
+/* weave.css — Weave Draft page, on the site's design system (tokens.css,
+   DESIGN.md). Shares nothing with bloom.css or flower.css so no other page can
    restyle this one by accident. */
+/* The page's own names, re-pointed onto tokens.css (DESIGN.md). --dim-2 was a
+   3:1 grey used for hints; faint is not text (rule 4), so it reads dim. */
 
 :root {
-  --ink: #0A0A0C; --ink-soft: #131316; --paper: #EDEDE8;
-  --dim: #8A8A85; --dim-2: #5A5A56;
-  --line: rgba(237, 237, 232, 0.10); --line-strong: rgba(237, 237, 232, 0.22);
-  --teal: #5FA0A0; --warn: #E07A6A;
-  --font-display: 'Playfair Display', Georgia, serif;
-  --font-mono: 'Space Mono', 'IBM Plex Mono', monospace;
+  --ink: var(--color-ground); --ink-soft: var(--color-raised); --paper: var(--color-ink);
+  --dim: var(--color-dim); --dim-2: var(--color-dim);
+  --line: var(--color-line); --line-strong: var(--color-line-strong);
+  --teal: var(--color-petrol);
+  --font-display: var(--type-serif);
+  --font-mono: var(--type-mono);
   --panel-w: 318px;
 }
 
@@ -47,13 +48,13 @@ body {
 .wv-drop {
   position: fixed; inset: 10px; z-index: 20; pointer-events: none;
   display: flex; align-items: center; justify-content: center;
-  border: 1px dashed var(--teal); background: rgba(10, 10, 12, 0.78);
+  border: 1px dashed var(--teal); background: color-mix(in srgb, var(--color-ground) 78%, transparent);
   letter-spacing: .12em; text-transform: uppercase; color: var(--paper);
 }
 .wv-drop[hidden] { display: none; }
 
 /* THE PANEL — the bug page's box, fixed down the right. */
-.wv-box { background: rgba(10, 10, 12, .9); border: 1px solid var(--line-strong); backdrop-filter: blur(6px); }
+.wv-box { background: color-mix(in srgb, var(--color-ground) 90%, transparent); border: 1px solid var(--line-strong); backdrop-filter: blur(6px); }
 .wv-panel { position: fixed; top: 18px; right: 18px; bottom: 18px; z-index: 4; width: calc(var(--panel-w) - 36px); overflow-y: auto; padding: 12px 14px; }
 .wv-label { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--dim); margin: 0 0 8px; }
 
@@ -92,8 +93,8 @@ button.wv-btn {
 }
 button.wv-btn:hover { border-color: var(--teal); color: var(--teal); }
 button.wv-btn.is-on { border-color: var(--teal); color: var(--teal); }
-button.wv-btn--solid { background: var(--teal); color: var(--ink); border-color: var(--teal); }
-button.wv-btn--solid:hover { color: var(--ink); opacity: .85; }
+button.wv-btn--solid { background: var(--color-deep); color: var(--paper); border-color: var(--color-deep); }
+button.wv-btn--solid:hover { color: var(--paper); border-color: var(--teal); }
 button.wv-btn--small { padding: 2px 7px; font-size: 11px; line-height: 1.3; }
 .wv-hint { font-size: 10.5px; color: var(--dim-2); line-height: 1.5; margin: 0 0 8px; }
 
@@ -107,7 +108,7 @@ button.wv-btn--small { padding: 2px 7px; font-size: 11px; line-height: 1.3; }
 /* THE YARN LIBRARY: one collapsible card per yarn — a swatch, the name and
    the count on its summary, every field in a two-column grid below. */
 .wv-yarns { display: flex; flex-direction: column; gap: 4px; margin-bottom: 7px; }
-details.wv-yarn { border: 1px solid var(--line); background: rgba(19, 19, 22, .6); }
+details.wv-yarn { border: 1px solid var(--line); background: color-mix(in srgb, var(--color-raised) 60%, transparent); }
 details.wv-yarn > summary {
   list-style: none; cursor: pointer; display: grid; grid-template-columns: 16px 1fr auto; gap: 8px;
   align-items: center; padding: 5px 7px; font-size: 11px; user-select: none;
@@ -134,7 +135,7 @@ details.wv-yarn[open] > summary { border-bottom: 1px solid var(--line); }
 
 /* SYSTEMS: a named repeat of yarn x count, one block per system. */
 .wv-systems { display: flex; flex-direction: column; gap: 6px; margin-bottom: 7px; }
-.wv-sys { border: 1px solid var(--line); padding: 6px 7px; background: rgba(19, 19, 22, .6); }
+.wv-sys { border: 1px solid var(--line); padding: 6px 7px; background: color-mix(in srgb, var(--color-raised) 60%, transparent); }
 .wv-sys-head { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; margin-bottom: 5px; }
 .wv-sys-head input[type=text] { min-width: 0; background: var(--ink-soft); color: var(--paper); border: 1px solid var(--line-strong); font-family: var(--font-mono); font-size: 11px; padding: 3px 6px; border-radius: 0; }
 .wv-sys-head .wv-ratio { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 10px; white-space: nowrap; }
@@ -148,7 +149,8 @@ details.wv-yarn[open] > summary { border-bottom: 1px solid var(--line); }
 
 /* the physical read-out sits inside its own section, under the inputs */
 .wv-readout.wv-phys { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 8px; }
-.wv-readout.wv-phys .wv-dense { color: var(--warn); font-weight: 700; }
+.wv-readout.wv-phys .wv-dense { color: var(--paper); font-weight: 500; }
+.wv-readout.wv-phys .wv-dense::before { content: '! '; }
 
 .wv-file { display: block; margin-top: 4px; color: var(--dim); font-size: 10.5px; }
 .wv-file input { display: block; margin-top: 4px; max-width: 100%; font: inherit; color: inherit; }
@@ -158,7 +160,8 @@ details.wv-yarn[open] > summary { border-bottom: 1px solid var(--line); }
   padding-top: 10px; margin-top: 6px; white-space: pre-wrap;
 }
 .wv-readout b { color: var(--paper); font-weight: 400; }
-.wv-readout .warn { color: var(--warn); }
+.wv-readout .warn { color: var(--paper); }
+.wv-readout .warn::before { content: '! '; }
 
 /* PHONE: the panel becomes a bottom sheet and the draft keeps the top. Both
    are pinned to the viewport's own width, so the page never scrolls sideways

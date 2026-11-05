@@ -268,3 +268,48 @@ costs frozen tags).
   `node tools/verify-print-scaffold.mjs` reads 70 checks, 0 failed.
   - The line-art paper `#F2F0EA` is artwork and is kept. Line art is the
     shipped default, so /print still opens on paper.
+
+## 10. Batch 4 as built
+
+- **The pattern for TOOL-system pages.** marble, weave and artist-tracker
+  each keep their own names (`--ink`, `--paper`, `--teal` …). Those names are
+  re-pointed at tokens: `--ink` → ground, `--paper` → ink, `--teal` → petrol,
+  and the lines → the line tokens. The fonts are Fraunces and Plex Mono.
+  - **Batches 5–9 reuse this.** The gated tool pages share this `:root`.
+  - `--dim-2` was a 3:1 grey used for text, so it now reads dim (rule 4).
+  - Solid buttons were a teal fill with ground text. They are now a deep fill
+    with ink text, like every other pressed control.
+- **marble.**
+  - The point-budget warning was amber text; it is now ink with `!`. The
+    export error was rust text; it is now ink with `✕`.
+  - Its checkbox takes the petrol accent; it was the browser's blue.
+  - The ink palette and sheet colours are artwork (saved links name them) and
+    are untouched.
+- **weave.** "too dense for single-layer" and every `.warn` line were
+  `#E07A6A` text. They are now ink with `!`, and the ruled wording is
+  unchanged. Yarn colours are user data and are untouched.
+- **artist-tracker.**
+  - **Category is data, so it is a companion colour AND a shape** (rule 6).
+    - Tattoo is a filled plum disc. Touring is a filled indigo diamond.
+      Following is an ink ring with no fill.
+    - The same marks sit before the list's category label (now ink-2, it was
+      brick / teal / paper text) and are the map pins.
+    - The active category filter keeps a coloured underline under ink text.
+  - **Clusters.** They are a deep disc with an ink count; a large cluster is
+    marked by a seafoam ring. They were teal, and brick for large.
+  - **Errors and warnings.**
+    - The password error and the photo error are ink with `✕`.
+    - Remove is ink-2 with `✕`.
+    - A warning import report has a plum rule and a `!` heading. Its counts
+      are ink.
+    - "geocoding paused" is ink (the word says it). The unplotted count is
+      ink-2.
+  - **Found, not caused.** The cleaning list's location strings were coloured
+    `var(--ink)`, which on this page is the BACKGROUND, so they were never
+    visible. They are ink now.
+  - The JPEG matte under pasted photos is raised `#0C0E0E`; it was `#131316`.
+    This affects new pastes only.
+- **Gates.**
+  - `verify-tracker-drawer` asserted the Instagram link is `rgb(95,160,160)`.
+    It now asserts petrol `rgb(47,163,163)`. Result: 427/427.
+  - `verify-marble` 51/51. `verify-weave --browser` 24/24 + 14/14.
