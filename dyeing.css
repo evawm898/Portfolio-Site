@@ -11,13 +11,15 @@
    two dyes of the cross-dyeing swatch — which is why that swatch also tells them apart by fiber
    (straight vs crimped) and molecule shape (dot vs diamond). Mint / undyed ink is the next
    closest (27); they never share a fiber here.
+   The generic "a dye" of parts 01 and 02 (--dye-colour) is the site's accent petrol (--petrol-bright,
+   #2fa3a3; Eva, Nov 5), so the three class colours appear only where a dye class is the subject.
    Superseded provisional palette (option 2): #E3A44A / #A98CE6 / #C9604E.
 --------------------------------------------------- */
 #dyeing {
   --dye-disperse: #7880D8;  /* indigo — disperse dye, polyester */
   --dye-acid:     #A98CC8;  /* plum   — acid dye, nylon */
   --dye-reactive: #B3DBB4;  /* mint   — reactive dye, cotton */
-  --dye-colour:   var(--dye-disperse);   /* "a dye", in the parts not about a dye class */
+  --dye-colour:   var(--petrol-bright);  /* "a dye", in the parts not about a dye class: the site accent */
   --dye-undyed:   var(--ink);
 }
 

@@ -12469,7 +12469,7 @@ Field Notes No. 08 (`dyeing.html`, `dyeing.css`, `textile-dyeing.js`, `textile-d
 in `/textile-basics.js`'s `DRAW` stroke language: where colour enters the chain (a stage picker; a row of
 four, a 2 × 2 grid under 560 px), pigment vs dye, the three dye classes, and cross dyeing with Reserve and
 Reality toggles. Copy stays generic — no internal product, project or band names.
-- **Colour has one owner**: `--dye-*` on `#dyeing` in `dyeing.css` (Eva's Direction A: indigo disperse,
+- **Colour has one owner**: `--dye-*` on `#dyeing` in `dyeing.css` (Eva's Direction A, with the generic dye of parts 01–02 in the accent petrol: indigo disperse,
   plum acid, mint reactive). The JS only writes `var(--dye-*)`; `verify-page.mjs` fails on a dye hex in
   the markup. Indigo/plum is the closest pair and they share the cross-dyed swatch, which is why fibre
   pattern and molecule shape also separate them — never colour alone.
