@@ -396,7 +396,7 @@ def test_wale_consensus_prefers_counted_spacing_when_trustworthy(monkeypatch):
         column_support_counts=[1], row_count=6, lattice_consistency=0.2,
     )
 
-    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown"):
+    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown", pixels_per_mm=None):
         axis = lambda px: AxisResult(spacing_px=px, positions_px=[], confidence=0.6)
         return GaugeAnalysisResult(
             success=True, message="", wale=axis(12.0), course=axis(16.0),
@@ -405,7 +405,7 @@ def test_wale_consensus_prefers_counted_spacing_when_trustworthy(monkeypatch):
 
     fake_lattices = {0: trustworthy, 100: untrustworthy}
 
-    def fake_loop_lattice(image_bgr, roi, orientation, course_rows_px=None):
+    def fake_loop_lattice(image_bgr, roi, orientation, course_rows_px=None, pixels_per_mm=None):
         return fake_lattices[roi[0]]
 
     monkeypatch.setattr(gauge_analysis, "analyze_gauge", fake_analyze_gauge)
@@ -444,7 +444,7 @@ def test_implausible_ratio_region_excluded_before_consensus_reproduces_the_varie
     fake_course = {"A": 3.6, "B": 2.51, "C": 3.58}  # course reads roughly consistent across all three, per the report
     labels_by_x = {0: "A", 100: "B", 200: "C"}
 
-    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown"):
+    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown", pixels_per_mm=None):
         label = labels_by_x[roi[0]]
         axis = lambda px: AxisResult(spacing_px=px, positions_px=[], confidence=0.7)
         return GaugeAnalysisResult(
@@ -513,7 +513,7 @@ def test_loop_lattice_absolute_density_implausible_region_excluded_from_wale_onl
     ordinary = FakeLattice(wale_spacing_px=15.0, column_count=6)
     fake_course = {0: 3.0, 100: 20.0}
 
-    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown"):
+    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown", pixels_per_mm=None):
         axis = lambda px: AxisResult(spacing_px=px, positions_px=[], confidence=0.7)
         wale_periodicity_px = 2.0 if roi[0] == 0 else 15.0
         return GaugeAnalysisResult(
@@ -523,7 +523,7 @@ def test_loop_lattice_absolute_density_implausible_region_excluded_from_wale_onl
 
     fake_lattices = {0: absurd, 100: ordinary}
 
-    def fake_loop_lattice(image_bgr, roi, orientation, course_rows_px=None):
+    def fake_loop_lattice(image_bgr, roi, orientation, course_rows_px=None, pixels_per_mm=None):
         return fake_lattices[roi[0]]
 
     monkeypatch.setattr(gauge_analysis, "analyze_gauge", fake_analyze_gauge)
@@ -586,7 +586,7 @@ def test_primary_region_is_never_an_outlier_on_every_axis_it_has(monkeypatch):
     fake_course = {"A": 1.0, "B": 2.0, "C": 500.0, "D": 999.0, "E": 50.0, "F": 50.1, "G": 50.2}
     labels_by_x = {i * 60: label for i, label in enumerate("ABCDEFG")}
 
-    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown"):
+    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown", pixels_per_mm=None):
         label = labels_by_x[roi[0]]
         axis = lambda px: AxisResult(spacing_px=px, positions_px=[], confidence=0.6)
         return GaugeAnalysisResult(

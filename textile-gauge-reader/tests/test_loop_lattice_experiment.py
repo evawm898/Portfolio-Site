@@ -253,7 +253,9 @@ def test_analyze_loop_lattice_experiment_signature_has_no_ground_truth_param():
     import inspect
 
     params = set(inspect.signature(analyze_loop_lattice_experiment).parameters)
-    assert params == {"image_bgr", "roi", "orientation", "course_rows_px"}
+    # pixels_per_mm is the request's own calibration (the working-scale front door,
+    # README "Analysis at one working resolution"), not an expected answer.
+    assert params == {"image_bgr", "roi", "orientation", "course_rows_px", "pixels_per_mm"}
     assert not any("actual" in p or "ground" in p or "truth" in p for p in params)
 
 

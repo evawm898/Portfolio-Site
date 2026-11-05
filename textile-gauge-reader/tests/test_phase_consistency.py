@@ -200,10 +200,10 @@ def test_real_photo_course_selection_still_unaffected_by_phase_consistency(real_
 def test_real_photo_no_ground_truth_reaches_the_prediction():
     """Static confirmation that `analyze_gauge` has no path for a
     ground-truth value to enter: its signature accepts only the image,
-    ROI, orientation, and structure -- nothing resembling an expected
-    answer."""
+    ROI, orientation, structure and the request's own calibration (pixels_per_mm,
+    the working-scale front door) -- nothing resembling an expected answer."""
     import inspect
 
     params = set(inspect.signature(analyze_gauge).parameters)
-    assert params == {"image_bgr", "roi", "orientation", "structure"}
+    assert params == {"image_bgr", "roi", "orientation", "structure", "pixels_per_mm"}
     assert not any("actual" in p or "ground" in p or "truth" in p for p in params)
