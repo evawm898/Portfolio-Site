@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Textile 101 · Dyeing — animation prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="../../textile-101.css">
+<link rel="stylesheet" href="dyeing.css">
+</head>
+<body>
+<main>
+  <!-- ================= DYEING ================= -->
+  <section class="tx-topic" id="dyeing">
+    <div class="tx-topic-head">
+      <h2>Dyeing</h2>
+      <div class="tx-topic-copy">
+        <p>Color can go in at almost any point in the chain &mdash; into the polymer before there is a fiber, into loose fiber, into yarn, or into finished fabric. Where it goes in, and which dye is used, decides how the color behaves for the rest of the product&rsquo;s life.</p>
+        <p class="muted">The fiber decides the dye: each fiber only takes the dye chemistry that can get into it, or hold on to it.</p>
+      </div>
+    </div>
+
+    <!-- ---------- A · WHERE COLOR ENTERS ---------- -->
+    <div class="tx-dye__part" id="dyeing-stage">
+      <div class="tx-dye__head">
+        <div><span class="n">10.1</span><h3>Where Color Enters</h3></div>
+        <div>
+          <p>Pick a stage and watch the dye go in there. Everything after it inherits the color; everything before it is still undyed.</p>
+          <p class="muted">The trade is always the same: the earlier the color goes in, the deeper and steadier it is &mdash; and the earlier you have to commit to it.</p>
+        </div>
+      </div>
+
+      <div class="tx-dye__stages" role="group" aria-label="Dye stage">
+        <div class="tx-dye__group"><span class="tx-dye__group-label">Before the yarn</span><div class="tx-dye__group-btns">
+          <button class="tx-dye__btn" data-dye-for="chain" data-dye-key="stage" data-dye-value="solution" aria-pressed="false">Solution (dope)</button>
+          <button class="tx-dye__btn" data-dye-for="chain" data-dye-key="stage" data-dye-value="fiber" aria-pressed="false">Fiber (stock)*</button>
+        </div></div>
+        <div class="tx-dye__group"><span class="tx-dye__group-label">Yarn</span><div class="tx-dye__group-btns">
+          <button class="tx-dye__btn" data-dye-for="chain" data-dye-key="stage" data-dye-value="skein" aria-pressed="false">Skein</button>
+          <button class="tx-dye__btn" data-dye-for="chain" data-dye-key="stage" data-dye-value="package" aria-pressed="true">Package</button>
+          <button class="tx-dye__btn" data-dye-for="chain" data-dye-key="stage" data-dye-value="beam" aria-pressed="false">Warp beam</button>
+        </div></div>
+        <div class="tx-dye__group"><span class="tx-dye__group-label">Fabric</span><div class="tx-dye__group-btns">
+          <button class="tx-dye__btn" data-dye-for="chain" data-dye-key="stage" data-dye-value="piece" aria-pressed="false">Piece</button>
+        </div></div>
+      </div>
+
+      <div class="tx-dye__anim" data-dye-scene="chain"><svg role="img" aria-label="Four panels left to right: polymer, fiber, yarn, fabric. Dye drops into the chosen stage; that stage and every stage after it turn the dye color, the ones before it stay white."></svg></div>
+      <div class="tx-dye__labels" aria-hidden="true"><span>Polymer</span><span>Fiber</span><span>Yarn</span><span>Fabric</span></div>
+
+      <div class="tx-dye__below">
+        <div class="tx-dye__meters" aria-live="polite">
+          <div class="tx-dye__meter"><div class="tx-dye__pips" data-meter="early"></div><span><b>Color goes in deeper and steadier</b> &mdash; less structure already built to distort</span></div>
+          <div class="tx-dye__meter"><div class="tx-dye__pips" data-meter="late"></div><span><b>Color decided later</b> &mdash; more flexibility, shorter lead time</span></div>
+        </div>
+        <div class="tx-dye__stage-copy">
+          <p class="tx-dye__caption" data-stage-copy="solution" hidden>Pigment goes into the melted polymer before the fiber exists, so the color <em>is</em> the fiber. The most fade-resistant in sunlight, and there&rsquo;s no dye bath, so no dye effluent. But the color is chosen before anything else is.</p>
+          <p class="tx-dye__caption" data-stage-copy="fiber" hidden>Loose fiber is dyed before it&rsquo;s spun into yarn, so the color runs all the way through every yarn made from it.<span class="note">* Staple fibers only &mdash; the short kind (cotton, wool, cut polyester or nylon). A continuous filament can&rsquo;t be dyed loose.</span></p>
+          <p class="tx-dye__caption" data-stage-copy="skein" hidden>Yarn dyed in big, loose loops &mdash; relaxed, so it keeps its bulk and a soft hand. Dyed yarn is what makes stripes, checks and heathers possible.<span class="note">If elastane is already in the yarn or fabric, the hot dye bath can cost it stretch. Color put in earlier, or into the polymer, avoids that.</span></p>
+          <p class="tx-dye__caption" data-stage-copy="package" hidden>Yarn wound tight on a perforated core, with the dye pumped through it under pressure. Dyed yarn is what makes stripes, checks and heathers possible.<span class="note">If elastane is already in the yarn or fabric, the hot dye bath can cost it stretch. Color put in earlier, or into the polymer, avoids that.</span></p>
+          <p class="tx-dye__caption" data-stage-copy="beam" hidden>A whole sheet of warp yarns, side by side under tension, dyed together on one beam &mdash; ready to weave.<span class="note">If elastane is already in the yarn or fabric, the hot dye bath can cost it stretch. Color put in earlier, or into the polymer, avoids that.</span></p>
+          <p class="tx-dye__caption" data-stage-copy="piece" hidden>The finished fabric is dyed. The color is decided last, with the shortest lead time &mdash; but everything is already built: in a tight fabric the dye may not reach the middle of every yarn.<span class="note">If elastane is already in the fabric, the hot dye bath can cost it stretch. Garments can be dyed later still, after they&rsquo;re sewn.</span></p>
+        </div>
+      </div>
+
+      <div class="tx-dye__sub">Three ways to dye yarn &mdash; three different states of the yarn</div>
+      <div class="tx-dye__grid tx-dye__grid--3">
+        <figure class="tx-dye__cell" data-dye-scene="skein">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Loose loops of yarn hang from a rod; the dye bath rises around them and the loops take the color"></svg></div>
+          <figcaption><span class="label">Skein (hank)</span><span class="state">Relaxed</span><span class="sub">Loose loops hang in the bath, so the yarn stays lofty and soft &mdash; but it has to be rewound before it can be used.</span></figcaption>
+        </figure>
+        <figure class="tx-dye__cell" data-dye-scene="package">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Cross-section of yarn wound in rings around a perforated core; dye is pumped out through the core, then back in, until every ring is colored"></svg></div>
+          <figcaption><span class="label">Package</span><span class="state">Controlled compression</span><span class="sub">Wound to a set density on a perforated core; the dye is pumped through, inside out and then outside in.</span></figcaption>
+        </figure>
+        <figure class="tx-dye__cell" data-dye-scene="beam">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Parallel yarns stretched between a bar and a perforated beam; dye rises up through all of them at once"></svg></div>
+          <figcaption><span class="label">Warp beam</span><span class="state">Aligned under tension</span><span class="sub">The whole warp, side by side on one perforated beam, dyed in one go.</span></figcaption>
+        </figure>
+      </div>
+
+      <div class="tx-dye__sub">How far the dye gets: one yarn, cut across</div>
+      <div class="tx-dye__grid tx-dye__grid--2">
+        <figure class="tx-dye__cell" data-dye-scene="pen-yarn">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Cross-section of a round yarn made of many fibers; the color moves in from the outside until every fiber is colored"></svg></div>
+          <figcaption><span class="label">Dyed as yarn</span><span class="sub">The dye has room to reach every fiber, right to the middle.</span></figcaption>
+        </figure>
+        <figure class="tx-dye__cell" data-dye-scene="pen-piece">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Cross-section of a yarn squeezed flat by its neighbours in a fabric; the color colors the outer fibers but stays pale in the middle"></svg></div>
+          <figcaption><span class="label">Dyed as fabric</span><span class="sub">Squeezed by its neighbours in a tight fabric, the yarn can take the color mostly at its surface and stay paler inside &mdash; called ring dyeing.</span></figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <!-- ---------- B · PIGMENT VS DYE ---------- -->
+    <div class="tx-dye__part" id="dyeing-pigment">
+      <div class="tx-dye__head">
+        <div><span class="n">10.2</span><h3>Inside, On, or Into</h3></div>
+        <div>
+          <p>Pigment and dye are different things. Pigment is solid particles; it has no hold on a fiber of its own, so it&rsquo;s either locked inside the polymer or glued onto the surface. Dye is molecules that go <em>into</em> the fiber.</p>
+        </div>
+      </div>
+      <div class="tx-dye__grid tx-dye__grid--3">
+        <figure class="tx-dye__cell" data-dye-scene="solution">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Cross-section of a fiber; pigment particles are stirred into it while it is still melted, then it sets with particles all through it"></svg></div>
+          <figcaption><span class="label">Solution-dyed</span><span class="state">Pigment inside</span><span class="sub">Pigment mixed into the polymer before it&rsquo;s spun. The color is part of the fiber.</span></figcaption>
+        </figure>
+        <figure class="tx-dye__cell" data-dye-scene="printed">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Cross-section of a white fiber; pigment particles land on its top surface and a binder film coats over them; the inside stays white"></svg></div>
+          <figcaption><span class="label">Pigment printed</span><span class="state">Pigment on the surface</span><span class="sub">Particles held on by a binder. A stiff print can restrict stretch and crack; heavy pigment changes the hand, and it can rub off.</span></figcaption>
+        </figure>
+        <figure class="tx-dye__cell" data-dye-scene="dyed">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Cross-section of a fiber in a dye bath; small dye molecules move from the bath into the fiber and spread through it"></svg></div>
+          <figcaption><span class="label">Dyed</span><span class="state">Dye into the fiber</span><span class="sub">Dye molecules go into the fiber &mdash; dissolved in it, or bonded to it, depending on the dye.</span></figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <!-- ---------- C · WHY THE FIBER DECIDES THE DYE ---------- -->
+    <div class="tx-dye__part" id="dyeing-classes">
+      <div class="tx-dye__head">
+        <div><span class="n">10.3</span><h3>Why the Fiber Decides the Dye</h3></div>
+        <div>
+          <p>Zoom into a fiber and it&rsquo;s long chains of molecules. A dye only works on a fiber if it can get in among those chains and stay there &mdash; and each fiber offers a different way to hold on.</p>
+          <p class="muted">So each fiber has its dye class: disperse for polyester, acid for nylon, reactive for cotton.</p>
+        </div>
+      </div>
+      <div class="tx-dye__grid tx-dye__grid--3">
+        <figure class="tx-dye__cell" data-dye-scene="disperse">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Polyester chains, packed tight; heat to 130 degrees loosens them, small round dye molecules slip in between, then the chains close and trap them"></svg></div>
+          <figcaption><span class="label">Disperse &rarr; polyester</span><span class="state">Trapped</span><span class="sub">Polyester has nothing for a dye to grab. Hot and under pressure, its chains loosen; tiny dye molecules slip in and stay trapped when it cools.</span></figcaption>
+        </figure>
+        <figure class="tx-dye__cell" data-dye-scene="acid">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Nylon chains with a few sites; in an acid bath each site gains a plus sign; dye molecules marked minus move in and pair with the plus sites"></svg></div>
+          <figcaption><span class="label">Acid &rarr; nylon (and wool)</span><span class="state">Ionic bond</span><span class="sub">In an acid bath the fiber&rsquo;s sites pick up a + charge; the dye carries a &minus;, and they pair up. Nylon has only a few of these sites, wool many.</span></figcaption>
+        </figure>
+        <figure class="tx-dye__cell" data-dye-scene="reactive">
+          <div class="tx-dye__anim"><svg role="img" aria-label="Cotton chains; dye molecules settle onto them, then with alkali each forms a solid bond to the chain; dye that reacted with the water instead is washed away"></svg></div>
+          <figcaption><span class="label">Reactive &rarr; cotton</span><span class="state">Covalent bond</span><span class="sub">With alkali, the dye bonds to the cotton itself. Some dye reacts with the water instead &mdash; it can&rsquo;t bond, so it&rsquo;s washed off.</span></figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <!-- ---------- D · ONE BATH, TWO DYES ---------- -->
+    <div class="tx-dye__part" id="dyeing-cross">
+      <div class="tx-dye__head">
+        <div><span class="n">10.4</span><h3>One Bath, Two Dyes &mdash; Cross Dyeing</h3></div>
+        <div>
+          <p>Because each dye only takes to its own fiber, a fabric blended from two fibers can go into one bath with two dyes and come out two colors. That&rsquo;s cross dyeing.</p>
+          <p class="muted">Choose the two dyes to match instead and the same bath gives one solid color: union dyeing.</p>
+        </div>
+      </div>
+      <div class="tx-dye__toggles" role="group" aria-label="Cross dyeing options">
+        <button class="tx-dye__btn" data-dye-for="cross" data-dye-key="reserve" aria-pressed="false">Reserve: leave the acid dye out</button>
+        <button class="tx-dye__btn" data-dye-for="cross" data-dye-key="reality" aria-pressed="false">Reality: cross-staining</button>
+      </div>
+      <div class="tx-dye__cross">
+        <div class="tx-dye__anim" data-dye-scene="cross"><svg role="img" aria-label="A woven swatch of polyester and nylon sits in a dye bath with round disperse dye molecules and diamond-shaped acid dye molecules; each kind moves to its own fiber, so the polyester turns one color and the nylon another"></svg></div>
+        <div>
+          <ul class="tx-dye__legend">
+            <li><svg viewBox="-9 -9 18 18" aria-hidden="true"><circle r="3.4" fill="var(--dye-disperse)"/></svg><span><b>Disperse dye</b> &rarr; polyester: the smooth, straight filaments running up and down</span></li>
+            <li><svg viewBox="-9 -9 18 18" aria-hidden="true"><path d="M0,-4.6L4.6,0L0,4.6L-4.6,0Z" fill="var(--dye-acid)"/><path d="M-2.3,0H2.3" stroke="var(--black)" stroke-width="1.3"/></svg><span><b>Acid dye</b> &rarr; nylon: the crimped filaments running across</span></li>
+          </ul>
+          <div class="tx-dye__notes">
+            <p data-cross-note="reserve" hidden><b>Reserve dyeing.</b> Leave one dye out and that fiber comes out undyed &mdash; a two-tone, or a heather if the fibers are mixed in the yarn.</p>
+            <p data-cross-note="reality" hidden class="tx-dye__pending"></p>
+            <p><b>Polyester with cotton</b> is harder: disperse dye wants a hot, acidic bath and reactive dye an alkaline one. So the two usually run in the same bath as two steps, one after the other.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+  import { mountDyeing, STAGES } from './dyeing.js';
+  const q = new URLSearchParams(location.search);
+  const onState = p => {
+    if (p.name === 'chain') {
+      const i = STAGES.findIndex(s => s.id === p.state.stage), panel = STAGES[i].panel;
+      document.querySelectorAll('[data-stage-copy]').forEach(e => { e.hidden = e.dataset.stageCopy !== p.state.stage; });
+      document.querySelectorAll('.tx-dye__labels span').forEach((e, j) => e.classList.toggle('is-entry', j === panel));
+      const pips = n => Array.from({ length: STAGES.length }, (_, k) => `<i class="${k < n ? 'on' : ''}"></i>`).join('');
+      document.querySelector('[data-meter="early"]').innerHTML = pips(STAGES.length - i);
+      document.querySelector('[data-meter="late"]').innerHTML = pips(i + 1);
+    }
+    if (p.name === 'cross') document.querySelectorAll('[data-cross-note]').forEach(e => { e.hidden = !p.state[e.dataset.crossNote]; });
+  };
+  window.__dy = mountDyeing(document, { onState, autoplay: !q.has('still'), reducedMotion: q.has('reduce') ? true : undefined });
+</script>
+</body>
+</html>

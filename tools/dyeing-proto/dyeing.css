@@ -1,0 +1,86 @@
+/* ---------------------------------------------------
+   Dyeing (section 10) — prototype styles. Moves into textile-101.css at integration.
+
+   THE DYE PALETTE LIVES HERE AND ONLY HERE. dyeing.js strokes var(--dye-*) and never names a
+   colour, so the final pick is the three lines below.
+   PROVISIONAL: option 2 (amber / violet / brick), Eva, Nov 5 — palette pick deferred.
+--------------------------------------------------- */
+#dyeing {
+  --dye-disperse: #E3A44A;  /* option 1: #E3A44A · option 3: #D97757 */
+  --dye-acid:     #A98CE6;  /* option 1: #A98CE6 · option 3: #B8A6F0 */
+  --dye-reactive: #C9604E;  /* option 1: #E3A44A (repeats disperse) · option 3: #D97757 (repeats disperse) */
+  --dye-colour:   var(--dye-disperse);   /* "a dye", in the parts not about a dye class (A, B) */
+  --dye-undyed:   var(--ink);
+}
+
+.tx-dye__part { margin-top: 4.5rem; }
+.tx-dye__part:first-of-type { margin-top: 3rem; }
+.tx-dye__head { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 46rem); gap: 4vw; margin-bottom: 1.8rem; }
+.tx-dye__head .n { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; color: var(--petrol-bright); margin-bottom: 0.5rem; }
+.tx-dye__head h3 { font-family: var(--serif); font-weight: 500; font-size: 1.55rem; line-height: 1.2; margin: 0; color: var(--ink); }
+.tx-dye__head p { margin: 0 0 0.8rem; color: var(--ink); line-height: 1.7; }
+.tx-dye__head p.muted { color: var(--ink-dim); }
+
+.tx-dye__anim { width: 100%; }
+.tx-dye__anim svg { display: block; width: 100%; height: auto; cursor: pointer; }
+.tx-dye__grid { display: grid; gap: 1.25rem 1.5rem; }
+.tx-dye__grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tx-dye__grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tx-dye__cell { margin: 0; }
+.tx-dye__cell .tx-dye__anim { margin-bottom: 0.9rem; }
+.tx-dye__cell .label { display: block; font-family: var(--serif); font-weight: 500; font-size: 1.2rem; color: var(--ink); }
+.tx-dye__cell .state { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--petrol-bright); margin-top: 0.3rem; }
+.tx-dye__cell .sub { display: block; margin-top: 0.45rem; font-size: 12px; line-height: 1.55; color: var(--ink-dim); }
+.tx-dye__sub { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 2.6rem 0 1rem; }
+
+/* A · the stage picker */
+.tx-dye__stages { display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; margin: 0 0 1.4rem; }
+.tx-dye__group { display: flex; flex-direction: column; gap: 0.45rem; }
+.tx-dye__group-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+.tx-dye__group-btns { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.tx-dye__btn {
+  font: 12px var(--mono); color: var(--ink-dim); background: transparent; border: 1px solid var(--line-strong);
+  border-radius: 999px; padding: 0.42rem 0.8rem; cursor: pointer; transition: color .15s, border-color .15s;
+}
+.tx-dye__btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+.tx-dye__btn[aria-pressed="true"] { color: var(--black); background: var(--ink); border-color: var(--ink); }
+.tx-dye__btn:focus-visible { outline: 2px solid var(--petrol-bright); outline-offset: 2px; }
+.tx-dye__labels { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 0.55rem; text-align: center; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+.tx-dye__labels .is-entry { color: var(--dye-colour); }
+.tx-dye__labels .is-entry::before { content: "\2193\00a0dye here\00a0\00b7\00a0"; }
+.tx-dye__below { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem 3rem; margin-top: 1.6rem; align-items: start; }
+.tx-dye__meters { display: grid; gap: 0.9rem; }
+.tx-dye__meter { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.9rem; align-items: center; }
+.tx-dye__pips { display: flex; gap: 4px; }
+.tx-dye__pips i { width: 14px; height: 6px; border-radius: 3px; border: 1px solid var(--line-strong); }
+.tx-dye__pips i.on { background: var(--ink); border-color: var(--ink); }
+.tx-dye__meter span { font-size: 12px; line-height: 1.45; color: var(--ink-dim); }
+.tx-dye__meter b { font-weight: 500; color: var(--ink); }
+.tx-dye__caption { font-size: 13px; line-height: 1.65; color: var(--ink); margin: 0; }
+.tx-dye__caption .note { display: block; margin-top: 0.55rem; font-size: 12px; color: var(--ink-dim); }
+
+/* D · toggles, legend, the held copy slot */
+.tx-dye__toggles { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 1.2rem; }
+.tx-dye__toggles .tx-dye__btn[aria-pressed="true"]::before { content: "\2713\00a0"; }
+.tx-dye__cross { display: grid; grid-template-columns: minmax(0, 46rem) minmax(0, 1fr); gap: 1.5rem 3rem; align-items: start; }
+.tx-dye__legend { list-style: none; margin: 0 0 1.4rem; padding: 0; display: grid; gap: 0.7rem; }
+.tx-dye__legend li { display: grid; grid-template-columns: 18px 1fr; gap: 0.7rem; align-items: center; font-size: 12px; line-height: 1.5; color: var(--ink-dim); }
+.tx-dye__legend li b { color: var(--ink); font-weight: 500; }
+.tx-dye__legend svg { width: 18px; height: 18px; display: block; }
+.tx-dye__notes p { font-size: 12.5px; line-height: 1.65; color: var(--ink-dim); margin: 0 0 0.9rem; }
+.tx-dye__notes p b { color: var(--ink); font-weight: 500; }
+.tx-dye__notes [hidden] { display: none; }
+/* row 15: the poly/nylon "Reality" copy is Eva's to write; this slot stays empty until then.
+   The prototype marks it so the empty slot is visible; the page will not. */
+.tx-dye__pending:empty { min-height: 2.6rem; border: 1px dashed var(--line-strong); border-radius: 4px; }
+.tx-dye__pending:empty::after { content: "copy pending (Eva, row 15)"; display: block; padding: 0.6rem 0.8rem; font: 11px var(--mono); color: var(--ink-faint); }
+
+@media (max-width: 900px) {
+  .tx-dye__head, .tx-dye__below, .tx-dye__cross { grid-template-columns: 1fr; }
+  .tx-dye__grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .tx-dye__grid--2, .tx-dye__grid--3 { grid-template-columns: 1fr; }
+  .tx-dye__labels { font-size: 9px; letter-spacing: 0.06em; }
+  .tx-dye__labels .is-entry::before { content: "\2193\00a0"; }
+}

@@ -14,10 +14,18 @@ export const KIND = {
   filament: { crimpK: 1, n: 26, camp: 0.12, wave: 40 },
   textured: { crimpK: 1, n: 24, camp: 1.9, wave: 11 },
 };
-export function fibresFor(kind, seed, S) {
-  if (kind === 'staple') return yarnFibres(seed, S + 20, -20);
-  const K = KIND[kind], r = rng(seed), out = [];
-  for (let i = 0; i < K.n; i++) {
+// o.n (filament count) and o.density (staple, a share of DRAW's own density) thin a yarn out for
+// the small yarns the dyeing scenes draw (a skein loop, a warp sheet), where DRAW's density reads as
+// a solid band
+export function fibresFor(kind, seed, S, o = {}) {
+  if (kind === 'staple') {
+    if (!o.density) return yarnFibres(seed, S + 20, -20);
+    const r = rng(seed), out = [], n = Math.round((S + 40) / 276 * 74 * o.density);
+    for (let i = 0; i < n; i++) { const f = makeFibre(r, i, false); f.c = -20 + (i + r()) / n * (S + 40); f.sgn = 1; out.push(f); }
+    return out;
+  }
+  const K = KIND[kind], r = rng(seed), out = [], n = o.n || K.n;
+  for (let i = 0; i < n; i++) {
     const f = makeFibre(r, i, false);
     f.len = S + 200; f.c = S / 2; f.sgn = 1;
     f.camp = K.camp * (0.7 + 0.6 * r()); f.waves = f.len / (K.wave * (0.85 + 0.3 * r()));
@@ -39,15 +47,15 @@ export function dyedPiece(yarn, s0, s1) {
   }
   return `<path d="${bandPath(yarn.line, s0, s1, yarn.R + 2)}" fill="${BG}" stroke="none"/>` + runsMarkup(runs);
 }
-const yarnOn = (line, kind, color, seed, R) => ({ line, sOff: 0, R, kind, color, seed, fibres: fibresFor(kind, seed, line.length), front: 1, back: BACK, edge: EDGE });
+export const yarnOn = (line, kind, color, seed, R, o = {}) => ({ line, sOff: 0, R, kind, color, seed, fibres: fibresFor(kind, seed, line.length, o), front: 1, back: BACK, edge: EDGE });
 
 // a plain weave close-up: warp (vertical) and weft (horizontal) each its own fibre kind + colour
-export function dyedWeave({ warp, weft, cols = 6, rows = 5, pitch = 52, rowPitch = 44, R = 18 }) {
-  const w = (cols - 1) * pitch, h = (rows - 1) * rowPitch, x0 = VIEW.w / 2 - w / 2, y0 = VIEW.h / 2 - h / 2, ext = 60;
+export function dyedWeave({ warp, weft, cols = 6, rows = 5, pitch = 52, rowPitch = 44, R = 18, cx = VIEW.w / 2, cy = VIEW.h / 2, ext = 60 }) {
+  const w = (cols - 1) * pitch, h = (rows - 1) * rowPitch, x0 = cx - w / 2, y0 = cy - h / 2;
   const layers = ['', '', ''];
   for (let k = 0; k < rows; k++) {
     const y = y0 + k * rowPitch, line = centreline([lineSeg(x0 - ext, y, x0 + w + ext, y)]);
-    const yarn = yarnOn(line, weft.kind, weft.color, SEED + 301 + k, R);
+    const yarn = yarnOn(line, weft.kind, weft.color, SEED + 301 + k, R, weft);
     for (let i = -1; i <= cols; i++) {
       const s0 = i < 0 ? 0 : ext + (i - 0.5) * pitch, s1 = i === cols ? line.length : ext + (i + 0.5) * pitch;
       layers[i < 0 || i === cols ? 0 : ((i + k) % 2 === 0 ? 2 : 1)] += dyedPiece(yarn, s0, s1);
@@ -55,7 +63,7 @@ export function dyedWeave({ warp, weft, cols = 6, rows = 5, pitch = 52, rowPitch
   }
   for (let i = 0; i < cols; i++) {
     const x = x0 + i * pitch, line = centreline([lineSeg(x, y0 + h + ext, x, y0 - ext)]);
-    const yarn = yarnOn(line, warp.kind, warp.color, SEED + 401 + i, R);
+    const yarn = yarnOn(line, warp.kind, warp.color, SEED + 401 + i, R, warp);
     for (let k = -1; k <= rows; k++) {
       const yTop = k < 0 ? y0 - ext : y0 + (k - 0.5) * rowPitch, yBot = k === rows ? y0 + h + ext : y0 + (k + 0.5) * rowPitch;
       const s0 = (y0 + h + ext) - Math.min(yBot, y0 + h + ext), s1 = (y0 + h + ext) - Math.max(yTop, y0 - ext);
