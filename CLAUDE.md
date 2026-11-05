@@ -11103,6 +11103,18 @@ from a changed harness; one temp dir PER mutant — Node caches modules by URL a
 path served the first mutant to all of them). Sheet: `node tools/shot-scene-studio.mjs <dir>`.
 `?dev=1` mounts the harness via the shell's `host.panel()`; `studio-dev.js` is the one DOM
 module and is excluded from `verify-scene.mjs`'s discipline list by name. Not in CI.
+**The continuity pass (Nov 5, the "Continuity pass" section of the doc):** every channel is
+quintic Hermite segments that start from the channel's own velocity and acceleration (an
+ease name is a SKEW, never "from rest"); the airborne body is pieces held as data
+(`seg`/`glide`/`ballistic`), so the seams are C2 and scrub stays exact; a landing is set
+down (forepaws arrive at rest, grounded only after recover), leg reach is a soft tanh
+limit. The witness is REFINEMENT — per-step Δv must halve when the step halves (1/960 vs
+1/1920 s) on every drawn point of every edge and an action chain; a threshold cannot see
+a seam. Ambient spec revised: an action every 5–12 s across the pair, both may move but
+never the same kind within 4 s, the floor shared at 55 cm, dozes 8–20 s. A cat is ONE ink
+fill on true capsule tangents; painter's order by separating planes per part. The browser
+gate holds frame cost (p99 < 8 ms, worst < 16.7 ms) under the director.
+`tools/record-scene-studio.mjs ambient|jump` makes exact-frame videos (not committed).
 
 ## Artist Tracker (`artist-tracker.html`)
 

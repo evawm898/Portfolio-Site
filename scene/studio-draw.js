@@ -14,6 +14,7 @@
 
 import { ROOM, FURNITURE, NODES, bayOffset, onSurface, pointInPoly } from './studio-room.js';
 import { solveRig } from './studio-rig.js';
+import { toeWorld } from './studio-cat.js';
 import { CAMERA } from './studio-room.js';
 
 export const PALETTE = {
@@ -111,15 +112,22 @@ export function drawRoom(ctx, view) {
   rail([[X, ROOM.wainscotY, Z0], [X, ROOM.wainscotY, B], [bay[3][0], ROOM.wainscotY, B]]);
   rail(bay.map(([x, z]) => [x, ROOM.wainscotY, z]));
 
-  // the sill: one continuous ledge across all three facets
+  // the sill: one continuous ledge across all three facets. Its front edge is
+  // the glass line offset into the room by the sill's depth; on the two side
+  // facets that edge is CUT where it meets the back wall's plane (not clamped
+  // onto it, which slid its ends sideways and left the ledge stopping short of
+  // the wall with no face under it)
   const inner = bayOffset(ROOM.sillDepth);
-  const clipZ = (p) => [p[0], Math.max(B, p[1])];
-  const innerC = inner.map(clipZ);
-  poly(ctx, view, [...bay.map(([x, z]) => [x, ROOM.sillY, z]), ...innerC.slice().reverse().map(([x, z]) => [x, ROOM.sillY, z])], PALETTE.sillTop);
+  const meetWall = (p, q) => { const t = (B - p[1]) / (q[1] - p[1]); return [p[0] + (q[0] - p[0]) * t, B]; };
+  const front = [meetWall(inner[0], inner[1]), inner[1], inner[2], meetWall(inner[3], inner[2])];
+  const sy = ROOM.sillY, ay = ROOM.sillY - ROOM.sillApron;
+  poly(ctx, view, [...bay.map(([x, z]) => [x, sy, z]), ...front.slice().reverse().map(([x, z]) => [x, sy, z])], PALETTE.sillTop);
   for (let i = 0; i < 3; i++) {
-    const a = innerC[i], b = innerC[i + 1];
-    poly(ctx, view, [[a[0], ROOM.sillY, a[1]], [b[0], ROOM.sillY, b[1]], [b[0], ROOM.sillY - ROOM.sillApron, b[1]], [a[0], ROOM.sillY - ROOM.sillApron, a[1]]], i === 1 ? PALETTE.sillFace : shade(PALETTE.sillFace, 0.95));
+    const a = front[i], b = front[i + 1];
+    poly(ctx, view, [[a[0], sy, a[1]], [b[0], sy, b[1]], [b[0], ay, b[1]], [a[0], ay, a[1]]], i === 1 ? PALETTE.sillFace : shade(PALETTE.sillFace, 0.95));
   }
+  // the nosing: a lit edge where the top turns down into the face
+  line(ctx, view, front.map(([x, z]) => [x, sy, z]), PALETTE.sillTop, Math.max(1, view.scaleAt(B) * 1.2));
 
   // crown molding: a lit band with a shaded lip
   const crown = (pts) => {
@@ -230,49 +238,56 @@ function drawItem(ctx, view, item) {
 // ---------------------------------------------------------------- the cat --
 function disc(ctx, view, q, r) {
   const p = view.p(q[0], q[1], q[2]);
-  ctx.moveTo(p.x + r * p.s, p.y);
-  ctx.arc(p.x, p.y, Math.max(0.5, r * p.s), 0, Math.PI * 2);
+  discAt(ctx, p.x, p.y, Math.max(0.5, r * p.s));
 }
-// a tapered capsule between two world points
+// A TAPERED CAPSULE between two world points: two discs and the band of their
+// two EXTERNAL TANGENTS, every subpath wound the same way as ctx.arc. The band
+// is built on the true tangents, not on the perpendicular at each end: on a
+// foreshortened capsule (a cat facing into or out of the room) the ends'
+// projected distance falls below the difference of their radii, and a
+// perpendicular-ended quad then folds over itself — its reversed half CANCELS
+// the discs under the nonzero rule and a pale seam opens through the
+// silhouette. Where one disc swallows the other there is no band at all.
 function capsule(ctx, view, a, b, ra, rb) {
   const pa = view.p(a[0], a[1], a[2]), pb = view.p(b[0], b[1], b[2]);
   const Ra = Math.max(0.5, ra * pa.s), Rb = Math.max(0.5, rb * pb.s);
-  const dx = pb.x - pa.x, dy = pb.y - pa.y, L = Math.hypot(dx, dy) || 1e-6;
-  const nx = -dy / L, ny = dx / L;
-  // WOUND THE SAME WAY AS ctx.arc, or the nonzero rule cancels the overlap
-  // and every joint shows a pale seam through the silhouette.
-  ctx.moveTo(pa.x - nx * Ra, pa.y - ny * Ra);
-  ctx.lineTo(pb.x - nx * Rb, pb.y - ny * Rb);
-  ctx.lineTo(pb.x + nx * Rb, pb.y + ny * Rb);
-  ctx.lineTo(pa.x + nx * Ra, pa.y + ny * Ra);
+  discAt(ctx, pa.x, pa.y, Ra);
+  discAt(ctx, pb.x, pb.y, Rb);
+  const dx = pb.x - pa.x, dy = pb.y - pa.y, L = Math.hypot(dx, dy);
+  if (L <= Math.abs(Ra - Rb) + 1e-3) return;
+  const ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+  const s = (Ra - Rb) / L, c = Math.sqrt(Math.max(0, 1 - s * s));
+  // tangent directions on the two sides, from each centre
+  const t1x = s * ux - c * nx, t1y = s * uy - c * ny;
+  const t2x = s * ux + c * nx, t2y = s * uy + c * ny;
+  ctx.moveTo(pa.x + Ra * t1x, pa.y + Ra * t1y);
+  ctx.lineTo(pb.x + Rb * t1x, pb.y + Rb * t1y);
+  ctx.lineTo(pb.x + Rb * t2x, pb.y + Rb * t2y);
+  ctx.lineTo(pa.x + Ra * t2x, pa.y + Ra * t2y);
   ctx.closePath();
-  ctx.moveTo(pa.x + Ra, pa.y); ctx.arc(pa.x, pa.y, Ra, 0, Math.PI * 2);
-  ctx.moveTo(pb.x + Rb, pb.y); ctx.arc(pb.x, pb.y, Rb, 0, Math.PI * 2);
 }
+function discAt(ctx, x, y, r) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
 
-function drawLeg(ctx, view, L, fill) {
-  ctx.beginPath();
+function legPath(ctx, view, L) {
   for (let k = 0; k < 3; k++) capsule(ctx, view, L.pts[k], L.pts[k + 1], L.widths[k] / 2, L.widths[k + 1] / 2);
   disc(ctx, view, L.paw, 1.75);
-  ctx.fillStyle = fill; ctx.fill('nonzero');
 }
 
+// ONE SILHOUETTE, ONE FILL. Everything drawn in the cat's ink — tail, body,
+// neck, the near legs, head, muzzle, ears — goes into a single path and is
+// filled once, so no two parts meet along an anti-aliased edge (two fills of
+// one colour that only touch leave a hairline of the ground between them).
+// The far legs are a separate, lighter fill underneath: that edge is meant.
 export function drawCat(ctx, view, rig) {
   const near = (L) => Math.sign(L.i % 2 === 0 ? 1 : -1) === rig.nearSign;
-  // far legs, a shade lighter, under everything
-  for (const L of rig.legs) if (!near(L)) drawLeg(ctx, view, L, PALETTE.catFar);
-  // tail
+  ctx.beginPath();
+  for (const L of rig.legs) if (!near(L)) legPath(ctx, view, L);
+  ctx.fillStyle = PALETTE.catFar; ctx.fill('nonzero');
   ctx.beginPath();
   for (let k = 0; k < rig.tail.length - 1; k++) capsule(ctx, view, rig.tail[k].p, rig.tail[k + 1].p, rig.tail[k].r, rig.tail[k + 1].r);
-  ctx.fillStyle = PALETTE.cat; ctx.fill('nonzero');
-  // body
-  ctx.beginPath();
   for (let k = 0; k < rig.spine.length - 1; k++) capsule(ctx, view, rig.spine[k].p, rig.spine[k + 1].p, rig.spine[k].r, rig.spine[k + 1].r);
   capsule(ctx, view, rig.spine[rig.spine.length - 1].p, rig.head.c, rig.spine[rig.spine.length - 1].r * 0.85, rig.head.r * 0.7);
-  ctx.fillStyle = PALETTE.cat; ctx.fill('nonzero');
-  for (const L of rig.legs) if (near(L)) drawLeg(ctx, view, L, PALETTE.cat);
-  // head
-  ctx.beginPath();
+  for (const L of rig.legs) if (near(L)) legPath(ctx, view, L);
   disc(ctx, view, rig.head.c, rig.head.r);
   disc(ctx, view, rig.muzzle.c, rig.muzzle.r);
   for (const tri of rig.ears) {
@@ -331,24 +346,66 @@ function drawShadow(ctx, view, cat) {
 }
 
 // ------------------------------------------------- the front plane, per frame --
-const ITEM = Object.fromEntries(FURNITURE.map(f => [f.node, f]));
+// PAINTER'S ORDER, PART BY PART. One depth key per piece of furniture cannot
+// say "on the chaise's seat, behind its raised end", so the furniture is drawn
+// part by part (far to near, as before) and each cat goes in after the LAST
+// part it is in front of or standing on. A cat is in front of a box when it is
+// on the camera's side of one of the box's camera-facing faces — or above its
+// top — and in front of a vertical cylinder when it is nearer the camera.
+function inFrontOf(cat, part, own) {
+  const c = cat.ch, f = [Math.cos(cat.h), Math.sin(cat.h)];
+  // judged at the body's centre — and, on the piece the cat is standing on or
+  // jumping off or onto, at its hips and shoulders too: a cat straddling that
+  // piece's edge is in front of the face its shoulders are past
+  const us = own ? [(c.hipU + c.shU) / 2, c.hipU, c.shU] : [(c.hipU + c.shU) / 2];
+  for (const u of us) if (pointInFront(cat, part, cat.pos[0] + f[0] * u, cat.pos[2] + f[1] * u)) return true;
+  return false;
+}
+// Every test here is a SEPARATING PLANE: a plane through one of the part's
+// faces with the camera and the cat on one side and the whole part on the
+// other. Then no sight line from the camera to the cat can pass through the
+// part, so drawing the cat after it is never wrong. Above the part's top (the
+// cat's lowest paw over it, the camera higher still) is the same argument.
+function pointInFront(cat, part, x, z) {
+  let feet = Infinity;
+  for (let i = 0; i < 4; i++) feet = Math.min(feet, toeWorld(cat, i)[1]);
+  if (CAMERA.y > part.y1 && feet >= part.y1 - 0.5) return true;
+  if (part.kind === 'box') {
+    if (z < part.z0) return true;
+    if (part.x0 > CAMERA.x && x < part.x0) return true;
+    if (part.x1 < CAMERA.x && x > part.x1) return true;
+    return false;
+  }
+  return Math.hypot(x - CAMERA.x, z - CAMERA.z) < Math.hypot(part.x - CAMERA.x, part.z - CAMERA.z) - part.r;
+}
 
-function catKey(cat, legEdge) {
-  const nodes = legEdge ? [legEdge.from, legEdge.to] : [cat.node];
-  let key = cat.pos[2] + 6;
-  for (const n of nodes) if (ITEM[n]) key = Math.min(key, ITEM[n].z - 0.5);
-  if (!legEdge && ITEM[cat.node]) key = ITEM[cat.node].z - 0.5;
-  return key;
+export function drawOrder(cats, legEdges = []) {
+  let list = [];
+  for (const item of FURNITURE.slice().sort((a, b) => b.z - a.z)) {
+    const ps = item.parts.slice().sort((a, b) => camDist(...partCentre(b)) - camDist(...partCentre(a)));
+    for (const part of ps) list.push({ item, part });
+  }
+  // each cat in turn, the farther first: it goes after everything it is in
+  // front of, and whatever it is NOT in front of that came before that point
+  // moves to just after it — so a part in front of a cat is never overdrawn
+  // by it however the furniture happened to be listed
+  const idx = cats.map((c, i) => i).sort((a, b) => camDist(...cats[b].pos) - camDist(...cats[a].pos));
+  for (const i of idx) {
+    const cat = cats[i], e = legEdges[i], mine = new Set([cat.node, ...(e ? [e.from, e.to] : [])]);
+    const front = (d) => (d.part ? inFrontOf(cat, d.part, mine.has(d.item.node)) : true);   // an earlier cat is farther
+    let at = 0;
+    list.forEach((d, k) => { if (front(d)) at = k + 1; });
+    const head = list.slice(0, at), tail = list.slice(at);
+    list = [...head.filter(front), { cat: i }, ...head.filter(d => !front(d)), ...tail];
+  }
+  return list;
 }
 
 export function drawActors(ctx, view, cats, legEdges, rigs) {
   ctx.clearRect(0, 0, view.w, view.h);
-  const list = FURNITURE.map(item => ({ key: item.z, item }));
-  cats.forEach((cat, i) => list.push({ key: catKey(cat, legEdges[i]), cat, rig: rigs[i] }));
-  list.sort((a, b) => b.key - a.key);
-  for (const d of list) {
-    if (d.item) drawItem(ctx, view, d.item);
-    else { drawShadow(ctx, view, d.cat); drawCat(ctx, view, d.rig); }
+  for (const d of drawOrder(cats, legEdges)) {
+    if (d.part) drawPart(ctx, view, d.part);
+    else { drawShadow(ctx, view, cats[d.cat]); drawCat(ctx, view, rigs[d.cat]); }
   }
 }
 

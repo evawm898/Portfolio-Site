@@ -25,35 +25,65 @@ const UPPER = 9.6, FORE = 9.9;
 const FOOT_W = [3.6, -3.6, 4.0, -4.0];
 const TAIL_N = 12, TAIL_SEG = 2.4;
 
-// THE SHOULDER BLADE SLIDES. A cat's scapula is not fixed to its ribs, so a
-// reaching foreleg starts a little further toward its paw than a standing one;
-// `slide` is how far the attachment may follow a paw that is out of reach.
+// THE SHOULDER BLADE SLIDES, AND THE LIMB NEVER SNAPS STRAIGHT. A cat's
+// scapula is not fixed to its ribs, so a reaching foreleg starts a little
+// further toward its paw than a standing one; `slide` is how far the
+// attachment may follow. Two-bone IK has a singularity at full extension —
+// the knee angle is acos of something reaching 1, whose derivative is
+// infinite — so a limb driven to its length WHIPS its knee straight in a frame.
+// Here the span the bones are asked for is a SOFT limit: above SOFT_FROM of
+// the full length it approaches (never reaches) the full length smoothly, and
+// the difference is taken up by the slide (smoothly capped at `slide`). Only
+// past both is the paw out of reach, and `over` says by how much.
+const SOFT_FROM = 0.86, SOFT_TOP = 0.985;
+// tanh: slope 1 and curvature 0 where it takes over, so the knee's motion
+// stays continuous in its acceleration too, not only its velocity
+function softSpan(d, full) {
+  const d0 = SOFT_FROM * full, top = SOFT_TOP * full, w = top - d0;
+  if (d <= d0) return d;
+  return d0 + w * Math.tanh((d - d0) / w);
+}
+// and the same at the folded end, where the bones cannot overlap
+function softFloor(d, low) {
+  const band = 1.2;
+  if (d >= low + band) return d;
+  return low + band * (1 + Math.tanh((d - low - band) / band));
+}
+const softCap = (x, cap) => (cap <= 0 ? 0 : cap * Math.tanh(x / cap));
 function ik2(ax, ay, bx, by, l1, l2, sign, slide = 0) {
   let dx = bx - ax, dy = by - ay;
   let d = Math.hypot(dx, dy);
-  const lim = l1 + l2 - 0.05;
-  if (slide > 0 && d > lim) {
-    const m = Math.min(slide, d - lim) / d;
-    ax += dx * m; ay += dy * m; dx = bx - ax; dy = by - ay; d = Math.hypot(dx, dy);
-  }
-  const dmax = l1 + l2 - 0.05, dmin = Math.abs(l1 - l2) + 0.2;
+  const full = l1 + l2;
+  const ext = d / full;
+  const want = softSpan(d, full);
+  const m = softCap(d - want, slide);
+  if (m > 0 && d > 1e-9) { ax += dx * m / d; ay += dy * m / d; dx = bx - ax; dy = by - ay; d = Math.hypot(dx, dy); }
+  const dmax = softSpan(1e9, full) - 1e-6, dmin = Math.abs(l1 - l2) + 0.2;
   let reached = true;
-  const over = Math.max(0, d - dmax);
-  if (d > dmax) { dx *= dmax / d; dy *= dmax / d; d = dmax; reached = false; }
-  if (d < dmin) { const k = dmin / Math.max(1e-6, d); dx *= k; dy *= k; d = dmin; }
+  // past the slide's reach the soft span still bends the limb short of its
+  // paw: that shortfall is the paw drawn off its plant
+  const span = Math.min(d, want);
+  const over = Math.max(0, d - span);
+  if (over > 1e-6) { dx *= span / d; dy *= span / d; d = span; reached = over < 0.05; }
+  void dmax;
+  { const d2 = softFloor(d, dmin); if (d2 !== d) { const k = d2 / Math.max(1e-6, d); dx *= k; dy *= k; d = d2; } }
   const base = Math.atan2(dy, dx);
   const c = Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d)));
   const a = Math.acos(c);
-  return { ax, ay, jx: ax + l1 * Math.cos(base + sign * a), jy: ay + l1 * Math.sin(base + sign * a), ex: ax + dx, ey: ay + dy, reached, over };
+  return { ax, ay, jx: ax + l1 * Math.cos(base + sign * a), jy: ay + l1 * Math.sin(base + sign * a), ex: ax + dx, ey: ay + dy, reached, over, ext, slid: m };
 }
 
 // The sleeping curl: the body's centre line bent onto an arc in plan.
+// Written so it has no switch-over at small bend: sin(ku)/k and (1-cos ku)/k
+// are carried through sinc, which is smooth through zero — a cutoff here was
+// a jump in the drawing every time a cat uncurled past it.
+const sinc = (x) => (Math.abs(x) < 1e-4 ? 1 - x * x / 6 : Math.sin(x) / x);
 function bender(b) {
-  if (Math.abs(b) < 1e-4) return (u, v, w) => [u, v, w];
+  if (b === 0) return (u, v, w) => [u, v, w];
   const k = b * Math.PI / 30;
   return (u, v, w) => {
-    const s = Math.sin(k * u), c = Math.cos(k * u);
-    return [s / k - w * s, v, (1 - c) / k + w * c];
+    const s = Math.sin(k * u), c = Math.cos(k * u), h = k * u / 2;
+    return [u * sinc(k * u) - w * s, v, Math.sin(h) * u * sinc(h) + w * c];
   };
 }
 
@@ -109,7 +139,7 @@ export function solveRig(cat) {
 
   // --- legs
   const legs = [];
-  let unreached = 0, over = 0;
+  let unreached = 0, over = 0, ext = 0, lastOver = 0;
   for (let i = 0; i < 4; i++) {
     const fore = i < 2;
     const toe = world2local(cat, toeWorld(cat, i));
@@ -121,7 +151,7 @@ export function solveRig(cat) {
       const wrist = [toe[0] - 1.5, toe[1] + 2.3];
       const s = ik2(A[0], A[1], wrist[0], wrist[1], UPPER, FORE, -1, 3.2);
       if (!s.reached) unreached++;
-      over = Math.max(over, s.over);
+      over = Math.max(over, s.over); ext = Math.max(ext, s.ext); lastOver = s.over;
       pts = [[s.ax, s.ay], [s.jx, s.jy], [s.ex, s.ey], [s.ex + 1.5, s.ey - 2.3]];
       widths = [4.6, 3.3, 2.9, 2.6];
     } else {
@@ -129,13 +159,13 @@ export function solveRig(cat) {
       const hock = [toe[0] - META * Math.sin(hockAng), toe[1] + META * Math.cos(hockAng)];
       const s = ik2(A[0], A[1], hock[0], hock[1], THIGH, SHIN, +1, 1.6);
       if (!s.reached) unreached++;
-      over = Math.max(over, s.over);
+      over = Math.max(over, s.over); ext = Math.max(ext, s.ext); lastOver = s.over;
       pts = [[s.ax, s.ay], [s.jx, s.jy], [s.ex, s.ey], [s.ex + META * Math.sin(hockAng), s.ey - META * Math.cos(hockAng)]];
       widths = [6.4, 3.8, 3.0, 2.7];
     }
     const tw = toe[2];
     const world = pts.map((p, k) => W(p[0], p[1], aw + (tw - aw) * (k / 3)));
-    legs.push({ i, fore, name: FOOT_NAMES[i], pts: world, widths, paw: world[3] });
+    legs.push({ i, fore, name: FOOT_NAMES[i], pts: world, widths, paw: world[3], over: lastOver });
   }
 
   // --- tail
@@ -168,6 +198,6 @@ export function solveRig(cat) {
       const a = W(...ey.c), b = W(ey.c[0] + ey.nrm[0], ey.c[1] + ey.nrm[1], ey.c[2] + ey.nrm[2]);
       return { c: a, n: [b[0] - a[0], b[1] - a[1], b[2] - a[2]], open: ey.open };
     }),
-    legs, tail, nearSign, unreached, over,
+    legs, tail, nearSign, unreached, over, ext,
   };
 }
