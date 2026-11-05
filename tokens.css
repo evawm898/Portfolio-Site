@@ -1,0 +1,49 @@
+/* ---------------------------------------------------
+   Eva Maskalenko — site design tokens
+   The ONE source of the site's colours and type. DESIGN.md is the
+   rulebook; this file is the numbers. Every page links it FIRST:
+
+     <link rel="stylesheet" href="tokens.css">
+
+   Names are prefixed --color-* / --type-* on purpose: no page stylesheet
+   uses either prefix, while several use --ink, --line, --petrol and
+   --font-mono with DIFFERENT meanings (on the tool pages --ink is the
+   background; in styles.css --petrol is the deep fill). A prefixed name
+   cannot be silently overridden by a page's own :root.
+--------------------------------------------------- */
+
+:root {
+  /* Neutrals, darkest to lightest */
+  --color-ground:      #060707;  /* page background */
+  --color-raised:      #0c0e0e;  /* panels, cards, inputs */
+  --color-line:        #232727;  /* hairlines, borders */
+  --color-line-strong: #34393a;  /* emphasised borders, control tracks */
+  --color-faint:       #565f5f;  /* em-dash separators, disabled, meta at large size */
+  --color-dim:         #8b9494;  /* secondary text, captions, labels */
+  --color-ink-2:       #a7afaf;  /* body copy one step down from ink */
+  --color-ink:         #e9ecec;  /* primary text */
+
+  /* Petrol family */
+  --color-deep:        #1c6b6b;  /* button fills, rules. Never text. */
+  --color-petrol:      #2fa3a3;  /* links, active states, eyebrows */
+  --color-seafoam:     #6fb7ae;  /* section numbers, "No. 0x" */
+
+  /* Companions: diagrams, data and tool artwork ONLY. Never text. */
+  --color-plum:        #a98cc8;
+  --color-indigo:      #7880d8;
+  --color-mint:        #b3dbb4;
+
+  /* Type */
+  --type-serif: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --type-mono:  "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+}
+
+/* Small screens: the muted text tones step up one rung so they keep
+   their contrast on a phone. Stays inside the palette: dim takes ink-2,
+   faint takes dim. */
+@media (max-width: 600px) {
+  :root {
+    --color-dim:   #a7afaf;
+    --color-faint: #8b9494;
+  }
+}
