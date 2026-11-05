@@ -2185,7 +2185,8 @@ TGR_BAD_INPUT_SUBSET=1 python -m pytest tests/test_bad_input_sweep.py   # the pi
 runner, i.e. 3.6 to 4.5 minutes added, over the three-minute budget. So **CI runs a representative subset by
 default** (whenever the `CI` environment variable is set; no workflow file was edited): 12 inputs × 8 fixtures ×
 both modes and 8 non-knit images, chosen so every cause label has a witness (the suite asserts it), about a
-minute. The verify simulation is cheap and always runs in full. The pins outside the subset are skipped there, and
+minute: **measured on CI, the pytest step is 224 s with the subset (75-128 s before), 1.6 to 2.5 minutes
+added**. The verify simulation is cheap and always runs in full. The pins outside the subset are skipped there, and
 the full-sweep tests (headline totals, the README block) are skipped; **the full sweep is the documented opt-in**
 (`TGR_BAD_INPUT_FULL=1`, above) and is what a PR that changes a failure should run before re-pinning. A cheap
 always-on test checks that the README headline carries the pinned totals, so a re-pin that forgets to regenerate
