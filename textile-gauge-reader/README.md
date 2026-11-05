@@ -3953,6 +3953,139 @@ confident-and-wrong 0 on every row, resolution row and jitter point (reading err
 third; no measured value moved; the metamorphic sweep (118 / 12 / 5 / 12 / 7) and the rest of the suite
 unchanged.
 
+### Area size and the course axis: a minimum-periods status rule was derived, measured and NOT shipped (2026-11-05; stop-and-report, negative result recorded)
+
+**Docs only: no analyzer, consensus, calibration, frontend or harness code changed, and nothing was re-pinned.** The
+brief was a status-only rule ("an area cannot be confident on an axis without enough evidence"), motivated by the
+bad-input sweep's 38 silent axes under `truth` and 37 under `ruler` (35 and 34 of them COURSE), which the card hides
+only because wale is almost always uncertain. The diagnosis step said to stop if the derived rule did not separate the
+silent cells from the correct ones. It did not, so no rule was written. Everything below was measured on `main` at
+`cd58802` (full sweep, `TGR_BAD_INPUT_FULL=1`; the app-path card, resolution rows and jitter points; the verify
+simulation), by capturing every `/analyze-multi` response in full and tabulating each area's rectangle, pitch and status.
+
+**The cells.** 69 silent course cells over both calibration modes (35 `truth` + 34 `ruler`), by cause label:
+
+| cause | cells |
+|---|---|
+| `COURSE \| orientation left at the default on a rotated photo` | 20 |
+| `COURSE \| stretched photo (one calibration cannot serve both axes)` | 15 |
+| `COURSE \| rotated 15 degrees` | 14 |
+| `COURSE \| contaminated hand-drawn box (ruler / pins / swatch edge)` | 8 |
+| `COURSE \| hand-drawn box on a degraded photo (low light / 4000 px)` | 6 |
+| `COURSE \| small hand-drawn box` | 4 |
+| `COURSE \| blur flicker` | 2 |
+| **total** | **69** |
+
+Only the small-box and contaminated-box cells (ruler, pins, swatch edge) are "an area that carries too little fabric, or
+fabric plus contamination" (12 of the 69). The orientation, stretch and 15° cells (49 of them) are wrong for reasons
+that have nothing to do with how big the area is; the other 8 are degraded-photo boxes and blur flicker.
+
+**The derivation of the one rule with a mechanism: at least 4 periods.** Every period estimate here comes from an
+autocorrelation whose search window is lags `[MIN_PLAUSIBLE_SPACING_PX, n // 2)` (`_autocorrelation_spacing` and
+`_prefer_fundamental_seed`: "at most half the signal length (beyond that, too few repeats to trust)"). A pitch `p`
+can therefore only be found when the signal spans more than `2p`. The scorer tells a pitch from its harmonics by
+evaluating the family `p/2, p, 2p` (`_labeled_candidates`), and the `2p` member is only observable by the same estimator
+when `2p < n/2`, that is when the area spans at least `4p`. So 4 periods is the least extent over which the analyzer
+can distinguish a period from its double. It is not tuned to anything: it follows from the existing lag window. The
+other existing floors do not give a usable rule: `MIN_REPEATS_FOR_ANY_SCORE = 2` is vacuous (every area already spans
+at least 2.1 periods, because the lag window enforces it), 5 is the metamorphic half-ROI skip (a test-harness rule, not
+an analyzer rule) and 8 is where a reward score saturates (`MIN_REPEATS_FOR_FULL_SCORE`), not a status rule.
+
+**Why it does not separate: "periods spanned" is counted at the MEASURED pitch, and the wrong readings are sub-harmonics.**
+Teal's 0.4 in box truly spans 2.0 periods (5 courses per inch). The detector reads a pitch four times too fine
+(+300%), so measured against its own reading the area spans 8.00 periods and looks well supplied. A count at the true
+pitch would flag it; the true pitch is the thing being measured. The cluster, `truth` calibration, area extent in
+periods at the measured pitch and at the true pitch:
+
+| input | fixture | class | error | status | periods (measured) | periods (true) |
+|---|---|---|---|---|---|---|
+| box_small | teal | silent | +300.4% | confident | **8.00** | 2.00 |
+| box_small | knit_05 | silent | +45.2% | confident | 3.89 | 2.68 |
+| box_small | synth_jersey | ok | +2.9% | confident | 2.88 | 2.80 |
+| box_small | synth_rib | ok | −1.1% | confident | 2.77 | 2.80 |
+| box_ruler | knit_08 | silent | −67.8% | confident | 3.33 | 10.35 |
+| box_ruler | teal | silent | −14.9% | confident | 6.38 | 7.50 |
+| box_ruler | knit_09 | silent | +14.3% | confident | 13.01 | 11.38 |
+| box_ruler | knit_06 | ok | −1.5% | confident | 8.31 | 8.43 |
+| box_pins | teal | silent | +11.9% | confident | 8.39 | 7.50 |
+| box_pins | the other nine fixtures | ok | −7.0% to +6.9% | confident | 8.50 to 11.44 | 8.43 to 11.38 |
+
+Silent cells span 3.3 to 38.3 periods at the measured pitch (synth_garter rot15, +120%, is the maximum); correct
+confident cells start at 2.1. A ruler or pins in the box does not shrink the span at all (the true span is 7.5 to
+11.4): it corrupts what the periodicity detector finds, which area size does not describe.
+
+**The simulation.** Run on the captured responses, not by implementing the rule: an area is demoted to `uncertain` on
+an axis when it spans fewer than `t` periods of its own measured pitch, and the axis stays `confident` only if more
+than half of the areas that contributed are still confident (the shipped `_rollup_status`). Both calibration modes
+together; "silent fixed" is a silent cell that becomes uncertain, "correct lost" a confident-and-within-10% cell that
+becomes uncertain (it was right and is now merely uncertain):
+
+| t (periods) | course: silent fixed (of 69) | course: correct lost (of 255) | wale: silent fixed (of 6) | wale: correct lost (of 78) |
+|---|---|---|---|---|
+| 2 | 0 | 0 | 0 | 0 |
+| 3 | 0 | 4 | 0 | 0 |
+| **4 (derived)** | **6** | 4 | 0 | **14** |
+| 5 | 12 | 4 | 0 | 16 |
+| 6 | 21 | 8 | 2 | 18 |
+| 8 | 32 | 28 | 4 | 62 |
+| 9 | 38 | 67 | 4 | 62 |
+| 10 | 40 | 103 | 4 | 64 |
+
+At the derived 4: the cells fixed are knit_01 `blur4+box`, knit_05 `box_small` and knit_08 `box_ruler` (each in both
+modes); the cells lost are synth_jersey and synth_rib `box_small` (both modes); and 14 correct wale cells (synth_rib
+boxes) are lost. Teal `box_small`, `box_ruler`, `box_pins` and knit_09 `box_ruler` are all left silent. The 8.00 and
+8.39 of teal's cells need `t ≥ 9`, which turns a quarter of the correct course cells and almost all the wale ones
+uncertain (course 67 of 255, wale 62 of 78 at `t = 9`). The only threshold that reaches the cluster is a tuned one.
+
+**The two fragile cells.** knit_01 rot15 course (+9.0%) is a consensus of two areas (A at 5.45 periods, B at 6.24; a third was
+excluded as an outlier). It stays confident and within the bar at the derived 4 and 5; at 6 area A is demoted, the two
+are no longer a majority, and it flips to uncertain: a coverage loss, not a fix. Teal
+`box_pins` course (+11.9%, 8.39 periods) stays confident-and-wrong at every `t` below 8.4, so no rule here reaches it.
+Success criterion 1 (course confident-and-wrong 0 on box_small, box_ruler and box_pins) therefore fails.
+The app-path coverage criteria (3) and the jitter, metamorphic and suite criteria (5, 6) were not evaluated, because
+there was no implementation to evaluate (the simulation above is on the sweep's cells only, not on the app-path card).
+
+**Rejected, with the condition for revisiting.**
+- *A minimum number of periods at the measured pitch* (4, 5, 6, 8, 9 or 10): the derived 4 fixes 6 of 69 course cells
+  and costs 14 correct wale cells; anything that reaches teal costs a quarter of the correct course coverage. Revisit
+  when an estimate of the true pitch exists that does not come from the same autocorrelation (a count of repeats, the
+  user's own anchored box, or a second detector whose bias is not shared), so that "periods spanned" can be counted at
+  a pitch the area did not choose.
+- *A minimum physical area from the plausible gauge range* (`PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MIN/MAX`, 0.5 to 20 per
+  inch): 4 periods at the coarsest plausible 0.5 per inch is an 8 in area, which rejects every real hand-drawn box; any
+  tighter bound is a typed prior on gauge. Revisit if the app ever carries a labelled gauge prior it can defend.
+- *Any other threshold on area size or on periods*: the silent cells span 3.3 to 38 periods and the correct ones 2.1
+  upward, so no value separates them; eight photos are too few to tune on. Revisit with a labelled set an order of
+  magnitude larger.
+- *Treating this as an area-size problem at all* for the 49 orientation, stretch and 15° cells: they are a calibration
+  axis and orientation question, not a small-area one; they need their own mechanism.
+
+**What this leaves.** Unchanged: the card is still protected from these cells only by wale's uncertainty, and the
+warning in the "Bad inputs" section stands: restoring wale confidence without fixing the course cells first would turn
+them into card-silent runs.
+
+### Does the upload path honor EXIF orientation? Yes, at both ends (2026-11-05; read-only check, nothing changed)
+
+The page does no resize, canvas step or re-encode on upload: `handleFile` keeps the `File`, shows it through
+`URL.createObjectURL(file)` in an `<img>`, takes its coordinate frame from that image's `naturalWidth` and
+`naturalHeight`, and sends the same original bytes (`fd.append("file", state.file)`) on every route. So what is shown
+and what is analyzed are two decodes of one file: the browser's, and `backend/image_io.decode_image`'s
+`cv2.imdecode(..., cv2.IMREAD_COLOR)`, which applies the EXIF orientation tag (it is switched off only by
+`IMREAD_IGNORE_ORIENTATION`, which nothing passes). Checked rather than assumed, on `real_jersey_sample.jpg`
+re-saved rotated 90° with EXIF orientation 6 ("display upright"):
+
+| file | Chromium `<img>` natural size | backend decode | `/analyze-multi` wale / course px |
+|---|---|---|---|
+| upright, no EXIF | 724 × 484 | 724 × 484 | 34.667 / 24.5 |
+| stored sideways, EXIF 6 | 724 × 484, drawn upright | 724 × 484 | 34.667 / 24.5 (identical) |
+| stored sideways, no EXIF (control) | 484 × 724 | 484 × 724 | 74.0 / 35.0 (a different reading) |
+
+The same holds for all eight EXIF values (1 to 8, mirrored ones included) on OpenCV 5.0.0 and on 4.9.0, the lowest
+version `requirements.txt` allows: each decodes to the upright size and to pixels within JPEG re-encoding noise of the
+upright file (mean absolute difference 0.7 to 1.4 grey levels against 0.0 for tag 1). A 650 × 200 box that fits only
+the upright frame is accepted for the EXIF file and refused as outside the image for the control. Not covered: PNG or
+WebP files carrying an orientation chunk, and browsers other than Chromium.
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits
