@@ -313,3 +313,29 @@ costs frozen tags).
   - `verify-tracker-drawer` asserted the Instagram link is `rgb(95,160,160)`.
     It now asserts petrol `rgb(47,163,163)`. Result: 427/427.
   - `verify-marble` 51/51. `verify-weave --browser` 24/24 + 14/14.
+
+## 11. Batch 5 as built
+
+frame, cage, lantern, tile and bug follow §10's pattern:
+- The page's own `:root` is re-pointed at tokens.
+- The type is Fraunces and Plex Mono.
+- Solid buttons are a deep fill with ink text.
+- `--dim-2` reads dim.
+
+**Warnings and errors.** Every text site that was amber, rust or red is now ink with `!` (a warning) or `✕` (an error or refusal):
+- frame's readout warning
+- cage's `bad` value and refused-edit status. Its "told" note is ink-2.
+- lantern and tile: section counts, warned outputs, messages and status lines. Also tile's on-canvas status line and lantern's build warnings.
+- bug: its message, readout `bad`, export error and editor status
+
+A rule that can be empty only draws its glyph `:not(:empty)`.
+
+**Flag markers** (lantern, tile) are non-text marks: a plum ring for a warning and a plum square for a failure (R1). `ok` / `info` keep a petrol disc.
+
+**Kept as artwork** (rule 9 — editor marks and exports, measured by gates):
+- tile's edge A / edge B colours. The key in the 3×3 header matches them.
+- bug's outline-editor handles and fit lines
+- lantern's on-screen CUT / SCORE / PERF lines (the exported file's machine convention)
+- the SVG-preview paper `#EDEDE8` on cage and bug. In that mode their header sits on paper in ink with a `#55554F` sub-line. That is the one place a dark-on-light text colour remains, and it is the artwork's own surface.
+
+**Gates.** No gate asserted a chrome colour. All five workflows run on this PR.
