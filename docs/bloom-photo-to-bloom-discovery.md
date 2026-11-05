@@ -1498,6 +1498,7 @@ records what the route can now replicate, then ranks the remaining gaps. It does
   narrow CURVE outline can silently keep the OLD petal width: 0 notes, and the status line says clean.
   The validator's read-back (V2) is the only thing that sees it. It is a page defect, and not fixed here
   (no page change was in scope).
+  Filed as [#499](https://github.com/evawm898/Portfolio-Site/issues/499) (ruled, §13.6).
 
 ---
 
@@ -1647,7 +1648,22 @@ outline curves on.
 | colour, everywhere | can't build |
 | the lotus's green outer whorl drawn as petals | ruled (b): it stays in the petal controls |
 
-### 13.6 For Eva's ruling
+### 13.6 Rulings — RULED (Eva, Nov 5)
+
+**The outline stage PASSED (Nov 5) on the S4 sheet. The v1 staged scope (globals → per-layer → outline)
+is complete.**
+
+- **The sepal outline in schema v3: CONFIRMED** as the intended reading.
+- **The width-refusal hazard is filed** as a page defect:
+  [evawm898/Portfolio-Site#499](https://github.com/evawm898/Portfolio-Site/issues/499) — load as new onto a
+  page drawing a narrow outline curve silently keeps the old `petalWidth` (22 instead of the file's 8), with
+  0 notes and a clean status line; only the validator's read-back sees it. It sits beside
+  [#495](https://github.com/evawm898/Portfolio-Site/issues/495) (the ring placed only through the width).
+- **The next gap is #1 on §12's ranking: per-layer cup and curl** (S5, §14).
+
+The questions as they were asked are kept below, so each ruling can be read against what it answered.
+
+#### The questions as asked (Nov 5)
 
 1. **Does the outline stage pass** on the S4 sheet?
 2. **The sepal outline in schema v3** was included because sepal count, size and angle are on the schema.
