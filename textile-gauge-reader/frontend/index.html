@@ -107,9 +107,13 @@
     <section class="tgr-step-panel" data-panel="orientation" hidden>
       <h2>Wale orientation</h2>
       <p class="tgr-hint">Wales are the vertical columns of stitches formed by the knitting direction. In this photo, do wales run vertically or horizontally?</p>
+      <!-- Pre-selection from /propose-rois's wale-direction detection (orientation_detected): the detected
+           option is checked and this note says so in plain words; when the detection is unsure NOTHING is
+           checked and Continue waits for a choice. See syncOrientationUI in textile-gauge-reader.js. -->
+      <p id="orientationDetectedNote" class="tgr-hint tgr-hint--auto" hidden></p>
       <div class="tgr-radio-row">
         <label class="tgr-radio-option">
-          <input type="radio" name="orientation" value="vertical" checked>
+          <input type="radio" name="orientation" value="vertical">
           <span>Wales run <strong>vertically</strong> ↕ (courses run horizontally)</span>
         </label>
         <label class="tgr-radio-option">
