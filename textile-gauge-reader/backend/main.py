@@ -49,6 +49,7 @@ from analysis.gauge_analysis import (
     analyze_loop_lattice_experiment,
     count_repeats_by_template_match,
     detect_ruler_calibration,
+    detect_wale_orientation,
     justify_ruler_calibration,
 )
 from storage import corrections_store
@@ -69,6 +70,7 @@ from .schemas import (
     Orientation,
     OutlierOut,
     ProposedRoiOut,
+    OrientationVoteOut,
     ProposeRoisResponse,
     RepeatMatchOut,
     RoiMeasurementOut,
@@ -584,9 +586,21 @@ async def propose_rois(
             ).model_dump(),
         )
 
+    detection = await run_in_threadpool(
+        detect_wale_orientation, image, [(r.x, r.y, r.width, r.height) for r in proposal.rois],
+        pixels_per_mm, [r.label for r in proposal.rois],
+    )
+
     response = ProposeRoisResponse(
         success=proposal.success,
         message=proposal.message,
+        orientation_detected=detection.orientation,
+        orientation_message=detection.message,
+        orientation_votes=[
+            OrientationVoteOut(label=v.label, leg_slant_var_x=v.leg_slant_var_x,
+                               leg_slant_var_y=v.leg_slant_var_y, vote=v.vote)
+            for v in detection.votes
+        ],
         rois=[
             ProposedRoiOut(
                 x=r.x, y=r.y, width=r.width, height=r.height, label=r.label,

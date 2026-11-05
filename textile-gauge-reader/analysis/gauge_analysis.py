@@ -97,7 +97,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field, replace
-from typing import Callable, Dict, List, Literal, Optional, Tuple
+from typing import Callable, Dict, List, Literal, Optional, Tuple, Sequence
 
 import cv2
 import numpy as np
@@ -4660,6 +4660,128 @@ def _local_anomaly_fraction(
 # proposals again (README, "Measurement-area proposal at one working
 # resolution").
 ROI_PROPOSAL_WORKING_PX_PER_INCH = WORKING_PX_PER_INCH  # one owner: WORKING_PX_PER_INCH above
+
+
+# --- Wale-direction detection ------------------------------------------------
+#
+# Which image axis the wales run along, read off the proposed areas BEFORE the
+# user is asked -- the orientation step pre-selects it (frontend
+# syncOrientationUI). It decides nothing about the measurement: analyze_gauge
+# still takes the orientation the user confirms, authoritatively, exactly as
+# before (criterion 3 of the PR that added this: every run whose orientation
+# was already right is byte-identical).
+#
+# THE SIGNAL IS #338's LEG-SLANT FIELD AND NOTHING ELSE. _orientation_field is
+# the signed local lean relative to the area's own mean orientation; in a knit
+# every stitch's two legs lean opposite ways, so collapsed ACROSS the wales
+# (a signal that varies along the wale-spacing axis) the field alternates sign
+# wale by wale and carries most of its variance, while collapsed ALONG the
+# wales each row's left and right legs cancel and little is left. So the axis
+# along which the collapsed field varies MORE is the wale-spacing axis: wales
+# run vertically when the x-signal's variance beats the y-signal's, and
+# horizontally when the y-signal's does. A bare comparison, no threshold.
+# Measured on every proposed area of the eleven app-path fixtures (the eight
+# photos plus the synthetic jersey, garter and rib): right on every area
+# upright (variance ratios 1.18 .. 3500) and on every area rotated 90 degrees
+# (0.00 .. 0.83) -- see README "Wale direction is detected".
+#
+# "UNSURE" IS UNANIMITY, NOT A MARGIN: each proposed area votes by that
+# comparison, and the detection is the vote only when every area agrees.
+# A split vote, no area, or an area with no signal is "unsure" and the page
+# pre-selects nothing. Nothing numeric is tuned here.
+#
+# What it does NOT read: the 2D autocorrelation's anisotropy (wrong on
+# knit_09 and the rib), the structure tensor's dominant axis (wrong on garter,
+# whose ridges are the strongest edges) and the stitch:row ratio (wrong on the
+# rib, knit_09 and the synthetic jersey, so not even a tiebreaker). The
+# photo's tilt is not corrected first: the detector reads the area as it is.
+# (At 15 degrees of tilt the projection onto the image axes mixes the two
+# signals and the vote can be unanimous and wrong -- measured on two of eleven
+# fixtures; a tilt that far is outside _normalize_rotation's +/-6 degree
+# reach and is a separate mechanism, recorded in the README.)
+
+
+@dataclass
+class OrientationVote:
+    """One proposed area's reading: the leg-slant signal's variance along each image axis."""
+
+    label: str
+    leg_slant_var_x: Optional[float]  # the field collapsed to a signal that varies with x (wale-spacing axis when wales are vertical)
+    leg_slant_var_y: Optional[float]
+    vote: Optional[Orientation]       # None when the area carried no signal
+
+
+@dataclass
+class OrientationDetection:
+    orientation: Optional[Orientation]  # None = unsure: pre-select nothing
+    votes: List[OrientationVote] = field(default_factory=list)
+    message: str = ""
+
+
+def _leg_slant_variances(gray: np.ndarray) -> Tuple[Optional[float], Optional[float]]:
+    """The leg-slant field's variance collapsed along each image axis (see above)."""
+    if gray is None or gray.size == 0 or gray.shape[0] < 2 or gray.shape[1] < 2:
+        return None, None
+    _, gx, gy = _enhance_texture(gray)
+    fld = _orientation_field(gx, gy)
+    sx = _orientation_signal(fld, _COLLAPSE_AXIS["horizontal"])  # varies with x
+    sy = _orientation_signal(fld, _COLLAPSE_AXIS["vertical"])    # varies with y
+    vx, vy = float(np.var(sx)), float(np.var(sy))
+    if not np.isfinite(vx) or not np.isfinite(vy):
+        return None, None
+    return vx, vy
+
+
+def _orientation_vote(vx: Optional[float], vy: Optional[float]) -> Optional[Orientation]:
+    if vx is None or vy is None or vx == vy or (vx <= 0 and vy <= 0):
+        return None
+    return "vertical" if vx > vy else "horizontal"
+
+
+def detect_wale_orientation(
+    image_bgr: np.ndarray,
+    rois: Sequence[Tuple[int, int, int, int]],
+    pixels_per_mm: Optional[float],
+    labels: Optional[Sequence[str]] = None,
+) -> OrientationDetection:
+    """
+    Which way the wales run, as a unanimous vote of the leg-slant signal over
+    `rois` (each (x, y, w, h) in native pixels, read at the same working scale
+    analyze_gauge analyses it at). `orientation` is None when the areas
+    disagree, when there is no area, or when any area carries no signal.
+    """
+    votes: List[OrientationVote] = []
+    for i, roi in enumerate(rois):
+        label = labels[i] if labels is not None and i < len(labels) else f"area {i + 1}"
+        working = _working_area(image_bgr, roi, pixels_per_mm)
+        if working is None:
+            x, y, w, h = _clamp_roi(image_bgr, roi)
+            crop = image_bgr[y : y + h, x : x + w] if w > 0 and h > 0 else np.zeros((0, 0, 3), np.uint8)
+        else:
+            crop = working[0]
+        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if crop.size else crop
+        vx, vy = _leg_slant_variances(gray)
+        votes.append(OrientationVote(label=label, leg_slant_var_x=vx, leg_slant_var_y=vy, vote=_orientation_vote(vx, vy)))
+
+    cast = [v.vote for v in votes]
+    if not cast:
+        return OrientationDetection(None, votes, "Could not tell which way the wales run (no measurement area to read) \u2014 please choose.")
+    if any(v is None for v in cast):
+        return OrientationDetection(None, votes, "Could not tell which way the wales run (an area carried no stitch signal) \u2014 please choose.")
+    if len(set(cast)) != 1:
+        n_v = sum(1 for v in cast if v == "vertical")
+        return OrientationDetection(
+            None, votes,
+            f"Could not tell which way the wales run: {n_v} of {len(cast)} areas read up-and-down and "
+            f"{len(cast) - n_v} read across \u2014 please choose.",
+        )
+    detected: Orientation = cast[0]
+    words = "up and down" if detected == "vertical" else "across"
+    return OrientationDetection(
+        detected, votes,
+        f"Wales look like they run {words} in this photo (all {len(cast)} measurement area{'s' if len(cast) != 1 else ''} agree) "
+        f"\u2014 change it if that is not right.",
+    )
 
 
 def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> RoiProposalResult:

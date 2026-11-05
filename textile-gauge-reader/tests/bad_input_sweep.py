@@ -36,6 +36,9 @@ pure-integer hash, never numpy's random stream, so an input is the same on every
   * knit_01's box does NOT sit on the photo's red marker yarn: its centre is moved up the
     swatch (`CENTRE["knit_01"]`) and `test_bad_input_sweep.py` asserts no marker pixel is in
     the box. (The first audit's centre box lay on the marker: knit_01 C -48%.)
+  * `rot90_detected` rotates the photo 90 degrees and sends the orientation the page PRE-SELECTS
+    (`/propose-rois`'s `orientation_detected`, the leg-slant vote over the proposed areas); an unsure
+    detection is scored as the old default "vertical" and recorded. `rot90_correct` sets it by hand.
   * `rot15` rotates the photo 15 degrees and CROPS to the largest axis-aligned rectangle
     inside it. (The audit filled the corners by reflection, which invents stitches.)
   * knit_02's 1.5 in box cannot avoid the tape measure whatever its position (the tape
@@ -247,7 +250,7 @@ INPUTS: List[Input] = [
     Input("blur4", "Gaussian blur, sigma 4 px"),
     Input("blur4+box", "Blur sigma 4 px, hand-drawn box"),
     Input("rot90_correct", "Rotated 90 degrees, orientation set correctly"),
-    Input("rot90_default", "Rotated 90 degrees, orientation left at the default"),
+    Input("rot90_detected", "Rotated 90 degrees, orientation as the page pre-selects it (detected)"),
     Input("rot15", "Rotated 15 degrees, cropped (no filled corners)"),
     Input("rot15+box", "Rotated 15 degrees, cropped, hand-drawn box"),
     Input("big4000", "Resampled to a 4000 px long edge"),
@@ -343,9 +346,13 @@ def make_input(name: str, variant: str) -> Optional[Made]:
         img = cv2.GaussianBlur(img, (0, 0), 2.0 if v == "blur2" else 4.0)
     elif v == "blur4+box":
         raise AssertionError("handled above")
-    elif v in ("rot90_correct", "rot90_default"):
+    elif v in ("rot90_correct", "rot90_detected"):
         img = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
-        orientation = "horizontal" if v == "rot90_correct" else "vertical"
+        # rot90_detected: the user takes whatever the orientation step pre-selects
+        # (/propose-rois's orientation_detected, see Runner.analyse). Until wale
+        # direction was detected this row was "orientation left at the default"
+        # (`rot90_default`, 11 silent axes: both axes read the wrong physical pitch).
+        orientation = "horizontal" if v == "rot90_correct" else "detected"
     elif v == "rot15":
         img = rotate_crop(img, 15.0)
     elif v == "big4000":
@@ -506,15 +513,29 @@ class Runner:
         return self._detect[key]
 
     def analyse(self, data: bytes, ctype: str, fn: str, cal: dict, roi: Optional[dict], orientation: str) -> dict:
-        """propose-rois (every area accepted) unless a box was drawn, then analyze-multi."""
-        out = {"areas": 0, "analyzed": False, "message": "", "propose_message": ""}
+        """propose-rois (every area accepted) unless a box was drawn, then analyze-multi.
+
+        `orientation` is sent as given, except "detected": the orientation the page would PRE-SELECT
+        from /propose-rois's `orientation_detected` (the wale-direction vote over the proposed areas).
+        When the detection is unsure the page pre-selects nothing and makes the user choose; the sweep
+        cannot model that choice, so an unsure detection is scored as the old default, "vertical", and
+        the run records `orientation_detected` None so the table can say how many were unsure.
+        """
+        out = {"areas": 0, "analyzed": False, "message": "", "propose_message": "", "orientation_detected": None,
+               "orientation_used": orientation}
         if roi is not None:
             rois = [roi]
+            if orientation == "detected":
+                raise ValueError("a detected orientation needs the proposal path (no hand-drawn box)")
         else:
             pb = self.post("/propose-rois", cal, data, ctype, fn)
             out["propose_message"] = pb.get("message", "")
+            out["orientation_detected"] = pb.get("orientation_detected")
             rois = [{"label": r["label"], "x": r["x"], "y": r["y"], "width": r["width"], "height": r["height"],
                      "source": "auto"} for r in (pb.get("rois") or [])]
+        if orientation == "detected":
+            orientation = out["orientation_detected"] or "vertical"
+            out["orientation_used"] = orientation
         out["areas"] = len(rois)
         if not rois:
             return out
@@ -589,7 +610,7 @@ def card_is_confident(run: dict) -> bool:
 
 # The CI subset: the inputs and fixtures whose cells carry the pinned failure modes and the controls,
 # chosen so that every cause label below still has a witness (the subset test asserts it).
-SUBSET_INPUTS = ("base", "box_good", "box_small", "box_ruler", "box_pins", "blur4", "blur4+box", "rot90_default",
+SUBSET_INPUTS = ("base", "box_good", "box_small", "box_ruler", "box_pins", "blur4", "blur4+box", "rot90_detected",
                  "rot15", "stretch13", "lowlight", "lowlight+box")
 SUBSET_FIXTURES = ("jersey", "teal", "knit_01", "knit_06", "knit_08", "knit_09", "synth_jersey", "synth_rib")
 SUBSET_NONKNIT = ("text_lines", "wood_grain", "brick_wall", "gingham_woven", "corduroy", "random_noise", "flat_grey",
@@ -761,7 +782,7 @@ REASONS = (REASON_SMALL_BOX, REASON_CONTAMINATED_BOX, REASON_DEGRADED_BOX, REASO
 
 
 def _reason_for(inp: str) -> str:
-    if inp == "rot90_default":
+    if inp == "rot90_detected":
         return REASON_ORIENTATION
     if inp == "stretch13":
         return REASON_STRETCH

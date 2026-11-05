@@ -61,16 +61,16 @@ KNOWN_SILENT = {
             ('knit_05', 'lowlight+box', 'course'),
         ],
         'COURSE | orientation left at the default on a rotated photo': [
-            ('jersey', 'rot90_default', 'course'),
-            ('knit_01', 'rot90_default', 'course'),
-            ('knit_05', 'rot90_default', 'course'),
-            ('knit_06', 'rot90_default', 'course'),
-            ('knit_08', 'rot90_default', 'course'),
-            ('knit_09', 'rot90_default', 'course'),
-            ('synth_garter', 'rot90_default', 'course'),
-            ('synth_jersey', 'rot90_default', 'course'),
-            ('synth_rib', 'rot90_default', 'course'),
-            ('teal', 'rot90_default', 'course'),
+            ('jersey', 'rot90_detected', 'course'),
+            ('knit_01', 'rot90_detected', 'course'),
+            ('knit_05', 'rot90_detected', 'course'),
+            ('knit_06', 'rot90_detected', 'course'),
+            ('knit_08', 'rot90_detected', 'course'),
+            ('knit_09', 'rot90_detected', 'course'),
+            ('synth_garter', 'rot90_detected', 'course'),
+            ('synth_jersey', 'rot90_detected', 'course'),
+            ('synth_rib', 'rot90_detected', 'course'),
+            ('teal', 'rot90_detected', 'course'),
         ],
         'COURSE | rotated 15 degrees': [
             ('jersey', 'rot15+box', 'course'),
@@ -100,7 +100,7 @@ KNOWN_SILENT = {
             ('teal', 'blur4+box', 'wale'),
         ],
         'WALE | orientation left at the default on a rotated photo': [
-            ('knit_06', 'rot90_default', 'wale'),
+            ('knit_06', 'rot90_detected', 'wale'),
         ],
     },
     'ruler': {
@@ -119,16 +119,16 @@ KNOWN_SILENT = {
             ('knit_05', 'lowlight+box', 'course'),
         ],
         'COURSE | orientation left at the default on a rotated photo': [
-            ('jersey', 'rot90_default', 'course'),
-            ('knit_01', 'rot90_default', 'course'),
-            ('knit_05', 'rot90_default', 'course'),
-            ('knit_06', 'rot90_default', 'course'),
-            ('knit_08', 'rot90_default', 'course'),
-            ('knit_09', 'rot90_default', 'course'),
-            ('synth_garter', 'rot90_default', 'course'),
-            ('synth_jersey', 'rot90_default', 'course'),
-            ('synth_rib', 'rot90_default', 'course'),
-            ('teal', 'rot90_default', 'course'),
+            ('jersey', 'rot90_detected', 'course'),
+            ('knit_01', 'rot90_detected', 'course'),
+            ('knit_05', 'rot90_detected', 'course'),
+            ('knit_06', 'rot90_detected', 'course'),
+            ('knit_08', 'rot90_detected', 'course'),
+            ('knit_09', 'rot90_detected', 'course'),
+            ('synth_garter', 'rot90_detected', 'course'),
+            ('synth_jersey', 'rot90_detected', 'course'),
+            ('synth_rib', 'rot90_detected', 'course'),
+            ('teal', 'rot90_detected', 'course'),
         ],
         'COURSE | rotated 15 degrees': [
             ('jersey', 'rot15+box', 'course'),
@@ -157,18 +157,18 @@ KNOWN_SILENT = {
             ('teal', 'blur4+box', 'wale'),
         ],
         'WALE | orientation left at the default on a rotated photo': [
-            ('knit_06', 'rot90_default', 'wale'),
+            ('knit_06', 'rot90_detected', 'wale'),
         ],
     },
 }
 
 # Runs whose CARD says Confident while some scored axis is more than 10% off. Both calibration modes agree.
 KNOWN_CARD_SILENT = {
-    "truth": [("knit_06", "rot90_default"), ("knit_09", "stretch13"), ("teal", "blur4"), ("teal", "blur4+box")],
-    "ruler": [("knit_06", "rot90_default"), ("knit_09", "stretch13"), ("teal", "blur4"), ("teal", "blur4+box")],
+    "truth": [("knit_06", "rot90_detected"), ("knit_09", "stretch13"), ("teal", "blur4"), ("teal", "blur4+box")],
+    "ruler": [("knit_06", "rot90_detected"), ("knit_09", "stretch13"), ("teal", "blur4"), ("teal", "blur4+box")],
 }
 CARD_SILENT_WHY = {
-    ("knit_06", "rot90_default"): "orientation left at the default: both axes read the wrong physical axis, both say confident",
+    ("knit_06", "rot90_detected"): "orientation left at the default: both axes read the wrong physical axis, both say confident",
     ("knit_09", "stretch13"): "stretched 1.3x: wale is right and confident, the course axis (+30%) is confident too",
     ("teal", "blur4"): "blur sigma 4: teal's wale (-13.7%, uncertain on the sharp photo) flips to confident",
     ("teal", "blur4+box"): "the same flip on a hand-drawn box",
@@ -280,7 +280,7 @@ def test_inputs_do_what_they_say():
     lap = lambda m: cv2.Laplacian(cv2.cvtColor(m.img, cv2.COLOR_BGR2GRAY), cv2.CV_64F).var()
     assert lap(bis.make_input("jersey", "blur4")) < lap(bis.make_input("jersey", "blur2")) < lap(base)
     # rotation by 90 swaps the shape, and the orientation is the only difference between the two rows
-    r90, r90d = bis.make_input("jersey", "rot90_correct"), bis.make_input("jersey", "rot90_default")
+    r90, r90d = bis.make_input("jersey", "rot90_correct"), bis.make_input("jersey", "rot90_detected")
     assert r90.img.shape[:2] == (w, h) and r90.data == r90d.data
     assert (r90.orientation, r90d.orientation) == ("horizontal", "vertical")
     # stretch: 1.3x wider, one calibration along x for both axes

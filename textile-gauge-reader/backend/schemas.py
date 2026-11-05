@@ -49,12 +49,28 @@ class ProposedRoiOut(BaseModel):
     periodicity_consistency: float = 0.5
 
 
+class OrientationVoteOut(BaseModel):
+    """One proposed area's wale-direction reading (analysis.gauge_analysis.detect_wale_orientation)."""
+
+    label: str
+    leg_slant_var_x: Optional[float] = None  # the leg-slant field's variance collapsed to a signal along x
+    leg_slant_var_y: Optional[float] = None  # ... along y; the larger names the wale-spacing axis
+    vote: Optional[Orientation] = None       # None: this area carried no signal
+
+
 class ProposeRoisResponse(BaseModel):
     success: bool
     message: str = ""
     rois: List[ProposedRoiOut] = Field(default_factory=list)
     window_size_px: Optional[int] = None
     pixels_per_mm: Optional[float] = None
+    # Which way the wales look like they run, as a unanimous vote over `rois`
+    # (None = unsure: the page pre-selects nothing and the user must choose).
+    # A pre-selection only: /analyze and /analyze-multi still take the
+    # orientation the user confirms.
+    orientation_detected: Optional[Orientation] = None
+    orientation_message: str = ""
+    orientation_votes: List[OrientationVoteOut] = Field(default_factory=list)
 
 
 class CandidateOut(BaseModel):
