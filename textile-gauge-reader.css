@@ -1,35 +1,27 @@
 /* ---------------------------------------------------
    Automatic Textile Gauge Reader — experimental lab page
-   Reuses the portfolio's token *names* (--black, --ink, --petrol,
-   --mono, --serif — same variables styles.css defines) but redefines
-   their values here to a light theme, specific to this page. Loading
-   after styles.css, this block wins the cascade for every rule on this
-   page — both the shared .tgr-topbar/.tgr-intro-style rules and the
-   ones below — without touching styles.css or any other (still dark)
-   portfolio page. Also adds a small set of lab-specific tokens for
-   things the base site has no equivalent for (a second accent to tell
-   wale/course lines apart, confidence-bar colors, error/warning tones).
+   DARK, on the site's design system (Eva's ruling R3, Nov 5): the legacy
+   names (--black, --ink, --petrol …) come from styles.css, which aliases
+   them onto tokens.css, so this page no longer redefines them.
+   The lab-specific names below are for MARKS, never text (DESIGN.md
+   rule 1): a status is said in ink with a glyph or a word.
+   --tgr-course-mark is the key swatch for the course-axis overlay. It
+   matches COURSE_COLOR in textile-gauge-reader.js, which is drawn on the
+   fabric photo (artwork, rule 9).
 --------------------------------------------------- */
 
 :root {
-  --black:         #ffffff;
-  --black-raised:  #f3f3f1;
-  --line:          #d9d9d5;
-  --line-strong:   #b7b7b1;
-  --ink:           #16181a;
-  --ink-dim:       #565e60;
-  --ink-faint:     #7c8385;
-  --petrol:        #1c6b6b;
-  --petrol-bright: #0f7d7d;
-
-  --tgr-panel-bg:    var(--black-raised);
-  --tgr-course:      #a56b2e;   /* warm rust — distinct from petrol, stays in-palette */
-  --tgr-error:       #c1524c;
-  --tgr-error-bg:    rgba(193, 82, 76, 0.08);
-  --tgr-error-border:rgba(193, 82, 76, 0.3);
-  --tgr-warn-bg:     rgba(165, 107, 46, 0.08);
-  --tgr-warn-border: rgba(165, 107, 46, 0.3);
-  --tgr-ok-dot:      #2f9e5e;
+  /* faint (3.07:1) is not small text (rule 4); this page sets its footnote,
+     badge and step labels in it, so it reads dim here. */
+  --ink-faint:         var(--color-dim);
+  --tgr-panel-bg:      var(--black-raised);
+  --tgr-course-mark:   #a56b2e;
+  --tgr-mark-bad:      var(--color-plum);
+  --tgr-mark-ok:       var(--color-mint);
+  --tgr-error-bg:      color-mix(in srgb, var(--color-plum) 8%, transparent);
+  --tgr-error-border:  color-mix(in srgb, var(--color-plum) 45%, transparent);
+  --tgr-warn-bg:       var(--color-raised);
+  --tgr-warn-border:   var(--color-line-strong);
 }
 
 /* ---------------------------------------------------
@@ -121,8 +113,8 @@
   background: var(--ink-faint);
   flex-shrink: 0;
 }
-.tgr-service-status.is-online .tgr-service-status__dot { background: var(--tgr-ok-dot); }
-.tgr-service-status.is-offline .tgr-service-status__dot { background: var(--tgr-error); }
+.tgr-service-status.is-online .tgr-service-status__dot { background: var(--tgr-mark-ok); }
+.tgr-service-status.is-offline .tgr-service-status__dot { background: none; border: 1.5px solid var(--tgr-mark-bad); box-sizing: border-box; }
 .tgr-service-status.is-checking .tgr-service-status__dot { background: var(--petrol-bright); }
 
 .tgr-link-btn {
@@ -313,8 +305,9 @@
   font-weight: 600;
 }
 
+.tgr-error:not(:empty)::before { content: '\2715\00a0'; }
 .tgr-error {
-  color: var(--tgr-error);
+  color: var(--ink);
   font-size: 12.5px;
   background: var(--tgr-error-bg);
   border: 1px solid var(--tgr-error-border);
@@ -323,8 +316,9 @@
   margin-top: 0.5rem;
 }
 
+.tgr-warning:not(:empty)::before { content: '! '; }
 .tgr-warning {
-  color: var(--tgr-course);
+  color: var(--ink);
   font-size: 12.5px;
   background: var(--tgr-warn-bg);
   border: 1px solid var(--tgr-warn-border);
@@ -400,7 +394,7 @@
 }
 .tgr-radio-option:has(input:checked) {
   border-color: var(--petrol-bright);
-  background: rgba(15, 125, 125, 0.07);
+  background: color-mix(in srgb, var(--color-petrol) 7%, transparent);
   color: var(--ink);
 }
 .tgr-radio-option input { margin-top: 0.2rem; }
@@ -414,8 +408,8 @@
 }
 
 .tgr-btn {
-  background: var(--petrol-bright);
-  color: var(--black);
+  background: var(--petrol);
+  color: var(--ink);
   border: none;
   padding: 0.55rem 1rem;
   border-radius: 4px;
@@ -463,7 +457,7 @@
 .tgr-roi-list__item:hover { border-color: var(--ink-dim); }
 .tgr-roi-list__item.is-selected {
   border-color: var(--petrol-bright);
-  background: rgba(15, 125, 125, 0.08);
+  background: color-mix(in srgb, var(--color-petrol) 8%, transparent);
 }
 .tgr-roi-list__swatch {
   width: 18px;
@@ -475,11 +469,11 @@
   justify-content: center;
   font-family: var(--mono);
   font-size: 10px;
-  font-weight: 700;
-  color: var(--black);
-  background: var(--petrol-bright);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--petrol);
 }
-.tgr-roi-list__item.is-manual .tgr-roi-list__swatch { background: var(--tgr-course); }
+.tgr-roi-list__item.is-manual .tgr-roi-list__swatch { background: var(--tgr-course-mark); }
 .tgr-roi-list__meta {
   flex: 1;
   min-width: 0;
@@ -502,7 +496,7 @@
   cursor: pointer;
   font-size: 13px;
 }
-.tgr-roi-list__remove:hover { border-color: var(--tgr-error); color: var(--tgr-error); }
+.tgr-roi-list__remove:hover { border-color: var(--tgr-mark-bad); color: var(--ink); }
 .tgr-roi-list__empty {
   font-size: 12px;
   color: var(--ink-faint);
@@ -568,8 +562,9 @@
   font-weight: 700;
   margin-top: 0.15rem;
 }
-.tgr-confidence-word--confident { color: var(--tgr-ok-dot); }
-.tgr-confidence-word--uncertain { color: var(--tgr-error); }
+.tgr-confidence-word--confident { color: var(--ink); }
+.tgr-confidence-word--uncertain { color: var(--ink); }
+.tgr-confidence-word--uncertain::before { content: '! '; }
 
 .tgr-secondary-card {
   display: flex;
@@ -624,7 +619,7 @@
   margin-top: 0.5rem;
   font-size: 10.5px;
   line-height: 1.5;
-  color: var(--tgr-course);
+  color: var(--ink);
 }
 
 /* ---------------------------------------------------
@@ -633,7 +628,7 @@
 --------------------------------------------------- */
 
 .tgr-consistency-panel {
-  border-color: rgba(15, 125, 125, 0.35);
+  border-color: color-mix(in srgb, var(--color-petrol) 35%, transparent);
 }
 .tgr-consistency-panel summary { color: var(--petrol-bright); font-weight: 600; }
 .tgr-consistency-row {
@@ -649,7 +644,7 @@
 .tgr-consistency-row span:last-child { color: var(--ink); font-family: var(--mono); text-align: right; }
 .tgr-consistency-outlier {
   font-size: 11px;
-  color: var(--tgr-course);
+  color: var(--color-ink-2);
   line-height: 1.5;
   padding: 0.25rem 0;
 }
@@ -679,8 +674,8 @@
   border-radius: 3px;
   margin-left: 0.4rem;
 }
-.tgr-roi-diag-card__tag.is-included { color: var(--tgr-ok-dot); border: 1px solid var(--tgr-ok-dot); }
-.tgr-roi-diag-card__tag.is-excluded { color: var(--tgr-error); border: 1px solid var(--tgr-error-border); }
+.tgr-roi-diag-card__tag.is-included { color: var(--color-ink-2); border: 1px solid var(--tgr-mark-ok); }
+.tgr-roi-diag-card__tag.is-excluded { color: var(--color-ink-2); border: 1px dashed var(--tgr-mark-bad); }
 
 /* ---------------------------------------------------
    Debug / diagnostics (loop centers, detection details)
@@ -755,9 +750,9 @@
   color: var(--ink-dim);
   line-height: 1.5;
 }
-.tgr-debug-axis__reason.is-corrected { color: var(--tgr-course); }
+.tgr-debug-axis__reason.is-corrected { color: var(--color-ink-2); }
 .tgr-debug-axis__ambiguity {
-  color: var(--tgr-error);
+  color: var(--ink);
   background: var(--tgr-warn-bg);
   border: 1px solid var(--tgr-warn-border);
   border-radius: 3px;
@@ -776,7 +771,7 @@
   vertical-align: middle;
 }
 .tgr-debug-axis__status.is-uncertain {
-  color: var(--tgr-course);
+  color: var(--ink);
   border: 1px solid var(--tgr-warn-border);
   background: var(--tgr-warn-bg);
 }
@@ -807,7 +802,7 @@
 }
 .tgr-debug-candidate-card.is-selected {
   border-color: var(--petrol-bright);
-  background: rgba(15, 125, 125, 0.06);
+  background: color-mix(in srgb, var(--color-petrol) 6%, transparent);
 }
 .tgr-debug-candidate-card__head {
   display: flex;
@@ -949,10 +944,11 @@
 .tgr-comparison__row:last-child { border-bottom: none; }
 .tgr-comparison__label { color: var(--ink-dim); flex-shrink: 0; }
 .tgr-comparison__values { color: var(--ink); text-align: right; }
-.tgr-comparison__delta { font-weight: 700; margin-left: 0.5rem; }
-.tgr-comparison__delta.is-good { color: var(--tgr-ok-dot); }
-.tgr-comparison__delta.is-mid { color: var(--tgr-course); }
-.tgr-comparison__delta.is-bad { color: var(--tgr-error); }
+.tgr-comparison__delta { font-weight: 500; margin-left: 0.5rem; }
+.tgr-comparison__delta.is-good { color: var(--ink); }
+.tgr-comparison__delta.is-mid { color: var(--color-ink-2); }
+.tgr-comparison__delta.is-bad { color: var(--ink); }
+.tgr-comparison__delta.is-bad::before { content: '! '; }
 .tgr-comparison__id {
   margin-top: 0.6rem;
   font-size: 10.5px;
@@ -1025,8 +1021,8 @@
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  background: rgba(20, 20, 20, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: color-mix(in srgb, var(--color-ground) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 15%, transparent);
   border-radius: 6px;
   padding: 0.3rem 0.4rem;
   backdrop-filter: blur(2px);
@@ -1036,9 +1032,9 @@
   width: 24px;
   height: 24px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
-  color: #f2f2f0;
+  border: 1px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
+  background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+  color: var(--color-ink);
   font-family: var(--mono);
   font-size: 15px;
   line-height: 1;
@@ -1047,22 +1043,22 @@
   align-items: center;
   justify-content: center;
 }
-.tgr-zoom-controls__btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); }
+.tgr-zoom-controls__btn:hover:not(:disabled) { background: color-mix(in srgb, var(--color-ink) 16%, transparent); }
 .tgr-zoom-controls__btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .tgr-zoom-controls__level {
   font-family: var(--mono);
   font-size: 11px;
-  color: #f2f2f0;
+  color: var(--color-ink);
   min-width: 3.4em;
   text-align: center;
 }
 .tgr-zoom-controls__reset {
   background: none;
   border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  border-left: 1px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
   margin-left: 0.15rem;
   padding-left: 0.5rem;
-  color: #f2f2f0;
+  color: var(--color-ink);
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.04em;
@@ -1084,9 +1080,9 @@
   height: 30px;
   padding: 0 0.65rem;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(20, 20, 20, 0.72);
-  color: #f2f2f0;
+  border: 1px solid color-mix(in srgb, var(--color-ink) 20%, transparent);
+  background: color-mix(in srgb, var(--color-ground) 72%, transparent);
+  color: var(--color-ink);
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.04em;
@@ -1095,19 +1091,19 @@
   backdrop-filter: blur(2px);
 }
 .tgr-gridbox-controls__btn:hover,
-.tgr-gridbox-controls__unit:hover { background: rgba(255, 255, 255, 0.16); }
+.tgr-gridbox-controls__unit:hover { background: color-mix(in srgb, var(--color-ink) 16%, transparent); }
 .tgr-gridbox-controls__btn.is-active {
-  background: var(--tgr-course);
-  border-color: var(--tgr-course);
-  color: #060707;
+  background: var(--color-deep);
+  border-color: var(--color-petrol);
+  color: var(--color-ink);
 }
 
 .tgr-gridbox-panel {
   position: fixed;
   z-index: 6;
   transform: translate(-50%, 12px);
-  background: rgba(15, 15, 15, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: color-mix(in srgb, var(--color-raised) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 18%, transparent);
   border-radius: 8px;
   padding: 0.6rem 0.7rem;
   min-width: 190px;
@@ -1136,8 +1132,8 @@
   position: fixed;
   z-index: 6;
   transform: translate(-50%, 12px); /* horizontally centered under the anchor point, offset below it */
-  background: rgba(15, 15, 15, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: color-mix(in srgb, var(--color-raised) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-ink) 18%, transparent);
   border-radius: 8px;
   padding: 0.6rem 0.7rem;
   min-width: 190px;
@@ -1168,7 +1164,9 @@
   margin: 0.35rem 0 0;
   font-size: 11px;
   line-height: 1.4;
-  color: #e0b830; /* matches the warning tone used elsewhere (e.g. inferred-loop markers), not an error */
+  color: var(--color-ink-2);
+}
+.tgr-cal-popup__spanhint:not(:empty)::before { content: '! ';
 }
 .tgr-cal-popup .tgr-button-row { margin: 0.5rem 0 0; }
 .tgr-cal-popup .tgr-error { margin: 0.4rem 0 0; font-size: 11px; padding: 0.4rem 0.5rem; }
