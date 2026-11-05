@@ -3678,7 +3678,7 @@ windows* (the 11.6% wale spread is the 0.5x copy's +0.8% against the 1x/2x copy'
 high-px/in mechanism it used to name is fixed**: every area is analysed at 180 px/in, 2x reads the 1x copy
 to the pixel and the 8 px sensor grid is gone. The generated block above is regenerated from this tree.
 
-### Consensus status respects each area's own doubt (2026-11-05; DRAFT — the "status flips must not increase" criterion failed, 5 → 8)
+### Consensus status respects each area's own doubt (2026-11-05; stop-and-report on the jitter-flip criterion (5 → 8), then merged on Eva's ruling)
 
 **Status only: no measured value changes.** Every spacing, per-inch value, confidence, area and overlay of
 all 101 `/analyze-multi` responses on the app-path card (every fixture × calibration (a), the ruler pre-fill,
@@ -3757,10 +3757,14 @@ behind "a consensus exists". They are pinned in `JITTER_UNSTABLE` (the readings 
 - *Stabilising the verdict across jitter* (hysteresis, or the worst of the neighbouring scales): it would use
   information the app does not have at analysis time (one photo, one scale) — not built.
 
-**Open for Eva.** Criterion 4 (flips must not increase) fails by three, all on synthetic fabrics whose
-readings are exact; every other criterion holds (confident-and-wrong 0 on every row, resolution row and jitter
-point; coverage down about a third; no measured value moved; the metamorphic sweep and the rest of the suite
-unchanged). This change is not merged.
+**RULED (Eva, Nov 5): the three extra jitter status flips are accepted** — synth_garter W, and synth_rib W at
+−2% and −1% (status flips 5 → 8). They are status-only flickers on exact readings (0.0 ± 3%), and they fail
+safe: the flicker can only move a verdict between "confident" and "uncertain" on a reading that is right, never
+put "confident" on a wrong one. They stay pinned in `JITTER_UNSTABLE` (strict xfails: the day the per-area
+statuses stop flickering they XPASS and the entries come off on purpose). Every other criterion held:
+confident-and-wrong 0 on every row, resolution row and jitter point (reading error); coverage down about a
+third; no measured value moved; the metamorphic sweep (118 / 12 / 5 / 12 / 7) and the rest of the suite
+unchanged.
 
 ## Deploying the backend to Render
 

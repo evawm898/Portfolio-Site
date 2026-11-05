@@ -68,8 +68,9 @@ across the resolution rows. THE COST, recorded rather than hidden: wale statuses
 almost everywhere (the per-area wale detector flags uncertain on 9 of 11 fixtures even when right), so
 confident-and-within-10% on (a) goes 18 -> 12 of 19, and on the wale axis 9 -> 3 of 9; and the consensus now
 inherits per-area status flicker under scale jitter: status flips 5 -> 8 (synth_garter W and synth_rib W join
-knit_01 C as jitter-unstable). That increase breaks the ruled "flips must not increase" criterion; this change
-is therefore a DRAFT awaiting Eva's call, with the two new entries pinned in JITTER_UNSTABLE below.
+knit_01 C as jitter-unstable). That increase broke the "flips must not increase" criterion and was ACCEPTED BY
+EVA'S RULING (Nov 5): status-only flickers on exact readings, failing safe; the two new entries stay pinned in
+JITTER_UNSTABLE below.
 
 RE-PINNED 2026-10-23 for the two phone-resolution mechanisms (README: "Phone-resolution
 photos: the ROI proposer at one working resolution, and the course loop-center pitch may
@@ -217,13 +218,13 @@ JITTER_UNSTABLE[("synth_garter", "wale")] = (
     "status flips under jitter since the consensus status rolls up the areas' own doubt: all three areas read "
     "uncertain from -2% to +1% (consensus uncertain, as at the exact scale) and at +2% the proposer places two "
     "areas that are both confident (consensus confident). The reading is 0.0 +-3% throughout; only the verdict "
-    "follows the per-area flicker. One of the three flips that break the 'flips must not increase' criterion."
+    "follows the per-area flicker. One of the three flips accepted by Eva's ruling (Nov 5)."
 )
 JITTER_UNSTABLE[("synth_rib", "wale")] = (
     "status flips under jitter since the consensus status rolls up the areas' own doubt: at the exact scale two "
     "of three areas are confident (consensus confident); at -2% and -1% only one is (uncertain). The reading is "
-    "0.0 +-2% throughout; only the verdict follows the per-area flicker. One of the three flips that break the "
-    "'flips must not increase' criterion."
+    "0.0 +-2% throughout; only the verdict follows the per-area flicker. Two of the three flips accepted by "
+    "Eva's ruling (Nov 5)."
 )
 
 # The headline: confident-and-wrong rows per calibration mode.
