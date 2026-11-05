@@ -53,6 +53,12 @@ one is offered, else calibrate by hand, correctly". (b)'s confident-and-wrong ax
 'ruler-detector error' strict xfails from #441 are regular tests. The old as-is numbers
 are in the PR report; mode (a), the jitter table and every census above are unchanged.
 
+RE-PINNED 2026-11-05 for analysis at one working resolution (README: "Analysis at one working
+resolution"): every area is analysed on a 180 px/in copy, so 1x and 2x read identically on every photo
+finer than that; knit_08's two "proposer placement at 2x" pins passed and came off; knit_01 C (a) came
+inside the bar (+7.5% uncertain, a regular test); knit_02 W is +12.5% confident on four-stitch windows
+and is pinned as KNOWN CONFIDENT-AND-WRONG by Eva's ruling (counts 2 / 2).
+
 RE-PINNED 2026-10-23 for the two phone-resolution mechanisms (README: "Phone-resolution
 photos: the ROI proposer at one working resolution, and the course loop-center pitch may
 corroborate, never override by a harmonic"). The proposer works on a copy downsampled to
@@ -79,49 +85,49 @@ REGRESSION_PP = 2.0
 # number at all (no proposals, or a consensus with no measurement).
 BASELINE = {
     # (a) correct scale from ground truth
-    ("truth", "jersey", "course"): -6.4,
-    ("truth", "jersey", "wale"): -5.5,
-    ("truth", "knit_01", "course"): -30.2,
-    ("truth", "knit_01", "wale"): -1.9,
-    ("truth", "knit_02", "wale"): -2.4,
-    ("truth", "knit_05", "course"): -5.8,
-    ("truth", "knit_05", "wale"): 2.4,
-    ("truth", "knit_06", "course"): 2.0,
-    ("truth", "knit_06", "wale"): -4.3,
-    ("truth", "knit_08", "course"): -2.3,
-    ("truth", "knit_08", "wale"): 4.5,
-    ("truth", "knit_09", "course"): -0.9,
-    ("truth", "knit_09", "wale"): -2.5,
-    ("truth", "synth_garter", "course"): 0.1,
-    ("truth", "synth_garter", "wale"): 0.0,
-    ("truth", "synth_jersey", "course"): 0.1,
-    ("truth", "synth_jersey", "wale"): 0.2,
-    ("truth", "synth_rib", "course"): 0.1,
-    ("truth", "synth_rib", "wale"): 0.0,
-    ("truth", "teal", "course"): -0.6,
-    ("truth", "teal", "wale"): -13.0,
+    ('truth', 'jersey', 'course'): -6.4,
+    ('truth', 'jersey', 'wale'): -5.5,
+    ('truth', 'knit_01', 'course'): 7.5,
+    ('truth', 'knit_01', 'wale'): 0.7,
+    ('truth', 'knit_02', 'wale'): 12.5,
+    ('truth', 'knit_05', 'course'): -8.3,
+    ('truth', 'knit_05', 'wale'): 2.1,
+    ('truth', 'knit_06', 'course'): -1.5,
+    ('truth', 'knit_06', 'wale'): -4.2,
+    ('truth', 'knit_08', 'course'): -2.2,
+    ('truth', 'knit_08', 'wale'): 4.8,
+    ('truth', 'knit_09', 'course'): -1.0,
+    ('truth', 'knit_09', 'wale'): -1.9,
+    ('truth', 'synth_garter', 'course'): 0.1,
+    ('truth', 'synth_garter', 'wale'): 0.0,
+    ('truth', 'synth_jersey', 'course'): 0.1,
+    ('truth', 'synth_jersey', 'wale'): 0.2,
+    ('truth', 'synth_rib', 'course'): 0.1,
+    ('truth', 'synth_rib', 'wale'): 0.0,
+    ('truth', 'teal', 'course'): -0.7,
+    ('truth', 'teal', 'wale'): -13.4,
     # (b) the pre-fill accepted if offered, else a correct manual calibration
-    ("ruler", "jersey", "course"): -6.7,
-    ("ruler", "jersey", "wale"): -6.2,
-    ("ruler", "knit_01", "course"): 4.7,
-    ("ruler", "knit_01", "wale"): 2.8,
-    ("ruler", "knit_02", "wale"): -2.4,
-    ("ruler", "knit_05", "course"): -5.8,
-    ("ruler", "knit_05", "wale"): 2.4,
-    ("ruler", "knit_06", "course"): 2.0,
-    ("ruler", "knit_06", "wale"): -4.3,
-    ("ruler", "knit_08", "course"): -2.3,
-    ("ruler", "knit_08", "wale"): 4.5,
-    ("ruler", "knit_09", "course"): -0.9,
-    ("ruler", "knit_09", "wale"): -2.5,
-    ("ruler", "synth_garter", "course"): 0.1,
-    ("ruler", "synth_garter", "wale"): 0.0,
-    ("ruler", "synth_jersey", "course"): 0.1,
-    ("ruler", "synth_jersey", "wale"): 0.2,
-    ("ruler", "synth_rib", "course"): 0.1,
-    ("ruler", "synth_rib", "wale"): 0.0,
-    ("ruler", "teal", "course"): -0.6,
-    ("ruler", "teal", "wale"): -13.0,
+    ('ruler', 'jersey', 'course'): -6.7,
+    ('ruler', 'jersey', 'wale'): -6.2,
+    ('ruler', 'knit_01', 'course'): 2.2,
+    ('ruler', 'knit_01', 'wale'): 7.6,
+    ('ruler', 'knit_02', 'wale'): 12.5,
+    ('ruler', 'knit_05', 'course'): -8.3,
+    ('ruler', 'knit_05', 'wale'): 2.1,
+    ('ruler', 'knit_06', 'course'): -1.5,
+    ('ruler', 'knit_06', 'wale'): -4.2,
+    ('ruler', 'knit_08', 'course'): -2.2,
+    ('ruler', 'knit_08', 'wale'): 4.8,
+    ('ruler', 'knit_09', 'course'): -1.0,
+    ('ruler', 'knit_09', 'wale'): -1.9,
+    ('ruler', 'synth_garter', 'course'): 0.1,
+    ('ruler', 'synth_garter', 'wale'): 0.0,
+    ('ruler', 'synth_jersey', 'course'): 0.1,
+    ('ruler', 'synth_jersey', 'wale'): 0.2,
+    ('ruler', 'synth_rib', 'course'): 0.1,
+    ('ruler', 'synth_rib', 'wale'): 0.0,
+    ('ruler', 'teal', 'course'): -0.7,
+    ('ruler', 'teal', 'wale'): -13.4,
 }
 
 _LEG_GATE = (
@@ -131,16 +137,10 @@ _LEG_GATE = (
     "a harmonic')"
 )
 # Why every beyond-bar row is beyond it.
-KNOWN_BEYOND_BAR = {
-    ("truth", "knit_01", "course"): (
-        "-30.2% UNCERTAIN: the working-resolution proposer places three 1.5-inch areas; area B's course "
-        "seed is the two-row period (235 px against a 58.4 px truth; its half-lag is anti-correlated, so the "
-        "sub-repeat test cannot descend it), its 39 px loop-center pitch matches no candidate and is set aside, "
-        "and the consensus of 54.5 / 241 / 83.7 px is flagged uncertain. At -1% / -0.5% / +0.5% / +1% scale the "
-        "windows move and the row reads 5.6-5.9/in confident (JITTER_UNSTABLE). On main (two areas) it read "
-        "+4.3% confident; on the proposer commit alone the same -30.2% uncertain."
-    ),
-}
+# Why every beyond-bar row is beyond it: none at present. knit_01 C (a) came inside the bar
+# (+7.5% uncertain) once each area is analysed at the working resolution (README: "Analysis at one
+# working resolution"); its jitter entry stands.
+KNOWN_BEYOND_BAR: dict = {}
 
 # Rows pinned as KNOWN CONFIDENT-AND-WRONG by ruling: still "confident"
 # with |error| > CONFIDENT_WRONG_PCT (those inside the 20% bar are also
@@ -162,6 +162,19 @@ KNOWN_CONFIDENT_AND_WRONG = {
     ("ruler", "teal", "wale"): (
         "the same row as (a): no ruler pre-fill is offered on teal, so the user calibrates by hand and reads "
         "exactly (a)'s -11.0% confident. Calibration adds nothing to it (test_calibration_adds_no_confident_and_wrong_rows)."
+    ),
+    ("truth", "knit_02", "wale"): (
+        "+12.5% CONFIDENT -- KNOWN CONFIDENT-AND-WRONG, ACCEPTED BY EVA'S RULING (Nov 5) on the working-resolution "
+        "analysis: four-stitch windows; all areas uncertain but consensus reports confident; target of the status "
+        "roll-up PR. The proposer's four 1-inch areas hold four stitches each and every one reads uncertain at every "
+        "scale (per area: native +6.7/+116%, 180 px/in +12.5%, 240 -1.6%, 360 +113% -- the resampling chain's "
+        "lottery, not a scale law; main's -2.4% was the same lottery); the consensus calls four agreeing uncertain "
+        "areas confident."
+    ),
+    ("ruler", "knit_02", "wale"): (
+        "the same row as (a): no ruler pre-fill is offered on knit_02 (WITHHELD_RULER), so the user calibrates by "
+        "hand and reads (a)'s +12.5% confident. Four-stitch windows; all areas uncertain but consensus reports "
+        "confident; target of the status roll-up PR."
     ),
 }
 
@@ -208,8 +221,8 @@ JITTER_UNSTABLE = {
 
 # The headline: confident-and-wrong rows per calibration mode.
 CONFIDENT_AND_WRONG = {
-    "truth": [("teal", "wale")],
-    "ruler": [("teal", "wale")],
+    "truth": [("knit_02", "wale"), ("teal", "wale")],
+    "ruler": [("knit_02", "wale"), ("teal", "wale")],
 }
 
 @pytest.fixture(scope="module")
@@ -380,27 +393,18 @@ def test_readme_carries_the_generated_table(card):
 # resolution. Strict xfails: the day one agrees, the entry has to come off on purpose.
 RESOLUTION_DISAGREE = {
     ("knit_02", "wale"): (
-        "high px/in, deferred: at 2x (2374 px/in) every area reads an 8 px period on both axes at autocorrelation "
-        "strength 0.76-0.82 -- an image-wide 4 px sensor/ISP grid (present in fabric and non-fabric windows alike, "
-        "not the re-encode: PNG, JPEG q95 and q75 and no re-encode all read it) that the fixed 3 px smoothing "
-        "suppresses at 1x and the upscale moves to 8 px, where it is the crop's strongest periodicity; the wale "
-        "consensus is then empty. Analysis-side resolution normalisation is its own decision (README)."
-    ),
-    ("knit_02", "course"): (
-        "high px/in, deferred: no course truth, and at 2x the areas read the 8 px grid above (a 4985% spread "
-        "against the ~200 px readings at 0.5x and 1x)."
-    ),
-    ("knit_08", "course"): (
-        "proposer placement at 2x (accepted, Eva Oct 23): 11.8% spread, all confident (7.33 / 6.74 / 6.56 per "
-        "inch at 0.5x / 1x / 2x against 6.90) -- the working-resolution proposer's two 2-inch areas sit elsewhere "
-        "at each resolution (main read 4 / 4 / 1 areas and a 5.6% spread; the proposer commit alone reads this "
-        "row identically). Every resolution is inside 10% of the truth."
+        "four-stitch windows (Eva's ruling, Nov 5): 4.03 / 4.50 / 4.50 per inch at 0.5x / 1x / 2x against 4.0, an "
+        "11.6% spread, every status confident -- the proposer's 1-inch areas hold four stitches each and every area "
+        "is uncertain; the consensus reports confident (KNOWN_CONFIDENT_AND_WRONG). The high-px/in mechanism is "
+        "FIXED: each area is analysed at 180 px/in, so 2x reads the 1x copy to the pixel and the 8 px sensor grid is "
+        "gone (README: 'Analysis at one working resolution')."
     ),
 }
 
 # Confident-and-wrong at some resolution, pinned exactly (fixture, scale, axis).
 RESOLUTION_CONFIDENT_AND_WRONG = [
-    ("knit_08", 2.0, "wale"),   # proposer placement at 2x (accepted, Eva Oct 23): +10.1% confident, the two 2-inch areas the proposer lands at 2x (the proposer commit alone reads it identically)
+    ("knit_02", 1.0, "wale"),   # four-stitch windows (KNOWN_CONFIDENT_AND_WRONG): +12.5% confident at 1x and, the same copy, at 2x
+    ("knit_02", 2.0, "wale"),
     ("teal", 0.5, "wale"),      # teal W's accepted -11..-14% (KNOWN_CONFIDENT_AND_WRONG), at every resolution
     ("teal", 1.0, "wale"),
     ("teal", 2.0, "wale"),
