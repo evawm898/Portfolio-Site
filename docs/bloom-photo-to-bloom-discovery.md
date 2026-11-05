@@ -387,7 +387,7 @@ The order is by how much a wrong guess cost in the dry run (§6).
 | # | question | resolves | ask when | default if unanswered |
 |---|---|---|---|---|
 | Q-scale | "About how big should the printed flower be? (petal length or overall width in mm)" | `petalLength` (the scale anchor; every other size is read as a ratio against it) | **[Ruled Nov 3, ruling 1: only when the proportions look wrong at 35 mm]** ~~always, unless a size was given with the photo~~; a photo never carries scale | 35 mm (the registry default) |
-| Q-profile | "Seen from the side, is it flat, a shallow bowl, a deep cup, a closed globe, or reflexed (petals bending back)?" | `petalTilt`, `petalSpineCurl`, `layerTilt` | no side or low view, and the face-on silhouette fits more than one profile. **Tilt and spine curl trade against each other in a 3/4 view** — the double tulip overshot both ways (§6) | the profile class the photo suggests, at middle values |
+| Q-profile | "Seen from the side, is it flat, a shallow bowl, a deep cup, a closed globe, or reflexed (petals bending back)?" | `petalTilt`, `petalSpineCurl`, `layerTilt` | **[Ruled Nov 5, ruling (a) of §11.8: NEVER when a side photo is attached — the side photo answers it, and on S2's evidence (§10.2) the photo beat the word answer on two flowers of three]** no side or low view, and the face-on silhouette fits more than one profile. **Tilt and spine curl trade against each other in a 3/4 view** — the double tulip overshot both ways (§6) | the profile class the photo suggests, at middle values |
 | Q-focal | "There are several flowers — which one?" (or "the open one or the bud?") | the whole design | more than one flower in focus, or flowers at different stages (the tulip photo: an open bloom and a closed one) | the largest, sharpest flower |
 | Q-layers | "Is it single, semi-double or fully double?" | `layerCount`, `layerSize` | inner petals hidden or the centre not visible | from the visible rings |
 | Q-count | "Roughly how many petals in the outer ring?" | `petalCount` | petals overlap so much the ring cannot be counted, or the flower is seen edge-on | the visible count ×(360°/visible arc) |
@@ -1373,9 +1373,26 @@ What is left is in the miss log.
   - petals passing through each other in a closed bud.
 - **Procedure, not a stage:** the lotus's green outer whorl read as petals. See ruling-pending (b).
 
-### 11.8 Rulings pending — proposed, NOT adopted
+### 11.8 Rulings — RULED (Eva, Nov 5)
 
-Each is a proposal for Eva's ruling. Nothing here was built as if it were ruled.
+**The per-layer stage PASSED (Nov 5) on the S3 sheet.**
+
+- **(a) ADOPTED.** Q-profile is skipped when a side photo is attached. The question bank (§3) says so.
+- **(b) DECLINED.** There is no sepal-whorl procedure rule. A sepal-like outer whorl stays in the petal
+  controls.
+- **(c) Width places the ring, as in v5. No page change.** The coupling is filed as a defect under Per-layer
+  values: [evawm898/Portfolio-Site#495](https://github.com/evawm898/Portfolio-Site/issues/495) — a whorl's
+  ring cannot be chosen independently of its petal width, and the hidden `layerSize` default 0.72 still
+  places the rings.
+- **(d)** The outline curves were correctly kept out of schema v2. **The outline stage (S4) adds them.**
+- **(e) V7 stays a FAIL.**
+- **(f) A zero offset counts as a layer setting its own value.**
+
+The proposals as they were put are kept below, so each ruling can be read against what it answered.
+
+#### The proposals as put (Nov 5)
+
+Each was a proposal for Eva's ruling. Nothing here was built as if it were ruled.
 
 - **(a) Skip Q-profile when a side photo is attached.**
   - On S2's evidence (§10.2) the word answer and the side photo disagreed on two of three flowers, and
