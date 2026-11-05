@@ -26,6 +26,7 @@
    =================================================================== */
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, predicateDrivers } from '../bloom-registry.js';
 import { SCOPE_LAYER_OWNED, SCOPE_VALUE_GROUPS, SCOPE_LAYER_PLACEMENTS } from '../bloom-geometry.js';
+import { SCOPEABLE_IDS } from '../bloom-file.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -171,18 +172,30 @@ export const SCHEMA = [
    NOT in v2, each a W1 when written:
      - every other offset (the ~30 delta-on-global sliders: petalCup,
        petalSpineCurl, … — a layer cannot own them, only nudge the global);
+       (v4, S5) petalCup and petalSpineCurl join as DELTA rows — `deltas` below;
      - (v2 only) the OUTLINE values — v3 adds them (ruling (d), §11.8);
      - petal / tier / strand entries (per-petal is FAN only; tiers are sepals).
    The switch: `scopeLayers` ON, under one of `placements` — the geometry's own
    SCOPE_LAYER_PLACEMENTS. The owned list is RESTATED here and checked against
    the geometry's SCOPE_LAYER_OWNED at load, both directions: importing it
    would let a quantity added to the geometry enter the photo schema silently. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 export const LAYER_SCHEMA = Object.freeze({
   switch: 'scopeLayers',
   placements: ['RADIAL', 'SPIRAL'],
   offsets: ['petalLength', 'petalWidth', 'petalTilt'],
   values: ['petalCurlMode', 'petalSpineCurve', 'petalOutlineMode', 'petalOutlineCurve'],
+  /* SCHEMA v4 (S5, Nov 5) — per-layer CUP and SPINE CURL. These are DELTA-ON-GLOBAL
+     offsets, NOT owned values: a layer entry naming one does not own the quantity
+     (Q3.5 keys only on SCOPE_LAYER_OWNED); the layer's petals read the GLOBAL plus
+     the offset, through the resolver's one clamp to the registry range. So the
+     sidecar records BOTH the global (its own confidence, in `controls`) and each
+     layer's offset (its own confidence, in `layers`), and the validator warns W2
+     where global + offset leaves the registry range (the clamp is silent). Every
+     other delta-on-global slider (the other ~30 of SCOPEABLE_IDS) stays OFF the
+     schema: W1 when written. A spine-curl offset on a layer whose petals are drawn
+     on a CURVE spine is INERT there (curl mode CURVE reads no slider curl). */
+  deltas: ['petalCup', 'petalSpineCurl'],
 });
 {
   const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
@@ -190,6 +203,11 @@ export const LAYER_SCHEMA = Object.freeze({
   const owned = [...SCOPE_VALUE_GROUPS.spine, ...SCOPE_VALUE_GROUPS.outline];
   if (!same(LAYER_SCHEMA.values, owned)) throw new Error(`LAYER_SCHEMA.values [${LAYER_SCHEMA.values}] is not the geometry's spine + outline value groups [${owned}]`);
   if (!same(LAYER_SCHEMA.placements, SCOPE_LAYER_PLACEMENTS)) throw new Error(`LAYER_SCHEMA.placements [${LAYER_SCHEMA.placements}] is not the geometry's SCOPE_LAYER_PLACEMENTS [${SCOPE_LAYER_PLACEMENTS}]`);
+  /* a delta row must be a scopeable delta (the file's own SCOPEABLE_IDS), and never an owned quantity */
+  for (const id of LAYER_SCHEMA.deltas) {
+    if (!SCOPEABLE_IDS.includes(id)) throw new Error(`LAYER_SCHEMA.deltas: ${id} is not in the design file's SCOPEABLE_IDS`);
+    if (SCOPE_LAYER_OWNED.includes(id)) throw new Error(`LAYER_SCHEMA.deltas: ${id} is OWNED by a layer (SCOPE_LAYER_OWNED), not a delta`);
+  }
 }
 
 /* Everything below runs only when this file is RUN. The photo-subset validator
@@ -216,7 +234,7 @@ for (const r of SCHEMA) {
   if (r.range && c.kind === 'slider' && (r.range[0] < c.min || r.range[1] > c.max)) bad.push(`schema row ${r.id} widens the registry range`);
 }
 if (CLASS[LAYER_SCHEMA.switch] && CLASS[LAYER_SCHEMA.switch][0] === D) bad.push(`the per-layer switch ${LAYER_SCHEMA.switch} is class d — never set`);
-for (const id of [...LAYER_SCHEMA.offsets, ...LAYER_SCHEMA.values, LAYER_SCHEMA.switch]) if (!byId[id]) bad.push(`per-layer schema row ${id} is not a control`);
+for (const id of [...LAYER_SCHEMA.offsets, ...LAYER_SCHEMA.deltas, ...LAYER_SCHEMA.values, LAYER_SCHEMA.switch]) if (!byId[id]) bad.push(`per-layer schema row ${id} is not a control`);
 if (bad.length) { console.error('CENSUS INVALID:\n  ' + bad.join('\n  ')); process.exit(2); }
 
 const secLabel = Object.fromEntries(SECTIONS.map((s) => [s.id, s.label || s.id]));
@@ -229,7 +247,7 @@ const neverTrue = (c) => c.visibleWhen && JSON.stringify(c.visibleWhen).includes
 const counts = { a: 0, b: 0, c: 0, d: 0 };
 for (const c of CONTROLS) counts[CLASS[c.id][0]]++;
 if (!process.argv.includes('--md')) {
-  console.log(`CENSUS: ${CONTROLS.length} controls — a ${counts.a} · b ${counts.b} · c ${counts.c} · d ${counts.d}; schema v${SCHEMA_VERSION}: ${SCHEMA.length} global rows (${SCHEMA.filter((r) => !r.since).length} v1 + ${SCHEMA.filter((r) => r.since === 3).length} outline, v3) + per-layer (${LAYER_SCHEMA.switch} ON under ${LAYER_SCHEMA.placements.join('/')}; offsets ${LAYER_SCHEMA.offsets.join(', ')}; values ${LAYER_SCHEMA.values.join(', ')}); every control classified, every class an id`);
+  console.log(`CENSUS: ${CONTROLS.length} controls — a ${counts.a} · b ${counts.b} · c ${counts.c} · d ${counts.d}; schema v${SCHEMA_VERSION}: ${SCHEMA.length} global rows (${SCHEMA.filter((r) => !r.since).length} v1 + ${SCHEMA.filter((r) => r.since === 3).length} outline, v3) + per-layer (${LAYER_SCHEMA.switch} ON under ${LAYER_SCHEMA.placements.join('/')}; owned offsets ${LAYER_SCHEMA.offsets.join(', ')}; delta offsets ${LAYER_SCHEMA.deltas.join(', ')} (v4); values ${LAYER_SCHEMA.values.join(', ')}); every control classified, every class an id`);
   process.exit(0);
 }
 console.log(`| control | kind | section | range / options | default | class | why |\n|---|---|---|---|---|---|---|`);

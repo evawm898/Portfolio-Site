@@ -33,6 +33,10 @@
                   offset (what the layer OWNS), every owned value equal; each
                   confidence in the enum, each photo declared — and no sidecar
                   `layers` where the subset writes none;
+                  (S5, schema v4) a DELTA offset (`LAYER_SCHEMA.deltas`) is recorded
+                  `kind: "delta"` with `global: { value, confidence }` — the composed
+                  global and the `controls` record's own confidence ("default" where
+                  the subset leaves it at its default); an owned one never says delta;
                S6 also restates `revisedFrom.layerChanges` from the two subsets'
                   layer entries (null where absent), never from the sidecar.
              Exits 1 on any finding.
@@ -58,6 +62,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { DEFAULTS } from '../bloom-registry.js';
+import { LAYER_SCHEMA } from './bloom-photo-census.mjs';
 import { readNewDesign, scopesForBuild } from '../bloom-file.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -130,6 +135,15 @@ function check() {
         sf[`${L.layer}:${grp}.${k}`] = grp === 'offsets' ? x.offset : x.value;
         if (grp === 'offsets' && !same(x.value, +(Number(g[k]) + x.offset).toFixed(9))) bad.push(`${tag} S7: layers[${L.layer}] ${k} records value ${x.value}, the global ${g[k]} + offset ${x.offset} is ${Number(g[k]) + x.offset}`);
         if (!CONF.has(x.confidence)) bad.push(`${tag} S7: layers[${L.layer}] ${k} confidence ${x.confidence}`);
+        /* schema v4 (S5): a DELTA offset (petalCup / petalSpineCurl) says so, and carries the GLOBAL it rides
+           on with that global's own confidence — the composed global, and the `controls` record's confidence
+           (or "default" where the subset leaves the global at its default) */
+        if (grp === 'offsets' && LAYER_SCHEMA.deltas.includes(k)) {
+          const gc = sc.controls && sc.controls[k] ? sc.controls[k].confidence : 'default';
+          if (x.kind !== 'delta') bad.push(`${tag} S7: layers[${L.layer}] ${k} is a delta offset and is not recorded as kind "delta"`);
+          if (!x.global || !same(x.global.value, g[k])) bad.push(`${tag} S7: layers[${L.layer}] ${k} records global ${JSON.stringify(x.global && x.global.value)}, the composed global is ${g[k]}`);
+          else if (x.global.confidence !== gc) bad.push(`${tag} S7: layers[${L.layer}] ${k} records the global's confidence ${x.global.confidence}, the sidecar's controls say ${gc}`);
+        } else if (grp === 'offsets' && x.kind === 'delta') bad.push(`${tag} S7: layers[${L.layer}] ${k} is recorded as a delta and is an OWNED quantity`);
         if (!(x.photos || []).length) bad.push(`${tag} S7: layers[${L.layer}] ${k} names no photo`);
         for (const p of x.photos || []) if (!photoIds.has(p)) bad.push(`${tag} S5: layers[${L.layer}] ${k} cites undeclared photo ${p}`);
       }
@@ -191,7 +205,7 @@ async function render(outDir, SHEET, PHOTOS, BARE) {
   const { browser, page } = await launchPage({ viewport: { width: 640, height: 640 }, deviceScaleFactor: 1 });
   const report = {};
   try {
-    for (const it of versions().filter((x) => !ONLY_V.length || ONLY_V.includes(x.v))) {
+    for (const it of versions().filter((x) => !ONLY_V.length || ONLY_V.includes(x.v) || ONLY_V.includes(`${x.flower}:${x.v}`))) {
       const tag = `${it.flower}-${it.v}`;
       const text = fs.readFileSync(it.design, 'utf8');
       const state = composed(JSON.parse(text));
@@ -260,7 +274,7 @@ async function sheet(browser, report, SHEET, PHOTOS) {
       const sc = JSON.parse(fs.readFileSync(path.join(SET, f, `${f}-${r.v}.bloom-photo.json`), 'utf8'));
       const val = (x) => (x && typeof x === 'object' ? 'curve' : x);
       const ch = sc.revisedFrom ? [...Object.entries(sc.revisedFrom.changes).map(([id, c]) => `${id} ${val(c.from)}→${val(c.to)}`), ...((sc.revisedFrom.layerChanges || []).map((c) => `L${c.layer} ${c.field.replace(/^offsets\./, '').replace(/^values\./, '')} ${typeof c.from === 'object' && c.from ? 'curve' : c.from}→${typeof c.to === 'object' && c.to ? 'curve' : c.to}`))].join(', ') : 'first pass';
-      const own = (sc.layers || []).map((L) => `L${L.layer}: ${['petalLength', 'petalTilt'].filter((k) => L.offsets && L.offsets[k]).map((k) => `${k === 'petalLength' ? 'len' : 'tilt'} ${L.offsets[k].value}`).join(' ')}${L.values && L.values.petalSpineCurve ? ' +spine' : ''}${L.values && L.values.petalOutlineCurve ? ' +outline' : ''}`).join(' · ');
+      const own = (sc.layers || []).map((L) => `L${L.layer}: ${['petalLength', 'petalTilt', 'petalCup', 'petalSpineCurl'].filter((k) => L.offsets && L.offsets[k]).map((k) => `${({ petalLength: 'len', petalTilt: 'tilt', petalCup: 'cup', petalSpineCurl: 'curl' })[k]} ${L.offsets[k].value}`).join(' ')}${L.values && L.values.petalSpineCurve ? ' +spine' : ''}${L.values && L.values.petalOutlineCurve ? ' +outline' : ''}`).join(' · ');
       for (const [v, file] of Object.entries(r.shots)) {
         html += `<div style="width:${W}px"><img src="${img(file)}" style="width:${W}px;height:${W}px"><div>${r.v} · ${v} · ${r.named} named · ${(r.exportTris || 0).toLocaleString('en-US')} tris (export)</div>${v === 'front' ? `<div style="color:#9ab;font-size:10px">${ch}</div>` : `<div style="color:#cb9;font-size:10px">${own || 'no per-layer values'}${r.proportions && r.proportions.bodyHW ? ` · inner-half h:w ${r.proportions.bodyHW}` : ''} · petals h:w ${r.proportions ? r.proportions.petalsHW : '?'}</div>`}</div>`;
       }

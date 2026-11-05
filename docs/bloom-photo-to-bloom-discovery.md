@@ -1443,7 +1443,7 @@ node tools/bloom-photo-s2.mjs <out> --versions v3,v4,v5 --sheet-bare docs/img/ph
 
 ## 12. v1 status — what the three stages together can and cannot replicate (Nov 5)
 
-Stages: globals (S2, PASSED), per-layer (S3, PASSED), outline (S4, §13 — its ruling is Eva's). This section
+Stages: globals (S2, PASSED), per-layer (S3, PASSED), outline (S4, §13, PASSED Nov 5); then per-layer cup and curl (S5, §14 — its ruling is Eva's). This section
 records what the route can now replicate, then ranks the remaining gaps. It does not propose sessions.
 
 **Replicates, on the three test flowers:**
@@ -1469,13 +1469,30 @@ records what the route can now replicate, then ranks the remaining gaps. It does
 - petal overlap / imbrication (petals interpenetrate);
 - tip features under ~1 mm (a daisy ray's notches, a lotus mucro's distinct point);
 - strap-like curling stamens;
-- **how much a whorl's petals cup or curl differently from the others.** Per-layer cup and curl are
-  delta-on-global sliders and have been **out of every stage so far.** This is the lotus body.
+- ~~**how much a whorl's petals cup or curl differently from the others.** Per-layer cup and curl are
+  delta-on-global sliders and have been **out of every stage so far.** This is the lotus body.~~
+  **[Nov 5, S5: schema v4 admits them as deltas, §14. The lotus body goes 1.052 → 1.161 (v9).]**
 - a whorl's ring is chosen only through its petal width
   ([#495](https://github.com/evawm898/Portfolio-Site/issues/495), ruled (c));
 - scale (35 mm by default) and the stem and leaves (design choices).
 
-**The remaining gaps, ranked by how much they would improve the sheet:**
+**The remaining gaps, ranked by how much they would improve the sheet — REVISED after S5 (Nov 5):**
+
+1. **The ring / width coupling** (#495) — up from 6th. With S5's cup and curl in place, the lotus body's
+   remaining gap is the RING: owning narrower L2/L3 widths pulls the rings in and reads 1.374 (−8 / −11 mm) or
+   1.659 (−12 / −15) against v9's 1.161 — but the ring only moves with the petal's width, and the photo's body
+   petals are broad. Cup and curl alone reach ≈ 1.27 at most (§14.4). It is now the largest visible miss.
+2. **A petal count per whorl.** (unchanged — the water lily's 4 long outer and ~10 short inner petals)
+3. **Disc florets.** (unchanged)
+4. **The sepals' cup** (unchanged — `sepalCup`, off the schema).
+5. **Petal irregularity.** (unchanged)
+6. **Imbrication, tip features under the floor, strap stamens.** (unchanged)
+7. **Colour.** (unchanged)
+
+S5's result for the old #1: **per-layer cup and curl** took the lotus body from 1.052 to 1.161 (v9; v8 1.209)
+against ≈ 1.45. Curl does the work and cup moves the silhouette by ≤ 0.01. Its ruling is Eva's (§14.7).
+
+**The ranking as it stood before S5 (Nov 5)**, kept so the revision can be read against it:
 
 1. **Per-layer cup and curl.** The lotus body is still squat: inner-half h:w **1.05** against the
    photo's **≈ 1.45**. It is the largest visible miss on the sheet, and no stage can reach it.
@@ -1498,6 +1515,7 @@ records what the route can now replicate, then ranks the remaining gaps. It does
   narrow CURVE outline can silently keep the OLD petal width: 0 notes, and the status line says clean.
   The validator's read-back (V2) is the only thing that sees it. It is a page defect, and not fixed here
   (no page change was in scope).
+  Filed as [#499](https://github.com/evawm898/Portfolio-Site/issues/499) (ruled, §13.6).
 
 ---
 
@@ -1647,7 +1665,22 @@ outline curves on.
 | colour, everywhere | can't build |
 | the lotus's green outer whorl drawn as petals | ruled (b): it stays in the petal controls |
 
-### 13.6 For Eva's ruling
+### 13.6 Rulings — RULED (Eva, Nov 5)
+
+**The outline stage PASSED (Nov 5) on the S4 sheet. The v1 staged scope (globals → per-layer → outline)
+is complete.**
+
+- **The sepal outline in schema v3: CONFIRMED** as the intended reading.
+- **The width-refusal hazard is filed** as a page defect:
+  [evawm898/Portfolio-Site#499](https://github.com/evawm898/Portfolio-Site/issues/499) — load as new onto a
+  page drawing a narrow outline curve silently keeps the old `petalWidth` (22 instead of the file's 8), with
+  0 notes and a clean status line; only the validator's read-back sees it. It sits beside
+  [#495](https://github.com/evawm898/Portfolio-Site/issues/495) (the ring placed only through the width).
+- **The next gap is #1 on §12's ranking: per-layer cup and curl** (S5, §14).
+
+The questions as they were asked are kept below, so each ruling can be read against what it answered.
+
+#### The questions as asked (Nov 5)
 
 1. **Does the outline stage pass** on the S4 sheet?
 2. **The sepal outline in schema v3** was included because sepal count, size and angle are on the schema.
@@ -1667,3 +1700,207 @@ node tools/verify-bloom-photo-subset.mjs --negative-control --base /tmp/base.jso
 node tools/verify-bloom-photo-subset.mjs docs/photo-to-bloom/eva-set/*/*.subset.bloom-design.json
 node tools/bloom-photo-s2.mjs <out> --versions v5,v6,v7 --sheet-bare docs/img/photo-to-bloom-s4.png
 ```
+
+---
+
+## 14. S5 — per-layer cup and curl on the S2 photos (Nov 5)
+
+The next gap after the v1 staged scope (§13.6): #1 on §12's ranking. Same six photos (§11.1): the
+working copies in the session's scratchpad, re-read for EXIF / GPS / XMP / IPTC / profiles (all empty), none
+committed. **No bloom page code changed** (`bloom*.js`, `bloom.html`, `bloom.css` are `main`'s).
+
+| file | what |
+|---|---|
+| `docs/photo-to-bloom/eva-set/lotus/lotus-v{8,9}.*` | v8: per-layer cup and curl read from the photos; v9: the one render-feedback iteration |
+| `tools/bloom-photo-census.mjs` | schema v4: `LAYER_SCHEMA.deltas` |
+| `tools/verify-bloom-photo-subset.mjs` | delta W2, W3 (inert), the TOLD record; five fixtures (26 in all) |
+| `tools/bloom-photo-s2.mjs` | S7's delta record; `--versions` takes `flower:v`; captions show cup / curl |
+| `docs/img/photo-to-bloom-s5.png` | the sheet (placeholders for the photos) |
+
+### 14.1 Schema v4 — per-layer cup and spine curl, as DELTAS
+
+- `LAYER_SCHEMA.deltas = ['petalCup', 'petalSpineCurl']`, beside the owned `offsets` (length, width, tilt).
+- **They are DELTA-on-global, not owned values**, and the schema says so in its rows: a layer entry naming
+  one does not own the quantity (Q3.5 keys only on `SCOPE_LAYER_OWNED`). The layer's petals read the GLOBAL
+  plus the offset, through the resolver's one clamp to the registry range.
+- Checked at module load: each delta row is in the design file's `SCOPEABLE_IDS` and is NOT owned.
+- Every other delta slider (the other 28 of `SCOPEABLE_IDS`'s offsets) stays off the schema: W1.
+- **The sidecar records both halves, each with its own confidence.** Each delta offset carries `kind: "delta"`
+  and `global: { value, confidence }`. `bloom-photo-s2.mjs --check` (S7) holds them: the global is the
+  composed one, its confidence is the `controls` record's (or `"default"` where the subset leaves it at its
+  default), and an owned offset never says delta. Must-fail on a scratch copy, four plants (a wrong global, a
+  wrong global confidence, a delta not marked, an owned one marked delta): exactly four S7 findings.
+
+### 14.2 The validator
+
+- **W2 (extended):** a delta whose global + offset leaves the registry range. The build clamps it silently, as
+  it does an owned sum.
+- **W3 (new, a warning made without a ruling):** a schema value the BUILD makes inert — a spine-curl delta on a
+  layer whose petals are drawn on a CURVE spine (the layer's own curl mode, else the whole bloom's). Curl mode
+  CURVE reads no slider curl. §14.7 asks whether it should fail.
+- **TOLD (not a clause, not a warning):** what the page's read-out says it clamped — `CUP CLAMPED` (the
+  section's fold clamp) and `FOLD LIMIT` (the spine's). Printed under the file, pinned by the fixtures, never
+  decides the exit code.
+
+**Five fixtures**, `--self` 26 of 26 plus the exit-code leg, each loaded onto the DIRTY page:
+
+| fixture | what | fires | warns | told |
+|---|---|---|---|---|
+| `SCOPED_CUPCURL` | an intended per-layer cup/curl pair (effective cups 0.1 / 0.4) | — | — | — |
+| `SCOPED_CUPCURL_OFF` | the same entries, Per-layer values OFF | **V7** | — | — |
+| `SCOPED_CUP_CLAMPED` | a layer cup delta to 0.9, past the fold clamp | — | — | CUP CLAMPED |
+| `SCOPED_DELTA_RANGE` | a layer cup delta to 1.3, past the registry | — | W2 | CUP CLAMPED |
+| `SCOPED_CURL_INERT` | a curl delta on a layer that owns a CURVE spine | — | W3 | — |
+
+- **"Written with Per-layer values off fails as hidden": it fails, as V7, not as a hidden control.** No control is
+  hidden (the file does not name `scopeLayers`, and cup and curl are visible). The layer ENTRIES are inert: the
+  reader keeps them with zero notes and the build reaches no petal with them. V7 is the scope form of rule 3,
+  which is the "hidden" rule's own reason.
+- **The fold clamp surfaces as a PAGE READ-OUT ONLY.** `SCOPED_CUP_CLAMPED` loads with **0 reader notes, a clean
+  status line, and V0–V7 all pass**. The page says `CUP CLAMPED at u 0.99…, asked radius … mm, drawn 0.750 mm …
+  N rows on M of K parts`. No reader note exists for it: the reader does not build, and the clamp is the
+  builder's. How the validator should treat it is §14.7's question.
+- `SCOPED_DELTA` (the off-schema delta, W1) now writes `petalTwist`: schema v4 put its old `petalCup` ON the schema.
+- **The negative control:** all six page mutants and both validator mutants behave. Four page mutants' lists were
+  widened to their measured sets on the new fixtures, by the S3 mechanisms again (the dirty page's leftovers;
+  `SCOPED_CUPCURL_OFF` is `SCOPED_INERT`'s shape). Each mutant was run one at a time against a saved base.
+- **Measured: the fold clamp binds at the NIB on any cup from about 0.5 up, on its own.** On the default petal:
+  none at cup 0.3, 7 rows at u 0.9986 at 0.6, 8 at 1.0, 9 at 1.2 (tip shape 1.0: from u 0.971). **S4's v6 lotus,
+  which PASSED, already reads CUP CLAMPED** at global cup 1.0 on all four whorls (u 0.9986, 7 rows each), before any
+  per-layer value. The apex nib draws the half-width to 0.05 mm, and the section's radius follows it down.
+
+### 14.3 The lotus — v8 from the photos, v9 one render iteration
+
+**Daisy and water lily stay at S4 v7.** Their photos show no per-layer cup or curl difference worth reading. The
+daisy's two ray tiers are the same shallow, uncurled strap. The water lily's outer petals are straight and its
+inner ones upright and straight; any cup difference is slight and was not read. No values were added to fill the
+stage.
+
+**Read from the photos (v8):**
+
+| layer | whorl | cup (global 1.0, medium) | curl (global 60, medium) |
+|---|---|---|---|
+| L0, L1 | the splayed outer boats | unchanged | inert: they own CURVE spines (§11.4) |
+| L2 | the broad shells wrapping the body | **+0.2 → 1.2**, medium: each wraps round its neighbour | **+40 → 100**, low: the side photo's front shell rises steep and its tip turns in over the top |
+| L3 | the innermost, at the top | **+0.2 → 1.2**, medium: hooded | **−15 → 45**, low: erect, only the tips lean together |
+
+**v9 (the render):** in v8 the shells (L2, curl 100) sank below the innermost petals and left L3 standing as a
+bare column, where the photo's shells make the bulk of the egg-shaped body. And L3 at cup 1.2 folded the sheet at
+its root (§14.5). v9 takes L2's curl to **+20 (80)** and L3's cup to **+0.1 (1.1)**.
+
+**Recorded honestly:** before v8 was written, a Node sweep of cup and curl offsets on v6 (no render) was run to
+learn which way each lever moves the body. v8's values are the photo's reading; the sweep is the reason this
+section can say what cup and curl can and cannot reach (§14.4).
+
+**The validator reads all three lotus versions PASS, 0 notes, 0 warnings**, each told `CUP CLAMPED` (the nib, as
+v6). Sidecars: 22 versions PASS. Every version loads as new with 0 notes. Triangles unmoved at 61,432 (no lattice
+changes).
+
+### 14.4 The closed body's proportions
+
+Measured as in §11.6 (the export mesh, the inner half of the layers = L2–L3, by each petal's own emitted range).
+
+| | closed body h : w | body (mm) | whole flower h : w |
+|---|---|---|---|
+| **photo** | **≈ 1.45** | — | 1.16 |
+| S4 v6 | 1.052 | 43.2 × 41.0 | 0.634 |
+| S5 v8 | **1.209** | 44.6 × 36.9 | 0.655 |
+| S5 v9 | **1.161** | 44.6 × 38.4 | 0.655 |
+
+- **v9 is the closest-looking (the shells stand round the body) and v8 the closest by the number.** The number
+  rewards L2 sinking out of the silhouette, which is the look v9 corrects.
+- **What cup and curl can reach, measured** (the Node sweep on v6's owned lengths, tilts and widths): the best
+  body is **≈ 1.27** (L2 curl +90, L3 −15), with L2 sunk as in v8. Curl moves the body: L2's curl narrows it, and
+  L3's less-curl makes it taller. **Cup moves it by ≤ 0.01 anywhere in its range** (−0.6..+0.2 on L2/L3): the cup
+  shapes each shell's section, not the silhouette.
+- **The rest of the gap is the RING, and it is #495.** With v9's cup and curl unchanged, owning narrower widths on
+  L2/L3 (−8 / −11 mm) pulls the rings in and reads **1.374**; −12 / −15 reads **1.659**. But the ring only moves
+  with the petal's width (#495), and the photo's body petals are BROAD. A steeper L2 tilt (+25, 85°) reads 1.301
+  and folds L2 at 20 pairs. These are measurements, not versions: the stage is cup and curl.
+- **The whole flower stays squat (0.655 vs 1.16)**: the outer whorls splay wider than the photo's (§13.5's
+  estimate on L1). Cup and curl did not touch them: the outer whorls own CURVE spines.
+
+### 14.5 Contacts and clamps the new values trigger
+
+| | census (within-shell pairs) | self-approach, every petal (`measureWall`, the combination gate's own) | CUP CLAMPED | FOLD LIMIT |
+|---|---|---|---|---|
+| S4 v6 | **0** | L0 0.932 · L1 0.963 · L2 0.987 · L3 1.026 mm (all at u 0.96–0.98, v −0.33) | all four whorls, u 0.9986, 7 rows | none |
+| S5 v8 | **20 pairs, all L3 on itself**, worst span 0.0089 mm, at the ROOT (z 0.78 mm, r 13.7 mm on L3's 13.0 mm ring) | L2 **0.959** · L3 **0.999** (under the 1.0 mm bar) | all four, u 0.9993 (L2/L3 asked 0.333 mm) | none |
+| S5 v9 | **0** | L2 0.958 · L3 1.011 | as v8 | none |
+
+- **v8's fold is the declared `petalCup max (1.2)` class**, reached through a per-layer delta. Attributed by
+  single-lever builds: L3 cup +0.2 alone reads the same 20 pairs, while L3's curl alone, L2's cup alone, and L3 at
+  cup 1.1 or 1.15 read 0. The matrix declares the same fold on the default petal (`petalCup max (1.2)`).
+- **The self-approach under 1 mm is the cup × narrow-tip class (§18a of the session-32 record), and it is
+  PRE-EXISTING**: v6 already reads 0.932 / 0.963 / 0.987 on L0–L2 near the tip. The cup deltas move L2 0.987 →
+  0.958 and L3 1.026 → 0.999 (v8) → 1.011 (v9). These are approaches, not folds (the census reads 0 on v6 and
+  v9).
+- **No spine FOLD LIMIT binds** on any version (L2 at cup 1.2 × curl 100 included).
+- **Nothing in route A sees the census or the self-approach.** The validator judges load fidelity, not
+  printability; these numbers were measured by hand (§14.8). §14.7 asks whether it should.
+
+### 14.6 Miss log
+
+| row | now | |
+|---|---|---|
+| **lotus body squat** (S4 v6 1.052 vs ≈ 1.45) | **partly fixed** — v9 1.161 (v8 1.209) | The shells wrap and the innermost petals stand. Cup and curl reach ≈ 1.27 at most; the rest is the ring (#495). |
+| lotus inner petals cup and curl in less than the photo's | **fixed in kind** | L2 curls in over the top; L3 stands erect with its tips together |
+| water lily sepals' boat cup | not touched | `sepalCup` is off the schema (a sepal delta, not per layer) |
+| lotus outer whorls splay too wide (1.66× vs 1.36× the body) | not touched | an owned-tilt / length estimate on L1; whole flower h:w 0.655 |
+
+**New misses S5 introduced:**
+
+- v8: L2 sank out of the body (curl 100) — an estimate, fixed in v9.
+- v8: L3 at cup 1.2 folds at its root (20 pairs) — the declared cup-max class, fixed in v9 (cup 1.1).
+
+**Everything remaining, tagged** (§13.5's table, updated):
+
+| miss | tag |
+|---|---|
+| **lotus body still squat** (v9 1.161 vs 1.45) | **#495** — the ring moves only with the petal's width, and the photo's body petals are broad |
+| lotus outer whorls splay too wide | my estimate (L1's tilt and length) |
+| water lily sepals' boat cup | delta slider family (`sepalCup`; off the schema) |
+| daisy rays slightly irregular | my estimate (variance left at 0) |
+| water lily 4 long + ~10 short petals | can't build (`petalCount` is whole-whorl) |
+| lotus petal count inside the bud | can't build (the photo cannot show it) |
+| daisy ray-tip notches; a distinct lotus mucro | can't build (under the 1 mm feature at this scale) |
+| disc florets | can't build (ruling 5) |
+| petals passing through each other in a closed bud | can't build (the accepted look) |
+| strap-like curling stamens | can't build |
+| colour, everywhere | can't build |
+| the lotus's green outer whorl drawn as petals | ruled (b): it stays in the petal controls |
+
+### 14.7 For Eva's ruling
+
+1. **Does per-layer cup and curl pass** on the S5 sheet? (Not decided here.)
+2. **CUP CLAMPED in the validator.** It surfaces only as a page read-out: 0 reader notes, a clean status, V0–V7 pass.
+   It is built as TOLD, which is printed and pinned and never decides the exit. It also fires at the nib on any
+   cup from about 0.5 up, including the PASSED S4 v6. The options:
+   - (i) keep it as told only;
+   - (ii) a warning;
+   - (iii) a warning only where the clamp binds AWAY from the nib, where it changes the form rather than the last
+     half millimetre of the tip;
+   - (iv) a failure — which would fail S4 v6 and most cupped flowers.
+3. **W3 (an inert curl delta)** is built as a warning. By rule 3's reasoning (an inert value is an error, as V7
+   holds for an inert entry), should it fail?
+4. **A printability check in route A?** v8's fold (20 pairs) and the self-approach under 1 mm were found by hand.
+   The validator checks load fidelity only. Should it gain the census (X2's within-shell count) on the composed
+   state, as a clause or a warning? It is a Node build of a few seconds per file.
+
+### 14.8 Reproduce
+
+```
+export CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium
+node tools/bloom-photo-census.mjs
+node tools/bloom-photo-s2.mjs --check
+node tools/verify-bloom-photo-subset.mjs --self --save /tmp/base.json
+node tools/verify-bloom-photo-subset.mjs --negative-control --base /tmp/base.json --mutant=<id>
+node tools/verify-bloom-photo-subset.mjs docs/photo-to-bloom/eva-set/*/*.subset.bloom-design.json
+node tools/bloom-photo-s2.mjs <out> --versions lotus:v6,lotus:v8,lotus:v9,daisy:v7,waterlily:v7 --sheet-bare docs/img/photo-to-bloom-s5.png
+```
+
+The proportions, the census and the self-approach were measured with Node scripts against the shipped modules
+(`buildBloomInto` with the file's scopes; `census` from `tools/bloom-self-intersection.mjs`; `measureWall` from
+`tools/bloom-wall-thickness.mjs`). The scripts are session-only and not committed.
+
+![S5 sheet](img/photo-to-bloom-s5.png)

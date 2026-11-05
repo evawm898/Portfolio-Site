@@ -1,0 +1,633 @@
+{
+  "format": "bloom-photo",
+  "version": 1,
+  "design": "lotus-v8.subset.bloom-design.json",
+  "designSha256": "14f4ca5a130f194899aeb60578761da8f0ab73b2fb6078552642f6a40a58c7d5",
+  "photos": [
+    {
+      "id": "p1",
+      "role": "three-quarter",
+      "name": "lotus/front"
+    },
+    {
+      "id": "p2",
+      "role": "side",
+      "name": "lotus/side"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-profile",
+      "asked": "LOTUS: seen from the side, is it a closed globe (bud, petals converging at the top), a deep cup open at the top, a shallow bowl, or flat open?",
+      "answer": "Closed globe / bud",
+      "resolves": [
+        "petalTilt",
+        "petalSpineCurl",
+        "layerTilt"
+      ],
+      "outcome": {
+        "petalTilt": "overridden by p2: 35 -> 45",
+        "petalSpineCurl": "overridden by p2: 30 -> 60",
+        "layerTilt": "overridden by p2: 18 -> 15"
+      }
+    }
+  ],
+  "controls": {
+    "petalCount": {
+      "value": 5,
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "layerCount": {
+      "value": 4,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalWidth": {
+      "value": 28,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "petalTilt": {
+      "value": 45,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "petalSpineCurl": {
+      "value": 60,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "petalCup": {
+      "value": 1,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "scopeLayers": {
+      "value": "ON",
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ],
+      "note": "the per-layer stage's switch: on because the subset writes overrides.layers"
+    },
+    "petalOutlineMode": {
+      "value": "CURVE",
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ],
+      "note": "the mucro is the S2 outline-stage miss"
+    },
+    "petalOutlineCurve": {
+      "value": {
+        "mode": "symmetric",
+        "points": [
+          [
+            0,
+            0.06
+          ],
+          [
+            0.2,
+            0.15
+          ],
+          [
+            0.45,
+            0.205
+          ],
+          [
+            0.65,
+            0.215
+          ],
+          [
+            0.82,
+            0.185
+          ],
+          [
+            0.92,
+            0.12
+          ],
+          [
+            0.975,
+            0.045
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ],
+      "note": "front photo: widest past the middle, rounded shoulders, a small point at the tip (y in units of length x 16 / the layer's own width)"
+    }
+  },
+  "unmapped": [
+    {
+      "feature": "colour, colour pattern, veining, blotches",
+      "nearest": "nothing (deep pink inner, pale pink-green outer, fine veins)",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "the outermost whorl is sepal-like (green, Nelumbo's outer tepals)",
+      "nearest": "drawn as petals (layer 0 owns a short splayed length/tilt); the sepal controls were not tried — procedure rule proposed for ruling, §11",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "petal overlap / imbrication",
+      "nearest": "drawn interpenetrating (a closed bud is all overlap)",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "a small point (mucro) at each rounded petal tip",
+      "nearest": "nothing — a rounded tip (the outline stage's)",
+      "photos": [
+        "p1"
+      ]
+    },
+    {
+      "feature": "petal count of the closed inner whorls",
+      "nearest": "5 per whorl assumed (hidden in the bud)",
+      "photos": [
+        "p1"
+      ]
+    }
+  ],
+  "revisedFrom": {
+    "design": "lotus-v6.subset.bloom-design.json",
+    "why": "S5, per-layer cup and curl read from the photos: the body's outer wrapping petals (L2) are broad shells that wrap the bud and whose tips turn in over the top (more curl, more cup); the innermost petals (L3) stand erect and only meet at the top (less curl, more cup). The outer splayed whorls (L0, L1) are drawn on CURVE spines (curl inert) and keep the global cup.",
+    "changes": {},
+    "layerChanges": [
+      {
+        "layer": 2,
+        "field": "offsets.petalCup",
+        "from": null,
+        "to": 0.2
+      },
+      {
+        "layer": 2,
+        "field": "offsets.petalSpineCurl",
+        "from": null,
+        "to": 40
+      },
+      {
+        "layer": 3,
+        "field": "offsets.petalCup",
+        "from": null,
+        "to": 0.2
+      },
+      {
+        "layer": 3,
+        "field": "offsets.petalSpineCurl",
+        "from": null,
+        "to": -15
+      }
+    ]
+  },
+  "layers": [
+    {
+      "layer": 0,
+      "whorl": "outermost — short, greenish, splayed boats (Nelumbo's outer tepals)",
+      "offsets": {
+        "petalLength": {
+          "offset": -15,
+          "value": 20,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "about half the bud body's height (side photo); 20 mm is the slider floor"
+        },
+        "petalTilt": {
+          "offset": -15,
+          "value": 30,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "base-to-tip chord ~30-38 deg above the horizontal (side photo)"
+        },
+        "petalWidth": {
+          "offset": 0,
+          "value": 28,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "as broad as the body petals (side photo); owned so its ring stays R0"
+        }
+      },
+      "values": {
+        "petalCurlMode": {
+          "value": "CURVE",
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "the outer whorl does not incurve like the bud"
+        },
+        "petalSpineCurve": {
+          "value": {
+            "mode": "single",
+            "points": [
+              [
+                0,
+                0
+              ],
+              [
+                0.5,
+                0.03
+              ],
+              [
+                0.95,
+                0.12
+              ]
+            ]
+          },
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "a nearly straight blade, lip turning up slightly at the tip"
+        },
+        "petalOutlineMode": {
+          "value": "CURVE",
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "its own outline (the Oct 11 ruling: a layer owns its curve)"
+        },
+        "petalOutlineCurve": {
+          "value": {
+            "mode": "symmetric",
+            "points": [
+              [
+                0,
+                0.07
+              ],
+              [
+                0.25,
+                0.18
+              ],
+              [
+                0.55,
+                0.215
+              ],
+              [
+                0.8,
+                0.19
+              ],
+              [
+                0.93,
+                0.12
+              ],
+              [
+                1,
+                0
+              ]
+            ]
+          },
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "the outer tepals are blunt boats with no point (side photo)"
+        }
+      }
+    },
+    {
+      "layer": 1,
+      "whorl": "second — pink petals leaning out from the lower half of the bud",
+      "offsets": {
+        "petalLength": {
+          "offset": -9,
+          "value": 26,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "about three quarters of the body's height; base hidden"
+        },
+        "petalTilt": {
+          "offset": 10,
+          "value": 55,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "~55-60 deg, tips leaning away from the bud (side photo)"
+        },
+        "petalWidth": {
+          "offset": -2,
+          "value": 26,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "slightly narrower; owned to place the ring (the hidden layerSize cannot)"
+        }
+      },
+      "values": {
+        "petalCurlMode": {
+          "value": "CURVE",
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "straight, not wrapping the bud"
+        },
+        "petalSpineCurve": {
+          "value": {
+            "mode": "single",
+            "points": [
+              [
+                0,
+                0
+              ],
+              [
+                0.5,
+                0.02
+              ],
+              [
+                0.95,
+                0.03
+              ]
+            ]
+          },
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "a straight blade"
+        },
+        "petalOutlineMode": {
+          "value": "CURVE",
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "its own outline (the Oct 11 ruling: a layer owns its curve)"
+        },
+        "petalOutlineCurve": {
+          "value": {
+            "mode": "symmetric",
+            "points": [
+              [
+                0,
+                0.07
+              ],
+              [
+                0.25,
+                0.18
+              ],
+              [
+                0.55,
+                0.215
+              ],
+              [
+                0.8,
+                0.19
+              ],
+              [
+                0.93,
+                0.12
+              ],
+              [
+                1,
+                0
+              ]
+            ]
+          },
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "the outer tepals are blunt boats with no point (side photo)"
+        }
+      }
+    },
+    {
+      "layer": 2,
+      "whorl": "third — the large veined petals that wrap the bud body",
+      "offsets": {
+        "petalLength": {
+          "offset": 5,
+          "value": 40,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1",
+            "p2"
+          ],
+          "reading": "v4 at 35 closed below the photo's height (render feedback)"
+        },
+        "petalTilt": {
+          "offset": 15,
+          "value": 60,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "the wrapping petals lean in from ~60 deg and the incurve closes them (v4's 75 + incurve closed a spike)"
+        },
+        "petalWidth": {
+          "offset": -4,
+          "value": 24,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1",
+            "p2"
+          ],
+          "reading": "owned to place the ring; the inner petals read narrower in the photo"
+        },
+        "petalCup": {
+          "offset": 0.2,
+          "value": 1.2,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1",
+            "p2"
+          ],
+          "reading": "the broad body shells wrap the bud more than the global 1.0 — front photo: each curls round its neighbour; 1.2 is the slider's max",
+          "kind": "delta",
+          "global": {
+            "value": 1,
+            "confidence": "medium",
+            "note": "the layer reads the GLOBAL plus this offset (a delta, not owned); the global keeps its own confidence in `controls`"
+          }
+        },
+        "petalSpineCurl": {
+          "offset": 40,
+          "value": 100,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "side photo: the front body petal rises steep and its tip turns in over the top, ~100 deg of turn against the global 60",
+          "kind": "delta",
+          "global": {
+            "value": 60,
+            "confidence": "medium",
+            "note": "the layer reads the GLOBAL plus this offset (a delta, not owned); the global keeps its own confidence in `controls`"
+          }
+        }
+      }
+    },
+    {
+      "layer": 3,
+      "whorl": "innermost — darker pink, tallest, the closed tip of the bud",
+      "offsets": {
+        "petalLength": {
+          "offset": 10,
+          "value": 45,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1",
+            "p2"
+          ],
+          "reading": "the tallest whorl, reaching the bud's top (render feedback)"
+        },
+        "petalTilt": {
+          "offset": 25,
+          "value": 70,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "upright, closing at the top with the incurve"
+        },
+        "petalWidth": {
+          "offset": -7,
+          "value": 21,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "the darker inner petals are the narrowest (front photo); owned to place the ring"
+        },
+        "petalCup": {
+          "offset": 0.2,
+          "value": 1.2,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "front photo: the innermost petals are hooded, wrapping the centre",
+          "kind": "delta",
+          "global": {
+            "value": 1,
+            "confidence": "medium",
+            "note": "the layer reads the GLOBAL plus this offset (a delta, not owned); the global keeps its own confidence in `controls`"
+          }
+        },
+        "petalSpineCurl": {
+          "offset": -15,
+          "value": 45,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "side photo: the innermost petals stand erect and only their tips lean together, ~45 deg of turn",
+          "kind": "delta",
+          "global": {
+            "value": 60,
+            "confidence": "medium",
+            "note": "the layer reads the GLOBAL plus this offset (a delta, not owned); the global keeps its own confidence in `controls`"
+          }
+        }
+      }
+    }
+  ]
+}
