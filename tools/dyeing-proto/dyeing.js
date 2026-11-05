@@ -219,7 +219,7 @@ const packageScene = (() => {
         dyn += arrowHead(x + 1.5 * Math.cos(ang), y + 1.5 * Math.sin(ang), ang, 6, DYE.colour, o).replace('stroke-width="1.3"', 'stroke-width="2"');
         }
       }
-      dyn += text(160, 214, t < 0.53 ? 'pumped through: inside → out' : 'then outside → in', { anchor: 'middle' });
+      dyn += text(160, 214, t < 0.53 ? 'pumped through: inside → out' : t < 0.92 ? 'then outside → in' : 'every layer dyed, wound tight', { anchor: 'middle' });
       return { vars, dyn };
     },
   };
@@ -256,7 +256,7 @@ const beamScene = (() => {
 
 // ---------- A3 · how far the dye gets: a yarn's cross-section ----------
 function penScene(kind) {
-  const C = { x: 160, y: 84 }, sy = kind === 'piece' ? 0.66 : 1, R = 58;
+  const C = { x: 160, y: 84 }, sy = kind === 'piece' ? 0.66 : 1, R = 55;
   const pts = discPoints(SEED + (kind === 'piece' ? 12 : 11), C.x, C.y, R, 13.2, sy, 0.25);
   const band = p => Math.min(5, Math.floor((1 - p.r) * 6));     // 0 = surface ... 5 = core
   const reach = kind === 'piece' ? [1, 0.9, 0.55, 0.28, 0.16, 0.12] : [1, 1, 1, 1, 1, 1];
@@ -453,7 +453,7 @@ const reactiveScene = (() => {
     viewBox: '0 0 320 220', duration: 6000,
     build() {
       let s = surface() + chainsMarkup(1);
-      for (const p of S) s += `<path d="M${p.x},${f1(p.y + 8)}V${f1(p.y + 3)}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.8"/>` + text(p.x, p.y + 1, 'OH', { fill: INK, size: 7, anchor: 'middle', op: 0.85 });
+      for (const p of S) s += `<path d="M${p.x},${f1(p.y + 8)}V${f1(p.y + 3)}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="0.8"/>`;
       return s;
     },
     frame(t) {
@@ -463,7 +463,8 @@ const reactiveScene = (() => {
         const u = seg(t, 0.04 + p.d * 0.16, 0.3 + p.d * 0.12);
         const at = { x: p.x, y: p.y - 10 };
         const q = u >= 1 ? at : arcPath({ x: p.dx, y: p.dy }, at, (p.d - 0.5) * 0.5, u);
-        if (bond > 0) dyn += `<path d="M${p.x},${f1(p.y - 3)}V${f1(p.y - 7.5)}" stroke="${DYE.reactive}" stroke-width="${f1(1 + 1.4 * bond)}"${op(bond)}/>`;
+        if (bond < 1) dyn += text(p.x, p.y + 1, 'OH', { fill: INK, size: 7, anchor: 'middle', op: f1(0.85 * (1 - bond) * 100) / 100 });
+        if (bond > 0) dyn += `<path d="M${p.x},${f1(p.y + 3)}V${f1(p.y - 7.5)}" stroke="${DYE.reactive}" stroke-width="${f1(1 + 1.4 * bond)}"${op(bond)}/>`;
         dyn += glyph('reactive', q.x, q.y, DYE.reactive, 1.3);
       }
       for (const h of H) {
@@ -472,7 +473,7 @@ const reactiveScene = (() => {
         dyn += glyph('reactive', h.x, y, DYE.reactive, 1.3).replace('/>', `${op(1 - 0.45 * hyd)}/>`);
         if (hyd > 0) dyn += `<circle cx="${h.x + 5}" cy="${f1(y + 3)}" r="1.9" fill="none" stroke="${DYE.reactive}" stroke-width="1"${op(hyd * (1 - 0.45 * hyd))}/>`;
       }
-      const label = t < 0.38 ? 'dye settles onto the cotton ...' : t < 0.66 ? 'add alkali: it bonds to the fiber (covalent)' : 'wash off the dye that reacted with water';
+      const label = t < 0.38 ? 'dye settles onto the cotton ...' : t < 0.66 ? 'add alkali: it bonds to the fiber (covalent)' : t < 0.95 ? 'wash off the dye that reacted with water' : 'what stays is bonded to the cotton';
       dyn += text(CH.x0, 14, label, { fill: INK, size: 10 });
       return { vars: {}, dyn };
     },

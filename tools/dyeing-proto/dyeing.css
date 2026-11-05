@@ -47,7 +47,7 @@
 .tx-dye__btn:focus-visible { outline: 2px solid var(--petrol-bright); outline-offset: 2px; }
 .tx-dye__labels { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 0.55rem; text-align: center; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
 .tx-dye__labels .is-entry { color: var(--dye-colour); }
-.tx-dye__labels .is-entry::before { content: "\2193\00a0dye here\00a0\00b7\00a0"; }
+.tx-dye__labels .is-entry::before { content: "\2193\00a0 dye here\00a0\00b7\00a0"; }
 .tx-dye__below { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.5rem 3rem; margin-top: 1.6rem; align-items: start; }
 .tx-dye__meters { display: grid; gap: 0.9rem; }
 .tx-dye__meter { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.9rem; align-items: center; }
