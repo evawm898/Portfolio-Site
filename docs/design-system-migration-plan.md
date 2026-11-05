@@ -339,3 +339,19 @@ A rule that can be empty only draws its glyph `:not(:empty)`.
 - the SVG-preview paper `#EDEDE8` on cage and bug. In that mode their header sits on paper in ink with a `#55554F` sub-line. That is the one place a dark-on-light text colour remains, and it is the artwork's own surface.
 
 **Gates.** No gate asserted a chrome colour. All five workflows run on this PR.
+
+## 12. Batch 6 as built
+
+**/cards and /textile-gauge-reader are the two light pages, built one way** (R2 for /cards; for /textile-gauge-reader Eva replaced R3's dark reading on Nov 5: "have the textile-gauge-reader light the same way cards is").
+- Type and the deep petrol (`--petrol`, fills and rules) come from tokens.
+- The paper neutrals are /cards' own: ground `#faf8f4`, panels `#ffffff`, lines `#ddd8ce` / `#c2bcae`, ink `#17191a`, dim `#5c6363`, faint `#8b9494`.
+- Links and eyebrows use `#177a7a`. The system petrol `#2fa3a3` is 2.9:1 on this paper, too faint for text; `#177a7a` is its paper-legible step (4.8:1).
+- Solid buttons are the deep fill with paper text.
+
+**Warnings and errors** are ink with `!` or `✕` (R1), as on the dark pages. The error box keeps a faint plum tint and border. On /textile-gauge-reader, confidence words, comparison deltas, inclusion tags and debug notes that were green, rust or red are now ink or dim; the uncertain and bad ones carry `!`.
+
+**Marks on paper.** Mint is too pale to mark anything on paper, so the "ok" marks on /textile-gauge-reader (the online dot, the included-area tag border) are the deep petrol, and the "bad" marks are plum in a different shape (a ring, a dashed border). Colour is never the only cue.
+
+**Kept as artwork:** the card faces and their font list on /cards; on /textile-gauge-reader the overlays drawn on the fabric photo (and the course-line key swatch that matches them) and the zoom / grid-box controls that float on the black photo area, which stay dark glass in the system's dark tokens. The calibration and grid-box popups are paper panels.
+
+**Gates.** /cards: `verify-cards-fonts` and `verify-cards-svg-glyphs` run by hand (no workflow covers cards). /textile-gauge-reader's workflow fires only on `textile-gauge-reader/**`, so no CI runs on this PR's CSS; no gate asserts a chrome colour.
