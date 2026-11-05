@@ -94,7 +94,7 @@ html, body {
   flex-direction: column;
   padding-top: 4.4rem;              /* clear the fixed site header; does NOT scroll away */
   padding-right: var(--fl-rail-w);  /* the rail's gutter — keeps the scrollbar clear of it */
-  background: rgba(12, 14, 14, 0.86);
+  background: color-mix(in srgb, var(--color-raised) 86%, transparent);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
   border: 0;
@@ -152,7 +152,7 @@ html, body {
   z-index: 10;
   width: 190px;
   max-width: calc(100vw - 3rem);
-  background: rgba(12, 14, 14, 0.86);
+  background: color-mix(in srgb, var(--color-raised) 86%, transparent);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
   border: 1px solid var(--line-strong);
@@ -261,7 +261,7 @@ input[type="range"]::-webkit-slider-thumb {
   margin-top: -5.5px;               /* centre the thumb on the 2px track */
   border-radius: 50%;
   background: var(--petrol-bright);
-  border: 1px solid #071615;
+  border: 1px solid var(--black);
   transition: background-color 0.12s ease, transform 0.12s ease;
 }
 input[type="range"]::-moz-range-thumb {
@@ -269,7 +269,7 @@ input[type="range"]::-moz-range-thumb {
   height: 12px;
   border-radius: 50%;
   background: var(--petrol-bright);
-  border: 1px solid #071615;
+  border: 1px solid var(--black);
 }
 input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.15); }
 /* Suppress the outline only for pointer focus; show a clear, cross-browser
@@ -318,7 +318,7 @@ input[type="checkbox"]::after {
 }
 input[type="checkbox"]:checked {
   border-color: var(--petrol);
-  background: rgba(28, 107, 107, 0.25);
+  background: color-mix(in srgb, var(--color-deep) 25%, transparent);
 }
 input[type="checkbox"]:checked::after {
   transform: translateX(16px);
@@ -498,9 +498,9 @@ input[type="checkbox"]:checked::after {
 .fl-btn--primary {
   color: var(--petrol-bright);
   border-color: var(--petrol);
-  background: rgba(28, 107, 107, 0.22);
+  background: color-mix(in srgb, var(--color-deep) 22%, transparent);
 }
-.fl-btn--primary:hover { background: rgba(28, 107, 107, 0.34); }
+.fl-btn--primary:hover { background: color-mix(in srgb, var(--color-deep) 34%, transparent); }
 .fl-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* MAKE block — live printability badge, fits readout, and the save/share/get action row.
@@ -524,14 +524,18 @@ input[type="checkbox"]:checked::after {
   border-radius: 50%;
   transform: translateY(1px);
   background: var(--petrol-bright);
-  box-shadow: 0 0 6px rgba(47, 163, 163, 0.7);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--color-petrol) 70%, transparent);
 }
 .fl-badge__text { color: var(--ink); }
+/* A warning is said in ink (the text carries its own '! '); the dot is a
+   plum ring, a non-text mark (R1). */
 .fl-badge[data-state="warn"] .fl-badge__dot {
-  background: #d8a53f;
-  box-shadow: 0 0 6px rgba(216, 165, 63, 0.65);
+  background: none;
+  border: 1.5px solid var(--color-plum);
+  box-sizing: border-box;
+  box-shadow: none;
 }
-.fl-badge[data-state="warn"] .fl-badge__text { color: #e7c887; }
+.fl-badge[data-state="warn"] .fl-badge__text { color: var(--ink); }
 .fl-fit {
   font-family: var(--mono);
   font-size: 10px;
@@ -650,7 +654,7 @@ input[type="checkbox"]:checked::after {
   justify-content: center;
   padding: 0;
   cursor: pointer;
-  background: rgba(12, 14, 14, 0.86);
+  background: color-mix(in srgb, var(--color-raised) 86%, transparent);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
   border: 1px solid var(--line-strong);
@@ -739,7 +743,7 @@ html.fl-collapsed .fl-panel__toggle { right: 0; }
   width: 84px;
   height: 84px;
   object-fit: cover;
-  background: #0c0e0e;
+  background: var(--black-raised);
   border: 1px solid var(--line-strong);
   color: var(--petrol);
   font-size: 20px;
@@ -765,10 +769,11 @@ html.fl-collapsed .fl-panel__toggle { right: 0; }
 .fl-preset:focus-visible .fl-preset__thumb { outline: 2px solid var(--petrol-bright); outline-offset: 1px; }
 .fl-preset.is-active .fl-preset__thumb {
   border-color: var(--petrol-bright);
-  box-shadow: 0 0 0 1px var(--petrol-bright), 0 0 10px rgba(47, 163, 163, 0.4);
+  box-shadow: 0 0 0 1px var(--petrol-bright), 0 0 10px color-mix(in srgb, var(--color-petrol) 40%, transparent);
 }
 .fl-preset.is-active .fl-preset__name { color: var(--petrol-bright); }
-.fl-preset--draft .fl-preset__note { color: #d8a53f; }
+.fl-preset--draft .fl-preset__note { color: var(--ink-dim); }
+.fl-preset--draft .fl-preset__note::before { content: '\270E\00a0'; }
 
 /* ---------------------------------------------------
    Save modal
@@ -781,7 +786,7 @@ html.fl-collapsed .fl-panel__toggle { right: 0; }
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: rgba(6, 7, 7, 0.72);
+  background: color-mix(in srgb, var(--color-ground) 72%, transparent);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }
@@ -789,7 +794,7 @@ html.fl-collapsed .fl-panel__toggle { right: 0; }
 .fl-modal__card {
   width: 340px;
   max-width: 100%;
-  background: rgba(12, 14, 14, 0.96);
+  background: color-mix(in srgb, var(--color-raised) 96%, transparent);
   border: 1px solid var(--line-strong);
   padding: 1.5rem 1.5rem 1.3rem;
 }
@@ -832,9 +837,10 @@ html.fl-collapsed .fl-panel__toggle { right: 0; }
   min-height: 1.1rem;
   font-family: var(--mono);
   font-size: 10.5px;
-  color: #e6836b;
+  color: var(--ink);
   margin: 0.55rem 0 0;
 }
+.fl-modal__error:not(:empty)::before { content: '\2715\00a0'; }
 .fl-modal__actions {
   display: flex;
   justify-content: flex-end;

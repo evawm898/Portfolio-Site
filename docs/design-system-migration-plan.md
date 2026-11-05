@@ -355,3 +355,18 @@ A rule that can be empty only draws its glyph `:not(:empty)`.
 **Kept as artwork:** the card faces and their font list on /cards; on /textile-gauge-reader the overlays drawn on the fabric photo (and the course-line key swatch that matches them) and the zoom / grid-box controls that float on the black photo area, which stay dark glass in the system's dark tokens. The calibration and grid-box popups are paper panels.
 
 **Gates.** /cards: `verify-cards-fonts` and `verify-cards-svg-glyphs` run by hand (no workflow covers cards). /textile-gauge-reader's workflow fires only on `textile-gauge-reader/**`, so no CI runs on this PR's CSS; no gate asserts a chrome colour.
+
+## 13. Batch 7 as built
+
+flower's chrome already read the legacy names, which batch 1 aliased onto tokens, and `flower.html` already links `tokens.css`. What was left was `flower.css`'s hard-coded values:
+- The translucent panel, modal and button fills (`rgba(12,14,14,…)`, `rgba(28,107,107,…)`, `rgba(47,163,163,…)`, `rgba(6,7,7,…)`) are `color-mix` over the raised, deep, petrol and ground tokens at the same opacities.
+- The slider thumb's ring and the preset thumbnail's ground are tokens (same values).
+
+**Off-palette text, R1:**
+- The print-fit badge's warning text was amber; it is ink. The text already carries its own `! `. The warning dot is a plum ring.
+- The save modal's error was coral; it is ink with `✕`, drawn `:not(:empty)`.
+- The dev-only draft-preset note was amber; it is dim with a `✎` before it.
+
+**Kept as artwork:** the three.js view and the preset thumbnails.
+
+**Gates.** No flower workflow names `flower.css`, so CI runs nothing on this PR. The CSS cannot reach geometry, the export, the visibility predicates or the registry. `verify-registry-sync` and `verify-tier-visibility` were run by hand and pass.
