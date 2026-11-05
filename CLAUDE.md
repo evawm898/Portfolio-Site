@@ -11117,7 +11117,7 @@ path served the first mutant to all of them). Sheet: `node tools/shot-scene-stud
 **The cat's look (Nov 5, the "visual style" section of the doc):** a cute minimal black silhouette drawn by
 `drawCat` alone — the legs are still solved and DISCARDED at draw time (two convex drapes, torso to each
 pair's paws, with a filleted belly arch; paws as nubs), paper ears facing the camera, white ring eyes down to
-profile, whiskers, `#000` never lightened. The one path is also stroked 1 px in the same ink: Skia's AA leaves
+profile (none from behind — RULED Nov 5, a face turned to the window shows no eyes), whiskers, `#000` never lightened. The one path is also stroked 1 px in the same ink: Skia's AA leaves
 internal-edge seams in an overlapping nonzero path (on `main` too). Sheet: `node tools/shot-scene-studio-style.mjs <dir>`.
 `?dev=1` mounts the harness via the shell's `host.panel()`; `studio-dev.js` is the one DOM
 module and is excluded from `verify-scene.mjs`'s discipline list by name. Not in CI.

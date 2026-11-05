@@ -150,8 +150,8 @@ identically.
   the eye faces the camera down to 0.15 past profile — head-on, three-quarter and profile.
   Foreshortened to no less than 0.62 of their width, kept inside the head disc; two rings
   that would touch are one eye seen past the other and the nearer is drawn alone. Shut:
-  a white arc. **A cat with its back to the camera shows no eyes** — a decision made
-  without a ruling (the alternative is eyes on the back of the head).
+  a white arc. **A cat with its back to the camera shows no eyes — RULED (Eva, Nov 5):** a
+  cat whose face is turned to the window shows no eyes. Do not add eyes to a back view.
 - **Whiskers**: three a side from the cheek, fanned, while that cheek faces the camera.
 - **Ink**: `#000000`, never lightened. **The same path is also stroked 1 px in the same
   ink**: Skia's analytic antialiasing leaves a faint seam (~7 % short of full cover) along
