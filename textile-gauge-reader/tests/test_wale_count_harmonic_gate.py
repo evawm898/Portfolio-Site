@@ -60,14 +60,14 @@ def _rois():
 
 
 def _run(monkeypatch, periodicity_by_x: dict, lattice_by_x: dict, **kwargs):
-    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown"):
+    def fake_analyze_gauge(image_bgr, roi, orientation, structure="unknown", pixels_per_mm=None):
         axis = lambda px: AxisResult(spacing_px=px, positions_px=[], confidence=0.5)
         return GaugeAnalysisResult(
             success=True, message="", wale=axis(periodicity_by_x[roi[0]]), course=axis(48.0),
             roi_width_px=roi[2], roi_height_px=roi[3],
         )
 
-    def fake_loop_lattice(image_bgr, roi, orientation, course_rows_px=None):
+    def fake_loop_lattice(image_bgr, roi, orientation, course_rows_px=None, pixels_per_mm=None):
         return lattice_by_x[roi[0]]
 
     monkeypatch.setattr(gauge_analysis, "analyze_gauge", fake_analyze_gauge)

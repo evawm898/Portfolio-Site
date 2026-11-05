@@ -3540,6 +3540,140 @@ vs 0.862) decided. A proposer-side change (a sharpness ceiling that follows the 
 or re-ranking at native resolution) is the fix and belongs to the proposer's owner; it is
 recorded here rather than widened into this PR.
 
+### Analysis at one working resolution: each area is downscaled to 180 px/in before analysis -- BUILT AND MEASURED, NOT MERGED (stop-and-report, 2026-11-05)
+
+The next PR after #456 (its §3 and §4): `/analyze` and `/analyze-multi` analyse every area on an
+INTER_AREA copy at **`WORKING_PX_PER_INCH = 180`** (one owner now; `ROI_PROPOSAL_WORKING_PX_PER_INCH`
+is an alias of it) and map every pixel result back to native pixels. ONE mechanism:
+`analyze_gauge(..., pixels_per_mm=)` and `analyze_loop_lattice_experiment(..., pixels_per_mm=)` are
+front doors onto the untouched detectors (`_analyze_gauge_at_scale`, `_analyze_loop_lattice_
+experiment_at_scale`); `_working_area` crops the native ROI, resamples it to the working scale and
+hands back the exact per-axis factors; periods, positions, candidates, loop centers, lattice columns
+and the ROI size come back native, the reason strings carry a note naming the scale their pixel
+figures are at, and the response carries `analysis_px_per_inch` / `analysis_scale`. A photo at or
+under 180 px/in is analysed on its own pixels (never upsampled); a call with no calibration is the
+old path exactly, so the pinned-crop scorecard, the metamorphic sweep and every unit test that calls
+`analyze_gauge` bare are unchanged by construction. Nothing in period selection, the consensus, the
+#456 tolerance, calibration, the ruler gate or the proposer moved. `tests/test_working_scale_analysis.py`
+pins the mechanism (the one owner, the never-upscale branch, the map-back on a synthetic at 3x, the
+lattice's native rows in / native positions out, the multi-ROI path).
+
+**How the working scale was chosen (before any gate ran).** The analyser's fixed-PIXEL quantities
+are lengths: the 3 px smoother and its 3x3 Gaussian / Sobel kernels, `MIN_PLAUSIBLE_SPACING_PX` 3,
+the loop-center detector's 3 px minimum separation and 0.8 px DoG sigma floor, `MIN_PHASE_PATCH_PX`
+3, `TEMPLATE_MATCH_MIN_PERIOD_PX` 4, and the metamorphic sweep's own 8 px-per-period floor (under
+it the T/2 leg lattice sits within a pixel of the plausibility floor and the smoother spans a third
+of a period). So the pitch at the working scale must clear ~8 px, and its half-period too for the
+T-vs-T/2 discrimination: `S / gauge >= 16 px`. The finest plausible stitch here is
+`PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MAX` = 20/in, so `S >= 160`; a real fine hand-knit (~10/in) wants
+`S >= 160` for 16 px. The upper side is cost and the proven span: the coarsest real fixture the
+detector is validated on is the jersey at 166 px/in, the synthetics are drawn at 180, and the
+downsample2x invariant holds on fixtures at 170-350 px/in, so 180 is inside the span the constants
+were tuned over and the coarsest (cheapest) value that keeps every floor clear. **Fixed px/in, not a
+per-stitch rule**: the stitch pitch is the quantity under measurement, so a scale derived from it is
+a second, pilot measurement feeding the first (and circular with the seed the scale changes), where
+the calibration every request already carries is independent of the fabric. **Why the proposer's
+own 180**: an area is then analysed on the very texture it was judged analysable on. One rule covers
+both ends: knit_05 (320 px/in) is analysed at 0.562x (true course pitch 47.8 -> 26.9 px), knit_02 at
+2x (2374 px/in) at 0.076x (true wale pitch 593 -> 45 px, and the 8 px sensor grid of §3 becomes
+0.6 px and is integrated away). **Not tuned to a gate** -- and that is exactly why it stops below.
+
+**Timing (criterion 1): PASS.** Whole request on each photo at a 4000 px long edge, alone on the box,
+same method as §4 (the "before" column re-measured on `main` on the same box, same run):
+
+| photo @4000 | propose s | areas | analyze s before -> after | whole request before -> after |
+|---|---|---|---|---|
+| jersey (4000x2674) | 0.55 -> 0.48 | 2 | 5.30 -> 0.58 | 5.85 -> **1.06 s** |
+| knit_01 (4000x3517) | 1.07 -> 1.18 | 4 | 9.00 -> 1.36 | 10.06 -> **2.54 s** |
+| knit_02 (4000x2667) | 0.11 -> 0.10 | 4 | 14.94 -> 0.44 | 15.05 -> **0.54 s** |
+| teal (3200x4000) | 0.26 -> 0.26 | 4 | 22.48 -> 0.94 | 22.74 -> **1.20 s** |
+
+**Resolution invariance (criterion 3), `tests/app_path_scorecard.py` at 0.5x / 1x / 2x, calibration (a):**
+
+| fixture | axis | 0.5x | 1x | 2x | spread | verdict |
+|---|---|---|---|---|---|---|
+| knit_02 | wale | 4.03 +0.8% C | 4.50 **+12.5%** C | 4.50 **+12.5%** C | 11.6% | DISAGREE (§ below; 2x no longer reads the 8 px grid -- it reads what 1x reads) |
+| knit_02 | course | (no truth) | | | 8.2% | agree (was 4985%) |
+| knit_01 | course | 5.70 +0.0% C | 6.13 +7.5% u | 2.79 -51.0% u | 119.7% | flagged (uncertain at 1x and 2x; the doubled seed of #456 §5) |
+| knit_01 | wale | 3.96 +4.3% C | 3.83 +0.7% C | 3.83 +0.8% C | 3.6% | agree |
+| knit_05 | wale | 4.78 +1.6% C | 4.80 +2.1% C | 4.69 -0.3% C | 2.4% | agree |
+| knit_05 | course | 6.43 -4.1% C | 6.14 -8.3% C | 6.14 -8.3% C | 4.6% | agree |
+| knit_08 | wale | 4.87 +8.3% C | 4.72 +4.8% C | 4.72 +4.8% C | 3.3% | agree -- **the "proposer placement at 2x" pins MOVED**: 2x reads exactly what 1x reads (was +10.1% C) |
+| knit_08 | course | 7.33 +6.2% C | 6.75 -2.2% C | 6.75 -2.2% C | 8.6% | agree (was 11.8%, DISAGREE) |
+| teal | wale | 3.50 -12.6% C | 3.47 -13.4% C | 3.46 -13.5% C | 1.0% | agree (the accepted row) |
+| every other row | | | | | <= 4.5% | agree |
+
+The 1x and 2x cells are IDENTICAL on every photo over 180 px/in (the 2x upscale resamples to the
+same 180 px/in copy), which is the invariance the mechanism buys: knit_08's two 2x pins pass now
+(`RESOLUTION_DISAGREE["knit_08","course"]` and the `("knit_08", 2.0, "wale")` entry would XPASS).
+Confident-and-wrong at some resolution: teal W at all three (accepted) and **knit_02 W at 1x and 2x**.
+
+**knit_02 at 2x (criterion 2): the 8 px grid is gone and the row is NOT a regular test**, because
+what 1x and 2x now read is +12.5% confident (below).
+
+**The app path (criteria 4 and 6), calibration (a) and (b) alike -- every row that moved against the pins:**
+
+| row | pinned | here | why |
+|---|---|---|---|
+| knit_02 W | -2.4% C | **+12.5% C** | **NEW confident-and-wrong, both modes** -- the stop condition; diagnosed below |
+| knit_01 C (a) | -30.2% u | +7.5% u | area A reads 54.3 px confident, B the doubled 118.5 px confident, C 158.6 px uncertain; the consensus lands on A and is flagged uncertain, still JITTER_UNSTABLE (the same entry: the exact scale reads uncertain, every jittered scale 5.6-5.9/in confident) |
+| knit_01 C (b) | +4.7% C | +2.2% C | same, on the ruler's -0.8% scale |
+| knit_01 W (a) / (b) | -1.9% / +2.8% C | +0.7% / +7.6% C | the three areas read 84.3 / 87.0 / 88.3 px (each uncertain, the T-vs-T/2 margin) against 87.6 true; (b)'s +7.6 is (a)'s +0.7 plus the pre-fill's own scale error on a different consensus median, a 4.8-point worsening the 2-point regression rule would refuse |
+| knit_05 C | -5.8% C | -8.3% C | the four areas read 52.3 / 52.1 / 49.2 / 48.3 px against 47.8 and the weighted median lands on the two 52s (1 px of a 26.9 px working pitch is 3.7%); a 2.5-point worsening the regression rule would refuse |
+| knit_06 C | +2.0% C | -1.5% C | 0.384x copy, all four areas within 4% |
+| knit_09 W / C, knit_08 W / C, knit_06 W, teal W / C, knit_05 W | | | within 0.6 points of the pins |
+
+Confident-and-wrong (criterion 4): **(a) 2 (teal W, knit_02 W), (b) 2** against the required 1 / 1 --
+one new row. Jitter (criterion 6): knit_01 C only, the same entry as the pins; no new unstable axis.
+Pinned-crop scorecard (criterion 5): **0 rows moved** -- it calls `analyze_gauge` with no calibration
+and takes the old path to the byte (`python tests/test_ground_truth_scorecard.py` is identical,
+knit_02 W +120.4% and knit_01 C -46.9% included). The same eight crops WITH their calibration passed
+(not pinned anywhere; measured for the record) read within 3 points of native on every row and the
+two beyond-bar rows stay beyond it: knit_02 W +122.7%, knit_01 C -47.4%; teal W -15.1%. Metamorphic
+sweep (criterion 7): **118 / 12 / 5 / 12 / 7**, the #456 baseline exactly (no calibration on that path).
+Suite (criterion 8): the mechanism's 10 new tests pass; the pinned app-path tests fail on exactly the
+rows above (knit_02 W both modes, knit_01 W (b), knit_05 C both modes, knit_01 C (a)'s strict xfail
+XPASSing at +7.5%, the two confident-and-wrong counts, the README block, and the three knit_08 2x /
+knit_02 course strict xfails that XPASS -- 12 failed, 614 passed, 2 skipped, 48 xfailed); nothing
+else in the suite moves. (Two signature pins -- `analyze_gauge` and `analyze_loop_lattice_experiment`
+"have no ground-truth parameter" -- now name `pixels_per_mm`, the request's calibration, and the
+consensus tests' fakes of both functions accept it; a fake of the lattice that did not was swallowed
+by the per-area try/except and read as "no count", which is the kind of silence those tests exist for.)
+
+**Diagnosis of knit_02 W, per area (`/propose-rois` offers four 1-inch windows, 1187 px, each holding
+FOUR stitches of a 296.75 px pitch).** Every area is `uncertain` at every scale; the consensus calls
+four agreeing uncertain areas confident (the consensus rule, not touched). On main the four areas read
+137.5 / 278 / 316 / 304 px (the first the T/2 leg lattice, the other three -6% / +6% / +2%) and the
+consensus of the three was -2.4%. On the 180 px/in copy (45 px pitch) they read 263.8 / 263.8 / 303.3 /
+270.4: the v3 scorer picks the right family member on every area (44 px, 2x of a 22 px leg seed), and
+`_refine_spacing_from_positions` then reads 40 px off the detected peaks -- gaps of 40 / 31 / 40 / 32
+working px, of which only the two 40s are inside the refinement's ±20% band. The peaks are not where
+the columns are because a window of four stitches has nothing to average over; which gaps a copy
+yields is decided by the resampling chain, not by the scale: area B reads +6.7% on its own pixels,
++12.5% at 180, -1.6% at 240, **+113% at 360**; area A +116% native, +12.5% / -3.2% / +2.3% at 180 /
+240 / 360; the 0.5x copy (a different INTER_AREA chain to the same 180 px/in) reads +0.8%. Any
+working scale that lands knit_02 inside 10% does so by the same lottery that gave main its -2.4%, and
+choosing one for it is choosing the scale by the gate -- the brief's stop condition, and the proposer
+note above ("do not move the working scale to rescue a reading"). The mechanism is doing what it
+claims (the 2x row no longer reads the sensor grid; it reads the 1x copy to the pixel); what it exposes
+is that knit_02's wale reading on four-stitch windows was never a measurement with 10% precision.
+
+**What would move it, none taken here**: wider areas on fine photos (B at 2 inches reads +3.3% at 180;
+the proposer's window size and its 97% fabric rule are the proposer's), or a per-area precision floor
+that refuses to call a four-repeat window confident (a consensus / status rule, out of scope). **Rejected
+on the way**: a stitch-relative working scale (a pilot measurement feeding the measurement it scales,
+and the seed is the thing the scale changes); analysing at native and only resampling for the
+loop-center detector (two scales inside one area -- the detector's pitch would then be compared with
+periods read at another scale, the #456 §2 class of entanglement); re-scoring the area's quality at the
+working scale (`_roi_quality_score` stays on native pixels: it is the proposer's own sharpness term,
+which #456 §1 measured as having no scale law, and it only weights the consensus).
+
+**Status: the branch carries the mechanism, its tests and this note; the pins are untouched, the
+generated block is not regenerated, and the PR is NOT merged.** Eva's call: accept knit_02 W as a
+declared confident-and-wrong row by ruling (teal W's treatment -- the row is a four-stitch window's
+lottery on every tree) and merge, or hold the mechanism until the proposer offers wider areas on fine
+photos.
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits

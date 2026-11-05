@@ -451,6 +451,7 @@ async def analyze(
             roi=roi,
             orientation=orientation,  # type: ignore[arg-type]  # Literal-compatible str
             structure=structure,  # type: ignore[arg-type]  # Literal-compatible str
+            pixels_per_mm=pixels_per_mm,
         )
     except Exception:  # pragma: no cover - defensive: never fabricate a result
         logger.exception("Analysis raised an unexpected exception")
@@ -482,6 +483,7 @@ async def analyze(
             analyze_loop_lattice_experiment,
             image, roi=roi, orientation=orientation,  # type: ignore[arg-type]
             course_rows_px=result.course.positions_px or None,
+            pixels_per_mm=pixels_per_mm,
         )
         loop_lattice_out = _loop_lattice_to_out(lattice, pixels_per_mm)
     except Exception:  # pragma: no cover - defensive: experimental path, never fatal
@@ -508,6 +510,8 @@ async def analyze(
         loop_centers_px=result.loop_centers_px,
         rotation_deg=result.rotation_deg,
         loop_lattice_debug=loop_lattice_out,
+        analysis_px_per_inch=result.analysis_px_per_inch,
+        analysis_scale=result.analysis_scale,
     )
     return JSONResponse(status_code=200, content=response.model_dump())
 
@@ -822,6 +826,8 @@ async def analyze_multi(
             wale_source=m.wale_source,
             wale_count_confidence=m.wale_count_confidence,
             wale_count_note=m.wale_count_note,
+            analysis_px_per_inch=m.analysis_px_per_inch,
+            analysis_scale=m.analysis_scale,
         )
         for m in result.per_roi
     ]
@@ -847,6 +853,8 @@ async def analyze_multi(
         loop_centers_px=primary_measurement.loop_centers_px,
         rotation_deg=primary_measurement.rotation_deg,
         loop_lattice_debug=primary_loop_lattice_out,
+        analysis_px_per_inch=primary_measurement.analysis_px_per_inch,
+        analysis_scale=primary_measurement.analysis_scale,
         multi_roi=MultiRoiDebugOut(
             per_roi=per_roi_out,
             wale_consensus=_axis_consensus_to_out(result.wale_consensus, pixels_per_mm),

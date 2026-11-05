@@ -182,6 +182,28 @@ SEED_HALF_MIN_STRENGTH_RATIO = 0.75
 # every width. 4.0 is the middle of the measured-good range.
 SUBREPEAT_TEMPLATE_HEIGHT_FRACTION = 4.0
 SMOOTHING_WINDOW_PX = 3          # 1D smoothing window applied to projection signals
+# THE WORKING SCALE, one owner for the proposer and the per-area analysis.
+# Every fixed-PIXEL quantity in this module (the 3 px smoother and its 3x3
+# Gaussian / Sobel kernels, MIN_PLAUSIBLE_SPACING_PX = 3, the loop-center
+# detector's 3 px minimum separation and 0.8 px DoG sigma floor,
+# MIN_PHASE_PATCH_PX = 3, TEMPLATE_MATCH_MIN_PERIOD_PX = 4, the metamorphic
+# sweep's 8 px-per-period floor under which the T/2 leg lattice sits within
+# a pixel of the plausibility floor) is a length tuned on ~170-350 px/in
+# photos. A photo finer than this is analysed on an INTER_AREA copy at this
+# scale (never coarser: a coarser photo is analysed as it is -- there is
+# nothing finer to recover and an upscale manufactures nothing). Why a FIXED
+# px/in rather than a per-stitch rule: the stitch pitch is the quantity under
+# measurement, so a scale derived from it would be a second (pilot)
+# measurement feeding the first; the calibration every request already
+# carries is independent of the fabric. Why 180: the finest plausible stitch
+# (PLAUSIBLE_ABSOLUTE_WALES_PER_INCH_MAX, 20/in) is 9 px here, above the 8 px
+# floor; the coarsest real fixture the detector is proven on reads 166 px/in
+# and the synthetic fixtures 180, so the working copy sits inside the span
+# the constants were tuned over; the proposer already chooses its windows on
+# this copy (ROI_PROPOSAL_WORKING_PX_PER_INCH), so an area is analysed on
+# the very texture it was judged analysable on. Do not move it to rescue a
+# reading (README, "Analysis at one working resolution").
+WORKING_PX_PER_INCH = 180.0
 CLAHE_CLIP_LIMIT = 2.0
 CLAHE_TILE_GRID = (8, 8)
 MIN_LOOP_CENTERS_FOR_EVIDENCE = 4    # below this, loop-center evidence is too thin to trust
@@ -521,6 +543,12 @@ class GaugeAnalysisResult:
     # Purely diagnostic -- overlays are always translated back to the
     # original (unrotated) image coordinates.
     rotation_deg: float = 0.0
+    # The scale the area was actually analysed at (see WORKING_PX_PER_INCH):
+    # None / 1.0 when it was analysed on its own pixels. Every pixel field
+    # of this result is in NATIVE image pixels regardless; the reason
+    # strings quote figures at the analysed scale and say so.
+    analysis_px_per_inch: Optional[float] = None
+    analysis_scale: float = 1.0
 
 
 def _direction_for(orientation: Orientation) -> Tuple[Direction, Direction]:
@@ -538,15 +566,117 @@ def _direction_for(orientation: Orientation) -> Tuple[Direction, Direction]:
     return "vertical", "horizontal"
 
 
+def _working_scale_factor(pixels_per_mm: Optional[float]) -> Optional[float]:
+    """The resample factor (< 1) that takes a photo at `pixels_per_mm` down to
+    WORKING_PX_PER_INCH, or None when the photo is already at or under it (it
+    is then analysed on its own pixels -- never upsampled)."""
+    if pixels_per_mm is None or pixels_per_mm <= 0:
+        return None
+    native_ppi = pixels_per_mm * 25.4
+    if native_ppi <= WORKING_PX_PER_INCH:
+        return None
+    return WORKING_PX_PER_INCH / native_ppi
+
+
+def _clamp_roi(image_bgr: np.ndarray, roi: Tuple[int, int, int, int]) -> Tuple[int, int, int, int]:
+    img_h, img_w = image_bgr.shape[:2]
+    x, y, w, h = roi
+    x = max(0, min(int(round(x)), img_w - 1))
+    y = max(0, min(int(round(y)), img_h - 1))
+    w = max(0, min(int(round(w)), img_w - x))
+    h = max(0, min(int(round(h)), img_h - y))
+    return x, y, w, h
+
+
+def _working_area(
+    image_bgr: np.ndarray, roi: Tuple[int, int, int, int], pixels_per_mm: Optional[float]
+) -> Optional[Tuple[np.ndarray, Tuple[int, int, int, int], float, float]]:
+    """Downscale ONE area to the working scale before analysis.
+
+    Returns (working_crop, native_roi, fx, fy) -- the area's pixels resampled
+    (INTER_AREA) to WORKING_PX_PER_INCH, the clamped native ROI it came from,
+    and the exact per-axis factors (working / native) every result is mapped
+    back through -- or None when the area is analysed on its own pixels.
+    """
+    factor = _working_scale_factor(pixels_per_mm)
+    if factor is None or image_bgr is None or image_bgr.size == 0:
+        return None
+    x, y, w, h = _clamp_roi(image_bgr, roi)
+    if w <= 0 or h <= 0:
+        return None
+    ww = max(1, int(round(w * factor)))
+    wh = max(1, int(round(h * factor)))
+    crop = image_bgr[y : y + h, x : x + w]
+    working = cv2.resize(crop, (ww, wh), interpolation=cv2.INTER_AREA)
+    return working, (x, y, w, h), ww / float(w), wh / float(h)
+
+
+def _scale_note(pixels_per_mm: float, factor: float) -> str:
+    return (f" [analysed at {WORKING_PX_PER_INCH:.0f} px/in, a {factor:.3f}x copy of this "
+            f"{pixels_per_mm * 25.4:.0f} px/in area; pixel figures in this text are at that scale]")
+
+
+def _map_axis_back(axis: AxisResult, along_x: bool, fx: float, fy: float, x0: int, y0: int, note: str) -> AxisResult:
+    f = fx if along_x else fy
+    off = x0 if along_x else y0
+    axis.spacing_px = None if axis.spacing_px is None else axis.spacing_px / f
+    axis.positions_px = [p / f + off for p in axis.positions_px]
+    axis.candidates_px = [c / f for c in axis.candidates_px]
+    for d in axis.candidate_details:
+        d.period_px = d.period_px / f
+    for name in ("selected_reason", "uncertain_reason", "message"):
+        v = getattr(axis, name)
+        if v:
+            setattr(axis, name, v + note)
+    return axis
+
+
 def analyze_gauge(
+    image_bgr: np.ndarray,
+    roi: Tuple[int, int, int, int],
+    orientation: Orientation,
+    structure: Structure = "unknown",
+    pixels_per_mm: Optional[float] = None,
+) -> GaugeAnalysisResult:
+    """
+    Analyze a rectangular region of a textile photograph and estimate
+    wale spacing and course spacing in pixels.
+
+    `pixels_per_mm` (optional, the request's own calibration): when given
+    and the photo is finer than WORKING_PX_PER_INCH, the area is analysed
+    on an INTER_AREA copy at that scale and every pixel result (periods,
+    positions, candidates, loop centers) is mapped back to native pixels.
+    Without it the area is analysed on its own pixels, exactly as before.
+    """
+    working = _working_area(image_bgr, roi, pixels_per_mm)
+    if working is None:
+        return _analyze_gauge_at_scale(image_bgr, roi, orientation, structure)
+    small, (x0, y0, w, h), fx, fy = working
+    result = _analyze_gauge_at_scale(small, (0, 0, small.shape[1], small.shape[0]), orientation, structure)
+    wale_direction, course_direction = _direction_for(orientation)
+    note = _scale_note(float(pixels_per_mm), fx)
+    result.wale = _map_axis_back(result.wale, wale_direction == "horizontal", fx, fy, x0, y0, note)
+    result.course = _map_axis_back(result.course, course_direction == "horizontal", fx, fy, x0, y0, note)
+    result.loop_centers_px = [(cx / fx + x0, cy / fy + y0) for cx, cy in result.loop_centers_px]
+    result.roi_width_px = w if result.roi_width_px else 0
+    result.roi_height_px = h if result.roi_height_px else 0
+    result.analysis_px_per_inch = WORKING_PX_PER_INCH
+    result.analysis_scale = fx
+    if result.message and not result.success:
+        result.message += note
+    return result
+
+
+def _analyze_gauge_at_scale(
     image_bgr: np.ndarray,
     roi: Tuple[int, int, int, int],
     orientation: Orientation,
     structure: Structure = "unknown",
 ) -> GaugeAnalysisResult:
     """
-    Analyze a rectangular region of a textile photograph and estimate
-    wale spacing and course spacing in pixels.
+    The detector proper, on the pixels it is handed (analyze_gauge is the
+    front door that decides which pixels those are). Estimates wale spacing
+    and course spacing in pixels.
 
     Args:
         image_bgr: full source image as a BGR numpy array (as decoded by OpenCV).
@@ -3159,6 +3289,8 @@ class LoopLatticeResult:
     course_spacing_px: Optional[float] = None   # echoed from the given course rows, not re-measured here
     scale_used_px: Optional[float] = None   # which periodicity-candidate scale won
     message: str = ""
+    analysis_px_per_inch: Optional[float] = None  # see GaugeAnalysisResult.analysis_px_per_inch
+    analysis_scale: float = 1.0
 
 
 def _diagonal_gradient_channels(gx: np.ndarray, gy: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -3363,6 +3495,47 @@ def _build_row_banded_lattice(
 
 
 def analyze_loop_lattice_experiment(
+    image_bgr: np.ndarray,
+    roi: Tuple[int, int, int, int],
+    orientation: Orientation,
+    course_rows_px: Optional[List[float]] = None,
+    pixels_per_mm: Optional[float] = None,
+) -> LoopLatticeResult:
+    """Front door: the same working-scale rule as analyze_gauge (see
+    WORKING_PX_PER_INCH). `course_rows_px` are NATIVE full-image coordinates
+    whatever the scale; every position and spacing comes back native."""
+    working = _working_area(image_bgr, roi, pixels_per_mm)
+    if working is None:
+        return _analyze_loop_lattice_experiment_at_scale(image_bgr, roi, orientation, course_rows_px)
+    small, (x0, y0, w, h), fx, fy = working
+    wale_direction, _ = _direction_for(orientation)
+    wale_along_x = wale_direction == "horizontal"
+    # course rows run along the frame's OTHER axis
+    f_row, off_row = (fy, y0) if wale_along_x else (fx, x0)
+    f_col, off_col = (fx, x0) if wale_along_x else (fy, y0)
+    rows_small = None
+    if course_rows_px:
+        rows_small = [(v - off_row) * f_row for v in course_rows_px]
+    res = _analyze_loop_lattice_experiment_at_scale(
+        small, (0, 0, small.shape[1], small.shape[0]), orientation, rows_small
+    )
+    res.direct_centers_px = [(cx / fx + x0, cy / fy + y0) for cx, cy in res.direct_centers_px]
+    res.inferred_centers_px = [(cx / fx + x0, cy / fy + y0) for cx, cy in res.inferred_centers_px]
+    res.wale_columns_px = [c / f_col + off_col for c in res.wale_columns_px]
+    if res.wale_spacing_px is not None:
+        res.wale_spacing_px = res.wale_spacing_px / f_col
+    if res.course_spacing_px is not None:
+        res.course_spacing_px = res.course_spacing_px / f_row
+    if res.scale_used_px is not None:
+        res.scale_used_px = res.scale_used_px / f_col
+    if res.message:
+        res.message += _scale_note(float(pixels_per_mm), fx)
+    res.analysis_px_per_inch = WORKING_PX_PER_INCH
+    res.analysis_scale = fx
+    return res
+
+
+def _analyze_loop_lattice_experiment_at_scale(
     image_bgr: np.ndarray,
     roi: Tuple[int, int, int, int],
     orientation: Orientation,
@@ -4486,7 +4659,7 @@ def _local_anomaly_fraction(
 # resolution, and above it the 2x-upscaled synthetic garter loses its
 # proposals again (README, "Measurement-area proposal at one working
 # resolution").
-ROI_PROPOSAL_WORKING_PX_PER_INCH = 180.0
+ROI_PROPOSAL_WORKING_PX_PER_INCH = WORKING_PX_PER_INCH  # one owner: WORKING_PX_PER_INCH above
 
 
 def propose_measurement_rois(image_bgr: np.ndarray, pixels_per_mm: float) -> RoiProposalResult:
@@ -4999,6 +5172,12 @@ class RoiMeasurement:
     quality_parts: dict
     loop_centers_px: List[Tuple[float, float]] = field(default_factory=list)
     rotation_deg: float = 0.0
+    # The scale the area was actually analysed at (see WORKING_PX_PER_INCH):
+    # None / 1.0 when it was analysed on its own pixels. Every pixel field
+    # of this result is in NATIVE image pixels regardless; the reason
+    # strings quote figures at the analysed scale and say so.
+    analysis_px_per_inch: Optional[float] = None
+    analysis_scale: float = 1.0
     loop_lattice: Optional["LoopLatticeResult"] = None
     # Which evidence backs this region's WALE consensus candidate:
     # "loop_count" when this region's own loop-lattice detector found
@@ -5288,7 +5467,10 @@ def analyze_multi_roi(
         # Independent analysis: the SAME single-ROI detector used before
         # multi-region review existed, called once per region, never
         # given any other region's pixels or results.
-        result = analyze_gauge(image_bgr=image_bgr, roi=roi_tuple, orientation=orientation, structure=structure)
+        result = analyze_gauge(
+            image_bgr=image_bgr, roi=roi_tuple, orientation=orientation, structure=structure,
+            pixels_per_mm=pixels_per_mm,
+        )
 
         quality_score, quality_parts = 0.0, {}
         if w > 0 and h > 0:
@@ -5305,6 +5487,7 @@ def analyze_multi_roi(
             loop_lattice = analyze_loop_lattice_experiment(
                 image_bgr, roi=roi_tuple, orientation=orientation,
                 course_rows_px=result.course.positions_px or None,
+                pixels_per_mm=pixels_per_mm,
             )
         except Exception:
             loop_lattice = None
@@ -5328,6 +5511,7 @@ def analyze_multi_roi(
             rotation_deg=result.rotation_deg, loop_lattice=loop_lattice,
             wale_source=wale_source, wale_count_confidence=count_confidence,
             wale_count_note=count_note,
+            analysis_px_per_inch=result.analysis_px_per_inch, analysis_scale=result.analysis_scale,
         ))
 
     # --- Per-region plausibility gates, applied BEFORE cross-region

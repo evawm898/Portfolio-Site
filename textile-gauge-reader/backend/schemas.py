@@ -266,6 +266,11 @@ class RoiMeasurementOut(BaseModel):
     # harmonic (see _wale_count_harmonic_note). None when the count was
     # used, or when there was no trustworthy count to begin with.
     wale_count_note: Optional[str] = None
+    # The scale this area was analysed at (analysis.gauge_analysis.WORKING_PX_PER_INCH)
+    # and the resample factor from native; None / 1.0 = analysed on its own pixels.
+    # Every pixel field above is native regardless.
+    analysis_px_per_inch: Optional[float] = None
+    analysis_scale: float = 1.0
 
 
 class MultiRoiDebugOut(BaseModel):
@@ -314,6 +319,10 @@ class AnalyzeResponse(BaseModel):
     # from /analyze-multi (the "Review Measurement Areas" flow). None for
     # the legacy single-ROI /analyze path.
     multi_roi: Optional[MultiRoiDebugOut] = None
+    # The scale the (primary) area was analysed at and the resample factor from
+    # native (see RoiMeasurementOut); None / 1.0 = analysed on its own pixels.
+    analysis_px_per_inch: Optional[float] = None
+    analysis_scale: float = 1.0
 
 
 class RepeatMatchOut(BaseModel):
