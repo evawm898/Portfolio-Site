@@ -744,6 +744,12 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   - Lotus v8 / v9 (daisy and water lily stay at v7): body 1.052 → 1.209 / **1.161** vs ≈ 1.45. Cup and curl
     reach ≈ 1.27 at most; the rest is the ring (#495, now #1). v8's L3 cup 1.2 folded (20 pairs, the cup-max
     class); v9 is 0. Sheet `docs/img/photo-to-bloom-s5.png`.
+  - **[Nov 5: per-layer cup / curl PASSED; §14.7 RULED, built in §14.9.]**
+    - W3 is now the FAILING clause **V8**.
+    - `CUP CLAMPED` WARNS (**W4**) only where the clamp binds below the NIB. The tip is the geometry's own region
+      (`tipCap.apex`). The test is the record's worst station on the nib AND its row count ≤ the part's nib stations.
+    - A tip-only clamp stays TOLD.
+    - No self-intersection check, by ruling. Next: #495.
 
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
 (Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read

@@ -1870,7 +1870,20 @@ Measured as in §11.6 (the export mesh, the inner half of the layers = L2–L3, 
 | colour, everywhere | can't build |
 | the lotus's green outer whorl drawn as petals | ruled (b): it stays in the petal controls |
 
-### 14.7 For Eva's ruling
+### 14.7 Rulings — RULED (Eva, Nov 5)
+
+**The per-layer cup / curl stage PASSED (Nov 5) on the S5 sheet.**
+
+- **CUP CLAMPED: a WARNING only where the clamp binds AWAY from the petal tip.** A tip-only clamp stays TOLD
+  (printed, never changes the result). Built as **W4** (§14.9).
+- **W3 (a curl delta on a CURVE-spine layer, which builds nothing) becomes a FAIL.** Built as clause **V8**.
+- **No self-intersection check in the validator.** The census and the self-approach stay hand-measured where a
+  session wants them.
+- **Next: fix #495 on the bloom** (a discovery and a prototype first — §15).
+
+The questions as asked are kept below, so each ruling can be read against what it answered.
+
+#### The questions as asked (Nov 5)
 
 1. **Does per-layer cup and curl pass** on the S5 sheet? (Not decided here.)
 2. **CUP CLAMPED in the validator.** It surfaces only as a page read-out: 0 reader notes, a clean status, V0–V7 pass.
@@ -1904,3 +1917,78 @@ The proportions, the census and the self-approach were measured with Node script
 `tools/bloom-wall-thickness.mjs`). The scripts are session-only and not committed.
 
 ![S5 sheet](img/photo-to-bloom-s5.png)
+
+### 14.9 The validator under the rulings (Nov 5)
+
+`tools/verify-bloom-photo-subset.mjs` only (and this doc). No page or geometry file changed; the diff matches no
+workflow's path filter (checked against every `paths:` list, with `bloom-geometry.js` as the positive control).
+
+**V8 — W3 becomes a FAIL.** A spine-curl delta on a layer whose petals are drawn on a CURVE spine (the layer's own
+curl mode, else the whole bloom's) builds nothing. It is now clause **V8**, computed from the file alone (no page).
+`SCOPED_CURL_INERT` fires V8.
+
+**W4 — the fold clamp away from the tip.** The rule, as built:
+
+- **The tip is the NIB**, the region the geometry gives. The nib starts where the drawn outline passes the law's
+  crossing of the print floor: `tipCap.apex`, `x = u · drawnLengthMm > xLawMm` (`apexNibPlan`'s own `halfAt`
+  test). No constant is typed.
+- **Read off the clamp's own record.** A Node build of the composed state with the file's scopes, in both modes,
+  per petal and sepal. Each record is `form.cupClamp`, the same record the page's `CUP CLAMPED` line is printed from.
+- **Tip-only means BOTH:**
+  - (a) the reported station — the WORST, the smallest radius asked — lies on the nib; and
+  - (b) the reported row count is no more than the part's emitted nib stations (× halves on a two-sided outline).
+- **Anything else warns W4, exit 0.** A tip-only clamp stays TOLD and never changes the result.
+- **Why (b) is needed: the reported location alone cannot see the binding.** On the nib the cup is scaled with
+  the half-width (`cupScale = hb / TIP_HALF_MM`). So the radius it asks is the same at every nib station, and no
+  larger than anywhere off it. The worst station is therefore on the nib whenever the nib binds, whatever else
+  binds. Measured on the default petal:
+
+  | cup | rows clamped | nib stations | worst u | (a) alone | (a) + (b) |
+  |---|---|---|---|---|---|
+  | 0.6 | 7 | 7 | 0.9986 | tip | tip |
+  | 1.0 | 8 | 7 | 0.9995 | tip | **away** |
+  | 1.2 | 9 | 7 | 0.9986 | tip | **away** |
+  | 1.2, tip shape 1.0 | 12 | 8 | 0.9711 | tip | **away** |
+
+  `the-clamp-is-located-by-its-worst-station-alone` is the mutant that restores (a) alone. It must break the W4
+  exit leg, and it does.
+- **How far below the nib is INFERRED, and the warning says so.** The record keeps the worst station and a count,
+  not every station. Where the half-width falls monotonically into the nib, the extra rows are the stations
+  nearest it. The warning names "the k stations below the nib, down to u … — … mm from the tip".
+- **The residual exposure is stated, not closed:** a cup gradient that drops the cup across the nib's own last
+  millimetre could leave some nib stations unclamped while an off-nib one binds, and (b) would undercount.
+- **A part with no nib** (a squared terminal holds the outline above the floor) has no tip region. Any clamp there
+  is away from it.
+- **Validity:** a part whose clamp counts more rows than it emitted (stations × halves) aborts the run.
+
+**Fixtures** (`--self` 27 of 27, plus two spawned exit legs):
+
+| fixture | what | fires | warns | told |
+|---|---|---|---|---|
+| `SCOPED_CUP_CLAMPED` | layer cup 0.55: 7 rows on 7 nib stations | — | — | CUP CLAMPED |
+| `SCOPED_CUP_AWAY` (new) | layer cup 1.2 on an 8 mm layer: 13 rows against 8 nib stations, reaching ~2.7 mm from the tip | — | **W4** | CUP CLAMPED |
+| `SCOPED_DELTA_RANGE` | layer cup 1.3 (clamped to 1.2): 11 rows against 7 | — | W2, **W4** | CUP CLAMPED |
+| `SCOPED_CURL_INERT` | a curl delta on a CURVE-spine layer | **V8** | — | — |
+
+- `SCOPED_CUP_CLAMPED` was cup 0.9 in S5. At 0.9 that layer binds 9 rows against 7, so it is the away case now. It
+  was moved to 0.55 to pin the tip-only side.
+- **The exit-code legs:** the off-schema file lists W1 and exits 0; the cup-away file lists W4 and exits 0.
+- **Negative control:** all six page mutants behave, run one at a time against a saved base. Four lists were widened
+  by `SCOPED_CUP_AWAY`, by the S3 mechanisms. All three validator mutants behave:
+  - a warning fails the run → both legs break;
+  - the W1 warning dropped → the W1 leg breaks;
+  - the clamp located by its worst station alone → the W4 leg breaks.
+
+**Every S2–S5 version re-run, none edited: 22 of 22 PASS, 0 notes.**
+
+- **One new warning: `lotus-v4` W4.** Layer 3 clamps 8 rows against 7 nib stations, reaching (inferred) the one
+  station below the nib, u 0.9851, 0.60 mm from the tip, in both modes. v4 owned L3's width at 12 mm under the
+  global cup 1.0. v5 onward own it at 21 mm, and their clamps are tip-only.
+- `waterlily-v6`'s W2 (two outline points lifted) is S4's, unchanged.
+- Every lotus version from v1 is still TOLD `CUP CLAMPED`, tip-only on every other part. That includes S4's
+  PASSED v6 and S5's v8 and v9.
+
+**Ambiguity for Eva:** "the tip" is read as the NIB, the geometry's own region, so a clamp one station above the
+nib warns (lotus v4: 0.60 mm from the tip). If "the tip" should mean the converging tip more broadly, that needs a
+length the geometry does not give, and it would be a typed constant.
+
