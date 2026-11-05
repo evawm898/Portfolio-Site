@@ -1,0 +1,273 @@
+{
+  "format": "bloom-photo",
+  "version": 1,
+  "design": "daisy-v5.subset.bloom-design.json",
+  "designSha256": "083985ec0d3bb0fe071bf2dcc2b5b415eff6b84eb412df7b177ae6f931a4c076",
+  "photos": [
+    {
+      "id": "p1",
+      "role": "face",
+      "name": "daisy/front"
+    },
+    {
+      "id": "p2",
+      "role": "side",
+      "name": "daisy/side"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-profile",
+      "asked": "DAISY: seen from the side, are the rays flat, a shallow bowl, a deep cup, or reflexed (bending back)?",
+      "answer": "Flat",
+      "resolves": [
+        "petalTilt",
+        "petalSpineCurl",
+        "layerTilt"
+      ],
+      "outcome": {
+        "petalTilt": "overridden by p2: 5 -> 22",
+        "petalSpineCurl": "answer kept (side photo agrees)",
+        "layerTilt": "overridden by p2: 3 -> 6"
+      }
+    }
+  ],
+  "controls": {
+    "petalCount": {
+      "value": 11,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "layerCount": {
+      "value": 2,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalWidth": {
+      "value": 16,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalBaseTaper": {
+      "value": 1.5,
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "petalTipTaper": {
+      "value": 1,
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "petalTipShape": {
+      "value": 2.5,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalTilt": {
+      "value": 22,
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "petalCup": {
+      "value": 0.15,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "spread": {
+      "value": 2.9,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "headRise": {
+      "value": 0.25,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "scopeLayers": {
+      "value": "ON",
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ],
+      "note": "the per-layer stage's switch: on because the subset writes overrides.layers"
+    }
+  },
+  "unmapped": [
+    {
+      "feature": "composite disc florets",
+      "nearest": "nothing — a smooth hub (§4, ruling 5: never approximated with stamens)",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "ray tip teeth (two or three shallow notches at each ray tip)",
+      "nearest": "nothing — below the lobe floor on a 35 mm ray",
+      "photos": [
+        "p1"
+      ]
+    },
+    {
+      "feature": "colour, colour pattern, veining, blotches",
+      "nearest": "nothing (white rays, yellow disc)",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "rays of slightly irregular length and angle",
+      "nearest": "nothing (variance left at 0: the irregularity is small)",
+      "photos": [
+        "p1"
+      ]
+    }
+  ],
+  "revisedFrom": {
+    "design": "daisy-v4.subset.bloom-design.json",
+    "why": "the render sheet (one feedback iteration): v4 shrank the disc (0.389 -> 0.367 of the flower) because the hidden layerSize default (0.72) placed the inner tier's ring",
+    "changes": {},
+    "layerChanges": [
+      {
+        "layer": 0,
+        "field": "offsets.petalWidth",
+        "from": null,
+        "to": 0
+      },
+      {
+        "layer": 1,
+        "field": "offsets.petalWidth",
+        "from": null,
+        "to": 0
+      }
+    ],
+    "notes": "Both tiers now own their width at the global 16 mm, so both stand on one ring at the disc edge (the photo: every ray leaves the disc edge); disc/flower 0.385 (v3 0.389, photo ~0.39)."
+  },
+  "layers": [
+    {
+      "layer": 0,
+      "whorl": "outer (back) tier of rays",
+      "offsets": {
+        "petalLength": {
+          "offset": 0,
+          "value": 35,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "front photo: both tiers' tips at ~3.6 disc radii — equal length"
+        },
+        "petalTilt": {
+          "offset": -8,
+          "value": 14,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "the lower tier lies flatter, near horizontal (side photo)"
+        },
+        "petalWidth": {
+          "offset": 0,
+          "value": 16,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "both tiers as wide as each other and leaving the disc edge (front photo); owned so the ring is R0, not the hidden layerSize default"
+        }
+      }
+    },
+    {
+      "layer": 1,
+      "whorl": "inner (front) tier of rays",
+      "offsets": {
+        "petalLength": {
+          "offset": 0,
+          "value": 35,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "equal to the outer tier (front photo)"
+        },
+        "petalTilt": {
+          "offset": 8,
+          "value": 30,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "the upper tier stands ~30 deg up (side photo)"
+        },
+        "petalWidth": {
+          "offset": 0,
+          "value": 16,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "both tiers as wide as each other and leaving the disc edge (front photo); owned so the ring is R0, not the hidden layerSize default"
+        }
+      }
+    }
+  ]
+}

@@ -684,7 +684,7 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   its default and is told `hidden`. The page writes the complete state to every input (Reset's events).
 - `readDoc` / `applyDesign` are byte-identical; `tools/verify-bloom-load-unchanged.mjs --base <wt>` compares the
   old path's record, state, scopes, save and STL bytes on both trees (not in CI).
-- `tools/verify-bloom-photo-subset.mjs` (V0–V6, onto a DIRTY page; `--self` ten fixtures plus a spawned exit-code
+- `tools/verify-bloom-photo-subset.mjs` (V0–V7, onto a DIRTY page; `--self` fifteen fixtures plus a spawned exit-code
   leg, `--negative-control` five page mutants plus two of its own) is F16 of the design-file gate. Sidecar
   `<name>.bloom-photo.json`, format in §9.3. No emission is built; outline and per-layer emission are S2/S3, gated
   on the zero-notes check.
@@ -698,6 +698,25 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   PASS the validator with 0 notes and 0 warnings. **The photos are NOT committed** (stock watermarks — Eva's ruling);
   the sheet `docs/img/photo-to-bloom-s2.png` shows placeholders. `node tools/bloom-photo-s2.mjs --check` holds each
   sidecar to its subset (S1–S6, not in CI). Whether globals PASS is Eva's ruling from the sheet; outline (S3) waits on it.
+  **[Nov 5: globals PASSED; the stage order changed — per-layer BEFORE outline. S3 below.]**
+- **S3, the per-layer stage (Nov 5), is §11 of the same doc.** Read §11.4 before writing a scoped subset.
+  - **Schema v2** (`LAYER_SCHEMA` in the census) is the per-layer rows only, the 46 globals unchanged:
+    - `scopeLayers` ON under RADIAL / SPIRAL;
+    - layer offsets on the three OWNED quantities, `petalLength` / `petalWidth` / `petalTilt`;
+    - the spine as a layer value.
+    - Checked at load against the geometry's `SCOPE_LAYER_OWNED`. Delta offsets, outline values and
+      petal / tier / strand entries WARN (W1).
+  - **The validator gained V7** (every layer entry reaches a petal, from the BUILDER's own scope summary;
+    a FAIL) and per-layer W1 / W2.
+    - Five fixtures, `--self` 15 of 15.
+    - The new mutant is `the-leftover-scope-is-merged-into-the-file`. Every page and validator mutant
+      behaves.
+  - **Per-layer ON hides `layerSize` / `layerTilt`, so every layer must OWN its length and tilt.** And an
+    inner whorl's RING stays on the hidden `layerSize` default (0.72) unless the layer owns its WIDTH:
+    ring = R0 × own width / global width. That is ruling-pending (c).
+  - v4 / v5 for the three flowers: 15 of 15 subsets PASS, 0 notes, 0 warnings. Sheet
+    `docs/img/photo-to-bloom-s3.png` (placeholders). Lotus body h:w 1.05 against the photo's ≈ 1.45.
+  - Rulings pending (a)–(f) are in §11.8. Whether per-layer passes is Eva's ruling from the sheet.
 
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
 (Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read

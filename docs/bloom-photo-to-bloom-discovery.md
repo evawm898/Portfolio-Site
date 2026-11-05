@@ -1134,3 +1134,290 @@ Two per-layer-looking misses are NOT fixable there: a count per whorl, and a not
    measures the photo alone.
 4. **Q-profile was asked BEFORE the side photo was read**, as the brief ordered. So v2's changes are
    measured against front + answer, not front alone.
+
+---
+
+## 11. S3 — the per-layer stage on the S2 photos (Nov 5)
+
+Route A again, on the same six photos. Each flower starts from its **S2 v3 subset**, with the globals
+unchanged, and adds per-layer values. The rulings in force:
+
+- the globals stage PASSED (Nov 5) on the S2 sheet;
+- the stage order changed: **per-layer before outline**.
+
+| file | what |
+|---|---|
+| `docs/photo-to-bloom/eva-set/<flower>/<flower>-v{4,5}.subset.bloom-design.json` | v4: per-layer values read from the photos; v5: the one render-feedback iteration |
+| `docs/photo-to-bloom/eva-set/<flower>/<flower>-v{4,5}.bloom-photo.json` | the sidecars (§9.3, plus an optional `layers` record, §11.3) |
+| `tools/bloom-photo-census.mjs` | schema v2: `SCHEMA_VERSION`, `LAYER_SCHEMA` |
+| `tools/verify-bloom-photo-subset.mjs` | V7 and the per-layer W1/W2; five new fixtures; one new mutant |
+| `tools/bloom-photo-s2.mjs` | S7, the layer half of S6, scoped bounding boxes, `--versions`, the proportions |
+| `docs/img/photo-to-bloom-s3.png` | the sheet (placeholders for the photos) |
+
+**No bloom page code changed** (`bloom*.js`, `bloom.html`, `bloom.css` are `main`'s), so no bloom gate
+was owed, and no workflow's path filter names any file this session touched.
+
+### 11.1 The photos — session-only, stripped, read back
+
+Eva re-attached the three stock pairs (lotus `.webp`, daisy and water lily `.png`) to the session
+message. They never reached the container's upload directory, so the working copies were taken from
+the session's own transcript into the scratchpad. **Nothing was written into the repository.**
+
+- Each image was cut into its two views and written with `convert -strip`.
+- Read back: `identify -verbose` finds no EXIF, GPS, XMP, IPTC or profile on any of the six; PIL reads
+  `getexif()` and `info` empty.
+- The originals carried no EXIF or GPS. The lotus `.webp` carried one ICC profile (Google sRGB 2016),
+  which the strip removed. This is §10.1's finding again, on the same files.
+
+### 11.2 Schema v2 — the per-layer rows
+
+The 46 global rows are v1's, unchanged. v2 adds what a layer entry (`overrides.layers[i]`) may carry,
+restricted to what a layer **owns outright** (§9.6):
+
+| | ids | why |
+|---|---|---|
+| switch | `scopeLayers` ON, under `placement` RADIAL or SPIRAL | reclassified **d → b** in the census: the per-layer stage turns it on exactly when it writes layer entries |
+| offsets | `petalLength`, `petalWidth`, `petalTilt` | Q3.5: a layer entry naming one OWNS it. The layer's value is global + offset, with the `layerSize` / `layerTilt` ramp's term left out. |
+| values | `petalCurlMode`, `petalSpineCurve` | the spine (F3-scope) |
+
+The owned list is **restated** in the census and checked at module load against the geometry's own
+`SCOPE_LAYER_OWNED`, `SCOPE_VALUE_GROUPS.spine` and `SCOPE_LAYER_PLACEMENTS`, in both directions. A
+quantity added to the geometry therefore cannot enter the photo schema silently.
+
+**Not in v2, each a W1 when written:**
+
+- every other layer offset: the ~30 delta-on-global sliders (`petalCup`, `petalSpineCurl`, …);
+- the outline values (`petalOutlineMode` / `petalOutlineCurve`) — the outline is the NEXT stage;
+- any petal, tier or strand entry.
+
+`node tools/bloom-photo-census.mjs` prints `schema v2: 46 global rows + per-layer (…)`.
+
+### 11.3 The validator and the sidecar
+
+**V7 (a clause, it fails).** Every layer entry the file names must reach a petal. The evidence is the
+BUILDER's own scope summary, `__bloomMetrics().scopes`: `layersLive` true, `scopedLayers` exactly the
+file's layers, `keptLayers` empty. This is an owner the reader does not write.
+
+- An entry the build keeps inert loads with **zero notes**: Per-layer values left OFF, a CONTINUOUS or
+  FAN placement, a layer past the layer count. The reader keeps an inert record by design.
+- So V1 cannot see it. V7 is §2.2's rule 3 (a value written where it builds nothing fails) applied to
+  a scope.
+
+**Warnings, extended:**
+
+- **W1:** a layer offset the layer does not own, a layer value off v2, or any petal/tier/strand entry.
+- **W2:** an owned quantity whose global + offset lies outside the registry range. The build clamps it
+  silently, and the reader never sees a sum.
+
+**Five new fixtures, each against its written-down clause and warning sets** (`--self`, 15 of 15, plus
+the exit-code leg). Every one is loaded onto the DIRTY page, which carries a leftover layer-1 entry:
+
+| fixture | what | fires | warns |
+|---|---|---|---|
+| `SCOPED_RADIAL` | an intended scope: two layers owning tilt and length | — | — |
+| `SCOPED_SPIRAL` | SPIRAL, an owned width, and a drawn spine as a layer value | — | — |
+| `SCOPED_DELTA` | adds a layer `petalCup` offset (a delta, not owned) | — | **W1** |
+| `SCOPED_OWNED_RANGE` | `petalLength` 35 + 90 = 125 > 100 | — | **W2** |
+| `SCOPED_INERT` | layer entries with Per-layer values left OFF | **V7** | — |
+
+**The negative control** has six page mutants and two validator mutants. Every page mutant moves
+exactly the (fixture, clause) pairs it names, and every anchor is checked before any of them runs.
+
+- **The new mutant is `the-leftover-scope-is-merged-into-the-file`.** The page concatenates the dirty
+  page's scope with the file's — the plausible wrong reading of "take the file's scopes" once a file
+  carries some.
+  - It reddens **V4 on all 13 fixtures that load**: the leftover survives, scoped file or not.
+  - It also reddens **V7 on `SCOPED_DELTA`**: that file's own layers are [0], the leftover adds layer 1,
+    and the builder's scoped layers stop being the file's. That is a second owner seeing the same
+    defect.
+- **Three existing mutants' lists were WIDENED to their measured sets** on the new fixtures, never
+  loosened:
+  - `the-scopes-survive-a-new-design`: V4 and V7 on the scoped files;
+  - `the-new-design-keeps-the-page-value`: V2 on every scoped file;
+  - `the-subset-is-composed-over-the-page`: V1/V2/V5 on every scoped file.
+  - On the last two, **V7 STOPS firing on `SCOPED_INERT`**: the dirty page's leftover Per-layer ON
+    makes the file's inert entry LIVE, and V2/V3 catch the leftover instead. That is a flip in the
+    other direction, recorded as such.
+- **The anchor pre-check caught this session's own edit**: the `if (!row)` line that W1 now skips for
+  the switch was the anchor of the validator mutant `the-off-schema-warning-is-dropped`. It reported
+  `anchor matches 0 times` rather than a false pass, and the mutant was re-anchored.
+
+**The sidecar keeps `version` 1** and gains one optional field, as S2's three did:
+
+```
+"layers": [ { "layer": 0, "whorl": "<which whorl, in words>",
+              "offsets": { "<id>": { "offset": -15, "value": 20, "confidence": "medium", "source": "photo",
+                                     "question": null, "photos": ["p2"], "reading": "<what was read>" } },
+              "values":  { "<id>": { "value": <the subset's value>, "confidence": …, "source": …, "photos": […], "reading": "…" } } } ]
+```
+
+Two optional fields also go in `revisedFrom`: `layerChanges` (`{layer, field, from, to}`, null where
+absent) and `notes`. `bloom-photo-s2.mjs --check` holds both to the subset:
+
+- **S7:** `layers` names exactly the subset's layer fields. Each offset is equal, its `value` is the
+  COMPOSED global + offset, and each owned value is equal. A sidecar `layers` on a subset with none is
+  a finding.
+- **S6** restates `layerChanges` from the two subsets.
+
+Its must-fail was run on a scratch copy with four plants: a wrong owned value, a missing layer field, a
+dropped `layerChanges` entry, and `layers` on a v3. It reported exactly those four (S7, S7, S6, S7).
+
+### 11.4 What per-layer values do on this tree — found by building, not by reading
+
+1. **Layer 0 is the OUTER whorl** (the largest ring). This was measured.
+2. **A positive drawn-spine `y` curls in, a negative one reflexes out.** This was measured.
+3. **Turning Per-layer values ON HIDES `layerSize` and `layerTilt`.** A subset that keeps them fails
+   rule 3, so v4 drops them. A layer that does not OWN its length and tilt then takes the ramp at the
+   **defaults** (0.72 and 12), not v3's values. So **every v4 layer owns its length and tilt.**
+4. **FINDING — the rings.** The ring each inner whorl stands on is still placed by the hidden
+   `layerSize` default unless the layer owns its **width**. Ring = R0 × own width / global width
+   (Eva's Oct 16 ruling).
+   - Measured, v3 → v4: the daisy's inner ring went 18.66 → 14.20 mm and its disc/flower 0.389 →
+     0.367; the lotus rings went 17.2/15.4/13.9/12.5 → 15.0/10.8/7.8/5.6 mm; the water lily's inner
+     ring went 8.23 → 6.26 mm, inside the stamen disc.
+   - **v5 owns widths to put the rings back.** That means a ring step costs a width step on the same
+     layer: on this tree there is no way to place an inner whorl's ring without also choosing its
+     petal width.
+   - Ruling-pending (c).
+
+### 11.5 The versions and the sheet
+
+![S3 sheet](img/photo-to-bloom-s3.png)
+
+`node tools/bloom-photo-s2.mjs <out> --versions v3,v4,v5 --sheet-bare docs/img/photo-to-bloom-s3.png [--sheet <png> --photos <dir>]`
+
+- Every version is loaded as a NEW design on a fresh page.
+- PRINT PREVIEW is on.
+- The cameras are S2's, matching the photo angles.
+- Each camera is framed on the export mesh built **with the file's scopes**. The S2 tool built none,
+  so a scoped version would have been framed on the wrong bloom.
+- The committed sheet carries placeholders; the sheet with the photos was sent in session only.
+- No pixel delta is quoted.
+
+| version | named | layer entries | reader notes | export tris | bbox (mm) | layer owned (len / tilt / width) |
+|---|---|---|---|---|---|---|
+| daisy v3 / v4 / v5 | 12 / 11 / 11 | – / 2 / 2 | 0 / 0 / 0 | 102,852 each | 104.7×105.6×16.9 / 105.7×106.5×21.0 / 108.7×109.5×18.6 | v4: L0 35/14, L1 35/30 · v5: + width 16/16 |
+| lotus v3 / v4 / v5 | 11 / 10 / 10 | – / 4 / 4 | 0 / 0 / 0 | 61,432 each | 51.2×53.0×32.9 / 58.2×60.7×35.5 / 65.7×65.4×43.2 | v4: L0 20/30*, L1 26/55*, L2 35/75, L3 40/85 · v5: L2 40/60, L3 45/70, widths 28/26/24/21 |
+| water lily v3 / v4 / v5 | 14 / 13 / 13 | – / 2 / 2 | 0 / 0 / 0 | 106,232 each | 81.9×81.9×33.0 / 81.1×81.1×30.6 / 81.9×81.9×30.6 | v4: L0 35/30, L1 30/65 · v5: + width 9/8 |
+
+\* a drawn spine as a layer value: L0 nearly straight with its lip up, L1 straight.
+
+The global incurve (60°) stays on L2/L3. **The triangle count does not move**, because no version
+changes a lattice.
+
+The validator reads all 15 versions PASS, 0 notes, 0 warnings, and V7 holds on every scoped one. The
+bounding-box builds report `layersLive: true`, `keptLayers: []`.
+
+**v5 in one line each** (the one render iteration):
+
+- **daisy:** both tiers own width 16, so both stand on ONE ring at the disc edge, as every ray does in
+  the photo. disc/flower is back to **0.385** (v3 0.389, photo ≈ 0.39).
+- **lotus:** v4 closed the body into a thin spike: L2/L3 at 75/85° plus the incurve, on 7.8 / 5.6 mm
+  rings. v5 leans the body whorls in less (60 / 70°), runs them longer (40 / 45 mm), and owns widths
+  28 / 26 / 24 / 21 mm. Those put the rings at 17.4 / 16.2 / 14.9 / 13.0 mm. The inner petals do read
+  narrower in the front photo.
+- **water lily:** widths 9 / 8 bring the inner ring back to 8.10 mm (v4 6.26).
+
+### 11.6 The lotus bud's proportions, measured
+
+Both sides are measured as SILHOUETTES in the side view.
+
+- **On the photo:** the colour mask of the side photo, per row.
+- **On the model:** the export mesh, by each petal's own emitted triangle range. The "inner half" is
+  layers 2–3, the two whorls that make the closed body. The outer two are the splayed ones.
+
+| | whole flower h : w | closed body (inner whorls) h : w |
+|---|---|---|
+| **photo** | 519 × 448 px = **1.16** | ≈ 480 × 330 px = **1.45** (S2's "≈ 1.4 : 1") |
+| v3 | 32.9 × 54.8 mm = **0.60** | 27.0 × 30.7 mm = **0.88** |
+| v4 | 35.5 × 63.4 mm = **0.56** | 35.5 × 21.9 mm = **1.62** (the spike) |
+| v5 | 43.2 × 68.3 mm = **0.63** | 43.2 × 41.1 mm = **1.05** |
+
+**v5 is the closest of the three on both measures and still squat.**
+
+- The body is ~0.72 of the photo's proportion.
+- The whole flower is ~0.54 of it, because the two splayed outer whorls are wider against the body than
+  in the photo: 1.66 × the body's width against the photo's 1.36 ×.
+
+What is left is in the miss log.
+
+### 11.7 Miss log — the S2 rows tagged "per-layer would fix", and what per-layer introduced
+
+| S2 row | now | how |
+|---|---|---|
+| daisy: the two tiers barely read apart | **fixed** (to Eva's eye) | Each tier owns its tilt (14° / 30°) at equal length. The side view separates them in v4 and v5. v5 narrows the separation a little, because both tiers stand on one ring. |
+| lotus: an open rosette, not a bud (one tilt step cannot splay the outer whorl and close the inner) | **partly fixed** | The structure now reads as the photo's: a splayed short outer pair of whorls around an upright body, with two layers owning a straight drawn spine. The body is squat (h:w 1.05 vs 1.45, §11.6). |
+| lotus: inner petals TALLER than the outer; the bud squat | **partly fixed** | The inner whorls own 40 / 45 mm against the outer 20 / 26. The bud is taller (43.2 mm vs v3's 32.9) and still squat. |
+| water lily: the outer petals are the longer; one shrink step averages it | **fixed** (in proportion) | Outer 35 mm at 30°, inner 30 mm at 65°. The COUNT per whorl (4 long + ~10 short) stays unmapped. |
+
+**New misses the per-layer stage introduced:**
+
+| miss | class | fixed by | |
+|---|---|---|---|
+| v4, all three: the inner rings re-placed by the hidden `layerSize` default (§11.4.4) | bloom (the ring follows only an owned width) + estimate (not anticipated) | v5 (owned widths) | the coupling stays: ruling-pending (c) |
+| lotus v4: the body closed into a spike (tilt 75/85 + the global incurve) | estimate | v5 | — |
+| lotus v5: the body still squat; its petals wrap less than the photo's broad, cupped, incurving body petals | **schema** — needs a per-layer CUP or CURL, which are delta-on-global sliders and out of scope. Logged and NOT used, as briefed. | — | per-layer deltas, or the outline (broader-shouldered body petals) |
+| lotus v5: the outer whorls splay wider against the body than in the photo (1.66× vs 1.36×) | estimate (the L1 tilt and length) | — | — |
+
+**What remains, re-tagged:**
+
+- **For the outline stage:**
+  - the daisy's paddle-for-strap rays;
+  - the lotus mucro;
+  - the water lily's boat-shaped sepals (the sepal outline curve).
+  - Possibly the lotus body's broader-shouldered petals (above).
+- **Can't build:**
+  - the water lily's petal count per whorl (`petalCount` is whole-whorl and not scopeable);
+  - disc florets, ray-tip notches below the lobe floor, colour;
+  - strap-like curling stamens;
+  - petals passing through each other in a closed bud.
+- **Procedure, not a stage:** the lotus's green outer whorl read as petals. See ruling-pending (b).
+
+### 11.8 Rulings pending — proposed, NOT adopted
+
+Each is a proposal for Eva's ruling. Nothing here was built as if it were ruled.
+
+- **(a) Skip Q-profile when a side photo is attached.**
+  - On S2's evidence (§10.2) the word answer and the side photo disagreed on two of three flowers, and
+    the photo was right both times.
+  - S3 asked no question at all: every per-layer value came from the photos.
+  - Proposal: ask Q-profile only when no side photo is attached.
+- **(b) Procedure rule: "a green or sepal-like outer whorl → check the sepal controls before the petal
+  controls."**
+  - From the S2 lotus miss, which recurs here: the lotus's green, short outer whorl is drawn as layer 0
+    of the petals.
+  - Under the rule it would have been tried as sepals first (`sepalCount` / `sepalScale` /
+    `sepalAngle` are on the schema).
+  - Not tried in S3: the one iteration was spent on the rings.
+- **(c) The ring / width coupling (§11.4.4).** Under Per-layer values, an inner whorl's ring is placed
+  by the hidden `layerSize` default unless the layer owns its width. The options:
+  - (i) keep it: route A owns widths to place rings, as v5 does;
+  - (ii) a schema change: allow the per-layer stage to keep `layerSize` (today it is hidden, so it fails
+    rule 3 — a registry change, not a schema one);
+  - (iii) a geometry change: an owned LENGTH also places the ring.
+  - Each has a different owner.
+- **(d) Outline values are kept OUT of schema v2** (W1 when written), because the outline is the next
+  stage. A placement made without a ruling.
+- **(e) V7 is a FAILING clause, not a warning.** An inert layer entry is the scope form of rule 3.
+  §9.7's "warn, never fail" ruling was about the schema, and V7 is not a schema statement. A reading,
+  not a ruling.
+- **(f) Owning with a zero offset.** `petalLength: 0` OWNS the length at the global (Q3.5 keys on the
+  offset's presence). The subsets use it, and the sidecar records `value` beside every `offset`.
+
+### 11.9 Reproduce
+
+```
+npm i --no-save three@0.161.0 playwright-core
+export CHROMIUM_EXECUTABLE=/opt/pw-browsers/chromium
+node tools/bloom-photo-census.mjs
+node tools/bloom-photo-s2.mjs --check
+node tools/verify-bloom-photo-subset.mjs --self
+node tools/verify-bloom-photo-subset.mjs --negative-control --mutant=<id>
+node tools/verify-bloom-photo-subset.mjs docs/photo-to-bloom/eva-set/*/*.subset.bloom-design.json
+node tools/bloom-photo-s2.mjs <out> --versions v3,v4,v5 --sheet-bare docs/img/photo-to-bloom-s3.png
+```
+
+- The negative control runs one mutant per invocation, each about 7 min on this box, because a full
+  sweep is past a foreground run's ceiling.
+- None of it is in CI except `--self`, through the design-file gate's F16, and no workflow's path
+  filter names these tools.

@@ -36,7 +36,15 @@
      V4  the scopes the page holds are the file's (none when it carries none) —
          the dirty page's layer scope must be gone;
      V5  the status line says the load was clean;
-     V6  no page error.
+     V6  no page error;
+     V7  (schema v2, S3) EVERY LAYER ENTRY THE FILE NAMES REACHES A PETAL — read
+         off the BUILDER's own scope summary (`__bloomMetrics().scopes`), an
+         owner the reader does not write: `layersLive` true, `scopedLayers`
+         exactly the file's layers, `keptLayers` empty. A layer entry the build
+         keeps INERT (Per-layer values left OFF, a CONTINUOUS / FAN placement,
+         a layer past the layer count) loads with zero notes — the reader keeps
+         an inert record by design — so V1 cannot see it; §2.2's rule 3 (a
+         value written where it builds nothing fails) applied to a scope.
 
    WARNINGS, listed apart from the clauses and NEVER counted in the exit code
    (Eva's ruling 2 of §9.7, Nov 4: the photo schema WARNS, it does not fail).
@@ -49,6 +57,14 @@
          range or values (`varianceSize` / `varianceForm` are half the slider;
          §2.1 says why). A narrowing is a schema statement, so it warns too —
          a reading made without a ruling, one line to drop.
+   SCHEMA v2 (S3, Nov 5) — the per-layer rows, `LAYER_SCHEMA` in the census:
+     W1  also: a layer entry's offset that the layer does NOT own (a delta on
+         the global — petalCup, petalSpineCurl, …), a layer value off the v2
+         schema (the outline's — the outline is the next stage), or any
+         petal / tier / strand entry;
+     W2  also: an OWNED quantity whose effective value (the file's global, or
+         the default, plus the layer's offset) lies outside the registry's own
+         range — the build clamps it SILENTLY (the reader never sees a sum).
    A name that is not a control at all is V1's (`unknown`), never a warning.
 
    RUN:  node tools/verify-bloom-photo-subset.mjs <file.json> [...]
@@ -57,7 +73,7 @@
                       with its `controls` put in the v1 envelope; the dropped
                       keys are named. The raw file is still validated as it is.
          node tools/verify-bloom-photo-subset.mjs --self
-                      the ten written-down fixtures below, each against its
+                      the fifteen written-down fixtures below (five added for schema v2, S3), each against its
                       expected clause AND warning sets, then the off-schema
                       fixture through a SPAWNED copy of this validator: it
                       must list W1 and exit 0 (CI: spawned by the design-file
@@ -78,7 +94,7 @@ import { fileURLToPath } from 'node:url';
 import { CONTROLS, DEFAULTS, valuesEqual } from '../bloom-registry.js';
 import { composeDoc, toText } from '../bloom-file.js';
 import { serveRepo, launchPage, openBloom, settleBuild } from './bloom-harness.mjs';
-import { SCHEMA } from './bloom-photo-census.mjs';
+import { SCHEMA, LAYER_SCHEMA } from './bloom-photo-census.mjs';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 
@@ -100,10 +116,23 @@ function schemaWarnings(obj) {
   const off = [], out = [];
   for (const [id, v] of named) {
     const row = SCHEMA_ROW.get(id);
-    if (!row) { off.push(`${id}=${JSON.stringify(v)}`); continue; }
+    if (!row) { if (id !== LAYER_SCHEMA.switch) off.push(`${id}=${JSON.stringify(v)}`); continue; }
     if (row.range && typeof v === 'number' && (v < row.range[0] || v > row.range[1])) out.push(`${id} ${v} (schema ${row.range[0]}..${row.range[1]})`);
     if (row.values && !row.values.includes(v)) out.push(`${id} ${JSON.stringify(v)} (schema ${row.values.join(' / ')})`);
   }
+  /* schema v2: the per-layer switch is on the schema; the per-layer rows */
+  const ov = obj && obj.overrides && typeof obj.overrides === 'object' && !Array.isArray(obj.overrides) ? obj.overrides : {};
+  const glob = (id) => (obj.controls && id in obj.controls ? obj.controls[id] : DEFAULTS[id]);
+  (Array.isArray(ov.layers) ? ov.layers : []).forEach((e, i) => {
+    if (!e || typeof e !== 'object') return;
+    for (const [id, d] of Object.entries(e.offsets || {})) {
+      if (!LAYER_SCHEMA.offsets.includes(id)) { off.push(`layers[${i}].offsets.${id}=${JSON.stringify(d)} (a delta on the global — a layer does not own it)`); continue; }
+      const c = controlOf.get(id), eff = Number(glob(id)) + d;
+      if (c && typeof d === 'number' && (eff < c.min || eff > c.max)) out.push(`layers[${i}] owns ${id} ${glob(id)} + ${d} = ${eff} (registry ${c.min}..${c.max}: clamped silently by the build)`);
+    }
+    for (const id of Object.keys(e.values || {})) if (!LAYER_SCHEMA.values.includes(id)) off.push(`layers[${i}].values.${id} (not a per-layer value in schema v2)`);
+  });
+  for (const k of ['petals', 'tiers', 'strands']) if (Array.isArray(ov[k]) && ov[k].length) off.push(`overrides.${k} (${ov[k].length} entr${ov[k].length === 1 ? 'y' : 'ies'} — schema v2 writes layer entries only)`);
   if (off.length) warned.W1 = `off the photo schema: ${off.join(', ')}`;
   if (out.length) warned.W2 = `outside the photo schema's own range: ${out.join(', ')}`;
   return warned;
@@ -120,6 +149,7 @@ const DIRTY_TEXT = toText(composeDoc(DIRTY_STATE, { savedAt: '2026-11-03T00:00:0
 
 const ENV = { format: 'bloom-design', version: 1 };
 const CLEAN = { petalCount: 12, petalTilt: 40, petalCup: 0.3, layerCount: 2, layerSize: 0.8 };
+const SCOPED = { petalCount: 12, petalTilt: 40, petalCup: 0.3, layerCount: 2, scopeLayers: 'ON' };
 /* THE FIXTURES, WRITTEN DOWN with the clauses each must fire and the warnings
    each must list (`warn`, default none) — never derived from the module under
    test. The three the brief names are OUT_OF_RANGE, UNKNOWN_FIELD and
@@ -136,6 +166,19 @@ const FIXTURES = [
   { id: 'SIDECAR_INSIDE', file: { ...ENV, controls: { ...CLEAN }, confidence: { petalCount: 0.9 } }, expect: ['V1', 'V5'] },
   { id: 'OFF_SCHEMA', file: { ...ENV, controls: { ...CLEAN, stamenCount: 6, antherElongation: 4 } }, expect: [], warn: ['W1'] },
   { id: 'SCHEMA_RANGE', file: { ...ENV, controls: { ...CLEAN, varianceSize: 0.4 } }, expect: [], warn: ['W2'] },
+  /* SCHEMA v2 (S3): an INTENDED per-layer scope must load clean — onto the dirty
+     page, whose own leftover layer entry (layer 1, petalTilt +5) V4 must not
+     see survive. `layerSize` / `layerTilt` are not named: they HIDE while
+     Per-layer values is live (the registry), so a scoped subset owns each
+     layer's length and tilt instead. */
+  { id: 'SCOPED_RADIAL', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: { petalTilt: -10 } }, { layer: 1, offsets: { petalLength: 6, petalTilt: 15 } }] } }, expect: [] },
+  { id: 'SCOPED_SPIRAL', file: { ...ENV, controls: { ...SCOPED, placement: 'SPIRAL' }, overrides: { layers: [{ layer: 0, offsets: { petalWidth: 4 } }, { layer: 1, offsets: { petalTilt: 20 }, values: { petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.5, 0.15], [0.9, 0.5]] } } }] } }, expect: [] },
+  /* a layer offset the layer does not OWN loads clean and only warns */
+  { id: 'SCOPED_DELTA', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: { petalTilt: -10, petalCup: 0.2 } }] } }, expect: [], warn: ['W1'] },
+  /* an owned sum past the registry range loads clean (the build clamps it) and warns */
+  { id: 'SCOPED_OWNED_RANGE', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalLength: 90 } }] } }, expect: [], warn: ['W2'] },
+  /* layer entries with Per-layer values left OFF: zero notes, nothing built — V7 */
+  { id: 'SCOPED_INERT', file: { ...ENV, controls: { ...CLEAN }, overrides: { layers: [{ layer: 1, offsets: { petalLength: 6 } }] } }, expect: ['V7'] },
   { id: 'NO_ENVELOPE', file: { views: ['front'], controls: { ...CLEAN }, frame: 1 }, expect: ['V0', 'V1', 'V2', 'V3', 'V4', 'V5'] },   // V3: the dirty page's own layerSize hides under Per-layer values
 ];
 
@@ -148,12 +191,29 @@ const MUTANTS = [
     to: '  selectScope(null);\n  for (const c of CONTROLS) {\n    if (!r.applied.includes(c.id)) continue;\n    inputs[c.id].value = r.doc.controls[c.id];',
     /* V2 on the fixtures whose V2 did not already fire; V3 wherever the subset
        names layerSize — the dirty page's leftover Per-layer values (ON) hides it */
-    breaks: ['CLEAN:V2', 'CLEAN:V3', 'HIDDEN_OPTION:V3', 'OFF_SCHEMA:V2', 'OFF_SCHEMA:V3', 'OFF_STEP:V3', 'OUT_OF_RANGE:V3', 'SCHEMA_RANGE:V2', 'SCHEMA_RANGE:V3', 'SIDECAR_INSIDE:V2', 'SIDECAR_INSIDE:V3', 'UNKNOWN_FIELD:V2', 'UNKNOWN_FIELD:V3'],
+    breaks: ['CLEAN:V2', 'CLEAN:V3', 'HIDDEN_OPTION:V3', 'OFF_SCHEMA:V2', 'OFF_SCHEMA:V3', 'OFF_STEP:V3', 'OUT_OF_RANGE:V3', 'SCHEMA_RANGE:V2', 'SCHEMA_RANGE:V3', 'SIDECAR_INSIDE:V2', 'SIDECAR_INSIDE:V3', 'UNKNOWN_FIELD:V2', 'UNKNOWN_FIELD:V3',
+      /* S3: every scoped fixture's read-back (V2); and on SCOPED_INERT the
+         dirty page's leftover Per-layer ON makes the file's inert entry LIVE,
+         so V7 STOPS firing there while V2/V3 see the leftover */
+      'SCOPED_RADIAL:V2', 'SCOPED_SPIRAL:V2', 'SCOPED_DELTA:V2', 'SCOPED_OWNED_RANGE:V2', 'SCOPED_INERT:V2', 'SCOPED_INERT:V3', 'SCOPED_INERT:V7'],
   },
   {
     id: 'the-scopes-survive-a-new-design', file: 'bloom.js',
     from: "next[k] = r.doc.overrides[k] || [];", to: "next[k] = (had && had[k]) || [];",
-    breaks: ['CLEAN:V4', 'OUT_OF_RANGE:V4', 'UNKNOWN_FIELD:V4', 'HIDDEN_CONTROL:V4', 'HIDDEN_OPTION:V4', 'OFF_STEP:V4', 'SIDECAR_INSIDE:V4', 'OFF_SCHEMA:V4', 'SCHEMA_RANGE:V4'],
+    breaks: ['CLEAN:V4', 'OUT_OF_RANGE:V4', 'UNKNOWN_FIELD:V4', 'HIDDEN_CONTROL:V4', 'HIDDEN_OPTION:V4', 'OFF_STEP:V4', 'SIDECAR_INSIDE:V4', 'OFF_SCHEMA:V4', 'SCHEMA_RANGE:V4',
+      /* S3: a scoped file's own layers are REPLACED by the leftover (layer 1) —
+         V4 always, V7 wherever the file's layer set is not [1] */
+      'SCOPED_RADIAL:V4', 'SCOPED_RADIAL:V7', 'SCOPED_SPIRAL:V4', 'SCOPED_SPIRAL:V7', 'SCOPED_DELTA:V4', 'SCOPED_DELTA:V7', 'SCOPED_OWNED_RANGE:V4', 'SCOPED_INERT:V4'],
+  },
+  {
+    /* S3: the page MERGES the leftover scope into the file's — the plausible
+       wrong reading of "take the file's scopes" once a file carries some */
+    id: 'the-leftover-scope-is-merged-into-the-file', file: 'bloom.js',
+    from: "next[k] = r.doc.overrides[k] || [];", to: "next[k] = [...((had && had[k]) || []), ...(r.doc.overrides[k] || [])];",
+    /* V4 on every fixture — scoped or not, the dirty page's layer-1 entry
+       survives; and V7 on SCOPED_DELTA, whose own layers are [0]: the leftover
+       adds layer 1, so the BUILDER's scoped layers stop being the file's */
+    breaks: ['CLEAN:V4', 'HIDDEN_CONTROL:V4', 'HIDDEN_OPTION:V4', 'OFF_SCHEMA:V4', 'OFF_STEP:V4', 'OUT_OF_RANGE:V4', 'SCHEMA_RANGE:V4', 'SCOPED_DELTA:V4', 'SCOPED_DELTA:V7', 'SCOPED_INERT:V4', 'SCOPED_OWNED_RANGE:V4', 'SCOPED_RADIAL:V4', 'SCOPED_SPIRAL:V4', 'SIDECAR_INSIDE:V4', 'UNKNOWN_FIELD:V4'],
   },
   {
     id: 'hidden-controls-are-applied', file: 'bloom-file.js',
@@ -172,7 +232,13 @@ const MUTANTS = [
        leftover becomes a NAMED control, so the hidden rule talks (V1/V5 on the
        clean file), the leftovers stay (V2) and the leftover Per-layer values
        hides the named layerSize (V3) */
-    breaks: ['CLEAN:V1', 'CLEAN:V2', 'CLEAN:V3', 'CLEAN:V5', 'HIDDEN_OPTION:V3', 'OFF_SCHEMA:V1', 'OFF_SCHEMA:V2', 'OFF_SCHEMA:V3', 'OFF_SCHEMA:V5', 'OFF_STEP:V3', 'OUT_OF_RANGE:V3', 'SCHEMA_RANGE:V1', 'SCHEMA_RANGE:V2', 'SCHEMA_RANGE:V3', 'SCHEMA_RANGE:V5', 'SIDECAR_INSIDE:V2', 'SIDECAR_INSIDE:V3', 'UNKNOWN_FIELD:V2', 'UNKNOWN_FIELD:V3'],
+    breaks: ['CLEAN:V1', 'CLEAN:V2', 'CLEAN:V3', 'CLEAN:V5', 'HIDDEN_OPTION:V3', 'OFF_SCHEMA:V1', 'OFF_SCHEMA:V2', 'OFF_SCHEMA:V3', 'OFF_SCHEMA:V5', 'OFF_STEP:V3', 'OUT_OF_RANGE:V3', 'SCHEMA_RANGE:V1', 'SCHEMA_RANGE:V2', 'SCHEMA_RANGE:V3', 'SCHEMA_RANGE:V5', 'SIDECAR_INSIDE:V2', 'SIDECAR_INSIDE:V3', 'UNKNOWN_FIELD:V2', 'UNKNOWN_FIELD:V3',
+      /* S3: the leftovers named on every scoped file talk (V1/V5: the dirty
+         page's layerSize / layerTilt are hidden under the file's own Per-layer
+         values) and stay (V2); SCOPED_INERT inherits the leftover's ON, so its
+         V7 stops firing and its CLEAN-like V3 fires */
+      'SCOPED_RADIAL:V1', 'SCOPED_RADIAL:V2', 'SCOPED_RADIAL:V5', 'SCOPED_SPIRAL:V1', 'SCOPED_SPIRAL:V2', 'SCOPED_SPIRAL:V5', 'SCOPED_DELTA:V1', 'SCOPED_DELTA:V2', 'SCOPED_DELTA:V5',
+      'SCOPED_OWNED_RANGE:V1', 'SCOPED_OWNED_RANGE:V2', 'SCOPED_OWNED_RANGE:V5', 'SCOPED_INERT:V1', 'SCOPED_INERT:V2', 'SCOPED_INERT:V3', 'SCOPED_INERT:V5', 'SCOPED_INERT:V7'],
   },
 ];
 
@@ -198,7 +264,7 @@ async function validate(page, port, text, name) {
     const rec = await page.evaluate(([t, n]) => window.__bloomDesign.loadAsNew(t, n), [text, name]);
     await settleBuild(page, 120000);
     const after = await page.evaluate(([ids]) => ({
-      ui: window.__bloomUIState(), scopes: window.__bloomDesign.scopes(),
+      ui: window.__bloomUIState(), scopes: window.__bloomDesign.scopes(), built: (window.__bloomMetrics() || {}).scopes || null,
       status: document.getElementById('designStatus').textContent,
       hidden: ids.filter((id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return !w || w.hidden; }),
     }), [(() => { try { const o = JSON.parse(text); return o && o.controls && typeof o.controls === 'object' ? Object.keys(o.controls).filter((k) => controlOf.has(k)) : []; } catch { return []; } })()]);
@@ -216,6 +282,14 @@ async function validate(page, port, text, name) {
     if (!sOk) fired.V4 = `page scopes ${JSON.stringify(after.scopes)}`;
     if (!/as a NEW design/.test(after.status) || !/every field read clean, nothing to report/.test(after.status)) fired.V5 = after.status.replace(/\s+/g, ' ').slice(0, 300);
     if (errors.length) fired.V6 = errors.join(' | ');
+    const fileLayers = obj && obj.overrides && Array.isArray(obj.overrides.layers)
+      ? [...new Set(obj.overrides.layers.filter((e) => e && (Object.keys(e.offsets || {}).length + Object.keys(e.values || {}).length)).map((e) => e.layer))].sort((a, b) => a - b) : [];
+    if (fileLayers.length) {
+      const b = after.built;
+      if (!b || !b.layersLive || JSON.stringify(b.scopedLayers) !== JSON.stringify(fileLayers) || (b.keptLayers || []).length) {
+        fired.V7 = `the file's layers [${fileLayers}] — the build ${b ? `layersLive ${b.layersLive}, scoped [${b.scopedLayers}], kept INERT [${b.keptLayers}]` : 'reports no scopes'}`;
+      }
+    }
     return { fired, warned: schemaWarnings(obj), rec, applied: rec.appliedIds || [] };
   } finally { page.off('pageerror', onErr); }
 }
@@ -292,7 +366,7 @@ try {
 const SELF_MUTANTS = [
   /* anchors joined from pieces so the definitions below do not match themselves */
   { id: 'a-warning-fails-the-run', from: ['        if (bad.length)', ' failed = true;'].join(''), to: '        if (bad.length || warns.length) failed = true;', breaks: 'the exit code' },
-  { id: 'the-off-schema-warning-is-dropped', from: ['    if (!row) {', ' off.push('].join(''), to: '    if (!row) { if (0) off.push(', breaks: 'the W1 line' },
+  { id: 'the-off-schema-warning-is-dropped', from: ['    if (!row) { if (id !== LAYER_SCHEMA.switch)', ' off.push('].join(''), to: '    if (!row) { if (0) off.push(', breaks: 'the W1 line' },
 ];
 function exitLeg(script) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'photo-subset-'));

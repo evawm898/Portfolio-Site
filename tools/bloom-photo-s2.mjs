@@ -27,6 +27,14 @@
                   version's composed state and the previous one's — the
                   "which changed and by how much" record, restated here from the
                   two subsets and DEFAULTS, never read from the sidecar.
+               S7 (S3, Nov 5) a version that writes `overrides.layers` carries a
+                  sidecar `layers` naming EXACTLY the subset's layer entries —
+                  every offset equal, its `value` the composed global plus the
+                  offset (what the layer OWNS), every owned value equal; each
+                  confidence in the enum, each photo declared — and no sidecar
+                  `layers` where the subset writes none;
+               S6 also restates `revisedFrom.layerChanges` from the two subsets'
+                  layer entries (null where absent), never from the sidecar.
              Exits 1 on any finding.
 
    RENDER:   node tools/bloom-photo-s2.mjs <out-dir> [--sheet <png>] [--photos <dir>] [--sheet-bare <png>]
@@ -50,7 +58,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { DEFAULTS } from '../bloom-registry.js';
-import { readNewDesign } from '../bloom-file.js';
+import { readNewDesign, scopesForBuild } from '../bloom-file.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SET = path.join(ROOT, 'docs/photo-to-bloom/eva-set');
@@ -78,6 +86,9 @@ function versions() {
   return out;
 }
 const composed = (subset) => { const r = readNewDesign(subset); if (!r.ok) throw new Error(r.error); return r.doc.controls; };
+const scopesOf = (subset) => { const r = readNewDesign(subset); if (!r.ok) throw new Error(r.error); return r.doc.overrides; };
+/* every (layer, offsets|values, id) a subset's layer entries carry — one owner for S6 and S7 */
+const layerFields = (subset) => { const m = {}; for (const e of ((subset.overrides || {}).layers || [])) for (const g of ['offsets', 'values']) for (const [k, x] of Object.entries(e[g] || {})) m[`${e.layer}:${g}.${k}`] = x; return m; };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 function check() {
@@ -109,6 +120,23 @@ function check() {
       if (!(id in subset.controls) && !(id in DEFAULTS)) bad.push(`${tag} S4: ${q.id} resolves ${id}, not a control`);
     }
     for (const u of sc.unmapped || []) for (const p of u.photos || []) if (!photoIds.has(p)) bad.push(`${tag} S5: unmapped "${u.feature}" cites undeclared photo ${p}`);
+    /* S7: the per-layer record */
+    const lf = layerFields(subset);
+    if (!Object.keys(lf).length) { if (sc.layers) bad.push(`${tag} S7: a sidecar 'layers' where the subset writes no layer entry`); }
+    else {
+      const g = composed(subset);
+      const sf = {};
+      for (const L of sc.layers || []) for (const grp of ['offsets', 'values']) for (const [k, x] of Object.entries(L[grp] || {})) {
+        sf[`${L.layer}:${grp}.${k}`] = grp === 'offsets' ? x.offset : x.value;
+        if (grp === 'offsets' && !same(x.value, +(Number(g[k]) + x.offset).toFixed(9))) bad.push(`${tag} S7: layers[${L.layer}] ${k} records value ${x.value}, the global ${g[k]} + offset ${x.offset} is ${Number(g[k]) + x.offset}`);
+        if (!CONF.has(x.confidence)) bad.push(`${tag} S7: layers[${L.layer}] ${k} confidence ${x.confidence}`);
+        if (!(x.photos || []).length) bad.push(`${tag} S7: layers[${L.layer}] ${k} names no photo`);
+        for (const p of x.photos || []) if (!photoIds.has(p)) bad.push(`${tag} S5: layers[${L.layer}] ${k} cites undeclared photo ${p}`);
+      }
+      const a = Object.keys(lf).sort(), b = Object.keys(sf).sort();
+      if (!same(a, b)) bad.push(`${tag} S7: sidecar layer fields [${b}] != subset [${a}]`);
+      for (const k of a) if (k in sf && !same(sf[k], lf[k])) bad.push(`${tag} S7: ${k} sidecar ${JSON.stringify(sf[k])} != subset ${JSON.stringify(lf[k])}`);
+    }
     /* S6: restate the revision from the two subsets, never from the sidecar */
     const prev = all.filter((x) => x.flower === it.flower && x.v < it.v).pop();
     if (prev) {
@@ -121,6 +149,11 @@ function check() {
         const c = sc.revisedFrom.changes[id];
         if (c && (!same(c.from, a[id]) || !same(c.to, b[id]))) bad.push(`${tag} S6: ${id} recorded ${c.from} -> ${c.to}, composed ${a[id]} -> ${b[id]}`);
       }
+      const pa = layerFields(JSON.parse(fs.readFileSync(prev.design, 'utf8'))), pb = layerFields(subset);
+      const wantL = [...new Set([...Object.keys(pa), ...Object.keys(pb)])].filter((k) => !same(pa[k], pb[k])).sort()
+        .map((k) => ({ layer: +k.split(':')[0], field: k.split(':')[1], from: pa[k] ?? null, to: pb[k] ?? null }));
+      const gotL = ((sc.revisedFrom && sc.revisedFrom.layerChanges) || []).slice().sort((x, y) => `${x.layer}:${x.field}`.localeCompare(`${y.layer}:${y.field}`));
+      if (!same(wantL, gotL)) bad.push(`${tag} S6: layerChanges ${JSON.stringify(gotL)} != the subsets' difference ${JSON.stringify(wantL)}`);
     } else if (sc.revisedFrom) bad.push(`${tag} S6: a first version carries revisedFrom`);
   }
   for (const b of bad) console.log('FAIL ' + b);
@@ -128,13 +161,27 @@ function check() {
   return bad.length === 0;
 }
 
-async function bbox(state) {
+async function bbox(state, overrides) {
   const G = await import('../bloom-geometry.js');
   const acc = new G.MeshBuilder({ exportMode: true });
-  G.buildBloomInto(acc, state);
+  /* WITH the file's scopes (S3): a scoped version built without them is a
+     different bloom, and the camera would frame the wrong one */
+  const built = G.buildBloomInto(acc, state, { below: null, scopes: scopesForBuild(overrides) });
   const P = acc.positions, lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < P.length; i += 3) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], P[i + k]); hi[k] = Math.max(hi[k], P[i + k]); }
-  return { lo, hi };
+  /* THE PROPORTIONS a side photo is read against, on the EXPORT mesh: the
+     whole flower's height (z) over its widest horizontal diameter, and the
+     same for the petals of every layer but the outermost (the closed BODY of
+     a bud with its splayed outer whorl excluded) — by each petal's own emitted
+     triangle range, read from the builder's record. */
+  const ext = (tris) => { let zl = Infinity, zh = -Infinity, r = 0; for (const [a, b] of tris) for (let t = a; t < b; t++) for (let j = 0; j < 9; j += 3) { const i = t * 9 + j; zl = Math.min(zl, P[i + 2]); zh = Math.max(zh, P[i + 2]); r = Math.max(r, Math.hypot(P[i], P[i + 1])); } return { h: zh - zl, w: 2 * r }; };
+  /* the BODY is the inner half of the layers (layer >= ceil(n/2)): petalsAll is
+     built ring by ring, one ring per layer, so a petal's layer is its index over
+     the per-ring count — read off the builder's own list, scoped or not */
+  const all = built.petalsAll || [], nRings = (built.rings || []).length || 1, per = all.length / nRings;
+  const tagged = all.map((p, i) => ({ p, layer: Math.floor(i / per) })).filter((x) => x.p && x.p.triRange);
+  const whole = ext(tagged.map((x) => x.p.triRange)), inner = ext(tagged.filter((x) => x.layer >= Math.ceil(nRings / 2)).map((x) => x.p.triRange));
+  return { lo, hi, petalsHW: +(whole.h / whole.w).toFixed(3), petalsHmm: +whole.h.toFixed(1), petalsWmm: +whole.w.toFixed(1), bodyLayers: `${Math.ceil(nRings / 2)}..${nRings - 1}`, bodyHW: nRings > 1 ? +(inner.h / inner.w).toFixed(3) : null, bodyHmm: +inner.h.toFixed(1), bodyWmm: +inner.w.toFixed(1) };
 }
 
 async function render(outDir, SHEET, PHOTOS, BARE) {
@@ -144,11 +191,11 @@ async function render(outDir, SHEET, PHOTOS, BARE) {
   const { browser, page } = await launchPage({ viewport: { width: 640, height: 640 }, deviceScaleFactor: 1 });
   const report = {};
   try {
-    for (const it of versions()) {
+    for (const it of versions().filter((x) => !ONLY_V.length || ONLY_V.includes(x.v))) {
       const tag = `${it.flower}-${it.v}`;
       const text = fs.readFileSync(it.design, 'utf8');
       const state = composed(JSON.parse(text));
-      const { lo, hi } = await bbox(state);
+      const { lo, hi, ...prop } = await bbox(state, scopesOf(JSON.parse(text)));
       await openBloom(page, port, { asShipped: true });
       const res = await page.evaluate(([t, n]) => window.__bloomDesign.loadAsNew(t, n), [text, path.basename(it.design)]);
       await settleBuild(page, 180000);
@@ -174,7 +221,8 @@ async function render(outDir, SHEET, PHOTOS, BARE) {
         flower: it.flower, v: it.v, named: Object.keys(JSON.parse(text).controls).length,
         load: { action: res && res.action, applied: res && res.applied, notes: notes.map((x) => `${x.kind}: ${x.text}`) },
         mode: modeTag(m), exportTris: m.shownMode === 'export' ? m.shownTris : null, maxDimMm: m.maxDimMm,
-        bboxMm: hi.map((h, k) => +(h - lo[k]).toFixed(1)),
+        bboxMm: hi.map((h, k) => +(h - lo[k]).toFixed(1)), proportions: prop,
+        scopes: m.scopes ? { layersLive: m.scopes.layersLive, scopedLayers: m.scopes.scopedLayers, keptLayers: m.scopes.keptLayers } : null,
         told: read.split(/(?<=[.)])\s+/).filter((s) => /CLAMP|FOLD LIMIT|NO ROOM|EXHAUSTED|SATURAT/.test(s)).map((s) => s.trim().slice(0, 240)),
         shots,
       };
@@ -198,8 +246,8 @@ async function sheet(browser, report, SHEET, PHOTOS) {
   const cols = 2 + Math.max(...flowers.map((f) => Object.values(report).filter((r) => r.flower === f).length * 2));
   const W = 232;
   let html = `<html><body style="margin:0;background:#16181a;color:#e8e8e4;font:12px monospace;padding:14px;width:${cols * (W + 8) + 20}px">`;
-  html += '<h2 style="margin:0 0 6px">Photo to bloom S2 — globals stage on Eva\'s set. Every design loaded AS A NEW DESIGN (zero notes); PRINT PREVIEW on.</h2>';
-  html += '<div style="margin-bottom:8px;color:#aab">v1 = front photo + the Q-profile answer · v2 = + the side photo · v3 = one feedback iteration after the sheet. Cameras match the photo angles. No pixel delta is quoted.</div>';
+  html += TITLE ? `<h2 style="margin:0 0 6px">${TITLE}</h2>` : '<h2 style="margin:0 0 6px">Photo to bloom S2 — globals stage on Eva\'s set. Every design loaded AS A NEW DESIGN (zero notes); PRINT PREVIEW on.</h2>';
+  html += `<div style="margin-bottom:8px;color:#aab">${SUBTITLE || 'v1 = front photo + the Q-profile answer · v2 = + the side photo · v3 = one feedback iteration after the sheet. Cameras match the photo angles. No pixel delta is quoted.'}</div>`;
   for (const f of flowers) {
     html += `<div style="margin:12px 0 4px;font-size:14px">${f.toUpperCase()}</div><div style="display:flex;gap:8px;align-items:flex-start">`;
     for (const v of ['front', 'side']) {
@@ -210,9 +258,10 @@ async function sheet(browser, report, SHEET, PHOTOS) {
     }
     for (const r of Object.values(report).filter((x) => x.flower === f)) {
       const sc = JSON.parse(fs.readFileSync(path.join(SET, f, `${f}-${r.v}.bloom-photo.json`), 'utf8'));
-      const ch = sc.revisedFrom ? Object.entries(sc.revisedFrom.changes).map(([id, c]) => `${id} ${c.from}→${c.to}`).join(', ') : 'first pass';
+      const ch = sc.revisedFrom ? [...Object.entries(sc.revisedFrom.changes).map(([id, c]) => `${id} ${c.from}→${c.to}`), ...((sc.revisedFrom.layerChanges || []).map((c) => `L${c.layer} ${c.field.replace(/^offsets\./, '').replace(/^values\./, '')} ${typeof c.from === 'object' && c.from ? 'curve' : c.from}→${typeof c.to === 'object' && c.to ? 'curve' : c.to}`))].join(', ') : 'first pass';
+      const own = (sc.layers || []).map((L) => `L${L.layer}: ${['petalLength', 'petalTilt'].filter((k) => L.offsets && L.offsets[k]).map((k) => `${k === 'petalLength' ? 'len' : 'tilt'} ${L.offsets[k].value}`).join(' ')}${L.values ? ' +spine curve' : ''}`).join(' · ');
       for (const [v, file] of Object.entries(r.shots)) {
-        html += `<div style="width:${W}px"><img src="${img(file)}" style="width:${W}px;height:${W}px"><div>${r.v} · ${v} · ${r.named} named · ${(r.exportTris || 0).toLocaleString('en-US')} tris (export)</div>${v === 'front' ? `<div style="color:#9ab;font-size:10px">${ch}</div>` : ''}</div>`;
+        html += `<div style="width:${W}px"><img src="${img(file)}" style="width:${W}px;height:${W}px"><div>${r.v} · ${v} · ${r.named} named · ${(r.exportTris || 0).toLocaleString('en-US')} tris (export)</div>${v === 'front' ? `<div style="color:#9ab;font-size:10px">${ch}</div>` : `<div style="color:#cb9;font-size:10px">${own || 'no per-layer values'}${r.proportions && r.proportions.bodyHW ? ` · inner-half h:w ${r.proportions.bodyHW}` : ''} · petals h:w ${r.proportions ? r.proportions.petalsHW : '?'}</div>`}</div>`;
       }
     }
     html += '</div>';
@@ -226,5 +275,6 @@ async function sheet(browser, report, SHEET, PHOTOS) {
 
 if (flag('--check')) process.exit(check() ? 0 : 1);
 const SHEET = opt('--sheet'), PHOTOS = opt('--photos'), BARE = opt('--sheet-bare');
+const ONLY_V = (opt('--versions') || '').split(',').filter(Boolean), TITLE = opt('--title'), SUBTITLE = opt('--subtitle');
 if (!check()) process.exit(1);
 await render(argv[0] || '/tmp/bloom-photo-s2', SHEET, PHOTOS, BARE);

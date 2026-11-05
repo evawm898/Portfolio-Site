@@ -19,10 +19,13 @@
    behind a NEVER-TRUE predicate, or a choice value the registry marks hidden.
 
    RUN:  node tools/bloom-photo-census.mjs [--md]     (--md prints the doc tables)
-   IMPORT: `SCHEMA` is exported for tools/verify-bloom-photo-subset.mjs; importing
-           runs no census and prints nothing.
+   IMPORT: `SCHEMA`, `SCHEMA_VERSION` and `LAYER_SCHEMA` are exported for
+           tools/verify-bloom-photo-subset.mjs; importing runs no census and
+           prints nothing (the one load-time check is LAYER_SCHEMA against the
+           geometry's own owned list — it throws, it does not print).
    =================================================================== */
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, predicateDrivers } from '../bloom-registry.js';
+import { SCOPE_LAYER_OWNED, SCOPE_VALUE_GROUPS, SCOPE_LAYER_PLACEMENTS } from '../bloom-geometry.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,7 +36,8 @@ const CLASS = {
   petalCount: [A, 'count the petals of one whorl'], spread: [A, 'the centre-to-petal proportion (disc diameter / flower diameter)'],
   placement: [A, 'ring / spiral-packed head / continuous / mirror-symmetric fan'], fanPerSide: [A, 'FAN only — petals each side of the plane'],
   fanSpacing: [A, 'FAN only — angle between neighbours'], fanCenterPetal: [A, 'FAN only — a petal on the mirror line or a gap'],
-  scopePetals: [D, 'editor toggle that unlocks per-petal scopes — v1 writes no scopes'], scopeLayers: [D, 'editor toggle that unlocks per-layer scopes — v1 writes no scopes'],
+  scopePetals: [D, 'editor toggle that unlocks per-petal scopes — the photo schema writes no per-petal scopes'],
+  scopeLayers: [B, 'the Per-layer values switch — schema v2 (S3) turns it ON exactly when it writes `overrides.layers`; v1 wrote no scopes'],
   layerCount: [A, 'single / semi-double / double — but inner layers are hidden in a dense double: confidence low there'],
   layerSize: [A, 'inner petals shorter than outer'], layerPhase: [A, 'inner petals staggered into the gaps or aligned'],
   layerTilt: [B, 'inner whorls more upright than outer — needs a side or low view'],
@@ -142,6 +146,39 @@ export const SCHEMA = [
   { id: 'sepalCount', group: 'sepals', ask: true }, { id: 'sepalScale', group: 'sepals' }, { id: 'sepalAngle', group: 'sepals' },
 ];
 
+/* ---- SCHEMA VERSION 2 (photo-to-bloom S3, Nov 5): THE PER-LAYER ROWS ------
+   The 46 global rows above are UNCHANGED (v1's). v2 adds what a LAYER entry
+   (`overrides.layers[i]`) may carry, restricted to what a layer OWNS OUTRIGHT
+   rather than offsets (§9.6, §11 of the doc):
+     offsets  petalLength / petalWidth / petalTilt — Q3.5: a layer entry naming
+              one of these OWNS it (the layer's value is global + offset, and
+              the `layerSize` / `layerTilt` ramp's term is left out for it);
+     values   the spine — `petalCurlMode` / `petalSpineCurve` (F3-scope).
+   NOT in v2, each a W1 when written:
+     - every other offset (the ~30 delta-on-global sliders: petalCup,
+       petalSpineCurl, … — a layer cannot own them, only nudge the global);
+     - the OUTLINE values (`petalOutlineMode` / `petalOutlineCurve`): the
+       outline is the NEXT stage (stage order changed Nov 5: per-layer before
+       outline), so the per-layer stage does not write a curve outline;
+     - petal / tier / strand entries (per-petal is FAN only; tiers are sepals).
+   The switch: `scopeLayers` ON, under one of `placements` — the geometry's own
+   SCOPE_LAYER_PLACEMENTS. The owned list is RESTATED here and checked against
+   the geometry's SCOPE_LAYER_OWNED at load, both directions: importing it
+   would let a quantity added to the geometry enter the photo schema silently. */
+export const SCHEMA_VERSION = 2;
+export const LAYER_SCHEMA = Object.freeze({
+  switch: 'scopeLayers',
+  placements: ['RADIAL', 'SPIRAL'],
+  offsets: ['petalLength', 'petalWidth', 'petalTilt'],
+  values: ['petalCurlMode', 'petalSpineCurve'],
+});
+{
+  const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+  if (!same(LAYER_SCHEMA.offsets, SCOPE_LAYER_OWNED)) throw new Error(`LAYER_SCHEMA.offsets [${LAYER_SCHEMA.offsets}] is not the geometry's SCOPE_LAYER_OWNED [${SCOPE_LAYER_OWNED}]`);
+  if (!same(LAYER_SCHEMA.values, SCOPE_VALUE_GROUPS.spine)) throw new Error(`LAYER_SCHEMA.values [${LAYER_SCHEMA.values}] is not the geometry's spine value group [${SCOPE_VALUE_GROUPS.spine}]`);
+  if (!same(LAYER_SCHEMA.placements, SCOPE_LAYER_PLACEMENTS)) throw new Error(`LAYER_SCHEMA.placements [${LAYER_SCHEMA.placements}] is not the geometry's SCOPE_LAYER_PLACEMENTS [${SCOPE_LAYER_PLACEMENTS}]`);
+}
+
 /* Everything below runs only when this file is RUN. The photo-subset validator
    imports SCHEMA (one owner of the 46 rows) and must not inherit the census's
    process.exit. */
@@ -165,6 +202,8 @@ for (const r of SCHEMA) {
   }
   if (r.range && c.kind === 'slider' && (r.range[0] < c.min || r.range[1] > c.max)) bad.push(`schema row ${r.id} widens the registry range`);
 }
+if (CLASS[LAYER_SCHEMA.switch] && CLASS[LAYER_SCHEMA.switch][0] === D) bad.push(`the per-layer switch ${LAYER_SCHEMA.switch} is class d — never set`);
+for (const id of [...LAYER_SCHEMA.offsets, ...LAYER_SCHEMA.values, LAYER_SCHEMA.switch]) if (!byId[id]) bad.push(`per-layer schema row ${id} is not a control`);
 if (bad.length) { console.error('CENSUS INVALID:\n  ' + bad.join('\n  ')); process.exit(2); }
 
 const secLabel = Object.fromEntries(SECTIONS.map((s) => [s.id, s.label || s.id]));
@@ -177,7 +216,7 @@ const neverTrue = (c) => c.visibleWhen && JSON.stringify(c.visibleWhen).includes
 const counts = { a: 0, b: 0, c: 0, d: 0 };
 for (const c of CONTROLS) counts[CLASS[c.id][0]]++;
 if (!process.argv.includes('--md')) {
-  console.log(`CENSUS: ${CONTROLS.length} controls — a ${counts.a} · b ${counts.b} · c ${counts.c} · d ${counts.d}; schema ${SCHEMA.length} rows; every control classified, every class an id`);
+  console.log(`CENSUS: ${CONTROLS.length} controls — a ${counts.a} · b ${counts.b} · c ${counts.c} · d ${counts.d}; schema v${SCHEMA_VERSION}: ${SCHEMA.length} global rows + per-layer (${LAYER_SCHEMA.switch} ON under ${LAYER_SCHEMA.placements.join('/')}; offsets ${LAYER_SCHEMA.offsets.join(', ')}; values ${LAYER_SCHEMA.values.join(', ')}); every control classified, every class an id`);
   process.exit(0);
 }
 console.log(`| control | kind | section | range / options | default | class | why |\n|---|---|---|---|---|---|---|`);
