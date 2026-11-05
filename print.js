@@ -176,7 +176,7 @@ const vec = v => Array.isArray(v) ? `[${v.map(num).join(', ')}]` : String(v);
 // --- renderer / scene ------------------------------------------------------
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setClearColor(0x0c0e0e);
+renderer.setClearColor(0x060707);   // --color-ground (shaded view; line art draws on paper)
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 10000);
@@ -508,7 +508,7 @@ dotsIn.addEventListener('input', readStyle);
 function setLineArt(on) {
   if (!art) return;
   art.setEnabled(on);
-  renderer.setClearColor(on ? 0xf2f0ea : 0x0c0e0e);
+  renderer.setClearColor(on ? 0xf2f0ea : 0x060707);
   lineArtBox.checked = on;
   renderArt();
 }

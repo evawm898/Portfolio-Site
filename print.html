@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
 
 <!-- Three.js via ES-module import map, pinned to the SAME version bloom.html
      already pins (0.161.0) so the two pages share one cached copy and any
@@ -27,8 +28,8 @@
 </script>
 
 <style>
-  :root { --mono: "IBM Plex Mono", ui-monospace, monospace; color-scheme: dark; }
-  html, body { margin: 0; height: 100%; background: #0c0e0e; color: #d8dedd; }
+  :root { --mono: var(--type-mono); color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: var(--color-ground); color: var(--color-ink); }
   #print-canvas { display: block; width: 100vw; height: 100vh; }
 
   /* Debug panel — reports whatever bundle is currently loaded (the pivot
@@ -48,15 +49,15 @@
   }
   #print-debug, #print-bundle-load {
     font-family: var(--mono); font-size: 0.72rem; line-height: 1.65;
-    background: rgba(10, 12, 12, 0.86); border: 1px solid #2b3333;
+    background: color-mix(in srgb, var(--color-raised) 86%, transparent); border: 1px solid var(--color-line-strong);
     padding: 0.75rem 0.9rem; border-radius: 2px;
   }
-  #print-bundle-load { color: #96a2a1; }
+  #print-bundle-load { color: var(--color-ink-2); }
   #print-bundle-load input[type=file] {
     display: block; margin-top: 0.3rem; max-width: 100%;
     font: inherit; color: inherit;
   }
-  #print-bundle-load .hint { color: #6b7776; font-size: 0.68rem; display: block; margin-top: 0.3rem; }
+  #print-bundle-load .hint { color: var(--color-dim); font-size: 0.68rem; display: block; margin-top: 0.3rem; }
   #print-log { margin: 0; white-space: pre-wrap; font: inherit; }
 
   /* PANELS ARE ALWAYS PRESENT, AND EACH ONE COLLAPSES ON ITS OWN.
@@ -67,35 +68,36 @@
      a control that vanishes is indistinguishable from a control that was
      never built, which is exactly the confusion this replaces. */
   .panel > summary {
-    color: #6fb7ae; letter-spacing: 0.08em; cursor: pointer;
+    color: var(--color-petrol); letter-spacing: 0.08em; cursor: pointer;
     list-style: none; user-select: none; display: flex; align-items: center; gap: 0.4rem;
   }
   .panel > summary::-webkit-details-marker { display: none; }
   .panel > summary::before { content: '\25be'; font-size: 0.85em; width: 0.7em; }
   .panel:not([open]) > summary::before { content: '\25b8'; }
-  .panel > summary:hover { color: #8fd3ca; }
+  .panel > summary:hover { color: var(--color-ink); }
   .panel[open] > summary { margin-bottom: 0.5rem; }
   /* Everything a panel shows when it has nothing to report. */
-  .panel-empty { color: #6b7776; margin: 0; }
-  #print-debug b { color: #6fb7ae; font-weight: 500; }
-  #print-debug .err { color: #e07a6a; }
+  .panel-empty { color: var(--color-dim); margin: 0; }
+  #print-debug b { color: var(--color-petrol); font-weight: 500; }
+  #print-debug .err { color: var(--color-ink); }
+  #print-debug .err::before { content: '\2715  '; }
   /* Bundle picker — always visible, above the log it describes. The
      drag-and-drop target is the whole page (see #print-dropzone-hint); this
      input is the keyboard/click-reachable equivalent for the same action. */
   #print-dropzone-hint {
     position: fixed; inset: 0.6rem; z-index: 10; pointer-events: none;
     display: flex; align-items: center; justify-content: center;
-    border: 2px dashed #6fb7ae; border-radius: 4px;
-    background: rgba(12, 14, 14, 0.72);
-    font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.06em; color: #c8d2d1;
+    border: 2px dashed var(--color-petrol); border-radius: 4px;
+    background: color-mix(in srgb, var(--color-raised) 72%, transparent);
+    font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.06em; color: var(--color-ink);
   }
   #print-dropzone-hint[hidden] { display: none; }
   #print-marker-toggle {
     display: flex; align-items: center; gap: 0.45rem;
-    margin-top: 0.85rem; padding-top: 0.7rem; border-top: 1px solid #222a2a;
-    color: #96a2a1; cursor: pointer; user-select: none;
+    margin-top: 0.85rem; padding-top: 0.7rem; border-top: 1px solid var(--color-line);
+    color: var(--color-ink-2); cursor: pointer; user-select: none;
   }
-  #print-marker-toggle input { accent-color: #6fb7ae; margin: 0; }
+  #print-marker-toggle input { accent-color: var(--color-petrol); margin: 0; }
   /* `display: flex` above outranks the UA sheet's `[hidden] { display: none }`,
      so the attribute alone would NOT hide this row — it would offer a toggle
      for a marker that is not in the bundle. Measured: the gate's
@@ -117,22 +119,22 @@
   }
   #print-pose, #print-stylize {
     font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
-    background: rgba(10, 12, 12, 0.9); border: 1px solid #2b3333;
-    padding: 0.7rem 0.9rem; border-radius: 2px; color: #96a2a1;
+    background: color-mix(in srgb, var(--color-raised) 90%, transparent); border: 1px solid var(--color-line-strong);
+    padding: 0.7rem 0.9rem; border-radius: 2px; color: var(--color-ink-2);
   }
-  .pose-title { color: #6fb7ae; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
+  .pose-title { color: var(--color-petrol); letter-spacing: 0.08em; margin-bottom: 0.5rem; }
   .pose-row { display: grid; grid-template-columns: 3.2rem 1fr 3.2rem; align-items: center; gap: 0.5rem; }
-  .pose-row input[type=range] { width: 100%; accent-color: #6fb7ae; margin: 0; }
-  .pose-row output { text-align: right; color: #c8d2d1; }
-  .pose-hint { margin: 0.55rem 0 0.5rem; color: #6b7776; }
+  .pose-row input[type=range] { width: 100%; accent-color: var(--color-petrol); margin: 0; }
+  .pose-row output { text-align: right; color: var(--color-ink); }
+  .pose-hint { margin: 0.55rem 0 0.5rem; color: var(--color-dim); }
   #resetPose {
-    background: none; border: 1px solid #2b3333; color: #96a2a1;
+    background: none; border: 1px solid var(--color-line-strong); color: var(--color-ink-2);
     font: inherit; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 2px;
   }
-  #resetPose:hover { border-color: #6fb7ae; color: #c8d2d1; }
+  #resetPose:hover { border-color: var(--color-petrol); color: var(--color-ink); }
   #print-posestate {
-    margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid #222a2a;
-    white-space: pre-wrap; font: inherit; color: #96a2a1;
+    margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid var(--color-line);
+    white-space: pre-wrap; font: inherit; color: var(--color-ink-2);
   }
   #print-canvas.dragging { cursor: grabbing; }
 
@@ -140,45 +142,45 @@
      whole stage — with a wider value column because these read-outs carry a
      unit as well as a number. */
   #print-artstate {
-    margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid #222a2a;
-    white-space: pre-wrap; font: inherit; color: #96a2a1;
+    margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid var(--color-line);
+    white-space: pre-wrap; font: inherit; color: var(--color-ink-2);
   }
   #lineart-toggle {
     display: flex; align-items: center; gap: 0.45rem;
-    margin-bottom: 0.6rem; color: #96a2a1; cursor: pointer; user-select: none;
+    margin-bottom: 0.6rem; color: var(--color-ink-2); cursor: pointer; user-select: none;
   }
-  #lineart-toggle input { accent-color: #6fb7ae; margin: 0; }
+  #lineart-toggle input { accent-color: var(--color-petrol); margin: 0; }
   /* the stylize read-outs carry a unit as well as a number */
   #print-stylize .pose-row { grid-template-columns: 3.4rem 1fr 4.4rem; }
 
   /* INFILL shares the panel grammar; its rows carry a slightly wider label
      column because "curvature" and "spacing" do not abbreviate well. */
   #print-infill { font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
-    background: rgba(10, 12, 12, 0.9); border: 1px solid #2b3333;
-    padding: 0.7rem 0.9rem; border-radius: 2px; color: #96a2a1; }
+    background: color-mix(in srgb, var(--color-raised) 90%, transparent); border: 1px solid var(--color-line-strong);
+    padding: 0.7rem 0.9rem; border-radius: 2px; color: var(--color-ink-2); }
   #print-infill .pose-row { grid-template-columns: 4rem 1fr 4rem; }
   #print-infill select {
-    background: #101414; color: #c8d2d1; border: 1px solid #2b3333;
+    background: var(--color-raised); color: var(--color-ink); border: 1px solid var(--color-line-strong);
     font: inherit; padding: 0.15rem 0.3rem; border-radius: 2px; width: 100%;
   }
   #infill-anchor-toggle {
     display: flex; align-items: center; gap: 0.45rem;
-    margin: 0.55rem 0 0.5rem; color: #96a2a1; cursor: pointer; user-select: none;
+    margin: 0.55rem 0 0.5rem; color: var(--color-ink-2); cursor: pointer; user-select: none;
   }
-  #infill-anchor-toggle input { accent-color: #6fb7ae; margin: 0; }
+  #infill-anchor-toggle input { accent-color: var(--color-petrol); margin: 0; }
   #infill-fan-debug {
     display: flex; align-items: center; gap: 0.4rem; margin-top: 0.5rem;
-    color: #2f8f9d; font-size: 0.72rem; cursor: pointer;
+    color: var(--color-petrol); font-size: 0.72rem; cursor: pointer;
   }
-  #infill-fan-debug input { accent-color: #2f8f9d; margin: 0; }
+  #infill-fan-debug input { accent-color: var(--color-petrol); margin: 0; }
   #resetAnchors {
-    background: none; border: 1px solid #2b3333; color: #96a2a1;
+    background: none; border: 1px solid var(--color-line-strong); color: var(--color-ink-2);
     font: inherit; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 2px;
   }
-  #resetAnchors:hover { border-color: #6fb7ae; color: #c8d2d1; }
+  #resetAnchors:hover { border-color: var(--color-petrol); color: var(--color-ink); }
   #print-infillstate {
-    margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid #222a2a;
-    white-space: pre-wrap; font: inherit; color: #96a2a1;
+    margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid var(--color-line);
+    white-space: pre-wrap; font: inherit; color: var(--color-ink-2);
   }
 </style>
 </head>

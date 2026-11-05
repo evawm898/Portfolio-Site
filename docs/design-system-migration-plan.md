@@ -241,3 +241,30 @@ costs frozen tags).
 - **Left and flagged.** On color-change, the gel-electrolyte label is
   `#3c4649` text drawn on the pale substrate swatch (a depicted material, where
   ink would not read).
+
+## 9. Batch 3 as built
+
+- **lab.** The hover twist-direction letter is Fraunces 600, not
+  Montserrat 700 (R7). Montserrat is gone from the font link.
+- **dress.** The inline figure panel is `--color-raised`.
+- **skirt.** The white `.skirt-figure` panel stays white (R4). Only a comment
+  was added saying so.
+- **flower-saved.** The `.sv-*` rules in `flower.css` are used by this page
+  only.
+  - The Delete button was salmon `#E6836B` text. It is now ink-2, carries a
+    `✕` glyph, and turns ink on hover (rule 1).
+  - The card grounds are tokens.
+  - The rest of `flower.css` is flower's, in batch 7.
+- **print.** The page now links `tokens.css`, and every chrome colour in its
+  style block is a token:
+  - Panels sit on raised. Borders are line-strong and dividers are line.
+  - Panel text is ink-2. Hints are dim; they were `#6B7776`, too faint to be
+    text.
+  - Values are ink. Headings, checkboxes and the fan-debug toggle are petrol.
+  - The load error was `#E07A6A` text. It is now ink with `✕`.
+- **print's shaded-view ground.** The ground of the shaded view (line art
+  off) is `#060707`; it was `#0C0E0E`. The scaffold gate's `DARK` background
+  constant moved with it in the same commit, and
+  `node tools/verify-print-scaffold.mjs` reads 70 checks, 0 failed.
+  - The line-art paper `#F2F0EA` is artwork and is kept. Line art is the
+    shipped default, so /print still opens on paper.

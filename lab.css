@@ -149,8 +149,8 @@
 /* Opacity is driven entirely by JS (inline style + transition) so it can
    react to hover in real time — hold/fade timing lives in lab.html */
 .js-direction-letter {
-  font-family: 'Montserrat', var(--mono);
-  font-weight: 700;
+  font-family: var(--type-serif);  /* R7: was Montserrat 700 */
+  font-weight: 600;
   font-size: 150px;
   fill: var(--ink);
   opacity: 0;
