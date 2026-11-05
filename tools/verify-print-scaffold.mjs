@@ -374,7 +374,7 @@ async function run({ mutant = null, shots = false } = {}) {
     const buf = await page.screenshot({ path: shots ? path.join(OUT, name) : undefined });
     return inkFraction(buf, bg);
   };
-  const PAPER = [242, 240, 234], DARK = [12, 14, 14];
+  const PAPER = [242, 240, 234], DARK = [6, 7, 7];   // the shaded view clears to --color-ground
 
   // --- line art is the shipped default -----------------------------------
   out('\n--- line art, shipped state ---');

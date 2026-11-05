@@ -902,14 +902,14 @@ body.fl-preview .fl-modal { display: none !important; }
 }
 .sv-card {
   border: 1px solid var(--line-strong);
-  background: rgba(12, 14, 14, 0.6);
+  background: color-mix(in srgb, var(--color-raised) 60%, transparent);
   display: flex;
   flex-direction: column;
 }
 .sv-card__preview {
   position: relative;
   aspect-ratio: 1 / 1;
-  background: #060707;
+  background: var(--color-ground);
   border-bottom: 1px solid var(--line);
   overflow: hidden;
 }
@@ -920,7 +920,7 @@ body.fl-preview .fl-modal { display: none !important; }
   height: 100%;
   border: 0;
   display: block;
-  background: #060707;
+  background: var(--color-ground);
 }
 .sv-card__ph {
   position: absolute;
@@ -953,8 +953,9 @@ body.fl-preview .fl-modal { display: none !important; }
   gap: 0.5rem;
   margin-top: 0.9rem;
 }
-.sv-del { color: #e6836b; border-color: rgba(230, 131, 107, 0.4); }
-.sv-del:hover { color: #ff9f86; border-color: #e6836b; }
+.sv-del { color: var(--color-ink-2); border-color: var(--color-line-strong); }
+.sv-del::before { content: '\2715\00a0'; }
+.sv-del:hover { color: var(--color-ink); border-color: var(--color-dim); }
 
 /* ---------------------------------------------------
    Responsive — panel becomes a bottom sheet on small screens
