@@ -59,6 +59,19 @@ finer than that; knit_08's two "proposer placement at 2x" pins passed and came o
 inside the bar (+7.5% uncertain, a regular test); knit_02 W is +12.5% confident on four-stitch windows
 and is pinned as KNOWN CONFIDENT-AND-WRONG by Eva's ruling (counts 2 / 2).
 
+RE-PINNED 2026-11-05 for the consensus status roll-up (README: "Consensus status respects each area's own
+doubt"): the consensus is "confident" only when more than half of the areas whose readings it combines are
+individually confident (one area: its own status). STATUS ONLY -- every spacing, per-inch value, confidence,
+area and overlay is unchanged (compared field by field over 101 /analyze-multi responses). Confident-and-wrong
+goes 2 / 2 -> 0 / 0 on (a) / (b) (teal W and knit_02 W now say uncertain, values still -13.4% and +12.5%), 5 -> 0
+across the resolution rows. THE COST, recorded rather than hidden: wale statuses on the app path read uncertain
+almost everywhere (the per-area wale detector flags uncertain on 9 of 11 fixtures even when right), so
+confident-and-within-10% on (a) goes 18 -> 12 of 19, and on the wale axis 9 -> 3 of 9; and the consensus now
+inherits per-area status flicker under scale jitter: status flips 5 -> 8 (synth_garter W and synth_rib W join
+knit_01 C as jitter-unstable). That increase broke the "flips must not increase" criterion and was ACCEPTED BY
+EVA'S RULING (Nov 5): status-only flickers on exact readings, failing safe; the two new entries stay pinned in
+JITTER_UNSTABLE below.
+
 RE-PINNED 2026-10-23 for the two phone-resolution mechanisms (README: "Phone-resolution
 photos: the ROI proposer at one working resolution, and the course loop-center pitch may
 corroborate, never override by a harmonic"). The proposer works on a copy downsampled to
@@ -142,41 +155,23 @@ _LEG_GATE = (
 # working resolution"); its jitter entry stands.
 KNOWN_BEYOND_BAR: dict = {}
 
-# Rows pinned as KNOWN CONFIDENT-AND-WRONG by ruling: still "confident"
-# with |error| > CONFIDENT_WRONG_PCT (those inside the 20% bar are also
-# guarded against regression by test_app_path_row like any other row;
-# those beyond it are strict xfails there too, with their diagnosis in
-# KNOWN_BEYOND_BAR). Each is a
-# strict xfail on test_known_confident_and_wrong_row_is_fixed: the day a
-# change takes the row inside 10% or flags it uncertain, it XPASSes and
-# the entry has to come off on purpose, together with its line in
-# CONFIDENT_AND_WRONG below.
-KNOWN_CONFIDENT_AND_WRONG = {
-    ("truth", "teal", "wale"): (
-        "-11.0% CONFIDENT -- KNOWN CONFIDENT-AND-WRONG, ACCEPTED BY EVA'S RULING on the loop-count gate "
-        "(variant B) and the target of the next PR: teal's own wale periodicity reads 75-80 px against a "
-        "68.2 px truth on every proposed area at every scale (the pinned-crop scorecard reads -12.4%), and "
-        "only a count's VALUE ever put it inside 10%; under the ruling a corroborating count supplies "
-        "confidence, never the value. Within 15% at all seven scales (ruling condition 2)."
-    ),
-    ("ruler", "teal", "wale"): (
-        "the same row as (a): no ruler pre-fill is offered on teal, so the user calibrates by hand and reads "
-        "exactly (a)'s -11.0% confident. Calibration adds nothing to it (test_calibration_adds_no_confident_and_wrong_rows)."
-    ),
-    ("truth", "knit_02", "wale"): (
-        "+12.5% CONFIDENT -- KNOWN CONFIDENT-AND-WRONG, ACCEPTED BY EVA'S RULING (Nov 5) on the working-resolution "
-        "analysis: four-stitch windows; all areas uncertain but consensus reports confident; target of the status "
-        "roll-up PR. The proposer's four 1-inch areas hold four stitches each and every one reads uncertain at every "
-        "scale (per area: native +6.7/+116%, 180 px/in +12.5%, 240 -1.6%, 360 +113% -- the resampling chain's "
-        "lottery, not a scale law; main's -2.4% was the same lottery); the consensus calls four agreeing uncertain "
-        "areas confident."
-    ),
-    ("ruler", "knit_02", "wale"): (
-        "the same row as (a): no ruler pre-fill is offered on knit_02 (WITHHELD_RULER), so the user calibrates by "
-        "hand and reads (a)'s +12.5% confident. Four-stitch windows; all areas uncertain but consensus reports "
-        "confident; target of the status roll-up PR."
-    ),
-}
+# Rows accepted as KNOWN CONFIDENT-AND-WRONG by ruling (status "confident", |error| >
+# CONFIDENT_WRONG_PCT): none. There were four until the consensus status rolled up the areas' own doubt;
+# they are FORMER_CONFIDENT_AND_WRONG below. An entry here would be a strict xfail on a row-fixed test with
+# its diagnosis, and would have to be listed in CONFIDENT_AND_WRONG as well.
+KNOWN_CONFIDENT_AND_WRONG: dict = {}
+
+# The four rows that WERE pinned above, as strict xfails, until the consensus status rolled up the areas'
+# own doubt (README: "Consensus status respects each area's own doubt"): teal W -13.4% and knit_02 W +12.5%,
+# on (a) and on (b) (no ruler pre-fill is offered on either photo, so (b) reads (a)'s run). Every area of
+# each reads individually uncertain; the consensus used to call that "confident". They are REGULAR tests now:
+# the reading is unchanged (still beyond 10% -- this change moves no measured value) and the status says so.
+FORMER_CONFIDENT_AND_WRONG = [
+    ("truth", "teal", "wale"),
+    ("ruler", "teal", "wale"),
+    ("truth", "knit_02", "wale"),
+    ("ruler", "knit_02", "wale"),
+]
 
 # Rows that were pinned here as KNOWN CONFIDENT-AND-WRONG "ruler-detector errors, target of the calibration PR"
 # and are now REGULAR tests (test_ruler_error_rows_are_no_longer_confident_and_wrong): the pre-fill that put
@@ -219,11 +214,21 @@ JITTER_UNSTABLE = {
     ),
 }
 
+JITTER_UNSTABLE[("synth_garter", "wale")] = (
+    "status flips under jitter since the consensus status rolls up the areas' own doubt: all three areas read "
+    "uncertain from -2% to +1% (consensus uncertain, as at the exact scale) and at +2% the proposer places two "
+    "areas that are both confident (consensus confident). The reading is 0.0 +-3% throughout; only the verdict "
+    "follows the per-area flicker. One of the three flips accepted by Eva's ruling (Nov 5)."
+)
+JITTER_UNSTABLE[("synth_rib", "wale")] = (
+    "status flips under jitter since the consensus status rolls up the areas' own doubt: at the exact scale two "
+    "of three areas are confident (consensus confident); at -2% and -1% only one is (uncertain). The reading is "
+    "0.0 +-2% throughout; only the verdict follows the per-area flicker. Two of the three flips accepted by "
+    "Eva's ruling (Nov 5)."
+)
+
 # The headline: confident-and-wrong rows per calibration mode.
-CONFIDENT_AND_WRONG = {
-    "truth": [("knit_02", "wale"), ("teal", "wale")],
-    "ruler": [("knit_02", "wale"), ("teal", "wale")],
-}
+CONFIDENT_AND_WRONG: dict = {"truth": [], "ruler": []}
 
 @pytest.fixture(scope="module")
 def card():
@@ -260,19 +265,30 @@ def test_app_path_row(card, key):
     )
 
 
-@pytest.mark.parametrize("key", [
-    pytest.param(key, id="-".join(key), marks=_strict(reason)) for key, reason in KNOWN_CONFIDENT_AND_WRONG.items()
-])
-def test_known_confident_and_wrong_row_is_fixed(card, key):
-    row = card["rows"][key]
-    assert not ap.confident_and_wrong(row), (
-        f"{key}: {row['error']:+.1f}% (status {row['status']}) -- still confident-and-wrong"
-    )
+def test_no_row_is_a_known_confident_and_wrong_exception(card):
+    """KNOWN_CONFIDENT_AND_WRONG is empty: a confident-and-wrong row is never an accepted exception any more.
+    A future ruling that accepts one adds it to the dict (and the headline list below) with its diagnosis, and
+    restores a strict xfail for it; until then every row in the card must pass this."""
+    assert not KNOWN_CONFIDENT_AND_WRONG
+    bad = sorted(k for k, r in card["rows"].items() if ap.confident_and_wrong(r))
+    assert not bad, f"confident-and-wrong rows: {bad}"
 
 
 def test_known_confident_and_wrong_rows_are_in_the_headline_list():
     for (mode, name, axis) in KNOWN_CONFIDENT_AND_WRONG:
         assert (name, axis) in CONFIDENT_AND_WRONG[mode], f"{(mode, name, axis)} is pinned as known but missing from CONFIDENT_AND_WRONG"
+
+
+@pytest.mark.parametrize("key", FORMER_CONFIDENT_AND_WRONG, ids=lambda k: "-".join(k))
+def test_former_confident_and_wrong_rows_now_say_uncertain(card, key):
+    """teal W and knit_02 W: every area uncertain, so the consensus is uncertain. The READING is the same
+    reading (this change moves no measured value): still beyond 10%, now honestly labelled."""
+    row = card["rows"][key]
+    assert row["status"] == "uncertain", f"{key}: status {row['status']} (areas {row['area_status']})"
+    assert row["error"] is not None and abs(row["error"]) > ap.CONFIDENT_WRONG_PCT, (
+        f"{key}: {row['error']} -- the reading moved; the roll-up must change the status only"
+    )
+    assert not ap.confident_and_wrong(row)
 
 
 def test_baseline_covers_every_scored_row(card):
@@ -391,24 +407,10 @@ def test_readme_carries_the_generated_table(card):
 # (fixture, axis) whose readings at the three resolutions disagree by more than
 # RESOLUTION_AGREE_PCT with every status confident, or that lose a measurement at one
 # resolution. Strict xfails: the day one agrees, the entry has to come off on purpose.
-RESOLUTION_DISAGREE = {
-    ("knit_02", "wale"): (
-        "four-stitch windows (Eva's ruling, Nov 5): 4.03 / 4.50 / 4.50 per inch at 0.5x / 1x / 2x against 4.0, an "
-        "11.6% spread, every status confident -- the proposer's 1-inch areas hold four stitches each and every area "
-        "is uncertain; the consensus reports confident (KNOWN_CONFIDENT_AND_WRONG). The high-px/in mechanism is "
-        "FIXED: each area is analysed at 180 px/in, so 2x reads the 1x copy to the pixel and the 8 px sensor grid is "
-        "gone (README: 'Analysis at one working resolution')."
-    ),
-}
+RESOLUTION_DISAGREE: dict = {}  # knit_02 W's entry came off: its 4.03 / 4.50 / 4.50 readings are now flagged uncertain
 
 # Confident-and-wrong at some resolution, pinned exactly (fixture, scale, axis).
-RESOLUTION_CONFIDENT_AND_WRONG = [
-    ("knit_02", 1.0, "wale"),   # four-stitch windows (KNOWN_CONFIDENT_AND_WRONG): +12.5% confident at 1x and, the same copy, at 2x
-    ("knit_02", 2.0, "wale"),
-    ("teal", 0.5, "wale"),      # teal W's accepted -11..-14% (KNOWN_CONFIDENT_AND_WRONG), at every resolution
-    ("teal", 1.0, "wale"),
-    ("teal", 2.0, "wale"),
-]
+RESOLUTION_CONFIDENT_AND_WRONG: list = []  # was five (knit_02 W at 1x/2x, teal W at 0.5x/1x/2x) until the status roll-up
 
 
 @pytest.mark.parametrize("name", [f.name for f in ap.FIXTURES])
