@@ -276,7 +276,15 @@
                          // pointerdown handler on the canvas checks this and bails, so a
                          // second finger landing can never also start a new ROI/calibration/
                          // grid-box drag on top of the pinch.
-    orientation: "vertical",
+    // null until the orientation step pre-selects the detected direction (see
+    // syncOrientationUI) or the user picks one; the backend is never sent a
+    // silent default -- Continue is disabled while this is null.
+    orientation: null,
+    // /propose-rois's wale-direction detection, exactly as the backend reported
+    // it: "vertical" | "horizontal" when every proposed area agreed, null when
+    // it was unsure (or no areas were proposed), plus the backend's own words.
+    orientationDetected: null,
+    orientationMessage: "",
     structure: "unknown",
     result: null,
     showMeasurementAreas: false, // "Show measurement areas" toggle -- all approved ROI outlines, results step
@@ -1921,6 +1929,8 @@
     state.rois = [];
     state.proposedRois = [];
     state.selectedRoiId = null;
+    state.orientationDetected = null;
+    state.orientationMessage = "";
     roiError.hidden = true;
     updateRoiUI();
     render();
@@ -2004,6 +2014,11 @@
       state.proposedRois = proposed.map((r) => ({ ...r }));
       state.rois = proposed;
       state.selectedRoiId = proposed[0].id;
+      // The detection rides on the proposal (it is a vote over these same areas,
+      // see analysis.gauge_analysis.detect_wale_orientation); a response from an
+      // older backend simply has no field and reads as unsure.
+      state.orientationDetected = data.orientation_detected || null;
+      state.orientationMessage = data.orientation_message || "";
       updateRoiUI();
       render();
     } catch (err) {
@@ -2045,6 +2060,7 @@
     // orientation/analyze/results flow unchanged.
     const primary = state.rois[0];
     state.roi = { x: primary.x, y: primary.y, width: primary.width, height: primary.height };
+    syncOrientationUI();
     goToStep("orientation");
   });
 
@@ -2364,11 +2380,46 @@
 
   // --- Step 4: Orientation -----------------------------------------------
 
+  const orientationDetectedNote = document.getElementById("orientationDetectedNote");
+
   document.querySelectorAll('input[name="orientation"]').forEach((radio) => {
     radio.addEventListener("change", (e) => {
       if (e.target.checked) state.orientation = e.target.value;
+      updateOrientationContinue();
     });
   });
+
+  function updateOrientationContinue() {
+    orientationConfirmBtn.disabled = state.orientation !== "vertical" && state.orientation !== "horizontal";
+  }
+
+  // Pre-select the detected wale direction (or nothing) on entering the step.
+  // The detection is a vote over the proposed areas: every area agreed, or it
+  // is unsure. Unsure pre-selects NOTHING and says so -- there is no silent
+  // default, because a wrong orientation makes both axes read the wrong
+  // physical pitch (the bad-input sweep's worst single input before this).
+  // The user can always change the pre-selection; it is only a starting point.
+  function syncOrientationUI() {
+    const detected = state.orientationDetected;
+    const radios = document.querySelectorAll('input[name="orientation"]');
+    if (detected === "vertical" || detected === "horizontal") {
+      state.orientation = detected;
+      radios.forEach((r) => { r.checked = r.value === detected; });
+      orientationDetectedNote.textContent =
+        state.orientationMessage ||
+        (detected === "vertical"
+          ? "Wales look like they run up and down in this photo \u2014 change it if that is not right."
+          : "Wales look like they run across this photo \u2014 change it if that is not right.");
+    } else {
+      state.orientation = null;
+      radios.forEach((r) => { r.checked = false; });
+      orientationDetectedNote.textContent =
+        state.orientationMessage ||
+        "Could not tell which way the wales run in this photo \u2014 please choose below.";
+    }
+    orientationDetectedNote.hidden = false;
+    updateOrientationContinue();
+  }
 
   document.querySelectorAll('input[name="structure"]').forEach((radio) => {
     radio.addEventListener("change", (e) => {
@@ -2377,6 +2428,7 @@
   });
 
   orientationConfirmBtn.addEventListener("click", () => {
+    if (state.orientation !== "vertical" && state.orientation !== "horizontal") return;
     buildAnalyzeSummary();
     goToStep("analyze");
   });
@@ -3394,7 +3446,9 @@
     state.gridBox = { visible: false, unit: "in", x: null, y: null, dragging: false, dragOffset: null };
     state.roi = null;
     state.roiDrag = null;
-    state.orientation = "vertical";
+    state.orientation = null;
+    state.orientationDetected = null;
+    state.orientationMessage = "";
     state.result = null;
     state.showMeasurementAreas = false;
     state.selectedDiagnosticRoiLabel = null;
@@ -3406,7 +3460,9 @@
     resetView();
     viewerEmpty.hidden = false;
     unitSelect.value = "cm";
-    document.querySelector('input[name="orientation"][value="vertical"]').checked = true;
+    document.querySelectorAll('input[name="orientation"]').forEach((r) => { r.checked = false; });
+    orientationDetectedNote.hidden = true;
+    updateOrientationContinue();
     resetCalibrationUI();
     resetRoiUI();
     verifyPredictedSummary.innerHTML = "";

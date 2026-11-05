@@ -42,6 +42,10 @@ import bad_input_sweep as bis
 
 SUBSET_MODE = bis.subset_requested()
 
+# RE-PINNED 2026-11-05 for wale-direction detection (README: "Wale direction is detected"): the `rot90_default`
+# row is `rot90_detected` now (the user takes the orientation the page pre-selects) and its eleven silent cells
+# and knit_06's card-silent run come off; totals move by exactly those (silent 38 -> 27 / 37 -> 26, card-silent
+# 4 -> 3, uncertain-but-right 99 -> 107 / 98 -> 107); no other pin moved (every other row byte-identical).
 # Pinned 2026-11-05 against main c0e0073 (the consensus status roll-up, #500, is in). Per calibration mode,
 # cause -> [(fixture, input, axis)]. Generated from a full run; re-pin with the README block.
 KNOWN_SILENT = {
@@ -59,18 +63,6 @@ KNOWN_SILENT = {
             ('jersey', 'lowlight+box', 'course'),
             ('knit_01', 'big4000+box', 'course'),
             ('knit_05', 'lowlight+box', 'course'),
-        ],
-        'COURSE | orientation left at the default on a rotated photo': [
-            ('jersey', 'rot90_default', 'course'),
-            ('knit_01', 'rot90_default', 'course'),
-            ('knit_05', 'rot90_default', 'course'),
-            ('knit_06', 'rot90_default', 'course'),
-            ('knit_08', 'rot90_default', 'course'),
-            ('knit_09', 'rot90_default', 'course'),
-            ('synth_garter', 'rot90_default', 'course'),
-            ('synth_jersey', 'rot90_default', 'course'),
-            ('synth_rib', 'rot90_default', 'course'),
-            ('teal', 'rot90_default', 'course'),
         ],
         'COURSE | rotated 15 degrees': [
             ('jersey', 'rot15+box', 'course'),
@@ -99,9 +91,6 @@ KNOWN_SILENT = {
             ('teal', 'blur4', 'wale'),
             ('teal', 'blur4+box', 'wale'),
         ],
-        'WALE | orientation left at the default on a rotated photo': [
-            ('knit_06', 'rot90_default', 'wale'),
-        ],
     },
     'ruler': {
         'COURSE | blur flicker (status flips to confident under blur)': [
@@ -117,18 +106,6 @@ KNOWN_SILENT = {
             ('jersey', 'lowlight+box', 'course'),
             ('knit_01', 'big4000+box', 'course'),
             ('knit_05', 'lowlight+box', 'course'),
-        ],
-        'COURSE | orientation left at the default on a rotated photo': [
-            ('jersey', 'rot90_default', 'course'),
-            ('knit_01', 'rot90_default', 'course'),
-            ('knit_05', 'rot90_default', 'course'),
-            ('knit_06', 'rot90_default', 'course'),
-            ('knit_08', 'rot90_default', 'course'),
-            ('knit_09', 'rot90_default', 'course'),
-            ('synth_garter', 'rot90_default', 'course'),
-            ('synth_jersey', 'rot90_default', 'course'),
-            ('synth_rib', 'rot90_default', 'course'),
-            ('teal', 'rot90_default', 'course'),
         ],
         'COURSE | rotated 15 degrees': [
             ('jersey', 'rot15+box', 'course'),
@@ -156,19 +133,15 @@ KNOWN_SILENT = {
             ('teal', 'blur4', 'wale'),
             ('teal', 'blur4+box', 'wale'),
         ],
-        'WALE | orientation left at the default on a rotated photo': [
-            ('knit_06', 'rot90_default', 'wale'),
-        ],
     },
 }
 
 # Runs whose CARD says Confident while some scored axis is more than 10% off. Both calibration modes agree.
 KNOWN_CARD_SILENT = {
-    "truth": [("knit_06", "rot90_default"), ("knit_09", "stretch13"), ("teal", "blur4"), ("teal", "blur4+box")],
-    "ruler": [("knit_06", "rot90_default"), ("knit_09", "stretch13"), ("teal", "blur4"), ("teal", "blur4+box")],
+    "truth": [("knit_09", "stretch13"), ("teal", "blur4"), ("teal", "blur4+box")],
+    "ruler": [("knit_09", "stretch13"), ("teal", "blur4"), ("teal", "blur4+box")],
 }
 CARD_SILENT_WHY = {
-    ("knit_06", "rot90_default"): "orientation left at the default: both axes read the wrong physical axis, both say confident",
     ("knit_09", "stretch13"): "stretched 1.3x: wale is right and confident, the course axis (+30%) is confident too",
     ("teal", "blur4"): "blur sigma 4: teal's wale (-13.7%, uncertain on the sharp photo) flips to confident",
     ("teal", "blur4+box"): "the same flip on a hand-drawn box",
@@ -191,8 +164,8 @@ KNOWN_NONKNIT_CARD_CONFIDENT = [("gingham_woven", "box")]
 
 # The headline totals of the full sweep, per calibration mode.
 PINNED_TOTALS = {
-    "truth": {"n": 447, "runs": 234, "silent": 38, "card_silent": 4, "no-result": 96, "uncertain-right": 99},
-    "ruler": {"n": 447, "runs": 234, "silent": 37, "card_silent": 4, "no-result": 94, "uncertain-right": 98},
+    "truth": {"n": 447, "runs": 234, "silent": 27, "card_silent": 3, "no-result": 96, "uncertain-right": 107},
+    "ruler": {"n": 447, "runs": 234, "silent": 26, "card_silent": 3, "no-result": 94, "uncertain-right": 107},
 }
 PINNED_NONKNIT = {"runs": 26, "no_result": 17, "confident_axes": 10, "card_confident": 1}
 
@@ -279,10 +252,11 @@ def test_inputs_do_what_they_say():
     # blur removes high-frequency energy; 4 more than 2
     lap = lambda m: cv2.Laplacian(cv2.cvtColor(m.img, cv2.COLOR_BGR2GRAY), cv2.CV_64F).var()
     assert lap(bis.make_input("jersey", "blur4")) < lap(bis.make_input("jersey", "blur2")) < lap(base)
-    # rotation by 90 swaps the shape, and the orientation is the only difference between the two rows
-    r90, r90d = bis.make_input("jersey", "rot90_correct"), bis.make_input("jersey", "rot90_default")
+    # rotation by 90 swaps the shape, and the orientation is the only difference between the two rows:
+    # set by hand on one, "detected" (the page's own pre-selection) on the other
+    r90, r90d = bis.make_input("jersey", "rot90_correct"), bis.make_input("jersey", "rot90_detected")
     assert r90.img.shape[:2] == (w, h) and r90.data == r90d.data
-    assert (r90.orientation, r90d.orientation) == ("horizontal", "vertical")
+    assert (r90.orientation, r90d.orientation) == ("horizontal", "detected")
     # stretch: 1.3x wider, one calibration along x for both axes
     st = bis.make_input("jersey", "stretch13")
     assert st.img.shape[1] == round(w * 1.3) and st.img.shape[0] == h
