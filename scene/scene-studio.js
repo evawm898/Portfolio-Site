@@ -82,10 +82,20 @@ export default function createStudioScene(host) {
   };
   if (dev.on) mountDev(host.panel(), api);
 
+  // WHAT A FRAME COSTS: the director, routing, every cat's step and IK, and the
+  // draw — the whole of this scene's work per frame, kept for the gate (which
+  // reports the worst frame and the 99th percentile, never the mean)
+  const cost = { ms: [], dt: [], max: 20000 };   // five minutes at 60 fps
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : 0);
   const scene = {
     frame(dt) {
+      const t0 = now();
       if (!dev.frozen) advance(dt * dev.timeScale);
       render();
+      if (dt > 0) {
+        cost.ms.push(now() - t0); cost.dt.push(dt);
+        if (cost.ms.length > cost.max) { cost.ms.shift(); cost.dt.shift(); }
+      }
     },
     resize(w, h) { view = createView(w, h); roomDirty = true; },
     pointer(x, y, wall) {
@@ -129,6 +139,10 @@ export default function createStudioScene(host) {
           return { x0, y0, x1, y1 };
         }
         case 'project': { const p = view.p(cmd.x, cmd.y, cmd.z); return { x: p.x, y: p.y, s: p.s }; }
+        case 'frameCost': {
+          if (cmd.reset) { cost.ms.length = 0; cost.dt.length = 0; return true; }
+          return { ms: cost.ms.slice(), dt: cost.dt.slice() };
+        }
         default: return null;
       }
     },

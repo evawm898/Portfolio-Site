@@ -135,11 +135,13 @@ export const FURNITURE = [
     parts: [
       { kind: 'box', x0: 150, x1: 206, y0: 0, y1: 4, z0: 190, z1: 372, tone: 'woodDark' },
       { kind: 'box', x0: 150, x1: 206, y0: 4, y1: 32, z0: 190, z1: 372, tone: 'uphDark' },
-      { kind: 'box', x0: 151, x1: 205, y0: 32, y1: 40, z0: 206, z1: 371, tone: 'uph' },
-      // the raised end, toward the front of the room
-      { kind: 'box', x0: 151, x1: 205, y0: 32, y1: 63, z0: 191, z1: 206, tone: 'uph' },
+      // the seat cushion, open toward the room
+      { kind: 'box', x0: 151, x1: 205, y0: 32, y1: 40, z0: 191, z1: 354, tone: 'uph' },
+      // the raised end at the FAR (bay) end, where a chaise's back goes: at the
+      // near end it walled off any cat on the seat from the viewer
+      { kind: 'box', x0: 151, x1: 205, y0: 32, y1: 63, z0: 354, z1: 371, tone: 'uph' },
       // the low back along the wall
-      { kind: 'box', x0: 198, x1: 206, y0: 40, y1: 52, z0: 206, z1: 372, tone: 'uphDark' },
+      { kind: 'box', x0: 198, x1: 206, y0: 40, y1: 52, z0: 191, z1: 354, tone: 'uphDark' },
     ],
   },
 ];
@@ -187,7 +189,7 @@ export const NODES = {
   chairL: { id: 'chairL', y: 46, comfy: true, facing: -Math.PI / 2, area: { kind: 'rect', x0: -76, x1: -52, z0: 382, z1: 402 } },
   chairR: { id: 'chairR', y: 46, comfy: true, facing: -Math.PI / 2, area: { kind: 'rect', x0: 52, x1: 76, z0: 382, z1: 402 } },
   table: { id: 'table', y: 72, comfy: false, facing: null, area: { kind: 'disk', x: 0, z: 388, r: 12 } },
-  chaise: { id: 'chaise', y: 40, comfy: true, facing: Math.PI, area: { kind: 'rect', x0: 162, x1: 192, z0: 228, z1: 352 } },
+  chaise: { id: 'chaise', y: 40, comfy: true, facing: Math.PI, area: { kind: 'rect', x0: 162, x1: 192, z0: 206, z1: 336 } },
   sill: { id: 'sill', y: ROOM.sillY, comfy: true, facing: null, area: { kind: 'ledge', path: SILL_LINE, ends: 22 } },
 };
 
@@ -237,8 +239,8 @@ const RAW_EDGES = [
   E('floor>chaise', 'floor', 'chaise', 'up', null, [186, 280], { edge: [152, 280] }),
   E('chaise>floor', 'chaise', 'floor', 'down', [166, 300], [120, 300]),
   // chaise <-> sill, the right facet
-  E('chaise>sill', 'chaise', 'sill', 'up', [166, 352], [126.9, 406.9]),
-  E('sill>chaise', 'sill', 'chaise', 'down', [128, 405], [171.5, 343.9]),
+  E('chaise>sill', 'chaise', 'sill', 'up', [168, 336], [126.9, 406.9]),
+  E('sill>chaise', 'sill', 'chaise', 'down', [128, 405], [172, 318]),
   // floor <-> sill directly, the left facet: legal, high, and dispreferred
   E('floor>sill', 'floor', 'sill', 'up', null, [-130.4, 410.4], { edge: [-137.6, 382.5] }),
   E('sill>floor', 'sill', 'floor', 'down', [-128, 398], [-138, 352]),
@@ -326,7 +328,7 @@ export function onSurface(nodeId, x, z) {
     case 'chairL': return x >= -84 && x <= -44 && z >= 372 && z <= 412;
     case 'chairR': return x >= 44 && x <= 84 && z >= 372 && z <= 412;
     case 'table': return Math.hypot(x, z - 388) <= 27;
-    case 'chaise': return x >= 151 && x <= 205 && z >= 206 && z <= 371;
+    case 'chaise': return x >= 151 && x <= 205 && z >= 191 && z <= 353;
     case 'sill': {
       const b = bayProject(x, z);
       // inside the bay, within sillDepth of the glass, in front of the back wall plane

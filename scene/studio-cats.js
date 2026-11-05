@@ -251,7 +251,10 @@ function finishTraversal(D, i) {
   const cat = D.cats[i];
   const x = rnd(D);
   const posture = x < 0.55 ? 'sit' : x < 0.85 ? 'loaf' : 'stand';
-  if (posture !== 'stand') startAction(cat, 'pose', { posture });
+  // (not the posture change the other cat is in the middle of: that is a pair
+  // sitting down in step)
+  if (posture !== 'stand' && !mirrored(D, i, 'pose')) startAction(cat, 'pose', { posture });
+  else if (!mirrored(D, i, 'look')) startAction(cat, 'look');
   // having arrived, it often does a thing there
   if (rnd(D) < 0.5) D.chain[i].push(rnd(D) < 0.55 ? 'look' : 'groom');
 }

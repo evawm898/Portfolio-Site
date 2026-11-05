@@ -52,6 +52,10 @@ const BRIEF = {
   // dozes brief and self-ending, two cats free to move at once but never in
   // step, the floor shared but never by two cats on top of each other
   actionEvery: [5, 12], busyShare: 0.6, doze: [8, 20], floorApart: 55,
+  // frame cost: set from measurement (headless software raster, 1280x800:
+  // p99 1.3 ms, worst 3.2 ms over 180 s), with the frame budget as the worst
+  // case and a missed frame an interval past 1.5 vsyncs
+  frameP99Ms: 8, frameWorstMs: 16.7, missedShare: 0.01,
 };
 
 // ---------------------------------------------------------------- harness ---
@@ -78,8 +82,9 @@ async function load(dir) {
   const cat = await import(pathToFileURL(path.join(dir, 'studio-cat.js')).href);
   const cats = await import(pathToFileURL(path.join(dir, 'studio-cats.js')).href);
   const rig = await import(pathToFileURL(path.join(dir, 'studio-rig.js')).href);
+  const draw = await import(pathToFileURL(path.join(dir, 'studio-draw.js')).href);
   void imp;
-  return { room, cat, cats, rig, dir };
+  return { room, cat, cats, rig, draw, dir };
 }
 
 // ---------------------------------------------------------------- measures --
@@ -126,7 +131,7 @@ function linearRuns(series, minRun = 24) {
 
 // ----------------------------------------------------------------- PART ONE --
 async function partOne(M) {
-  const { room, cat: K, cats: C, rig } = M;
+  const { room, cat: K, cats: C, rig, draw } = M;
   const E = room.EDGES;
 
   section = 'graph';
@@ -394,6 +399,192 @@ async function partOne(M) {
     // the end of its leg (it was 5.3 cm before the stride and gather fixes)
     assert(worst < 2, `${where}: a limb falls ${worst.toFixed(2)} cm short of its paw`);
     return `largest shortfall: ${top.join(', ')}`;
+  });
+
+  section = 'continuity';
+  // A SEAM IS A DISCONTINUITY, AND THE INSTRUMENT IS REFINEMENT. "No linear
+  // segment" is not continuity: chained tweens that each ease from rest pass it
+  // and still hitch at every seam. So every DRAWN point — the spine, the head,
+  // each knee and paw, the tail tip — is simulated at two step sizes, 1/960 s
+  // and 1/1920 s, and the largest per-step change of its velocity (second
+  // difference) and of its acceleration (third) is compared across them. On a
+  // curve that is continuous in velocity the per-step change of velocity HALVES
+  // when the step halves; across a velocity jump it does not shrink at all.
+  // Likewise one order up. A ratio near 1 is a seam, wherever it falls —
+  // between phases or inside one. Steep but smooth motion (a launch) resolves
+  // at these step sizes; a ratio of 0.72 is the bar between the two regimes.
+  const drawn = (c) => {
+    const r = rig.solveRig(c), o = {};
+    r.spine.forEach((q, k) => { o['spine' + k] = q.p; });
+    o.head = r.head.c;
+    r.legs.forEach(L => { o['knee' + L.name] = L.pts[1]; o['paw' + L.name] = L.paw; });
+    o.tail = r.tail[r.tail.length - 1].p;
+    return o;
+  };
+  const simulate = (make, dt) => {
+    const c = make();
+    for (let k = 0; k < Math.round(0.25 / dt); k++) K.stepCat(c, dt);
+    c.__go(c);
+    const rows = [];
+    let g = 0;
+    while ((c.prog || c.__next) && g++ < 40 / dt) {
+      if (!c.prog && c.__next) c.__next(c);
+      K.stepCat(c, dt);
+      rows.push({ t: g * dt, p: drawn(c), ph: c.prog ? c.prog.plan.phases[c.prog.i]?.k : 'between' });
+    }
+    return rows;
+  };
+  const worstStep = (rows, dt, order) => {
+    const out = {};
+    for (const k of Object.keys(rows[0].p)) {
+      let w = 0, at = 0, ph = '';
+      for (let i = order; i < rows.length; i++) {
+        for (let j = 0; j < 3; j++) {
+          const x = (n) => rows[i - n].p[k][j];
+          const d = order === 2 ? (x(0) - 2 * x(1) + x(2)) / dt : (x(0) - 3 * x(1) + 3 * x(2) - x(3)) / (dt * dt);
+          if (Math.abs(d) > w) { w = Math.abs(d); at = rows[i].t; ph = rows[i].ph; }
+        }
+      }
+      out[k] = { w, at, ph };
+    }
+    return out;
+  };
+  const programs = [];
+  for (const e of E) programs.push([e.id, () => {
+    const rs = room.restSpot(e.from, e.launch[0] - Math.cos(e.heading) * 8, e.launch[1] - Math.sin(e.heading) * 8, e.heading + 0.5);
+    const c = K.createCat({ id: 'r', seed: 3, node: e.from, x: rs.x, z: rs.z, heading: rs.heading, posture: 'sit' });
+    c.__go = (k) => K.startLeg(k, e.id);
+    return c;
+  }]);
+  // STATE CHANGES: actions run back to back, each the step after the last
+  // ended, so every pose-to-pose and action-to-action hand-over is a seam
+  programs.push(['chain of actions', () => {
+    const c = K.createCat({ id: 'a', seed: 77, node: 'chaise', x: 177, z: 260, heading: Math.PI, posture: 'sit' });
+    const seq = [['groom'], ['look'], ['stretch'], ['reposition', { target: room.restSpot('chaise', 177, 300, 0) }], ['pose', { posture: 'loaf' }], ['settleDown'], ['wake'], ['pose', { posture: 'stand' }], ['settleDown']];
+    let n = 0;
+    c.__go = (k) => { const [a, x] = seq[n++]; K.startAction(k, a, x || {}); };
+    c.__next = (k) => { if (n < seq.length) c.__go(k); else c.__next = null; };
+    return c;
+  }]);
+  const refine = (order, floor) => {
+    const bad = [];
+    let worst = 0;
+    for (const [name, make] of programs) {
+      const a = worstStep(simulate(make, 1 / 960), 1 / 960, order), b = worstStep(simulate(make, 1 / 1920), 1 / 1920, order);
+      for (const k of Object.keys(a)) {
+        const r = b[k].w / Math.max(1e-9, a[k].w);
+        if (b[k].w > floor) worst = Math.max(worst, r);
+        if (r > 0.72 && b[k].w > floor) bad.push(`${name} ${k} at ${b[k].at.toFixed(3)} s (${b[k].ph}): ${b[k].w.toFixed(0)} per step, ratio ${r.toFixed(2)}`);
+      }
+    }
+    return { bad, worst };
+  };
+  check('velocity is continuous at every seam of every jump, drop, step and action', () => {
+    const { bad, worst } = refine(2, 30);
+    assert(!bad.length, `${bad.length} velocity jumps: ${bad.slice(0, 4).join('; ')}`);
+    return `${programs.length} programs x ${Object.keys(drawn(K.createCat({ id: 'x', seed: 1, node: 'floor', x: 0, z: 200, heading: 0 }))).length} drawn points; worst refinement ratio ${worst.toFixed(2)} (a jump reads ~1, smooth ~0.5)`;
+  });
+  check('acceleration is continuous too', () => {
+    const { bad, worst } = refine(3, 4000);
+    assert(!bad.length, `${bad.length} acceleration jumps: ${bad.slice(0, 4).join('; ')}`);
+    return `worst refinement ratio ${worst.toFixed(2)}`;
+  });
+  check('a landing is set down, not stopped: the forepaws arrive at rest', () => {
+    const rows = [];
+    for (const e of E.filter(x => x.type !== 'across')) {
+      const r = C.rehearse(e.id, { seed: 17, dt: 1 / 960 });
+      const S = r.samples;
+      const ev = r.events.find(x => x.type === 'foreContact');
+      assert(ev, `${e.id}: no forepaw contact`);
+      const i = Math.round((ev.t - r.t0) * 960) - 1;
+      const v = Math.hypot(...['x', 'y', 'z'].map(a => (S[i][`toeFL${a}`] - S[i - 1][`toeFL${a}`]) * 960));
+      rows.push([e.id, v]);
+    }
+    const worst = rows.reduce((a, b) => (b[1] > a[1] ? b : a));
+    assert(worst[1] < 8, `${worst[0]}: the forepaw meets the surface at ${worst[1].toFixed(1)} cm/s`);
+    return `forepaws meet the surface at <= ${worst[1].toFixed(2)} cm/s (${worst[0]})`;
+  });
+
+  section = 'draw';
+  // A RECORDING CONTEXT: what drawCat asks the canvas to do, as data
+  const recorder = () => {
+    const ops = [];
+    let path = [], cur = null;
+    const ctx = {
+      set fillStyle(v) { this._f = v; }, get fillStyle() { return this._f; },
+      beginPath() { path = []; cur = null; },
+      moveTo(x, y) { cur = { pts: [[x, y]], arc: false }; path.push(cur); },
+      lineTo(x, y) { cur.pts.push([x, y]); },
+      closePath() {},
+      arc(x, y, r, a0, a1, ccw) { if (cur) { cur.arc = true; cur.ccw = !!ccw; cur.r = r; } },
+      ellipse() { cur = { pts: [], arc: true, eye: true }; path.push(cur); },
+      fill(rule) { ops.push({ fill: this._f, path, rule }); },
+      save() {}, restore() {}, translate() {}, rotate() {}, scale() {}, clearRect() {}, stroke() {},
+    };
+    return { ctx, ops };
+  };
+  const view = room.createView(1280, 800);
+  const poseSweep = () => {
+    const out = [];
+    for (let h = 0; h < 48; h++) for (const posture of ['stand', 'sit', 'loaf', 'curl']) {
+      const c = K.createCat({ id: 'a', seed: 3 + h, node: 'floor', x: (h % 8) * 30 - 100, z: 60 + Math.floor(h / 8) * 50, heading: h * Math.PI / 24, posture });
+      for (let i = 0; i < 30; i++) K.stepCat(c, 1 / 60);
+      out.push(c);
+    }
+    for (const e of E) { const r = C.rehearse(e.id, { seed: 3, dt: 1 / 60 }); for (let k = 0; k < r.samples.length; k += 3) out.push(null); out.push(r.cat); }
+    return out.filter(Boolean);
+  };
+  check('a cat is one ink fill, every part of it wound the same way', () => {
+    let fills = 0, subpaths = 0, reversed = 0, folded = 0, cats = 0;
+    const area = (P) => { let a = 0; for (let i = 0; i < P.length; i++) { const p = P[i], q = P[(i + 1) % P.length]; a += p[0] * q[1] - q[0] * p[1]; } return a / 2; };
+    for (const c of poseSweep()) {
+      const { ctx, ops } = recorder();
+      draw.drawCat(ctx, view, rig.solveRig(c));
+      cats++;
+      const ink = ops.filter(o => o.fill === draw.PALETTE.cat && o.path.some(sp => !sp.eye));
+      fills += ink.length;
+      assert(ink.length === 1, `${ink.length} ink fills for one cat — two fills of one colour leave a hairline where they meet`);
+      for (const o of ops.filter(q => q.fill === draw.PALETTE.cat || q.fill === draw.PALETTE.catFar)) for (const sp of o.path) {
+        if (sp.eye) continue;
+        subpaths++;
+        if (sp.arc) { if (sp.ccw) reversed++; continue; }
+        if (sp.pts.length < 3) continue;
+        // every polygon clockwise on screen, as ctx.arc is, and convex where
+        // it is a band (a fold is a reversed corner)
+        if (area(sp.pts) < -1e-6) reversed++;
+        const P = sp.pts;
+        for (let i = 0; i < P.length; i++) {
+          const a = P[i], b = P[(i + 1) % P.length], d = P[(i + 2) % P.length];
+          if ((b[0] - a[0]) * (d[1] - a[1]) - (b[1] - a[1]) * (d[0] - a[0]) < -1e-6) { folded++; break; }
+        }
+      }
+    }
+    assert(!reversed && !folded, `${reversed} reversed and ${folded} folded subpaths: under the nonzero rule a reversed part CANCELS what it overlaps and opens a pale seam`);
+    return `${cats} cats, ${subpaths} subpaths, all one way, one ink fill each`;
+  });
+  check('a cat is drawn in front of what it is in front of, and behind what is in front of it', () => {
+    const at = (node, x, z, h, posture = 'sit') => { const c = K.createCat({ id: 'p', seed: 1, node, x, z, heading: h, posture }); for (let i = 0; i < 20; i++) K.stepCat(c, 1 / 60); return c; };
+    const order = (c) => draw.drawOrder([c]);
+    const afterAll = (c, id) => { const o = order(c), ci = o.findIndex(d => d.cat === 0); return o.every((d, k) => !d.part || d.item.id !== id || k < ci); };
+    const before = (c, id, pred) => { const o = order(c), ci = o.findIndex(d => d.cat === 0); return o.some((d, k) => d.part && d.item.id === id && pred(d.part) && k > ci); };
+    const rows = [];
+    // on the chaise's seat: over the whole chaise, its raised end behind
+    assert(afterAll(at('chaise', 177, 300, Math.PI), 'chaise'), 'a cat on the chaise is hidden by it');
+    rows.push('on the chaise');
+    // on the floor beside the chaise's open side: in front of it
+    assert(afterAll(at('floor', 128, 280, Math.PI / 2), 'chaise'), 'a cat on the floor beside the chaise is drawn behind its side');
+    rows.push('beside it');
+    // on the sill behind a chair: the chair's back covers it
+    // (x -90: the sight line from the camera to it passes through chairL's back)
+    assert(before(at('sill', -90, 440, 0, 'loaf'), 'chairL', p => p.y1 > 60), 'a cat on the sill is drawn over the chair back in front of it');
+    rows.push('on the sill behind a chair');
+    // on a chair: over the chair
+    assert(afterAll(at('chairL', -64, 392, 0), 'chairL'), 'a cat on a chair is hidden by it');
+    rows.push('on a chair');
+    // in front of the table on the floor: over the table
+    assert(afterAll(at('floor', 0, 330, 0), 'table'), 'a cat in front of the table is drawn behind it');
+    rows.push('in front of the table');
+    return rows.join(', ');
   });
 
   section = 'director';
@@ -676,6 +867,29 @@ async function partTwo() {
     });
     await page.close();
 
+    // WHAT A FRAME COSTS UNDER THE DIRECTOR, AT REAL SPEED: the scene's own
+    // work per frame (director, routing, both cats, IK, draw) read from the
+    // page's ring, the worst frame and the 99th percentile — never the mean —
+    // and the frames the page actually missed (an interval past 1.5 vsyncs)
+    const SOAK_S = 40;
+    const cp = await open('');
+    await checkAsync(`a frame costs under a frame's budget at the worst, over ${SOAK_S} s of the director`, async () => {
+      await cp.evaluate(() => window.__scene.sceneQuery('dev', { op: 'frameCost', reset: true }));
+      await cp.waitForTimeout(SOAK_S * 1000);
+      const c = await cp.evaluate(() => window.__scene.sceneQuery('dev', { op: 'frameCost' }));
+      const ms = c.ms.slice().sort((a, b) => a - b), dt = c.dt.slice().sort((a, b) => a - b);
+      const q = (a, p) => a[Math.min(a.length - 1, Math.floor(p * a.length))];
+      const missed = c.dt.filter(x => x > 1.5 / 60).length;
+      const acts = await cp.evaluate(() => window.__scene.sceneState().log.filter(l => l.what === 'act').length);
+      assert(ms.length > SOAK_S * 30, `only ${ms.length} frames in ${SOAK_S} s`);
+      assert(q(ms, 0.99) < BRIEF.frameP99Ms, `p99 ${q(ms, 0.99).toFixed(2)} ms`);
+      assert(ms[ms.length - 1] < BRIEF.frameWorstMs, `worst ${ms[ms.length - 1].toFixed(2)} ms`);
+      assert(missed <= ms.length * BRIEF.missedShare, `${missed} of ${ms.length} frames missed`);
+      assert(!cp.__errs.length, cp.__errs.join('; '));
+      return `${ms.length} frames, ${acts} actions; cost p50 ${q(ms, 0.5).toFixed(2)} p99 ${q(ms, 0.99).toFixed(2)} worst ${ms[ms.length - 1].toFixed(2)} ms; interval p99 ${(q(dt, 0.99) * 1000).toFixed(1)} ms, ${missed} missed`;
+    });
+    await cp.close();
+
     const dp = await open('&dev=1');
     await checkAsync('?dev=1 mounts the harness inside the stage', async () => {
       const r = await dp.evaluate(() => { const p = document.querySelector('.scene-dev'); return p && p.parentElement.id; });
@@ -717,17 +931,22 @@ async function partTwo() {
 
 // --------------------------------------------------------------- mutants ----
 const MUTANTS = [
-  { id: 'a-linear-ease', file: 'studio-cat.js', from: "inOut: (t) => t * t * t * (t * (t * 6 - 15) + 10),", to: 'inOut: (t) => t + 1e-12 * t * (1 - t),',
-    breaks: ['motion/no-channel-moves-linearly-in-any-jump-drop-step-or-action', 'motion/there-is-no-linear-ease-to-ask-for'], mayAlso: ['*'] },
-  { id: 'the-flight-is-eased', file: 'studio-cat.js', from: '      const y = J.yL + J.vy0 * tt - 0.5 * J.g * tt * tt;\n      const k = tt / J.T;\n      const p = J.pitchL + (LAND_PITCH',
-    to: '      const y = J.yL + (J.vy0 * J.T - 0.5 * J.g * J.T * J.T) * EASE.inOut(tt / J.T) + 0 * J.vy0;\n      const k = tt / J.T;\n      const p = J.pitchL + (LAND_PITCH',
-    breaks: ['upjump/the-flight-is-a-parabola-under-constant-gravity-never-eased', 'upjump/the-apex-sits-15-25-of-the-rise-above-the-landing-surface'], mayAlso: ['upjump/*', 'motion/*', 'downjump/*'] },
+  // every segment linear: the one interpolant every tween, swing and landing
+  // piece goes through, made a straight line at constant speed
+  { id: 'a-linear-ease', file: 'studio-cat.js', from: '  k = Math.max(0, Math.min(1, k));\n  const k2 = k * k, k3 = k2 * k, k4 = k3 * k, k5 = k4 * k;',
+    to: '  k = Math.max(0, Math.min(1, k));\n  if (T > 0) return [p0 + (p1 - p0) * k, (p1 - p0) / T, 0];\n  const k2 = k * k, k3 = k2 * k, k4 = k3 * k, k5 = k4 * k;',
+    breaks: ['motion/no-channel-moves-linearly-in-any-jump-drop-step-or-action', 'continuity/velocity-is-continuous-at-every-seam-of-every-jump-drop-step-and-action'], mayAlso: ['*'] },
+  // the arc replaced by an eased segment from rest to where it lands
+  { id: 'the-flight-is-eased', file: 'studio-cat.js', from: "      setPiece(cat, 'y', { kind: 'ballistic', t0: t1, y0: J.yL, v0: J.vy0, g: J.g });\n      setPiece(cat, 'p', { kind: 'seg', ...seg5(t1, T, J.pitchL, 0, 0, LAND_PITCH, 0, 0) });",
+    to: "      setPiece(cat, 'y', { kind: 'seg', ...seg5(t1, T, J.yL, 0, 0, J.yL + J.vy0 * T - 0.5 * J.g * T * T, 0, 0) });\n      setPiece(cat, 'p', { kind: 'seg', ...seg5(t1, T, J.pitchL, 0, 0, LAND_PITCH, 0, 0) });",
+    breaks: ['upjump/the-flight-is-a-parabola-under-constant-gravity-never-eased', 'continuity/velocity-is-continuous-at-every-seam-of-every-jump-drop-step-and-action'], mayAlso: ['upjump/*', 'motion/*', 'downjump/*', 'continuity/*', 'director/*'] },
   { id: 'the-apex-is-too-high', file: 'studio-cat.js', from: '  const ya = dstY + H_STAND + apex * rise;', to: '  const ya = dstY + H_STAND + (apex + 0.3) * rise;',
     // a higher arc is a faster body: that is the same defect, seen twice
     breaks: ['upjump/the-apex-sits-15-25-of-the-rise-above-the-landing-surface'], mayAlso: ['upjump/*', 'motion/*', 'downjump/*', 'director/*'] },
   // the touchdown order swapped: the hind pair is planted at the arc's end
-  { id: 'hind-paws-land-first', file: 'studio-cat.js', from: '      for (const i of [0, 1]) {\n        const p = toeWorld(cat, i);', to: '      for (const i of [2, 3]) {\n        const p = toeWorld(cat, i);',
-    breaks: ['upjump/forepaws-land-first-and-the-hind-paws-60-100-ms-later'], mayAlso: ['upjump/*', 'motion/*', 'downjump/*', 'director/*'] },
+  { id: 'hind-paws-land-first', file: 'studio-cat.js', from: "      for (const i of [0, 1]) {\n        const f = cat.feet[i];\n        const p = f.mode === 'swing' ? f.sw.to : toeWorld(cat, i);",
+    to: "      for (const i of [2, 3]) plantAt(cat, i, [toeWorld(cat, i)[0], dst.y, toeWorld(cat, i)[2]]);\n      for (const i of [0, 1]) {\n        const f = cat.feet[i];\n        const p = f.mode === 'swing' ? f.sw.to : toeWorld(cat, i);",
+    breaks: ['upjump/forepaws-land-first-and-the-hind-paws-60-100-ms-later'], mayAlso: ['upjump/*', 'motion/*', 'downjump/*', 'director/*', 'continuity/*'] },
   { id: 'the-gather-is-not-random', file: 'studio-cat.js', from: '      d: between(cat, TIMING.gather),', to: '      d: (rnd(cat), 0.8),',
     breaks: ['upjump/the-gather-is-randomised-per-jump-and-so-is-every-other-phase'], mayAlso: [] },
   { id: 'the-down-jump-is-the-up-jump', file: 'studio-cat.js', from: "  if (edge.type === 'up') {\n    const gather", to: "  if (edge.type === 'up' || edge.type === 'down') {\n    const gather",
@@ -739,27 +958,58 @@ const MUTANTS = [
     breaks: ['director/a-cat-reaches-a-surface-only-by-traversing-an-edge'], mayAlso: ['director/*'] },
   // both guards gone: the destination filter and the route's blocked nodes
   { id: 'cats-may-share-a-surface', file: 'studio-cats.js', edits: [
-      ["  const opts = Object.keys(NODES).filter(n => n !== cat.node && n !== o.node && n !== reserved(D, other(i)));", "  const opts = Object.keys(NODES).filter(n => n !== cat.node);"],
-      ["  const blocked = [D.cats[o].node, reserved(D, o)].filter(n => n !== D.cats[i].node);", "  const blocked = [];"],
-      ["  if (e.to === D.cats[other(i)].node) { note(D, 'blocked', { cat: i, edge: id }); D.trav[i] = null; return; }", ""]],
-    breaks: ['director/two-cats-never-share-a-surface-never-move-at-once-never-run-one-action-together'], mayAlso: ['director/*'] },
-  // both guards gone: the relocation's and the scheduler's
-  { id: 'both-cats-move-at-once', file: 'studio-cats.js', edits: [
-      ["function tryRelocate(D, i, why) {\n  if (moving(D, other(i))) return false;", "function tryRelocate(D, i, why) {"],
-      ["  if (!D.hold && D.t >= D.nextMove && !moving(D, 0) && !moving(D, 1)) {", "  if (!D.hold && D.t >= D.nextMove) {"],
-      ["      else D.nextMove = Infinity;   // re-armed when the traversal ends", "      else D.nextMove = D.t + 3;"],
-      ["    const awake = [0, 1].filter(i => !D.cats[i].prog && !D.cats[i].asleep);", "    const awake = [0, 1].filter(i => !moving(D, i) && !D.cats[i].prog && !D.cats[i].asleep);"]],
-    breaks: ['director/two-cats-never-share-a-surface-never-move-at-once-never-run-one-action-together'], mayAlso: ['director/*'] },
+      ["  const opts = Object.keys(NODES).filter(n => n !== cat.node && (n === 'floor' || (n !== o.node && n !== reserved(D, other(i)))));", "  const opts = Object.keys(NODES).filter(n => n !== cat.node);"],
+      ["  const blocked = [D.cats[o].node, reserved(D, o)].filter(n => n !== D.cats[i].node && n !== 'floor');", "  const blocked = [];"],
+      ["  const crowded = (e.to !== 'floor' && (e.to === o.node || e.to === reserved(D, other(i))))\n    || !legsClear", "  const crowded = false\n    || !legsClear"]],
+    breaks: ['director/two-cats-never-share-a-perch-keep-apart-on-the-floor-and-never-do-one-small-action-together'], mayAlso: ['director/*'] },
+  { id: 'two-floor-cats-may-stand-on-each-other', file: 'studio-cats.js', from: 'export const FLOOR_APART = 55;', to: 'export const FLOOR_APART = 0;',
+    breaks: ['director/two-cats-never-share-a-perch-keep-apart-on-the-floor-and-never-do-one-small-action-together'], mayAlso: ['director/*'] },
+  // the mirror rule gone: the second cat may start what the first just started
+  { id: 'the-cats-mirror-each-other', file: 'studio-cats.js', from: "  if (!travel && oc.action && kindOf(oc.action === 'leg' ? 'relocate' : oc.action) === k) return true;\n  return D.started[o].some(([kk, t]) => kk === k && D.t - t < MIRROR_WINDOW);",
+    to: "  void travel; void oc;\n  return false && D.started[o].some(([kk, t]) => kk === k && D.t - t < MIRROR_WINDOW);",
+    breaks: ['director/two-cats-never-share-a-perch-keep-apart-on-the-floor-and-never-do-one-small-action-together'], mayAlso: ['director/*'] },
   { id: 'a-mid-air-click-applies', file: 'studio-cats.js', from: "  else if (moving(D, i)) { D.queue[i] = { at: wall }; out = 'queued'; }\n", to: '',
     breaks: ['director/a-click-mid-leg-is-queued-then-served-nothing-changes-in-the-air'], mayAlso: ['director/*'] },
   { id: 'no-rate-limit', file: 'studio-cats.js', from: 'export const CLICK_LIMIT = 4;', to: 'export const CLICK_LIMIT = 999;',
     breaks: ['director/an-over-clicked-cat-flicks-an-ear-and-ignores-you'], mayAlso: ['director/*'] },
   { id: 'every-jump-costs-the-same', file: 'studio-room.js', from: "  if (edge.type === 'up') return 1 + 0.9 * Math.pow(r, 1.8);", to: "  if (edge.type === 'up') return 1;",
     breaks: ['graph/the-two-stage-route-to-the-sill-is-preferred-and-the-direct-one-is-legal'], mayAlso: ['director/*'] },
-  { id: 'relocations-every-few-seconds', file: 'studio-cats.js', from: 'export const SPONTANEOUS = [20, 60];', to: 'export const SPONTANEOUS = [2, 6];',
-    breaks: ['director/a-spontaneous-relocation-comes-20-60-s-after-the-last-at-most'], mayAlso: ['director/*'] },
-  { id: 'nobody-sleeps', file: 'studio-cats.js', from: 'export const SLEEP_AFTER = [45, 95];', to: 'export const SLEEP_AFTER = [4500, 9500];',
-    breaks: ['director/a-long-idle-on-a-comfortable-perch-ends-asleep-and-a-sleeper-wakes-before-it-moves'], mayAlso: ['director/*'] },
+  { id: 'the-room-goes-quiet', file: 'studio-cats.js', from: 'export const ACTION_EVERY = [5, 12];', to: 'export const ACTION_EVERY = [25, 60];',
+    breaks: ['director/a-deliberate-action-every-5-12-s-across-the-pair-and-usually-one-cat-doing-something'], mayAlso: ['director/*'] },
+  { id: 'a-doze-is-a-long-sleep', file: 'studio-cats.js', from: 'export const DOZE = [8, 20];', to: 'export const DOZE = [80, 200];',
+    breaks: ['director/a-doze-is-brief-and-ends-on-its-own-and-a-sleeper-wakes-before-it-moves'], mayAlso: ['director/*'] },
+  // CONTINUITY. Each of these is a seam the motion core exists to remove.
+  // a tween that starts from rest, whatever the channel was doing
+  { id: 'a-tween-starts-from-rest', file: 'studio-cat.js', from: "  if (tw) { const r = evalSeg(tw.cur, tw.t); return [r[1], r[2]]; }\n  return [cat.chv[ch] || 0, cat.cha[ch] || 0];",
+    to: "  void tw;\n  return [0, 0];",
+    breaks: ['continuity/velocity-is-continuous-at-every-seam-of-every-jump-drop-step-and-action'], mayAlso: ['continuity/*', 'motion/*', 'upjump/*', 'downjump/*', 'director/*'] },
+  // a swing that leaves from rest though the paw was moving
+  { id: 'a-swing-forgets-how-the-paw-was-moving', file: 'studio-cat.js', from: '    v0: moving ? [...cat.toeV[i]] : [0, 0, 0], a0: moving ? [...cat.toeA[i]] : [0, 0, 0], ...extra };',
+    to: '    v0: [0, 0, 0], a0: [0, 0, 0], ...extra, __m: moving };',
+    breaks: ['continuity/velocity-is-continuous-at-every-seam-of-every-jump-drop-step-and-action'], mayAlso: ['continuity/*', 'motion/*', 'upjump/*', 'downjump/*', 'director/*'] },
+  // a hard reach limit: the knee snaps straight at the top of its travel
+  { id: 'the-leg-reach-is-a-hard-clamp', file: 'studio-rig.js', from: '  const want = softSpan(d, full);', to: '  const want = Math.min(d, SOFT_TOP * full);',
+    breaks: ['continuity/acceleration-is-continuous-too'], mayAlso: ['continuity/*', 'motion/*', 'upjump/*', 'downjump/*', 'director/*'] },
+  // the landing's descent begun from rest, the arc's velocity thrown away
+  { id: 'the-landing-starts-from-rest', file: 'studio-cat.js', from: "  setPiece(cat, 'y', { kind: 'seg', ...seg5(t0, tau, y0, vy, ay, yB, 0, 0) });",
+    to: "  setPiece(cat, 'y', { kind: 'seg', ...seg5(t0, tau, y0, 0 * vy, 0 * ay, yB, 0, 0) });",
+    breaks: ['continuity/velocity-is-continuous-at-every-seam-of-every-jump-drop-step-and-action'], mayAlso: ['continuity/*', 'motion/*', 'upjump/*', 'downjump/*', 'director/*'] },
+  // the forepaws left posed off the shoulders to the end: stopped by the surface
+  { id: 'the-forepaws-are-stopped-not-set-down', file: 'studio-cat.js', from: "      if (t >= cat.free.jump.T - FORE_LAND && !cat.defer.some(q => q.kind === 'fore'))",
+    to: "      if (false && t >= cat.free.jump.T - FORE_LAND && !cat.defer.some(q => q.kind === 'fore'))",
+    breaks: ['continuity/a-landing-is-set-down-not-stopped-the-forepaws-arrive-at-rest'], mayAlso: ['continuity/*', 'motion/*', 'upjump/*', 'downjump/*', 'director/*'] },
+  // DRAWING. the silhouette split into two fills of one ink, which leaves the
+  // hairline seam where they meet
+  { id: 'the-silhouette-is-two-fills', file: 'studio-draw.js', from: "  for (const L of rig.legs) if (near(L)) legPath(ctx, view, L);\n  disc(ctx, view, rig.head.c, rig.head.r);",
+    to: "  for (const L of rig.legs) if (near(L)) legPath(ctx, view, L);\n  ctx.fillStyle = PALETTE.cat; ctx.fill('nonzero'); ctx.beginPath();\n  disc(ctx, view, rig.head.c, rig.head.r);",
+    breaks: ['draw/a-cat-is-one-ink-fill-every-part-of-it-wound-the-same-way'], mayAlso: [] },
+  // a capsule's band on the perpendicular rather than the true tangents
+  { id: 'a-capsule-band-is-not-tangent', file: 'studio-draw.js', from: '  const s = (Ra - Rb) / L, c = Math.sqrt(Math.max(0, 1 - s * s));', to: '  const s = 0 * (Ra - Rb) / L, c = 1;',
+    breaks: ['draw/a-cat-is-one-ink-fill-every-part-of-it-wound-the-same-way'], mayAlso: [] },
+  // painter's order by one depth key: the furniture's list order, the cat inserted by its centre
+  { id: 'the-painter-sorts-on-one-key', file: 'studio-draw.js', from: '    list = [...head.filter(front), { cat: i }, ...head.filter(d => !front(d)), ...tail];',
+    to: '    list = [...head, { cat: i }, ...tail];',
+    breaks: ['draw/a-cat-is-drawn-in-front-of-what-it-is-in-front-of-and-behind-what-is-in-front-of-it'], mayAlso: [] },
   { id: 'a-module-calls-math-random', file: 'studio-rig.js', from: 'const TAIL_N = 12, TAIL_SEG = 2.4;', to: 'const TAIL_N = 12, TAIL_SEG = 2.4 + 0 * Math.random();',
     breaks: ['discipline/no-studio-module-schedules-frames-binds-listeners-or-reaches-the-page'], mayAlso: [] },
 ];
@@ -791,12 +1041,16 @@ async function main() {
     for (const b of m.breaks) if (!names.has(b)) { console.log(`STALE ${m.id}: names ${b}, which the gate does not run`); process.exit(1); }
   }
   let failed = 0;
+  // A PREFIX OF ITS OWN: tools/verify-scene.mjs sweeps every `__mutant__*` in
+  // scene/ at its start and end, so a tree named that way vanished mid-sweep
+  // whenever the two gates ran together (measured: two discipline checks red on
+  // a mutant that touches no source they read).
   // ONE DIRECTORY PER MUTANT: Node caches an ES module by its URL, so a reused
   // path hands every later mutant the first one's code (measured: fifteen
   // "misses" that were all the linear-ease mutant, cached)
   let seq = 0;
   for (const m of set) {
-    const tmp = path.join(SCENE, `__mutant__studio_${seq++}`);
+    const tmp = path.join(SCENE, `__studio_mutant__${seq++}`);
     fs.rmSync(tmp, { recursive: true, force: true });
     fs.mkdirSync(tmp);
     for (const f of STUDIO) fs.copyFileSync(path.join(SCENE, f), path.join(tmp, f));
@@ -819,6 +1073,6 @@ async function main() {
   process.exit(failed ? 1 : 0);
 }
 
-const sweepMutants = () => { for (const f of fs.readdirSync(SCENE)) if (f.startsWith('__mutant__studio')) fs.rmSync(path.join(SCENE, f), { recursive: true, force: true }); };
+const sweepMutants = () => { for (const f of fs.readdirSync(SCENE)) if (f.startsWith('__studio_mutant__')) fs.rmSync(path.join(SCENE, f), { recursive: true, force: true }); };
 sweepMutants();
 main().catch(e => { console.error(e); sweepMutants(); process.exit(1); });

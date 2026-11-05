@@ -1270,7 +1270,9 @@ function solveDownJump(cat, edge, ph) {
   const edgeS = planeS(cat, [edge.launch[0], 0, edge.launch[1]]) + FORE_TOE_U;
   const landS = planeS(cat, [edge.land[0], 0, edge.land[1]]);
   const pR = -0.85, LR = TORSO * 1.08;
-  const sR = edgeS - 0.5, yR = srcY + 10;
+  // the pour ends with the shoulders just over the edge, not past it: further, and
+  // the hind legs, still planted, are hauled out to their full length
+  const sR = edgeS - 4, yR = srcY + 10.5;
   const vyR = -32;
   const Ll = TORSO * 1.04;
   const offFu = Ll / 2 * Math.cos(DOWN_LAND_PITCH) + DOWN_LAND_FORE[0];
