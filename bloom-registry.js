@@ -38,6 +38,7 @@
    in either direction.
    =================================================================== */
 import { UMBEL_FLORET_RANGE, UMBEL_HEAD_VALUES, UMBEL_DEPTH_VALUES, UMBEL_RAY_RANGE, UMBEL_RAY_LENGTH_RANGE } from './bloom-geometry.js';
+import { LAYER_RING_RANGE, LAYER_RING_STEP } from './bloom-geometry.js';
 import { INFLORESCENCE_TYPES, FLORET_NODE_RANGE, FLORET_PETAL_RANGE, FLORET_SCALE_RANGE,
   PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE, PEDICEL_GRADIENT_RANGE, PEDICEL_CORYMB_VALUES } from './bloom-geometry.js';
 import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WALL_MM, INFILL_DENSITY_SWEEP,
@@ -1895,6 +1896,26 @@ const scopeNames = (list, name) => list.map(name).join(', ');
    said as kept, never as "carries its own values", because the picker cannot
    list it (the review's finding: the first cut named such a layer and told the
    visitor to pick it). */
+/* THE LAYER RING'S READ-OUT (#495) — from the PICKED layer's own ring record
+   (footRing()'s, handed down as `shown.pickedRing` by the page): its own
+   fraction or the derived one, in millimetres on the hub ring, and — where the
+   build did not place the ring the visitor asked for — ASKED vs BUILT (a value
+   past the range, from a file, is clamped; a ring past 1 grows the hub). With
+   no layer picked there is nothing to read: a ring is a layer's own. */
+function layerRingFmt(v, ui, shown) {
+  const p = shown && shown.pickedRing;
+  if (!p) return 'a layer\'s own — pick a layer in the bar above to place its ring';
+  const R0 = p.R0, f = p.own ? p.own.built : p.derived;
+  let t = `${f.toFixed(2)}x the hub ring = ${(R0 * f).toFixed(2)} mm`;
+  if (p.own) {
+    t += ` — ${p.name}'s OWN ring`;
+    if (p.own.clamped) t += ` · asked ${Number(p.own.asked).toFixed(2)}x, built ${p.own.built.toFixed(2)}x (CLAMPED to ${LAYER_RING_RANGE[0].toFixed(2)}-${LAYER_RING_RANGE[1].toFixed(2)})`;
+  } else {
+    t += ` — DERIVED (${p.ownWidth ? 'from its own width' : p.layer === 0 ? 'the rim' : 'the Shrink ramp'})${p.derived < LAYER_RING_RANGE[0] ? ` · under the slider's ${LAYER_RING_RANGE[0].toFixed(2)}, which cannot show it` : ''}; drag to give ${p.name} its own`;
+  }
+  if (p.grew) t += ` · the HUB GREW ${p.grew.fromMm.toFixed(2)} -> ${p.grew.toMm.toFixed(2)} mm to fit it`;
+  return t;
+}
 const scopeToggleFmt = (kind) => (v, ui, shown) => {
   const sc = shown && shown.scopes;
   const list = sc ? ((kind === 'layers' ? sc.scopedLayers : sc.scopedPetals) || []) : [];
@@ -3788,6 +3809,23 @@ export const CONTROLS = [
     label: 'Per-layer values', fmt: scopeToggleFmt('layers'),
     tier: 'standard', role: 'arrangement',
     visibleWhen: { all: [{ id: 'placement', oneOf: [...SCOPE_LAYER_PLACEMENTS] }, { ref: 'headPresent' }] } },
+
+  /* ===================================================================
+     A LAYER'S OWN RING (#495, Eva's rulings of Nov 5 — read the geometry's
+     LAYER_RING_RANGE block). Where the picked layer's whorl stands, as a
+     FRACTION OF THE HUB RING (R0, the area rule's ring layer 1 stands on by
+     default). A LAYER'S OWN VALUE, never a whole-bloom one: it is edited only
+     with a layer picked in the scope bar, where it shows that layer's ring —
+     its own where it owns one, else the DERIVED ring it is built on today (the
+     ramp's or its own width's), so nothing moves until it is dragged; with no
+     layer picked the page greys it and says so. Its whole-bloom value is never
+     read (the geometry reads `values.layerRing` off a layer entry and nothing
+     else), so it stays at its default and a saved file carries it inert.
+     The range is the geometry's, imported (Q6) — PROPOSED, for Eva's ruling
+     from the sheet. Past 1 the hub grows to the ring (Oct 16). */
+  { id: 'layerRing', section: 'arrangement', kind: 'slider', min: LAYER_RING_RANGE[0], max: LAYER_RING_RANGE[1], step: LAYER_RING_STEP, default: 1,
+    label: 'Layer ring', fmt: layerRingFmt, tier: 'standard', role: 'arrangement',
+    visibleWhen: { all: [{ ref: 'scopeLayersLive' }, { ref: 'headPresent' }] } },
 
   /* ===================================================================
      ORGANIC VARIANCE, BUILD 1 OF 3 — SIZE (Eva's rulings, §9 of

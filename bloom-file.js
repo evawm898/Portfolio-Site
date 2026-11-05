@@ -80,7 +80,7 @@
 // applied" — nothing reads it, and whether it is retired or given a meaning is
 // F3's (the first session with a live curve control) to decide, not this one's.
 import { CONTROLS, RETIRED_IDS, migrateRoles } from './bloom-registry.js';
-import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS, SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_IDS, SCOPE_STRAND_IDS } from './bloom-geometry.js';
+import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS, SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_IDS, SCOPE_STRAND_IDS, SCOPE_LAYER_VALUE_IDS, LAYER_RING_RANGE } from './bloom-geometry.js';
 import { readCurveValue, cloneCurve } from './bloom-curve.js';
 import { DEFAULTS, evalPredicate } from './bloom-registry.js';   // the LOAD-AS-NEW reader only (end of file)
 
@@ -423,12 +423,25 @@ function readScopeEntry(k, e, i, notes) {
      and spine, a TIER's (curves-sepals, Oct 20) their sepal twins. */
   if (e.values !== undefined && k === 'strands') notes.push(note('invalid', `${where}.values: a strand owns no values — not applied`));
   else if (e.values !== undefined) {
-    const valueIds = k === 'tiers' ? SEPAL_SCOPE_VALUE_IDS : SCOPE_VALUE_IDS;
+    /* #495: a LAYER entry may also own its ring (`layerRing`, a fraction of the
+       hub ring) — a layer's own, so a petal or tier entry carrying one is told */
+    const valueIds = k === 'tiers' ? SEPAL_SCOPE_VALUE_IDS : k === 'layers' ? [...SCOPE_VALUE_IDS, ...SCOPE_LAYER_VALUE_IDS] : SCOPE_VALUE_IDS;
     if (!e.values || typeof e.values !== 'object' || Array.isArray(e.values)) notes.push(note('invalid', `${where}.values is not an object — not applied`));
     else {
       const vals = {};
       for (const id of Object.keys(e.values)) {
         if (SCOPE_UNSCOPED.includes(id)) { notes.push(note('invalid', `${where}.values.${id}: never scoped — it is the material (Q3.6) — not applied`)); continue; }
+        if (SCOPE_LAYER_VALUE_IDS.includes(id) && k !== 'layers') { notes.push(note('invalid', `${where}.values.${id}: a ring is a layer's own — only an overrides.layers entry may own one — not applied`)); continue; }
+        /* THE RING IS KEPT AS ASKED (a finite number), and a value past the range
+           is told here and CLAMPED BY THE BUILD, whose read-out prints asked vs
+           built — so a re-save writes what was asked, never a silent clamp */
+        if (SCOPE_LAYER_VALUE_IDS.includes(id)) {
+          const r = e.values[id];
+          if (typeof r !== 'number' || !Number.isFinite(r)) { notes.push(note('invalid', `${where}.values.${id} is ${JSON.stringify(r)}, not a number — not applied`)); continue; }
+          if (r < LAYER_RING_RANGE[0] || r > LAYER_RING_RANGE[1]) notes.push(note('clamped', `${where}.values.${id} ${r} is past the ring's range ${LAYER_RING_RANGE[0]}-${LAYER_RING_RANGE[1]} — kept as asked; the build clamps it to ${Math.min(LAYER_RING_RANGE[1], Math.max(LAYER_RING_RANGE[0], r))} and the read-out says so`));
+          vals[id] = r;
+          continue;
+        }
         if (!valueIds.includes(id)) { notes.push(note(controlOf.has(id) ? 'invalid' : 'unknown', `${where}.values.${id}: only ${valueIds.join(' / ')} may be owned as a value${k === 'tiers' ? ' by a sepal tier' : ''} — not applied`)); continue; }
         const r = coerceField(controlOf.get(id), e.values[id]);
         if (r.note) notes.push(note(r.kind || 'invalid', `${where}.values.${id}: ${r.note}`));

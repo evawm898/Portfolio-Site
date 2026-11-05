@@ -2050,6 +2050,32 @@ export const SMOKE_BLOCKS = [
         path: "ST13 the stem's top under a domed head above an umbel, UM1 the flare on a stem that runs on through the band to the head, UM3 the boss on the stem below the head" },
     ],
   },
+  {
+    n: 85, title: "a layer's own ring (#495, Nov 5)",
+    anchor: 'LAYER RING: RADIAL x 3 — layer 3 owns 0.40 of the hub ring',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are
+       footRing()'s OWNED RING (`layerOwnedRing`, replacing the derived ring on
+       the layer that owns one, layer 1 included), the hub growing for an owned
+       RING past 1 (a second route to the Oct 16 growth), and the range CLAMP.
+       The subset: the anchor (an owned ring inside the derived one), the hub
+       growth, layer 1 owning a ring inside its rim (J2's identity moves), the
+       clamp, and the photo lotus. --conn is REQUIRED: a ring moved in moves a
+       whorl's feet across the hub's top, and the voxel fill is what says every
+       foot still reaches the hub. */
+    conn: true,
+    rows: [
+      { label: 'LAYER RING: RADIAL x 3 — layer 3 owns 0.40 of the hub ring',
+        path: "Z3 ring 3 at R0 x its own 0.40, restated from the row's @scopes, the record's asked / built both ways, Z2 an entry owning only a ring reaches no petal" },
+      { label: 'LAYER RING: hub growth — layer 3 owns 1.30 (the HUB GROWS to it; layers 1 and 2 keep their places, told)',
+        path: "Z3 the hub grown to layer 3's own 1.30 and the growth record naming it, J2 the rim's identity with ring 3" },
+      { label: 'LAYER RING: layer 1 owns 0.80 (the outer whorl inside the rim)',
+        path: "J2 ring 0 strictly inside the hub (layer 1 owns 0.80), Z3 R0 undone by the restated fraction, J3 the outer feet still reach the hub" },
+      { label: 'LAYER RING: asked PAST the range — layer 3 asks 2.60 (built 2.00, CLAMPED, told)',
+        path: "Z3 the record's asked 2.60 and built 2.00 against the restated range, the hub grown to the built ring" },
+      { label: 'LAYER RING: the photo LOTUS (S5 v9) — layers 3 and 4 own rings 0.64 / 0.51 (the closed body h:w 1.161 -> 1.444)',
+        path: "Z3 two owned rings beside owned widths (the ring wins), OC5 / C1 the scoped outline and spine curves unmoved by the ring" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

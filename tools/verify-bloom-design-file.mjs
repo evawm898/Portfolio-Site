@@ -207,8 +207,13 @@ async function nodeClauses(F, rec) {
          trip carries, EXPECTED exactly where the controls say both are on,
          restated here from the row's own state and never from the reader */
       const bothOn = String(st.petalInfill) === 'VORONOI' && String(st.petalTexture ?? 'NONE') !== 'NONE';
-      const notes = r.notes.filter((n) => !(bothOn && n.kind === 'conflict'));
+      /* a layer RING asked past the range (#495) is kept as asked and TOLD — the
+         one other note a clean round trip carries, EXPECTED exactly where the
+         row's own record asks one past 0.10-2.00 (restated, never the reader's) */
+      const ringPast = ((rec0 && rec0.layers) || []).filter((e) => e.values && typeof e.values.layerRing === 'number' && (e.values.layerRing < 0.1 || e.values.layerRing > 2)).length;
+      const notes = r.notes.filter((n) => !(bothOn && n.kind === 'conflict') && !(ringPast && n.kind === 'clamped' && /values\.layerRing .* past the ring's range/.test(n.text)));
       if (bothOn && !r.notes.some((n) => n.kind === 'conflict')) bad.push('both the infill and a texture are on and the reader did not say so (Q9)');
+      if (r.notes.filter((n) => n.kind === 'clamped' && /values\.layerRing/.test(n.text)).length !== ringPast) bad.push(`${ringPast} layer ring(s) past the range, but the reader told ${r.notes.filter((n) => /values\.layerRing/.test(n.text)).length}`);
       if (notes.length) bad.push(`${notes.length} note(s): ${notes.slice(0, 2).map((n) => n.text).join(' | ')}`);
       if (rec0 && JSON.stringify(r.doc.overrides) !== JSON.stringify({ layers: rec0.layers || [], petals: rec0.petals || [], tiers: rec0.tiers || [], strands: rec0.strands || [] })) bad.push(`the overrides did not round-trip: ${JSON.stringify(r.doc.overrides)}`);
       for (const c of REG.CONTROLS) if (!(c.id in r.doc.controls) || !same(c, r.doc.controls[c.id], st[c.id])) { bad.push(`${c.id} ${JSON.stringify(st[c.id])} -> ${JSON.stringify(r.doc.controls[c.id])}`); break; }

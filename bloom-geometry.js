@@ -1904,6 +1904,54 @@ export const SCOPE_PAIRED_PLACEMENTS = Object.freeze(['RADIAL', 'FAN']);
 export const SCOPE_LAYER_OWNED = Object.freeze(['petalLength', 'petalWidth', 'petalTilt']);
 
 /* ===================================================================
+   A LAYER'S OWN RING (#495, Eva's rulings of Nov 5 — option A of
+   docs/bloom-photo-to-bloom-discovery.md §15; read §15 and §16 before touching
+   any of this). Under Per-layer values a LAYER entry may own where its whorl
+   stands: `values.layerRing`, a FRACTION OF THE HUB RING R0 (the area rule's
+   ring, the ring layer 1 stands on by default — never millimetres, so it stays
+   proportional when the petal count or Spread moves R0). EVERY layer may own
+   one, layer 1 included; a layer that owns none takes TODAY'S DERIVED RING, by
+   branch (`ringFactor` below is the old expression's own double), so every
+   design saved before this existed builds byte-identically.
+
+   AN OWNED VALUE, NOT AN OFFSET: it REPLACES the derived ring outright (the
+   ramp's `layerSize^L` or an owned width's `own / Petal width`) — the ring has
+   no whole-bloom value to offset from. It rides a layer entry's `values`
+   beside the outline's and the spine's, and it is NOT a petal value: the
+   whorl's ring is footRing()'s, so `scopeOffsetsFor` keeps it out of every
+   petal's term (an entry owning only a ring reaches no petal at all, exactly
+   as an entry that did not exist — the byte identity of the petal path).
+
+   THE RANGE is the registry's (imported, Q6) and the geometry CLAMPS to it and
+   says so: the record keeps the ASKED fraction beside the BUILT one, the
+   read-out prints both ("asked vs built"). A ring past 1 GROWS THE HUB to it
+   (Eva's Oct 16 ruling, unchanged — the hub's rim moves out to the widest
+   ring past layer 1's and that ring sits ON it). PROPOSED, FOR EVA'S RULING:
+   0.10-2.00 — every derived ring of the default ramp to six layers
+   (0.72^5 = 0.193), the lotus's 0.51-0.64 (§15.2), and a hub grown to twice
+   the area rule's. Deeper layers on a small Layer size derive rings under
+   0.10; the slider cannot show those and the read-out says the derived value.
+   =================================================================== */
+export const LAYER_RING_RANGE = Object.freeze([0.10, 2.00]);
+export const LAYER_RING_STEP = 0.01;
+export const SCOPE_LAYER_VALUE_IDS = Object.freeze(['layerRing']);
+/* THE RING A LAYER OWNS, or null — the one reader, gated on the toggle exactly
+   as `scopeOffsetsFor` gates every layer entry (an entry the toggle keeps
+   inert is still validated). Several entries for one layer: the LAST wins, as
+   `takeValues` replaces. Returns `{ asked, built, clamped }`, the fraction of R0. */
+export function layerOwnedRing(scopes, layer, state) {
+  if (!scopes) return null;
+  let asked = null;
+  for (const e of scopes.layers || []) {
+    checkScopeValues(e.values, `layers[${e.layer}]`, SCOPE_LAYER_ENTRY_VALUE_IDS);
+    if (e.layer === layer && e.values && 'layerRing' in e.values) asked = e.values.layerRing;
+  }
+  if (asked === null || !scopeLayersLive(state)) return null;
+  const built = Math.min(LAYER_RING_RANGE[1], Math.max(LAYER_RING_RANGE[0], asked));
+  return { asked, built, clamped: built !== asked };
+}
+
+/* ===================================================================
    THE TWO TOGGLES (Scoping-b, Eva's rulings — read docs/bloom-scoping-selection.md
    before touching any of this). "Per-layer independence is RADIAL only;
    per-petal is FAN only. Each is a toggle; off = today's panel exactly."
@@ -2014,9 +2062,16 @@ function checkScopeValues(values, where, ids = SCOPE_VALUE_IDS) {
   if (typeof values !== 'object' || Array.isArray(values)) throw new Error(`scopes: ${where}.values is not an object`);
   for (const k of Object.keys(values)) {
     if (SCOPE_UNSCOPED.includes(k)) throw new Error(`scopes: ${where} carries a value for ${k}, which is never scoped (Q3.6)`);
+    if (SCOPE_LAYER_VALUE_IDS.includes(k) && !ids.includes(k)) throw new Error(`scopes: ${where}.values.${k} — a ring is a LAYER's own (#495); only a layer entry may own one`);
     if (!ids.includes(k)) throw new Error(`scopes: ${where}.values.${k} — only ${ids.join(' / ')} may be owned as values`);
+    if (SCOPE_LAYER_VALUE_IDS.includes(k) && (typeof values[k] !== 'number' || !Number.isFinite(values[k]))) throw new Error(`scopes: ${where}.values.${k} is ${JSON.stringify(values[k])}, not a finite fraction of the hub ring`);
   }
 }
+/* the values a LAYER entry may own: the petals' outline and spine, and its ring */
+const SCOPE_LAYER_ENTRY_VALUE_IDS = Object.freeze([...SCOPE_VALUE_IDS, ...SCOPE_LAYER_VALUE_IDS]);
+/* an entry that owns ONLY a ring (no offset, no petal value) reaches no petal */
+const ringOnlyEntry = (e) => !Object.keys(e.offsets || {}).length && !!e.values && Object.keys(e.values).length > 0
+  && Object.keys(e.values).every((k) => SCOPE_LAYER_VALUE_IDS.includes(k));
 
 /* THE ENTRIES THAT REACH SLOT `slot` OF LAYER `layer`, summed into one
    `{ base: delta }` term, with the bounds the resolver clamps against. Returns
@@ -2042,15 +2097,17 @@ export function scopeOffsetsFor(scopes, { layer, slot, n, state }) {
   /* the owned VALUES (F6-scope) and which scope each came from: a layer's
      replace the whole bloom's, a petal's replace the layer's */
   let values = null, valueFrom = null;
+  /* a layer's RING is footRing()'s, never a petal's value (#495) */
   const takeValues = (vals, from) => {
     if (!vals) return;
-    for (const k of Object.keys(vals)) { (values || (values = {}))[k] = vals[k]; (valueFrom || (valueFrom = {}))[k] = from; }
+    for (const k of Object.keys(vals)) { if (SCOPE_LAYER_VALUE_IDS.includes(k)) continue; (values || (values = {}))[k] = vals[k]; (valueFrom || (valueFrom = {}))[k] = from; }
   };
-  for (const e of scopes.layers || []) { checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`); checkScopeValues(e.values, `layers[${e.layer}]`); }
+  for (const e of scopes.layers || []) { checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`); checkScopeValues(e.values, `layers[${e.layer}]`, SCOPE_LAYER_ENTRY_VALUE_IDS); }
   for (const e of scopes.petals || []) { checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`); checkScopeValues(e.values, `petals[${e.layer},${e.slot}]`); }
   if (layersLive) {
     for (const e of scopes.layers || []) {
       if (e.layer !== layer) continue;
+      if (ringOnlyEntry(e)) continue;
       addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;
       takeValues(e.values, 'layer');
       /* Q3.5: a layer entry naming a size or tilt base OWNS it for this layer */
@@ -2513,7 +2570,7 @@ export function footRing(state, acc, opts = {}) {
          exactly in IEEE-754 (multiplication by 1.0 is exact for every finite x). */
       const footCount = 1;
       sumSq += footCount * rFoot * rFoot;
-      raw.push({ lambda, scale, authoredWidth, width, rFoot, footCount, ownWidth: null, ringFactor: scale });
+      raw.push({ lambda, scale, authoredWidth, width, rFoot, footCount, ownWidth: null, ringFactor: scale, derivedRingFactor: scale, ownRing: null });
     }
   } else {
   for (let L = 0; L < layerCount; L++) {
@@ -2552,14 +2609,18 @@ export function footRing(state, acc, opts = {}) {
     const authoredWidth = ownWidth === null ? state.petalWidth * scale * 0.4 * state.footDelicacy : ownWidth * 0.4 * state.footDelicacy;
     const width = Math.max(FOOT_MIN_WIDTH_MM, authoredWidth);   // the ASKED foot (floored; the cap follows the ring map)
     const rFoot = Math.sqrt((width * thickness) / Math.PI);
-    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;
+    const derivedRingFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;
+    /* #495: A LAYER'S OWN RING REPLACES THE DERIVED ONE (see LAYER_RING_RANGE).
+       With none owned this is the line above's own double, by branch. */
+    const ownRing = layerOwnedRing(tierScopes, L, state);
+    const ringFactor = ownRing === null ? derivedRingFactor : ownRing.built;
     /* The group is the whole whorl and `footCount` is `state.petalCount` (or
        the fan's derived count) — the SAME DOUBLE the pre-role expression
        multiplied by, deliberately read unrounded exactly as that expression
        read it. */
     const footCount = slotCount;
     sumSq += footCount * rFoot * rFoot;
-    raw.push({ lambda: L, scale, authoredWidth, width, rFoot, footCount, ownWidth, ringFactor });
+    raw.push({ lambda: L, scale, authoredWidth, width, rFoot, footCount, ownWidth, ringFactor, derivedRingFactor, ownRing });
   }
   }
 
@@ -2635,9 +2696,11 @@ export function footRing(state, acc, opts = {}) {
      radius the rim, the dome and the hub read; with no layer past the outer
      whorl it is R0 itself, BY BRANCH (the same double, no product formed). */
   let growFactor = 1, growLayer = -1;
-  for (let k = 0; k < raw.length; k++) if (raw[k].ownWidth !== null && raw[k].ringFactor > growFactor) { growFactor = raw[k].ringFactor; growLayer = k; }
+  /* #495: an OWNED RING past 1 grows the hub too, layer 1's included — the same
+     ruling, a second way to ask for a ring past the rim */
+  for (let k = 0; k < raw.length; k++) if ((raw[k].ownWidth !== null || raw[k].ownRing !== null) && raw[k].ringFactor > growFactor) { growFactor = raw[k].ringFactor; growLayer = k; }
   const Rhub = growLayer >= 0 ? R0 * growFactor : R0;
-  const hubGrowth = growLayer >= 0 ? { layer: growLayer, factor: growFactor, fromMm: R0, toMm: Rhub, byMm: Rhub - R0 } : null;
+  const hubGrowth = growLayer >= 0 ? { layer: growLayer, factor: growFactor, fromMm: R0, toMm: Rhub, byMm: Rhub - R0, by: raw[growLayer].ownRing !== null ? 'ring' : 'width' } : null;
   /* ===================================================================
      THE DOME (Sep 4) — a spherical cap through the rim (Rhub, z = 0 — R0
      itself unless the hub grew for an owned ring) rising H = headRise * Rhub
@@ -2887,6 +2950,10 @@ export function footRing(state, acc, opts = {}) {
          ring's factor on R0 (the ramp's `scale` where nothing is owned; past
          1 the hub grows to it — `hub.growth`). */
       ownWidth: p.ownWidth, ringFactor: p.ringFactor,
+      /* #495: the ring the layer would take without one of its own (the ramp's
+         or its width's), and the ring it OWNS — `{ asked, built, clamped }`,
+         fractions of R0 — or null */
+      derivedRingFactor: p.derivedRingFactor, ownRing: p.ownRing,
       authoredWidth: p.authoredWidth,
       widthClamped: p.authoredWidth < FOOT_MIN_WIDTH_MM,
       /* THE CEILING TWIN (Eva, Sep 1). The floor has been reported since the
@@ -2979,7 +3046,7 @@ export function footRing(state, acc, opts = {}) {
      own thickness is the petal's law at u = 0, and a filament is one sheet. */
   const hubRootTaper = petalRootTaper(hubRootTaperLengthMm(state, tierScopes));
   const hubThickness = hubRootTaper === null ? thickness : thickness * hubRootTaper.rootFactor;
-  const hub = { radius: sphere ? dome.Rd : Rhub, thickness: hubThickness, derivedRadius, dome, growth: hubGrowth, rootTaper: hubRootTaper, sheetThickness: thickness };
+  const hub = { radius: sphere ? dome.Rd : Rhub, thickness: hubThickness, derivedRadius, ringR0: R0, dome, growth: hubGrowth, rootTaper: hubRootTaper, sheetThickness: thickness };
 
   /* THE REPRODUCTIVE PARTS' OWN RADIUS — ONE OWNER (session 24). A filament
      and a style are each ONE SHEET THICK (Part thickness owns the material
