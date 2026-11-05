@@ -78,14 +78,27 @@
      delta still does.
      W2  also: a delta whose effective value (global + offset) leaves the
          registry range — clamped silently by the build, as an owned sum is.
-     W3  a schema value the BUILD makes INERT: a spine-curl delta on a layer
-         whose petals are drawn on a CURVE spine (curl mode CURVE reads no
-         slider curl). A warning, made without a ruling (§14 asks whether it
-         should fail, as rule 3's hidden values and V7's inert entries do).
+     W3  (RETIRED by Eva's ruling of Nov 5 — now the failing clause V8) a
+         schema value the BUILD makes INERT.
      TOLD (not a clause, not a warning): what the page's READ-OUT says it
          clamped — CUP CLAMPED (the section's fold clamp) and FOLD LIMIT (the
          spine's). No reader note carries either. Printed, pinned by the
-         fixtures, never decides the exit; how to treat it is Eva's ruling.
+         fixtures, never decides the exit.
+   EVA'S RULINGS ON §14.7 (Nov 5):
+     V8  (a CLAUSE — it was W3) a spine-curl delta on a layer whose petals are
+         drawn on a CURVE spine (the layer's own curl mode, else the whole
+         bloom's): curl mode CURVE reads no slider curl, so the value builds
+         nothing — rule 3, as V7 holds for an inert entry. Pure, from the file.
+     W4  the fold clamp binds AWAY FROM THE PETAL TIP. The tip is the NIB, the
+         region the geometry itself gives (`tipCap.apex`: from where the drawn
+         outline passes the law's crossing of the print floor). Read off a
+         NODE build of the composed state in both modes, per petal and sepal,
+         from the part's own clamp record: a clamp is tip-only when its
+         reported (worst) station is on the nib AND its reported row count is
+         no more than the part's emitted nib stations; anything else warns
+         (`clampLocated` says why the count is needed). A tip-only clamp stays
+         TOLD and never changes the result. A warning: exit 0.
+   NOT BUILT, by the same ruling: a self-intersection check.
    A name that is not a control at all is V1's (`unknown`), never a warning.
 
    RUN:  node tools/verify-bloom-photo-subset.mjs <file.json> [...]
@@ -94,11 +107,11 @@
                       with its `controls` put in the v1 envelope; the dropped
                       keys are named. The raw file is still validated as it is.
          node tools/verify-bloom-photo-subset.mjs --self
-                      the twenty-six written-down fixtures below (five added for schema v2, S3; six for v3, S4; five for v4, S5), each against its
-                      expected clause AND warning sets, then the off-schema
-                      fixture through a SPAWNED copy of this validator: it
-                      must list W1 and exit 0 (CI: spawned by the design-file
-                      gate)
+                      the twenty-seven written-down fixtures below (five added for schema v2, S3; six for v3, S4; five for v4, S5; one for the CUP CLAMPED ruling), each against its
+                      expected clause, warning AND told sets, then two fixtures
+                      through a SPAWNED copy of this validator: the off-schema
+                      one must list W1 and exit 0, the away-from-tip clamp W4
+                      and exit 0 (CI: spawned by the design-file gate)
          node tools/verify-bloom-photo-subset.mjs --self --save <base.json>
                       as --self, and writes the fixtures' fired / warned sets with
                       the sha256 of every file that decides them
@@ -109,9 +122,10 @@
                       the fixtures again under each mutant of bloom.js /
                       bloom-file.js; every mutant must move EXACTLY the
                       (fixture, clause) pairs it names, every anchor checked
-                      before any mutant runs; then two mutants of THIS file
-                      (a warning fails the run, the W1 warning is dropped),
-                      each of which must break the spawned exit-0 leg
+                      before any mutant runs; then three mutants of THIS file
+                      (a warning fails the run, the W1 warning is dropped,
+                      the clamp located by its worst station alone), each of
+                      which must break exactly the spawned exit-0 legs it names
    Needs playwright-core and three@0.161.0 (npm i --no-save). On a container
    whose Chromium lives under chrome-linux64/, set CHROMIUM_EXECUTABLE.
    =================================================================== */
@@ -164,7 +178,78 @@ function outlineLifts(obj) {
   }
   return [...seen];
 }
-/* W1 / W2 — pure, from the file's own `controls` and the schema; no page. */
+/* THE FOLD CLAMP, LOCATED (Eva's ruling of Nov 5 on §14.7 2) — a NODE build of
+   the composed state with the file's scopes, in BOTH modes, read off every
+   petal's and sepal's OWN clamp record (`form.cupClamp`, the record the page's
+   CUP CLAMPED line is printed from) against that part's OWN NIB (the builder's
+   declared plan, `tipCap.apex`: the nib starts where the drawn outline passes
+   `xLawMm`, the law's crossing of the print floor — `apexNibPlan`'s own
+   `halfAt` test, x = u * drawnLength > xLawMm).
+
+   THE TIP IS THE NIB. The geometry gives that region; no constant is typed.
+   A clamp is TIP-ONLY when BOTH hold for every clamped part:
+     (a) its reported station (the worst — the smallest radius asked) lies on
+         the nib, and
+     (b) its reported ROW COUNT is no more than the part's emitted stations on
+         the nib (summed over both halves of a two-sided outline, whose clamp
+         counts a row once per half).
+   (b) is what makes (a) honest. On the nib the cup is scaled with the
+   half-width (`cupScale = hb / TIP_HALF_MM`), so the radius it asks is the
+   same at every nib station and no larger than anywhere off it — the worst
+   station is ON the nib whenever the nib binds, whatever else binds. Measured
+   on the default petal: cup 1.0 binds 8 rows against 7 nib stations, worst u
+   0.9995 (on the nib), so (a) alone calls a clamp that also binds above the
+   nib tip-only. The residual exposure (a cup gradient that drops the cup
+   across the nib's own last millimetre, so some nib stations stop binding
+   while an off-nib one binds) is stated, not closed.
+   A part with NO nib (a squared terminal holds the outline above the floor)
+   has no tip region: any clamp there is away from it.
+   VALIDITY: a part whose clamp counts more rows than it emitted stations
+   (x halves) means the record counts something other than emitted rows, and
+   the run aborts rather than classify on it. */
+function clampLocated(obj) {
+  if (!obj || !obj.controls || typeof obj.controls !== 'object') return { away: [], tip: 0 };
+  const r = readNewDesign(obj);
+  if (!r.ok) return { away: [], tip: 0 };
+  const away = new Set(); let tip = 0;
+  for (const exportMode of [false, true]) {
+    const acc = new G.MeshBuilder({ exportMode });
+    const b = G.buildBloomInto(acc, r.doc.controls, { below: null, scopes: scopesForBuild(r.doc.overrides) });
+    const parts = [...(b.petalsAll || []).filter(Boolean).map((p) => [`petal (layer ${p.whorl ?? '?'})`, p]),
+      ...(((b.sepals || {}).built) || []).filter(Boolean).map((p) => ['sepal', p])];
+    for (const [who, p] of parts) {
+      const cc = p.form && p.form.cupClamp;
+      if (!cc) continue;
+      const tc = p.tipCap || {};
+      const caps = tc.twoSided ? [tc.sides.left, tc.sides.right] : [tc];
+      const stations = p.profileU || [];
+      if (cc.rows > stations.length * caps.length) throw new Error(`HARNESS INVALID: ${who}'s fold clamp counts ${cc.rows} rows against ${stations.length * caps.length} emitted (stations x halves) — the record is not counting emitted rows`);
+      const nibs = caps.map((c) => (c && c.apex && c.apex.active ? c.apex : null));
+      const onNib = (u, a) => a !== null && u * a.drawnLengthMm > a.xLawMm;
+      const nibRows = nibs.reduce((n, a) => n + stations.filter((u) => onNib(u, a)).length, 0);
+      const worstOn = nibs.some((a) => onNib(cc.u, a));
+      if (worstOn && cc.rows <= nibRows) { tip++; continue; }
+      const from = nibs.filter(Boolean).map((a) => (a.xLawMm / a.drawnLengthMm).toFixed(4));
+      /* HOW FAR BELOW THE NIB, INFERRED and labelled so: the record keeps the
+         worst station and a count, not every station. Where the half-width
+         falls monotonically into the nib the extra rows are the stations
+         nearest it, so the clamp reaches the k-th emitted station below the
+         nib's first. Per half on a two-sided outline (the halves share
+         stations), so k is halved there. */
+      const below = Math.ceil((cc.rows - nibRows) / caps.length);
+      const firstNib = stations.findIndex((u) => nibs.some((a) => onNib(u, a)));
+      const reachI = firstNib < 0 ? stations.length - below : firstNib - below;
+      const reachU = reachI >= 0 && reachI < stations.length ? stations[reachI] : null;
+      const lenMm = (caps[0] && caps[0].apex && caps[0].apex.drawnLengthMm) || null;
+      const reach = reachU === null ? '' : `, reaching (inferred) the ${below} station${below === 1 ? '' : 's'} below the nib, down to u ${reachU.toFixed(4)}${lenMm ? ` — ${((1 - reachU) * lenMm).toFixed(2)} mm from the tip` : ''}`;
+      away.add(`${who}: ${cc.rows} row${cc.rows === 1 ? '' : 's'} clamped against ${nibRows} nib station${nibRows === 1 ? '' : 's'} (${from.length ? `nib from u ${[...new Set(from)].join(' / ')}` : 'no nib — a squared terminal'})${reach}; worst at u ${cc.u.toFixed(4)}, asked radius ${cc.askedRadiusMm.toFixed(3)} mm, drawn ${cc.drawnRadiusMm.toFixed(3)} (${exportMode ? 'export' : 'live'})`);
+    }
+  }
+  return { away: [...away], tip };
+}
+/* W1 / W2 / W4 and V8 — pure, from the file's own `controls`, its scopes and
+   the schema; no page. V8 is a CLAUSE computed here because it needs no page
+   (rule 3's inert value — it was W3 before Eva's ruling of Nov 5). */
 function schemaWarnings(obj) {
   const warned = {};
   const named = obj && obj.controls && typeof obj.controls === 'object' ? Object.entries(obj.controls).filter(([k]) => controlOf.has(k)) : [];
@@ -199,8 +284,13 @@ function schemaWarnings(obj) {
   for (const k of ['petals', 'tiers', 'strands']) if (Array.isArray(ov[k]) && ov[k].length) off.push(`overrides.${k} (${ov[k].length} entr${ov[k].length === 1 ? 'y' : 'ies'} — schema v2 writes layer entries only)`);
   if (off.length) warned.W1 = `off the photo schema: ${off.join(', ')}`;
   if (out.length) warned.W2 = `outside the photo schema's own range: ${out.join(', ')}`;
-  if (inert.length) warned.W3 = `a schema value the build makes INERT: ${inert.join(', ')}`;
-  return warned;
+  /* Eva's ruling (Nov 5): W3 becomes a FAIL — clause V8 */
+  const fired = {};
+  if (inert.length) fired.V8 = `a schema value the build makes INERT: ${inert.join(', ')}`;
+  /* Eva's ruling (Nov 5): CUP CLAMPED warns only AWAY from the tip */
+  const cl = clampLocated(obj);
+  if (cl.away.length) warned.W4 = `the fold clamp binds AWAY from the petal tip (the nib): ${cl.away.join('; ')}`;
+  return { warned, fired };
 }
 
 /* THE DIRTY DESIGN — complete, clean through the old path, far from DEFAULTS. */
@@ -273,12 +363,18 @@ const FIXTURES = [
      ENTRY is inert); a cup delta that takes the layer past the fold clamp loads
      clean and is TOLD on the page read-out only; a delta past the registry
      range warns W2 (clamped silently); a curl delta on a CURVE-spine layer
-     warns W3 (inert). */
+     warns W3 (inert).
+     EVA'S RULINGS (Nov 5): a clamp that binds ON THE NIB ONLY stays TOLD
+     (SCOPED_CUP_CLAMPED, effective cup 0.55: 7 rows on 7 nib stations); one
+     that binds below the nib WARNS W4 and exits 0 (SCOPED_CUP_AWAY: cup 1.2
+     on an 8 mm layer, 13 rows against 8 nib stations — the spawned exit leg
+     runs it too); W3 is now the FAILING clause V8. */
   { id: 'SCOPED_CUPCURL', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: { petalTilt: -10, petalCup: -0.2, petalSpineCurl: -20 } }, { layer: 1, offsets: { petalTilt: 15, petalCup: 0.1, petalSpineCurl: 40 } }] } }, expect: [] },
   { id: 'SCOPED_CUPCURL_OFF', file: { ...ENV, controls: { ...CLEAN }, overrides: { layers: [{ layer: 0, offsets: { petalCup: -0.2, petalSpineCurl: -20 } }, { layer: 1, offsets: { petalCup: 0.1, petalSpineCurl: 40 } }] } }, expect: ['V7'] },
-  { id: 'SCOPED_CUP_CLAMPED', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalCup: 0.6 } }] } }, expect: [], told: ['CUP CLAMPED'] },
-  { id: 'SCOPED_DELTA_RANGE', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalCup: 1.0 } }] } }, expect: [], warn: ['W2'], told: ['CUP CLAMPED'] },
-  { id: 'SCOPED_CURL_INERT', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalSpineCurl: 30 }, values: { petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.5, 0.1], [0.9, 0.3]] } } }] } }, expect: [], warn: ['W3'] },
+  { id: 'SCOPED_CUP_CLAMPED', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalCup: 0.25 } }] } }, expect: [], told: ['CUP CLAMPED'] },
+  { id: 'SCOPED_CUP_AWAY', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalCup: 0.9, petalWidth: -8 } }] } }, expect: [], warn: ['W4'], told: ['CUP CLAMPED'] },
+  { id: 'SCOPED_DELTA_RANGE', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalCup: 1.0 } }] } }, expect: [], warn: ['W2', 'W4'], told: ['CUP CLAMPED'] },
+  { id: 'SCOPED_CURL_INERT', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalSpineCurl: 30 }, values: { petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.5, 0.1], [0.9, 0.3]] } } }] } }, expect: ['V8'] },
   { id: 'NO_ENVELOPE', file: { views: ['front'], controls: { ...CLEAN }, frame: 1 }, expect: ['V0', 'V1', 'V2', 'V3', 'V4', 'V5'] },   // V3: the dirty page's own layerSize hides under Per-layer values
 ];
 
@@ -299,7 +395,7 @@ const MUTANTS = [
       /* S4: the outline fixtures, the same two mechanisms */
       'OUTLINE_CURVE:V2', 'OUTLINE_CURVE:V3', 'OUTLINE_LAYER:V2', 'OUTLINE_LIFTED:V2', 'OUTLINE_LIFTED:V3', 'WIDTH_REFUSED_ON_LOAD:V3',
       /* S5: the cup/curl fixtures, the S3 mechanisms again (SCOPED_CUPCURL_OFF is SCOPED_INERT's shape) */
-      'SCOPED_CUPCURL:V2', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V7', 'SCOPED_CUP_CLAMPED:V2', 'SCOPED_DELTA_RANGE:V2', 'SCOPED_CURL_INERT:V2'],
+      'SCOPED_CUPCURL:V2', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V7', 'SCOPED_CUP_CLAMPED:V2', 'SCOPED_CUP_AWAY:V2', 'SCOPED_DELTA_RANGE:V2', 'SCOPED_CURL_INERT:V2'],
   },
   {
     id: 'the-scopes-survive-a-new-design', file: 'bloom.js',
@@ -311,7 +407,7 @@ const MUTANTS = [
       /* S4: V4 on every outline fixture that loads; V7 on OUTLINE_LAYER (its layers [0, 1]) */
       'OUTLINE_CURVE:V4', 'OUTLINE_LAYER:V4', 'OUTLINE_LAYER:V7', 'OUTLINE_MODE_OFF:V4', 'LOBES_UNDER_CURVE:V4', 'OUTLINE_LIFTED:V4', 'WIDTH_REFUSED_ON_LOAD:V4',
       /* S5: V4 on every cup/curl fixture; V7 on SCOPED_CUPCURL (its layers [0, 1]) */
-      'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL:V7', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4'],
+      'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL:V7', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_CUP_AWAY:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4'],
   },
   {
     /* S3: the page MERGES the leftover scope into the file's — the plausible
@@ -325,7 +421,7 @@ const MUTANTS = [
       /* S4: V4 on every outline fixture that loads (OUTLINE_LAYER's layers [0, 1] already hold the leftover's 1, so no V7) */
       'OUTLINE_CURVE:V4', 'OUTLINE_LAYER:V4', 'OUTLINE_MODE_OFF:V4', 'LOBES_UNDER_CURVE:V4', 'OUTLINE_LIFTED:V4', 'WIDTH_REFUSED_ON_LOAD:V4',
       /* S5: V4 on every cup/curl fixture (each already names layer 1) */
-      'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4'],
+      'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_CUP_AWAY:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4'],
   },
   {
     id: 'hidden-controls-are-applied', file: 'bloom-file.js',
@@ -358,7 +454,7 @@ const MUTANTS = [
       'OUTLINE_CURVE:V1', 'OUTLINE_CURVE:V2', 'OUTLINE_CURVE:V3', 'OUTLINE_CURVE:V5', 'OUTLINE_LAYER:V1', 'OUTLINE_LAYER:V2', 'OUTLINE_LAYER:V5',
       'OUTLINE_LIFTED:V1', 'OUTLINE_LIFTED:V2', 'OUTLINE_LIFTED:V3', 'OUTLINE_LIFTED:V5', 'WIDTH_REFUSED_ON_LOAD:V1', 'WIDTH_REFUSED_ON_LOAD:V3', 'WIDTH_REFUSED_ON_LOAD:V5',
       /* S5: the scoped cup/curl fixtures as the S3 scoped ones; SCOPED_CUPCURL_OFF as SCOPED_INERT */
-      'SCOPED_CUPCURL:V1', 'SCOPED_CUPCURL:V2', 'SCOPED_CUPCURL:V5', 'SCOPED_CUP_CLAMPED:V1', 'SCOPED_CUP_CLAMPED:V2', 'SCOPED_CUP_CLAMPED:V5', 'SCOPED_DELTA_RANGE:V1', 'SCOPED_DELTA_RANGE:V2', 'SCOPED_DELTA_RANGE:V5',
+      'SCOPED_CUPCURL:V1', 'SCOPED_CUPCURL:V2', 'SCOPED_CUPCURL:V5', 'SCOPED_CUP_CLAMPED:V1', 'SCOPED_CUP_CLAMPED:V2', 'SCOPED_CUP_CLAMPED:V5', 'SCOPED_CUP_AWAY:V1', 'SCOPED_CUP_AWAY:V2', 'SCOPED_CUP_AWAY:V5', 'SCOPED_DELTA_RANGE:V1', 'SCOPED_DELTA_RANGE:V2', 'SCOPED_DELTA_RANGE:V5',
       'SCOPED_CURL_INERT:V1', 'SCOPED_CURL_INERT:V2', 'SCOPED_CURL_INERT:V5', 'SCOPED_CUPCURL_OFF:V1', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V5', 'SCOPED_CUPCURL_OFF:V7'],
   },
 ];
@@ -420,7 +516,9 @@ async function validate(page, port, text, name, dirtyOver = null) {
        (§14). A fixture pins what is told so the observation cannot drift. */
     const told = {};
     for (const k of TOLD_KEYS) { const at = after.readout.indexOf(k); if (at >= 0) { const end = after.readout.indexOf('\n', at); told[k] = after.readout.slice(at, end < 0 ? at + 400 : Math.min(end, at + 400)).replace(/\s+/g, ' '); } }
-    return { fired, warned: schemaWarnings(obj), told, rec, applied: rec.appliedIds || [] };
+    const sw = schemaWarnings(obj);
+    Object.assign(fired, sw.fired);
+    return { fired, warned: sw.warned, told, rec, applied: rec.appliedIds || [] };
   } finally { page.off('pageerror', onErr); }
 }
 
@@ -507,41 +605,55 @@ try {
   }
 } finally { await browser.close(); server.close(); }
 
-/* THE EXIT-CODE LEG (ruling 2): the OFF_SCHEMA fixture, written to a file and
-   handed to a SPAWNED copy of this validator, must list W1 and exit 0 — the
-   exit code is the claim, and only a separate process can show it. Under
-   --negative-control two mutants of THIS file must each break the leg. */
+/* THE EXIT-CODE LEGS (ruling 2, and Eva's CUP CLAMPED ruling of Nov 5): the
+   OFF_SCHEMA fixture must list W1 and exit 0, and SCOPED_CUP_AWAY must list
+   W4 (the fold clamp below the nib) and exit 0 — each written to a file and
+   handed to a SPAWNED copy of this validator, because the exit code is the
+   claim and only a separate process can show it. Under --negative-control
+   each validator mutant must break the leg it names. */
 const SELF_MUTANTS = [
   /* anchors joined from pieces so the definitions below do not match themselves */
-  { id: 'a-warning-fails-the-run', from: ['        if (bad.length)', ' failed = true;'].join(''), to: '        if (bad.length || warns.length) failed = true;', breaks: 'the exit code' },
-  { id: 'the-off-schema-warning-is-dropped', from: ['    if (!row) { if (id !== LAYER_SCHEMA.switch)', ' off.push('].join(''), to: '    if (!row) { if (0) off.push(', breaks: 'the W1 line' },
+  { id: 'a-warning-fails-the-run', from: ['        if (bad.length)', ' failed = true;'].join(''), to: '        if (bad.length || warns.length) failed = true;', breaks: ['W1', 'W4'] },
+  { id: 'the-off-schema-warning-is-dropped', from: ['    if (!row) { if (id !== LAYER_SCHEMA.switch)', ' off.push('].join(''), to: '    if (!row) { if (0) off.push(', breaks: ['W1'] },
+  /* the obvious reading of "from the clamp's own reported location": the worst
+     station alone — which sits on the nib whenever the nib binds, so a clamp
+     reaching below it is called tip-only */
+  { id: 'the-clamp-is-located-by-its-worst-station-alone', from: ['      if (worstOn &&', ' cc.rows <= nibRows) { tip++; continue; }'].join(''), to: '      if (worstOn) { tip++; continue; }', breaks: ['W4'] },
 ];
-function exitLeg(script) {
+const LEGS = [
+  { warn: 'W1', fixture: 'OFF_SCHEMA', name: 'off-schema', line: /^\s+warn W1: off the photo schema: antherElongation=4$/m },
+  { warn: 'W4', fixture: 'SCOPED_CUP_AWAY', name: 'cup-away', line: /^\s+warn W4: the fold clamp binds AWAY from the petal tip \(the nib\): petal \(layer 1\): 13 rows clamped against 8 nib stations/m },
+];
+function exitLeg(script, leg) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'photo-subset-'));
-  const file = path.join(dir, 'off-schema.subset.bloom-design.json');
-  fs.writeFileSync(file, JSON.stringify(FIXTURES.find((f) => f.id === 'OFF_SCHEMA').file));
+  const file = path.join(dir, `${leg.name}.subset.bloom-design.json`);
+  fs.writeFileSync(file, JSON.stringify(FIXTURES.find((f) => f.id === leg.fixture).file));
   const r = spawnSync(process.execPath, [script, file], { encoding: 'utf8', env: process.env });
   fs.rmSync(dir, { recursive: true, force: true });
   const out = (r.stdout || '') + (r.stderr || '');
-  return { status: r.status, w1: /^\s+warn W1: off the photo schema: antherElongation=4$/m.test(out), pass: /^PASS  off-schema/m.test(out), out };
+  return { status: r.status, listed: leg.line.test(out), pass: new RegExp(`^PASS  ${leg.name}`, 'm').test(out), out };
 }
 if (SELF || NEGATIVE) {
   const me = fileURLToPath(import.meta.url);
-  const leg = exitLeg(me);
-  const legOk = leg.status === 0 && leg.w1 && leg.pass;
-  console.log(`${legOk ? 'ok  ' : 'FAIL'}  exit-code leg: the off-schema file PASSES, lists W1 and exits ${leg.status}${legOk ? '' : `\n${leg.out.split('\n').map((l) => '        ' + l).join('\n')}`}`);
-  if (!legOk) failed = true;
-  if (NEGATIVE && legOk && (!ONLY.length || SELF_MUTANTS.some((m) => ONLY.includes(m.id)))) {
+  let legsOk = true;
+  for (const leg of LEGS) {
+    const r = exitLeg(me, leg);
+    const ok = r.status === 0 && r.listed && r.pass;
+    console.log(`${ok ? 'ok  ' : 'FAIL'}  exit-code leg (${leg.warn}): the ${leg.name} file PASSES, lists ${leg.warn} and exits ${r.status}${ok ? '' : `\n${r.out.split('\n').map((l) => '        ' + l).join('\n')}`}`);
+    if (!ok) { failed = true; legsOk = false; }
+  }
+  if (NEGATIVE && legsOk && (!ONLY.length || SELF_MUTANTS.some((m) => ONLY.includes(m.id)))) {
     const src = fs.readFileSync(me, 'utf8');
     for (const m of SELF_MUTANTS) mutate(src, { ...m, file: path.basename(me) });
-    console.log(`anchors: both validator mutants match exactly once`);
+    console.log(`anchors: all ${SELF_MUTANTS.length} validator mutants match exactly once`);
     for (const m of SELF_MUTANTS.filter((x) => !ONLY.length || ONLY.includes(x.id))) {
       const copy = path.join(path.dirname(me), `.photo-subset-mutant-${m.id}.mjs`);
       fs.writeFileSync(copy, mutate(src, { ...m, file: path.basename(me) }));
-      let r; try { r = exitLeg(copy); } finally { fs.rmSync(copy, { force: true }); }
-      const broke = !(r.status === 0 && r.w1 && r.pass);
-      console.log(`${broke ? 'ok  ' : 'FAIL'}  validator mutant ${m.id}: the leg ${broke ? `broke (exit ${r.status}, W1 ${r.w1 ? 'listed' : 'absent'})` : 'still passed'} — breaks ${m.breaks}`);
-      if (!broke) failed = true;
+      const broke = [];
+      try { for (const leg of LEGS) { const r = exitLeg(copy, leg); if (!(r.status === 0 && r.listed && r.pass)) broke.push(leg.warn); } } finally { fs.rmSync(copy, { force: true }); }
+      const ok = JSON.stringify(broke) === JSON.stringify([...m.breaks].sort());
+      console.log(`${ok ? 'ok  ' : 'FAIL'}  validator mutant ${m.id}: broke the leg(s) [${broke.join(' ')}] — names [${m.breaks.join(' ')}]`);
+      if (!ok) failed = true;
     }
   }
 }
