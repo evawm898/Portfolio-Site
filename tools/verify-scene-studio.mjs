@@ -46,7 +46,12 @@ process.on('warning', (w) => { if (w.name !== 'ModuleTypelessPackageJsonWarning'
 const BRIEF = {
   notice: [200, 400], gather: [500, 1200], launch: [80, 120], flight: [250, 450],
   apex: [0.15, 0.25], hindLag: [60, 100], compress: [120, 180], recover: [100, 200],
-  settle: [300, 800], spontaneous: [20, 60],
+  settle: [300, 800],
+  // the ambient spec as REVISED (Eva, after viewing #493): a deliberate action
+  // every 5-12 s across the pair, at least one cat usually doing something,
+  // dozes brief and self-ending, two cats free to move at once but never in
+  // step, the floor shared but never by two cats on top of each other
+  actionEvery: [5, 12], busyShare: 0.6, doze: [8, 20], floorApart: 55,
 };
 
 // ---------------------------------------------------------------- harness ---
@@ -396,7 +401,8 @@ async function partOne(M) {
   const soak = (() => {
     const D = C.createDirector({ seed: 11 });
     const dt = 1 / 120;
-    const out = { both: 0, same: 0, sameAction: 0, jump: 0, jumpAt: '', nodeChanges: 0, illegal: [], travelStarts: [], ends: [], clicks: [], wakeFirst: 0, sleptTravel: 0, steps: 0 };
+    const out = { both: 0, same: 0, sameAction: 0, sameAt: '', jump: 0, jumpAt: '', nodeChanges: 0, illegal: [], travelStarts: [], ends: [], clicks: [], wakeFirst: 0, sleptTravel: 0, steps: 0,
+      busy: 0, floorMin: Infinity, floorAt: '', dozes: [], dozeOn: [null, null], acts: {}, floorWalks: 0 };
     const prev = D.cats.map(c => ({ node: c.node, pos: [...c.pos], edge: null }));
     let lastLogLen = 0;
     for (let n = 0; n < 120 * 1500; n++) {
@@ -405,9 +411,27 @@ async function partOne(M) {
       C.stepDirector(D, dt);
       out.steps++;
       if (C.moving(D, 0) && C.moving(D, 1)) out.both++;
-      if (D.cats[0].node === D.cats[1].node) out.same++;
+      if (D.cats[0].node === D.cats[1].node && D.cats[0].node !== 'floor') out.same++;
       const a0 = D.cats[0].action, a1 = D.cats[1].action;
-      if (a0 && a1 && a0 === a1 && a0 !== 'leg') out.sameAction++;
+      // a small action (not a walk or a jump) done by both at once is the
+      // mirroring the spec forbids
+      if (a0 && a1 && a0 === a1 && !['leg', 'reposition'].includes(a0)) { out.sameAction++; out.sameAt = `${a0} at ${D.t.toFixed(1)} s`; }
+      // VISIBLY DOING SOMETHING: a program running (a walk, a groom, a jump...)
+      if (D.cats.some((c, i) => c.prog || C.moving(D, i))) out.busy++;
+      const [ca, cb] = D.cats;
+      if (ca.node === 'floor' && cb.node === 'floor' && !ca.free && !cb.free) {
+        const d = Math.hypot(ca.pos[0] - cb.pos[0], ca.pos[2] - cb.pos[2]);
+        if (d < out.floorMin) { out.floorMin = d; out.floorAt = `${D.t.toFixed(1)} s`; }
+      }
+      D.cats.forEach((c, i) => {
+        if (c.asleep && out.dozeOn[i] == null) out.dozeOn[i] = D.t;
+        // a doze the director ended (not one a click woke)
+        if (!c.asleep && out.dozeOn[i] != null) {
+          const why = D.log.filter(l => l.cat === i && (l.what === 'wake' || l.what === 'click')).pop();
+          if (why && why.what === 'wake') out.dozes.push(D.t - out.dozeOn[i]);
+          out.dozeOn[i] = null;
+        }
+      });
       D.cats.forEach((c, i) => {
         // what can be SEEN to jump: the body centre and the four paws. (The
         // root is a bookkeeping point that re-centres under the paws at a
@@ -416,7 +440,7 @@ async function partOne(M) {
         if (prev[i].vis) for (let k = 0; k < 5; k++) {
           const d = Math.hypot(now[k][0] - prev[i].vis[k][0], now[k][1] - prev[i].vis[k][1], now[k][2] - prev[i].vis[k][2]);
           // a paw whips at a launch; the body never moves faster than a jump
-          const lim = k ? 2.5 : 1;
+          const lim = k ? 2.5 : 1;   // the bar below is 6 cm for the body
           if (d / lim > out.jump) { out.jump = d / lim; out.jumpAt = `${c.id} ${k ? 'paw ' + k : 'body'} ${d.toFixed(2)} cm, ${c.prog ? c.prog.plan.phases[c.prog.i]?.k : 'idle'}`; }
         }
         prev[i].vis = now;
@@ -427,8 +451,11 @@ async function partOne(M) {
         }
         prev[i].node = c.node; prev[i].pos = [...c.pos];
       });
-      for (const l of D.log.slice(lastLogLen)) {
-        if (l.what === 'spontaneous') out.travelStarts.push(l.t);
+      // this step's own notes (the log is a bounded ring, so read by time)
+      const fresh = [];
+      for (let k = D.log.length - 1; k >= 0 && D.log[k].t === D.t; k--) fresh.unshift(D.log[k]);
+      for (const l of fresh) {
+        if (l.what === 'act') { out.travelStarts.push(l.t); out.acts[l.act] = (out.acts[l.act] || 0) + 1; }
       }
       lastLogLen = D.log.length;
     }
@@ -442,45 +469,51 @@ async function partOne(M) {
   });
   check('no position is ever set directly', () => {
     const o = soak.out;
-    assert(o.jump < 4, `a drawn point moved too far in one 1/120 s step: ${o.jumpAt} (body bar 4 cm, paws 10 cm)`);
-    return `worst against its bar: ${o.jumpAt} (body bar 4 cm, paws 10 cm per 1/120 s)`;
+    // the bar is the fastest LEGAL motion with room to spare: the direct
+    // floor > sill jump peaks at 4.8 cm per 1/120 s in rehearsal (574 cm/s);
+    // a set position is a jump of tens of centimetres
+    assert(o.jump < 6, `a drawn point moved too far in one 1/120 s step: ${o.jumpAt} (body bar 6 cm, paws 15 cm)`);
+    return `worst against its bar: ${o.jumpAt} (body bar 6 cm, paws 15 cm per 1/120 s)`;
   });
-  check('two cats never share a surface, never move at once, never run one action together', () => {
+  check('two cats never share a perch, keep apart on the floor, and never do one small action together', () => {
     const o = soak.out;
-    assert(o.same === 0, `shared a surface for ${o.same} steps`);
-    assert(o.both === 0, `both moving for ${o.both} steps`);
-    assert(o.sameAction === 0, `the same action together for ${o.sameAction} steps`);
-    return `${o.steps} steps clean`;
+    assert(o.same === 0, `shared a perch for ${o.same} steps`);
+    assert(o.floorMin >= BRIEF.floorApart * 0.8, `two cats on the floor ${o.floorMin.toFixed(1)} cm apart at ${o.floorAt}`);
+    assert(o.sameAction === 0, `the same small action together for ${o.sameAction} steps (${o.sameAt})`);
+    return `${o.steps} steps clean; both travelling at once ${(100 * o.both / o.steps).toFixed(1)}% of the time; closest on the floor ${o.floorMin.toFixed(0)} cm`;
   });
-  check('a spontaneous relocation comes 20-60 s after the last, at most', () => {
-    const s = soak.out.travelStarts;
-    const ends = soak.D.log.filter(l => l.what === 'travel').map(l => l.t);
-    assert(s.length >= 10, `only ${s.length} spontaneous relocations in 25 minutes`);
-    for (let i = 1; i < s.length; i++) assert(s[i] - s[i - 1] >= BRIEF.spontaneous[0] - 0.01, `two relocations ${(s[i] - s[i - 1]).toFixed(1)} s apart`);
-    void ends;
-    return `${s.length} in 25 min, closest ${Math.min(...s.slice(1).map((x, i) => x - s[i])).toFixed(1)} s apart`;
+  check('a deliberate action every 5-12 s across the pair, and usually one cat doing something', () => {
+    const o = soak.out, s = o.travelStarts;
+    assert(s.length >= 25 * 60 / BRIEF.actionEvery[1], `only ${s.length} actions in 25 minutes`);
+    const gaps = s.slice(1).map((x, i) => x - s[i]);
+    const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    inRange(mean, BRIEF.actionEvery, 'mean gap between actions', 0.01);
+    assert(Math.min(...gaps) >= BRIEF.actionEvery[0] - 0.01, `two actions ${Math.min(...gaps).toFixed(2)} s apart`);
+    // a cat that is busy when its turn comes passes the turn on a second later
+    const late = gaps.filter(g => g > BRIEF.actionEvery[1] + 0.01).length;
+    assert(late <= gaps.length * 0.1, `${late} of ${gaps.length} gaps past ${BRIEF.actionEvery[1]} s`);
+    const share = o.busy / o.steps;
+    assert(share >= BRIEF.busyShare, `a cat is doing something only ${(share * 100).toFixed(0)}% of the time`);
+    const kinds = Object.entries(o.acts).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(', ');
+    assert((o.acts.wander || 0) >= 10, `only ${o.acts.wander || 0} floor walks in 25 minutes`);
+    assert((o.acts.relocate || 0) >= 15, `only ${o.acts.relocate || 0} relocations in 25 minutes`);
+    return `${s.length} actions, mean ${mean.toFixed(1)} s apart (${Math.min(...gaps).toFixed(1)}-${Math.max(...gaps).toFixed(1)}); a cat busy ${(share * 100).toFixed(0)}% of the time; ${kinds}`;
   });
-  check('a long idle on a comfortable perch ends asleep, and a sleeper wakes before it moves', () => {
+  check('a doze is brief and ends on its own, and a sleeper wakes before it moves', () => {
+    const o = soak.out;
+    assert(o.dozes.length >= 3, `only ${o.dozes.length} dozes in 25 minutes`);
+    for (const d of o.dozes) inRange(d, BRIEF.doze, 'a doze', 0.6);
+    // a sleeper asked to travel wakes first
     const D = C.createDirector({ seed: 5 });
     D.hold = true;
-    const dt = 1 / 60;
-    let slept = false;
-    for (let n = 0; n < 60 * 200 && !slept; n++) { C.stepDirector(D, dt); slept = D.cats.some(c => c.asleep); }
-    assert(slept, 'nobody slept in 200 s of stillness');
-    const i = D.cats.findIndex(c => c.asleep);
-    assert(D.cats[i].posture === 'curl', `asleep in ${D.cats[i].posture}`);
-    D.hold = false; D.nextMove = D.t;
-    const otherAwake = !D.cats[1 - i].asleep;
-    // make the sleeper the only candidate: hold the other in an action
-    if (otherAwake) K.startAction(D.cats[1 - i], 'look');
-    C.stepDirector(D, dt);
-    const sleeper = D.cats[i];
-    const tr = D.trav[i];
-    if (tr) {
-      assert(sleeper.prog && sleeper.prog.plan.action === 'wake', `a sleeper set off with ${sleeper.prog && (sleeper.prog.plan.action || sleeper.prog.plan.edge)}`);
-      return 'asleep in a curl; woke before its first leg';
-    }
-    return 'asleep in a curl (the move went to the other cat this time)';
+    const cat = D.cats[0];
+    K.startAction(cat, 'pose', { posture: 'curl' });
+    for (let n = 0; n < 240 && cat.prog; n++) C.stepDirector(D, 1 / 120);
+    assert(cat.asleep, 'a curl did not end asleep');
+    const legs = C.planRoute(D, 0, 'floor');
+    C.startTraversal(D, 0, legs, 'floor');
+    assert(cat.prog && cat.prog.plan.action === 'wake', `a sleeper set off with ${cat.prog && (cat.prog.plan.action || cat.prog.plan.edge)}`);
+    return `${o.dozes.length} dozes, ${Math.min(...o.dozes).toFixed(1)}-${Math.max(...o.dozes).toFixed(1)} s; a sleeper wakes before its first leg`;
   });
   check('a click mid-leg is queued, then served; nothing changes in the air', () => {
     const D = C.createDirector({ seed: 9 });
