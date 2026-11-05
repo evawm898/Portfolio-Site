@@ -32,7 +32,11 @@ const L0 = 20;            // mm gauge length
 const EPS_MAX = 0.8;
 const NU = 0.45;          // substrate lateral contraction exponent
 const TEAL = [47, 163, 163], TEAL_DEEP = [28, 107, 107], COPPER = [201, 126, 66], COPPER_HI = [240, 190, 140];
-const SILVER = [196, 204, 204], SILVER_DIM = [128, 138, 138], RUST = [165, 107, 46];
+// Copper is drawn in copper (a real material in its real colour is content, DESIGN.md rule 10).
+// Silver is a neutral, so it takes the ink-2 / dim greys. Everything that says "resistance is
+// going wrong" — cracks, lost contacts, sparks, an open circuit — is the abstract warning state:
+// indigo. A copper trace straining past its meander is the abstract "strained" state: plum.
+const SILVER = [167, 175, 175], SILVER_DIM = [139, 148, 148], WARN = [120, 128, 216], STRAINED = [169, 140, 200];
 const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -163,7 +167,7 @@ class Printed {
       ctx.lineTo(xc + halfw + j[0], lerp(edgeY, tipY, 0.35));
       ctx.lineTo(xc + halfw + 1.5, edgeY);
       ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = 'rgba(165,107,46,0.55)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = rgb(WARN, 0.6); ctx.lineWidth = 1; ctx.stroke();
     }
   }
   seedElectrons(n) {
@@ -232,7 +236,7 @@ class Laminated {
     const pts = this.centerline(eps);
     const wpx = this.tw * this.yex * view.pxmm;
     const strained = this.metalStrain(eps);
-    const col = this.broken ? mix(COPPER, [120, 70, 40], 0.5) : mix(COPPER, RUST, clamp(strained / this.epsBreakMetal, 0, 1) * 0.6);
+    const col = this.broken ? mix(COPPER, [120, 70, 40], 0.5) : mix(COPPER, STRAINED, clamp(strained / this.epsBreakMetal, 0, 1) * 0.6);
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     ctx.beginPath();
     pts.forEach((p, i) => { const X = sx(p[0], eps), Y = sy(p[1], this.yex); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); });
@@ -342,7 +346,7 @@ class Yarn {
         const press = eps < 0.12 ? 1 + 0.6 * (eps / 0.12) : 1;
         ctx.beginPath(); ctx.arc(X, Y, 2.2 * press, 0, Math.PI * 2); ctx.fillStyle = rgb(TEAL, 0.95); ctx.fill();
       } else {
-        ctx.beginPath(); ctx.arc(X, Y, 2.4, 0, Math.PI * 2); ctx.strokeStyle = rgb(RUST, 0.8); ctx.lineWidth = 1; ctx.stroke();
+        ctx.beginPath(); ctx.arc(X, Y, 2.4, 0, Math.PI * 2); ctx.strokeStyle = rgb(WARN, 0.8); ctx.lineWidth = 1; ctx.stroke();
       }
     }
   }
@@ -426,7 +430,7 @@ function drawElectrons(ctx, els, R, R0) {
       ctx.beginPath(); ctx.moveTo(e.prev[0], e.prev[1]); ctx.lineTo(e.pos[0], e.pos[1]); ctx.strokeStyle = rgb(TEAL, 0.5); ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.stroke();
     }
     ctx.beginPath(); ctx.arc(e.pos[0], e.pos[1], 4.5, 0, Math.PI * 2); ctx.fillStyle = glow; ctx.fill();
-    ctx.beginPath(); ctx.arc(e.pos[0], e.pos[1], 1.9, 0, Math.PI * 2); ctx.fillStyle = '#dff6f6'; ctx.fill();
+    ctx.beginPath(); ctx.arc(e.pos[0], e.pos[1], 1.9, 0, Math.PI * 2); ctx.fillStyle = '#b3dbb4' /* mint */; ctx.fill();
   }
 }
 function drawSparks(ctx, dt) {
@@ -434,7 +438,7 @@ function drawSparks(ctx, dt) {
     s.t += dt;
     const life = s.big ? 0.9 : 0.45, k = clamp(s.t / life, 0, 1);
     const r = (s.big ? 22 : 9) * k + 2;
-    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.strokeStyle = rgb(RUST, (1 - k) * 0.9); ctx.lineWidth = s.big ? 2 : 1.2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI * 2); ctx.strokeStyle = rgb(WARN, (1 - k) * 0.9); ctx.lineWidth = s.big ? 2 : 1.2; ctx.stroke();
   }
   state.sparks = state.sparks.filter(s => s.t < (s.big ? 0.9 : 0.45));
 }
@@ -495,7 +499,7 @@ function drawChart() {
   }
   const R = state.R;
   const X = fx(state.eps), Y = isFinite(R) ? fy(R / S.R0) : Y1;
-  ctx.beginPath(); ctx.arc(X, Y, 4.5, 0, Math.PI * 2); ctx.fillStyle = css('--black-raised'); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = isFinite(R) ? css('--ink') : rgb(RUST); ctx.stroke();
+  ctx.beginPath(); ctx.arc(X, Y, 4.5, 0, Math.PI * 2); ctx.fillStyle = css('--black-raised'); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = isFinite(R) ? css('--ink') : rgb(WARN); ctx.stroke();
 }
 
 // ------------------------------------------------------------------ readouts

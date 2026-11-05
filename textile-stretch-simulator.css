@@ -6,8 +6,10 @@
 --------------------------------------------------- */
 
 :root {
-  --rust:        #a56b2e;
-  --rust-bright: #e8b06e;
+  /* "The yarn itself is straining": an abstract state, so a companion
+     (DESIGN.md). Plum sits next to petrol, the colour-blind pair, so every
+     strained mark also carries a dash or a glyph. */
+  --sim-strained: var(--color-plum);
 }
 
 .sim {
@@ -301,7 +303,10 @@ body.is-pulling .sim__canvas { cursor: grabbing; }
   color: var(--ink-faint);
   margin-bottom: 0.15rem;
 }
-.sim__line.is-warn strong { color: var(--rust-bright); }
+/* The page toggles is-warn on the <strong> itself (#ro-regime); the old
+   ".sim__line.is-warn strong" selector never matched it, on main as here. */
+.sim__line strong.is-warn { color: var(--color-ink); }
+.sim__line strong.is-warn::before { content: "! "; }
 
 .sim__bar {
   position: relative;
@@ -316,7 +321,9 @@ body.is-pulling .sim__canvas { cursor: grabbing; }
   background: var(--petrol-bright);
   transition: width 0.08s linear;
 }
-.sim__bar-fill.is-warn { background: var(--rust-bright); }
+.sim__bar-fill.is-warn {
+  background: repeating-linear-gradient(135deg, var(--sim-strained) 0 3px, transparent 3px 5px);
+}
 
 .sim__inset,
 .sim__chart {
@@ -346,7 +353,7 @@ body.is-pulling .sim__canvas { cursor: grabbing; }
   vertical-align: middle;
   background: var(--petrol-bright);
 }
-.sim__legend span.is-rust::before { background: var(--rust-bright); }
+.sim__legend span.is-strained::before { background: none; border-top: 2px dashed var(--sim-strained); height: 0; }
 .sim__legend span.is-ghost::before { background: none; border-top: 1px dashed var(--ink-dim); height: 0; }
 
 /* ---------- key in the notes body */
@@ -359,7 +366,7 @@ body.is-pulling .sim__canvas { cursor: grabbing; }
   margin-right: 0.35em;
   background: var(--petrol-bright);
 }
-.sim-key--rust { background: var(--rust-bright); }
+.sim-key--strained { background: none; border: 1.5px dashed var(--sim-strained); box-sizing: border-box; }
 
 /* ---------- responsive */
 

@@ -123,7 +123,7 @@
         <canvas class="sim__chart" id="chartCanvas" aria-label="Load-extension curve for the current pull direction, with the current state marked"></canvas>
         <div class="sim__legend">
           <span>structure carrying the load</span>
-          <span class="is-rust">yarn itself stretching</span>
+          <span class="is-strained">yarn itself stretching</span>
           <span class="is-ghost">swatch at rest</span>
         </div>
       </aside>
@@ -137,7 +137,7 @@
       <h2 class="project__section-title"><span>01</span>How to read it</h2>
       <div class="project__section-body">
         <p>The swatch is 20&nbsp;mm square at rest and is drawn at the yarn level: every loop or every crossing you see is the same unit cell, repeated. Your drag is a <em>force</em>, not a position. The cursor pulls the fabric through a compliant grip, the fabric extends along its own load&ndash;extension curve, and the gap between the cursor and the swatch edge is what stiffness feels like. A jersey follows your hand; a poplin pulled on grain hardly moves while the load climbs.</p>
-        <p>Yarn colour is the second channel. <span class="sim-key"></span>Teal means the structure is carrying the load and the yarn itself is slack. <span class="sim-key sim-key--rust"></span>Rust means the geometry has jammed and the yarn is now being strained. The bar under &ldquo;yarn strain&rdquo; runs to that yarn&rsquo;s break elongation; when it fills, the model stops extending and reports that the grip is slipping, not the fabric.</p>
+        <p>Yarn colour is the second channel. <span class="sim-key"></span>Teal means the structure is carrying the load and the yarn itself is slack. <span class="sim-key sim-key--strained"></span>Plum, dashed on the chart, means the geometry has jammed and the yarn is now being strained. The bar under &ldquo;yarn strain&rdquo; runs to that yarn&rsquo;s break elongation; when it fills, the model stops extending and reports that the grip is slipping, not the fabric.</p>
         <p>Let go to see recovery. A knit with no spandex snaps back only part way and then creeps, holding some permanent set; a few percent of spandex returns it to rest.</p>
       </div>
     </section>

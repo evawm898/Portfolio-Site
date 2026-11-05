@@ -7,7 +7,8 @@
    values are not measurements.
 
    Shared rules, enforced here rather than per figure:
-   - the chart is orange (#D85A30) and nothing in a scene is drawn in it;
+   - the chart is mint (#b3dbb4, a DESIGN.md companion: data, never text)
+     and nothing in a scene is drawn in it; the chart's words are ink;
    - a fabric toggle restarts that figure's test from the beginning;
    - a test plays once when the figure first scrolls into view, holds its end
      state, and replays on a click or Enter/Space on the canvas;
@@ -17,10 +18,11 @@
 (() => {
   'use strict';
 
-  const ORANGE = '#D85A30';
+  const CHART = '#b3dbb4';   // --color-mint
   const STILL = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const rootStyle = getComputedStyle(document.documentElement);
   const cssVar = (n, f) => rootStyle.getPropertyValue(n).trim() || f;
+  const CHART_TEXT = cssVar('--color-ink', '#e9ecec');   // a chart's words are ink, never the series colour
   const colours = () => ({
     ink: cssVar('--ink', '#e9ecec'), dim: cssVar('--ink-dim', '#8b9494'), faint: cssVar('--ink-faint', '#565f5f'),
     line: cssVar('--line-strong', '#34393a'), bg: cssVar('--black-raised', '#0c0e0e'), mono: cssVar('--mono', 'monospace'),
@@ -133,7 +135,7 @@
     ctx.textBaseline = 'top'; ctx.textAlign = 'left';
     ctx.font = '500 10px ' + C.mono; ctx.fillStyle = C.ink;
     ctx.fillText(o.title, r.x + 2, r.y + 4);
-    ctx.font = '9.5px ' + C.mono; ctx.fillStyle = ORANGE;
+    ctx.font = '9.5px ' + C.mono; ctx.fillStyle = CHART_TEXT;
     ctx.fillText('instrument output', r.x + 2, r.y + 17);
     const lw = ctx.measureText('instrument output').width;
     ctx.fillStyle = C.dim; ctx.fillText(' · illustrative', r.x + 2 + lw, r.y + 17);
@@ -155,12 +157,12 @@
 
   function plot(ctx, pts, X, Y, dash) {
     if (pts.length < 2) return;
-    ctx.save(); ctx.strokeStyle = ORANGE; ctx.lineWidth = 1.8; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.save(); ctx.strokeStyle = CHART; ctx.lineWidth = 1.8; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     if (dash) ctx.setLineDash(dash);
     ctx.beginPath(); pts.forEach(([a, b], i) => i ? ctx.lineTo(X(a), Y(b)) : ctx.moveTo(X(a), Y(b))); ctx.stroke();
     ctx.restore();
   }
-  function dot(ctx, x, y, r) { ctx.fillStyle = ORANGE; ctx.beginPath(); ctx.arc(x, y, r || 3.5, 0, Math.PI * 2); ctx.fill(); }
+  function dot(ctx, x, y, r) { ctx.fillStyle = CHART; ctx.beginPath(); ctx.arc(x, y, r || 3.5, 0, Math.PI * 2); ctx.fill(); }
   function label(st, text, x, y, align, col) {
     const { ctx, C } = st; ctx.save(); ctx.font = '9.5px ' + C.mono; ctx.fillStyle = col || C.dim;
     ctx.textAlign = align || 'left'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y); ctx.restore();
@@ -524,16 +526,16 @@
         if (!S.up) for (let i = 0; i <= 120 * S.b; i++) { const e = lerp(F.emax, F.set, i / 120); down.push([e, loadDown(F, e)]); }
         if (S.up && S.a > 0) up.push([S.e, loadUp(F, S.e)]);
         if (st.t >= 1) {                                // the energy lost on the round trip
-          ctx.save(); ctx.fillStyle = ORANGE; ctx.globalAlpha = 0.13; ctx.beginPath();
+          ctx.save(); ctx.fillStyle = CHART; ctx.globalAlpha = 0.13; ctx.beginPath();
           up.forEach(([a, b], i) => i ? ctx.lineTo(ax.X(a), ax.Y(b)) : ctx.moveTo(ax.X(a), ax.Y(b)));
           down.forEach(([a, b]) => ctx.lineTo(ax.X(a), ax.Y(b)));
           ctx.closePath(); ctx.fill(); ctx.restore();
           const y = ax.Y(0) - 7, x0 = ax.X(0), x1 = ax.X(F.set);
-          ctx.strokeStyle = ORANGE; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y - 3); ctx.lineTo(x0, y); ctx.lineTo(x1, y); ctx.lineTo(x1, y - 3); ctx.stroke();
-          label(st, 'growth', x1 + 4, y - 3, 'left', ORANGE);
+          ctx.strokeStyle = CHART; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y - 3); ctx.lineTo(x0, y); ctx.lineTo(x1, y); ctx.lineTo(x1, y - 3); ctx.stroke();
+          label(st, 'growth', x1 + 4, y - 3, 'left', CHART_TEXT);
           const em = F.emax * 0.62;
-          if (fab === 'jersey') label(st, 'energy lost', ax.X(em), ax.Y((loadUp(F, em) + loadDown(F, em)) / 2), 'center', ORANGE);
-          else label(st, 'energy lost', ax.X(em) + 14, ax.Y(loadDown(F, em)) + 4, 'left', ORANGE);
+          if (fab === 'jersey') label(st, 'energy lost', ax.X(em), ax.Y((loadUp(F, em) + loadDown(F, em)) / 2), 'center', CHART_TEXT);
+          else label(st, 'energy lost', ax.X(em) + 14, ax.Y(loadDown(F, em)) + 4, 'left', CHART_TEXT);
         }
         plot(ctx, up, ax.X, ax.Y);
         plot(ctx, down, ax.X, ax.Y, [5, 4]);
@@ -648,7 +650,7 @@
         plot(ctx, up, ax.X, ax.Y); plot(ctx, down, ax.X, ax.Y, [5, 4]);
         const p = S.up ? pUp(fab, S.x) : pDown(fab, S.x);
         if (st.el > 0.4) { dot(ctx, ax.X(S.x), ax.Y(p), 4); ctx.fillStyle = st.C.bg; ctx.beginPath(); ctx.arc(ax.X(S.x), ax.Y(p), 1.6, 0, Math.PI * 2); ctx.fill(); }
-        if (fab === 'spacer' && S.a > 0.55) label(st, 'plateau', ax.X(0.3), ax.Y(0.36) - 10, 'center', ORANGE);
+        if (fab === 'spacer' && S.a > 0.55) label(st, 'plateau', ax.X(0.3), ax.Y(0.36) - 10, 'center', CHART_TEXT);
         label(st, '— press   - - release', ax.px + 6, ax.py + 8, 'left', st.C.dim);
       },
       readout(st) {
@@ -746,9 +748,9 @@
         plot(ctx, pts, ax.X, ax.Y);
         const tPeak = TC + (() => { let best = 0, bv = -1; for (let i = 1; i < 2000; i++) { const v = shape(i / 2000, F.td); if (v > bv) { bv = v; best = i / 2000; } } return best; })();
         if (ts >= tPeak + 0.05) {
-          ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = ORANGE; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.moveTo(ax.X(TC), Math.round(ax.Y(F.qm)) + 0.5); ctx.lineTo(ax.px + ax.pw, Math.round(ax.Y(F.qm)) + 0.5); ctx.stroke(); ctx.restore();
+          ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = CHART; ctx.globalAlpha = 0.6; ctx.beginPath(); ctx.moveTo(ax.X(TC), Math.round(ax.Y(F.qm)) + 0.5); ctx.lineTo(ax.px + ax.pw, Math.round(ax.Y(F.qm)) + 0.5); ctx.stroke(); ctx.restore();
           dot(ctx, ax.X(tPeak), ax.Y(F.qm), 3.2);
-          label(st, 'q-max', ax.px + ax.pw, ax.Y(F.qm) - 8, 'right', ORANGE);
+          label(st, 'q-max', ax.px + ax.pw, ax.Y(F.qm) - 8, 'right', CHART_TEXT);
         }
       },
       readout(st) {
