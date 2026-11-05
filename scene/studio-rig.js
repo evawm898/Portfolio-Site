@@ -13,9 +13,11 @@
 // in plan), then carried to the world. Primitives come out in world centimetres
 // and the drawing projects them, so the rig never sees a screen.
 //
-// A BLACK CAT IS A SILHOUETTE, so overlap order only matters where it can be
-// seen: the FAR legs are drawn a shade lighter than the body and before it, the
-// NEAR legs after it, and the eyes last. That is the whole depth story here.
+// THE DRAWING DOES NOT SHOW THE LEGS. studio-draw.js renders a cute minimal
+// silhouette and reads only the paws off them (and which pair each belongs
+// to); the legs are still solved in full here, because the IK is what keeps a
+// planted paw planted and gives a pose its weight. The head also reports its
+// own frame (f, s, u) for the eyes and whiskers.
 
 import { local2world, toeWorld, world2local, FOOT_NAMES } from './studio-cat.js';
 import { CAMERA } from './studio-room.js';
