@@ -750,6 +750,15 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
       (`tipCap.apex`). The test is the record's worst station on the nib AND its row count ≤ the part's nib stations.
     - A tip-only clamp stays TOLD.
     - No self-intersection check, by ruling. Next: #495.
+- **#495 (Nov 5): DISCOVERY + PROTOTYPE, NOTHING SHIPPED — §15 of the same doc.** Read it before touching `footRing()`'s
+  `ringFactor`, `layerOwnedValues` or `layerSize`'s visibility.
+  - Four options are prototyped by `tools/bloom-ring-options.mjs` as anchored edits of TEMPORARY copies:
+    A an owned ring, B length places, C Layer size live, D Layer size owns every ring.
+  - Lotus body h:w (photo ≈ 1.45): A 1.444 · B 0.849 · C 1.235 · D 1.444. A and C keep all 46 saved designs
+    byte-identical; B moves 11 and D 16 of the 20 per-layer ones. D regresses the daisy and the water lily as written.
+  - `verify-bloom-load-unchanged.mjs --per-layer` is the compare that can see it (S1's own set turns Per-layer values on
+    nowhere).
+  - The combination gate's wall measure cannot see a ring move (one petal against itself); the builder's neighbour flag can.
 
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
 (Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read
