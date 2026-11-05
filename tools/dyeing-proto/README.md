@@ -13,7 +13,7 @@ Where the code lives:
 * `/textile-dyeing-draw.js` draws dyed yarns in `/textile-basics.js`'s stroke language (`DRAW`). It adds a fibre colour parameter and three fibre kinds that are told apart by pattern (cotton staple, smooth polyester filament, crimped nylon filament).
 * `/dyeing.css` holds the page's styles. The page also uses `textile-101.css` for its section and TOC layout.
 
-**Colour has one owner.** The dye colours are CSS custom properties on `#dyeing` in `/dyeing.css`: indigo (disperse), plum (acid), mint (reactive), and the generic "a dye" of parts 01 and 02 is the site accent petrol (`--petrol-bright`). This is Eva's palette, Direction A. `textile-dyeing.js` only ever writes `var(--dye-*)`, so a palette change is a CSS edit.
+**Colour has one owner.** The dye colours are CSS custom properties on `#dyeing` in `/dyeing.css`: indigo (disperse), plum (acid), mint (reactive), and the generic "a dye" of parts 01 and 02 is the site accent petrol (`--petrol-bright`). Part 04's cross-dyed swatch draws its polyester in petrol too (`--dye-cross-poly`), beside the plum nylon. This is Eva's palette, Direction A. `textile-dyeing.js` only ever writes `var(--dye-*)`, so a palette change is a CSS edit.
 
 Each scene builds its static fibres once per state. A frame then only sets CSS colour variables on the `<svg>` and redraws one group of moving molecules. The page takes two test switches: `?still` turns off scroll-triggered autoplay (used for recording), and `?reduce` forces end frames.
 

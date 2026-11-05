@@ -85,7 +85,7 @@ for (const [w, h] of [[1280, 900], [390, 844]]) {
   }
   ok(await page.$eval('[data-cross-note="reality"]', e => e.textContent.trim() === ''), `${w}px the poly/nylon Reality copy slot is still empty (row 15 is Eva's)`);
   // colour has one owner
-  const hexDye = await page.$$eval('[data-dye-scene] svg', ss => ss.flatMap(s => (s.innerHTML.match(/#(7880d8|a98cc8|b3dbb4|e3a44a|a98ce6|c9604e|d97757|b8a6f0)/gi) || [])));
+  const hexDye = await page.$$eval('[data-dye-scene] svg', ss => ss.flatMap(s => (s.innerHTML.match(/#(2fa3a3|1c6b6b|7880d8|a98cc8|b3dbb4|e3a44a|a98ce6|c9604e|d97757|b8a6f0)/gi) || [])));
   ok(hexDye.length === 0, `${w}px no dye hex in any scene's markup (${hexDye.length})`);
   const recolour = await page.evaluate(() => {
     const sec = document.getElementById('dyeing'), svg = document.querySelector('[data-dye-scene="cross"] svg');
@@ -94,6 +94,16 @@ for (const [w, h] of [[1280, 900], [390, 844]]) {
     return [a, b];
   });
   ok(recolour[0] !== recolour[1] && /0, 255, 0/.test(recolour[1]), `${w}px changing --dye-acid on the section recolours the nylon (${recolour.join(' -> ')})`);
+  // part 04's polyester is petrol through its own variable; part 03's disperse tile stays indigo
+  const crossPoly = await page.evaluate(() => {
+    const sec = document.getElementById('dyeing'), svg = document.querySelector('[data-dye-scene="cross"] svg');
+    const fil = svg.querySelector('path[stroke="var(--cw)"]'), a = getComputedStyle(fil).stroke;
+    const tile = document.querySelector('[data-dye-scene="disperse"] svg'); const t0 = tile.innerHTML;
+    sec.style.setProperty('--dye-cross-poly', 'rgb(255, 0, 255)'); const b = getComputedStyle(fil).stroke; sec.style.removeProperty('--dye-cross-poly');
+    return { a, b, ref: getComputedStyle(sec).getPropertyValue('--dye-cross-poly').trim(), tileUsesIt: /dye-cross-poly/.test(t0) };
+  });
+  ok(crossPoly.a !== crossPoly.b && /255, 0, 255/.test(crossPoly.b) && /petrol-bright|2fa3a3/i.test(crossPoly.ref) && !crossPoly.tileUsesIt,
+    `${w}px the cross swatch's polyester follows --dye-cross-poly (${crossPoly.ref}), part 03's tile does not`);
   // the lead animation's layout: a row of four on wide screens, a 2 x 2 grid under 560 px
   const lay = await page.evaluate(() => {
     const p = window.__dy.find(q => q.name === 'chain'), svg = p.svg, vb = svg.viewBox.baseVal, r = svg.getBoundingClientRect();

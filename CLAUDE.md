@@ -12471,8 +12471,8 @@ four, a 2 × 2 grid under 560 px), pigment vs dye, the three dye classes, and cr
 Reality toggles. Copy stays generic — no internal product, project or band names.
 - **Colour has one owner**: `--dye-*` on `#dyeing` in `dyeing.css` (Eva's Direction A, with the generic dye of parts 01–02 in the accent petrol: indigo disperse,
   plum acid, mint reactive). The JS only writes `var(--dye-*)`; `verify-page.mjs` fails on a dye hex in
-  the markup. Indigo/plum is the closest pair and they share the cross-dyed swatch, which is why fibre
-  pattern and molecule shape also separate them — never colour alone.
+  the markup. Part 04's cross-dyed swatch is petrol polyester (`--dye-cross-poly`) beside plum nylon (Eva,
+  Nov 5; ΔE 56 against indigo/plum's 20), and fibre pattern and molecule shape separate them too — never colour alone.
 - **The poly/nylon Reality copy is Eva's (row 15) and its slot ships empty** (`[data-cross-note="reality"]`,
   hidden while empty). Basic/cationic dye is left out by ruling. Finishes (deck slide 55) are a later
   section of this note.

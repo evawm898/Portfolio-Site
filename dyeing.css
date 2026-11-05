@@ -7,10 +7,12 @@
    Eva's palette, Direction A (Nov 5): indigo / plum / mint, one hue per dye class, mapped as her
    dye diagram maps them — indigo on the round polyester section, plum on the dashed nylon one,
    mint on the cotton bean. Measured on #060707: contrast 5.65 / 6.98 / 13.17.
-   The closest pair is indigo / plum (CIELAB delta-E 20; 17 simulated protan), and they are the
-   two dyes of the cross-dyeing swatch — which is why that swatch also tells them apart by fiber
-   (straight vs crimped) and molecule shape (dot vs diamond). Mint / undyed ink is the next
-   closest (27); they never share a fiber here.
+   The closest pair is indigo / plum (CIELAB delta-E 20; 17 simulated protan); they appear side by
+   side only in part 03's class tiles. Mint / undyed ink is the next closest (27); they never share
+   a fiber here.
+   Part 04's cross-dyed swatch draws its polyester in petrol (--dye-cross-poly, #2fa3a3) beside the
+   plum nylon (Eva, Nov 5): delta-E 56, 25 simulated protan, against indigo / plum's 20 / 17. Fiber
+   (straight vs crimped) and molecule shape (dot vs diamond) still tell the two apart as well.
    The generic "a dye" of parts 01 and 02 (--dye-colour) is the site's accent petrol (--petrol-bright,
    #2fa3a3; Eva, Nov 5), so the three class colours appear only where a dye class is the subject.
    Superseded provisional palette (option 2): #E3A44A / #A98CE6 / #C9604E.
@@ -19,6 +21,7 @@
   --dye-disperse: #7880D8;  /* indigo — disperse dye, polyester */
   --dye-acid:     #A98CC8;  /* plum   — acid dye, nylon */
   --dye-reactive: #B3DBB4;  /* mint   — reactive dye, cotton */
+  --dye-cross-poly: var(--petrol-bright);  /* the polyester's dye in part 04's cross-dyed swatch: petrol beside plum */
   --dye-colour:   var(--petrol-bright);  /* "a dye", in the parts not about a dye class: the site accent */
   --dye-undyed:   var(--ink);
 }

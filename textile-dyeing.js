@@ -27,6 +27,7 @@ const { INK, BG, SW, SEED, TAU, rng, seg, ease, lerp, f1, poly, runsMarkup, make
 export const DYE = {
   disperse: 'var(--dye-disperse)', acid: 'var(--dye-acid)', reactive: 'var(--dye-reactive)',
   undyed: 'var(--dye-undyed)', colour: 'var(--dye-colour)',   // --dye-colour: the generic "a dye" of parts A and B
+  crossPoly: 'var(--dye-cross-poly)',                         // the polyester's dye in part D's cross-dyed swatch
 };
 const DIM = 'var(--ink-dim, #a7afaf)', LINE = 'var(--line-strong, #34393a)';
 // k = 0 -> base, k = 1 -> c; whole percent so a play writes at most 100 distinct values
@@ -554,13 +555,13 @@ const crossScene = {
     const kw = share(CROSS.disp), kn = reserve ? 0 : share(CROSS.acid);
     const stain = reality ? share(CROSS.stray) * (1 - smooth(seg(t, T.clear0, T.clear1))) : 0;
     const nylon = mixTo(DYE.acid, kn);
-    const vars = { '--cw': mixTo(DYE.disperse, kw), '--cn': stain > 0.005 ? `color-mix(in srgb, ${DYE.disperse} ${Math.round(stain * 38)}%, ${nylon})` : nylon };
+    const vars = { '--cw': mixTo(DYE.crossPoly, kw), '--cn': stain > 0.005 ? `color-mix(in srgb, ${DYE.crossPoly} ${Math.round(stain * 38)}%, ${nylon})` : nylon };
     let dyn = '';
     const mol = (list, cls) => {
       for (const m of list) {
         const u = arrive(m); if (u >= 1) continue;
         const q = arcPath(m, { x: m.tx, y: m.ty }, (m.d - 0.5) * 0.5, u), wob = (1 - u) * 2.5 * Math.sin(t * 20 + m.d * 9);
-        dyn += glyph(cls, q.x + wob, q.y, cls === 'disperse' ? DYE.disperse : DYE.acid, 1.35).replace(/\/>/, `${op(1 - smooth(seg(u, 0.75, 1)))}/>`);
+        dyn += glyph(cls, q.x + wob, q.y, cls === 'disperse' ? DYE.crossPoly : DYE.acid, 1.35).replace(/\/>/, `${op(1 - smooth(seg(u, 0.75, 1)))}/>`);
       }
     };
     mol(CROSS.disp, 'disperse');
@@ -573,7 +574,7 @@ const crossScene = {
         else if (c <= 0) q = { x: m.tx, y: m.ty };
         else q = arcPath({ x: m.tx, y: m.ty }, { x: m.tx + 30, y: D_BATH.y - 30 }, 0.2, c);
         const o = u < 1 ? 1 - 0.6 * smooth(seg(u, 0.75, 1)) : c <= 0 ? 0.4 : 1 - c;
-        if (q.y > D_BATH.y - 20 && o > 0.02) dyn += glyph('disperse', q.x, q.y, DYE.disperse, 1.35).replace(/\/>/, `${op(o)}/>`);
+        if (q.y > D_BATH.y - 20 && o > 0.02) dyn += glyph('disperse', q.x, q.y, DYE.crossPoly, 1.35).replace(/\/>/, `${op(o)}/>`);
       }
     }
     const label = t < 0.12 ? (reserve ? 'one bath, one dye: the acid dye is left out' : 'one bath, two dyes')
