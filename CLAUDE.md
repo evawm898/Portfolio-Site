@@ -731,6 +731,19 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
     the old width. 0 notes; only V2 sees it. A page defect, not fixed.
   - v6 / v7: 20 of 20 subsets PASS. The lotus body is still squat (1.05 vs ≈ 1.45): per-layer cup / curl
     is out of every stage. Sheet `docs/img/photo-to-bloom-s4.png`.
+  - **[Nov 5: outline PASSED — the v1 staged scope is complete; the hazard is #499. §13.6.]**
+- **S5, per-layer cup and curl (Nov 5), is §14; §12's ranking is revised after it.**
+  - **Schema v4:** `LAYER_SCHEMA.deltas` = `petalCup`, `petalSpineCurl` — DELTAS on the global, never owned.
+    The sidecar records the global and each offset with their own confidences (`kind: "delta"`, `global`;
+    S7 holds them). Every other delta stays W1.
+  - **Validator:** a delta past the registry warns W2; a curl delta on a CURVE-spine layer warns **W3**
+    (inert, a warning made without a ruling); the page's `CUP CLAMPED` / `FOLD LIMIT` read-out is **TOLD** —
+    printed and pinned, never a clause. Five fixtures, `--self` 26 of 26; all eight mutants behave.
+  - **The fold clamp binds at the NIB on any cup from about 0.5 up** (S4's passed v6 already reads CUP
+    CLAMPED). It is a page read-out only, with 0 reader notes; its treatment is §14.7 (Eva's).
+  - Lotus v8 / v9 (daisy and water lily stay at v7): body 1.052 → 1.209 / **1.161** vs ≈ 1.45. Cup and curl
+    reach ≈ 1.27 at most; the rest is the ring (#495, now #1). v8's L3 cup 1.2 folded (20 pairs, the cup-max
+    class); v9 is 0. Sheet `docs/img/photo-to-bloom-s5.png`.
 
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
 (Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read

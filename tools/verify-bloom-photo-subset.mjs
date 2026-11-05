@@ -73,6 +73,19 @@
      W2  also: an OWNED quantity whose effective value (the file's global, or
          the default, plus the layer's offset) lies outside the registry's own
          range — the build clamps it SILENTLY (the reader never sees a sum).
+   SCHEMA v4 (S5, Nov 5) — per-layer CUP and SPINE CURL, `LAYER_SCHEMA.deltas`:
+     DELTAS on the global, never owned. W1 no longer fires on them; every other
+     delta still does.
+     W2  also: a delta whose effective value (global + offset) leaves the
+         registry range — clamped silently by the build, as an owned sum is.
+     W3  a schema value the BUILD makes INERT: a spine-curl delta on a layer
+         whose petals are drawn on a CURVE spine (curl mode CURVE reads no
+         slider curl). A warning, made without a ruling (§14 asks whether it
+         should fail, as rule 3's hidden values and V7's inert entries do).
+     TOLD (not a clause, not a warning): what the page's READ-OUT says it
+         clamped — CUP CLAMPED (the section's fold clamp) and FOLD LIMIT (the
+         spine's). No reader note carries either. Printed, pinned by the
+         fixtures, never decides the exit; how to treat it is Eva's ruling.
    A name that is not a control at all is V1's (`unknown`), never a warning.
 
    RUN:  node tools/verify-bloom-photo-subset.mjs <file.json> [...]
@@ -81,7 +94,7 @@
                       with its `controls` put in the v1 envelope; the dropped
                       keys are named. The raw file is still validated as it is.
          node tools/verify-bloom-photo-subset.mjs --self
-                      the twenty-one written-down fixtures below (five added for schema v2, S3; six for v3, S4), each against its
+                      the twenty-six written-down fixtures below (five added for schema v2, S3; six for v3, S4; five for v4, S5), each against its
                       expected clause AND warning sets, then the off-schema
                       fixture through a SPAWNED copy of this validator: it
                       must list W1 and exit 0 (CI: spawned by the design-file
@@ -124,6 +137,7 @@ const optVal = (k) => { const i = argv.indexOf(k); if (i < 0) return null; const
 const SAVE = optVal('--save'), BASE_FILE = optVal('--base');
 const FILES = argv.filter((a) => !a.startsWith('--'));
 const DIRTY_MIN = 15;
+const TOLD_KEYS = ['CUP CLAMPED', 'FOLD LIMIT'];
 const controlOf = new Map(CONTROLS.map((c) => [c.id, c]));
 const SCHEMA_ROW = new Map(SCHEMA.map((r) => [r.id, r]));
 
@@ -154,7 +168,7 @@ function outlineLifts(obj) {
 function schemaWarnings(obj) {
   const warned = {};
   const named = obj && obj.controls && typeof obj.controls === 'object' ? Object.entries(obj.controls).filter(([k]) => controlOf.has(k)) : [];
-  const off = [], out = [];
+  const off = [], out = [], inert = [];
   for (const [id, v] of named) {
     const row = SCHEMA_ROW.get(id);
     if (!row) { if (id !== LAYER_SCHEMA.switch) off.push(`${id}=${JSON.stringify(v)}`); continue; }
@@ -167,9 +181,15 @@ function schemaWarnings(obj) {
   (Array.isArray(ov.layers) ? ov.layers : []).forEach((e, i) => {
     if (!e || typeof e !== 'object') return;
     for (const [id, d] of Object.entries(e.offsets || {})) {
-      if (!LAYER_SCHEMA.offsets.includes(id)) { off.push(`layers[${i}].offsets.${id}=${JSON.stringify(d)} (a delta on the global — a layer does not own it)`); continue; }
+      const delta = LAYER_SCHEMA.deltas.includes(id);
+      if (!LAYER_SCHEMA.offsets.includes(id) && !delta) { off.push(`layers[${i}].offsets.${id}=${JSON.stringify(d)} (a delta on the global off the schema — v4 admits ${LAYER_SCHEMA.deltas.join(' / ')} only)`); continue; }
       const c = controlOf.get(id), eff = Number(glob(id)) + d;
-      if (c && typeof d === 'number' && (eff < c.min || eff > c.max)) out.push(`layers[${i}] owns ${id} ${glob(id)} + ${d} = ${eff} (registry ${c.min}..${c.max}: clamped silently by the build)`);
+      if (c && typeof d === 'number' && (eff < c.min || eff > c.max)) out.push(`layers[${i}] ${delta ? 'nudges' : 'owns'} ${id} ${glob(id)} + ${d} = ${eff} (registry ${c.min}..${c.max}: clamped silently by the build)`);
+      /* schema v4: a spine-curl DELTA on a layer whose petals are drawn on a
+         CURVE spine (the layer's own value, else the whole bloom's mode) is
+         INERT there — curl mode CURVE reads no slider curl */
+      const mode = e.values && 'petalCurlMode' in e.values ? e.values.petalCurlMode : glob('petalCurlMode');
+      if (id === 'petalSpineCurl' && mode === 'CURVE') inert.push(`layers[${i}].offsets.petalSpineCurl=${JSON.stringify(d)} (the layer's petals are drawn on a CURVE spine, which reads no slider curl)`);
     }
     for (const id of Object.keys(e.values || {})) if (!LAYER_SCHEMA.values.includes(id)) off.push(`layers[${i}].values.${id} (not a per-layer value in schema v2)`);
   });
@@ -179,6 +199,7 @@ function schemaWarnings(obj) {
   for (const k of ['petals', 'tiers', 'strands']) if (Array.isArray(ov[k]) && ov[k].length) off.push(`overrides.${k} (${ov[k].length} entr${ov[k].length === 1 ? 'y' : 'ies'} — schema v2 writes layer entries only)`);
   if (off.length) warned.W1 = `off the photo schema: ${off.join(', ')}`;
   if (out.length) warned.W2 = `outside the photo schema's own range: ${out.join(', ')}`;
+  if (inert.length) warned.W3 = `a schema value the build makes INERT: ${inert.join(', ')}`;
   return warned;
 }
 
@@ -222,7 +243,8 @@ const FIXTURES = [
   { id: 'SCOPED_RADIAL', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: { petalTilt: -10 } }, { layer: 1, offsets: { petalLength: 6, petalTilt: 15 } }] } }, expect: [] },
   { id: 'SCOPED_SPIRAL', file: { ...ENV, controls: { ...SCOPED, placement: 'SPIRAL' }, overrides: { layers: [{ layer: 0, offsets: { petalWidth: 4 } }, { layer: 1, offsets: { petalTilt: 20 }, values: { petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.5, 0.15], [0.9, 0.5]] } } }] } }, expect: [] },
   /* a layer offset the layer does not OWN loads clean and only warns */
-  { id: 'SCOPED_DELTA', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: { petalTilt: -10, petalCup: 0.2 } }] } }, expect: [], warn: ['W1'] },
+  /* (S5: petalTwist, since schema v4 puts petalCup ON the schema as a delta row) */
+  { id: 'SCOPED_DELTA', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: { petalTilt: -10, petalTwist: 10 } }] } }, expect: [], warn: ['W1'] },
   /* an owned sum past the registry range loads clean (the build clamps it) and warns */
   { id: 'SCOPED_OWNED_RANGE', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalLength: 90 } }] } }, expect: [], warn: ['W2'] },
   /* layer entries with Per-layer values left OFF: zero notes, nothing built — V7 */
@@ -244,6 +266,19 @@ const FIXTURES = [
      clean). A LIVE PAGE DEFECT, pre-existing; the fixture pins that the
      read-back still catches it with outline curves on. */
   { id: 'WIDTH_REFUSED_ON_LOAD', dirty: { petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_NARROW }, file: { ...ENV, controls: { ...CLEAN, petalOutlineMode: 'CURVE', petalOutlineCurve: OUTLINE_STRAP, petalWidth: 8 } }, expect: ['V2'] },
+  /* SCHEMA v4 (S5): per-layer CUP and SPINE CURL, deltas on the global. An
+     intended pair passes (effective cups 0.1 / 0.4, under the fold clamp);
+     the same entries with Per-layer values OFF load with zero notes and build
+     nothing — V7 (the reader keeps an inert record; no control is hidden, the
+     ENTRY is inert); a cup delta that takes the layer past the fold clamp loads
+     clean and is TOLD on the page read-out only; a delta past the registry
+     range warns W2 (clamped silently); a curl delta on a CURVE-spine layer
+     warns W3 (inert). */
+  { id: 'SCOPED_CUPCURL', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: { petalTilt: -10, petalCup: -0.2, petalSpineCurl: -20 } }, { layer: 1, offsets: { petalTilt: 15, petalCup: 0.1, petalSpineCurl: 40 } }] } }, expect: [] },
+  { id: 'SCOPED_CUPCURL_OFF', file: { ...ENV, controls: { ...CLEAN }, overrides: { layers: [{ layer: 0, offsets: { petalCup: -0.2, petalSpineCurl: -20 } }, { layer: 1, offsets: { petalCup: 0.1, petalSpineCurl: 40 } }] } }, expect: ['V7'] },
+  { id: 'SCOPED_CUP_CLAMPED', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalCup: 0.6 } }] } }, expect: [], told: ['CUP CLAMPED'] },
+  { id: 'SCOPED_DELTA_RANGE', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalCup: 1.0 } }] } }, expect: [], warn: ['W2'], told: ['CUP CLAMPED'] },
+  { id: 'SCOPED_CURL_INERT', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalSpineCurl: 30 }, values: { petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.5, 0.1], [0.9, 0.3]] } } }] } }, expect: [], warn: ['W3'] },
   { id: 'NO_ENVELOPE', file: { views: ['front'], controls: { ...CLEAN }, frame: 1 }, expect: ['V0', 'V1', 'V2', 'V3', 'V4', 'V5'] },   // V3: the dirty page's own layerSize hides under Per-layer values
 ];
 
@@ -262,7 +297,9 @@ const MUTANTS = [
          so V7 STOPS firing there while V2/V3 see the leftover */
       'SCOPED_RADIAL:V2', 'SCOPED_SPIRAL:V2', 'SCOPED_DELTA:V2', 'SCOPED_OWNED_RANGE:V2', 'SCOPED_INERT:V2', 'SCOPED_INERT:V3', 'SCOPED_INERT:V7',
       /* S4: the outline fixtures, the same two mechanisms */
-      'OUTLINE_CURVE:V2', 'OUTLINE_CURVE:V3', 'OUTLINE_LAYER:V2', 'OUTLINE_LIFTED:V2', 'OUTLINE_LIFTED:V3', 'WIDTH_REFUSED_ON_LOAD:V3'],
+      'OUTLINE_CURVE:V2', 'OUTLINE_CURVE:V3', 'OUTLINE_LAYER:V2', 'OUTLINE_LIFTED:V2', 'OUTLINE_LIFTED:V3', 'WIDTH_REFUSED_ON_LOAD:V3',
+      /* S5: the cup/curl fixtures, the S3 mechanisms again (SCOPED_CUPCURL_OFF is SCOPED_INERT's shape) */
+      'SCOPED_CUPCURL:V2', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V7', 'SCOPED_CUP_CLAMPED:V2', 'SCOPED_DELTA_RANGE:V2', 'SCOPED_CURL_INERT:V2'],
   },
   {
     id: 'the-scopes-survive-a-new-design', file: 'bloom.js',
@@ -272,7 +309,9 @@ const MUTANTS = [
          V4 always, V7 wherever the file's layer set is not [1] */
       'SCOPED_RADIAL:V4', 'SCOPED_RADIAL:V7', 'SCOPED_SPIRAL:V4', 'SCOPED_SPIRAL:V7', 'SCOPED_DELTA:V4', 'SCOPED_DELTA:V7', 'SCOPED_OWNED_RANGE:V4', 'SCOPED_INERT:V4',
       /* S4: V4 on every outline fixture that loads; V7 on OUTLINE_LAYER (its layers [0, 1]) */
-      'OUTLINE_CURVE:V4', 'OUTLINE_LAYER:V4', 'OUTLINE_LAYER:V7', 'OUTLINE_MODE_OFF:V4', 'LOBES_UNDER_CURVE:V4', 'OUTLINE_LIFTED:V4', 'WIDTH_REFUSED_ON_LOAD:V4'],
+      'OUTLINE_CURVE:V4', 'OUTLINE_LAYER:V4', 'OUTLINE_LAYER:V7', 'OUTLINE_MODE_OFF:V4', 'LOBES_UNDER_CURVE:V4', 'OUTLINE_LIFTED:V4', 'WIDTH_REFUSED_ON_LOAD:V4',
+      /* S5: V4 on every cup/curl fixture; V7 on SCOPED_CUPCURL (its layers [0, 1]) */
+      'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL:V7', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4'],
   },
   {
     /* S3: the page MERGES the leftover scope into the file's — the plausible
@@ -284,7 +323,9 @@ const MUTANTS = [
        adds layer 1, so the BUILDER's scoped layers stop being the file's */
     breaks: ['CLEAN:V4', 'HIDDEN_CONTROL:V4', 'HIDDEN_OPTION:V4', 'OFF_SCHEMA:V4', 'OFF_STEP:V4', 'OUT_OF_RANGE:V4', 'SCHEMA_RANGE:V4', 'SCOPED_DELTA:V4', 'SCOPED_DELTA:V7', 'SCOPED_INERT:V4', 'SCOPED_OWNED_RANGE:V4', 'SCOPED_RADIAL:V4', 'SCOPED_SPIRAL:V4', 'SIDECAR_INSIDE:V4', 'UNKNOWN_FIELD:V4',
       /* S4: V4 on every outline fixture that loads (OUTLINE_LAYER's layers [0, 1] already hold the leftover's 1, so no V7) */
-      'OUTLINE_CURVE:V4', 'OUTLINE_LAYER:V4', 'OUTLINE_MODE_OFF:V4', 'LOBES_UNDER_CURVE:V4', 'OUTLINE_LIFTED:V4', 'WIDTH_REFUSED_ON_LOAD:V4'],
+      'OUTLINE_CURVE:V4', 'OUTLINE_LAYER:V4', 'OUTLINE_MODE_OFF:V4', 'LOBES_UNDER_CURVE:V4', 'OUTLINE_LIFTED:V4', 'WIDTH_REFUSED_ON_LOAD:V4',
+      /* S5: V4 on every cup/curl fixture (each already names layer 1) */
+      'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4'],
   },
   {
     id: 'hidden-controls-are-applied', file: 'bloom-file.js',
@@ -315,7 +356,10 @@ const MUTANTS = [
       'SCOPED_OWNED_RANGE:V1', 'SCOPED_OWNED_RANGE:V2', 'SCOPED_OWNED_RANGE:V5', 'SCOPED_INERT:V1', 'SCOPED_INERT:V2', 'SCOPED_INERT:V3', 'SCOPED_INERT:V5', 'SCOPED_INERT:V7',
       /* S4: the outline fixtures, the same mechanism (WIDTH_REFUSED_ON_LOAD's V2 already fires) */
       'OUTLINE_CURVE:V1', 'OUTLINE_CURVE:V2', 'OUTLINE_CURVE:V3', 'OUTLINE_CURVE:V5', 'OUTLINE_LAYER:V1', 'OUTLINE_LAYER:V2', 'OUTLINE_LAYER:V5',
-      'OUTLINE_LIFTED:V1', 'OUTLINE_LIFTED:V2', 'OUTLINE_LIFTED:V3', 'OUTLINE_LIFTED:V5', 'WIDTH_REFUSED_ON_LOAD:V1', 'WIDTH_REFUSED_ON_LOAD:V3', 'WIDTH_REFUSED_ON_LOAD:V5'],
+      'OUTLINE_LIFTED:V1', 'OUTLINE_LIFTED:V2', 'OUTLINE_LIFTED:V3', 'OUTLINE_LIFTED:V5', 'WIDTH_REFUSED_ON_LOAD:V1', 'WIDTH_REFUSED_ON_LOAD:V3', 'WIDTH_REFUSED_ON_LOAD:V5',
+      /* S5: the scoped cup/curl fixtures as the S3 scoped ones; SCOPED_CUPCURL_OFF as SCOPED_INERT */
+      'SCOPED_CUPCURL:V1', 'SCOPED_CUPCURL:V2', 'SCOPED_CUPCURL:V5', 'SCOPED_CUP_CLAMPED:V1', 'SCOPED_CUP_CLAMPED:V2', 'SCOPED_CUP_CLAMPED:V5', 'SCOPED_DELTA_RANGE:V1', 'SCOPED_DELTA_RANGE:V2', 'SCOPED_DELTA_RANGE:V5',
+      'SCOPED_CURL_INERT:V1', 'SCOPED_CURL_INERT:V2', 'SCOPED_CURL_INERT:V5', 'SCOPED_CUPCURL_OFF:V1', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V5', 'SCOPED_CUPCURL_OFF:V7'],
   },
 ];
 
@@ -344,6 +388,7 @@ async function validate(page, port, text, name, dirtyOver = null) {
     const after = await page.evaluate(([ids]) => ({
       ui: window.__bloomUIState(), scopes: window.__bloomDesign.scopes(), built: (window.__bloomMetrics() || {}).scopes || null,
       status: document.getElementById('designStatus').textContent,
+      readout: (document.getElementById('readout') || {}).textContent || '',
       hidden: ids.filter((id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return !w || w.hidden; }),
     }), [(() => { try { const o = JSON.parse(text); return o && o.controls && typeof o.controls === 'object' ? Object.keys(o.controls).filter((k) => controlOf.has(k)) : []; } catch { return []; } })()]);
     let obj = null; try { obj = JSON.parse(text); } catch { /* V0 */ }
@@ -368,7 +413,14 @@ async function validate(page, port, text, name, dirtyOver = null) {
         fired.V7 = `the file's layers [${fileLayers}] — the build ${b ? `layersLive ${b.layersLive}, scoped [${b.scopedLayers}], kept INERT [${b.keptLayers}]` : 'reports no scopes'}`;
       }
     }
-    return { fired, warned: schemaWarnings(obj), rec, applied: rec.appliedIds || [] };
+    /* TOLD (schema v4, S5) — what the page's READ-OUT says it clamped, which no
+       reader note carries: the fold clamp on the section (CUP CLAMPED) and on
+       the spine (FOLD LIMIT). Recorded, never a clause or a warning: how the
+       validator should treat a clamp the photo's values ask for is Eva's ruling
+       (§14). A fixture pins what is told so the observation cannot drift. */
+    const told = {};
+    for (const k of TOLD_KEYS) { const at = after.readout.indexOf(k); if (at >= 0) { const end = after.readout.indexOf('\n', at); told[k] = after.readout.slice(at, end < 0 ? at + 400 : Math.min(end, at + 400)).replace(/\s+/g, ' '); } }
+    return { fired, warned: schemaWarnings(obj), told, rec, applied: rec.appliedIds || [] };
   } finally { page.off('pageerror', onErr); }
 }
 
@@ -401,6 +453,7 @@ try {
         console.log(`${bad.length ? 'FAIL' : 'PASS'}  ${name} — ${r.rec.action}${r.rec.action === 'loaded' ? `, ${r.applied.length} of ${r.rec.named} named controls applied, ${r.rec.notes.length} notes` : ''}${warns.length ? `, ${warns.length} warning(s)` : ''}`);
         for (const [k, why] of bad) console.log(`        ${k}: ${why}`);
         for (const [k, why] of warns) console.log(`        warn ${k}: ${why}`);
+        for (const [, why] of Object.entries(r.told)) console.log(`        told (page read-out, not a warning): ${why}`);
         warnCount += warns.length;
         if (bad.length) failed = true;
       }
@@ -420,15 +473,16 @@ try {
       const saved = JSON.parse(fs.readFileSync(BASE_FILE, 'utf8'));
       const stale = deciders.filter((f) => saved.treeSha[f] !== treeSha[f]);
       if (stale.length) throw new Error(`--base ${BASE_FILE} was saved on another tree (${stale.join(', ')} differ) — re-run --self --save`);
-      base = Object.fromEntries(Object.entries(saved.fixtures).map(([id, r]) => [id, { fired: Object.fromEntries(r.fired.map((k) => [k, 'saved'])), warned: Object.fromEntries(r.warned.map((k) => [k, 'saved'])) }]));
+      base = Object.fromEntries(Object.entries(saved.fixtures).map(([id, r]) => [id, { fired: Object.fromEntries(r.fired.map((k) => [k, 'saved'])), warned: Object.fromEntries(r.warned.map((k) => [k, 'saved'])), told: Object.fromEntries((r.told || []).map((k) => [k, 'saved'])) }]));
       console.log(`base: reused from ${BASE_FILE} (saved ${saved.savedAt}, every deciding file's sha256 matches)`);
     } else base = await runFixtures(page, port);
-    if (SAVE) fs.writeFileSync(SAVE, JSON.stringify({ savedAt: new Date().toISOString(), treeSha, fixtures: Object.fromEntries(Object.entries(base).map(([id, r]) => [id, { fired: Object.keys(r.fired), warned: Object.keys(r.warned) }])) }, null, 1));
+    if (SAVE) fs.writeFileSync(SAVE, JSON.stringify({ savedAt: new Date().toISOString(), treeSha, fixtures: Object.fromEntries(Object.entries(base).map(([id, r]) => [id, { fired: Object.keys(r.fired), warned: Object.keys(r.warned), told: Object.keys(r.told) }])) }, null, 1));
     for (const f of FIXTURES) {
       const got = Object.keys(base[f.id].fired).sort(), want = [...f.expect].sort();
       const gotW = Object.keys(base[f.id].warned).sort(), wantW = [...(f.warn || [])].sort();
-      const ok = JSON.stringify(got) === JSON.stringify(want) && JSON.stringify(gotW) === JSON.stringify(wantW);
-      console.log(`${ok ? 'ok  ' : 'FAIL'}  fixture ${f.id}: fired [${got.join(' ')}] warned [${gotW.join(' ')}]${ok ? '' : ` — expected [${want.join(' ')}] warned [${wantW.join(' ')}]`}`);
+      const gotT = Object.keys(base[f.id].told || {}).sort(), wantT = [...(f.told || [])].sort();
+      const ok = JSON.stringify(got) === JSON.stringify(want) && JSON.stringify(gotW) === JSON.stringify(wantW) && JSON.stringify(gotT) === JSON.stringify(wantT);
+      console.log(`${ok ? 'ok  ' : 'FAIL'}  fixture ${f.id}: fired [${got.join(' ')}] warned [${gotW.join(' ')}]${gotT.length ? ` told [${gotT.join(' / ')}]` : ''}${ok ? '' : ` — expected [${want.join(' ')}] warned [${wantW.join(' ')}] told [${wantT.join(' / ')}]`}`);
       if (!ok) for (const [k, why] of Object.entries(base[f.id].warned)) console.log(`        warn ${k}: ${why}`);
       if (!ok) { failed = true; for (const [k, why] of Object.entries(base[f.id].fired)) console.log(`        ${k}: ${why}`); }
     }
