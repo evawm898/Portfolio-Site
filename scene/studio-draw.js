@@ -37,8 +37,8 @@ export const PALETTE = {
   shadow: 'rgba(40, 36, 32, 0.18)',
   wood: '#8a8278', woodDark: '#6f685f',
   uph: '#9a948c', uphDark: '#7f7970',
-  cat: '#131316', catFar: '#2a2a2f',
-  eye: '#cfd4b2',
+  cat: '#000000',    // one pure black ink: never lightened for contrast
+  eye: '#ffffff',    // the face's marks: what carries a cat on dark furniture
 };
 
 const shade = (hex, k) => {
@@ -236,6 +236,44 @@ function drawItem(ctx, view, item) {
 }
 
 // ---------------------------------------------------------------- the cat --
+// THE STYLE: a cute, minimal black-cat silhouette. One pure black fill, no
+// outline, no shading; large white ring eyes; ears as sharp triangles off the
+// top of the head; three white whiskers a side; a thick tapered tail; and NO
+// VISIBLE LEGS. The rig still solves every leg — the IK is what gives a pose
+// its weight and keeps a paw planted — but the drawing discards the limbs and
+// keeps only two things from them: where each paw is, and which end of the
+// body it belongs to. The body is then the union of the spine's discs and two
+// DRAPES, each the convex hull of the torso's lower half and one pair's paws
+// (fore, hind). Each drape covers the whole torso, so their union reaches the
+// ground as one mass with a shallow arch under the belly between the pairs,
+// and each paw shows only as a small NUB at the hull's foot. No knee, no
+// joint, no limb shape survives, whatever the IK did with them.
+//
+// Every number here is a drawing proportion, in world cm or as a factor on the
+// rig's own radius, and none of it reaches the motion.
+const STYLE = {
+  body: 1.1,                 // the spine's discs, rounder than the rig's
+  head: 1.34,                // the head and everything on it, about its centre: big, cute
+  earTip: 1.08,              // the ear's tip pushed further out: a sharper point
+  muzzle: 0.8,               // a small snout, read only in profile
+  nub: 2.0, nubUp: 1.6,      // a paw's nub, and how far its centre sits above the paw
+  ankle: 2.5, ankleUp: 3.6,  // the drape's foot: just above the nub, so the nubs read
+  arch: 3.2,                 // the radius the belly's arch is rounded to, cm
+  tail: [2.5, 0.8],          // root and tip radius
+  eyeR: 1.6, eyeW: 0.45, eyeMinW: 1.4,    // a ring, cm; its stroke never under 1.4 px
+  eyeFacing: -0.15,          // an eye is drawn until it has turned this far past profile
+  whiskerLen: 6.4, whiskerW: 0.16, whiskerMinW: 0.75,
+};
+export const CAT_STYLE = STYLE;
+
+const v3 = {
+  add: (p, ...terms) => { const r = [...p]; for (const [k, v] of terms) { r[0] += v[0] * k; r[1] += v[1] * k; r[2] += v[2] * k; } return r; },
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+  dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  unit: (a) => { const m = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / m, a[1] / m, a[2] / m]; },
+};
+const toCamera = (q) => v3.unit([CAMERA.x - q[0], CAMERA.y - q[1], CAMERA.z - q[2]]);
+
 function disc(ctx, view, q, r) {
   const p = view.p(q[0], q[1], q[2]);
   discAt(ctx, p.x, p.y, Math.max(0.5, r * p.s));
@@ -268,47 +306,233 @@ function capsule(ctx, view, a, b, ra, rb) {
 }
 function discAt(ctx, x, y, r) { ctx.moveTo(x + r, y); ctx.arc(x, y, r, 0, Math.PI * 2); }
 
-function legPath(ctx, view, L) {
-  for (let k = 0; k < 3; k++) capsule(ctx, view, L.pts[k], L.pts[k + 1], L.widths[k] / 2, L.widths[k + 1] / 2);
-  disc(ctx, view, L.paw, 1.75);
+// A circle's points on screen, sampled densely enough that a hull through them
+// is its own tangent to a tenth of a pixel; `lower` keeps only the half below
+// the centre (screen y down), so a drape fills downward and never flattens a
+// dipped back.
+const RING_N = 32;
+function ringPts(out, view, q, r, lower) {
+  const p = view.p(q[0], q[1], q[2]), R = Math.max(0.5, r * p.s);
+  const n = lower ? RING_N / 2 : RING_N;
+  for (let k = 0; k <= n; k++) {
+    const a = (lower ? Math.PI : 2 * Math.PI) * k / (lower ? n : n + 1);
+    out.push({ x: p.x + R * Math.cos(a), y: p.y + R * Math.sin(a) });
+  }
+}
+function polyPath(ctx, P) {
+  if (P.length < 3) return;
+  ctx.moveTo(P[0].x, P[0].y);
+  for (let k = 1; k < P.length; k++) ctx.lineTo(P[k].x, P[k].y);
+  ctx.closePath();
 }
 
-// ONE SILHOUETTE, ONE FILL. Everything drawn in the cat's ink — tail, body,
-// neck, the near legs, head, muzzle, ears — goes into a single path and is
+// The cat's drawing geometry, in world cm, from the rig: the parts the
+// silhouette is made of, and where the face's marks go. Pure, so the gate can
+// measure it.
+export function catShape(rig) {
+  const H = rig.head, k = STYLE.head;
+  const scaleOnHead = (q, f = k) => v3.add(H.c, [f, v3.sub(q, H.c)]);
+  const torso = rig.spine.slice(0, 6).map(s => ({ p: s.p, r: s.r * STYLE.body }));
+  const neck = rig.spine[rig.spine.length - 1];
+  const up = [0, 1, 0];
+  const paws = rig.legs.map(L => ({
+    fore: L.fore,
+    nub: v3.add(L.paw, [STYLE.nubUp, up]),
+    ankle: v3.add(L.paw, [STYLE.ankleUp, up]),
+  }));
+  const ears = rig.ears.map(([a, tip, b]) => [scaleOnHead(a), scaleOnHead(tip, k * STYLE.earTip), scaleOnHead(b)]);
+  const n = rig.tail.length;
+  const tail = rig.tail.map((t, i) => ({ p: t.p, r: STYLE.tail[1] + (STYLE.tail[0] - STYLE.tail[1]) * Math.pow(1 - i / (n - 1), 1.15) }));
+  const eyes = rig.eyes.map(e => ({ c: scaleOnHead(e.c), n: e.n, open: e.open }));
+  const muzzle = { c: scaleOnHead(rig.muzzle.c), r: rig.muzzle.r * STYLE.muzzle };
+  return { torso, neck: { p: neck.p, r: neck.r }, head: { c: H.c, r: H.r * k, f: v3.unit(H.f), s: v3.unit(H.s), u: v3.unit(H.u) }, muzzle, ears, tail, paws, eyes };
+}
+
+// THE BELLY'S ARCH IS ROUNDED. The two drapes' union meets under the belly in
+// a V — two straight hull edges crossing — which reads as two legs. The corner
+// is filled with a fillet: the region from the crossing down to the NEAR arc of
+// a circle of radius `arch` touching both edges, so the union's edge runs down
+// one drape, round that arc and down the other. The region is star-shaped from
+// the crossing and is emitted as a fan of triangles, each convex and wound as
+// ctx.arc is. Only a crossing below
+// the torso whose open wedge faces down (the gap under the belly) is filleted.
+function insideConvex(P, x, y) {
+  for (let i = 0; i < P.length; i++) {
+    const a = P[i], b = P[(i + 1) % P.length];
+    if ((b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x) < -1e-6) return false;
+  }
+  return true;
+}
+function archFillet(ctx, view, S, A, B) {
+  if (A.length < 3 || B.length < 3) return;
+  const mid = S.torso[3].p, pm = view.p(mid[0], mid[1], mid[2]);
+  let best = null;
+  for (let i = 0; i < A.length; i++) {
+    const a0 = A[i], a1 = A[(i + 1) % A.length];
+    for (let j = 0; j < B.length; j++) {
+      const b0 = B[j], b1 = B[(j + 1) % B.length];
+      const rx = a1.x - a0.x, ry = a1.y - a0.y, qx = b1.x - b0.x, qy = b1.y - b0.y;
+      const den = rx * qy - ry * qx;
+      if (Math.abs(den) < 1e-9) continue;
+      const t = ((b0.x - a0.x) * qy - (b0.y - a0.y) * qx) / den, u = ((b0.x - a0.x) * ry - (b0.y - a0.y) * rx) / den;
+      if (t <= 1e-6 || t >= 1 - 1e-6 || u <= 1e-6 || u >= 1 - 1e-6) continue;
+      const X = { x: a0.x + rx * t, y: a0.y + ry * t };
+      if (X.y <= pm.y || (best && X.y <= best.X.y)) continue;
+      best = { X, a: [a0, a1], b: [b0, b1] };
+    }
+  }
+  if (!best) return;
+  const { X } = best;
+  // along each edge, the ray from the crossing that lies OUTSIDE the other drape
+  const ray = (seg, other) => {
+    for (const end of seg) {
+      const dx = end.x - X.x, dy = end.y - X.y, L = Math.hypot(dx, dy);
+      if (L < 1e-6) continue;
+      const e = 0.5 / L;
+      if (!insideConvex(other, X.x + dx * e, X.y + dy * e)) return { ux: dx / L, uy: dy / L, L };
+    }
+    return null;
+  };
+  const ra = ray(best.a, B), rb = ray(best.b, A);
+  if (!ra || !rb) return;
+  const bx = ra.ux + rb.ux, by = ra.uy + rb.uy, bl = Math.hypot(bx, by);
+  if (bl < 1e-6 || by / bl < 0.2) return;        // the gap must open downward
+  const half = Math.acos(Math.max(-1, Math.min(1, ra.ux * rb.ux + ra.uy * rb.uy))) / 2;
+  if (half < 0.05 || half > Math.PI / 2 - 0.05) return;
+  let r = STYLE.arch * pm.s;
+  const reach = Math.min(ra.L, rb.L) * 0.9;
+  r = Math.min(r, reach * Math.tan(half));
+  if (r < 0.5) return;
+  const dt = r / Math.tan(half), dc = r / Math.sin(half);
+  const cx = X.x + bx / bl * dc, cy = X.y + by / bl * dc;
+  // the NEAR arc, from one tangent point to the other: the side facing X
+  const a0 = Math.atan2(X.y + ra.uy * dt - cy, X.x + ra.ux * dt - cx);
+  let a1 = Math.atan2(X.y + rb.uy * dt - cy, X.x + rb.ux * dt - cx);
+  let da = a1 - a0;
+  while (da > Math.PI) da -= 2 * Math.PI;
+  while (da < -Math.PI) da += 2 * Math.PI;
+  const n = Math.max(2, Math.ceil(Math.abs(da) / 0.2));
+  const arc = [];
+  for (let k = 0; k <= n; k++) { const a = a0 + da * k / n; arc.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }); }
+  // the fillet is X down to that arc: star-shaped from X, so it is a fan of
+  // triangles, each convex and wound as ctx.arc is
+  for (let k = 0; k < n; k++) {
+    const p = arc[k], q = arc[k + 1];
+    const area = (p.x - X.x) * (q.y - X.y) - (p.y - X.y) * (q.x - X.x);
+    if (Math.abs(area) < 1e-9) continue;
+    polyPath(ctx, area > 0 ? [X, p, q] : [X, q, p]);
+  }
+}
+
+// ONE SILHOUETTE, ONE FILL. Everything in the cat's ink — the two drapes, the
+// nubs, tail, body, neck, head, muzzle, ears — goes into a single path and is
 // filled once, so no two parts meet along an anti-aliased edge (two fills of
 // one colour that only touch leave a hairline of the ground between them).
-// The far legs are a separate, lighter fill underneath: that edge is meant.
+// Then the face, in white, on top: rings for eyes and three whiskers a side.
 export function drawCat(ctx, view, rig) {
-  const near = (L) => Math.sign(L.i % 2 === 0 ? 1 : -1) === rig.nearSign;
+  const S = catShape(rig);
   ctx.beginPath();
-  for (const L of rig.legs) if (!near(L)) legPath(ctx, view, L);
-  ctx.fillStyle = PALETTE.catFar; ctx.fill('nonzero');
-  ctx.beginPath();
-  for (let k = 0; k < rig.tail.length - 1; k++) capsule(ctx, view, rig.tail[k].p, rig.tail[k + 1].p, rig.tail[k].r, rig.tail[k + 1].r);
-  for (let k = 0; k < rig.spine.length - 1; k++) capsule(ctx, view, rig.spine[k].p, rig.spine[k + 1].p, rig.spine[k].r, rig.spine[k + 1].r);
-  capsule(ctx, view, rig.spine[rig.spine.length - 1].p, rig.head.c, rig.spine[rig.spine.length - 1].r * 0.85, rig.head.r * 0.7);
-  for (const L of rig.legs) if (near(L)) legPath(ctx, view, L);
-  disc(ctx, view, rig.head.c, rig.head.r);
-  disc(ctx, view, rig.muzzle.c, rig.muzzle.r);
-  for (const tri of rig.ears) {
-    let [a, b, c] = tri.map(q => view.p(q[0], q[1], q[2]));
-    if ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x) < 0) [b, c] = [c, b];
-    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.closePath();
+  // the drapes first: each is a convex polygon, wound as ctx.arc is
+  const drapes = [true, false].map((fore) => {
+    const pts = [];
+    for (const t of S.torso) ringPts(pts, view, t.p, t.r, true);
+    for (const P of S.paws) if (P.fore === fore) ringPts(pts, view, P.ankle, STYLE.ankle, false);
+    return hull(pts);
+  });
+  for (const D of drapes) polyPath(ctx, D);
+  archFillet(ctx, view, S, drapes[0], drapes[1]);
+  for (const P of S.paws) disc(ctx, view, P.nub, STYLE.nub);
+  for (let i = 0; i < S.tail.length - 1; i++) capsule(ctx, view, S.tail[i].p, S.tail[i + 1].p, S.tail[i].r, S.tail[i + 1].r);
+  for (let i = 0; i < S.torso.length - 1; i++) capsule(ctx, view, S.torso[i].p, S.torso[i + 1].p, S.torso[i].r, S.torso[i + 1].r);
+  capsule(ctx, view, S.torso[S.torso.length - 1].p, S.neck.p, S.torso[S.torso.length - 1].r, S.neck.r * 1.05);
+  capsule(ctx, view, S.neck.p, S.head.c, S.neck.r * 1.05, S.head.r * 0.72);
+  disc(ctx, view, S.head.c, S.head.r);
+  disc(ctx, view, S.muzzle.c, S.muzzle.r);
+  // THE EARS ARE CUT FROM PAPER FACING THE CAMERA. The rig's ear is a flat
+  // triangle in the head's fore-and-up plane, so head-on it is seen edge-on
+  // as a hairline spike. Here an ear keeps the rig's base and tip but is drawn
+  // as a triangle of its own true width across the screen line from base to
+  // tip, the tip at least 1.35 base-widths out (pushed out from the head's
+  // centre where the ear points straight at the lens).
+  const ph = view.p(S.head.c[0], S.head.c[1], S.head.c[2]);
+  for (const [qa, qt, qb] of S.ears) {
+    const pb = view.p((qa[0] + qb[0]) / 2, (qa[1] + qb[1]) / 2, (qa[2] + qb[2]) / 2), pt = view.p(qt[0], qt[1], qt[2]);
+    const halfW = 0.5 * Math.hypot(qa[0] - qb[0], qa[1] - qb[1], qa[2] - qb[2]) * pb.s;
+    let dx = pt.x - pb.x, dy = pt.y - pb.y, len = Math.hypot(dx, dy);
+    const out = Math.hypot(pb.x - ph.x, pb.y - ph.y);
+    if (len < 1e-6) { dx = pb.x - ph.x; dy = pb.y - ph.y; len = out || 1; if (!out) { dx = 0; dy = -1; len = 1; } }
+    const ux = dx / len, uy = dy / len, h = Math.max(len, 3 * halfW * 0.9);
+    const tip = { x: pb.x + ux * h, y: pb.y + uy * h };
+    let a = { x: pb.x - uy * halfW, y: pb.y + ux * halfW }, c = { x: pb.x + uy * halfW, y: pb.y - ux * halfW };
+    if ((tip.x - a.x) * (c.y - a.y) - (tip.y - a.y) * (c.x - a.x) < 0) [a, c] = [c, a];
+    ctx.moveTo(a.x, a.y); ctx.lineTo(tip.x, tip.y); ctx.lineTo(c.x, c.y); ctx.closePath();
   }
   ctx.fillStyle = PALETTE.cat; ctx.fill('nonzero');
-  // eyes, only where they face the camera and are open
-  for (const e of rig.eyes) {
-    const toCam = [CAMERA.x - e.c[0], CAMERA.y - e.c[1], CAMERA.z - e.c[2]];
-    const m = Math.hypot(...toCam), nm = Math.hypot(...e.n);
-    const facing = (toCam[0] * e.n[0] + toCam[1] * e.n[1] + toCam[2] * e.n[2]) / (m * nm);
-    if (facing < 0.12 || e.open < 0.08) continue;
+  // THE SAME PATH, STROKED HAIR-THIN IN THE SAME INK. Skia's analytic
+  // antialiasing leaves a faint seam (7 % short of full cover, measured on a
+  // 2x headless raster, on main as well) along an INTERNAL edge of an
+  // overlapping nonzero path — the top of a disc inside the body, say. A
+  // stroke of the one path in the one ink puts full cover on every such edge;
+  // on the outer edge it grows the silhouette by half a pixel, no outline.
+  ctx.strokeStyle = PALETTE.cat; ctx.lineWidth = 1; ctx.lineJoin = 'round'; ctx.stroke();
+  drawFace(ctx, view, S);
+}
+
+// THE FACE. The eyes carry a black cat on a dark chaise, so they are big, pure
+// white and drawn whenever the face is turned toward the camera at all —
+// head-on, three-quarter and in profile (the near eye), until it is turned this
+// far past profile. A ring is foreshortened by how squarely it faces, but never
+// below half its width, and it is kept inside the head's own disc so it never
+// reads off the silhouette. Shut, it is a white arc; half shut, a squashed ring.
+function drawFace(ctx, view, S) {
+  const H = S.head, pc = view.p(H.c[0], H.c[1], H.c[2]), headR = H.r * pc.s;
+  ctx.strokeStyle = PALETTE.eye;
+  ctx.lineCap = 'round';
+  // the head's up on screen: the rings stand on it
+  const pu = view.p(H.c[0] + H.u[0], H.c[1] + H.u[1], H.c[2] + H.u[2]);
+  const ux = pu.x - pc.x, uy = pu.y - pc.y;
+  const rot = Math.hypot(ux, uy) > 1e-6 ? Math.atan2(uy, ux) + Math.PI / 2 : 0;
+  const rings = [];
+  for (const e of S.eyes) {
+    const facing = v3.dot(toCamera(e.c), v3.unit(e.n));
+    if (facing < STYLE.eyeFacing) continue;
     const p = view.p(e.c[0], e.c[1], e.c[2]);
-    const rx = Math.max(0.6, 0.95 * p.s * (0.45 + 0.55 * facing)), ry = Math.max(0.3, 0.72 * p.s * e.open);
-    ctx.beginPath(); ctx.ellipse(p.x, p.y, rx, ry, 0, 0, Math.PI * 2);
-    ctx.fillStyle = PALETTE.eye; ctx.fill();
-    ctx.beginPath(); ctx.ellipse(p.x, p.y, Math.max(0.3, rx * 0.22), ry * 0.92, 0, 0, Math.PI * 2);
-    ctx.fillStyle = PALETTE.cat; ctx.fill();
+    const R = STYLE.eyeR * p.s, w = Math.max(STYLE.eyeMinW, STYLE.eyeW * p.s);
+    const rx = R * (0.62 + 0.38 * Math.max(0, Math.min(1, facing)));
+    // inside the head disc, ring and stroke both
+    let x = p.x, y = p.y;
+    const dx = x - pc.x, dy = y - pc.y, d = Math.hypot(dx, dy), room = headR - R - w;
+    if (d > room && d > 1e-6) { x = pc.x + dx * Math.max(0, room) / d; y = pc.y + dy * Math.max(0, room) / d; }
+    rings.push({ x, y, R, rx, w, facing, open: e.open });
   }
+  // two rings that would touch are one eye seen past the other: the nearer
+  // (the one facing the camera more squarely) is drawn alone, as in profile
+  if (rings.length === 2 && Math.hypot(rings[0].x - rings[1].x, rings[0].y - rings[1].y) < rings[0].rx + rings[1].rx + rings[0].w) {
+    rings.splice(rings[0].facing >= rings[1].facing ? 1 : 0, 1);
+  }
+  for (const g of rings) {
+    ctx.lineWidth = g.w;
+    ctx.beginPath();
+    if (g.open < 0.25) ctx.ellipse(g.x, g.y, g.rx, g.R * 0.6, rot, 0.12 * Math.PI, 0.88 * Math.PI);
+    else ctx.ellipse(g.x, g.y, g.rx, g.R * Math.min(1, g.open), rot, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // whiskers: three a side from the cheek, fanned, drawn while that cheek is
+  // turned toward the camera
+  const m = S.muzzle.c, pm = view.p(m[0], m[1], m[2]);
+  ctx.lineWidth = Math.max(STYLE.whiskerMinW, STYLE.whiskerW * pm.s);
+  ctx.beginPath();
+  for (const sg of [1, -1]) {
+    const side = v3.add([0, 0, 0], [sg, H.s], [0.4, H.f]);
+    if (v3.dot(toCamera(m), v3.unit(side)) < -0.2) continue;
+    const root = v3.add(m, [sg * 1.0, H.s], [0.2, H.f]);
+    for (const j of [-1, 0, 1]) {
+      const dir = v3.unit(v3.add([0, 0, 0], [sg, H.s], [0.42, H.f], [0.3 * j - 0.06, H.u]));
+      const a = view.p(...v3.add(root, [0.5, dir])), b = view.p(...v3.add(root, [STYLE.whiskerLen, dir]));
+      ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+    }
+  }
+  ctx.stroke();
 }
 
 // The surface under a point: the highest node at or below `y` whose surface

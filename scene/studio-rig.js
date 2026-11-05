@@ -190,7 +190,12 @@ export function solveRig(cat) {
 
   return {
     spine: spine.map(s => ({ p: W(s.q[0], s.q[1], s.q[2]), r: s.r })),
-    head: { c: W(...head.c), r: head.r },
+    // the head's own frame, carried as differences of points (the bend is not
+    // linear): drawing only — the whiskers and the eye rings are laid on it
+    head: (() => {
+      const c0 = W(...head.c), dir = (v) => { const b = W(head.c[0] + v[0], head.c[1] + v[1], head.c[2] + v[2]); return [b[0] - c0[0], b[1] - c0[1], b[2] - c0[2]]; };
+      return { c: c0, r: head.r, f: dir(hf), s: dir(hs), u: dir(hu) };
+    })(),
     muzzle: { c: W(...muzzle.c), r: muzzle.r },
     ears: ears.map(tri => tri.map(q => W(q[0], q[1], q[2]))),
     eyes: eyes.map(ey => {
