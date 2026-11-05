@@ -4,6 +4,11 @@
    PROTOTYPED, MEASURED AND RENDERED SIDE BY SIDE. NOTHING HERE SHIPS.
    (read §15 of docs/bloom-photo-to-bloom-discovery.md and evawm898/Portfolio-Site#495)
 
+   [Nov 5: OPTION A SHIPPED (§16) and this tree's ring line moved with it, so
+   every option's anchor now REFUSES here — by design, the run says which. This
+   tool reproduces §15 on its own base, 40888af: `git worktree add <wt> 40888af`
+   and run it from there. The shipped option is `tools/shot-bloom-layer-ring.mjs`.]
+
    THE DEFECT. With Per-layer values ON, a whorl's ring is placed by
    `footRing()`'s `ringFactor`: the hidden `layerSize` ramp (`layerSize^L`,
    default 0.72 because the control hides) unless the layer OWNS its width, in

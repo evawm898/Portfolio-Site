@@ -759,6 +759,27 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   - `verify-bloom-load-unchanged.mjs --per-layer` is the compare that can see it (S1's own set turns Per-layer values on
     nowhere).
   - The combination gate's wall measure cannot see a ring move (one petal against itself); the builder's neighbour flag can.
+  - **[Nov 5: RULED — option A, a FRACTION of the hub ring, every layer (layer 1 included), W4's tip = the nib. SHIPPED,
+    §16 and the block below.]**
+
+**A LAYER OWNS ITS RING UNDER PER-LAYER VALUES — AN OWNED VALUE, A FRACTION OF THE HUB RING, THE DERIVED RING BY BRANCH**
+(#495 option A, Eva's rulings of Nov 5 — read §16 of `docs/bloom-photo-to-bloom-discovery.md` and the geometry's
+`LAYER_RING_RANGE` block before touching `layerOwnedRing`, `derivedRingFactor`, `SCOPE_LAYER_VALUE_IDS`, `ringOnlyEntry`,
+`layerRing`, `layerRingFmt`, bloom.js's `RING_IDS` / `pickedRingOf` / `layerRingLine`, `ownedRingRestated`, Z3 / J2 or
+route (as)).
+- A layer entry's `values.layerRing` REPLACES the derived ring (the ramp's, or an owned width's). It is footRing()'s, never a
+  petal's: an entry owning only a ring reaches no petal. Absent, `ringFactor` is the old double by branch.
+- Past 1 the HUB GROWS to it (Oct 16), layer 1 included. Other layers keep the area rule's place: they shift only for an owned
+  WIDTH. Flagged against the brief's "(other layers shift outward)".
+- The range 0.10-2.00 is PROPOSED and flagged. It is clamped and told (asked vs built on the control and on a `LAYER RINGS`
+  line); a file keeps the asked value.
+- The `Layer ring` control is greyed with no layer picked. Picked, it shows the DERIVED ring until dragged; a drag back to the
+  derived step prunes the entry.
+- Proof: `verify-bloom-load-unchanged --added layerRing --per-layer`, 46 / 46 identical with the control moving (`--added`
+  normalises exactly the new field). Block 85 (14 rows, 1,667); `frozen/phase94` = main's 1,653 rows at `ba539e0`. Panel
+  route (as) with four mutants (THIRTY-SIX routes).
+- Sheet: `node tools/shot-bloom-layer-ring.mjs docs/img/layer-ring-495.png --base <wt>`. The lotus with owned rings 0.64 / 0.51
+  reads body h:w 1.161 -> 1.444.
 
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
 (Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read

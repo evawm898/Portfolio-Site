@@ -978,8 +978,8 @@ const MUTANTS = [
     witness: (G) => G.scopeOffsetsFor({ petals: [{ layer: 0, slot: 4, offsets: { petalCup: 0.4 } }] }, { layer: 0, slot: 1, n: 5, state: { ...FAN_PETALS_ON(), fanPerSide: 2 } }) !== null },
   /* Validation back on the kept entries only — the first cut's shape. */
   { id: 'unreached-entries-are-not-validated', breaks: ['SO5'],
-    from: '  for (const e of scopes.layers || []) { checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`); checkScopeValues(e.values, `layers[${e.layer}]`); }\n  for (const e of scopes.petals || []) { checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`); checkScopeValues(e.values, `petals[${e.layer},${e.slot}]`); }',
-    to: '  for (const e of scopes.layers || []) if (!layersLive) { checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`); checkScopeValues(e.values, `layers[${e.layer}]`); }\n  for (const e of scopes.petals || []) if (!petalsLive) { checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`); checkScopeValues(e.values, `petals[${e.layer},${e.slot}]`); }',
+    from: '  for (const e of scopes.layers || []) { checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`); checkScopeValues(e.values, `layers[${e.layer}]`, SCOPE_LAYER_ENTRY_VALUE_IDS); }\n  for (const e of scopes.petals || []) { checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`); checkScopeValues(e.values, `petals[${e.layer},${e.slot}]`); }',
+    to: '  for (const e of scopes.layers || []) if (!layersLive) { checkScopeOffsets(e.offsets || {}, `layers[${e.layer}]`); checkScopeValues(e.values, `layers[${e.layer}]`, SCOPE_LAYER_ENTRY_VALUE_IDS); }\n  for (const e of scopes.petals || []) if (!petalsLive) { checkScopeOffsets(e.offsets || {}, `petals[${e.layer},${e.slot}]`); checkScopeValues(e.values, `petals[${e.layer},${e.slot}]`); }',
     witness: (G) => { try { G.scopeOffsetsFor({ layers: [{ layer: 3, offsets: { sheetThickness: 0.5 } }] }, { layer: 0, slot: 0, n: 8, state: { ...REG.DEFAULTS, scopeLayers: 'ON' } }); return true; } catch (e) { return false; } } },
   { id: 'a-mirror-pair-is-split', breaks: ['SO3', 'SO4', 'SO7'],
     from: '  if (!SCOPE_PAIRED_PLACEMENTS.includes(state.placement)) return slot;\n  return Math.min(slot, mirrorPartner(slot, n, mirrorFor(state)));',
@@ -1052,21 +1052,21 @@ const MUTANTS = [
     to: '    const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;',
     witness: (G) => OWN_WIDTH_PROBE(G).width === OWN_WIDTH_PROBE(G, null).width },
   { id: 'the-ring-keeps-the-ramp', breaks: ['SO13'],
-    from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;',
-    to: '    const ringFactor = scale;',
+    from: '    const derivedRingFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;',
+    to: '    const derivedRingFactor = scale;',
     witness: (G) => { const r = OWN_WIDTH_PROBE(G); return r.factor === r.scale; } },
   /* Eva's Oct 16 ruling on the rim hold: "grow the hub instead of holding the
      ring at the rim". The hold put back — the ring capped at R0, so nothing
      ever asks past the rim and the hub never grows. */
   { id: 'the-ring-is-held-at-the-rim-again', breaks: ['SO13'],
-    from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;',
-    to: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ownWidth / state.petalWidth);',
+    from: '    const derivedRingFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;',
+    to: '    const derivedRingFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ownWidth / state.petalWidth);',
     witness: (G) => { const r = OWN_WIDTH_PROBE(G, 3); return r.factor === 1; } },
   /* ... and the hub grown from something other than the widest owned ring —
      the rim moved to the FIRST owned ring past it instead of the widest. */
   { id: 'the-hub-grows-for-the-wrong-ring', breaks: ['SO13'],
-    from: '  for (let k = 0; k < raw.length; k++) if (raw[k].ownWidth !== null && raw[k].ringFactor > growFactor) { growFactor = raw[k].ringFactor; growLayer = k; }',
-    to: '  for (let k = 0; k < raw.length; k++) if (raw[k].ownWidth !== null && raw[k].ringFactor > 1) { growFactor = raw[k].ringFactor * 0.999; growLayer = k; }',
+    from: '  for (let k = 0; k < raw.length; k++) if ((raw[k].ownWidth !== null || raw[k].ownRing !== null) && raw[k].ringFactor > growFactor) { growFactor = raw[k].ringFactor; growLayer = k; }',
+    to: '  for (let k = 0; k < raw.length; k++) if ((raw[k].ownWidth !== null || raw[k].ownRing !== null) && raw[k].ringFactor > 1) { growFactor = raw[k].ringFactor * 0.999; growLayer = k; }',
     witness: (G) => { const st = { ...REG.DEFAULTS, layerCount: 3, scopeLayers: 'ON' }; const c = kindOf.get('petalWidth'); const fr = G.footRing(st, new G.MeshBuilder({ exportMode: false }), { scopes: { layers: [{ layer: 2, offsets: { petalWidth: 3 } }], petals: [], tiers: [], bounds: { petalWidth: { min: c.min, max: c.max } } } }); return fr.hub.radius !== fr.rings[2].radius; } },
   { id: 'a-spiral-inner-is-dropped', file: 'registry', breaks: ['SO7'],
     from: '  if (radial || spiral) {\n    for (let k = 1; k < L; k++) { const o = entryFor(k, 0); if (o) layers.push({ layer: k, offsets: o }); }',

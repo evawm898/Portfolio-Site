@@ -4169,8 +4169,8 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     const MUTANTS = [
       { name: 'per-layer values stay RADIAL only', from: "export const SCOPE_LAYER_PLACEMENTS = Object.freeze(['RADIAL', 'SPIRAL']);", to: "export const SCOPE_LAYER_PLACEMENTS = Object.freeze(['RADIAL']);" },
       { name: 'the foot keeps the ramp', from: '    const authoredWidth = ownWidth === null ? state.petalWidth * scale * 0.4 * state.footDelicacy : ownWidth * 0.4 * state.footDelicacy;', to: '    const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;' },
-      { name: 'the ring keeps the ramp', from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;', to: '    const ringFactor = scale;' },
-      { name: 'the ring is held at the rim again', from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;', to: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ownWidth / state.petalWidth);' },
+      { name: 'the ring keeps the ramp', from: '    const derivedRingFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;', to: '    const derivedRingFactor = scale;' },
+      { name: 'the ring is held at the rim again', from: '    const derivedRingFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;', to: '    const derivedRingFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ownWidth / state.petalWidth);' },
     ];
     for (const m of MUTANTS) if (geoSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom-geometry.js — the mutant cannot be applied`);
     for (const m of MUTANTS) {
