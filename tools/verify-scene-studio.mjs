@@ -950,7 +950,9 @@ const MUTANTS = [
   { id: 'the-gather-is-not-random', file: 'studio-cat.js', from: '      d: between(cat, TIMING.gather),', to: '      d: (rnd(cat), 0.8),',
     breaks: ['upjump/the-gather-is-randomised-per-jump-and-so-is-every-other-phase'], mayAlso: [] },
   { id: 'the-down-jump-is-the-up-jump', file: 'studio-cat.js', from: "  if (edge.type === 'up') {\n    const gather", to: "  if (edge.type === 'up' || edge.type === 'down') {\n    const gather",
-    breaks: ['downjump/a-down-jump-is-its-own-program-no-gather-no-launch'], mayAlso: ['downjump/*', 'motion/*', 'upjump/*', 'director/*'] },
+    // a drop put through the up-jump's solve is a different program, and its
+    // landing is not the one its own arc was solved for: a seam, rightly seen
+    breaks: ['downjump/a-down-jump-is-its-own-program-no-gather-no-launch'], mayAlso: ['downjump/*', 'motion/*', 'upjump/*', 'director/*', 'continuity/*'] },
   // the approach walk skipped: the cat is put at its launch spot
   { id: 'a-cat-is-put-at-its-launch-spot', file: 'studio-cats.js', from: '  D.lastLeg = { i, edge: id, snap: structuredClone(cat), dur: null };', to: '  cat.pos = [e.launch[0], cat.pos[1], e.launch[1]];\n  D.lastLeg = { i, edge: id, snap: structuredClone(cat), dur: null };',
     breaks: ['director/no-position-is-ever-set-directly'], mayAlso: ['director/*'] },
