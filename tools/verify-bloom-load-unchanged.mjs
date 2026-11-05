@@ -26,7 +26,14 @@
    then report that sample as DIFFERENT on clauses 2, 4 and 5 (or the
    comparison could not see a change at all).
 
-   RUN:  node tools/verify-bloom-load-unchanged.mjs --base <worktree of the base commit> [--control]
+   `--per-layer` (#495, the ring-options discovery): ALSO the designs S1's set
+   never reaches, because none of them turns Per-layer values on — the photo
+   set's per-layer subsets (v4 onward, each through the OLD path as a subset)
+   and every live matrix row whose scopes OWN a layer's size (block 64's law
+   rows and their kin). A change to where a ring goes can move only those.
+   `--only <regex>` runs the samples whose name matches (a foreground chunk).
+
+   RUN:  node tools/verify-bloom-load-unchanged.mjs --base <worktree of the base commit> [--control] [--per-layer] [--only <regex>]
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -83,6 +90,21 @@ samples.push({ name: 'a clamp (petalLength 140)', text: JSON.stringify({ ...full
 samples.push({ name: 'an unknown key', text: JSON.stringify({ ...full, controls: { ...full.controls, petalColour: 'red' }, sidecar: 1 }) });
 const ret = { ...full.controls }; delete ret.stemNodeSwelling; delete ret.stemNodeKink;
 samples.push({ name: 'a retired id (stemNodeProminence 0.48)', text: JSON.stringify({ ...full, controls: { ...ret, 'stemNodeProminence': 0.48, stemLength: 100 } }) });
+
+if (argv.includes('--per-layer')) {
+  const SET = path.join(ROOT, 'docs/photo-to-bloom/eva-set');
+  for (const fl of fs.readdirSync(SET).sort()) for (const f of fs.readdirSync(path.join(SET, fl)).filter((x) => x.endsWith('.subset.bloom-design.json')).sort()) {
+    const text = fs.readFileSync(path.join(SET, fl, f), 'utf8');
+    if (JSON.parse(text).controls.scopeLayers === 'ON') samples.push({ name: `per-layer subset ${f}`, text });
+  }
+  for (const row of MATRIX) {
+    const sc = H.rowScopes(row);
+    if (!sc || !(sc.layers || []).some((e) => ['petalLength', 'petalWidth', 'petalTilt'].some((k) => k in (e.offsets || {})))) continue;
+    samples.push({ name: `per-layer row: ${row.label}`, text: toText(composeDoc(stateOf(row), { savedAt: SAVED, scopes: sc })) });
+  }
+}
+const oi = argv.indexOf('--only');
+if (oi >= 0) { const re = new RegExp(argv[oi + 1]); for (let i = samples.length - 1; i >= 0; i--) if (!re.test(samples[i].name)) samples.splice(i, 1); }
 
 const strip = (t) => t.replace(/"savedAt": "[^"]*"/, '"savedAt": "-"');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-load-unchanged-'));

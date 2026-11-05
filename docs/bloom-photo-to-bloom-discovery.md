@@ -1992,3 +1992,172 @@ curl mode, else the whole bloom's) builds nothing. It is now clause **V8**, comp
 nib warns (lotus v4: 0.60 mm from the tip). If "the tip" should mean the converging tip more broadly, that needs a
 length the geometry does not give, and it would be a typed constant.
 
+
+## 15. #495 — where a whorl's ring goes under Per-layer values: four options, prototyped (Nov 5)
+
+[evawm898/Portfolio-Site#495](https://github.com/evawm898/Portfolio-Site/issues/495). **A discovery and a prototype. NOTHING
+SHIPS:** `bloom-geometry.js`, `bloom-registry.js`, `bloom.js` and the harness are `main`'s. Not picked; the trade-offs are
+for Eva's ruling.
+
+| file | what |
+|---|---|
+| `tools/bloom-ring-options.mjs` | the four options as ANCHORED EDITS of temporary copies of the modules (each anchor must match once). `--measure`, `--sweep`, `--write <opt> <worktree>`, `--sheet` |
+| `tools/verify-bloom-load-unchanged.mjs` | gains `--per-layer` (the per-layer designs S1's set never reaches) and `--only <regex>` (a foreground chunk) |
+| `docs/img/ring-options-495.png` | the sheet: export mesh (print preview), the photos' own two angles, photos as placeholders |
+
+### 15.1 The defect, read from the code
+
+`footRing()` places ring L at `R0 × ringFactor`, and `ringFactor` has two producers:
+
+- the hidden `layerSize` ramp, `layerSize^L` (0.72 by default, because the control hides under Per-layer values);
+- the layer's OWNED width, `own width / Petal width` (Eva's Oct 16 ruling).
+
+A ring past R0 GROWS THE HUB (her third Oct 16 ruling). So a ring moves only with a petal width. The lotus's body
+petals are broad, and on the rings their widths give, the body stays squat (§14.4: 1.161 against the photo's ≈ 1.45).
+
+### 15.2 The options as prototyped
+
+- **A — an owned ring per layer.**
+  - A fraction of the area rule's ring R0, owned by a layer entry. Absent, the ring is today's derived value, BY BRANCH.
+  - A ring past R0 grows the hub, so the Oct 16 hub ruling is kept.
+  - **Prototyped in the geometry only:** the ring rides the build's layer scope. There is no registry control, design-file
+    field or page wiring (§15.6).
+- **B — an owned LENGTH places the ring.** `own length / Petal length`, layer 0 at R0, ahead of the width; a ring past R0
+  grows the hub. Supersedes the RING half of the Oct 16 width ruling (the foot still follows the width).
+- **C — Layer size stays live** (unhidden) under Per-layer values. A registry edit only: the geometry already reads it for
+  every layer that does not own its width, and an owned width still places its ring (Oct 16 kept).
+- **D — Layer size is the ring's ONE owner** under Per-layer values: every ring is `R0 × layerSize^L`, and an owned width
+  sets the foot and the blade only. This is the cleaner one the code suggests: one producer of ring placement.
+  - It supersedes the RING half of the Oct 16 width ruling.
+  - The hub ruling becomes UNREACHABLE: no ring can pass R0, because `layerSize` ≤ 0.90.
+- **C and D both owe the harness a change.** `tools/bloom-harness.mjs` asserts at MODULE LOAD that Layer size and Layer
+  tilt hide exactly when Per-layer values are live (Q3.5). The prototype's page-side runs narrow that statement to Layer
+  tilt.
+
+**The lotus per option** is S5 v9 with its broad inner petals KEPT BROAD (widths 28 / 26 / 24 / 21 mm). Each option's one
+free number was chosen by a sweep (`--sweep`) toward ≈ 1.45:
+
+| option | the lotus variant | swept |
+|---|---|---|
+| A | v9 + owned rings L2 **0.64**, L3 **0.51** (× R0) | 0.80/0.70 → 1.224 · 0.70/0.60 → 1.353 · 0.66/0.54 → 1.413 · 0.62/0.48 → 1.477 · 0.55/0.40 → 1.606 |
+| B | v9 as written (its photo-read lengths now place the rings) | — (no free number: the lengths are the photo's) |
+| C | v9, L2/L3 drop their owned widths (C keeps width-places-ring), Layer size **0.84** | 0.90 → 1.223 · **0.84 → 1.235** (best) · 0.76 → 1.165 · 0.64 → 1.079 |
+| D | v9 + Layer size **0.80** | 0.90 → 1.213 · 0.84 → 1.345 · **0.80 → 1.444** · 0.76 → 1.553 · 0.72 → 1.633 |
+
+The daisy and the water lily are **v7 as written, under each option** (no new values), to show what moves.
+
+### 15.3 What each option builds (EXPORT mesh, `--measure`)
+
+| | lotus rings (mm) | hub (mm) | **closed body h:w** (photo ≈ 1.45) | whole h:w (photo 1.16) | daisy rings | water lily rings |
+|---|---|---|---|---|---|---|
+| main (S5 v9 / v7) | 17.39 / 16.15 / 14.91 / 13.04 | 17.39 | 1.161 (44.6 × 38.4) | 0.655 | 21.27 / 21.27 | 9.12 / 8.10 |
+| **A** | 17.39 / 16.15 / **11.13 / 8.87** | 17.39 | **1.444** (44.6 × 30.9) | 0.655 | unchanged | unchanged |
+| **B** | 17.39 / **12.92 / 19.88 / 22.36** | **22.36 (GROWN 4.97 for L3)** | **0.849** (44.6 × 52.6) | 0.655 | unchanged (lengths = global) | 9.12 / **7.81** |
+| **C** | 16.62 / 15.43 / 11.72 / 9.85 | 16.62 | **1.235** (44.6 × 36.1) | 0.670 | unchanged | unchanged |
+| **D** | 17.39 / **13.91 / 11.13 / 8.91** | 17.39 | **1.444** (44.6 × 30.9) | 0.655 | 21.27 / **15.31** | 9.12 / **6.56** |
+
+- **A and D reach the photo's body.** Only A moves exactly the two body rings: D also takes L1 in (16.15 → 13.91), because
+  one number places every ring.
+- **B goes the wrong way on the lotus, and the mechanism is general:** the lotus's body petals are LONGER than its outer
+  boats (40 / 45 mm against 20 / 26), so length-placed rings move OUT. L3's ring passes R0 and the hub grows 4.97 mm (the
+  Oct 16 hub ruling, respected and working). The body goes 1.161 → 0.849. To pull a ring in under B, the petal must be
+  SHORTER, which couples ring to length exactly as today couples it to width. Any flower whose inner petals are longer
+  than its outer ones (a lotus or a rose bud) is on the wrong side of B.
+- **C cannot decouple, and the sweep is the measurement:** best 1.235.
+  - A layer that keeps its owned width keeps the width-placed ring (Oct 16).
+  - A layer that drops it takes the ramp for BOTH ring and width: the body petals narrow to 19.8 / 16.6 mm at 0.84.
+  - The two move together; "broad kept broad" is not reachable under C.
+- **D regresses both other flowers as written.**
+  - The daisy's two ray tiers both stood on the rim (owned width = global); under D the inner tier drops to the ramp's
+    0.72 (15.31 mm). The disc shrinks, visible on the sheet.
+  - **The daisy's look is UNREACHABLE under D**: two tiers on one ring needs `layerSize` 1.0, past its 0.90 maximum.
+  - The water lily's inner whorl goes 8.10 → 6.56 mm, back inside the stamen disc: S3's v4 defect, returned.
+- **Triangles unmoved by any option** (lotus 61,432; daisy 70,820; water lily 106,232).
+
+### 15.4 Saved designs — the old-path before / after compare
+
+`tools/verify-bloom-load-unchanged.mjs --base <worktree of main> --per-layer` was run from a worktree per option
+(`--write <opt>`). It compares the load record, the page state, the scopes, the page's own save and the exported STL's
+bytes, two page sessions per sample.
+
+- **S1's own set** (26 samples: six dry-run files, DEFAULTS, fifteen matrix rows, four that make the reader talk) turns
+  Per-layer values on NOWHERE. So it cannot see this change, and all four options read **26 of 26 identical**. That is
+  true and says nothing, which is why `--per-layer` exists.
+- **`--per-layer`** adds the 20 designs that can move:
+  - the 13 photo-set per-layer subsets (v4 onward), through the OLD path;
+  - every live matrix row whose scopes OWN a layer's size (block 64's law rows and kin, 7).
+- The compare's must-fail (`--control`, petalCup + 0.05 on the head side) moved `ui save stl`.
+
+| option | S1's set | per-layer designs | what moves |
+|---|---|---|---|
+| **A** | 26 / 26 identical | **20 / 20 identical** | nothing — every design carries no ring, and the derived ring is the old expression by branch |
+| **B** | 26 / 26 | **9 / 20** identical | **11 move**: daisy v4, lotus v4–v9, water lily v4–v7, and the row `PER-LAYER: SPIRAL x 3 turns — turn 2 owns its width, turn 3 its length and tilt` — every design whose owned length differs from the global |
+| **C** | 26 / 26 | **20 / 20 identical** | nothing (an unhidden control on a complete file reads the same; the geometry already read it) |
+| **D** | 26 / 26 | **4 / 20** identical | **16 move**: every design whose owned width placed a ring (daisy v5–v7, lotus v5–v9, water lily v5–v7, five of the `PER-LAYER:` law rows, the scoped-outline row) |
+
+- **"Rename labels, never IDs" holds in every option:** no id is added, retired or renamed in any prototype. A would ADD
+  one (§15.6).
+- **B and D cannot be migrated to byte identity.** A saved design cannot carry the ring it used to get:
+  - under B, the length must stay the length;
+  - under D, one `layerSize` cannot express per-layer rings.
+  So each is a ruled re-shape of those designs, by the precedent of #418's "a design saved with CURVE and a width other
+  than 16 reshapes on load — no migration".
+
+### 15.5 Print checks (EXPORT; `--measure`)
+
+| | lotus census (within-shell pairs) | lotus rim, 1.0 mm floor (E1's bar `min(1.0, body)`) | lotus wall (`measureWall`, every petal — the combination gate's `self-every`) | lotus neighbour (builder's own flag) |
+|---|---|---|---|---|
+| main | 0 | 2,400 profiles, thinnest 0.2185 mm, **0 undeclared**, 440 declared clamps (the nib's) | L0 0.932 · L1 0.963 · L2 0.958 · L3 1.011 | skin gap −1.199 (crossing), feet 1.99 mm |
+| A | 0 | identical to main | identical to main | −1.199, feet 5.01 |
+| B | 0 | identical to main | identical to main | −1.194, feet 1.99 |
+| C | 0 | thinnest 0.2169, 0 undeclared, 440 declared | L2 **0.916** · L3 **0.935** (narrower petals) | −1.194, feet 3.91 |
+| D | 0 | identical to main | identical to main | −1.198, feet 4.01 |
+
+- **The combination gate's wall measure CANNOT see a ring move, by its subject** (one petal's own sheet against itself),
+  so A, B and D read main's to the digit. C moves it only because C changes widths. The under-1 mm figures on L0–L2 are
+  §14.5's pre-existing cup × narrow-tip approaches.
+- **The measure a ring moves is the NEIGHBOUR** (two petals' laminae, skin to skin):
+  - the lotus's skin gap is pinned at about one sheet of crossing in every option (the accepted closed-bud look);
+  - **D, as written, takes the daisy to 0.651 mm and the water lily to 0.907 mm** — under 1 mm, from 1.327 and 2.086.
+  - A, B and C leave both other flowers' gaps unmoved (the water lily under B: 1.864).
+- **Every build reads 0 within-shell pairs and 0 undeclared rim profiles under the 1.0 mm floor.** The 440 declared clamps
+  are the apex nib's bead, pre-existing and identical across options. Every sheet build is the export mesh.
+
+### 15.6 The trade-offs, for Eva's ruling (not picked)
+
+| | A — owned ring | B — length places | C — Layer size live | D — Layer size owns every ring |
+|---|---|---|---|---|
+| lotus body (≈ 1.45), broad petals kept | **1.444** | 0.849 (wrong way) | 1.235 (narrows the petals) | **1.444** (also moves L1) |
+| daisy / water lily v7 | unchanged | water lily ring −0.29 mm | unchanged | **regress** (daisy unreachable; water lily inside its stamen disc) |
+| saved designs (46) | **all identical** | 11 of 20 per-layer move | **all identical** | 16 of 20 per-layer move |
+| Oct 16 rulings | both kept (width places a ring unless the layer owns one; hub grows) | width-ring half SUPERSEDED; hub kept | both kept | width-ring half SUPERSEDED; hub unreachable |
+| producers of a ring | three (ramp, width, owned ring) — the owned one wins | three (ramp, width, length) | two (unchanged) | **one** (the ramp) |
+| what ships | a new owned quantity: a registry control (a per-layer "Ring" visible only under Per-layer values, its displayed default the derived value), its design-file field, the scope reader, schema v5's row, Z3 / SO13 restated, a panel route | one geometry line; Z3 / SO13 restated | one registry line; the harness's Q3.5 statement and the panel routes that assert the hide | one geometry line + C's registry and harness changes; Z3 / SO13 restated |
+| route A (photo) | the ring becomes a photo-read value (ring step from the photo's front view), independent of width | rings follow the photo's lengths | no new freedom | one ring ramp, read from the front view |
+
+**Ambiguities, for Eva:**
+
+- **A's unit.** The prototype owns a FRACTION of the area rule's ring R0, not millimetres. A fraction stays proportional when
+  the petal count or Spread moves R0; millimetres would read directly off a photo. It needs a ruling.
+- **A at layer 0.** The prototype lets layer 0 own a ring too (a fraction under 1 sits the outer whorl inside the rim; over
+  1 grows the hub). Whether the outer whorl may leave the rim is a ruling.
+- **B's precedence** is length over width (the prompt's wording). Width over length would leave every v5–v9 photo design
+  where it is, but then B moves nothing the lotus needs.
+- **D's daisy.** D cannot put two whorls on one ring. Raising `layerSize`'s 0.90 ceiling to 1.0 would; that ceiling is
+  load-bearing for a CONTINUOUS instrument (J5, the depth note in CLAUDE.md), so it is not a free change.
+
+### 15.7 Reproduce
+
+```
+node tools/bloom-ring-options.mjs --measure        # the tables in §15.3 and §15.5
+node tools/bloom-ring-options.mjs --sweep          # §15.2's sweep
+node tools/bloom-ring-options.mjs --sheet docs/img/ring-options-495.png [--photos <dir of the six photos>]
+git worktree add <wt>/base origin/main; git worktree add --detach <wt>/A HEAD
+node tools/bloom-ring-options.mjs --write A <wt>/A   # (and B, C, D); symlink node_modules into each
+(cd <wt>/A && node tools/verify-bloom-load-unchanged.mjs --base <wt>/base --per-layer [--only <regex>] [--control])
+```
+
+The photos were the six S2 photos (session-only working copies, read back: no ancillary PNG chunks, so no EXIF / XMP /
+text), never committed; the committed sheet carries placeholders.
+
+![#495 ring options](img/ring-options-495.png)
