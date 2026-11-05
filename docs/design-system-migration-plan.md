@@ -1,6 +1,6 @@
 # Design-system migration — Part 0 audit and plan
 
-Status: **PROPOSED, waiting on Eva's approval and rulings.** Nothing on any
+Status: **APPROVED (Eva, Nov 5) with the rulings in §6 and one added rule (material colours are content, DESIGN.md rule 10).** Nothing on any
 page has changed yet. This PR adds `tokens.css` (linked by no page yet) and
 `DESIGN.md` (the rules). Read `DESIGN.md` first.
 
@@ -109,7 +109,7 @@ non-colour cue because several sit beside petrol:
 |---|---|---|---|---|
 | textile-stretch-simulator | rust `#E8B06E` / `rgba(165,107,46)` | yarn jammed / being strained (vs petrol = slack) | **plum** | already dashed (`setLineDash([2,3])`); legend gets a dashed swatch |
 | textile-stretch-simulator | rust as WARN TEXT (`.sim__line.is-warn strong`) | over-strain read-out | **ink + `!` glyph** | text, not colour |
-| conductive-trace-resistance | copper `#C97E42` | copper trace | **plum** | legend label; trace drawn solid |
+| conductive-trace-resistance | copper `#C97E42` | copper trace | ~~plum~~ **copper stays** (ruled: material colour) | legend label |
 | conductive-trace-resistance | silver `#C4CCCC` | silver trace | **ink-2** (neutral = metal) | legend label |
 | conductive-trace-resistance | rust `#E8B06E` (bar, legend, `rgba(165,107,46)` stroke) | resistance warning / oxidised | **indigo** | warning bar gets a hatched fill |
 | conductive-trace-resistance | rust WARN TEXT | warning read-out | **ink + `!`** | — |
@@ -117,9 +117,9 @@ non-colour cue because several sit beside petrol:
 | color-change | electron `#E8B06E` | electron dots | **mint** | label "electron" already present |
 | color-change | blue `#3A5FD0` | the electrochromic COLOURED state | **indigo** (a dyed state — filled, rule 7) | — |
 | color-change | UV violet `rgba(160,110,255)` | UV arrows | **indigo** | arrows + "UV" label already |
-| color-change | amber `rgba(227,179,65)` | thermochromic capsules / heat | **mint** | — |
+| color-change | amber `rgba(227,179,65)` | thermochromic capsules / heat | **keep if it is the pigment's colour** (rule 10), else mint — checked in batch 2 | — |
 | color-change | rust `rgba(165,107,46)` | broken C–O bond (dashed) | **plum** | already dashed + labelled |
-| color-change | browns `rgba(120,90,60)`, `rgba(160,120,80)` | fibre core / yarn | **undyed fibre: ink outline, no fill** (rule 7) — confirm it IS an undyed fibre (R6) | — |
+| color-change | browns `rgba(120,90,60)`, `rgba(160,120,80)` | fibre core / yarn | **keep** (ruled R6: thermochromic pigment states, material colour) | — |
 | knit-lab | `#E8B06E` `.is-bad` text | a failing read-out | **ink + `!`** | — |
 
 Exception proposed: **none**. Every one-off maps.
@@ -131,7 +131,24 @@ Exception proposed: **none**. Every one-off maps.
 - Canvas artwork, exported files, saved-link colour values (marble inks,
   weave yarns, cards suits).
 
-## 6. Rulings needed from Eva
+## 6. Rulings (Eva, Nov 5)
+
+- **Added rule — material colours are content.** A diagram depicting a real
+  material in its real colour keeps it. So in §4: **copper stays copper**;
+  silver → ink-2, electrons → mint, electrochromic blue and UV → indigo,
+  strained yarn → plum, resistance warning → indigo + hatch, rust warning TEXT
+  → ink + `!`.
+- **R1** approved. **R2** approved: /cards stays light, recorded in DESIGN.md.
+  **R3** approved: /textile-gauge-reader goes dark. **R4** approved.
+- **R5**: fonts and nav move to tokens; the scene ground and line ink stay as
+  artwork. Not exempt.
+- **R6**: the color-change browns are thermochromic pigment states — material
+  colours, KEEP. (Any that turns out to be undyed fibre is flagged and drawn as
+  an ink outline.) The amber capsules are pigment too and keep for the same
+  reason; flagged in batch 2 if not.
+- **R7**: Fraunces 600. **R8** approved. **R9** approved.
+
+### The questions as asked
 
 - **R1. Error/warning treatment.** The rule says no red text; about 55 chrome
   sites use red/amber/rust for errors and warnings. Proposed: ink (or dim) text
@@ -174,7 +191,7 @@ order (bloom's export gate is eight ~1 h shards).
 | # | Batch | Pages | CI that fires |
 |---|---|---|---|
 | 0 | **This PR** — `tokens.css`, `DESIGN.md`, this plan | none | none (no workflow matches) |
-| 1 | Main site | index, about, field-notes + the 4 essay pages, `styles.css` aliases | none |
+| 1 | Main site + Part 0 | `styles.css` legacy names aliased onto tokens, `tokens.css` linked in all 18 pages that load `styles.css`; index, about, field-notes, the essays | the five flower gates (flower.html gains the link) |
 | 2 | Field-note tools | color-change, conductive-trace, stretch simulator, knit-lab, textile-101, quantifying-comfort (§4 mappings) | none |
 | 3 | Hidden main-system pages | lab, dress, skirt, flower-saved, print | none |
 | 4 | Tool family A (no CI) | marble, weave, artist-tracker (+ its gate's teal assertion) | none — run `verify-marble`, `verify-weave`, `verify-tracker-drawer` by hand |

@@ -4,30 +4,27 @@
 --------------------------------------------------- */
 
 :root {
-  --black:        #060707;
-  --black-raised: #0c0e0e;
-  --line:         #232727;
-  --line-strong:  #34393a;
-  --ink:          #e9ecec;
-  --ink-dim:      #8b9494;
-  --ink-faint:    #565f5f;
-  --petrol:       #1c6b6b;
-  --petrol-bright:#2fa3a3;
+  /* Legacy names, kept so every rule below and every page stylesheet that
+     reads them keeps working. They are ALIASES onto tokens.css, which every
+     page links first; the values live there and only there (DESIGN.md).
+     Note the legacy --petrol is the DEEP fill and --petrol-bright is the
+     system's petrol. */
+  --black:        var(--color-ground);
+  --black-raised: var(--color-raised);
+  --line:         var(--color-line);
+  --line-strong:  var(--color-line-strong);
+  --ink:          var(--color-ink);
+  --ink-dim:      var(--color-dim);
+  --ink-faint:    var(--color-faint);
+  --petrol:       var(--color-deep);
+  --petrol-bright:var(--color-petrol);
 
-  --serif: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --mono:  "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  --serif: var(--type-serif);
+  --mono:  var(--type-mono);
 }
 
-/* On small screens, lighten the muted text tones — the same dimness
-   that reads fine on a desktop display loses too much contrast on
-   mobile. Every rule keys off these two custom properties, so this
-   alone lightens body copy, captions, and labels sitewide. */
-@media (max-width: 600px) {
-  :root {
-    --ink-dim:   #a7afaf;
-    --ink-faint: #7d8686;
-  }
-}
+/* Small screens lighten dim and faint one rung each — tokens.css owns that,
+   so it reaches every page through the aliases above. */
 
 * {
   margin: 0;
@@ -87,7 +84,7 @@ a {
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.18em;
-  color: var(--petrol-bright);
+  color: var(--color-seafoam);
   margin-bottom: 2.5rem;
   padding-left: 1.5rem;
 }
@@ -125,7 +122,7 @@ a {
 }
 
 .hero__meta .dot {
-  color: var(--petrol);
+  color: var(--color-faint);
 }
 
 /* ---------------------------------------------------
@@ -143,7 +140,7 @@ a {
 .section-label__number {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--petrol-bright);
+  color: var(--color-seafoam);
   letter-spacing: 0.14em;
 }
 
@@ -225,7 +222,7 @@ a {
   margin-top: 1.5rem;
   font-size: 10px;
   letter-spacing: 0.14em;
-  color: var(--ink-faint);
+  color: var(--color-seafoam);
   border-top: 1px solid var(--line);
   padding-top: 0.75rem;
 }
@@ -288,7 +285,7 @@ a {
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--petrol-bright);
+  color: var(--color-seafoam);
   margin-bottom: 1.25rem;
 }
 
@@ -354,7 +351,7 @@ a {
   font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--petrol);
+  color: var(--color-petrol);
   margin-bottom: 0.75rem;
 }
 
@@ -461,7 +458,7 @@ a {
 .project-header__index {
   font-size: 12px;
   letter-spacing: 0.18em;
-  color: var(--petrol-bright);
+  color: var(--color-seafoam);
 }
 
 .project__hero {
@@ -572,7 +569,7 @@ a {
   content: "\2014";
   position: absolute;
   left: 0;
-  color: var(--petrol);
+  color: var(--color-faint);
 }
 
 .project__list strong {

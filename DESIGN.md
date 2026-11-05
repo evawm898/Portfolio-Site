@@ -93,7 +93,14 @@ things apart without leaving the system.
    chrome. Editor marks drawn on the canvas (drag handles, selection outlines)
    count as artwork until a page is migrated deliberately, because several
    gates measure them.
-10. **Machine conventions are not design.** Colours a downstream machine
+10. **Material colours are content** (Eva, Nov 5). When a diagram depicts a
+    real material in its real colour — copper, rust, thermochromic pigment
+    states — that colour stays as artwork, the same as generator art.
+    Companions are for ABSTRACT categories (a state, a class, a series), never
+    for depicting a material. A copper trace is drawn copper; "strained" is
+    drawn plum. The rule covers marks, never text: a material name in a
+    caption is still ink.
+11. **Machine conventions are not design.** Colours a downstream machine
     reads — e.g. a laser cutter's red-cut / blue-score in an exported SVG —
     stay what the machine expects.
 
@@ -109,7 +116,17 @@ things apart without leaving the system.
   `--petrol` is the DEEP fill and `--petrol-bright` is today's petrol — the
   prefixed token names exist so that confusion does not spread.
 
-## Light pages
+## Light pages — one recorded exception
 
-The system is dark. A page that must be light (a print-on-paper preview) is an
-explicit, recorded exception; see the migration plan for which ones are ruled.
+The system is dark. **`/cards` is the one light page** (Eva, Nov 5): it is a
+print-design tool whose preview reads as paper. It uses the system's TYPE and
+PETROL family and keeps its own paper neutrals (`cards.css`); everything else
+— `/textile-gauge-reader` included — is dark. A new light page is a ruling,
+not a choice a session makes.
+
+## Errors and warnings
+
+Ink (or dim) text with a glyph: `!` for a warning, `✕` for a refusal or an
+error. A raised panel with a line-strong rule may hold it. Plum is allowed as a
+non-text marker beside it (a dot, a bar), never as the text colour and never
+as the only cue.
