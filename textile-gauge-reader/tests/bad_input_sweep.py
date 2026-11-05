@@ -771,7 +771,7 @@ def nonknit_metrics(sweep: dict, mode: str) -> dict:
 REASON_SMALL_BOX = "small hand-drawn box"
 REASON_CONTAMINATED_BOX = "contaminated hand-drawn box (ruler / pins / swatch edge)"
 REASON_DEGRADED_BOX = "hand-drawn box on a degraded photo (low light / 4000 px)"
-REASON_ORIENTATION = "orientation left at the default on a rotated photo"
+REASON_ORIENTATION = "orientation as the page pre-selected it on a rotated photo"
 REASON_STRETCH = "stretched photo (one calibration cannot serve both axes)"
 REASON_ROT15 = "rotated 15 degrees"
 REASON_BLUR = "blur flicker (status flips to confident under blur)"

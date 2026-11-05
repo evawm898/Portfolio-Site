@@ -2147,7 +2147,7 @@ non-knit photos already in the repository are referenced in place) and sent thro
 the scorecard, on both calibration modes (`truth`: a perfect manual calibration; `ruler`: the current flow,
 the pre-fill if the gate offers one, else a perfect manual calibration). The inputs: the photo as uploaded; a
 hand-drawn 1.5 in box (the control), over the ruler, with six pins in it, across the swatch edge, and a 0.4 in
-box; blur σ2 and σ4 (and σ4 with a box); rotated 90° with the orientation set right and left at its default;
+box; blur σ2 and σ4 (and σ4 with a box); rotated 90° with the orientation set right and as the page pre-selects it (it was "left at its default" until wale direction was detected, see "Wale direction is detected");
 rotated 15° and cropped; resampled to a 4000 px long edge; low light at ×0.18, ×0.30 and ×0.50 (each also with
 a box); stretched 1.3×; and 13 non-knit images (nine procedural, four from the repository). Noise is a pure
 integer hash, so an input is the same bytes on every machine. Two weak tests of the first audit are fixed:
@@ -3963,7 +3963,7 @@ silent cells from the correct ones. It did not, so no rule was written. Everythi
 `cd58802` (full sweep, `TGR_BAD_INPUT_FULL=1`; the app-path card, resolution rows and jitter points; the verify
 simulation), by capturing every `/analyze-multi` response in full and tabulating each area's rectangle, pitch and status.
 
-**The cells.** 69 silent course cells over both calibration modes (35 `truth` + 34 `ruler`), by cause label:
+**The cells.** 69 silent course cells over both calibration modes (35 `truth` + 34 `ruler`), by cause label (as measured then; the 20 orientation cells are 0 since wale direction is detected — see "Wale direction is detected" below):
 
 | cause | cells |
 |---|---|
@@ -4085,6 +4085,97 @@ version `requirements.txt` allows: each decodes to the upright size and to pixel
 upright file (mean absolute difference 0.7 to 1.4 grey levels against 0.0 for tag 1). A 650 × 200 box that fits only
 the upright frame is accepted for the EXIF file and refused as outside the image for the control. Not covered: PNG or
 WebP files carrying an orientation chunk, and browsers other than Chromium.
+
+### Wale direction is detected, and the orientation step pre-selects it (2026-11-05)
+
+**What a user sees.** After the measurement areas are proposed, the orientation step opens with the detected
+direction already selected and a line saying so in plain words — *"Wales look like they run across in this photo
+(all 3 measurement areas agree) — change it if that is not right."* When the detection is unsure, nothing is
+selected, the line says *"Could not tell which way the wales run … please choose"*, and Continue waits for a choice.
+There is no silent default any more. The pre-selection is only that: `/analyze-multi` still takes the orientation
+the user confirms, authoritatively, and nothing in the measurement, the consensus, the status roll-up, the
+calibration or the proposer moved (the app-path scorecard, its resolution and jitter rows, the verify simulation
+and every other sweep row are byte-identical to `main` before this change; measured, see below).
+
+**The diagnosis.** `_direction_for` is the one place the orientation decides which image axis is which, and a wrong
+orientation SWAPS them: the wale pipeline (with its leg-slant evidence and 0.5x/1x/2x family) is run along the
+photo's vertical axis and so reads the physical COURSE pitch as "wale", while the course pipeline reads the wale
+pitch as "course". Neither axis reads a harmonic of the right pitch — each reads the other axis's pitch outright,
+through the wrong pipeline, which is why the `rot90_default` row was the sweep's worst single input (11 silent axes
+of 21, 10 loud-wrong, 0 ok) and why it stays unfixable from inside the analyzer: the analyzer never guesses the
+orientation (`analyze_gauge`'s own contract). The fix therefore lives where the question is asked.
+
+**The signal: #338's leg-slant field, and nothing else** (`detect_wale_orientation` in `analysis/gauge_analysis.py`,
+on `/propose-rois`). `_orientation_field` is the signed local lean relative to the area's mean orientation. In a
+knit every stitch's two legs lean opposite ways, so the field collapsed ACROSS the wales (the signal that varies along
+the wale-spacing axis) alternates sign wale by wale and carries most of its variance, while collapsed ALONG the wales
+each row's left and right legs cancel. The axis along which the collapsed field varies more is the wale-spacing axis.
+Per proposed area that is one comparison of two variances — no threshold — and the detection is the vote only when
+EVERY proposed area agrees; a split vote, no area, or an area with no signal is "unsure". Read at the same working
+scale the analysis reads the area at (`_working_area`), on the area as it is (no tilt correction first).
+
+**The evidence table.** Every proposed area of the eleven app-path fixtures (eight photos, the synthetic jersey,
+garter and rib), through the shipped route on the bytes the sweep uploads. Ratios are the variance along x over the
+variance along y, one per area; wales are vertical when it is above 1.
+
+| transform | right | unsure | confident wrong | per-area ratios (min .. max) |
+|---|---|---|---|---|
+| upright (truth: vertical) | **11 / 11** | 0 | 0 | 1.18 .. 3509 (every area above 1) |
+| rotated 90° (truth: horizontal) | **11 / 11** | 0 | 0 | 0.00 .. 0.83 (every area below 1) |
+| rotated 15°, cropped (truth: vertical) | 7 / 11 | 2 (teal, knit_06) | **2** (knit_02, synth_garter) | 0.57 .. 4.55, straddling 1 |
+
+The narrowest upright area is knit_02's second (1.18); the narrowest rotated-90° one is also knit_02's (0.83, with
+the garter's 0.83). Rotated 15° is a different mechanism and is OUT OF SCOPE here, reported as measured: the photo's
+tilt is past `_normalize_rotation`'s ±6° reach, the projection onto the image axes mixes the two signals, and the
+per-area comparison sits at the noise floor — on the RAW rotated pixels three fixtures read differently from the
+JPEG-re-encoded bytes the route sees (knit_02 unsure, knit_05 horizontal, knit_06 vertical). So a 15° photo can
+be pre-selected unanimously and wrong (knit_02 from a single area; the garter, which has no legs and whose
+upright margin is the smallest of the synthetics, from all three), and the words on the page are the only guard.
+That is not the same mechanism as the 90° row and is not fixed by this change; the condition for revisiting it is a
+tilt estimate the detector can read off the same field (the mean orientation `theta_bar` that
+`_orientation_field` already computes names the tilt), or extending the de-tilt search — either is its own change.
+
+**Non-knit images** (the sweep's thirteen): everything the proposer refuses to propose an area on is unsure
+(text, bricks, gingham, noise, flat grey, checkerboard, the four repository images). The three directional textures
+the proposer does accept get a confident call — wood grain "vertical", window blinds and corduroy "horizontal" —
+because each genuinely has a direction. That decides nothing about whether they measure: the status roll-up's
+non-knit behaviour is unchanged (the non-knit sweep table is byte-identical).
+
+**Rejected signals**, each measured on the same areas, and the condition under which it would be worth a second look:
+- *Anisotropy of the 2D autocorrelation* (the intensity projections' first-peak strength along x against y): wrong
+  on every area of knit_09 upright and rotated, and on the synthetic rib (its purl columns repeat as strongly as its
+  courses). Revisit only if a fabric with no leg slant at all (a plain weave) is ever in scope.
+- *The structure tensor's dominant axis* (Σgx² against Σgy²): wrong on every area of the synthetic garter, whose
+  ridges are the strongest edges in the picture. Same condition.
+- *The direction the stitch "V"s point*: not a candidate for THIS question — it separates up from down (a 180°
+  turn), and the orientation control has only two values (a 90° turn), under which "up" and "down" are the same
+  answer. Unused.
+- *The stitch:row ratio* (pitch along x over pitch along y, with "more rows than stitches" as the stockinette
+  prior): wrong on the rib (2.77), knit_09 (1.50) and the synthetic jersey itself (1.38), and inverted by garter
+  by construction. It cannot serve even as a tiebreaker on these fixtures, so it is not one.
+
+**The sweep row.** `rot90_default` ("orientation left at the default") is retired and `rot90_detected` ("orientation
+as the page pre-selects it") takes its place: the user takes the detection, which on this row is right 11 of 11
+(an unsure detection would be scored as the old default "vertical" and recorded; none is).
+
+| row (`truth` / `ruler` calibration) | axes | silent | card-silent | no result | uncertain but right | loud-wrong | ok |
+|---|---|---|---|---|---|---|---|
+| `rot90_default` before (orientation left at the default), both modes | 21 | **11** | 1 | 0 | 0 | 10 | 0 |
+| `rot90_detected` after (the user takes the pre-selection), `truth` | 21 | **0** | 0 | 0 | 8 | 1 | 12 |
+| `rot90_detected` after, `ruler` | 21 | **0** | 0 | 0 | 9 | 1 | 11 |
+| `rot90_correct` (set by hand; unchanged) `truth` / `ruler` | 21 | 0 | 0 | 0 | 8 / 9 | 1 | 12 / 11 |
+
+The `after` row is cell for cell the `rot90_correct` row: the detection pre-selects "horizontal" on all eleven and the
+run is then the same request. What remains on it is teal's wale (loud-wrong, said uncertain, the same cell the
+hand-set row carries). Totals: silent 38 -> 27 (`truth`) and 37 -> 26 (`ruler`), card-silent 4 -> 3 in both,
+uncertain-but-right 99 -> 107 and 98 -> 107; no-result unchanged.
+
+Everything else: the full suite passes with the sweep pins re-pinned for that row alone (the eleven `rot90_default`
+silent cells and knit_06's card-silent run come off; no other pin moved), the jitter status flips are unchanged,
+the metamorphic sweep is unchanged (118/12/5/12/7). The witness is `tests/test_wale_orientation_detection.py`:
+right on 11/11 upright and 11/11 rotated-90° through the route, a split vote is unsure (two real areas, one rotated),
+no area and no signal are unsure, the detection moves no measurement, and the 15° and non-knit outcomes are pinned as
+measured (the two 15° confident-wrong fixtures as strict xfails).
 
 ## Deploying the backend to Render
 
@@ -4574,7 +4665,7 @@ writeup.
 
 ## Known V0 limitations
 
-- Orientation is user-specified, not auto-detected.
+- Orientation is detected from the proposed areas and pre-selected (see "Wale direction is detected"); the user confirms it, and a photo tilted well past the de-tilt range (~15°) can be pre-selected wrong.
 - The CV pipeline assumes reasonably flat, evenly lit, in-focus fabric —
   heavy wrinkling, motion blur, or extreme glare will lower confidence or
   fail to detect a pattern (by design, it reports that rather than
