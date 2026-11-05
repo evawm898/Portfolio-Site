@@ -22,9 +22,11 @@ The contract:
   * The README's generated sweep block must be byte-identical to what a full run generates
     (`python tests/bad_input_sweep.py --write-readme` regenerates it).
 
-CI RUNTIME. The full sweep is about 2.5 minutes serial. `TGR_BAD_INPUT_SUBSET=1` runs the representative subset
-(bad_input_sweep.SUBSET_*): the pinned cells outside it are skipped and the total / README tests are skipped,
-because they describe the full sweep. The subset keeps a witness of every cause label (asserted below).
+CI RUNTIME. The full sweep is about 2.5 minutes serial and added 3.6-4.5 minutes to the job on a GitHub runner, so
+under CI (the `CI` environment variable) the representative subset runs by default (`TGR_BAD_INPUT_SUBSET=1` asks
+for it anywhere, `TGR_BAD_INPUT_FULL=1` forces the full sweep): the pinned cells outside it are skipped and the
+total / README-block tests are skipped, because they describe the full sweep. The subset keeps a witness of every
+cause label (asserted below), and a cheap always-on test checks the README headline against the pinned totals.
 """
 from __future__ import annotations
 
@@ -38,7 +40,7 @@ import pytest
 import app_path_scorecard as ap
 import bad_input_sweep as bis
 
-SUBSET_MODE = os.environ.get("TGR_BAD_INPUT_SUBSET") == "1"
+SUBSET_MODE = bis.subset_requested()
 
 # Pinned 2026-11-05 against main c0e0073 (the consensus status roll-up, #500, is in). Per calibration mode,
 # cause -> [(fixture, input, axis)]. Generated from a full run; re-pin with the README block.
@@ -481,6 +483,19 @@ def test_readme_carries_the_generated_sweep_block(sweep):
     assert block == bis.readme_block(sweep, vs.cached_verify()), (
         "README's bad-input sweep block is stale -- run `python tests/bad_input_sweep.py --write-readme`"
     )
+
+
+@pytest.mark.parametrize("mode", bis.MODES)
+def test_readme_headline_carries_the_pinned_totals(mode):
+    """Always on (no sweep needed): a re-pin without regenerating the README block is caught even where CI runs only
+    the subset and cannot compare the whole block."""
+    t = PINNED_TOTALS[mode]
+    line = (f"- **{mode}** calibration: **{t['silent']}** confident-and-wrong axes and **{t['card_silent']}** card-silent "
+            f"runs of {t['n']} scored axes in {t['runs']} runs; {t['no-result']} no-result axes; "
+            f"{t['uncertain-right']} uncertain-but-right axes")
+    path = os.path.join(os.path.dirname(__file__), "..", "README.md")
+    with open(path, encoding="utf-8") as fh:
+        assert line in fh.read(), f"README's headline for {mode} does not match the pinned totals -- regenerate the block"
 
 
 def test_the_wale_signals_diagnostic_still_imports():

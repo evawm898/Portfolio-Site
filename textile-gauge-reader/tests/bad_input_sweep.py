@@ -66,6 +66,14 @@ Run directly to print the README tables:
     python tests/bad_input_sweep.py                  # print the sweep and the verify tables
     python tests/bad_input_sweep.py --write-readme   # regenerate the README blocks
     python tests/bad_input_sweep.py --subset         # the CI subset only
+
+CI RUNTIME (measured). The full sweep is about 2.5 minutes serial on a developer box and added 3.6 to 4.5 minutes to
+the `textile-gauge-tests` job on a GitHub runner (the pytest step went from 75-128 s to 343 s), so CI runs a
+representative SUBSET (`SUBSET_*` below: 12 inputs x 8 fixtures x both modes, 8 non-knit images, a witness of every
+cause label -- asserted) by default whenever the CI environment variable is set, and the full sweep is the documented
+opt-in: `TGR_BAD_INPUT_FULL=1 python -m pytest tests/test_bad_input_sweep.py`. The verify simulation is cheap and
+always runs in full. The pins outside the subset are skipped in CI; the README block and the headline totals are
+guarded by the full run, and by a cheap always-on check that the README headline carries the pinned totals.
 """
 from __future__ import annotations
 
@@ -586,6 +594,14 @@ SUBSET_INPUTS = ("base", "box_good", "box_small", "box_ruler", "box_pins", "blur
 SUBSET_FIXTURES = ("jersey", "teal", "knit_01", "knit_06", "knit_08", "knit_09", "synth_jersey", "synth_rib")
 SUBSET_NONKNIT = ("text_lines", "wood_grain", "brick_wall", "gingham_woven", "corduroy", "random_noise", "flat_grey",
                   "repo_daisy_photo")
+
+
+def subset_requested() -> bool:
+    """The representative subset runs when TGR_BAD_INPUT_SUBSET=1, and by default under CI (GitHub sets CI=true:
+    the full sweep added more than three minutes to the job, measured). TGR_BAD_INPUT_FULL=1 forces the full sweep."""
+    if os.environ.get("TGR_BAD_INPUT_FULL") == "1":
+        return False
+    return os.environ.get("TGR_BAD_INPUT_SUBSET") == "1" or os.environ.get("CI", "").lower() == "true"
 
 
 def build_sweep(runner: Optional[Runner] = None, subset: bool = False, only_inputs: Optional[Tuple[str, ...]] = None,
