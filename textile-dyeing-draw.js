@@ -77,7 +77,7 @@ export function dyedWeave({ warp, weft, cols = 6, rows = 5, pitch = 52, rowPitch
 export function glyph(cls, x, y, color, s = 1) {
   if (cls === 'disperse') return `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(2.4 * s)}" fill="${color}"/>`;
   if (cls === 'acid') return `<path d="M${f1(x)},${f1(y - 3.4 * s)}L${f1(x + 3.4 * s)},${f1(y)}L${f1(x)},${f1(y + 3.4 * s)}L${f1(x - 3.4 * s)},${f1(y)}Z" fill="${color}"/><path d="M${f1(x - 1.7 * s)},${f1(y)}H${f1(x + 1.7 * s)}" stroke="${BG}" stroke-width="1.1"/>`;
-  if (cls === 'reactive') return `<path d="M${f1(x - 3.2 * s)},${f1(y + 2.4 * s)}L${f1(x)},${f1(y - 2.6 * s)}L${f1(x + 3.2 * s)},${f1(y + 2.4 * s)}" stroke="${color}" stroke-width="${f1(1.6 * s)}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if (cls === 'reactive') return `<path d="M${f1(x - 3.6 * s)},${f1(y + 2.9 * s)}L${f1(x)},${f1(y - 3.1 * s)}L${f1(x + 3.6 * s)},${f1(y + 2.9 * s)}Z" fill="${color}"/>`;
   return '';
 }
 const BEAN = 'M26 10C32 10 38 14 38 22C38 26 34 26 36 32C38 38 32 42 26 42C20 42 14 40 14 32C14 26 18 26 16 20C14 14 20 10 26 10Z';
