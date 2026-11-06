@@ -586,6 +586,23 @@
          direction named backwards, a start past the end not told. Three
          edits: this entry, the block, the negative control's flags and
          banner (THIRTY-FIVE routes).
+     (as) A LAYER'S OWN RING (#495 — Eva's rulings of Nov 5, option A; §16 of
+         docs/bloom-photo-to-bloom-discovery.md). RADIAL x 3: the Layer ring
+         control HIDES with per-layer values OFF; ON with no layer picked it is
+         SHOWN AND GREYED and its read-out says to pick a layer (a ring is a
+         layer's own); picking layer 3 enables it at the layer's DERIVED ring
+         (footRing()'s own `derivedRingFactor`) and the read-out says DERIVED; a
+         drag to 0.40 records the NUMBER 0.4 on layer 3's entry and builds ring
+         3 at R0 x 0.40 (the hub's own `ringR0`), told OWN; 1.30 grows the hub to
+         it (the growth record names layer 3, by a ring) and both the control's
+         read-out and the HUB GROWN line say so; set back to the derived value
+         the entry is PRUNED and ring 3 returns to the derived double, bit for
+         bit; a record asking 2.60 builds 2.00 and both read-outs say asked vs
+         built (CLAMPED); deselecting greys it again. Four mutants (bloom.js
+         and bloom-registry.js): the ring never greyed, a pick showing the
+         whole-bloom value, the clamp never told, the derived ring never given
+         back. Three edits: this entry, the block, the negative control's flags
+         and banner (THIRTY-SIX routes).
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -4152,8 +4169,8 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     const MUTANTS = [
       { name: 'per-layer values stay RADIAL only', from: "export const SCOPE_LAYER_PLACEMENTS = Object.freeze(['RADIAL', 'SPIRAL']);", to: "export const SCOPE_LAYER_PLACEMENTS = Object.freeze(['RADIAL']);" },
       { name: 'the foot keeps the ramp', from: '    const authoredWidth = ownWidth === null ? state.petalWidth * scale * 0.4 * state.footDelicacy : ownWidth * 0.4 * state.footDelicacy;', to: '    const authoredWidth = state.petalWidth * scale * 0.4 * state.footDelicacy;' },
-      { name: 'the ring keeps the ramp', from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;', to: '    const ringFactor = scale;' },
-      { name: 'the ring is held at the rim again', from: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;', to: '    const ringFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ownWidth / state.petalWidth);' },
+      { name: 'the ring keeps the ramp', from: '    const derivedRingFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;', to: '    const derivedRingFactor = scale;' },
+      { name: 'the ring is held at the rim again', from: '    const derivedRingFactor = ownWidth === null ? scale : L === 0 ? 1 : ownWidth / state.petalWidth;', to: '    const derivedRingFactor = ownWidth === null ? scale : L === 0 ? 1 : Math.min(1, ownWidth / state.petalWidth);' },
     ];
     for (const m of MUTANTS) if (geoSrc.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in bloom-geometry.js — the mutant cannot be applied`);
     for (const m of MUTANTS) {
@@ -5162,6 +5179,93 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (as) A LAYER'S OWN RING ON THE PANEL (#495) ----------------
+   See the header. The control's state off the wrapper and input the page drew,
+   its words off the read-out the page wrote, the numbers against
+   `__bloomMetrics()` (footRing()'s own `derivedRingFactor` / `ownRing` and the
+   hub's ring R0 and growth) and the record against `__bloomDesign.scopes()`. */
+{
+  const tag = '[layer ring]';
+  const settle = async (pg) => { await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await settleBuild(pg); };
+  const snap = (pg) => pg.evaluate(() => {
+    const el = document.getElementById('layerRing'); const w = el.closest('.bl-ctrl'); const m = window.__bloomMetrics();
+    return { hidden: w.hidden, disabled: el.disabled, value: el.value, said: w.querySelector('.bl-val').textContent,
+      rings: m.rings.map((r) => ({ radius: r.radius, derived: r.derivedRingFactor, own: r.ownRing })), R0: m.hubRingR0, hub: m.hubRadius, grew: m.hubGrowth,
+      rec: window.__bloomDesign.scopes(), readout: document.getElementById('readout').textContent };
+  });
+  const edit = async (pg, v) => { await pg.evaluate((x) => { const el = document.getElementById('layerRing'); el.value = String(x); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, v); await settle(pg); };
+  const ownOf = (rec, L) => { const e = rec && (rec.layers || []).find((q) => q.layer === L); return e && e.values ? e.values.layerRing : undefined; };
+  const run = async (pg, label) => {
+    const p = [];
+    let bad = await applyConfig(pg, [{ id: 'layerCount', value: '3' }, { id: 'scopeLayers', value: 'OFF' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    let r = await snap(pg);
+    if (!r.hidden) p.push('with per-layer values OFF the ring control is SHOWN');
+    bad = await applyConfig(pg, [{ id: 'scopeLayers', value: 'ON' }]);
+    r = await snap(pg);
+    if (bad.length || r.hidden) p.push(`with per-layer values ON the ring control is ${r.hidden ? 'hidden' : 'shown'} (${bad.join('; ')})`);
+    if (!r.disabled) p.push('with NO layer picked the ring control is enabled — a ring is a layer\'s own, so it must be greyed');
+    if (!/pick a layer/.test(r.said)) p.push(`with no layer picked the read-out does not say to pick a layer: "${r.said.slice(0, 160)}"`);
+    await pg.evaluate(() => window.__bloomScopeView.select({ kind: 'layer', layer: 2, slot: 0 })); await settle(pg);
+    r = await snap(pg);
+    const d = r.rings[2].derived, r0 = r.R0, before = r.rings[2].radius;
+    if (r.disabled) p.push('with layer 3 picked the ring control is still greyed');
+    if (Math.abs(Number(r.value) - d) > 0.005 + 1e-9) p.push(`picked, the slider shows ${r.value}, not layer 3's derived ring ${d}`);
+    if (!/DERIVED/.test(r.said) || !r.said.includes(d.toFixed(2))) p.push(`picked, the read-out does not say the DERIVED ${d.toFixed(2)}: "${r.said.slice(0, 160)}"`);
+    await edit(pg, 0.4);
+    r = await snap(pg);
+    if (ownOf(r.rec, 2) !== 0.4) p.push(`a drag to 0.40 recorded layer 3's ring as ${JSON.stringify(ownOf(r.rec, 2))}, not the number 0.4`);
+    if (Math.abs(r.rings[2].radius - r0 * 0.4) > 1e-9 * r0) p.push(`a drag to 0.40 built ring 3 at ${r.rings[2].radius} mm, not R0 ${r0} x 0.40`);
+    if (!/OWN ring/.test(r.said)) p.push(`a drag to 0.40: the read-out does not say OWN: "${r.said.slice(0, 160)}"`);
+    await edit(pg, 1.3);
+    r = await snap(pg);
+    if (!r.grew || r.grew.layer !== 2 || r.grew.by !== 'ring' || Math.abs(r.hub - r0 * 1.3) > 1e-9 * r0) p.push(`ring 1.30 on layer 3 did not grow the hub to it (${JSON.stringify(r.grew)}, hub ${r.hub})`);
+    if (!/HUB GREW/.test(r.said)) p.push(`ring 1.30: the read-out does not say the HUB GREW: "${r.said.slice(0, 200)}"`);
+    if (!/HUB GROWN[^\n]*owns a ring past the rim/.test(r.readout)) p.push('ring 1.30: the HUB GROWN line does not say an owned ring grew it');
+    await edit(pg, Number(d.toFixed(2)));
+    r = await snap(pg);
+    if (ownOf(r.rec, 2) !== undefined) p.push(`set back to the derived ${d.toFixed(2)}, layer 3 still OWNS ${ownOf(r.rec, 2)} — the entry must be pruned and the layer given back to its derived ring`);
+    if (r.rings[2].radius !== before) p.push(`set back to the derived ring, ring 3 is at ${r.rings[2].radius} mm, not the derived ${before}`);
+    /* a ring asked PAST the range (a file's), told asked vs built */
+    await pg.evaluate(() => window.__bloomScopes({ layers: [{ layer: 2, offsets: {}, values: { layerRing: 2.6 } }], petals: [], tiers: [], strands: [] })); await settle(pg);
+    await pg.evaluate(() => window.__bloomScopeView.select({ kind: 'layer', layer: 2, slot: 0 })); await settle(pg);
+    r = await snap(pg);
+    if (!r.rings[2].own || r.rings[2].own.asked !== 2.6 || r.rings[2].own.built !== 2 || !r.rings[2].own.clamped) p.push(`a ring asked 2.60: the record reads ${JSON.stringify(r.rings[2].own)}, not asked 2.6 / built 2 / clamped`);
+    if (!/asked 2\.60x, built 2\.00x \(CLAMPED/.test(r.said)) p.push(`a ring asked 2.60: the read-out does not say asked vs built: "${r.said.slice(0, 220)}"`);
+    if (!/LAYER RINGS[^\n]*asked 2\.60x, CLAMPED/.test(r.readout)) p.push('a ring asked 2.60: the LAYER RINGS line does not say it was CLAMPED');
+    await pg.evaluate(() => window.__bloomScopeView.deselect()); await settle(pg);
+    r = await snap(pg);
+    if (!r.disabled) p.push('deselected, the ring control is enabled again');
+    await pg.evaluate(() => window.__bloomScopes(null)); await settle(pg);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: hidden with per-layer OFF, greyed and told with no layer picked; picked, it shows the layer's DERIVED ring; a drag records an owned number and builds R0 x it; 1.30 grows the hub (told on both read-outs); back at the derived value the entry is pruned and the ring returns to the derived double; a file's 2.60 builds 2.00 and says asked vs built on both read-outs`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'the layer ring');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const pageSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const regSrc = fs.readFileSync(new URL('../bloom-registry.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the ring is never greyed', file: 'bloom.js', from: "&& (!ringOnly || (!!scopeView && scopeView.kind === 'layer'));", to: "&& true;" },
+      { name: 'a pick shows the whole-bloom value', file: 'bloom.js', from: '    if (r) eff.layerRing = r.ownRing ? r.ownRing.built : r.derivedRingFactor;', to: '' },
+      { name: 'the clamp is never told', file: 'bloom-registry.js', from: '    if (p.own.clamped) t += ', to: '    if (false) t += ' },
+      { name: 'the derived ring is never given back', file: 'bloom.js', from: '    if (derived !== null && Math.abs(val - derived) < LAYER_RING_STEP / 2) {', to: '    if (false) {' },
+    ];
+    for (const m of MUTANTS) { const src = m.file === 'bloom.js' ? pageSrc : regSrc; if (src.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in ${m.file} — the mutant cannot be applied`); }
+    for (const m of MUTANTS) {
+      const src = m.file === 'bloom.js' ? pageSrc : regSrc;
+      if (src.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route(`**/${m.file}`, (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: src.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -5308,14 +5412,19 @@ if (NEGATIVE_CONTROL) {
     /* ROUTE (ap), THE UMBEL'S HEAD TOGGLE — one flag per mutant */
     const sawUmbelLabel = fail.some((f) => /^\[umbel head\] MUTANT \(the label is never derived\).*it must say its controls shape the florets/.test(f));
     const sawUmbelCount = fail.some((f) => /^\[umbel head\] MUTANT \(the head petal count shows with the head off\).*the head-only controls show/.test(f));
-    if (sawRunRaceme && sawRunCrowd && sawRunPast && sawMopheadRays && sawMopheadClamp && sawDepthWrites && sawDepthKeeps && sawDepthLoad && sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    /* ROUTE (as), A LAYER'S OWN RING — one flag per mutant */
+    const sawRingGrey = fail.some((f) => /^\[layer ring\] MUTANT \(the ring is never greyed\).*must be greyed/.test(f));
+    const sawRingPick = fail.some((f) => /^\[layer ring\] MUTANT \(a pick shows the whole-bloom value\).*not layer 3's derived ring/.test(f));
+    const sawRingClamp = fail.some((f) => /^\[layer ring\] MUTANT \(the clamp is never told\).*does not say asked vs built/.test(f));
+    const sawRingBack = fail.some((f) => /^\[layer ring\] MUTANT \(the derived ring is never given back\).*must be pruned/.test(f));
+    if (sawRingGrey && sawRingPick && sawRingClamp && sawRingBack && sawRunRaceme && sawRunCrowd && sawRunPast && sawMopheadRays && sawMopheadClamp && sawDepthWrites && sawDepthKeeps && sawDepthLoad && sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
         && sawTextureGrey && sawTextureLine
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-FIVE ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-SIX ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
     console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}, umbel head — the label never derived: ${sawUmbelLabel}, the petal count shown: ${sawUmbelCount}, mophead — the rays at depth 1: ${sawMopheadRays}, the clamp untold: ${sawMopheadClamp}, depth 2's defaults — never written: ${sawDepthWrites}, a set control overwritten: ${sawDepthKeeps}, a load writes: ${sawDepthLoad}, node run — live under a raceme: ${sawRunRaceme}, the crowd backwards: ${sawRunCrowd}, a start past the end untold: ${sawRunPast}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }

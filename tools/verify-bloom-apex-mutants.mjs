@@ -3634,8 +3634,9 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (!m.some((p) => p.mode === 'CURVE') && c.filter((p) => p.mode === 'CURVE').length === 16) ? null : `the mutant's modes ${soModes(m)} (the clean tree's ${soModes(c)})`; } },
   { id: 'a-scoped-outline-leaks-to-sibling-layers', why: 'a layer\'s owned outline reaches EVERY layer — the outer whorl draws the inner layer\'s curve',
-    find: "      if (e.layer !== layer) continue;\n      addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;\n      takeValues(e.values, 'layer');",
-    into: "      takeValues(e.values, 'layer'); if (e.values) any = true;\n      if (e.layer !== layer) continue;\n      addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;", names: ['OC0', 'OC5'], rows: SO_ROWS,
+    /* Re-anchored (#495 option A): scopeOffsetsFor skips a ring-only layer entry, one line between the two the mutation reorders. */
+    find: "      if (e.layer !== layer) continue;\n      if (ringOnlyEntry(e)) continue;\n      addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;\n      takeValues(e.values, 'layer');",
+    into: "      takeValues(e.values, 'layer'); if (e.values) any = true;\n      if (e.layer !== layer) continue;\n      if (ringOnlyEntry(e)) continue;\n      addScopeOffsets(sum, e.offsets || {}, `layers[${e.layer}]`); any = true;", names: ['OC0', 'OC5'], rows: SO_ROWS,
     witness: (M, C) => { const m = soPetals(M, SO_MIXED()), c = soPetals(C, SO_MIXED());
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.filter((p) => p.whorl === 0).every((p) => p.mode === 'CURVE') && c.filter((p) => p.whorl === 0).every((p) => p.mode === 'LAW')) ? null : `layer 1 reads ${soModes(m.filter((p) => p.whorl === 0))} on the mutant (the clean tree's ${soModes(c.filter((p) => p.whorl === 0))})`; } },

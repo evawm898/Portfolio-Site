@@ -2123,7 +2123,18 @@ bytes, two page sessions per sample.
 - **Every build reads 0 within-shell pairs and 0 undeclared rim profiles under the 1.0 mm floor.** The 440 declared clamps
   are the apex nib's bead, pre-existing and identical across options. Every sheet build is the export mesh.
 
-### 15.6 The trade-offs, for Eva's ruling (not picked)
+### 15.6 The trade-offs — RULED (Eva, Nov 5): option A
+
+**The rulings (Nov 5):**
+
+- **#495: option A** — a per-layer OWNED ring position control.
+- **Unit: a FRACTION of the hub ring** (R0), not millimetres.
+- **Every layer may own its ring, layer 0 included**; the default is today's derived value on every layer.
+- **W4: "the tip" is the nib, as built** (§14.9's rule stands).
+
+Shipped in §16. The table and the questions as they were asked stay below, unedited.
+
+#### The trade-offs as laid out (Nov 5, before the ruling)
 
 | | A — owned ring | B — length places | C — Layer size live | D — Layer size owns every ring |
 |---|---|---|---|---|
@@ -2135,7 +2146,7 @@ bytes, two page sessions per sample.
 | what ships | a new owned quantity: a registry control (a per-layer "Ring" visible only under Per-layer values, its displayed default the derived value), its design-file field, the scope reader, schema v5's row, Z3 / SO13 restated, a panel route | one geometry line; Z3 / SO13 restated | one registry line; the harness's Q3.5 statement and the panel routes that assert the hide | one geometry line + C's registry and harness changes; Z3 / SO13 restated |
 | route A (photo) | the ring becomes a photo-read value (ring step from the photo's front view), independent of width | rings follow the photo's lengths | no new freedom | one ring ramp, read from the front view |
 
-**Ambiguities, for Eva:**
+**Ambiguities, for Eva (the questions as asked — answered by the rulings above):**
 
 - **A's unit.** The prototype owns a FRACTION of the area rule's ring R0, not millimetres. A fraction stays proportional when
   the petal count or Spread moves R0; millimetres would read directly off a photo. It needs a ruling.
@@ -2161,3 +2172,110 @@ The photos were the six S2 photos (session-only working copies, read back: no an
 text), never committed; the committed sheet carries placeholders.
 
 ![#495 ring options](img/ring-options-495.png)
+
+
+## 16. #495 shipped — a layer's own ring (option A, Nov 5)
+
+The rulings are §15.6's. **What ships:** a `Layer ring` control under Per-layer values, and the geometry, file, page and
+gate changes it owes. Read `bloom-geometry.js`'s `LAYER_RING_RANGE` block before touching any of it.
+
+### 16.1 The model
+
+- **An owned VALUE, not an offset.** A layer entry's `values.layerRing` is a fraction of R0, the area rule's ring (the
+  ring layer 1 stands on by default). It REPLACES the derived ring outright: the ramp's `layerSize^L` or an owned
+  width's `own / Petal width`. The ring has no whole-bloom value to offset from.
+- **Every layer may own one, layer 1 included** (under 1 it sits inside the rim; past 1 it grows the hub).
+- **Absent, the ring is today's derived value, by branch.** `ringFactor` is the old expression's own double, so every
+  design saved before this builds byte-identically (§16.4).
+- **It is footRing()'s, never a petal's.** `scopeOffsetsFor` keeps it out of every petal term, and an entry owning
+  only a ring reaches no petal (it is skipped exactly as an entry that did not exist). Z2's restatement does the same.
+- **The Oct 16 hub ruling is respected.** A ring past 1 GROWS THE HUB to it; the ring sits ON the grown rim, and the
+  growth record names the layer and `by: 'ring'`. The ruling's own mechanism is kept: every other layer stays where
+  the area rule puts it.
+  - **AMBIGUITY, for Eva:** the brief says "(other layers shift outward)". An owned ring does not change any foot, so
+    the area rule's R0 does not move, and the other layers DO NOT shift. They shift only for an owned WIDTH, because a
+    width feeds the area rule. Kept as built; a shift for a ring would be a new rule.
+- **Range: PROPOSED 0.10–2.00, step 0.01** (`LAYER_RING_RANGE`, imported by the registry; the harness restates it and
+  refuses to load if it moves).
+  - It covers the lotus's 0.51 / 0.64 and every derived ring of the default ramp to six layers (0.72^5 = 0.193).
+  - The top end is a hub grown to twice the area rule's ring.
+  - Deeper layers on a small Shrink derive rings under 0.10 (0.35^3 = 0.043): the slider cannot show those, and the
+    read-out says so and quotes the derived value.
+  - **FLAGGED for Eva's ruling from the sheet.** Measured at both ends on block 85: watertight, one piece, 0
+    within-shell pairs.
+- **Clamped and told.** The geometry clamps to the range and records `{ asked, built, clamped }`. The file reader keeps
+  a ring past the range AS ASKED (a re-save writes what was asked) and tells it.
+
+### 16.2 The page
+
+- **`Layer ring`** sits in Arrangement after Per-layer values, visible only while per-layer values are live.
+- **With no layer picked it is GREYED** (the one disabled-setter loop). Its read-out says a ring is a layer's own and to
+  pick one.
+- **Picked, it shows the layer's ring:** its own, else the DERIVED one (footRing()'s `derivedRingFactor`), so nothing
+  moves until it is dragged.
+- **A drag writes the number on the layer's entry.** Set back to the derived value's step, the entry is pruned and the
+  ring returns to the derived double.
+- **Read-outs, asked vs built:**
+  - the control's own: `0.64x the hub ring = 11.13 mm — Layer 3's OWN ring`, plus `asked 2.60x, built 2.00x
+    (CLAMPED …)` or `the HUB GREW 17.39 -> 22.61 mm to fit it`;
+  - a `LAYER RINGS` line listing every owned ring (and any clamp);
+  - the existing `HUB GROWN` line naming an owned ring as the cause.
+
+### 16.3 Gates
+
+| where | what |
+|---|---|
+| Z3 (both STL gates) | every ring restated from the controls and the row's `@scopes` — an owned ring (clamped into the restated range) or the derived one; the record's `ownRing` both ways; the hub grown to the widest owned ring or width, layer 1's included; R0 undone from ring 0 by the restated fraction where layer 1 owns one |
+| J2 | ring 0 is the rim unless layer 1 owns a ring (then strictly inside, or the hub grew to it) |
+| panel route **(as)** | hidden OFF, greyed with no pick, the derived ring under a pick, a drag recorded as a number and built at R0 x it, 1.30 grows the hub (both read-outs), back at the derived value the entry pruned and the ring the derived double, a file's 2.60 builds 2.00 (asked vs built on both read-outs), deselect greys. Four mutants: never greyed, a pick showing the whole-bloom value, the clamp never told, the derived ring never given back — all fire. THIRTY-SIX routes |
+| design file F2 | a ring past the range is the one expected note, restated from the row's own record |
+| block 85 | 14 rows (1,653 → 1,667): the default, the range's ends, hub growth (and on a dome), layer 1 at 0.80 / 1.25, a SPIRAL turn, asked past the range, beside an owned width, the photo lotus at 0.64 / 0.51, two GATED records (FAN; per-layer OFF). Smoke block 85, five rows, `--conn` |
+
+Local runs on block 85:
+
+- export gate 14 / 14 watertight, X1 / X2 / O1 clean;
+- connectedness 14 / 14 one piece;
+- the whole panel gate PASS;
+- scopes gate PASS;
+- design-file gate (Node) PASS;
+- photo-subset validator `--self` PASS;
+- route (as)'s four mutants each fire their own flag;
+- the five mutants this change disarmed were re-anchored (scopes `unreached-entries-are-not-validated`,
+  `the-ring-keeps-the-ramp`, `the-ring-is-held-at-the-rim-again`, `the-hub-grows-for-the-wrong-ring`; panel (ag)'s two
+  ring mutants). The four scopes mutants were re-run: each moves its witness and reddens SO5 / SO13.
+
+`frozen/phase94` is main's 1,653 rows at `ba539e0` (`--verify-frozen` PASS). `tools/bloom-ring-options.mjs` now refuses
+on this tree by design and reproduces §15 on 40888af.
+
+### 16.4 Every existing design builds identically
+
+`tools/verify-bloom-load-unchanged.mjs --base <worktree of ba539e0> --added layerRing --per-layer`:
+
+- **46 of 46 samples identical on all five clauses** (the load record, the page state, the scopes, the save and the
+  STL bytes): S1's 26 plus the 20 per-layer designs.
+- **The must-fail `--control`** (petalCup + 0.05 on the head) moved ui, save and STL.
+
+`--added` is new. A control the head adds is a new field in every save and every read-back state, so:
+
+- every sample is loaded WITHOUT it (what a design saved before it looks like);
+- the head side is normalised by exactly that field and nothing else: the `controls.layerRing is missing` note, `fields`
+  less one, the id dropped from the state and the save;
+- each is ASSERTED to read the registry default first.
+
+`--per-layer` now skips matrix rows whose record owns a ring (block 85), since no earlier tree could hold one.
+
+**The whole-matrix surface-bytes partition was NOT run.** Its first chunk was killed by this container (exit 137), and
+it was not retried. The construction is the argument: no stored row carries a `layerRing`, and `ringFactor` is the old
+expression by branch. CI's two STL gates and Z3 run every row.
+
+### 16.5 The sheet
+
+`node tools/shot-bloom-layer-ring.mjs docs/img/layer-ring-495.png --base <worktree of ba539e0>` — the photo lotus (S5 v9),
+the daisy and the water lily (v7):
+
+- **main vs this tree at the default: 0 of 552,888 / 637,380 / 956,088 export floats differ** (`Object.is`; the run
+  fails before writing on any difference);
+- **the lotus with owned rings 0.64 / 0.51:** rings 17.39 / 16.15 / 11.13 / 8.87 mm, closed body h:w **1.161 → 1.444**
+  (photo ≈ 1.45).
+
+![#495 a layer's own ring](img/layer-ring-495.png)

@@ -487,6 +487,15 @@ const E2_TURN_XFAIL = {
     { excessDeg: 33.699198, note: 'adds 78.699198 deg at [-22.181, 13.298, -87.314]; face-to-face 83.06, outline 4.36 — the LOWEST (asked-size) lobed leaf; the untapered 46 x 34 twin reads 78.699198, the class `LOBED TEETH: max` declares' },
   'NODE RUN: LEAF TAPER 0.75 FLOORED \u2014 a 4 mm wide leaf (its width floor holds it at 75%)':
     { excessDeg: 3.599123, note: 'adds 48.599123 deg at [35.744, 0.552, -64.285]; face-to-face 49.10, outline 0.50 — the LOWEST (asked-size) 40 x 4 mm leaf; its untapered twin reads 48.599123 (the narrow-span bead class)' },
+  /* #495 OPTION A (Nov 6, Eva's ruling): block 85's photo lotus. The turn is the
+     LOTUS's, not the owned ring's: the same row with every layerRing removed
+     from its @scopes (each layer on its DERIVED ring) reads the IDENTICAL
+     65.423210 deg at the identical height (z 31.371), only rotated about the
+     axis ([-7.476, 0.617] there against [-2.890, 3.709] here) — the owned ring
+     translates the petal radially and changes nothing E2 measures. The S5 v9
+     cupped whorls' bead class; the lotus was never a matrix row before. */
+  'LAYER RING: the photo LOTUS (S5 v9) \u2014 layers 3 and 4 own rings 0.64 / 0.51 (the closed body h:w 1.161 -> 1.444)':
+    { excessDeg: 20.423210, note: 'adds 65.423210 deg at [-2.890, 3.709, 31.371]; face-to-face 66.67, outline 1.25 — the S5 v9 lotus\'s own cupped petal: the owned-ring-removed twin (derived rings) reads 65.423210 at [-7.476, 0.617, 31.371] (Nov 6)' },
 };
 
 /* THE BEAD IS NOT DRAWN ON AN INFILLED BLADE, AND THAT IS DECLARED HERE

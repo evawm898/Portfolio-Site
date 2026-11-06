@@ -33,6 +33,17 @@
    rows and their kin). A change to where a ring goes can move only those.
    `--only <regex>` runs the samples whose name matches (a foreground chunk).
 
+   `--added <id,...>` (#495, the first shipping change this tool closes): a
+   registry control the HEAD adds and the base does not have. Every sample is
+   then loaded WITHOUT that field — what every design saved before it existed
+   looks like (the samples composed here by the head's own writer would carry
+   it) — and the head side is normalised by exactly what a new field costs and
+   nothing else: its `controls.<id> is missing` note dropped and `fields` less
+   one per id in the load record, the id dropped from the page state and from
+   the save, EACH ASSERTED to read the registry's default first (an added field
+   a design moved is a finding, never normalised). Everything else — every
+   other note, every other value, the scopes, the STL's bytes — byte for byte.
+
    RUN:  node tools/verify-bloom-load-unchanged.mjs --base <worktree of the base commit> [--control] [--per-layer] [--only <regex>]
    =================================================================== */
 import fs from 'node:fs';
@@ -100,8 +111,18 @@ if (argv.includes('--per-layer')) {
   for (const row of MATRIX) {
     const sc = H.rowScopes(row);
     if (!sc || !(sc.layers || []).some((e) => ['petalLength', 'petalWidth', 'petalTilt'].some((k) => k in (e.offsets || {})))) continue;
+    /* a row whose record OWNS A RING (#495's block 85) is a design no tree before
+       that change could hold — not a saved design, so not this compare's subject */
+    if ((sc.layers || []).some((e) => e.values && 'layerRing' in e.values)) continue;
     samples.push({ name: `per-layer row: ${row.label}`, text: toText(composeDoc(stateOf(row), { savedAt: SAVED, scopes: sc })) });
   }
+}
+const ai = argv.indexOf('--added');
+const ADDED = ai >= 0 ? argv[ai + 1].split(',').filter(Boolean) : [];
+for (const id of ADDED) if (!kindOf.has(id)) { console.error(`--added ${id}: not a control on this tree`); process.exit(2); }
+if (ADDED.length) for (const s of samples) {
+  const o = JSON.parse(s.text);
+  if (o && o.controls) { for (const id of ADDED) delete o.controls[id]; s.text = JSON.stringify(o); }
 }
 const oi = argv.indexOf('--only');
 if (oi >= 0) { const re = new RegExp(argv[oi + 1]); for (let i = samples.length - 1; i >= 0; i--) if (!re.test(samples[i].name)) samples.splice(i, 1); }
@@ -120,7 +141,24 @@ async function capture(root, s, perturb) {
     await H.settleBuild(page, 120000);
     const st = await page.evaluate(() => ({ ui: window.__bloomUIState(), scopes: window.__bloomDesign.scopes(), save: window.__bloomDesign.save() }));
     const stl = await H.exportStl(page, tmp);
-    return { rec: JSON.stringify(rec), ui: JSON.stringify(st.ui), scopes: JSON.stringify(st.scopes), save: strip(st.save), stl: stl ? crypto.createHash('sha256').update(stl).digest('hex') : 'no-stl' };
+    let save = strip(st.save);
+    if (root === ROOT && ADDED.length) {
+      /* the head's normalisation (`--added`, above) — each added field must read its default */
+      for (const id of ADDED) {
+        const dflt = DEFAULTS[id];
+        if (!(id in st.ui) || String(st.ui[id]) !== String(dflt)) throw new Error(`${s.name}: the added field ${id} reads ${JSON.stringify(st.ui[id])} in the page state, not its default ${dflt}`);
+        delete st.ui[id];
+        const i = (rec.notes || []).findIndex((n) => n.kind === 'missing' && n.text.startsWith(`controls.${id} is missing`));
+        if (i < 0 && rec.action === 'loaded') throw new Error(`${s.name}: the head told no missing ${id} — the file was not the field-less design it was meant to be`);
+        if (i >= 0) rec.notes.splice(i, 1);
+        if (typeof rec.fields === 'number') rec.fields -= 1;
+        const o = JSON.parse(save);
+        if (!o.controls || String(o.controls[id]) !== String(dflt)) throw new Error(`${s.name}: the head saved ${id} = ${JSON.stringify(o.controls && o.controls[id])}, not its default ${dflt}`);
+        save = save.replace(new RegExp(`\\n\\s*"${id}": [^,\\n]*,`), '');
+        if (save.includes(`"${id}"`)) throw new Error(`${s.name}: could not drop ${id} from the head's save text`);
+      }
+    }
+    return { rec: JSON.stringify(rec), ui: JSON.stringify(st.ui), scopes: JSON.stringify(st.scopes), save, stl: stl ? crypto.createHash('sha256').update(stl).digest('hex') : 'no-stl' };
   } finally { await browser.close(); server.close(); }
 }
 let failed = false, held = 0;

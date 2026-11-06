@@ -19,7 +19,7 @@ import { buildGridGltf } from './bloom-grid-gltf.js';
 import { composeDoc, readDoc, readNewDesign, toText, isDesignFile, scopesForBuild, scopesAreEmpty, SCOPEABLE_IDS, SCOPEABLE_TIER_IDS, scopeExclusionReason, scopeOffsetRefusal, composeControls, readControls, fieldFor } from './bloom-file.js';
 import { cloneCurve, curveSamples, pointsOf, proposeEdit, quantise, nearestOnCurve, sampleCurve, curveShapeRefusal, curveSpecProblems, curveEquals, switchMode } from './bloom-curve.js';
 import { leafBladeState, leafletBladeState, leafOutlineWidthScale, leafletOutlineWidthScale, compoundLeafLayout as compoundLeafLayoutForSeed } from './bloom-geometry.js';
-import { scopeOffsetsFor, scopeSlotKey, resolvePetalTerms, resolvePetalValues, SCOPE_VALUE_IDS, SCOPE_VALUE_GROUPS, SEPAL_SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_GROUPS, seedSpineCurve, seedOutlineCurve, sepalBladeState, sepalOutlineWidthScale, scopeValueGroup, SCOPE_LAYER_OWNED, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
+import { SCOPE_LAYER_VALUE_IDS, LAYER_RING_STEP, scopeOffsetsFor, scopeSlotKey, resolvePetalTerms, resolvePetalValues, SCOPE_VALUE_IDS, SCOPE_VALUE_GROUPS, SEPAL_SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_GROUPS, seedSpineCurve, seedOutlineCurve, sepalBladeState, sepalOutlineWidthScale, scopeValueGroup, SCOPE_LAYER_OWNED, scopeLayersLive, scopePetalsLive, petalGroupCount, sepalTierState, sepalTiersEligible, sepalTierCount } from './bloom-geometry.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -862,8 +862,11 @@ function applyVisibility() {
      and nothing switches it. This is the ONLY setter of a control's disabled
      state, as the loop above is of hidden. */
   for (const c of CONTROLS) {
-    if (c.enabledWhen === undefined) continue;
-    const on = evalPredicate(c.enabledWhen, ui);
+    /* #495: a LAYER'S RING is edited only with a layer picked — greyed (never
+       hidden) otherwise, its read-out saying so; the same one setter */
+    const ringOnly = RING_IDS.has(c.id);
+    if (c.enabledWhen === undefined && !ringOnly) continue;
+    const on = (c.enabledWhen === undefined || evalPredicate(c.enabledWhen, ui)) && (!ringOnly || (!!scopeView && scopeView.kind === 'layer'));
     wrappers[c.id].classList.toggle('bl-ctrl--disabled', !on);
     inputs[c.id].disabled = !on;
   }
@@ -966,7 +969,12 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 const SCOPE_IDS = new Set([...SCOPEABLE_IDS, ...SCOPE_VALUE_IDS]);
 /* curves-sepals: a tier's owned values (the sepal twins of the outline's and
    the spine's mode and curve) are values too — written whole, never offset */
-const SCOPE_VALUE_SET = new Set([...SCOPE_VALUE_IDS, ...SEPAL_SCOPE_VALUE_IDS]);
+const SCOPE_VALUE_SET = new Set([...SCOPE_VALUE_IDS, ...SEPAL_SCOPE_VALUE_IDS, ...SCOPE_LAYER_VALUE_IDS]);
+/* #495: A PICKED LAYER ALSO OWNS ITS RING (`layerRing`, the geometry's
+   SCOPE_LAYER_VALUE_IDS) — a layer's own value, so it binds under a LAYER pick
+   only; with no layer picked the page greys it (applyVisibility) */
+const LAYER_IDS = new Set([...SCOPEABLE_IDS, ...SCOPE_VALUE_IDS, ...SCOPE_LAYER_VALUE_IDS]);
+const RING_IDS = new Set(SCOPE_LAYER_VALUE_IDS);
 /* A SEPAL TIER IS A SCOPE TOO (F1.1a, Q3.8): picking one binds the SEPAL
    controls — the tier-scopeable set the file reader owns — and the Sepals
    section edits that tier. `{ kind: 'tier', layer: k, slot: 0 }`, k 0-based. */
@@ -978,7 +986,7 @@ const TIER_IDS = new Set([...SCOPEABLE_TIER_IDS, ...SEPAL_SCOPE_VALUE_IDS]);
    option, where every androecium control edits the bundle.
    `{ kind: 'strand', layer: i, slot: 0 }`, i the stamen's 0-based index. */
 const STRAND_IDS = new Set(SCOPE_STRAND_IDS);
-const idsFor = (v) => (v && v.kind === 'tier' ? TIER_IDS : v && v.kind === 'strand' ? STRAND_IDS : SCOPE_IDS);
+const idsFor = (v) => (v && v.kind === 'tier' ? TIER_IDS : v && v.kind === 'strand' ? STRAND_IDS : v && v.kind === 'layer' ? LAYER_IDS : SCOPE_IDS);
 let scopeView = null;              // { kind: 'layer' | 'petal' | 'tier' | 'strand', layer, slot } — the picked scope; null = the whole bloom
 const scopeGlobals = new Map();    // id -> the GLOBAL value's string, while a scope is picked
 let lastShown = null;
@@ -1113,6 +1121,11 @@ function scopeEffective(v, ui) {
       if (!owns.petalWidth) eff.petalWidth = Number(ui.petalWidth) * r.scale;
       if (!owns.petalTilt) eff.petalTilt = Number(ui.petalTilt) + r.tiltExtra;
     }
+    /* #495: THE LAYER'S RING — its own where it owns one (as BUILT, after the
+       range clamp), else the DERIVED ring it stands on (footRing()'s own
+       `derivedRingFactor` on the build on screen), so the slider shows the
+       ring that is built either way and nothing moves until it is dragged */
+    if (r) eff.layerRing = r.ownRing ? r.ownRing.built : r.derivedRingFactor;
   }
   return { eff, term };
 }
@@ -1147,7 +1160,20 @@ function scopeShown(shown) {
   const key = scopeValue(scopeView);
   if (!lightOnScreen) scopeLastInfill = { key, infill: p.infill || null };
   const infill = lightOnScreen ? (scopeLastInfill && scopeLastInfill.key === key ? scopeLastInfill.infill : null) : (p.infill || null);
-  return { ...shown, buckle: (p.form && p.form.buckle) || null, lobes: p.lobes || null, fringe: p.fringe || null, infill };
+  return { ...shown, buckle: (p.form && p.form.buckle) || null, lobes: p.lobes || null, fringe: p.fringe || null, infill, pickedRing: pickedRingOf(ui) };
+}
+/* #495: THE PICKED LAYER'S RING RECORD for the Layer ring read-out — footRing()'s
+   own (`derivedRingFactor`, `ownRing`, the hub's R0 and growth), never re-derived */
+function pickedRingOf(ui) {
+  if (!scopeView || scopeView.kind !== 'layer') return null;
+  const r = (lastRings || []).find((x) => Math.round(x.lambda) === scopeView.layer);
+  if (!r || !lastHub || typeof r.derivedRingFactor !== 'number') return null;
+  const g = lastHub.growth;
+  return {
+    layer: scopeView.layer, name: `${String(ui.placement) === 'SPIRAL' ? 'Turn' : 'Layer'} ${scopeView.layer + 1}`,
+    R0: lastHub.ringR0, derived: r.derivedRingFactor, own: r.ownRing || null, ownWidth: r.ownWidth !== null && r.ownWidth !== undefined,
+    grew: g && g.layer === scopeView.layer ? g : null,
+  };
 }
 
 /* BIND / UNBIND — state and the inputs' DISPLAYED values only; no event, no
@@ -1283,6 +1309,22 @@ function commitScopeValue(id, value) {
   const ui = readUI();
   const v = scopeView;
   let own = scopeOwnEntry(v, false);
+  /* #495: A LAYER'S RING — what it inherits is the DERIVED ring (footRing()'s
+     own, on the build on screen), and a slider set to that ring's own step
+     hands the layer back to it (the entry's key is removed, so the build is the
+     derived double again, not its rounding). Stored as a NUMBER. */
+  if (RING_IDS.has(id)) {
+    const r = (lastRings || []).find((x) => Math.round(x.lambda) === v.layer);
+    const derived = r ? r.derivedRingFactor : null;
+    const val = Number(value);
+    if (derived !== null && Math.abs(val - derived) < LAYER_RING_STEP / 2) {
+      if (own && own.values && id in own.values) { delete own.values[id]; pruneScopeEntry(own, v); }
+      return;
+    }
+    own = scopeOwnEntry(v, true);
+    (own.values || (own.values = {}))[id] = val;
+    return;
+  }
   const inherited = inheritedOutlineValue(v, id, ui, own);
   if (outlineValuesSame(id, value, inherited)) {
     if (own && own.values && id in own.values) { delete own.values[id]; pruneScopeEntry(own, v); }
@@ -1429,7 +1471,14 @@ function refreshScopeNotes(ui) {
     const wrap = wrappers[c.id];
     let text = '';
     let cls = null;
-    if (scopeView && ids.has(c.id) && SCOPE_VALUE_SET.has(c.id)) {
+    if (scopeView && ids.has(c.id) && RING_IDS.has(c.id)) {
+      /* #495: THE PICKED LAYER'S RING — its own, or the derived one it stands on */
+      cls = 'scoped';
+      const r = (lastRings || []).find((x) => Math.round(x.lambda) === scopeView.layer);
+      text = r && r.ownRing
+        ? `${name}: its OWN ring — it replaces the derived ${r.derivedRingFactor.toFixed(2)}x (set the slider to ${r.derivedRingFactor.toFixed(2)} to give it back)`
+        : `${name}: the DERIVED ring, live — it follows ${r && r.ownWidth !== null && r.ownWidth !== undefined ? 'its own width' : scopeView.layer === 0 ? 'the rim' : controlLabel('layerSize')}; dragging makes it ${name}'s own`;
+    } else if (scopeView && ids.has(c.id) && SCOPE_VALUE_SET.has(c.id)) {
       /* F6-SCOPE: WHOSE OUTLINE THIS IS — the picked scope's own, or inherited
          (live) from the layer or the whole bloom; a FAN pair's partner draws it
          mirrored. */
@@ -2279,7 +2328,17 @@ function sphereLine(rings, fr, mode) {
 function hubGrowthLine(fr, mode) {
   const g = fr.hub && fr.hub.growth;
   if (!g) return '';
-  return `HUB GROWN (${mode}) ${g.fromMm.toFixed(2)} -> ${g.toMm.toFixed(2)} mm (+${g.byMm.toFixed(2)} mm, ${g.factor.toFixed(3)}x) to fit layer ${g.layer + 1}'s ring — it owns a width past Petal width, so its ring sits ON the grown rim and every other layer keeps its own place\n`;
+  return `HUB GROWN (${mode}) ${g.fromMm.toFixed(2)} -> ${g.toMm.toFixed(2)} mm (+${g.byMm.toFixed(2)} mm, ${g.factor.toFixed(3)}x) to fit layer ${g.layer + 1}'s ring — ${g.by === 'ring' ? 'it owns a ring past the rim, so it' : 'it owns a width past Petal width, so its ring'} sits ON the grown rim and every other layer keeps its own place\n`;
+}
+/* #495: THE OWNED RINGS — every layer that owns its ring, footRing()'s own
+   record: the fraction BUILT, in mm, and ASKED vs BUILT where the build
+   clamped it. Empty where no layer owns one. */
+function layerRingLine(fr, mode) {
+  const own = (fr.rings || []).filter((r) => r.ownRing);
+  if (!own.length) return '';
+  const R0 = fr.hub ? fr.hub.ringR0 : null;
+  const said = own.map((r) => `layer ${Math.round(r.lambda) + 1} ${r.ownRing.built.toFixed(2)}x = ${r.radius.toFixed(2)} mm${r.ownRing.clamped ? ` (asked ${Number(r.ownRing.asked).toFixed(2)}x, CLAMPED)` : ''} (derived ${r.derivedRingFactor.toFixed(2)}x)`);
+  return `LAYER RINGS (${mode}, own, x the hub ring ${R0 !== null ? R0.toFixed(2) : '?'} mm): ${said.join('; ')}\n`;
 }
 
 function domeLine(rings, fr, mode) {
@@ -3813,6 +3872,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + footFloorLine(rings)
        + innerRingLine(rings, fr)
        + hubGrowthLine(fr, mode)
+       + layerRingLine(fr, mode)
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + seamLine(petals)
@@ -4710,6 +4770,7 @@ window.__bloomMetrics = () => ({
   hubRadius: lastHub.radius,
   /* THE HUB'S GROWTH FOR AN OWNED RING (Oct 16) — footRing()'s record, or null. */
   hubGrowth: lastHub.growth ? { ...lastHub.growth } : null,
+  hubRingR0: lastHub.ringR0 ?? null,
   hubThickness: lastHub.thickness,
   /* THE HUB'S OWN ROOT FACTOR (big petals): the law read on the longest blade
      the hub must carry, or null — and the sheet it multiplies. */
@@ -5379,6 +5440,9 @@ window.__bloomMetrics = () => ({
        factor on R0 (past 1 the hub grows to it — `hubGrowth` below):
        footRing()'s own record, read by panel route (ag). */
     ownWidth: r.ownWidth ?? null, ringFactor: r.ringFactor ?? null,
+    /* #495: the ring the layer would take without its own, and its own ring
+       `{ asked, built, clamped }` or null — footRing()'s own */
+    derivedRingFactor: r.derivedRingFactor ?? null, ownRing: r.ownRing ? { ...r.ownRing } : null,
     /* THE CEILING TWIN of widthClamped (Eva, Sep 1). The foot's UPPER clamp
        has always been able to bind - from petalWidth 25, a quarter of that
        slider - with the blade widening and the area-ruled ring standing
