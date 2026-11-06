@@ -313,3 +313,114 @@ costs frozen tags).
   - `verify-tracker-drawer` asserted the Instagram link is `rgb(95,160,160)`.
     It now asserts petrol `rgb(47,163,163)`. Result: 427/427.
   - `verify-marble` 51/51. `verify-weave --browser` 24/24 + 14/14.
+
+## 11. Batch 5 as built
+
+frame, cage, lantern, tile and bug follow §10's pattern:
+- The page's own `:root` is re-pointed at tokens.
+- The type is Fraunces and Plex Mono.
+- Solid buttons are a deep fill with ink text.
+- `--dim-2` reads dim.
+
+**Warnings and errors.** Every text site that was amber, rust or red is now ink with `!` (a warning) or `✕` (an error or refusal):
+- frame's readout warning
+- cage's `bad` value and refused-edit status. Its "told" note is ink-2.
+- lantern and tile: section counts, warned outputs, messages and status lines. Also tile's on-canvas status line and lantern's build warnings.
+- bug: its message, readout `bad`, export error and editor status
+
+A rule that can be empty only draws its glyph `:not(:empty)`.
+
+**Flag markers** (lantern, tile) are non-text marks: a plum ring for a warning and a plum square for a failure (R1). `ok` / `info` keep a petrol disc.
+
+**Kept as artwork** (rule 9 — editor marks and exports, measured by gates):
+- tile's edge A / edge B colours. The key in the 3×3 header matches them.
+- bug's outline-editor handles and fit lines
+- lantern's on-screen CUT / SCORE / PERF lines (the exported file's machine convention)
+- the SVG-preview paper `#EDEDE8` on cage and bug. In that mode their header sits on paper in ink with a `#55554F` sub-line. That is the one place a dark-on-light text colour remains, and it is the artwork's own surface.
+
+**Gates.** No gate asserted a chrome colour. All five workflows run on this PR.
+
+## 12. Batch 6 as built
+
+**/cards and /textile-gauge-reader are the two light pages, built one way** (R2 for /cards; for /textile-gauge-reader Eva replaced R3's dark reading on Nov 5: "have the textile-gauge-reader light the same way cards is").
+- Type and the deep petrol (`--petrol`, fills and rules) come from tokens.
+- The paper neutrals are /cards' own: ground `#faf8f4`, panels `#ffffff`, lines `#ddd8ce` / `#c2bcae`, ink `#17191a`, dim `#5c6363`, faint `#8b9494`.
+- Links and eyebrows use `#177a7a`. The system petrol `#2fa3a3` is 2.9:1 on this paper, too faint for text; `#177a7a` is its paper-legible step (4.8:1).
+- Solid buttons are the deep fill with paper text.
+
+**Warnings and errors** are ink with `!` or `✕` (R1), as on the dark pages. The error box keeps a faint plum tint and border. On /textile-gauge-reader, confidence words, comparison deltas, inclusion tags and debug notes that were green, rust or red are now ink or dim; the uncertain and bad ones carry `!`.
+
+**Marks on paper.** Mint is too pale to mark anything on paper, so the "ok" marks on /textile-gauge-reader (the online dot, the included-area tag border) are the deep petrol, and the "bad" marks are plum in a different shape (a ring, a dashed border). Colour is never the only cue.
+
+**Kept as artwork:** the card faces and their font list on /cards; on /textile-gauge-reader the overlays drawn on the fabric photo (and the course-line key swatch that matches them) and the zoom / grid-box controls that float on the black photo area, which stay dark glass in the system's dark tokens. The calibration and grid-box popups are paper panels.
+
+**Gates.** /cards: `verify-cards-fonts` and `verify-cards-svg-glyphs` run by hand (no workflow covers cards). /textile-gauge-reader's workflow fires only on `textile-gauge-reader/**`, so no CI runs on this PR's CSS; no gate asserts a chrome colour.
+
+## 13. Batch 7 as built
+
+flower's chrome already read the legacy names, which batch 1 aliased onto tokens, and `flower.html` already links `tokens.css`. What was left was `flower.css`'s hard-coded values:
+- The translucent panel, modal and button fills (`rgba(12,14,14,…)`, `rgba(28,107,107,…)`, `rgba(47,163,163,…)`, `rgba(6,7,7,…)`) are `color-mix` over the raised, deep, petrol and ground tokens at the same opacities.
+- The slider thumb's ring and the preset thumbnail's ground are tokens (same values).
+
+**Off-palette text, R1:**
+- The print-fit badge's warning text was amber; it is ink. The text already carries its own `! `. The warning dot is a plum ring.
+- The save modal's error was coral; it is ink with `✕`, drawn `:not(:empty)`.
+- The dev-only draft-preset note was amber; it is dim with a `✎` before it.
+
+**Kept as artwork:** the three.js view and the preset thumbnails.
+
+**Gates.** No flower workflow names `flower.css`, so CI runs nothing on this PR. The CSS cannot reach geometry, the export, the visibility predicates or the registry. `verify-registry-sync` and `verify-tier-visibility` were run by hand and pass.
+
+## 14. Batch 8 as built
+
+bloom keeps its own `--bl-*` names (bloom.css stands alone from styles.css by design), re-pointed at tokens; `bloom.html` links `tokens.css` first.
+
+**Ground and accent:**
+- The green-black ground `#0c0f0e` and mint-green accent `#8fd6b8` are retired.
+- The page, the panels and the three.js scene background are the system ground. The scene background is `0x060707` in `bloom.js`, as print's was in batch 3.
+- The accent (links, slider fills, section hovers, the cap hatch, the scope bar, curve handles) is petrol.
+- Ink, dim and line are the tokens; the translucent fills are `color-mix` over raised and ink.
+
+**R1:**
+- The readout's and design status's error lines (`.bl-err`) were pink. They are ink with `✕`.
+- A refused curve edit's reason was pink. It is ink with `✕`.
+- The refused handle is a dashed plum ring on the ground: a non-text mark, and dashed so colour is not the only cue.
+
+**Kept as artwork:** the bloom itself (its material and lights) and the grid `.glb`.
+
+**Gates.** No gate asserts a chrome colour. The status lines are read by `textContent`, which a `::before` glyph does not reach. `bloom.html`, `bloom.css` and `bloom.js` are in the filters of the three bloom workflows (panel, connectedness and export-watertight), so all three run on this PR, the last two for hours. The panel gate was also run locally.
+
+## 15. Batch 9 as built
+
+The remaining one-offs: plot, scene (per R5), shape-editor and bloom-texture-lab. Each links `tokens.css` and takes the type from it.
+
+**/plot.**
+- The panel greys are tokens: `#c8d2d1` is ink-2, `#96a2a1` dim, `#6b7776` faint, `#2b3333` / `#222a2a` line, `#0a0e0e` raised.
+- The page text is ink, and the translucent panels are `color-mix` over the ground.
+- The accent stays seafoam, which is already the system's own. The selected petal is drawn in that same teal on the canvas, so the panel's word for it has to match.
+- Warnings were amber and errors coral; both are ink, with `!` or `✕`.
+- Kept as artwork:
+  - the viewport ground `#000`, which the additive-ink calibration rests on
+  - the drawing, its handles and its highlight
+  - the exported files
+
+**/scene (R5).**
+- The nav is on tokens:
+  - text is dim, rising to ink on hover
+  - hairlines are line-strong
+  - the active scene's edge is petrol
+  - the fill is a `color-mix` of the ground
+  - a disabled slot is ink at 16%
+- The scene ground `#08090b` and its line ink stay. They are the scenes.
+
+**shape-editor (hidden).**
+- `:root` is re-pointed, and the title is Fraunces.
+- The primary button is a deep fill with ink text.
+- Status text is ink. Every warning carries `⚠`; the three that lacked one now have it. An uncalibrated backdrop reads `!`.
+- The five marking-layer colours and the back curve were amber, red, violet and sky, on the canvas and in the panel. They are now marks in petrol, plum, indigo, mint and seafoam. A layer button shows its colour as its border, and its word stays ink. The front/back legend is ink with a coloured rule before each word.
+
+**bloom-texture-lab (hidden prototype).**
+- Fonts and the tokens link are added.
+- The chrome is on tokens, and the scene background is the system ground.
+
+**Gates.** `verify-plot` and `verify-scene` were run by hand; no workflow names these pages. `verify-shape-editor-impact` reads only the shape-editor's maths, not its colours.

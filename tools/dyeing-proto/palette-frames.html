@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex">
+<title>Dye palette frames</title>
+<style>
+  :root { --black: #060707; --ink: #e9ecec; --ink-dim: #a7afaf; }
+  body { margin: 0; padding: 28px; background: var(--black); color: var(--ink); font: 12px/1.5 "IBM Plex Mono", monospace; }
+  h1 { font-weight: 400; font-size: 15px; margin: 0 0 4px; }
+  .note { color: var(--ink-dim); margin: 0 0 22px; max-width: 1360px; }
+  .row { display: grid; grid-template-columns: 150px 519px 519px 328px; gap: 20px; align-items: start; margin-bottom: 26px; }
+  .row .lab { color: var(--ink-dim); padding-top: 4px; }
+  .sw svg { display: block; width: 519px; height: 357px; }
+  .tiles { display: grid; gap: 12px; }
+  .tiles svg { display: block; width: 328px; height: 123px; }
+  .cap { color: var(--ink-dim); font-size: 11px; margin-top: 4px; }
+  .hd { display: grid; grid-template-columns: 150px 519px 519px 328px; gap: 20px; color: var(--ink-dim); margin-bottom: 8px; }
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <filter id="Protan" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.152286 1.052583 -0.204868 0 0  0.114503 0.786281 0.099216 0 0  -0.003882 -0.048116 1.051998 0 0  0 0 0 1 0"/></filter>
+  <filter id="Deutan" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="0.367322 0.860646 -0.227968 0 0  0.280085 0.672501 0.047413 0 0  -0.011820 0.042940 0.968881 0 0  0 0 0 1 0"/></filter>
+  <filter id="Tritan" color-interpolation-filters="linearRGB"><feColorMatrix type="matrix" values="1.255528 -0.076749 -0.178779 0 0  -0.078411 0.930809 0.147602 0 0  0.004733 0.691367 0.303900 0 0  0 0 0 1 0"/></filter>
+</defs></svg>
+<div id="out"></div>
+<script type="module">
+  import { dyedWeave, dyeTile } from '../../textile-dyeing-draw.js';
+  import { DRAW } from '../../textile-basics.js';
+  const OPTIONS = {
+    1: { name: 'Option 1 · Amber / Violet', c: ['#E3A44A', '#A98CE6'] },
+    2: { name: 'Option 2 · Amber / Violet / Brick', c: ['#E3A44A', '#A98CE6', '#C9604E'] },
+    3: { name: 'Option 3 · Vermilion / Periwinkle', c: ['#D97757', '#B8A6F0'] },
+  };
+  const id = new URLSearchParams(location.search).get('o') || '2', O = OPTIONS[id];
+  const [cD, cA] = O.c, cR = O.c[2] || O.c[0];
+  const svg = (vb, inner, f) => `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg"${f ? ` style="filter:url(#${f})"` : ''}><rect x="-50" y="-50" width="500" height="400" fill="#060707"/>${inner}</svg>`;
+  const cross = dyedWeave({ warp: { kind: 'filament', color: cD }, weft: { kind: 'textured', color: cA } });
+  const reserve = dyedWeave({ warp: { kind: 'filament', color: cD }, weft: { kind: 'textured', color: DRAW.INK } });
+  const tiles = [['disperse', 'filament', cD, 'disperse dye on polyester'], ['acid', 'textured', cA, 'acid dye on nylon'], ['reactive', 'staple', cR, 'reactive dye on cotton' + (O.c[2] ? '' : ' (repeats the first colour)')]]
+    .map(([cls, kind, c, cap]) => ({ m: dyeTile(cls, kind, c), cap }));
+  let h = `<h1>${O.name} &nbsp; ${O.c.join(' · ')}</h1><p class="note">Drawn with DRAW at the page's own cell sizes (519 px swatch, 328 px strip at a 1280 viewport), on the page's real ground (#060707), fibres at the opacities the page draws them. Cross-dyed: polyester filament warp (smooth filaments) + textured nylon weft (crimped filaments) from one bath. Reserve: the nylon left undyed. Colour-vision rows are Machado 2009 at full severity, applied in linear RGB.</p>`;
+  h += `<div class="hd"><span></span><span>Cross-dyed: two fibres, two dyes, one bath</span><span>Reserve: the nylon stays undyed</span><span>One tile per dye class</span></div>`;
+  for (const f of [null, 'Protan', 'Deutan', 'Tritan']) {
+    h += `<div class="row"><div class="lab">${f || 'Normal vision'}</div><div class="sw">${svg('0 0 320 220', cross, f)}</div><div class="sw">${svg('0 0 320 220', reserve, f)}</div><div class="tiles">${tiles.map(t => `<div>${svg('0 50 320 120', t.m, f)}${f ? '' : `<div class="cap">${t.cap}</div>`}</div>`).join('')}</div></div>`;
+  }
+  document.getElementById('out').innerHTML = h;
+  window.__done = true;
+</script>
+</body></html>

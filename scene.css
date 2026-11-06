@@ -9,6 +9,11 @@
  * THE PAGE IS A TAKEOVER. No document scroll, no chrome but the nav, and the
  * stage is the viewport. `overscroll-behavior: none` stops a trackpad from
  * rubber-banding or arming a back-swipe over a scene that has taken the wheel.
+ *
+ * DESIGN SYSTEM (ruling R5, batch 9): the type and the nav are on tokens.css;
+ * the scene GROUND and its line INK stay this section's own (they are the
+ * scenes, artwork). The nav keeps its hairline boxes, in the system's dim,
+ * line and ink; the active scene's edge is petrol.
  */
 
 :root {
@@ -16,7 +21,10 @@
   --scene-ink: #e2e8ee;
   --scene-ink-dim: rgba(226, 232, 238, 0.52);
   --scene-line: rgba(226, 232, 238, 0.22);
-  --scene-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --scene-mono: var(--type-mono);
+  --scene-nav-text: var(--color-dim);
+  --scene-nav-line: var(--color-line-strong);
+  --scene-nav-bg: color-mix(in srgb, var(--color-ground) 55%, transparent);
   color-scheme: dark;
 }
 
@@ -76,9 +84,9 @@ html, body {
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--scene-ink-dim);
-  background: rgba(8, 9, 11, 0.55);
-  border: 1px solid var(--scene-line);
+  color: var(--scene-nav-text);
+  background: var(--scene-nav-bg);
+  border: 1px solid var(--scene-nav-line);
   border-radius: 2px;
   text-decoration: none;
   cursor: pointer;
@@ -106,25 +114,25 @@ html, body {
 .scene-nav__return:focus-visible,
 .scene-nav__btn:not(:disabled):hover,
 .scene-nav__btn:not(:disabled):focus-visible {
-  color: var(--scene-ink);
-  border-color: rgba(226, 232, 238, 0.55);
-  background: rgba(8, 9, 11, 0.8);
+  color: var(--color-ink);
+  border-color: var(--color-dim);
+  background: color-mix(in srgb, var(--color-ground) 80%, transparent);
   outline: none;
 }
 
 /* The active scene is marked by a solid edge rather than a fill — the section
    is line art, and a filled chip would be the only solid shape on the page. */
 .scene-nav__btn.is-active {
-  color: var(--scene-ink);
-  border-color: var(--scene-ink);
+  color: var(--color-ink);
+  border-color: var(--color-petrol);
 }
 
 /* AN UNBUILT SLOT IS SHOWN, NOT HIDDEN. The shell holds eight; a row that grew
    a button at a time would never say how far along the section is. */
 .scene-nav__btn:disabled {
-  color: rgba(226, 232, 238, 0.16);
-  border-color: rgba(226, 232, 238, 0.09);
-  background: rgba(8, 9, 11, 0.35);
+  color: color-mix(in srgb, var(--color-ink) 16%, transparent);
+  border-color: var(--color-line);
+  background: color-mix(in srgb, var(--color-ground) 35%, transparent);
   cursor: default;
 }
 

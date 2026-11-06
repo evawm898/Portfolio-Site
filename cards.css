@@ -6,6 +6,12 @@
    instead of black. Deliberately its own stylesheet (not an import of
    styles.css) so this page can depart from the dark system cleanly,
    the same way bloom.css stands alone from styles.css.
+
+   The site's ONE light page (DESIGN.md, Eva's ruling R2, Nov 5). Type and
+   the deep petrol come from tokens.css; the paper neutrals are this page's
+   own. --petrol-bright stays #177a7a here: the system's petrol (#2fa3a3) is
+   2.9:1 on this paper, too faint for text, and #177a7a is its paper-legible
+   step (4.8:1).
 --------------------------------------------------- */
 
 :root {
@@ -16,11 +22,11 @@
   --ink:          #17191a;
   --ink-dim:      #5c6363;
   --ink-faint:    #8b9494;
-  --petrol:       #1c6b6b;
+  --petrol:       var(--color-deep);
   --petrol-bright:#177a7a;
 
-  --serif: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-  --mono:  "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  --serif: var(--type-serif);
+  --mono:  var(--type-mono);
   --cd-serif: var(--serif);
   --cd-mono: var(--mono);
 }
@@ -555,7 +561,8 @@ details:not([open]) > summary.cd-panel__label { margin-bottom: 0; }
   min-height: 1.4em;
 }
 
-.cd-font-status--error { color: #a3372f; }
+.cd-font-status--error { color: var(--ink); }
+.cd-font-status--error:not(:empty)::before { content: '\2715\00a0'; }
 
 /* Export buttons */
 
