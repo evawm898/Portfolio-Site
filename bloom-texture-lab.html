@@ -18,27 +18,33 @@
   }
 }
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
 <style>
-  :root { --ink: #e8e6e1; --dim: #8b8a86; --bg: #0b0b0d; --panel: #141417; --line: #2a2a30; --accent: #6fb7ae; }
+  /* design system (batch 9): chrome on tokens.css; the renders are artwork */
+  :root { --ink: var(--color-ink); --dim: var(--color-dim); --bg: var(--color-ground); --panel: var(--color-raised);
+          --line: var(--color-line); --accent: var(--color-petrol); --field: color-mix(in srgb, var(--color-raised) 92%, var(--color-ink)); }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 13px/1.4 var(--type-mono); }
   #wrap { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
   #side { background: var(--panel); border-right: 1px solid var(--line); padding: 12px 14px; overflow: auto; }
-  #side h1 { font-size: 14px; margin: 0 0 4px; }
+  #side h1 { font-family: var(--type-serif); font-weight: 500; font-size: 17px; margin: 0 0 4px; }
   #side p.note { color: var(--dim); margin: 0 0 12px; font-size: 11px; }
   label { display: block; margin: 8px 0 2px; color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
   select, input[type=range] { width: 100%; }
-  select { background: #1d1d22; color: var(--ink); border: 1px solid var(--line); padding: 4px; }
+  select { background: var(--field); color: var(--ink); border: 1px solid var(--line); padding: 4px; }
   .row { display: flex; gap: 6px; align-items: center; }
   .row span.v { min-width: 56px; text-align: right; color: var(--ink); }
   .chk { display: flex; gap: 6px; align-items: center; margin: 3px 0; color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 12px; }
-  button { background: #1d1d22; color: var(--ink); border: 1px solid var(--line); padding: 5px 8px; cursor: pointer; margin: 2px 2px 2px 0; }
+  button { background: var(--field); color: var(--ink); border: 1px solid var(--line); padding: 5px 8px; cursor: pointer; margin: 2px 2px 2px 0; }
   button:hover { border-color: var(--accent); }
   fieldset { border: 1px solid var(--line); margin: 10px 0; padding: 6px 8px; }
   legend { color: var(--accent); font-size: 11px; }
   #view { position: relative; }
   #view canvas { display: block; width: 100%; height: 100%; }
-  .tag { position: absolute; top: 8px; padding: 3px 8px; background: rgba(0,0,0,.55); border: 1px solid var(--line); font-size: 12px; pointer-events: none; }
+  .tag { position: absolute; top: 8px; padding: 3px 8px; background: color-mix(in srgb, var(--color-ground) 55%, transparent); border: 1px solid var(--line); font-size: 12px; pointer-events: none; }
   #tagA { left: 8px; } #tagB { left: calc(50% + 8px); }
   #status { position: absolute; bottom: 8px; left: 8px; right: 8px; color: var(--dim); font-size: 11px; pointer-events: none; white-space: pre-wrap; }
   #readout { white-space: pre-wrap; font-size: 11px; color: var(--ink); margin-top: 8px; }

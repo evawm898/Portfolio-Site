@@ -260,7 +260,7 @@ function drawBackdrop(ctx, canvas, img, calib, yOf, xOf) {
     ctx.drawImage(img, Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
     ctx.globalAlpha = 1;
     drawLandmarkDot(ctx, calib.waistPx, calib, yOf, xOf, "#2fa3a3", "waist");
-    drawLandmarkDot(ctx, calib.hemPx, calib, yOf, xOf, "#d98a35", "hem");
+    drawLandmarkDot(ctx, calib.hemPx, calib, yOf, xOf, "#a98cc8", "hem");
     if (calib.hRef) {
       drawLandmarkDot(ctx, calib.hRef.leftPx, calib, yOf, xOf, "#e9ecec", "L");
       drawLandmarkDot(ctx, calib.hRef.rightPx, calib, yOf, xOf, "#e9ecec", "R");
@@ -269,7 +269,7 @@ function drawBackdrop(ctx, canvas, img, calib, yOf, xOf) {
   ctx.restore();
 }
 function drawLandmarks(ctx, canvas, yOf) {
-  ctx.strokeStyle = "#d98a35"; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+  ctx.strokeStyle = "#a98cc8"; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
   for (const v of [0, 181]) {
     if (v < V_LO || v > V_HI) continue;
     const y = yOf(v);
@@ -289,7 +289,7 @@ function defFitOf(table) {
   };
 }
 
-const MARK_LAYER_COLORS = { neckline: "#d98a35", hemline: "#e05545", waist: "#8a63d9", armhole: "#4fb0e0" };
+const MARK_LAYER_COLORS = { neckline: "#a98cc8", hemline: "#7880d8", waist: "#b3dbb4", armhole: "#6fb7ae" };
 const MARK_LAYER_NAMES = Object.keys(MARK_LAYER_COLORS);
 
 // ---------------------------------------------------------------- a(v): mirrored single curve
@@ -478,8 +478,8 @@ class DualCurvePane {
     this._drawCurve(defFit, 1, "#4a5252", true);
     this._drawCurve(defFit, -1, "#4a5252", true);
     if (this.front.length >= 2) this._drawCurve(this.fitFront(), 1, "#2fa3a3", false);
-    if (this.back.length >= 2) this._drawCurve(this.fitBack(), -1, "#d98a35", false);
-    for (const [pts, side, color] of [[this.front, 1, "#2fa3a3"], [this.back, -1, "#d98a35"]]) {
+    if (this.back.length >= 2) this._drawCurve(this.fitBack(), -1, "#a98cc8", false);
+    for (const [pts, side, color] of [[this.front, 1, "#2fa3a3"], [this.back, -1, "#a98cc8"]]) {
       for (const p of pts) {
         ctx.beginPath();
         ctx.arc(this.xOf(p.y, side), this.yOf(p.v), this.dragPoint === p ? 5 : 3, 0, Math.PI * 2);
@@ -869,7 +869,7 @@ function updateShellStatusPill() {
     text = `working from ${shapeSource === "shape.yaml" ? "committed shape.yaml" : "the generator seed"} — not saved to the library yet`;
     dotClass = ""; btnEnabled = true; btnText = "Save";
   } else if (currentShell.dirty) {
-    text = `<b>${currentShell.name}</b> — <span class="warn">unsaved changes</span>`;
+    text = `<b>${currentShell.name}</b> — <span class="warn">⚠ unsaved changes</span>`;
     dotClass = "dirty"; btnEnabled = true; btnText = "Save";
   } else {
     text = `<b>${currentShell.name}</b> — <span class="ok">saved</span>`;
@@ -993,7 +993,7 @@ function setupCalibration(pane, refKey, suffix, hasHRef) {
       const hvDelta = 100 * (calib.mmPerPxH - calib.mmPerPxV) / calib.mmPerPxV;
       const verdict = Math.abs(hvDelta) < 3
         ? '<span class="ok">within noise</span>'
-        : '<span class="warn">large divergence — the image may be stretched/cropped non-uniformly</span>';
+        : '<span class="warn">⚠ large divergence — the image may be stretched/cropped non-uniformly</span>';
       hrefLine = ` · horizontal: independent ref (${calib.hRef.mm.toFixed(1)}mm) → ` +
         `<b>${calib.mmPerPxH.toFixed(3)}</b> mm/px · vs vertical: ` +
         `<b>${hvDelta > 0 ? "+" : ""}${hvDelta.toFixed(1)}%</b> — ${verdict}`;
@@ -1263,7 +1263,7 @@ function fmtMono(r, label) {
   const ok = r.non_increasing_waist_to_neckline;
   return `<b>${label}</b> — a(v) monotone waist→neckline: ` +
     (ok ? '<span class="ok">yes</span>'
-        : `<span class="warn">no</span> — worst +${r.worst_positive_slope_mm_per_mm.toFixed(3)} mm/mm ` +
+        : `<span class="warn">⚠ no</span> — worst +${r.worst_positive_slope_mm_per_mm.toFixed(3)} mm/mm ` +
           `at v≈${r.worst_at_v.toFixed(0)}`);
 }
 function fmtCircTable(rows, label) {

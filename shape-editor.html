@@ -7,12 +7,24 @@
 <meta name="description" content="Browser-only dress-shell workflow: upload calibrated photos, shape the shell live, and build a library of shells and the layouts placed on them — no server.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
 <style>
   :root {
-    --bg: #0c0e0e; --panel: #141717; --panel2: #191d1d; --line: #262b2b; --ink: #e9ecec;
-    --dim: #8b9494; --petrol: #2fa3a3; --amber: #d98a35; --red: #e05545;
-    --violet: #8a63d9; --sky: #4fb0e0;
-    --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    /* DESIGN SYSTEM (batch 9): chrome on tokens.css. Text is ink, ink-2, dim
+       or petrol; a warning or error is ink with a glyph (R1). The four mark
+       colours (the marking layers, the back curve, the hem landmark, the
+       banner and warning borders) are the companions and seafoam — marks,
+       never text; shape-editor-app.js draws the canvas in the same four. */
+    --bg: var(--color-ground); --panel: var(--color-raised);
+    --panel2: color-mix(in srgb, var(--color-raised) 94%, var(--color-ink)); --line: var(--color-line);
+    --ink: var(--color-ink); --ink2: var(--color-ink-2); --dim: var(--color-dim); --petrol: var(--color-petrol);
+    --deep: var(--color-deep);
+    --amber: var(--color-plum); --red: var(--color-plum);
+    --violet: var(--color-mint); --sky: var(--color-seafoam); --indigo: var(--color-indigo);
+    --mono: var(--type-mono); --serif: var(--type-serif);
     --sp1: 4px; --sp2: 8px; --sp3: 12px; --sp4: 16px;
   }
   * { box-sizing: border-box; margin: 0; }
@@ -23,7 +35,7 @@
   #curvePane { width: 720px; flex: none; border-right: 1px solid var(--line);
                overflow-y: auto; }
   #view { flex: 1; position: relative; min-width: 0; }
-  h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.02em;
+  h1 { font-family: var(--serif); font-size: 17px; font-weight: 500; letter-spacing: 0.01em;
        color: var(--ink); padding: var(--sp3) var(--sp3) 2px; }
   h2 { font-size: 10.5px; font-weight: 600; color: var(--petrol); margin: var(--sp3) var(--sp3) var(--sp1);
        text-transform: uppercase; letter-spacing: 0.09em; }
@@ -34,7 +46,7 @@
   canvas.curve { display: block; margin: 0 auto; }
   .kv { color: var(--dim); padding: 0 var(--sp3); line-height: 1.7; }
   .kv b { color: var(--ink); font-weight: 600; }
-  .ok { color: var(--petrol); } .warn { color: var(--amber); } .err { color: var(--red); }
+  .ok { color: var(--petrol); } .warn { color: var(--ink); } .err { color: var(--ink); }
   .stageIntro { padding: 2px var(--sp3) var(--sp2); color: var(--dim); font-size: 11px; }
   details.explain { margin: 2px var(--sp3) var(--sp2); font-size: 10px; color: var(--dim); }
   details.explain summary { cursor: pointer; color: var(--petrol); list-style: none; user-select: none; }
@@ -51,9 +63,9 @@
            font: inherit; padding: 3px 8px; cursor: pointer; border-radius: 2px; }
   button:hover { border-color: var(--petrol); }
   button.active { border-color: var(--petrol); color: var(--petrol); }
-  .primaryBtn { background: var(--petrol); border-color: var(--petrol); color: #0c0e0e;
-                font-weight: 700; padding: 8px 16px; font-size: 12px; }
-  .primaryBtn:hover { background: color-mix(in srgb, var(--petrol) 85%, white); }
+  .primaryBtn { background: var(--deep); border-color: var(--deep); color: var(--ink);
+                font-weight: 500; padding: 8px 16px; font-size: 12px; }
+  .primaryBtn:hover { border-color: var(--petrol); }
   .primaryBtn:disabled { opacity: 0.4; cursor: default; background: var(--line); border-color: var(--line); color: var(--dim); }
   .primaryBtn { transition: transform 0.15s ease, box-shadow 0.15s ease; }
   .primaryBtn.pulsed { transform: scale(1.05);
@@ -88,8 +100,9 @@
   #exportOverrideRow { display: none; color: var(--dim); gap: 6px; }
   .calibBlock { padding: 2px var(--sp3) var(--sp2); }
   .calibStatus { font-size: 10px; line-height: 1.6; }
-  .calibStatus.uncal { color: var(--red); }
-  .calibStatus.pending { color: var(--amber); }
+  .calibStatus.uncal { color: var(--ink); }
+  .calibStatus.uncal::before { content: '! '; }
+  .calibStatus.pending { color: var(--ink2); }
   .calibStatus.cal { color: var(--petrol); }
   .calibDiag { font-size: 10px; color: var(--dim); line-height: 1.6; margin-top: 4px;
                padding: 4px 6px; border: 1px solid var(--line); border-radius: 3px; }
@@ -119,11 +132,17 @@
   .viewGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
   .viewSlot { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
   .layerRow button { padding: 2px 8px; font-size: 10px; }
-  .layerRow button[data-layer="silhouette"].active { border-color: var(--petrol); color: var(--petrol); }
-  .layerRow button[data-layer="neckline"].active { border-color: var(--amber); color: var(--amber); }
-  .layerRow button[data-layer="hemline"].active { border-color: var(--red); color: var(--red); }
-  .layerRow button[data-layer="waist"].active { border-color: var(--violet); color: var(--violet); }
-  .layerRow button[data-layer="armhole"].active { border-color: var(--sky); color: var(--sky); }
+  /* a marking layer's button carries its canvas colour as a MARK (border and
+     swatch); the word stays ink — companions are never text */
+  .layerRow button[data-layer].active { color: var(--ink); border-width: 2px; padding: 1px 7px; }
+  .layerRow button[data-layer="silhouette"].active { border-color: var(--petrol); }
+  .layerRow button[data-layer="neckline"].active { border-color: var(--color-plum); }
+  .layerRow button[data-layer="hemline"].active { border-color: var(--indigo); }
+  .layerRow button[data-layer="waist"].active { border-color: var(--color-mint); }
+  .layerRow button[data-layer="armhole"].active { border-color: var(--sky); }
+  .key::before { content: ""; display: inline-block; width: 10px; height: 2px; margin-right: 4px; vertical-align: 3px; }
+  .key--front::before { background: var(--petrol); }
+  .key--back::before { background: var(--color-plum); }
   .fileRow input[type="file"] { color: var(--dim); font: inherit; font-size: 10px; max-width: 190px; }
   .checklist { padding: 2px var(--sp3) var(--sp2); line-height: 1.9; }
   .checklist .done { color: var(--petrol); }
@@ -149,13 +168,13 @@
   .libMeta { color: var(--dim); font-size: 10px; }
   .libActions { display: flex; gap: 4px; flex-wrap: wrap; }
   .libActions button { padding: 2px 6px; font-size: 10px; }
-  .libWarn { color: var(--amber); font-size: 10px; margin-top: 2px; line-height: 1.5; }
+  .libWarn { color: var(--ink); font-size: 10px; margin-top: 2px; line-height: 1.5; }
   .layoutRow { padding: var(--sp2) var(--sp3); border-bottom: 1px solid var(--line); }
   .layoutRow .name { color: var(--ink); font-weight: 600; }
   .layoutRow .meta { color: var(--dim); font-size: 10px; }
 
   /* -- backward-navigation / prompt modal --------------------------------- */
-  #navModal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 50;
+  #navModal { position: fixed; inset: 0; background: color-mix(in srgb, var(--color-ground) 70%, transparent); z-index: 50;
               display: none; align-items: center; justify-content: center; }
   #navModal.open { display: flex; }
   .modalBox { background: var(--panel); border: 1px solid var(--red); border-radius: 4px;
@@ -282,8 +301,8 @@
       </div>
       <div class="legend">
         a(v): committed (dashed) · edited (solid) · mirrored, ONE shared value both sides.<br>
-        b(v): <span style="color:#2fa3a3">front (right = CF)</span> ·
-        <span style="color:#d98a35">back (left = CB)</span> · each independently draggable.
+        b(v): <span class="key key--front">front (right = CF)</span> ·
+        <span class="key key--back">back (left = CB)</span> · each independently draggable.
       </div>
 
       <div class="row layerRow">

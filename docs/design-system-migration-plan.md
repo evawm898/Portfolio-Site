@@ -389,3 +389,38 @@ bloom keeps its own `--bl-*` names (bloom.css stands alone from styles.css by de
 **Kept as artwork:** the bloom itself (its material and lights) and the grid `.glb`.
 
 **Gates.** No gate asserts a chrome colour. The status lines are read by `textContent`, which a `::before` glyph does not reach. `bloom.html`, `bloom.css` and `bloom.js` are in the filters of the three bloom workflows (panel, connectedness and export-watertight), so all three run on this PR, the last two for hours. The panel gate was also run locally.
+
+## 15. Batch 9 as built
+
+The remaining one-offs: plot, scene (per R5), shape-editor and bloom-texture-lab. Each links `tokens.css` and takes the type from it.
+
+**/plot.**
+- The panel greys are tokens: `#c8d2d1` is ink-2, `#96a2a1` dim, `#6b7776` faint, `#2b3333` / `#222a2a` line, `#0a0e0e` raised.
+- The page text is ink, and the translucent panels are `color-mix` over the ground.
+- The accent stays seafoam, which is already the system's own. The selected petal is drawn in that same teal on the canvas, so the panel's word for it has to match.
+- Warnings were amber and errors coral; both are ink, with `!` or `✕`.
+- Kept as artwork:
+  - the viewport ground `#000`, which the additive-ink calibration rests on
+  - the drawing, its handles and its highlight
+  - the exported files
+
+**/scene (R5).**
+- The nav is on tokens:
+  - text is dim, rising to ink on hover
+  - hairlines are line-strong
+  - the active scene's edge is petrol
+  - the fill is a `color-mix` of the ground
+  - a disabled slot is ink at 16%
+- The scene ground `#08090b` and its line ink stay. They are the scenes.
+
+**shape-editor (hidden).**
+- `:root` is re-pointed, and the title is Fraunces.
+- The primary button is a deep fill with ink text.
+- Status text is ink. Every warning carries `⚠`; the three that lacked one now have it. An uncalibrated backdrop reads `!`.
+- The five marking-layer colours and the back curve were amber, red, violet and sky, on the canvas and in the panel. They are now marks in petrol, plum, indigo, mint and seafoam. A layer button shows its colour as its border, and its word stays ink. The front/back legend is ink with a coloured rule before each word.
+
+**bloom-texture-lab (hidden prototype).**
+- Fonts and the tokens link are added.
+- The chrome is on tokens, and the scene background is the system ground.
+
+**Gates.** `verify-plot` and `verify-scene` were run by hand; no workflow names these pages. `verify-shape-editor-impact` reads only the shape-editor's maths, not its colours.
