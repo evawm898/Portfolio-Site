@@ -141,8 +141,10 @@ concurrency:
 # tools/bloom-export-shards.mjs's header). One job ran 342 minutes on b4088e3
 # (run 36324870437: 26 min of Node preflight, 315 min of matrix) against
 # GitHub's 360-minute job limit, with no instrument able to tell SLOW from
-# HUNG. So there are three jobs:
-#   preflight  — every Node-only instrument, unchanged, in order;
+# HUNG. So the jobs are:
+#   preflight  — every Node-only instrument, in THREE PARALLEL PARTS
+#                (preflight-wall / preflight-node / preflight-render) and an
+#                aggregator that keeps the name `preflight` (see below);
 #   shard      — the matrix split EIGHT ways by `shardOf(index, n)`, each shard
 #                writing a census of what it attempted, reached and refused;
 #   verdict    — reconciles every census against its OWN buildMatrix() (every
@@ -154,30 +156,42 @@ concurrency:
 # EVERY JOB HAS AN EXPLICIT TIMEOUT, well under GitHub's 360, so a hang is
 # DECLARED by the timeout and shows up in the verdict as a shard with no
 # census. The preflight runs in PARALLEL with the shards: a red preflight is
-# still red within its own run (~50-60 minutes by Oct 6), and serialising it would add that to
+# still red within its own run, and serialising it would add its length to
 # every green run's wall time.
+#
+# WHY THE PREFLIGHT IS THREE JOBS (Nov 6). It was ONE job of ~26 Node-only
+# steps run back to back, and it grew past its own budget without any single
+# step getting slow. Measured from the step timestamps of three runs:
+#   main dfb1d13 (green)         79.8 min — 10 min under the 90-minute timeout
+#   main b6b0da7 (Nov 4)         CANCELLED at 90:00 inside the DB control
+#   PR  1fe7d40 (design batch 8) CANCELLED at 90:00 inside the DB control
+# Nothing hung and nothing in setup was slow (checkout 8-14 s, setup-node
+# 4 s, `npm i` 2-3 s, no browser in this job at all). The time is six steps:
+# CG control 13.7-17.5 min, I control 14.9-19.1, CG 12.2-15.7, DB control
+# 13.9+ (cancelled before it finished on both red runs), B0-B2 5.2-7.0, V
+# control 2.6-3.3. Every one is independent of every other, so a runner 25 %
+# slower than the green one (the two red runs, on EVERY step including ones
+# they do not touch) pushes the serial sum past 90. Raising the timeout would
+# only have moved the cliff; running the independent pieces side by side
+# removes it: the longest part is ~29 min on the green run's pace, ~37 min on
+# the red runs'. The step order WITHIN each part is the order it had, so every
+# "gate, then its control" pair still reads in sequence.
+#
+# THE AGGREGATOR KEEPS THE NAME `preflight`, and the three parts have their
+# own. The verdict job reads `needs.preflight.result`, the comments and docs
+# in this repo (and any status check that names it) say "preflight", and a
+# part-job that renamed it would silently stop being what they refer to. The
+# aggregator is `if: always()` and fails unless every part SUCCEEDED, so a part
+# that fails, is cancelled or never ran reads red here, not grey.
 jobs:
-  preflight:
+  # PART 1 — the wall instrument and the combination gate (~29 min on the green
+  # run's pace). Both import the geometry, the registry and the wall instrument
+  # and nothing else: no playwright, no npm install, no git history.
+  preflight-wall:
     runs-on: ubuntu-latest
-    # 90, NOT 60 (gate-hygiene, Oct 6). main's own preflight at 1899bfa ran
-    # 48.8 min — 81% of a 60-minute budget — and this PR's run, ~20-25% slower
-    # on EVERY step including steps it does not touch, hit 60:02 at DB0-DB2.
-    # Runner variance alone takes 48.8 past 60, so the budget was the defect;
-    # a timeout is for declaring a HANG, and 90 still does that.
-    timeout-minutes: 90
+    timeout-minutes: 60
     steps:
-      # fetch-depth 0 IS FOR CA5 AND NOTHING ELSE, AND A SHALLOW FETCH CANNOT
-      # REPLACE IT. On a pull_request `actions/checkout` takes refs/pull/N/merge
-      # at depth 1, so there is no origin/<base> ref and no common ancestor —
-      # `git diff origin/main...HEAD` is a merge-base diff and fails outright
-      # (measured: run 35743356440, "ambiguous argument 'origin/main...HEAD'").
-      # Deepening to a fixed depth would work until a branch forked further back
-      # and then go red for a reason that has nothing to do with the geometry,
-      # so it is the whole history: 62 MB and 54 commits against a job that runs
-      # for hours. Every other step here reads the working tree and no git.
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -210,6 +224,31 @@ jobs:
         run: node tools/bloom-combination-gate.mjs
       - name: ... and every one of those eight clauses must be able to fail
         run: node tools/bloom-combination-gate.mjs --control
+
+  # PART 2 — the Node-only instruments that import neither the harness nor
+  # playwright: tube, arc stability, infill, rim owner, hole rim, margin bead,
+  # census adjacency and its scope check (~28 min on the green run's pace). It
+  # is the only part with the full git history, because CA5 diffs against the
+  # PR's base.
+  preflight-node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # fetch-depth 0 IS FOR CA5 AND NOTHING ELSE, AND A SHALLOW FETCH CANNOT
+      # REPLACE IT. On a pull_request `actions/checkout` takes refs/pull/N/merge
+      # at depth 1, so there is no origin/<base> ref and no common ancestor —
+      # `git diff origin/main...HEAD` is a merge-base diff and fails outright
+      # (measured: run 35743356440, "ambiguous argument 'origin/main...HEAD'").
+      # Deepening to a fixed depth would work until a branch forked further back
+      # and then go red for a reason that has nothing to do with the geometry,
+      # so it is the whole history: 62 MB and 54 commits against a job that runs
+      # for hours. Every other step here reads the working tree and no git.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       # THE TUBE (corolla fusion, TU0-TU6) rides here for the wall instrument's
       # own reasons — the same question (one printable solid), Node-only, about
       # four minutes with its must-fails — and is OWED because both STL gates
@@ -315,6 +354,19 @@ jobs:
           else
             echo "CA5 scope: this PR does not change tools/bloom-self-intersection.mjs, so the census rule is not its subject — skipped. (The allowlist is about a CENSUS PR's scope; see the note above.)"
           fi
+
+  # PART 3 — everything that imports tools/bloom-harness.mjs, which imports
+  # playwright-core at MODULE LOAD, so it needs the npm install first (~23 min
+  # on the green run's pace). No browser is launched here, so there is no
+  # Chromium install either.
+  preflight-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       # playwright alone, at an exact version. It pins the exact playwright-core it
       # needs and npm hoists it, so the harness's `import 'playwright-core'` and the
       # browser that `npx playwright install` downloads can never disagree. Both
@@ -382,6 +434,27 @@ jobs:
         run: node tools/verify-bloom-defaults-bar.mjs
       - name: ... and that clause must be able to fail
         run: node tools/verify-bloom-defaults-bar.mjs --control
+
+  # The name `preflight` is kept for the verdict job (and anything else that
+  # names this check). It is only a join over the three parts above.
+  preflight:
+    runs-on: ubuntu-latest
+    needs: [preflight-wall, preflight-node, preflight-render]
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Every preflight part must have succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "preflight parts (wall node render): $RESULTS"
+          for r in $RESULTS; do
+            if [ "$r" != "success" ]; then
+              echo "a preflight part ended '$r' — the Node-only instruments did not all pass."
+              exit 1
+            fi
+          done
+
 
   # THE GATES THAT RAN IN NO WORKFLOW (D14, the gate-coverage session). Eight
   # bloom gates carried must-fail controls and were run by hand or not at all;
