@@ -29,7 +29,7 @@ export const DYE = {
   undyed: 'var(--dye-undyed)', colour: 'var(--dye-colour)',   // --dye-colour: the generic "a dye" of parts A and B
   crossPoly: 'var(--dye-cross-poly)',                         // the polyester's dye in part D's cross-dyed swatch
 };
-const DIM = 'var(--ink-dim, #a7afaf)', LINE = 'var(--line-strong, #34393a)';
+const DIM = 'var(--color-dim)', LINE = 'var(--color-line-strong)', PETROL = 'var(--color-petrol)';
 // k = 0 -> base, k = 1 -> c; whole percent so a play writes at most 100 distinct values
 export const mixTo = (c, k, base = DYE.undyed) => k >= 0.995 ? c : k <= 0.005 ? base : `color-mix(in srgb, ${c} ${Math.round(k * 100)}%, ${base})`;
 const g = inner => `<g fill="none" stroke-linecap="round" stroke-linejoin="round">${inner}</g>`;
@@ -163,7 +163,7 @@ const chainScene = {
     // the GRID layout carries its own labels (the ROW layout's are HTML, under the svg)
     if (L.labels) PANEL_NAMES.forEach((n, i) => {
       const P = L.at[i], entry = i === e;
-      dyn += text(P.x, P.y + 74 + 14, (entry ? '\u2193 dye here \u00b7 ' : '') + n.toUpperCase(), { anchor: 'middle', size: 10, fill: entry ? DYE.colour : DIM });
+      dyn += text(P.x, P.y + 74 + 14, (entry ? '\u2193 dye here \u00b7 ' : '') + n.toUpperCase(), { anchor: 'middle', size: 10, fill: entry ? PETROL : DIM });
     });
     // the dye going in: drops falling into the entry panel (and, for solution dyeing, pigment into the melt)
     const { dx, dy } = shift(L, e), cx = PANEL_X[e] + dx, r = rng(SEED + 70 + e);
@@ -226,8 +226,10 @@ const packageScene = (() => {
         const n = Math.floor(TAU * R / 15.5);
         for (let k = 0; k < n; k++) {
           const a = k * TAU / n + i * 0.3, x = C.x + R * Math.cos(a), y = C.y + R * Math.sin(a);
-          s += `<circle cx="${f1(x)}" cy="${f1(y)}" r="7" fill="${BG}" stroke="var(--pk${i})" stroke-width="${SW}"/>`;
-          for (let m = 0; m < 4; m++) { const b = a + m * TAU / 4 + 0.4; s += `<circle cx="${f1(x + 3 * Math.cos(b))}" cy="${f1(y + 3 * Math.sin(b))}" r="1.1" fill="var(--pk${i})"/>`; }
+          // undyed: an ink outline, no fill; dyed: filled. The four filaments inside are outlines that
+          // go ground-coloured as the yarn fills, so they stay legible on the dye.
+          s += `<circle cx="${f1(x)}" cy="${f1(y)}" r="7" fill="var(--pf${i})" stroke="var(--pk${i})" stroke-width="${SW}"/>`;
+          for (let m = 0; m < 4; m++) { const b = a + m * TAU / 4 + 0.4; s += `<circle cx="${f1(x + 3 * Math.cos(b))}" cy="${f1(y + 3 * Math.sin(b))}" r="1.3" fill="none" stroke="var(--pd${i})" stroke-width="0.8"/>`; }
         }
       });
       // wound to a set density: a dashed outer boundary pressing in
@@ -239,7 +241,8 @@ const packageScene = (() => {
       RINGS.forEach((_, i) => {
         const a = smooth(seg(t, 0.1 + 0.07 * i, 0.42 + 0.07 * i)) * 0.65;                  // in -> out
         const b = smooth(seg(t, 0.56 + 0.06 * (RINGS.length - 1 - i), 0.82 + 0.03 * (RINGS.length - 1 - i))); // out -> in completes it
-        vars[`--pk${i}`] = mixTo(DYE.colour, Math.min(1, a + (1 - a) * b));
+        const k = Math.min(1, a + (1 - a) * b);
+        vars[`--pk${i}`] = mixTo(DYE.colour, k); vars[`--pf${i}`] = mixTo(DYE.colour, k, BG); vars[`--pd${i}`] = mixTo(BG, k, INK);
       });
       const out = t < 0.52, u = out ? seg(t, 0.06, 0.5) : seg(t, 0.54, 0.95);
       let dyn = '';
@@ -343,6 +346,8 @@ const solutionScene = (() => {
     build: () => fibreBody('dy-sol-clip'),
     frame(t) {
       let dyn = '';
+      // a fibre with pigment all through it is a dyed fibre: filled (a tint, so the particles still read)
+      dyn += `<circle cx="${FIB.x}" cy="${FIB.y}" r="${FIB.r - 1}" fill="${DYE.colour}" fill-opacity="${f1(0.4 * smooth(seg(t, 0.5, 0.9)) * 100) / 100}"/>`;
       // the polymer is still melt while the pigment is stirred through it; then it sets as a fibre
       const set = smooth(seg(t, 0.62, 0.92));
       P.forEach((p, i) => {
@@ -396,6 +401,8 @@ const dyedScene = (() => {
     build: () => fibreBody('dy-dyed-clip') + fibreOutline(),
     frame(t) {
       let dyn = '';
+      // the fibre fills as the dye goes in
+      dyn += `<circle cx="${FIB.x}" cy="${FIB.y}" r="${FIB.r - 1}" fill="${DYE.colour}" fill-opacity="${f1(0.4 * smooth(seg(t, 0.4, 0.9)) * 100) / 100}"/>`;
       P.forEach((p, i) => {
         const a1 = Math.atan2(p.y - FIB.y, p.x - FIB.x) + (p.rnd - 0.5) * 0.8;
         const start = { x: FIB.x + (FIB.r + 22 + p.rnd * 16) * Math.cos(a1), y: FIB.y + (FIB.r + 22 + p.rnd * 16) * Math.sin(a1) };
@@ -499,7 +506,7 @@ const reactiveScene = (() => {
         const at = { x: p.x, y: p.y - 10 };
         const q = u >= 1 ? at : arcPath({ x: p.dx, y: p.dy }, at, (p.d - 0.5) * 0.5, u);
         if (bond < 1) dyn += text(p.x, p.y + 1, 'OH', { fill: INK, size: 7, anchor: 'middle', op: f1(0.85 * (1 - bond) * 100) / 100 });
-        if (bond > 0) dyn += `<path d="M${p.x},${f1(p.y + 3)}V${f1(p.y - 7.5)}" stroke="${DYE.reactive}" stroke-width="${f1(1 + 1.4 * bond)}"${op(bond)}/>`;
+        if (bond > 0) dyn += `<path d="M${p.x},${f1(p.y + 3)}V${f1(p.y - 7.5)}" stroke="${DYE.reactive}" stroke-width="${f1(1.2 + 1.6 * bond)}"${op(bond)}/>`;
         dyn += glyph('reactive', q.x, q.y, DYE.reactive, 1.3);
       }
       for (const h of H) {
