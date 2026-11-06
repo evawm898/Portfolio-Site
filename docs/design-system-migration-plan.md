@@ -370,3 +370,22 @@ flower's chrome already read the legacy names, which batch 1 aliased onto tokens
 **Kept as artwork:** the three.js view and the preset thumbnails.
 
 **Gates.** No flower workflow names `flower.css`, so CI runs nothing on this PR. The CSS cannot reach geometry, the export, the visibility predicates or the registry. `verify-registry-sync` and `verify-tier-visibility` were run by hand and pass.
+
+## 14. Batch 8 as built
+
+bloom keeps its own `--bl-*` names (bloom.css stands alone from styles.css by design), re-pointed at tokens; `bloom.html` links `tokens.css` first.
+
+**Ground and accent:**
+- The green-black ground `#0c0f0e` and mint-green accent `#8fd6b8` are retired.
+- The page, the panels and the three.js scene background are the system ground. The scene background is `0x060707` in `bloom.js`, as print's was in batch 3.
+- The accent (links, slider fills, section hovers, the cap hatch, the scope bar, curve handles) is petrol.
+- Ink, dim and line are the tokens; the translucent fills are `color-mix` over raised and ink.
+
+**R1:**
+- The readout's and design status's error lines (`.bl-err`) were pink. They are ink with `✕`.
+- A refused curve edit's reason was pink. It is ink with `✕`.
+- The refused handle is a dashed plum ring on the ground: a non-text mark, and dashed so colour is not the only cue.
+
+**Kept as artwork:** the bloom itself (its material and lights) and the grid `.glb`.
+
+**Gates.** No gate asserts a chrome colour. The status lines are read by `textContent`, which a `::before` glyph does not reach. `bloom.html`, `bloom.css` and `bloom.js` are in the filters of the three bloom workflows (panel, connectedness and export-watertight), so all three run on this PR, the last two for hours. The panel gate was also run locally.
