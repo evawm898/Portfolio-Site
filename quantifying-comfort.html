@@ -69,7 +69,8 @@
   .qc-do { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0.9rem 0 0; }
   .qc-do dt { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--petrol-bright); padding-top: 0.3em; }
   .qc-do dd { color: var(--ink); }
-  .qc-orange { color: #D85A30; }
+  /* the instrument's curve colour is artwork (DESIGN.md rules 9-10): shown as a swatch, never as text */
+  .qc-swatch { display: inline-block; width: 0.7em; height: 0.7em; margin-left: 0.4em; border-radius: 50%; background: #D85A30; vertical-align: baseline; }
   @media (max-width: 480px) { .qc-fig__controls { grid-template-columns: 1fr; } .qc-do { grid-template-columns: 1fr; gap: 0.1rem; } .qc-do dd { margin-bottom: 0.5rem; } }
   @media (prefers-reduced-motion: reduce) { .qc-chain__node, .qc-chain__wire { opacity: 1; transition: none; } }
 </style>
@@ -668,7 +669,7 @@
         <p>The industry word for touch is <strong>hand</strong>, or <strong>handle</strong>. &ldquo;Soft&rdquo; is several physical properties blurred into one word: a smooth, low-friction surface, low bending stiffness, and compressibility, the give under your fingers.</p>
         <p>The reference method measures each one separately: the <strong>Kawabata Evaluation System for Fabrics (KES-F)</strong>, a set of instruments for tensile and shear, bending, compression and surface. <strong>FAST</strong> (Fabric Assurance by Simple Testing, from CSIRO) is the cheaper industrial set. Instruments are calibrated against <strong>trained sensory panels</strong>: Kawabata&rsquo;s hand scales were fitted to the judgments of expert assessors from the trade.</p>
         <p>Japanese has words for the parts: <em>koshi</em> (stiffness), <em>numeri</em> (smoothness), <em>fukurami</em> (fullness).</p>
-        <p>Five tests follow. Every curve is <strong>illustrative</strong>: the shapes are right, the values aren&rsquo;t measured. The instrument&rsquo;s output is drawn in <span class="qc-orange">orange</span>; switching fabric, or clicking a figure, reruns the test.</p>
+        <p>Five tests follow. Every curve is <strong>illustrative</strong>: the shapes are right, the values aren&rsquo;t measured. The instrument&rsquo;s output is drawn in orange<span class="qc-swatch" aria-hidden="true"></span>; switching fabric, or clicking a figure, reruns the test.</p>
       </div>
     </section>
 

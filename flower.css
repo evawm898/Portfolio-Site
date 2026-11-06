@@ -875,7 +875,7 @@ body.fl-preview .fl-modal { display: none !important; }
   pointer-events: none;
   white-space: nowrap;
 }
-.fl-hint .dot { color: var(--petrol); margin: 0 0.5rem; }
+.fl-hint .dot { color: var(--color-faint); margin: 0 0.5rem; }
 
 /* ---------------------------------------------------
    Saved-designs gallery (flower-saved.html)

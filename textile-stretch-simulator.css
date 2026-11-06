@@ -110,7 +110,7 @@
 .sim__segbtn:hover { color: var(--ink); }
 .sim__segbtn.is-active {
   background: var(--petrol);
-  color: var(--black);
+  color: var(--ink);
   font-weight: 500;
 }
 .sim__segbtn:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: -3px; }
