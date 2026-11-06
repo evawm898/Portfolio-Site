@@ -19,7 +19,7 @@
   --dye-disperse: var(--color-indigo);   /* disperse dye, polyester */
   --dye-acid:     var(--color-plum);     /* acid dye, nylon */
   --dye-reactive: var(--color-mint);     /* reactive dye, cotton */
-  --dye-cross-poly: var(--color-petrol); /* the polyester's dye in part 04's cross-dyed swatch: petrol beside plum (Eva, Nov 5) */
+  --dye-cross-poly: var(--color-petrol); /* the polyester's dye in part 04's cross-dyed swatch: petrol beside plum (Eva, Nov 5; kept Nov 6) */
   --dye-colour:   var(--color-indigo);   /* "a dye", in the parts not about a dye class */
   --dye-undyed:   var(--color-ink);
 }
