@@ -12103,9 +12103,18 @@ renders outside the locked palette. Read its header before touching it. Born of 
 `tokens.css`, shipped unstyled for days, and a "returns 200, no JS error" check passed them, because a missing stylesheet
 is not an error. Static S1-S3 (a real `<link>` to `tokens.css`, first local sheet, every local href resolves) and
 render R1-R4 (the 14 tokens compute to **DESIGN.md's** values, not tokens.css's; page ground is ground/raised; chrome
-text is one of the six text tokens; no same-origin 4xx). `KNOWN` declares findings that are design rulings, held both ways
-(K0 when one stops firing). `cards.html` is the declared light page. It does not read canvas/SVG artwork, fonts or layout.
-Ten mutants incl. the real pre-#517 files.
+text is one of the six text tokens; no same-origin 4xx).
+**EVERY EXCEPTION LIVES IN DESIGN.md, NONE IN THE TOOL** (Eva, Nov 6; `KNOWN` is gone): "Declared exceptions" holds the
+Light pages table (`/cards`, `/textile-gauge-reader`), the Light set (paper/raised/ink/ink-2/faint/petrol/on-deep) and the
+Artwork surfaces table (`plot.html` `#000000`, `scene.html` `#08090B`), and the gate PARSES them. Held both ways: an
+exception no page needs fails as K0. Rule 1's one allowance is inverse text — ground-coloured text on a *control* filled
+with petrol or ink — judged on the composited background, so text on a deep fill is ink. A light page is held to the light
+set; a dark surface inside it (an image viewer) takes the six dark tokens. A new exception is a ruling: add the row there.
+**Public but not a site page:** Netlify publishes the repo root with no ignore file, so every HTML page under `tools/` and
+`docs/` and the gauge reader's dev copy are SERVED. `NOT_DEPLOYED` pages are not rendered; they get S4 (a
+`<meta name="robots">` with noindex) and, for `REDIRECTS`, S5 (the dev copy's inline script is RUN against a deployed host,
+which must redirect to `/textile-gauge-reader`, and against localhost, which must not — the backend serves it there).
+It does not read canvas/SVG artwork, fonts or layout. 26 mutants incl. the real pre-#517 files.
 
 ## `/knit-lab` — yarn-level knit simulator spike (pointer only)
 

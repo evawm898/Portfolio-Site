@@ -2,6 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- This is the LOCAL dev copy, served by the backend on localhost. Anywhere else (the deployed
+     site and its previews also publish this file as a static page) it sends the visitor to the
+     production page. The palette gate runs this script against both kinds of host (S5). -->
+<script>if (!/^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/.test(location.hostname)) location.replace('/textile-gauge-reader');</script>
+<noscript><meta http-equiv="refresh" content="0; url=/textile-gauge-reader"></noscript>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Automatic Textile Gauge Reader (local dev)</title>
 <meta name="description" content="Local full-stack dev copy of the Automatic Textile Gauge Reader -- served by the backend itself (same origin). See ../../textile-gauge-reader.html for the production copy; keep both in sync.">

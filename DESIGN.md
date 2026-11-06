@@ -71,7 +71,11 @@ things apart without leaving the system.
 ## Rules
 
 1. **Text is only** ink, ink-2, dim, faint, petrol or seafoam. No other text
-   colour — no red, no burgundy, no rust, no amber, no companion.
+   colour — no red, no burgundy, no rust, no amber, no companion. One
+   exception, **inverse text**: ground may be the text colour of a *control*
+   (a button, link, chip or tab) that is filled with **petrol or ink** — an
+   active chip. Nowhere else: not on a deep fill (text on deep is ink, rule 5),
+   not on a panel, not on a non-control.
 2. **Errors and warnings are not coloured text.** They are ink (or dim) text
    carrying a glyph or a word that says what they are (`! too dense`,
    `✕ refused`), optionally on a raised panel with a line-strong border. Colour
@@ -110,7 +114,12 @@ things apart without leaving the system.
 - This is checked, not hoped: `node tools/verify-site-palette.mjs` (CI: `site-palette`, every PR) loads every
   shipped page at 1280 and 390 px and fails on a missing or late `tokens.css` link, a token that does not
   compute to the table above, a page ground outside ground/raised, or chrome text outside the six text
-  tokens. A finding that is a design ruling rather than a bug is declared in its `KNOWN` list.
+  tokens (inverse text allowed per rule 1). A finding that is a design ruling rather than a bug is declared
+  in **Declared exceptions** below — the gate reads those tables, there is no list in the tool — and an
+  exception that stops being needed fails the run too.
+- It also covers the pages that are published but not part of the site: every HTML page under `tools/` and
+  `docs/` must be `noindex`, and `textile-gauge-reader/frontend/index.html` (the dev copy) must redirect
+  to `/textile-gauge-reader` anywhere but localhost.
 - Page stylesheets read `var(--color-*)` / `var(--type-*)`. A page may keep
   local aliases (`--bl-ink: var(--color-ink)`) but never a local hex for a
   chrome colour.
@@ -120,13 +129,51 @@ things apart without leaving the system.
   `--petrol` is the DEEP fill and `--petrol-bright` is today's petrol — the
   prefixed token names exist so that confusion does not spread.
 
-## Light pages — one recorded exception
+## Declared exceptions
 
-The system is dark. **`/cards` is the one light page** (Eva, Nov 5): it is a
-print-design tool whose preview reads as paper. It uses the system's TYPE and
-PETROL family and keeps its own paper neutrals (`cards.css`); everything else
-— `/textile-gauge-reader` included — is dark. A new light page is a ruling,
-not a choice a session makes.
+The gate (`tools/verify-site-palette.mjs`) reads the tables in this section. A page
+or surface listed here is held to what is declared, and an entry that no page needs
+any more fails the run. A new entry is a ruling, not a choice a session makes.
+
+### Light pages
+
+The system is dark. Two pages ship light (Eva, Nov 5 and Nov 6): **`/cards`**, a
+print-design tool whose preview reads as paper, and **`/textile-gauge-reader`**, a
+photo-analysis tool read against a white sheet. A light page uses the system's
+TYPE and PETROL family and ONE light neutral set — the **light set** below, not
+colours of its own.
+
+| Page | Why |
+|---|---|
+| `cards.html` | print-design tool; the preview reads as paper |
+| `textile-gauge-reader.html` | photo-analysis tool read against a white sheet |
+
+On a light page the gate holds the page ground to a light ground and chrome text
+to a light text. A surface that is itself dark (an image viewer, an overlay on
+one) takes the dark system's six text tokens, as on any dark page. White text is
+allowed only on a deep fill.
+
+### Light set
+
+| Token | Hex | Use |
+|---|---|---|
+| `--light-paper` | `#FAF8F4` | page ground |
+| `--light-raised` | `#FFFFFF` | panels, inputs |
+| `--light-ink` | `#17191A` | primary text |
+| `--light-ink-2` | `#5C6363` | secondary text |
+| `--light-faint` | `#8B9494` | captions, meta |
+| `--light-petrol` | `#177A7A` | links, eyebrows, active states (4.8:1 on paper) |
+| `--light-on-deep` | `#FFFFFF` | text on a deep fill |
+
+### Artwork surfaces
+
+Rule 9 puts the drawing surface outside the chrome. These two pages ARE their
+drawing surface: the ground the page sits on is the artwork's, not a token.
+
+| Page | Surface | Hex | Why |
+|---|---|---|---|
+| `plot.html` | the page ground | `#000000` | the drawing's own ground; its polarity setting decides black or white |
+| `scene.html` | the page ground | `#08090B` | the ambient scenes' own ground; the section has its own identity |
 
 ## Errors and warnings
 
