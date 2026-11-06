@@ -1,0 +1,47 @@
+# Site palette gate — every shipped HTML page renders inside the locked palette.
+#
+# Why it exists: #504 moved styles.css onto tokens.css, and six public pages
+# (dyeing.html + projects/*.html) never linked tokens.css. They went out
+# unstyled and stayed that way until #517 because a missing stylesheet is not
+# an error to a browser: the page returns 200, throws nothing, and looks wrong.
+# This reads what the browser COMPUTED (tokens, page ground, chrome text colour)
+# and whether every local stylesheet / script resolves — see the tool's header.
+#
+# NO PATH FILTER, on purpose. Anything that can change how a page renders (any
+# html, css, js, or tokens.css itself) must run it, and a filter is how a gate
+# misses the one change that matters. It is ~25 s of test plus the browser
+# install. Pages are discovered by walking the repo, so a new page is covered
+# the day it lands.
+name: site-palette
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  palette:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # Same pin the other browser workflows here carry.
+      - name: Install render deps
+        run: npm i --no-save playwright@1.62.1
+      - name: Drop Google's Chrome apt source (it is not used, and it broke CI)
+        run: |
+          sudo rm -fv /etc/apt/sources.list.d/google-chrome* || true
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Palette gate (static links + computed tokens, ground and text colour, 1280 and 390 px)
+        run: node tools/verify-site-palette.mjs
+      - name: Negative control (each failure mode reproduced, each caught by the clause that names it)
+        run: node tools/verify-site-palette.mjs --negative-control

@@ -107,6 +107,10 @@ things apart without leaving the system.
 ## Loading
 
 - Every page links `tokens.css` **first**, before its own stylesheet.
+- This is checked, not hoped: `node tools/verify-site-palette.mjs` (CI: `site-palette`, every PR) loads every
+  shipped page at 1280 and 390 px and fails on a missing or late `tokens.css` link, a token that does not
+  compute to the table above, a page ground outside ground/raised, or chrome text outside the six text
+  tokens. A finding that is a design ruling rather than a bug is declared in its `KNOWN` list.
 - Page stylesheets read `var(--color-*)` / `var(--type-*)`. A page may keep
   local aliases (`--bl-ink: var(--color-ink)`) but never a local hex for a
   chrome colour.

@@ -12095,6 +12095,18 @@ don't wait to be asked, and don't surface them only after the fact.
   `tools/verify-tier-visibility.mjs` pass, and diff `tools/dump-visibility.mjs` against
   the pre-change dump when the change is meant to be visibility-neutral.
 
+## Site palette gate (pointer only)
+
+`node tools/verify-site-palette.mjs` (`--negative-control`, `--report`; CI `site-palette.yml`, **no path filter**, every
+PR) loads every shipped HTML page (found by walking the repo, so a new page is covered the day it lands) and fails when it
+renders outside the locked palette. Read its header before touching it. Born of #504/#517: six pages never linked
+`tokens.css`, shipped unstyled for days, and a "returns 200, no JS error" check passed them, because a missing stylesheet
+is not an error. Static S1-S3 (a real `<link>` to `tokens.css`, first local sheet, every local href resolves) and
+render R1-R4 (the 14 tokens compute to **DESIGN.md's** values, not tokens.css's; page ground is ground/raised; chrome
+text is one of the six text tokens; no same-origin 4xx). `KNOWN` declares findings that are design rulings, held both ways
+(K0 when one stops firing). `cards.html` is the declared light page. It does not read canvas/SVG artwork, fonts or layout.
+Ten mutants incl. the real pre-#517 files.
+
 ## `/knit-lab` — yarn-level knit simulator spike (pointer only)
 
 Hidden page (`knit-lab.html`, `knit-lab.css`, `knit-lab.js`, `knit-lab-engine.js`, `knit-lab-worker.js`,
