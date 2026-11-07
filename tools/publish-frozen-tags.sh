@@ -128,7 +128,6 @@ declare -A TAG_PUSH_XFAIL=(
   [phase65]='GITHUB_TOKEN refused: .github/workflows/bloom-panel.yml (run 38441209204; #403, the design file, edited that file after c1fc595 and merged while #402 was in CI — the two sessions in flight against one base, so the refusal was not declarable in advance)'
   [phase83]='GITHUB_TOKEN refused: .github/workflows/frame.yml (run 39878247322; #452, /frame phase 3a, edited that file after 56f91f4 and merged while #451, the surface texture, was in CI — two sessions in flight against one base, the phase65 shape, so the refusal was not declarable in advance)'
   [phase92]='GITHUB_TOKEN refused: .github/workflows/frame.yml (run 41310696958; #479, /frame phase 3e step 2, edited that file after 8e00721 and merged while #472, the umbel hubs, was in CI — two sessions in flight against one base, the phase65 shape, so the refusal was not declarable in advance)'
-  [phase94]='DECLARED IN ADVANCE: #520 (c9b4125, the preflight split) modified .github/workflows/bloom-export-watertight.yml after ba539e0, and that file exists at the base, so the narrowed rule (Oct 5) predicts a refusal (site-palette.yml, added by #522, costs nothing); declared before the dispatch so an absence is expected, and a publish is called out as stale'
 )
 
 CHECK_ONLY=0
