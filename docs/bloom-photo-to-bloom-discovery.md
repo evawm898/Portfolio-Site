@@ -1472,9 +1472,13 @@ records what the route can now replicate, then ranks the remaining gaps. It does
 - ~~**how much a whorl's petals cup or curl differently from the others.** Per-layer cup and curl are
   delta-on-global sliders and have been **out of every stage so far.** This is the lotus body.~~
   **[Nov 5, S5: schema v4 admits them as deltas, §14. The lotus body goes 1.052 → 1.161 (v9).]**
-- a whorl's ring is chosen only through its petal width
-  ([#495](https://github.com/evawm898/Portfolio-Site/issues/495), ruled (c));
+- ~~a whorl's ring is chosen only through its petal width
+  ([#495](https://github.com/evawm898/Portfolio-Site/issues/495), ruled (c));~~
+  **[Nov 7, S6: #495 option A shipped (`392f99a`) and schema v5 writes a layer's own ring, §17. The lotus body goes
+  1.161 → 1.413 (v11).]**
 - scale (35 mm by default) and the stem and leaves (design choices).
+
+**[Nov 7: REVISED AGAIN after S6 — the current ranking is §17.6. The ring / width coupling below is closed.]**
 
 **The remaining gaps, ranked by how much they would improve the sheet — REVISED after S5 (Nov 5):**
 
@@ -2176,7 +2180,8 @@ text), never committed; the committed sheet carries placeholders.
 
 ## 16. #495 shipped — a layer's own ring (option A, Nov 5)
 
-The rulings are §15.6's. **What ships:** a `Layer ring` control under Per-layer values, and the geometry, file, page and
+The rulings are §15.6's, and Eva's two of Nov 5 on the shipped build are recorded in §16.1. **Merged as `392f99a`**
+([#514](https://github.com/evawm898/Portfolio-Site/pull/514)); #495 is closed. **What ships:** a `Layer ring` control under Per-layer values, and the geometry, file, page and
 gate changes it owes. Read `bloom-geometry.js`'s `LAYER_RING_RANGE` block before touching any of it.
 
 ### 16.1 The model
@@ -2192,17 +2197,19 @@ gate changes it owes. Read `bloom-geometry.js`'s `LAYER_RING_RANGE` block before
 - **The Oct 16 hub ruling is respected.** A ring past 1 GROWS THE HUB to it; the ring sits ON the grown rim, and the
   growth record names the layer and `by: 'ring'`. The ruling's own mechanism is kept: every other layer stays where
   the area rule puts it.
-  - **AMBIGUITY, for Eva:** the brief says "(other layers shift outward)". An owned ring does not change any foot, so
+  - ~~**AMBIGUITY, for Eva:** the brief says "(other layers shift outward)". An owned ring does not change any foot, so
     the area rule's R0 does not move, and the other layers DO NOT shift. They shift only for an owned WIDTH, because a
-    width feeds the area rule. Kept as built; a shift for a ring would be a new rule.
-- **Range: PROPOSED 0.10–2.00, step 0.01** (`LAYER_RING_RANGE`, imported by the registry; the harness restates it and
+    width feeds the area rule. Kept as built; a shift for a ring would be a new rule.~~
+    **RULED (Eva, Nov 5): approved as built.** An owned ring that grows the hub does NOT shift the other layers outward;
+    only owned widths feed the hub's sizing (the area rule).
+- **Range: 0.10–2.00, step 0.01 — RULED (Eva, Nov 5): approved as shipped.** (`LAYER_RING_RANGE`, imported by the registry; the harness restates it and
   refuses to load if it moves).
   - It covers the lotus's 0.51 / 0.64 and every derived ring of the default ramp to six layers (0.72^5 = 0.193).
   - The top end is a hub grown to twice the area rule's ring.
   - Deeper layers on a small Shrink derive rings under 0.10 (0.35^3 = 0.043): the slider cannot show those, and the
     read-out says so and quotes the derived value.
-  - **FLAGGED for Eva's ruling from the sheet.** Measured at both ends on block 85: watertight, one piece, 0
-    within-shell pairs.
+  - ~~**FLAGGED for Eva's ruling from the sheet.**~~ Ruled above. Measured at both ends on block 85: watertight, one
+    piece, 0 within-shell pairs.
 - **Clamped and told.** The geometry clamps to the range and records `{ asked, built, clamped }`. The file reader keeps
   a ring past the range AS ASKED (a re-save writes what was asked) and tells it.
 
@@ -2268,6 +2275,13 @@ on this tree by design and reproduces §15 on 40888af.
 it was not retried. The construction is the argument: no stored row carries a `layerRing`, and `ringFactor` is the old
 expression by branch. CI's two STL gates and Z3 run every row.
 
+**Before the merge (Eva's ruling, Nov 6), a SAMPLED compare:** `verify-bloom-surface-bytes` against a worktree of `ba539e0`
+over 100 phase94 rows stratified across placement (RADIAL 14, SPIRAL 10, FAN 10, CONTINUOUS 6), per-layer values on (10),
+scopes kept with per-layer off (8), other `@scopes` (8), hub growth (2), inflorescence
+(10), texture (10) and spread (12), both modes: **0 floats moved over 279,907,614 export floats and 3,205,194 grid
+values**; `--control` fired both clauses. No CI check byte-compares existing rows against a frozen baseline:
+[#523](https://github.com/evawm898/Portfolio-Site/issues/523).
+
 ### 16.5 The sheet
 
 `node tools/shot-bloom-layer-ring.mjs docs/img/layer-ring-495.png --base <worktree of ba539e0>` — the photo lotus (S5 v9),
@@ -2279,3 +2293,149 @@ the daisy and the water lily (v7):
   (photo ≈ 1.45).
 
 ![#495 a layer's own ring](img/layer-ring-495.png)
+
+---
+
+## 17. S6 — the ring stage on the lotus (schema v5, Nov 7)
+
+The next gap after S5 was #1 on §12's ranking, the ring / width coupling. #495 option A shipped (§16), so a photo can now
+write each whorl's ring. Same six photos (§11.1): the working copies in the session's scratchpad, stripped and read back
+(no EXIF / GPS / XMP / IPTC / profile), **none committed. No bloom page code changed** (`bloom*.js`, `bloom.html`,
+`bloom.css` are `main`'s at `392f99a`).
+
+| file | what |
+|---|---|
+| `docs/photo-to-bloom/eva-set/lotus/lotus-v{10,11}.*` | v10: each body whorl's OWN ring, read from the side photo; v11: one render iteration on the rings alone |
+| `tools/bloom-photo-census.mjs` | schema v5: `LAYER_SCHEMA.ring`; `layerRing` classified (it was unclassified on `main` — the census refused to print since #514) |
+| `tools/verify-bloom-photo-subset.mjs` | V9, W2 on a ring past the range, TOLD `HUB GROWN`; five fixtures (32 in all); a seventh page mutant |
+| `tools/bloom-photo-s2.mjs` | versions ordered by NUMBER (v10 was compared against v1); captions show a layer's ring |
+| `docs/img/photo-to-bloom-s6.png` | the sheet (placeholders for the photos) |
+
+### 17.1 Schema v5 — a layer's own ring
+
+- `LAYER_SCHEMA.ring = ['layerRing']`: `values.layerRing` on a layer entry, a fraction of the hub ring R0 that REPLACES the
+  derived ring (§16.1). It is a VALUE, not an offset: there is no whole-bloom ring to offset from.
+- Listed apart from `values` (the spine and outline) and checked at module load against the geometry's
+  `SCOPE_LAYER_VALUE_IDS`, both ways, for the same reason the other rows are: importing it would let a quantity the
+  geometry adds enter the photo schema silently.
+- **The `Layer ring` CONTROL is class d.** Its slider is a view of the picked layer and its own value is never read; a photo
+  writes the ring on the layer entry, never as this control (named in `controls`, it warns W1).
+- **Found:** #514 added the control and not its census row, so `node tools/bloom-photo-census.mjs` refused to print on
+  `main` (`unclassified controls: layerRing`). The census is in no CI workflow; the validator imports it without running
+  it, so nothing went red.
+
+### 17.2 The validator
+
+- **W1** no longer fires on `values.layerRing`.
+- **V9 (a clause):** every ring the file names on a layer the build reaches is the ring footRing() BUILT, read off
+  `__bloomMetrics().rings[i].ownRing` — an owner the reader does not write. `asked` must be the file's number and `built`
+  that number clamped to `LAYER_RING_RANGE`; and no ring may be owned that the file does not name (a leftover from the dirty
+  page). Judged only where the builder says the layers are live; an inert ring is V7's.
+- **W2** also: a ring outside 0.10–2.00. The reader already tells it as a clamp (V1 / V5); this says so from the file
+  alone, a second owner beside the reader's note. The negative control is what asked for it: with the reader's note
+  dropped (`a-reader-note-is-dropped`), a past-range ring passed every clause.
+- **TOLD** also: `HUB GROWN` — a ring past 1 grows the hub (the Oct 16 ruling), on the read-out only.
+
+**Five fixtures**, `--self` 32 of 32 plus the two exit-code legs, each loaded onto the DIRTY page:
+
+| fixture | what | fires | warns | told |
+|---|---|---|---|---|
+| `RING_OWNED` | an intended ring (layer 2 at 0.60, beside offsets) | — | — | — |
+| `RING_ONLY` | an entry that owns only a ring (it builds; it reaches no petal) | — | — | — |
+| `RING_GROWS` | layer 1 at 1.30 | — | — | HUB GROWN |
+| `RING_INERT` | a ring with Per-layer values OFF | **V7** | — | — |
+| `RING_PAST` | 2.60, past the range (built 2.00) | **V1 V5** | W2 | HUB GROWN |
+
+**The negative control: all seven page mutants behave**, each run alone against a saved base and then re-run once its list
+was widened.
+
+- **`the-build-drops-the-layer-ring` (new):** the page keeps the rings in its scopes and builds without them. V4 cannot see
+  it (the page's scopes are the file's). It moves exactly V9 on every live ring fixture, and V7 on the three ring-only ones
+  (an entry left with nothing reaches no layer).
+- **The six existing mutants** widen to the ring fixtures by their S3 / S5 mechanisms (the dirty page's leftovers;
+  `RING_INERT` is `SCOPED_INERT`'s shape). V9 joins `the-scopes-survive-a-new-design`'s list wherever the leftover entry,
+  which owns no ring, replaces the file's. `hidden-controls-are-applied` moves nothing new.
+
+### 17.3 The lotus — v10 from the photo, v11 one render iteration
+
+**Daisy and water lily stay at v7.** Both stand on derived rings their photos agree with (the daisy's two ray tiers on one
+rim; the water lily's inner whorl outside the stamen disc), so no ring was written to fill the stage.
+
+| layer | v9 (derived from the owned width) | v10 (read from the side photo) | v11 (render iteration) |
+|---|---|---|---|
+| L0, L1 | 1.00, 0.93 | unchanged (derived) | unchanged |
+| L2, the veined shells | 0.86 (24 / 28 mm) | **0.70**, low: the shells close round the receptacle on about 0.7 of the span where the outer boats leave it | **0.66**: at 0.70 the shells stood out at the body's base |
+| L3, the innermost | 0.75 (21 / 28 mm) | **0.50**, low: the cluster rises from the middle of the shells, about half the boats' span | **0.55**: at 0.50 the crown rose as a narrow spike |
+
+- **Recorded honestly:** §15.2's sweep (rings swept toward 1.45 on v9's other values) was known before v10 was written.
+  v10's rings are the photo's reading; v11's change is the render's. The widths stay v9's: their readings say the inner
+  petals are narrower, and an owned ring now places the ring whatever the width.
+- **The validator reads v9, v10 and v11 PASS, 0 notes, 0 warnings**, each told `CUP CLAMPED` (the nib, as v6). Sidecars:
+  24 versions PASS (`--check`). Triangles unmoved at 61,432.
+
+### 17.4 The closed body's proportions
+
+Measured as in §14.4 (the export mesh, the inner half of the layers = L2–L3, by each petal's own emitted range).
+
+| | L2 / L3 rings (mm) | closed body h : w | body (mm) | whole flower h : w |
+|---|---|---|---|---|
+| **photo** | — | **≈ 1.45** | — | 1.16 |
+| S5 v9 | 14.91 / 13.04 | 1.161 | 44.6 × 38.4 | 0.655 |
+| S6 v10 | 12.18 / 8.70 | **1.353** | 44.6 × 33.0 | 0.655 |
+| S6 v11 | 11.48 / 9.57 | **1.413** | 44.6 × 31.6 | 0.655 |
+
+- **The ring closes most of the body's gap: 1.161 → 1.413, against ≈ 1.45.** The rest is under the stage's resolution: the
+  rings are low-confidence readings of hidden bases.
+- **The whole flower stays squat (0.655 vs 1.16).** The outer whorls splay wider than the photo's (§13.5's estimate on L1).
+  That is not the ring's.
+
+### 17.5 Contacts the new rings trigger
+
+EXPORT, the whole bloom, the census's within-shell pairs and `neighbourFlag`'s nearest feet:
+
+| | within-shell pairs | cross-shell pairs | nearest feet (centres in foot widths) | blade skin gap |
+|---|---|---|---|---|
+| v9 | **0** | 33,132 | 0.19 (L0/3 – L2/2) | −1.20 mm (crossing, the accepted look) |
+| v10 | **0** | 37,319 | 0.40 (L0/0 – L2/4) | −1.20 mm |
+| v11 | **0** | 39,921 | 0.45 (L0/3 – L2/2) | −1.20 mm |
+
+No fold on any version. Pulling the body rings in makes the petals pass through each other more (cross-shell pairs), which
+is the export contract's overlap, and spreads the nearest feet further apart.
+
+### 17.6 §12's ranking, revised after S6
+
+1. **A petal count per whorl.** (was #2 — the water lily's 4 long outer and ~10 short inner petals; the largest visible miss now)
+2. **The outer whorls' splay.** (new) The lotus's whole-flower h:w is 0.655 against 1.16 while the body is at 1.413: the outer
+   boats and L1 open too wide. It is read with per-layer tilt and spine, already on the schema, so it is a reading miss to
+   look at, not a mechanism.
+3. **Disc florets.** (unchanged)
+4. **The sepals' cup.** (unchanged)
+5. **Petal irregularity.** (unchanged)
+6. **Imbrication, tip features under the floor, strap stamens.** (unchanged)
+7. **Colour.** (unchanged)
+
+The ring / width coupling (S5's #1) is CLOSED by #495 option A and this stage: 1.161 → 1.413.
+
+### 17.7 Reproduce
+
+```bash
+node tools/bloom-photo-census.mjs
+```
+
+```bash
+node tools/verify-bloom-photo-subset.mjs --self
+```
+
+```bash
+node tools/verify-bloom-photo-subset.mjs --negative-control --mutant=the-build-drops-the-layer-ring
+```
+
+```bash
+node tools/bloom-photo-s2.mjs --check
+```
+
+```bash
+node tools/bloom-photo-s2.mjs /tmp/s6 --versions lotus:v9,lotus:v10,lotus:v11 --sheet-bare docs/img/photo-to-bloom-s6.png
+```
+
+![S6 — the ring stage](img/photo-to-bloom-s6.png)

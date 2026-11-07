@@ -25,7 +25,7 @@
            geometry's own owned list — it throws, it does not print).
    =================================================================== */
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, predicateDrivers } from '../bloom-registry.js';
-import { SCOPE_LAYER_OWNED, SCOPE_VALUE_GROUPS, SCOPE_LAYER_PLACEMENTS } from '../bloom-geometry.js';
+import { SCOPE_LAYER_OWNED, SCOPE_VALUE_GROUPS, SCOPE_LAYER_PLACEMENTS, SCOPE_LAYER_VALUE_IDS } from '../bloom-geometry.js';
 import { SCOPEABLE_IDS } from '../bloom-file.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +39,7 @@ const CLASS = {
   fanSpacing: [A, 'FAN only — angle between neighbours'], fanCenterPetal: [A, 'FAN only — a petal on the mirror line or a gap'],
   scopePetals: [D, 'editor toggle that unlocks per-petal scopes — the photo schema writes no per-petal scopes'],
   scopeLayers: [B, 'the Per-layer values switch — schema v2 (S3) turns it ON exactly when it writes `overrides.layers`; v1 wrote no scopes'],
+  layerRing: [D, 'the Layer ring slider (#495) is a VIEW of the picked layer and its own value is never read — a photo writes a whorl\'s ring as `values.layerRing` on its layer entry (schema v5, LAYER_SCHEMA.ring), never as this control'],
   layerCount: [A, 'single / semi-double / double — but inner layers are hidden in a dense double: confidence low there'],
   layerSize: [A, 'inner petals shorter than outer'], layerPhase: [A, 'inner petals staggered into the gaps or aligned'],
   layerTilt: [B, 'inner whorls more upright than outer — needs a side or low view'],
@@ -179,7 +180,13 @@ export const SCHEMA = [
    SCOPE_LAYER_PLACEMENTS. The owned list is RESTATED here and checked against
    the geometry's SCOPE_LAYER_OWNED at load, both directions: importing it
    would let a quantity added to the geometry enter the photo schema silently. */
-export const SCHEMA_VERSION = 4;
+/* SCHEMA v5 (S6, Nov 7) — a layer's OWN RING (#495 option A): `values.layerRing`,
+   a fraction of the hub ring R0 that REPLACES the derived ring outright. It is
+   footRing()'s alone (it reaches no petal) and a LAYER's alone (a petal or tier
+   entry naming it is refused by the geometry). Listed apart from `values`
+   because it is not a spine or outline value, and checked against the
+   geometry's SCOPE_LAYER_VALUE_IDS both ways for the same reason as the rest. */
+export const SCHEMA_VERSION = 5;
 export const LAYER_SCHEMA = Object.freeze({
   switch: 'scopeLayers',
   placements: ['RADIAL', 'SPIRAL'],
@@ -196,12 +203,14 @@ export const LAYER_SCHEMA = Object.freeze({
      schema: W1 when written. A spine-curl offset on a layer whose petals are drawn
      on a CURVE spine is INERT there (curl mode CURVE reads no slider curl). */
   deltas: ['petalCup', 'petalSpineCurl'],
+  ring: ['layerRing'],
 });
 {
   const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
   if (!same(LAYER_SCHEMA.offsets, SCOPE_LAYER_OWNED)) throw new Error(`LAYER_SCHEMA.offsets [${LAYER_SCHEMA.offsets}] is not the geometry's SCOPE_LAYER_OWNED [${SCOPE_LAYER_OWNED}]`);
   const owned = [...SCOPE_VALUE_GROUPS.spine, ...SCOPE_VALUE_GROUPS.outline];
   if (!same(LAYER_SCHEMA.values, owned)) throw new Error(`LAYER_SCHEMA.values [${LAYER_SCHEMA.values}] is not the geometry's spine + outline value groups [${owned}]`);
+  if (!same(LAYER_SCHEMA.ring, SCOPE_LAYER_VALUE_IDS)) throw new Error(`LAYER_SCHEMA.ring [${LAYER_SCHEMA.ring}] is not the geometry's SCOPE_LAYER_VALUE_IDS [${SCOPE_LAYER_VALUE_IDS}]`);
   if (!same(LAYER_SCHEMA.placements, SCOPE_LAYER_PLACEMENTS)) throw new Error(`LAYER_SCHEMA.placements [${LAYER_SCHEMA.placements}] is not the geometry's SCOPE_LAYER_PLACEMENTS [${SCOPE_LAYER_PLACEMENTS}]`);
   /* a delta row must be a scopeable delta (the file's own SCOPEABLE_IDS), and never an owned quantity */
   for (const id of LAYER_SCHEMA.deltas) {
@@ -234,7 +243,7 @@ for (const r of SCHEMA) {
   if (r.range && c.kind === 'slider' && (r.range[0] < c.min || r.range[1] > c.max)) bad.push(`schema row ${r.id} widens the registry range`);
 }
 if (CLASS[LAYER_SCHEMA.switch] && CLASS[LAYER_SCHEMA.switch][0] === D) bad.push(`the per-layer switch ${LAYER_SCHEMA.switch} is class d — never set`);
-for (const id of [...LAYER_SCHEMA.offsets, ...LAYER_SCHEMA.deltas, ...LAYER_SCHEMA.values, LAYER_SCHEMA.switch]) if (!byId[id]) bad.push(`per-layer schema row ${id} is not a control`);
+for (const id of [...LAYER_SCHEMA.offsets, ...LAYER_SCHEMA.deltas, ...LAYER_SCHEMA.values, ...LAYER_SCHEMA.ring, LAYER_SCHEMA.switch]) if (!byId[id]) bad.push(`per-layer schema row ${id} is not a control`);
 if (bad.length) { console.error('CENSUS INVALID:\n  ' + bad.join('\n  ')); process.exit(2); }
 
 const secLabel = Object.fromEntries(SECTIONS.map((s) => [s.id, s.label || s.id]));
@@ -247,7 +256,7 @@ const neverTrue = (c) => c.visibleWhen && JSON.stringify(c.visibleWhen).includes
 const counts = { a: 0, b: 0, c: 0, d: 0 };
 for (const c of CONTROLS) counts[CLASS[c.id][0]]++;
 if (!process.argv.includes('--md')) {
-  console.log(`CENSUS: ${CONTROLS.length} controls — a ${counts.a} · b ${counts.b} · c ${counts.c} · d ${counts.d}; schema v${SCHEMA_VERSION}: ${SCHEMA.length} global rows (${SCHEMA.filter((r) => !r.since).length} v1 + ${SCHEMA.filter((r) => r.since === 3).length} outline, v3) + per-layer (${LAYER_SCHEMA.switch} ON under ${LAYER_SCHEMA.placements.join('/')}; owned offsets ${LAYER_SCHEMA.offsets.join(', ')}; delta offsets ${LAYER_SCHEMA.deltas.join(', ')} (v4); values ${LAYER_SCHEMA.values.join(', ')}); every control classified, every class an id`);
+  console.log(`CENSUS: ${CONTROLS.length} controls — a ${counts.a} · b ${counts.b} · c ${counts.c} · d ${counts.d}; schema v${SCHEMA_VERSION}: ${SCHEMA.length} global rows (${SCHEMA.filter((r) => !r.since).length} v1 + ${SCHEMA.filter((r) => r.since === 3).length} outline, v3) + per-layer (${LAYER_SCHEMA.switch} ON under ${LAYER_SCHEMA.placements.join('/')}; owned offsets ${LAYER_SCHEMA.offsets.join(', ')}; delta offsets ${LAYER_SCHEMA.deltas.join(', ')} (v4); values ${LAYER_SCHEMA.values.join(', ')}; the ring ${LAYER_SCHEMA.ring.join(', ')} (v5)); every control classified, every class an id`);
   process.exit(0);
 }
 console.log(`| control | kind | section | range / options | default | class | why |\n|---|---|---|---|---|---|---|`);

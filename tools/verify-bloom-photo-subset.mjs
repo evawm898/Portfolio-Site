@@ -98,6 +98,18 @@
          no more than the part's emitted nib stations; anything else warns
          (`clampLocated` says why the count is needed). A tip-only clamp stays
          TOLD and never changes the result. A warning: exit 0.
+   SCHEMA v5 (S6, Nov 7) — a layer's OWN RING (#495 option A), `LAYER_SCHEMA.ring`:
+     `values.layerRing` on a layer entry, a fraction of the hub ring that
+     replaces the derived ring. W1 no longer fires on it.
+     V9  (a CLAUSE) every ring the file names on a layer the build reaches is
+         the ring footRing() BUILT — `__bloomMetrics().rings[i].ownRing`, an
+         owner the reader does not write: asked = the file's number, built =
+         that number clamped to LAYER_RING_RANGE; and no ring is owned that
+         the file does not name. V4 cannot see a page that keeps the ring in
+         its scopes and builds without it (`the-build-drops-the-layer-ring`).
+     W2  also: a ring outside LAYER_RING_RANGE (the reader tells it as a
+         clamp, V1; this says so from the file alone).
+     TOLD also: HUB GROWN — a ring past 1 grows the hub (Oct 16), on the read-out.
    NOT BUILT, by the same ruling: a self-intersection check.
    A name that is not a control at all is V1's (`unknown`), never a warning.
 
@@ -107,7 +119,7 @@
                       with its `controls` put in the v1 envelope; the dropped
                       keys are named. The raw file is still validated as it is.
          node tools/verify-bloom-photo-subset.mjs --self
-                      the twenty-seven written-down fixtures below (five added for schema v2, S3; six for v3, S4; five for v4, S5; one for the CUP CLAMPED ruling), each against its
+                      the thirty-two written-down fixtures below (five added for schema v2, S3; six for v3, S4; five for v4, S5; one for the CUP CLAMPED ruling; five for v5, S6), each against its
                       expected clause, warning AND told sets, then two fixtures
                       through a SPAWNED copy of this validator: the off-schema
                       one must list W1 and exit 0, the away-from-tip clamp W4
@@ -151,7 +163,7 @@ const optVal = (k) => { const i = argv.indexOf(k); if (i < 0) return null; const
 const SAVE = optVal('--save'), BASE_FILE = optVal('--base');
 const FILES = argv.filter((a) => !a.startsWith('--'));
 const DIRTY_MIN = 15;
-const TOLD_KEYS = ['CUP CLAMPED', 'FOLD LIMIT'];
+const TOLD_KEYS = ['CUP CLAMPED', 'FOLD LIMIT', 'HUB GROWN'];
 const controlOf = new Map(CONTROLS.map((c) => [c.id, c]));
 const SCHEMA_ROW = new Map(SCHEMA.map((r) => [r.id, r]));
 
@@ -276,7 +288,10 @@ function schemaWarnings(obj) {
       const mode = e.values && 'petalCurlMode' in e.values ? e.values.petalCurlMode : glob('petalCurlMode');
       if (id === 'petalSpineCurl' && mode === 'CURVE') inert.push(`layers[${i}].offsets.petalSpineCurl=${JSON.stringify(d)} (the layer's petals are drawn on a CURVE spine, which reads no slider curl)`);
     }
-    for (const id of Object.keys(e.values || {})) if (!LAYER_SCHEMA.values.includes(id)) off.push(`layers[${i}].values.${id} (not a per-layer value in schema v2)`);
+    for (const id of Object.keys(e.values || {})) if (!LAYER_SCHEMA.values.includes(id) && !LAYER_SCHEMA.ring.includes(id)) off.push(`layers[${i}].values.${id} (not a per-layer value in schema v5)`);
+    /* schema v5: a ring past LAYER_RING_RANGE is clamped by the build — the reader tells it
+       (V1), and this says so from the file alone, a second owner beside the reader's note */
+    for (const id of LAYER_SCHEMA.ring) if (e.values && id in e.values && typeof e.values[id] === 'number' && (e.values[id] < G.LAYER_RING_RANGE[0] || e.values[id] > G.LAYER_RING_RANGE[1])) out.push(`layers[${i}] owns ${id} ${e.values[id]} (range ${G.LAYER_RING_RANGE[0]}..${G.LAYER_RING_RANGE[1]}: built at the nearest end)`);
   });
   /* schema v3: a petal or sepal outline point the BUILD lifts to the floor */
   const lifted = outlineLifts(obj);
@@ -375,6 +390,17 @@ const FIXTURES = [
   { id: 'SCOPED_CUP_AWAY', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalCup: 0.9, petalWidth: -8 } }] } }, expect: [], warn: ['W4'], told: ['CUP CLAMPED'] },
   { id: 'SCOPED_DELTA_RANGE', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalCup: 1.0 } }] } }, expect: [], warn: ['W2', 'W4'], told: ['CUP CLAMPED'] },
   { id: 'SCOPED_CURL_INERT', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: { petalTilt: 15, petalSpineCurl: 30 }, values: { petalCurlMode: 'CURVE', petalSpineCurve: { mode: 'single', points: [[0, 0], [0.5, 0.1], [0.9, 0.3]] } } }] } }, expect: ['V8'] },
+  /* SCHEMA v5 (S6): a layer's OWN RING (#495). An intended ring loads clean (V9
+     reads it off footRing()'s record); a ring-only entry is a scope with values
+     and builds; a ring past 1 grows the hub, TOLD on the read-out; a ring with
+     Per-layer values OFF is inert — V7; a ring past the range is clamped and told
+     by the reader (V1 / V5) and warned from the file (W2), and V9 still finds
+     asked 2.6 built 2.0. */
+  { id: 'RING_OWNED', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: { petalTilt: -10 } }, { layer: 1, offsets: { petalTilt: 15 }, values: { layerRing: 0.6 } }] } }, expect: [] },
+  { id: 'RING_ONLY', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerRing: 0.55 } }] } }, expect: [] },
+  { id: 'RING_GROWS', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: {}, values: { layerRing: 1.3 } }] } }, expect: [], told: ['HUB GROWN'] },
+  { id: 'RING_INERT', file: { ...ENV, controls: { ...CLEAN }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerRing: 0.6 } }] } }, expect: ['V7'] },
+  { id: 'RING_PAST', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerRing: 2.6 } }] } }, expect: ['V1', 'V5'], warn: ['W2'], told: ['HUB GROWN'] },
   { id: 'NO_ENVELOPE', file: { views: ['front'], controls: { ...CLEAN }, frame: 1 }, expect: ['V0', 'V1', 'V2', 'V3', 'V4', 'V5'] },   // V3: the dirty page's own layerSize hides under Per-layer values
 ];
 
@@ -395,7 +421,9 @@ const MUTANTS = [
       /* S4: the outline fixtures, the same two mechanisms */
       'OUTLINE_CURVE:V2', 'OUTLINE_CURVE:V3', 'OUTLINE_LAYER:V2', 'OUTLINE_LIFTED:V2', 'OUTLINE_LIFTED:V3', 'WIDTH_REFUSED_ON_LOAD:V3',
       /* S5: the cup/curl fixtures, the S3 mechanisms again (SCOPED_CUPCURL_OFF is SCOPED_INERT's shape) */
-      'SCOPED_CUPCURL:V2', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V7', 'SCOPED_CUP_CLAMPED:V2', 'SCOPED_CUP_AWAY:V2', 'SCOPED_DELTA_RANGE:V2', 'SCOPED_CURL_INERT:V2'],
+      'SCOPED_CUPCURL:V2', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V7', 'SCOPED_CUP_CLAMPED:V2', 'SCOPED_CUP_AWAY:V2', 'SCOPED_DELTA_RANGE:V2', 'SCOPED_CURL_INERT:V2',
+      /* S6: the ring fixtures, the same mechanisms (RING_INERT is SCOPED_INERT's shape) */
+      'RING_OWNED:V2', 'RING_ONLY:V2', 'RING_GROWS:V2', 'RING_PAST:V2', 'RING_INERT:V2', 'RING_INERT:V3', 'RING_INERT:V7'],
   },
   {
     id: 'the-scopes-survive-a-new-design', file: 'bloom.js',
@@ -407,7 +435,10 @@ const MUTANTS = [
       /* S4: V4 on every outline fixture that loads; V7 on OUTLINE_LAYER (its layers [0, 1]) */
       'OUTLINE_CURVE:V4', 'OUTLINE_LAYER:V4', 'OUTLINE_LAYER:V7', 'OUTLINE_MODE_OFF:V4', 'LOBES_UNDER_CURVE:V4', 'OUTLINE_LIFTED:V4', 'WIDTH_REFUSED_ON_LOAD:V4',
       /* S5: V4 on every cup/curl fixture; V7 on SCOPED_CUPCURL (its layers [0, 1]) */
-      'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL:V7', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_CUP_AWAY:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4'],
+      'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL:V7', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_CUP_AWAY:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4',
+      /* S6: V4 on every ring fixture; V7 where the file's layers are not [1]; V9 wherever the
+         file's ring is replaced by the leftover entry, which owns none (RING_INERT builds no layer) */
+      'RING_OWNED:V4', 'RING_OWNED:V7', 'RING_OWNED:V9', 'RING_ONLY:V4', 'RING_ONLY:V9', 'RING_GROWS:V4', 'RING_GROWS:V7', 'RING_GROWS:V9', 'RING_PAST:V4', 'RING_PAST:V9', 'RING_INERT:V4'],
   },
   {
     /* S3: the page MERGES the leftover scope into the file's — the plausible
@@ -421,7 +452,10 @@ const MUTANTS = [
       /* S4: V4 on every outline fixture that loads (OUTLINE_LAYER's layers [0, 1] already hold the leftover's 1, so no V7) */
       'OUTLINE_CURVE:V4', 'OUTLINE_LAYER:V4', 'OUTLINE_MODE_OFF:V4', 'LOBES_UNDER_CURVE:V4', 'OUTLINE_LIFTED:V4', 'WIDTH_REFUSED_ON_LOAD:V4',
       /* S5: V4 on every cup/curl fixture (each already names layer 1) */
-      'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_CUP_AWAY:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4'],
+      'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_CUP_AWAY:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4',
+      /* S6: V4 on every ring fixture; V7 on RING_GROWS, whose own layers are [0]. No V9: the
+         merged leftover owns no ring, and every ring the file names is still built */
+      'RING_OWNED:V4', 'RING_ONLY:V4', 'RING_GROWS:V4', 'RING_GROWS:V7', 'RING_PAST:V4', 'RING_INERT:V4'],
   },
   {
     id: 'hidden-controls-are-applied', file: 'bloom-file.js',
@@ -434,7 +468,10 @@ const MUTANTS = [
   {
     id: 'a-reader-note-is-dropped', file: 'bloom-file.js',
     from: '  const notes = r.notes.slice();\n  const named', to: '  const notes = [];\n  const named',
-    breaks: ['OUT_OF_RANGE:V1', 'OUT_OF_RANGE:V5', 'UNKNOWN_FIELD:V1', 'UNKNOWN_FIELD:V5', 'OFF_STEP:V1', 'OFF_STEP:V5', 'SIDECAR_INSIDE:V1', 'SIDECAR_INSIDE:V5'],
+    breaks: ['OUT_OF_RANGE:V1', 'OUT_OF_RANGE:V5', 'UNKNOWN_FIELD:V1', 'UNKNOWN_FIELD:V5', 'OFF_STEP:V1', 'OFF_STEP:V5', 'SIDECAR_INSIDE:V1', 'SIDECAR_INSIDE:V5',
+      /* S6: the reader's clamp note on a ring past the range — with it gone the file passes
+         every clause, and only W2 (pure, from the file) still says so */
+      'RING_PAST:V1', 'RING_PAST:V5'],
   },
   {
     id: 'the-subset-is-composed-over-the-page', file: 'bloom.js',
@@ -455,7 +492,21 @@ const MUTANTS = [
       'OUTLINE_LIFTED:V1', 'OUTLINE_LIFTED:V2', 'OUTLINE_LIFTED:V3', 'OUTLINE_LIFTED:V5', 'WIDTH_REFUSED_ON_LOAD:V1', 'WIDTH_REFUSED_ON_LOAD:V3', 'WIDTH_REFUSED_ON_LOAD:V5',
       /* S5: the scoped cup/curl fixtures as the S3 scoped ones; SCOPED_CUPCURL_OFF as SCOPED_INERT */
       'SCOPED_CUPCURL:V1', 'SCOPED_CUPCURL:V2', 'SCOPED_CUPCURL:V5', 'SCOPED_CUP_CLAMPED:V1', 'SCOPED_CUP_CLAMPED:V2', 'SCOPED_CUP_CLAMPED:V5', 'SCOPED_CUP_AWAY:V1', 'SCOPED_CUP_AWAY:V2', 'SCOPED_CUP_AWAY:V5', 'SCOPED_DELTA_RANGE:V1', 'SCOPED_DELTA_RANGE:V2', 'SCOPED_DELTA_RANGE:V5',
-      'SCOPED_CURL_INERT:V1', 'SCOPED_CURL_INERT:V2', 'SCOPED_CURL_INERT:V5', 'SCOPED_CUPCURL_OFF:V1', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V5', 'SCOPED_CUPCURL_OFF:V7'],
+      'SCOPED_CURL_INERT:V1', 'SCOPED_CURL_INERT:V2', 'SCOPED_CURL_INERT:V5', 'SCOPED_CUPCURL_OFF:V1', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V5', 'SCOPED_CUPCURL_OFF:V7',
+      /* S6: the ring fixtures as the scoped ones (RING_PAST's V1/V5 already fire); RING_INERT as SCOPED_INERT */
+      'RING_OWNED:V1', 'RING_OWNED:V2', 'RING_OWNED:V5', 'RING_ONLY:V1', 'RING_ONLY:V2', 'RING_ONLY:V5', 'RING_GROWS:V1', 'RING_GROWS:V2', 'RING_GROWS:V5', 'RING_PAST:V2',
+      'RING_INERT:V1', 'RING_INERT:V2', 'RING_INERT:V3', 'RING_INERT:V5', 'RING_INERT:V7'],
+  },
+  {
+    /* S6 (schema v5): the page builds WITHOUT the layer rings it holds — the
+       reader keeps them (V4 sees the file's scopes on the page) and the build
+       places the derived ring. Only V9 reads footRing()'s record; a ring-only
+       entry is left with no value at all, so its layer stops reaching the
+       build (V7) too. */
+    id: 'the-build-drops-the-layer-ring', file: 'bloom-file.js',
+    from: '  return { layers, petals, tiers, strands, bounds: scopeBounds() };',
+    to: "  return { layers: layers.map((e) => (e.values && 'layerRing' in e.values ? { ...e, values: Object.fromEntries(Object.entries(e.values).filter(([k]) => k !== 'layerRing')) } : e)), petals, tiers, strands, bounds: scopeBounds() };",
+    breaks: ['RING_OWNED:V9', 'RING_ONLY:V7', 'RING_ONLY:V9', 'RING_GROWS:V7', 'RING_GROWS:V9', 'RING_PAST:V7', 'RING_PAST:V9'],
   },
 ];
 
@@ -483,6 +534,7 @@ async function validate(page, port, text, name, dirtyOver = null) {
     await settleBuild(page, 120000);
     const after = await page.evaluate(([ids]) => ({
       ui: window.__bloomUIState(), scopes: window.__bloomDesign.scopes(), built: (window.__bloomMetrics() || {}).scopes || null,
+      rings: ((window.__bloomMetrics() || {}).rings || []).map((r) => ({ index: r.index, ownRing: r.ownRing || null })),
       status: document.getElementById('designStatus').textContent,
       readout: (document.getElementById('readout') || {}).textContent || '',
       hidden: ids.filter((id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return !w || w.hidden; }),
@@ -508,6 +560,31 @@ async function validate(page, port, text, name, dirtyOver = null) {
       if (!b || !b.layersLive || JSON.stringify(b.scopedLayers) !== JSON.stringify(fileLayers) || (b.keptLayers || []).length) {
         fired.V7 = `the file's layers [${fileLayers}] — the build ${b ? `layersLive ${b.layersLive}, scoped [${b.scopedLayers}], kept INERT [${b.keptLayers}]` : 'reports no scopes'}`;
       }
+    }
+    /* V9 (schema v5, S6): every ring the file names on a layer the build
+       reaches is the ring footRing() BUILT — read off footRing()'s own per-ring
+       record (`__bloomMetrics().rings[i].ownRing`), an owner the reader does not
+       write: its `asked` is the file's number and its `built` the number clamped
+       to LAYER_RING_RANGE (imported into Node from the geometry; a page mutant
+       changes the page's copy, never this one). And the
+       converse: no ring is owned that the file does not name (a leftover from
+       the dirty page). Judged only where V7's builder says the layers are live;
+       an inert ring is V7's. */
+    if (after.built && after.built.layersLive) {
+      const asked = new Map();
+      for (const e of (obj && obj.overrides && Array.isArray(obj.overrides.layers) ? obj.overrides.layers : [])) {
+        if (e && e.values && LAYER_SCHEMA.ring.some((k) => k in e.values)) asked.set(e.layer, e.values.layerRing);
+      }
+      const [lo, hi] = G.LAYER_RING_RANGE;
+      const bad9 = [];
+      for (const [layer, v] of asked) {
+        const r = after.rings.find((x) => x.index === layer);
+        if (!r) { if (layer < after.rings.length) bad9.push(`layer ${layer}: no ring record`); continue; }
+        const want = Math.min(hi, Math.max(lo, v));
+        if (!r.ownRing || r.ownRing.asked !== v || r.ownRing.built !== want) bad9.push(`layer ${layer}: the file asks ${v} (built ${want}), footRing() ${r.ownRing ? `asked ${r.ownRing.asked}, built ${r.ownRing.built}` : 'owns no ring — the derived ring was built'}`);
+      }
+      for (const r of after.rings) if (r.ownRing && !asked.has(r.index)) bad9.push(`layer ${r.index}: footRing() built an owned ring ${r.ownRing.built} the file does not name`);
+      if (bad9.length) fired.V9 = `the ring the build placed is not the file's: ${bad9.join('; ')}`;
     }
     /* TOLD (schema v4, S5) — what the page's READ-OUT says it clamped, which no
        reader note carries: the fold clamp on the section (CUP CLAMPED) and on
