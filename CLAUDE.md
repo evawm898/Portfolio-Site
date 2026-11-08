@@ -757,6 +757,8 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   fixtures (32), page mutant `the-build-drops-the-layer-ring`. Lotus v10 (rings read from the side photo, 0.70 / 0.50)
   and v11 (one render iteration, 0.66 / 0.55): body h:w **1.161 → 1.353 → 1.413** (photo ≈ 1.45), 0 within-shell pairs.
   `bloom-photo-s2.mjs` orders versions by NUMBER (v10 sorted between v1 and v2). §12's ranking is revised in §17.6.
+  **[Nov 8: RULED — the ring stage PASSES AS A MECHANISM, not as a match (§17.8): the look gap left is petal count / breadth
+  per whorl and the outer whorls' splay. Next: petal count per whorl, a bloom feature, discovery first.]**
 - **#495 (Nov 5): DISCOVERY + PROTOTYPE, NOTHING SHIPPED — §15 of the same doc.** Read it before touching `footRing()`'s
   `ringFactor`, `layerOwnedValues` or `layerSize`'s visibility.
   - Four options are prototyped by `tools/bloom-ring-options.mjs` as anchored edits of TEMPORARY copies:

@@ -1478,7 +1478,9 @@ records what the route can now replicate, then ranks the remaining gaps. It does
   1.161 → 1.413 (v11).]**
 - scale (35 mm by default) and the stem and leaves (design choices).
 
-**[Nov 7: REVISED AGAIN after S6 — the current ranking is §17.6. The ring / width coupling below is closed.]**
+**[Nov 7: REVISED AGAIN after S6 — the current ranking is §17.6. The ring / width coupling below is closed — Nov 8, RULED
+(§17.8): closed AS A MECHANISM, not as a match. The lotus still does not look like the photo; the look gap left is petal
+count / breadth per whorl and the outer whorls' splay, and petal count per whorl is next.]**
 
 **The remaining gaps, ranked by how much they would improve the sheet — REVISED after S5 (Nov 5):**
 
@@ -2303,6 +2305,8 @@ write each whorl's ring. Same six photos (§11.1): the working copies in the ses
 (no EXIF / GPS / XMP / IPTC / profile), **none committed. No bloom page code changed** (`bloom*.js`, `bloom.html`,
 `bloom.css` are `main`'s at `392f99a`).
 
+**[Nov 8: RULED — the ring stage PASSES AS A MECHANISM, not as a match. §17.8.]**
+
 | file | what |
 |---|---|
 | `docs/photo-to-bloom/eva-set/lotus/lotus-v{10,11}.*` | v10: each body whorl's OWN ring, read from the side photo; v11: one render iteration on the rings alone |
@@ -2416,6 +2420,10 @@ is the export contract's overlap, and spreads the nearest feet further apart.
 
 The ring / width coupling (S5's #1) is CLOSED by #495 option A and this stage: 1.161 → 1.413.
 
+**[Nov 8, RULED (§17.8): CLOSED AS A MECHANISM, NOT AS A MATCH.** The owned ring works and moves the lotus body the right
+way; the lotus still does not look like the photo. What is left of the look gap is #1 (petal count and breadth per whorl)
+and #2 (the outer whorls' splay). #1 is next: a bloom feature, its discovery next session.]
+
 ### 17.7 Reproduce
 
 ```bash
@@ -2439,3 +2447,15 @@ node tools/bloom-photo-s2.mjs /tmp/s6 --versions lotus:v9,lotus:v10,lotus:v11 --
 ```
 
 ![S6 — the ring stage](img/photo-to-bloom-s6.png)
+
+### 17.8 Rulings (Eva, Nov 8)
+
+- **The ring stage PASSES AS A MECHANISM.** The owned ring works, and it moves the lotus body the right way (1.161 → 1.413
+  against ≈ 1.45). **It does NOT mean the lotus matches the photo.** The remaining look gap is the petal count and breadth
+  per whorl, and the outer whorls' splay (§17.6, #1 and #2).
+- **The next gap is petal count per whorl** — a bloom feature, not a photo-reading stage. Its discovery is the next session.
+
+The questions as asked (Nov 7), kept beneath the rulings:
+
+- Does the ring stage pass on the lotus (v11 at body h:w 1.413 against the photo's ≈ 1.45)?
+- May #526 (schema v5, V9, lotus v10/v11) merge?
