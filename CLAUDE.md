@@ -759,6 +759,12 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   `bloom-photo-s2.mjs` orders versions by NUMBER (v10 sorted between v1 and v2). §12's ranking is revised in §17.6.
   **[Nov 8: RULED — the ring stage PASSES AS A MECHANISM, not as a match (§17.8): the look gap left is petal count / breadth
   per whorl and the outer whorls' splay. Next: petal count per whorl, a bloom feature, discovery first.]**
+- **Petal count per whorl (Nov 8): DISCOVERY + PROTOTYPE, NOTHING SHIPPED — §18 of the same doc.** Three options, anchored
+  edits of a temporary geometry copy (`tools/bloom-count-options.mjs`): A an owned count per layer, B an offset on the
+  global, C a whole-bloom count ramp. The count lives in three places (the area rule's foot count, the slot map, the whorl
+  primitive's `count`). All three keep S1's 26 + 22 per-layer designs byte-identical (48/48; must-fail 21/22). Lotus count
+  only: body h:w 1.482. Water lily 4/10 reads as the photo. The daisy is the global count (no per-whorl). Unresolved: the
+  tube (C throws; A/B never meet it), the sepal ceiling and Layer phase read the global count. Eva's ruling pending.
 - **#495 (Nov 5): DISCOVERY + PROTOTYPE, NOTHING SHIPPED — §15 of the same doc.** Read it before touching `footRing()`'s
   `ringFactor`, `layerOwnedValues` or `layerSize`'s visibility.
   - Four options are prototyped by `tools/bloom-ring-options.mjs` as anchored edits of TEMPORARY copies:
