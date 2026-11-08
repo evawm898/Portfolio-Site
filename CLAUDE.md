@@ -3143,10 +3143,6 @@ wording fits all seven of the newest tags (`phase46`..`phase52`, `phase49` refus
 probes and all six declared refusals (`phase5`, `phase22`, `phase23`, `phase42`, `phase43`,
 `phase45` — each dispatched from a `main` head of which its base is an ancestor, each with a
 workflow file differing). **`phase24` in run 9 is a known counterexample and is NOT explained under EITHER wording**
-**— and `phase94` (Nov 6, run 42293557289) is a SECOND: its base `ba539e0` is on `main`, the dispatch head `392f99a`
-MODIFIED `bloom-export-watertight.yml` (#520), which exists at the base, and it PUBLISHED. It had been declared in advance
-and the entry came off as stale** — so a declared-in-advance entry is a prediction, not a certainty, and the read-back is
-what settles it
 (its `bloom-export-watertight.yml` existed at its base, was MODIFIED by the dispatch head, and it
 published), **and `phase94` (Nov 7) is a second one**: its base `ba539e0` is on `main`, its `bloom-export-watertight.yml` existed at the base and #520 (`c9b4125`, the preflight split) MODIFIED it before the dispatch head `392f99a`, so the narrowed wording predicted a refusal — it was declared in `TAG_PUSH_XFAIL` in advance and **PUBLISHED, at the right commit** (run 42293557289; the script's own "STALE EXCEPTION" line named it, and the entry came out in the commit that observed it). A declaration made in advance on this rule is a prediction and can be wrong, which is exactly why the script calls a publishing entry stale. This is why this is a rule of thumb. **THE MECHANISM IS UNKNOWN AND IS NOT TO BE INVESTIGATED FURTHER**
 — its whole cost is that a pointer tag sometimes fails to publish while the matrices themselves
