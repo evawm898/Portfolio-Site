@@ -2459,3 +2459,171 @@ The questions as asked (Nov 7), kept beneath the rulings:
 
 - Does the ring stage pass on the lotus (v11 at body h:w 1.413 against the photo's ≈ 1.45)?
 - May #526 (schema v5, V9, lotus v10/v11) merge?
+
+## 18. Petal count per whorl — discovery and prototype, NOTHING SHIPPED (Nov 8)
+
+§17.6's #1, a bloom feature rather than a photo-reading stage (§17.8). Three options are prototyped as anchored edits of a
+TEMPORARY copy of `bloom-geometry.js` (`tools/bloom-count-options.mjs`; every anchor must match exactly once or the run
+refuses). **No shipped file moved**: `bloom*.js`, `bloom.html` and `bloom.css` are `main`'s at `1cd97f8`, and nothing
+touches the registry, the design file or the page. The count rides the build's layer scope (A, B) or the state (C), the
+way #495's ring options rode `e.ring`. The photos stay in the session's scratchpad, stripped, and are never committed.
+**Nothing is picked here — the trade-offs are §18.5, for Eva's ruling.**
+
+### 18.1 Where the count lives today
+
+`petalCount` is read for a ringed whorl (RADIAL, SPIRAL) in exactly three places, and every per-layer option has to
+reach all three or the whorl disagrees with itself:
+
+1. **the area rule** — `footRing()`'s ringed loop sums `footCount × rFoot²` with `footCount = slotCount`, the global
+   double, for every layer. So R0, and every ring that is a fraction of it (owned rings included), follows the count;
+2. **the slot map** — `slotRings[L]` is an array of `n` copies of the layer's descriptor;
+3. **the whorl primitive** — `buildBloomInto` hands `buildWhorlInto` `count: fr.slotCount` for every layer. That is
+   the RADIAL azimuth divisor; SPIRAL already restarts its golden-angle run per whorl (`phase + i × GOLDEN_ANGLE`, one
+   call per layer), so a per-turn count is simply a run of that length.
+
+The prototype's plumbing changes those three to the layer's own count `countOf(L)`. Where nothing asks for another count,
+`countOf(L)` is `slotCount` ITSELF (the same double), so the identity is BY BRANCH; §18.4 is what says it holds.
+
+### 18.2 The three options
+
+| | how a layer gets its count | where it is live | the lotus (6/5/3/3) | the water lily (4/10) |
+|---|---|---|---|---|
+| **A** owned | a layer entry's count REPLACES the global (a value, like `layerRing`, or an owned offset like length / width / tilt) | Per-layer values, RADIAL / SPIRAL | exact | exact |
+| **B** offset | a layer entry's count offset is ADDED to Petal count (scoping's delta default, Q3.2), rounded, clamped 3..40 | Per-layer values, RADIAL / SPIRAL | global 5: +1 / 0 / −2 / −2 | global 8: −4 / +2 |
+| **C** ramp (the code's suggestion) | one whole-bloom number r: whorl L carries round(Petal count × r^L), clamped 3..40 — `layerSize`'s shape | RADIAL / SPIRAL, with or without Per-layer values | 6/5/**4**/3 at r 0.80 (the nearest one ratio reaches) | 4/10 at r 2.5 |
+
+**A multiplier** (B's other reading) builds the same design as the offset at one global value; the two differ only in
+how a later move of the global count carries the layers (an offset keeps the difference, a multiplier the ratio, with
+rounding jumps). It is not prototyped separately.
+
+**C is the cleaner code and the narrower capability.** It needs no scope, works on designs without Per-layer values, and
+never moves layer 0 off the global (r^0 = 1), so every whole-whorl reader of the OUTER count (sepals, below) stays right.
+But it can only draw a geometric sequence: it cannot reach 6/5/3/3, nor any non-monotone set. And under Per-layer values
+it is a whole-bloom law standing beside layer-owned quantities, the situation Q3.5 resolved for `layerSize` / `layerTilt`
+by hiding them.
+
+### 18.3 The evidence — the photo set, EXPORT mesh
+
+`node tools/bloom-count-options.mjs --measure` (the census, the builder's `neighbourFlag`, the rim profiles, the emitted
+mesh). **Coverage** is n × (the built petal's widest blade) / (2π × its ring): how many times a whorl's blades wrap their
+ring, read off the built petals.
+
+| flower / variant | counts | body h:w (photo ≈ 1.45) | whole | coverage per whorl | within-shell pairs | skin gap · feet nearest | tris |
+|---|---|---|---|---|---|---|---|
+| lotus S6 v11 (main) | 5/5/5/5 | 1.413 | 0.655 | 0.69 / 0.90 / 1.79 / 2.11 | 0 | −1.200 mm · 4.73 | 61,432 |
+| lotus A = B, count only (v11's 24 / 21 mm body) | 6/5/3/3 | **1.482** | 0.677 | 0.88 / 0.96 / 1.15 / 1.36 | 0 | −1.200 · 0.93 | 52,246 |
+| lotus A = B, count + body widths back to 32 / 28 mm | 6/5/3/3 | 1.211 | 0.661 | 0.84 / 0.91 / 1.46 / 1.72 | **27** (span 0.0660) | −1.199 · 0.98 | 52,246 |
+| lotus C, count only | 6/5/4/3 | 1.454 | 0.668 | 0.86 / 0.93 / 1.49 / 1.32 | 0 | −1.200 · 1.65 | 55,308 |
+| lotus C, count + widths | 6/5/4/3 | 1.219 | 0.650 | 0.81 / 0.88 / 1.88 / 1.67 | **16** (span 0.0126) | −1.200 · 1.55 | 55,308 |
+| water lily v7 (main) | 8/8 | 0.665 | 0.352 | 1.13 / 0.97 | 0 | +2.086 · 0.81 | 106,232 |
+| water lily A = B = C | 4/10 | 0.686 | 0.359 | 0.61 / 1.31 | 0 | **−0.161** · 0.75 | 100,108 |
+| daisy v7 (main) | 11/11 | — | 0.167 | 1.09 / 1.09 | 0 | +1.327 · 4.84 | 70,820 |
+| daisy, GLOBAL 13 (every tree) | 13/13 | — | 0.162 | 1.19 / 1.19 | 0 | +1.240 · 4.46 | 83,068 |
+
+- **The lotus's slats are the count.** v11's body whorls wrap their small rings about twice over (coverage 1.79 / 2.11);
+  five petals that must stay narrow enough to fit read as slats. Three per body whorl, at v11's own widths, take
+  coverage to 1.15 / 1.36 and the body to **h:w 1.482 against the photo's ≈ 1.45**, with no fold. Widening those three
+  back to 32 / 28 mm reads broader (the sheet) but splays the body (1.211) and **folds 27 within-shell pairs** — a width
+  choice, not the count's; the tool keeps both variants so the two are not confused.
+- **The area rule moves R0 with the count.** Fewer feet make a smaller hub ring (17.39 → 16.27 mm, count only), and an
+  owned ring is a FRACTION of R0, so v11's owned body rings shrink with it (11.48 → 10.74 mm). That is the area rule
+  doing its job; it is also why a count edit moves the body's rings without anyone touching a ring.
+- **The water lily reads as the photo's star** (4 long pale outer, 10 inner; the brief's 4 + ~10 reproduces on the front
+  photo). Its ten inner petals now pass through each other (skin gap −0.161 mm, the accepted crossing class), with 0
+  within-shell pairs.
+- **The daisy needs no per-whorl count — measured, and the brief's premise is corrected.** The photo shows about 24–26
+  rays in ONE ring; v7 already draws 22 (two whorls of 11 interleaved at Layer phase 0.5, which read as one ring). That
+  is ~1.1–1.2× v7, not twice. Both whorls take the same count, so it is the GLOBAL count: 13 × 2 = 26 rays on every tree.
+- **Print checks:** 0 UNDECLARED rim profiles under the 1.0 mm floor on every build (the declared clamps scale with the
+  petal count, as on `main`); 0 within-shell pairs except the widened lotus body. Triangles FALL on the lotus and the
+  water lily (fewer petals) and rise on the daisy (more).
+
+### 18.4 Saved designs — the old load path, byte for byte
+
+`node tools/verify-bloom-load-unchanged.mjs --base <worktree of 1cd97f8> --per-layer`, run from a worktree of `1cd97f8`
+holding each option's patched `bloom-geometry.js` (`--write <opt> <dir>`): S1's 26 samples plus every Per-layer design
+(now 22: the photo set's per-layer subsets v4–v11 and the live matrix's layer-owning rows).
+
+| option | samples identical (record, state, scopes, save, STL bytes) |
+|---|---|
+| A | **48 of 48** |
+| B | **48 of 48** |
+| C | **48 of 48** |
+| must-fail `A-broken` (layer 1 takes one petal more with nothing asked) | **21 of 22 DIFFER on STL**; the one that holds is `PER-LAYER: GATED — CONTINUOUS …`, where a layer record is inert by design |
+| the tool's own `--control` (petalCup + 0.05 on the head) | moved ui, save and STL, as it must |
+
+Every option is the old bloom on every saved design, by branch; the compare can see a count move.
+
+### 18.5 Interactions — what each option meets, and what is NOT resolved
+
+`node tools/bloom-count-options.mjs --interactions` builds the water lily under each option against the features the
+count touches.
+
+| | A owned / B offset | C ramp |
+|---|---|---|
+| **SPIRAL** (turns are layer scopes) | builds (4/10). A turn's count is its own golden-angle run of that length; the runs already restart per turn, so nothing continuous is broken | builds (4/10), same reading |
+| **CONTINUOUS** | excluded (Per-layer values is not live there; a layer record is kept and inert) | excluded by branch. A count RAMP along one golden sequence would be a density law — not prototyped, **unresolved** |
+| **FAN** | excluded (Per-layer values is RADIAL / SPIRAL only); the fan's count is derived from Petals per side | excluded by branch. A per-layer Petals-per-side is a different question — **unresolved** |
+| **TUBE** (slits snap to divisors of the count) | no interaction TODAY, because Per-layer values ON makes the tube unavailable (SO11). That also means **a per-layer-count bloom can never be fused** — if the exclusion is ever lifted, the C findings apply | **THE BUILD THROWS** when a fused whorl's count differs from the global (`tubeLayer2` 1 or 2 on the 10-petal whorl: `Cannot read properties of undefined`), and 5 slits on that whorl SNAP to a divisor of the global 4 (→ free) though 5 divides 10. `tubePlan(state, layerCount, n)` reads ONE n. **Shipping C needs a per-whorl tube plan** |
+| **Voronoi infill** | builds (139,184 tris); the plan is per petal, so the count only multiplies it | same |
+| **Texture (BONE)** | builds (1,969,500 tris, under the 2.0 M cap); the derived lattice edge reads the whole build's count, so a count moves the edge like any other size | same |
+| **Sepals** | **the ceiling reads the GLOBAL count**: 40 asked builds 8 sepals over a 4-petal outer whorl (water lily, global 8). The ceiling (and the sepal phase's interleave) must read layer 0's own count — **unresolved for A / B** | no issue: layer 0 is always the global (r^0 = 1) |
+| **Layer phase** | `phase = L × layerPhase × 2π / petalCount` uses the GLOBAL count. Between whorls of 4 and 10 "interleave" has no single meaning — **unresolved** | same |
+| **Per-petal independence** (Per-petal values, FAN only) | untouched (FAN excluded). If FAN ever took a per-layer count, petal entries keyed on the canonical slot at one count would no longer name the same pair on every whorl — **unresolved** | untouched |
+| **Variance field** | its Nyquist bar (n/2) reads the global count; on a whorl with more petals the told ALIASED line is conservative, on one with fewer it under-tells — minor, **unresolved** | same |
+| **Owned rings / owned width** | an owned ring is a fraction of R0 and R0 follows the feet that are really there, so a count edit moves owned rings proportionally (§18.3) | same |
+
+**What shipping any option costs beyond the geometry** (not built): every instrument that assumes one slot count per
+bloom — J5 / J6, the Z family, coverage R1 / R3, the crowding raster, the variance read-out, `fr.slotCount`'s own
+consumers (scope pairing, the tube, the sepal ceiling) — must read the layer's own count; and A / B need a design-file
+field and a control on the scope bar (`petalCount` joins the scopeable set, today 33 petal-side ids).
+
+### 18.6 The trade-offs, for Eva's ruling (no pick)
+
+- **A — owned count.** Says exactly what the photo says, whorl by whorl (6/5/3/3, 4/10), and matches the Oct 16
+  doctrine that a layer under Per-layer values OWNS its quantities outright. A global Petal count edit then leaves owning
+  layers alone. Needs Per-layer values, so it can never meet the tube today. Sepal ceiling and layer phase must learn the
+  outer whorl's own count. Open: is it a VALUE that replaces (the `layerRing` shape) or an owned OFFSET (the length /
+  width / tilt shape)? It is the same build either way; it is a file-format and panel choice.
+- **B — offset on the global.** The same reach as A on any one design (identical bytes on every flower measured), but a
+  layer's count follows the global slider; at the slider's ends the offsets saturate (clamped, told). Reads oddly for
+  the water lily (global 8, offsets −4 / +2). Same exclusions and same unresolved readers as A.
+- **C — a whole-bloom count ramp.** One control, no scoping, works on non-per-layer designs, keeps the outer whorl at the
+  global count (so sepals and phase stay right for the outer whorl), and is the only option that meets the tube — where
+  it THROWS today and needs a per-whorl tube plan before it can ship. It cannot draw a non-geometric set (the lotus
+  comes out 6/5/4/3, body 1.454), and under Per-layer values it is a second owner beside the layers (Q3.5's question).
+- **The daisy is the global count in every option** — no feature needed (§18.3).
+- **The lotus's body numbers favour the COUNT, not the width**: count only reaches 1.482 cleanly; restoring the broad
+  widths reads broader on the sheet and folds. Which of the two is the lotus is a look ruling.
+
+Questions for Eva:
+
+1. A, B or C — or none?
+2. If A: a value that replaces (`layerRing`'s shape) or an owned offset (length / width / tilt's shape)?
+3. Layer phase between whorls of different counts: interleave on the outer whorl's pitch, on each whorl's own, or drop
+   the phase for whorls whose counts differ?
+4. If C: is a per-whorl tube plan in scope, and is C live under Per-layer values or hidden like Layer size?
+
+### 18.7 Reproduce
+
+```bash
+node tools/bloom-count-options.mjs --measure
+```
+
+```bash
+node tools/bloom-count-options.mjs --interactions
+```
+
+```bash
+node tools/bloom-count-options.mjs --write A <worktree of main>
+```
+
+```bash
+node <worktree>/tools/verify-bloom-load-unchanged.mjs --base <clean worktree of main> --per-layer
+```
+
+```bash
+node tools/bloom-count-options.mjs --sheet docs/img/petal-count-options.png
+```
+
+![Petal count per whorl — options A, B, C beside main](img/petal-count-options.png)
