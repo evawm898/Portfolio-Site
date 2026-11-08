@@ -750,6 +750,15 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
       (`tipCap.apex`). The test is the record's worst station on the nib AND its row count ≤ the part's nib stations.
     - A tip-only clamp stays TOLD.
     - No self-intersection check, by ruling. Next: #495.
+- **S6, the ring stage (Nov 7), is §17 of the same doc.** Schema v5 adds `LAYER_SCHEMA.ring` (`values.layerRing` on a layer
+  entry, checked against the geometry's `SCOPE_LAYER_VALUE_IDS`); the `layerRing` CONTROL is class d (a view of the picked
+  layer). The validator gains clause **V9** (every ring the file names is the ring footRing() built, off
+  `__bloomMetrics().rings[i].ownRing`; no unnamed ring owned), W2 on a ring past 0.10–2.00, TOLD `HUB GROWN`; five
+  fixtures (32), page mutant `the-build-drops-the-layer-ring`. Lotus v10 (rings read from the side photo, 0.70 / 0.50)
+  and v11 (one render iteration, 0.66 / 0.55): body h:w **1.161 → 1.353 → 1.413** (photo ≈ 1.45), 0 within-shell pairs.
+  `bloom-photo-s2.mjs` orders versions by NUMBER (v10 sorted between v1 and v2). §12's ranking is revised in §17.6.
+  **[Nov 8: RULED — the ring stage PASSES AS A MECHANISM, not as a match (§17.8): the look gap left is petal count / breadth
+  per whorl and the outer whorls' splay. Next: petal count per whorl, a bloom feature, discovery first.]**
 - **#495 (Nov 5): DISCOVERY + PROTOTYPE, NOTHING SHIPPED — §15 of the same doc.** Read it before touching `footRing()`'s
   `ringFactor`, `layerOwnedValues` or `layerSize`'s visibility.
   - Four options are prototyped by `tools/bloom-ring-options.mjs` as anchored edits of TEMPORARY copies:

@@ -85,10 +85,12 @@ function versions() {
   for (const flower of fs.readdirSync(SET).filter((f) => fs.statSync(path.join(SET, f)).isDirectory()).sort()) {
     for (const f of fs.readdirSync(path.join(SET, flower)).filter((x) => x.endsWith('.subset.bloom-design.json')).sort()) {
       const v = f.replace('.subset.bloom-design.json', '').replace(`${flower}-`, '');
-      out.push({ flower, v, design: path.join(SET, flower, f), sidecar: path.join(SET, flower, `${flower}-${v}.bloom-photo.json`) });
+      out.push({ flower, v, n: Number(v.replace(/^v/, '')), design: path.join(SET, flower, f), sidecar: path.join(SET, flower, `${flower}-${v}.bloom-photo.json`) });
     }
   }
-  return out;
+  /* by the version's NUMBER: a filename sort puts v10 between v1 and v2, and S6's
+     "the previous version" then compared v10 against v1 (S6, Nov 7) */
+  return out.sort((a, b) => a.flower.localeCompare(b.flower) || a.n - b.n);
 }
 const composed = (subset) => { const r = readNewDesign(subset); if (!r.ok) throw new Error(r.error); return r.doc.controls; };
 const scopesOf = (subset) => { const r = readNewDesign(subset); if (!r.ok) throw new Error(r.error); return r.doc.overrides; };
@@ -152,7 +154,7 @@ function check() {
       for (const k of a) if (k in sf && !same(sf[k], lf[k])) bad.push(`${tag} S7: ${k} sidecar ${JSON.stringify(sf[k])} != subset ${JSON.stringify(lf[k])}`);
     }
     /* S6: restate the revision from the two subsets, never from the sidecar */
-    const prev = all.filter((x) => x.flower === it.flower && x.v < it.v).pop();
+    const prev = all.filter((x) => x.flower === it.flower && x.n < it.n).pop();
     if (prev) {
       const a = composed(JSON.parse(fs.readFileSync(prev.design, 'utf8'))), b = composed(subset);
       const want = Object.keys(b).filter((id) => !same(a[id], b[id])).sort();
@@ -237,7 +239,7 @@ async function render(outDir, SHEET, PHOTOS, BARE) {
         mode: modeTag(m), exportTris: m.shownMode === 'export' ? m.shownTris : null, maxDimMm: m.maxDimMm,
         bboxMm: hi.map((h, k) => +(h - lo[k]).toFixed(1)), proportions: prop,
         scopes: m.scopes ? { layersLive: m.scopes.layersLive, scopedLayers: m.scopes.scopedLayers, keptLayers: m.scopes.keptLayers } : null,
-        told: read.split(/(?<=[.)])\s+/).filter((s) => /CLAMP|FOLD LIMIT|NO ROOM|EXHAUSTED|SATURAT/.test(s)).map((s) => s.trim().slice(0, 240)),
+        told: read.split(/(?<=[.)])\s+/).filter((s) => /CLAMP|FOLD LIMIT|NO ROOM|EXHAUSTED|SATURAT|HUB GROWN/.test(s)).map((s) => s.trim().slice(0, 240)),
         shots,
       };
       console.log(`${tag}: ${report[tag].load.action}, ${notes.length} notes; ${report[tag].mode}; bbox ${report[tag].bboxMm.join(' x ')} mm${report[tag].told.length ? `; told: ${report[tag].told.length}` : ''}`);
@@ -274,7 +276,7 @@ async function sheet(browser, report, SHEET, PHOTOS) {
       const sc = JSON.parse(fs.readFileSync(path.join(SET, f, `${f}-${r.v}.bloom-photo.json`), 'utf8'));
       const val = (x) => (x && typeof x === 'object' ? 'curve' : x);
       const ch = sc.revisedFrom ? [...Object.entries(sc.revisedFrom.changes).map(([id, c]) => `${id} ${val(c.from)}→${val(c.to)}`), ...((sc.revisedFrom.layerChanges || []).map((c) => `L${c.layer} ${c.field.replace(/^offsets\./, '').replace(/^values\./, '')} ${typeof c.from === 'object' && c.from ? 'curve' : c.from}→${typeof c.to === 'object' && c.to ? 'curve' : c.to}`))].join(', ') : 'first pass';
-      const own = (sc.layers || []).map((L) => `L${L.layer}: ${['petalLength', 'petalTilt', 'petalCup', 'petalSpineCurl'].filter((k) => L.offsets && L.offsets[k]).map((k) => `${({ petalLength: 'len', petalTilt: 'tilt', petalCup: 'cup', petalSpineCurl: 'curl' })[k]} ${L.offsets[k].value}`).join(' ')}${L.values && L.values.petalSpineCurve ? ' +spine' : ''}${L.values && L.values.petalOutlineCurve ? ' +outline' : ''}`).join(' · ');
+      const own = (sc.layers || []).map((L) => `L${L.layer}: ${['petalLength', 'petalTilt', 'petalCup', 'petalSpineCurl'].filter((k) => L.offsets && L.offsets[k]).map((k) => `${({ petalLength: 'len', petalTilt: 'tilt', petalCup: 'cup', petalSpineCurl: 'curl' })[k]} ${L.offsets[k].value}`).join(' ')}${L.values && L.values.petalSpineCurve ? ' +spine' : ''}${L.values && L.values.petalOutlineCurve ? ' +outline' : ''}${L.values && L.values.layerRing ? ` ring ${L.values.layerRing.value}` : ''}`).join(' · ');
       for (const [v, file] of Object.entries(r.shots)) {
         html += `<div style="width:${W}px"><img src="${img(file)}" style="width:${W}px;height:${W}px"><div>${r.v} · ${v} · ${r.named} named · ${(r.exportTris || 0).toLocaleString('en-US')} tris (export)</div>${v === 'front' ? `<div style="color:#9ab;font-size:10px">${ch}</div>` : `<div style="color:#cb9;font-size:10px">${own || 'no per-layer values'}${r.proportions && r.proportions.bodyHW ? ` · inner-half h:w ${r.proportions.bodyHW}` : ''} · petals h:w ${r.proportions ? r.proportions.petalsHW : '?'}</div>`}</div>`;
       }
