@@ -864,7 +864,7 @@ function applyVisibility() {
   for (const c of CONTROLS) {
     /* #495: a LAYER'S RING is edited only with a layer picked — greyed (never
        hidden) otherwise, its read-out saying so; the same one setter */
-    const ringOnly = RING_IDS.has(c.id);
+    const ringOnly = LAYER_OWN_IDS.has(c.id);
     if (c.enabledWhen === undefined && !ringOnly) continue;
     const on = (c.enabledWhen === undefined || evalPredicate(c.enabledWhen, ui)) && (!ringOnly || (!!scopeView && scopeView.kind === 'layer'));
     wrappers[c.id].classList.toggle('bl-ctrl--disabled', !on);
@@ -974,7 +974,11 @@ const SCOPE_VALUE_SET = new Set([...SCOPE_VALUE_IDS, ...SEPAL_SCOPE_VALUE_IDS, .
    SCOPE_LAYER_VALUE_IDS) — a layer's own value, so it binds under a LAYER pick
    only; with no layer picked the page greys it (applyVisibility) */
 const LAYER_IDS = new Set([...SCOPEABLE_IDS, ...SCOPE_VALUE_IDS, ...SCOPE_LAYER_VALUE_IDS]);
-const RING_IDS = new Set(SCOPE_LAYER_VALUE_IDS);
+const RING_IDS = new Set(['layerRing']);
+/* NOV 8: A PICKED LAYER ALSO OWNS ITS PETAL COUNT (`layerPetalCount`) — the
+   same treatment as its ring: bound under a LAYER pick only, greyed otherwise */
+const COUNT_IDS = new Set(['layerPetalCount']);
+const LAYER_OWN_IDS = new Set(SCOPE_LAYER_VALUE_IDS);
 /* A SEPAL TIER IS A SCOPE TOO (F1.1a, Q3.8): picking one binds the SEPAL
    controls — the tier-scopeable set the file reader owns — and the Sepals
    section edits that tier. `{ kind: 'tier', layer: k, slot: 0 }`, k 0-based. */
@@ -1126,6 +1130,9 @@ function scopeEffective(v, ui) {
        `derivedRingFactor` on the build on screen), so the slider shows the
        ring that is built either way and nothing moves until it is dragged */
     if (r) eff.layerRing = r.ownRing ? r.ownRing.built : r.derivedRingFactor;
+    /* NOV 8: THE LAYER'S PETAL COUNT — its own where it owns one (as BUILT),
+       else the GLOBAL count it takes, so nothing moves until it is dragged */
+    if (r) eff.layerPetalCount = r.ownCount ? r.ownCount.built : Math.round(Number(ui.petalCount));
   }
   return { eff, term };
 }
@@ -1160,7 +1167,19 @@ function scopeShown(shown) {
   const key = scopeValue(scopeView);
   if (!lightOnScreen) scopeLastInfill = { key, infill: p.infill || null };
   const infill = lightOnScreen ? (scopeLastInfill && scopeLastInfill.key === key ? scopeLastInfill.infill : null) : (p.infill || null);
-  return { ...shown, buckle: (p.form && p.form.buckle) || null, lobes: p.lobes || null, fringe: p.fringe || null, infill, pickedRing: pickedRingOf(ui) };
+  return { ...shown, buckle: (p.form && p.form.buckle) || null, lobes: p.lobes || null, fringe: p.fringe || null, infill, pickedRing: pickedRingOf(ui), pickedCount: pickedCountOf(ui) };
+}
+/* NOV 8: THE PICKED LAYER'S PETAL COUNT for the Layer petals read-out —
+   footRing()'s own `ownCount` record, never re-derived */
+function pickedCountOf(ui) {
+  if (!scopeView || scopeView.kind !== 'layer') return null;
+  const r = (lastRings || []).find((x) => Math.round(x.lambda) === scopeView.layer);
+  if (!r) return null;
+  return {
+    layer: scopeView.layer, name: `${String(ui.placement) === 'SPIRAL' ? 'Turn' : 'Layer'} ${scopeView.layer + 1}`,
+    global: Math.round(Number(ui.petalCount)), own: r.ownCount || null,
+    sepalsFollow: scopeView.layer === 0 && !!r.ownCount && Number(ui.sepalCount) >= 1,
+  };
 }
 /* #495: THE PICKED LAYER'S RING RECORD for the Layer ring read-out — footRing()'s
    own (`derivedRingFactor`, `ownRing`, the hub's R0 and growth), never re-derived */
@@ -1313,6 +1332,19 @@ function commitScopeValue(id, value) {
      own, on the build on screen), and a slider set to that ring's own step
      hands the layer back to it (the entry's key is removed, so the build is the
      derived double again, not its rounding). Stored as a NUMBER. */
+  /* NOV 8: A LAYER'S PETAL COUNT — what it inherits is the GLOBAL count; set
+     back to that count it hands the layer back (the key removed, so the whorl
+     is the global double again). Stored as a NUMBER. */
+  if (COUNT_IDS.has(id)) {
+    const val = Math.round(Number(value));
+    if (val === Math.round(Number(ui.petalCount))) {
+      if (own && own.values && id in own.values) { delete own.values[id]; pruneScopeEntry(own, v); }
+      return;
+    }
+    own = scopeOwnEntry(v, true);
+    (own.values || (own.values = {}))[id] = val;
+    return;
+  }
   if (RING_IDS.has(id)) {
     const r = (lastRings || []).find((x) => Math.round(x.lambda) === v.layer);
     const derived = r ? r.derivedRingFactor : null;
@@ -1471,7 +1503,15 @@ function refreshScopeNotes(ui) {
     const wrap = wrappers[c.id];
     let text = '';
     let cls = null;
-    if (scopeView && ids.has(c.id) && RING_IDS.has(c.id)) {
+    if (scopeView && ids.has(c.id) && COUNT_IDS.has(c.id)) {
+      /* NOV 8: THE PICKED LAYER'S PETAL COUNT — its own, or the global it takes */
+      cls = 'scoped';
+      const r = (lastRings || []).find((x) => Math.round(x.lambda) === scopeView.layer);
+      const g = Math.round(Number(ui.petalCount));
+      text = r && r.ownCount
+        ? `${name}: its OWN count — it replaces the global ${g} (set the slider to ${g} to give it back)`
+        : `${name}: the GLOBAL count, live — it follows ${controlLabel('petalCount')}; dragging makes it ${name}'s own`;
+    } else if (scopeView && ids.has(c.id) && RING_IDS.has(c.id)) {
       /* #495: THE PICKED LAYER'S RING — its own, or the derived one it stands on */
       cls = 'scoped';
       const r = (lastRings || []).find((x) => Math.round(x.lambda) === scopeView.layer);
@@ -2339,6 +2379,21 @@ function layerRingLine(fr, mode) {
   const R0 = fr.hub ? fr.hub.ringR0 : null;
   const said = own.map((r) => `layer ${Math.round(r.lambda) + 1} ${r.ownRing.built.toFixed(2)}x = ${r.radius.toFixed(2)} mm${r.ownRing.clamped ? ` (asked ${Number(r.ownRing.asked).toFixed(2)}x, CLAMPED)` : ''} (derived ${r.derivedRingFactor.toFixed(2)}x)`);
   return `LAYER RINGS (${mode}, own, x the hub ring ${R0 !== null ? R0.toFixed(2) : '?'} mm): ${said.join('; ')}\n`;
+}
+
+/* NOV 8: THE OWNED PETAL COUNTS — every whorl's count where any layer owns
+   one (footRing()'s record), ASKED vs BUILT where the build snapped a file's
+   value, the layer phase's INACTIVE pairs, and the sepals following the outer
+   whorl's own count. Empty where no layer owns a count. */
+function layerCountLine(fr, mode, ui) {
+  if (!fr.countsOwned) return '';
+  const word = String(ui.placement) === 'SPIRAL' ? 'turn' : 'layer';
+  const per = (fr.rings || []).map((r) => `${word} ${Math.round(r.lambda) + 1} ${r.ownCount ? `${r.ownCount.built} own${r.ownCount.snapped ? ` (asked ${r.ownCount.asked}, SNAPPED)` : ''}` : `${Math.round(Number(ui.petalCount))} global`}`);
+  const off = fr.phaseInactive && fr.phaseInactive.length
+    ? ` · LAYER PHASE INACTIVE between ${fr.phaseInactive.map((L) => `${word}s ${L} and ${L + 1} (${fr.whorlCounts[L - 1]} vs ${fr.whorlCounts[L]})`).join(', ')} — their counts differ`
+    : '';
+  const sep = fr.sepals && fr.rings[0] && fr.rings[0].ownCount ? ` · the sepals read the outer whorl's ${fr.rings[0].ownCount.built}` : '';
+  return `PETAL COUNTS (${mode}, per ${word}): ${per.join('; ')}${off}${sep}\n`;
 }
 
 function domeLine(rings, fr, mode) {
@@ -3843,6 +3898,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
   const short = omitted ? ` — ${fr.sequenceLength - omitted} BUILT, ${omitted} not (the stem, see below)` : '';
   const petalsSaid = cont ? `petals ${fr.sequenceLength} (${ui.petalCount}/turn)${short}`
     : fr.fan ? `petals ${fr.slotCount} (${fr.fan.perSide}/side${fr.fan.centre ? ' + one on the line' : ''})`
+    : fr.countsOwned ? `petals ${fr.whorlCounts.reduce((a, b) => a + b, 0)} (${fr.whorlCounts.join(' / ')} per whorl)`
     : `petals ${ui.petalCount}`;
   /* EVERY RING'S RADIUS is what this line has always printed, and at up to
      120 of them that stops being readable — so the continuous arm prints the
@@ -3873,6 +3929,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + innerRingLine(rings, fr)
        + hubGrowthLine(fr, mode)
        + layerRingLine(fr, mode)
+       + layerCountLine(fr, mode, ui)
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + seamLine(petals)
@@ -3965,6 +4022,10 @@ function regenerate() {
      Type / pedicel read-outs that quote them. Missing before, so the Type
      read-out said "no stem to carry it" on every raceme — found on main. */
   const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium, tube: built.tube || null,
+                  /* NOV 8: the per-whorl petal counts, for the Petals and Layer
+                     offset read-outs (footRing()'s own record) */
+                  counts: built.foot && built.foot.countsOwned ? { owned: true, whorlCounts: built.foot.whorlCounts, phaseInactive: built.foot.phaseInactive,
+                    ownedLayers: built.foot.rings.filter((r) => r.ownCount).map((r) => Math.round(r.lambda)), name: String(ui.placement) === 'SPIRAL' ? 'Turn' : 'Layer' } : null,
                   inflorescence: built.inflorescence || null, inflorescenceBuilt: built.inflorescenceBuilt || null,
                   /* THE LEAVES' records (leaf/stem build S3), for the leaf controls'
                      own read-outs. `leafArch`, `leafCup` and `leafTipShape` have
@@ -5443,6 +5504,9 @@ window.__bloomMetrics = () => ({
     /* #495: the ring the layer would take without its own, and its own ring
        `{ asked, built, clamped }` or null — footRing()'s own */
     derivedRingFactor: r.derivedRingFactor ?? null, ownRing: r.ownRing ? { ...r.ownRing } : null,
+    /* NOV 8: the whorl's petal count and its own count `{ asked, built,
+       snapped }` or null — footRing()'s own */
+    whorlCount: r.whorlCount ?? null, ownCount: r.ownCount ? { ...r.ownCount } : null,
     /* THE CEILING TWIN of widthClamped (Eva, Sep 1). The foot's UPPER clamp
        has always been able to bind - from petalWidth 25, a quarter of that
        slider - with the blade widening and the area-ruled ring standing
@@ -5532,6 +5596,11 @@ window.__bloomMetrics = () => ({
   fan: lastFoot.fan ? { ...lastFoot.fan } : null,
   mirror: lastFoot.mirror,
   slotCount: lastFoot.slotCount,
+  /* NOV 8: whether any whorl owns its petal count, each whorl's count, and
+     the whorls whose layer phase is inactive (counts differ) — footRing()'s */
+  countsOwned: lastFoot.countsOwned === true,
+  whorlCounts: lastFoot.whorlCounts ? [...lastFoot.whorlCounts] : null,
+  phaseInactive: lastFoot.phaseInactive ? [...lastFoot.phaseInactive] : [],
   /* THE FULL SPHERE (session 18) — footRing()'s own answer, cross-checked
      against the registry's `sphereMode` predicate by both gates on every
      row, exactly as the two eligibility flags beside it are. */

@@ -211,7 +211,11 @@ async function nodeClauses(F, rec) {
          one other note a clean round trip carries, EXPECTED exactly where the
          row's own record asks one past 0.10-2.00 (restated, never the reader's) */
       const ringPast = ((rec0 && rec0.layers) || []).filter((e) => e.values && typeof e.values.layerRing === 'number' && (e.values.layerRing < 0.1 || e.values.layerRing > 2)).length;
-      const notes = r.notes.filter((n) => !(bothOn && n.kind === 'conflict') && !(ringPast && n.kind === 'clamped' && /values\.layerRing .* past the ring's range/.test(n.text)));
+      /* and a layer PETAL COUNT asked off the integer grid or past 3-40 (Nov 8),
+         kept as asked and TOLD — restated from the row's own record */
+      const countOff = ((rec0 && rec0.layers) || []).filter((e) => e.values && typeof e.values.layerPetalCount === 'number' && (!Number.isInteger(e.values.layerPetalCount) || e.values.layerPetalCount < 3 || e.values.layerPetalCount > 40)).length;
+      const notes = r.notes.filter((n) => !(bothOn && n.kind === 'conflict') && !(ringPast && n.kind === 'clamped' && /values\.layerRing .* past the ring's range/.test(n.text)) && !(countOff && n.kind === 'clamped' && /values\.layerPetalCount .* not a whole petal count/.test(n.text)));
+      if (r.notes.filter((n) => n.kind === 'clamped' && /values\.layerPetalCount/.test(n.text)).length !== countOff) bad.push(`${countOff} layer petal count(s) off the grid or past the range, but the reader told ${r.notes.filter((n) => /values\.layerPetalCount/.test(n.text)).length}`);
       if (bothOn && !r.notes.some((n) => n.kind === 'conflict')) bad.push('both the infill and a texture are on and the reader did not say so (Q9)');
       if (r.notes.filter((n) => n.kind === 'clamped' && /values\.layerRing/.test(n.text)).length !== ringPast) bad.push(`${ringPast} layer ring(s) past the range, but the reader told ${r.notes.filter((n) => /values\.layerRing/.test(n.text)).length}`);
       if (notes.length) bad.push(`${notes.length} note(s): ${notes.slice(0, 2).map((n) => n.text).join(' | ')}`);

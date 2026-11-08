@@ -2076,6 +2076,36 @@ export const SMOKE_BLOCKS = [
         path: "Z3 two owned rings beside owned widths (the ring wins), OC5 / C1 the scoped outline and spine curves unmoved by the ring" },
     ],
   },
+  {
+    n: 86, title: "a layer's own petal count (Nov 8)",
+    anchor: 'LAYER PETALS: RADIAL x 3 — layer 2 owns 12 (layer phase INACTIVE between layers 1-2 and 2-3, told)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are
+       footRing()'s OWNED COUNT (`layerOwnedCount`, replacing the global on the
+       layer that owns one) reaching the area rule, the slot map, the whorl's
+       count, the foot cap's span and the scope term's n; the LAYER PHASE's
+       inactive law between whorls whose counts differ; the SEPALS on the outer
+       whorl's count; the single-whorl area-rule arm; and the snap. The subset:
+       the anchor (inactive on both sides of an owned count), a run of equal
+       owned counts below an inactive pair, the single-whorl arm, the outer
+       whorl owning 4 under 8 sepals asked, the snap, and the photo water lily.
+       --conn is REQUIRED: fewer or more feet move R0 and every ring with it,
+       and the voxel fill is what says every foot still reaches the hub. */
+    conn: true,
+    rows: [
+      { label: 'LAYER PETALS: RADIAL x 3 — layer 2 owns 12 (layer phase INACTIVE between layers 1-2 and 2-3, told)',
+        path: "PC1 whorl 2 emits 12 azimuths, PC2 the phase inactive at whorls 2 and 3, PC3 the area rule over 8 + 12 + 8 feet, PC0 the record both ways, SV1 every azimuth on the inactive phase law, Z1 the feet, Z3 the foot cap on its own span" },
+      { label: 'LAYER PETALS: a run below an inactive pair — layers 2 and 3 own 5 under the global 8 (inactive 1-2, the phase steps again 2-3)',
+        path: "PC2 inactive at whorl 2 only, SV1 whorl 3 stepped by one pitch of 5 from whorl 2's phase" },
+      { label: "LAYER PETALS: one whorl — layer 1 owns 5 under the global 8 (the area rule's single-whorl arm)",
+        path: "PC3 the single-whorl arm rFoot x sqrt(5), FC1 the foot cap on 2 pi / 5" },
+      { label: "LAYER PETALS: the outer whorl owns 4, 8 sepals asked (built 4 — the sepals read the OUTER whorl's count, told)",
+        path: "PC4 the sepal descriptor's ceiling and pitch on the outer whorl's restated 4, SP2 the ceiling the outer whorl's 4, SP4 the sepal pitch 2 pi / 4 off the outer petals' own azimuths" },
+      { label: 'LAYER PETALS: SNAPPED — layer 3 asks 55 (built 40, told)',
+        path: "PC0 asked 55 / built 40 / snapped, PC1 whorl 3 emits 40" },
+      { label: 'LAYER PETALS: the photo WATER LILY (v7) at 4 / 10 with its four sepals (on the outer whorl\'s pitch)',
+        path: "PC1 4 / 10, SP4 four sepals interleaved on the 4-petal outer whorl, OC5 the scoped outline unmoved by the count" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

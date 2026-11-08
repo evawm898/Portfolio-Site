@@ -114,6 +114,8 @@ if (argv.includes('--per-layer')) {
     /* a row whose record OWNS A RING (#495's block 85) is a design no tree before
        that change could hold — not a saved design, so not this compare's subject */
     if ((sc.layers || []).some((e) => e.values && 'layerRing' in e.values)) continue;
+    /* nor a row whose record OWNS A PETAL COUNT (Nov 8, block 86) */
+    if ((sc.layers || []).some((e) => e.values && 'layerPetalCount' in e.values)) continue;
     samples.push({ name: `per-layer row: ${row.label}`, text: toText(composeDoc(stateOf(row), { savedAt: SAVED, scopes: sc })) });
   }
 }

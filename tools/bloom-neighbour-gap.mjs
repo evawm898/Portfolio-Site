@@ -113,7 +113,7 @@ export function buildPetals(state, { remap = null, perSlot = null, exportMode = 
   } else {
     for (let L = 0; L < fr.layerCount; L++) {
       const slotsFor = fr.slotRings[L]; const ring = slotsFor[0];
-      whorl(fr.slotCount, ring.radius, () => ring.scale, () => ring.tiltExtra, ring.phase, state.placement, fr.fan, (i) => slotsFor[i]);
+      whorl(ring.ownCount ? ring.ownCount.built : fr.slotCount, ring.radius, () => ring.scale, () => ring.tiltExtra, ring.phase, state.placement, fr.fan, (i) => slotsFor[i]);
     }
   }
   return { acc, fr, petals };

@@ -1934,7 +1934,52 @@ export const SCOPE_LAYER_OWNED = Object.freeze(['petalLength', 'petalWidth', 'pe
    =================================================================== */
 export const LAYER_RING_RANGE = Object.freeze([0.10, 2.00]);
 export const LAYER_RING_STEP = 0.01;
-export const SCOPE_LAYER_VALUE_IDS = Object.freeze(['layerRing']);
+/* ===================================================================
+   A LAYER'S OWN PETAL COUNT (Eva's rulings of Nov 8 — option A of
+   docs/bloom-photo-to-bloom-discovery.md §18; read §18.6 and §19 before
+   touching any of this). Under Per-layer values a LAYER entry may own how many
+   petals its whorl carries: `values.layerPetalCount`, an integer that REPLACES
+   the global Petal count for that whorl (a value, like `layerRing`, never an
+   offset). A layer that owns none takes the global count — `slotCount`, the
+   very double every pre-existing expression read — BY BRANCH, so every design
+   saved before this existed builds byte-identically.
+   WHERE IT IS LIVE: RADIAL and SPIRAL with Per-layer values ON (the toggle's
+   own placements); CONTINUOUS and FAN never (the control is hidden there and a
+   record is kept and inert, as every layer entry is). The tube stays
+   unavailable under Per-layer values (SO11), so a per-layer count never meets
+   a fused whorl — the tube plan still reads ONE count, and that is why.
+   WHAT FOLLOWS THE OWNED COUNT, one owner each (§19 lists every reader):
+     the area rule's foot count (so R0 follows the feet that are really there),
+     the slot map's length, the whorl primitive's `count` (its RADIAL azimuth
+     divisor; a SPIRAL turn is a golden-angle run of that length), the foot
+     cap's span (2 pi / the layer's own count), the scope term's `n`, the
+     SEPALS (ceiling, pitch and interleave read the OUTER whorl's count — Eva's
+     ruling), the LAYER PHASE (inactive between two whorls whose counts differ —
+     Eva's ruling; footRing() owns the law and names every inactive pair), and
+     the variance field's aliasing bar (the SMALLEST whorl count — the whorl
+     that aliases first; a placement made without a ruling, §19).
+   THE RANGE is Petal count's own, 3..40, PROPOSED for Eva's ruling; the
+   registry imports it (Q6) and the harness holds it equal to the petalCount
+   row. A value off the integer grid or past the range is SNAPPED and CLAMPED
+   by the build and told (asked vs built); the file keeps what was asked.
+   =================================================================== */
+export const LAYER_PETAL_COUNT_RANGE = Object.freeze([3, 40]);
+export const SCOPE_LAYER_VALUE_IDS = Object.freeze(['layerRing', 'layerPetalCount']);
+/* THE COUNT A LAYER OWNS, or null — the one reader, gated on the toggle
+   exactly as `layerOwnedRing`. Several entries for one layer: the LAST wins.
+   Returns `{ asked, built, snapped }`: built is the asked value rounded to the
+   integer grid and clamped into LAYER_PETAL_COUNT_RANGE. */
+export function layerOwnedCount(scopes, layer, state) {
+  if (!scopes) return null;
+  let asked = null;
+  for (const e of scopes.layers || []) {
+    checkScopeValues(e.values, `layers[${e.layer}]`, SCOPE_LAYER_ENTRY_VALUE_IDS);
+    if (e.layer === layer && e.values && 'layerPetalCount' in e.values) asked = e.values.layerPetalCount;
+  }
+  if (asked === null || !scopeLayersLive(state)) return null;
+  const built = Math.min(LAYER_PETAL_COUNT_RANGE[1], Math.max(LAYER_PETAL_COUNT_RANGE[0], Math.round(asked)));
+  return { asked, built, snapped: built !== asked };
+}
 /* THE RING A LAYER OWNS, or null — the one reader, gated on the toggle exactly
    as `scopeOffsetsFor` gates every layer entry (an entry the toggle keeps
    inert is still validated). Several entries for one layer: the LAST wins, as
@@ -2062,14 +2107,15 @@ function checkScopeValues(values, where, ids = SCOPE_VALUE_IDS) {
   if (typeof values !== 'object' || Array.isArray(values)) throw new Error(`scopes: ${where}.values is not an object`);
   for (const k of Object.keys(values)) {
     if (SCOPE_UNSCOPED.includes(k)) throw new Error(`scopes: ${where} carries a value for ${k}, which is never scoped (Q3.6)`);
-    if (SCOPE_LAYER_VALUE_IDS.includes(k) && !ids.includes(k)) throw new Error(`scopes: ${where}.values.${k} — a ring is a LAYER's own (#495); only a layer entry may own one`);
+    if (SCOPE_LAYER_VALUE_IDS.includes(k) && !ids.includes(k)) throw new Error(`scopes: ${where}.values.${k} — a ${k === 'layerRing' ? 'ring (#495)' : 'petal count (Nov 8)'} is a LAYER's own; only a layer entry may own one`);
     if (!ids.includes(k)) throw new Error(`scopes: ${where}.values.${k} — only ${ids.join(' / ')} may be owned as values`);
-    if (SCOPE_LAYER_VALUE_IDS.includes(k) && (typeof values[k] !== 'number' || !Number.isFinite(values[k]))) throw new Error(`scopes: ${where}.values.${k} is ${JSON.stringify(values[k])}, not a finite fraction of the hub ring`);
+    if (SCOPE_LAYER_VALUE_IDS.includes(k) && (typeof values[k] !== 'number' || !Number.isFinite(values[k]))) throw new Error(`scopes: ${where}.values.${k} is ${JSON.stringify(values[k])}, not a finite ${k === 'layerRing' ? 'fraction of the hub ring' : 'petal count'}`);
   }
 }
 /* the values a LAYER entry may own: the petals' outline and spine, and its ring */
 const SCOPE_LAYER_ENTRY_VALUE_IDS = Object.freeze([...SCOPE_VALUE_IDS, ...SCOPE_LAYER_VALUE_IDS]);
-/* an entry that owns ONLY a ring (no offset, no petal value) reaches no petal */
+/* an entry that owns ONLY a ring and/or a petal count (no offset, no petal
+   value) reaches no petal: both are footRing()'s, never a petal's */
 const ringOnlyEntry = (e) => !Object.keys(e.offsets || {}).length && !!e.values && Object.keys(e.values).length > 0
   && Object.keys(e.values).every((k) => SCOPE_LAYER_VALUE_IDS.includes(k));
 
@@ -2097,7 +2143,7 @@ export function scopeOffsetsFor(scopes, { layer, slot, n, state }) {
   /* the owned VALUES (F6-scope) and which scope each came from: a layer's
      replace the whole bloom's, a petal's replace the layer's */
   let values = null, valueFrom = null;
-  /* a layer's RING is footRing()'s, never a petal's value (#495) */
+  /* a layer's RING and PETAL COUNT are footRing()'s, never a petal's value */
   const takeValues = (vals, from) => {
     if (!vals) return;
     for (const k of Object.keys(vals)) { if (SCOPE_LAYER_VALUE_IDS.includes(k)) continue; (values || (values = {}))[k] = vals[k]; (valueFrom || (valueFrom = {}))[k] = from; }
@@ -2570,7 +2616,7 @@ export function footRing(state, acc, opts = {}) {
          exactly in IEEE-754 (multiplication by 1.0 is exact for every finite x). */
       const footCount = 1;
       sumSq += footCount * rFoot * rFoot;
-      raw.push({ lambda, scale, authoredWidth, width, rFoot, footCount, ownWidth: null, ringFactor: scale, derivedRingFactor: scale, ownRing: null });
+      raw.push({ lambda, scale, authoredWidth, width, rFoot, footCount, ownWidth: null, ringFactor: scale, derivedRingFactor: scale, ownRing: null, whorlCount: slotCount, ownCount: null });
     }
   } else {
   for (let L = 0; L < layerCount; L++) {
@@ -2604,7 +2650,12 @@ export function footRing(state, acc, opts = {}) {
        0 floats in the foot moving when it does. With no owned width this is
        the ramp's expression character for character (`ringFactor` is `scale`,
        the same double). */
-    const own = layerOwnedValues(tierScopes, L, slotCount, state);
+    /* A LAYER'S OWN PETAL COUNT (Nov 8, see LAYER_PETAL_COUNT_RANGE): the
+       whorl's count where the layer owns one, else `slotCount` ITSELF — the
+       same double — so every expression below is the one it was, by branch. */
+    const ownCount = layerOwnedCount(tierScopes, L, state);
+    const whorlCount = ownCount === null ? slotCount : ownCount.built;
+    const own = layerOwnedValues(tierScopes, L, whorlCount, state);
     const ownWidth = own && 'petalWidth' in own ? own.petalWidth : null;
     const authoredWidth = ownWidth === null ? state.petalWidth * scale * 0.4 * state.footDelicacy : ownWidth * 0.4 * state.footDelicacy;
     const width = Math.max(FOOT_MIN_WIDTH_MM, authoredWidth);   // the ASKED foot (floored; the cap follows the ring map)
@@ -2618,9 +2669,9 @@ export function footRing(state, acc, opts = {}) {
        the fan's derived count) — the SAME DOUBLE the pre-role expression
        multiplied by, deliberately read unrounded exactly as that expression
        read it. */
-    const footCount = slotCount;
+    const footCount = whorlCount;
     sumSq += footCount * rFoot * rFoot;
-    raw.push({ lambda: L, scale, authoredWidth, width, rFoot, footCount, ownWidth, ringFactor, derivedRingFactor, ownRing });
+    raw.push({ lambda: L, scale, authoredWidth, width, rFoot, footCount, ownWidth, ringFactor, derivedRingFactor, ownRing, whorlCount, ownCount });
   }
   }
 
@@ -2659,7 +2710,7 @@ export function footRing(state, acc, opts = {}) {
      instead: `quantizerResiduals` below. */
   const guarded = !continuousMode && layerCount === 1;
   const derivedRadius = guarded
-    ? raw[0].rFoot * Math.sqrt(slotCount)   // area rule — the pre-layer expression, verbatim
+    ? raw[0].rFoot * Math.sqrt(raw[0].footCount)   // area rule — the pre-layer expression (footCount IS slotCount unless layer 1 owns its count)
     : generalDerived;
   const guardResidual = guarded ? Math.abs(generalDerived - derivedRadius) : null;
 
@@ -2682,7 +2733,7 @@ export function footRing(state, acc, opts = {}) {
   const capR0 = capThickness === thickness ? R0 : (() => {
     let s2 = 0;
     for (const p of raw) { const rf = Math.sqrt((p.width * capThickness) / Math.PI); s2 += p.footCount * rf * rf; }
-    const d = guarded ? Math.sqrt((raw[0].width * capThickness) / Math.PI) * Math.sqrt(slotCount) : Math.sqrt(s2);
+    const d = guarded ? Math.sqrt((raw[0].width * capThickness) / Math.PI) * Math.sqrt(raw[0].footCount) : Math.sqrt(s2);
     return d * state.spread;
   })();
   /* THE HUB GROWS TO THE WIDEST OWNED RING (Eva's ruling, Oct 16, replacing the
@@ -2772,6 +2823,28 @@ export function footRing(state, acc, opts = {}) {
     const relief = sphere ? (Math.abs(Math.cos(slope)) < 1e-9 ? Infinity : 1 / Math.abs(Math.cos(slope))) : dome ? (slope >= Math.PI / 2 - 1e-9 ? Infinity : 1 / Math.cos(slope)) : 1;
     return { slope, z, arc, relief };
   };
+  /* ===================================================================
+     THE LAYER PHASE BETWEEN WHORLS OF DIFFERENT COUNTS (Eva's ruling, Nov 8):
+     INACTIVE between two whorls whose counts differ. Layer phase turns whorl L
+     by `layerPhase` of ONE PITCH against whorl L-1, and between a 4-petal and a
+     10-petal whorl "a pitch" has no single meaning — so across such a pair the
+     inner whorl takes the outer one's phase unchanged (no offset), and a run of
+     equal-count whorls below it steps by its OWN pitch from there. footRing()
+     owns the law and names every inactive pair (`phaseInactive`, the inner
+     whorl's 0-based index); the read-out says so. WHERE NO LAYER OWNS A COUNT
+     this array is null and the descriptor takes the pre-existing expression
+     verbatim, by branch — every saved design's phases are their own doubles. */
+  const countsOwned = !continuousMode && !fanMode && raw.some((q) => q.ownCount !== null);
+  const phaseInactive = [];
+  const countPhases = countsOwned ? (() => {
+    const out = [];
+    let start = 0;
+    for (let L = 0; L < raw.length; L++) {
+      if (L > 0 && raw[L].whorlCount !== raw[L - 1].whorlCount) { start = L; out.push(out[L - 1]); phaseInactive.push(L); continue; }
+      out.push(start === 0 ? (raw[L].lambda * state.layerPhase * TAU) / raw[L].whorlCount : out[start] + ((L - start) * state.layerPhase * TAU) / raw[L].whorlCount);
+    }
+    return out;
+  })() : null;
   const rings = raw.map((p, L) => {
     /* ON THE SPHERE THE KEY IS THE POLAR ANGLE (session 18): under the
        continuous arm `L` IS the slot index k, so `phiAt(L)` places this
@@ -2820,7 +2893,8 @@ export function footRing(state, acc, opts = {}) {
        THE BRANCH: a foot inside its arc is the asked double, no product formed,
        so the shipping default (6.40 mm against a 6.95 mm arc) is the expression
        it was. */
-    const footSpanRad = fanMode ? fan.step : TAU / n;
+    /* a whorl that OWNS its petal count shares its ring among that many feet */
+    const footSpanRad = fanMode ? fan.step : p.ownCount ? TAU / p.ownCount.built : TAU / n;
     /* the cap's ring (above): this ring's radius where the sheet is printable,
        else the same law on the export floor's R0 (the sphere's Rd floor at the
        export thickness too) */
@@ -2865,7 +2939,11 @@ export function footRing(state, acc, opts = {}) {
          destroys the one plane the whole arrangement is about. So it is
          HIDDEN there by its own registry predicate and inert here — and that
          is what lets a fan carry pair scopes at any depth. */
-      phase: (continuousMode || fanMode) ? 0 : (p.lambda * state.layerPhase * TAU) / state.petalCount,
+      phase: (continuousMode || fanMode) ? 0 : countPhases ? countPhases[L] : (p.lambda * state.layerPhase * TAU) / state.petalCount,
+      /* A LAYER'S OWN PETAL COUNT (Nov 8): the whorl's count — `slotCount`
+         itself where none is owned — and the record `{ asked, built, snapped }`
+         or null. buildBloomInto lays the whorl from these. */
+      whorlCount: p.whorlCount, ownCount: p.ownCount,
       /* ===================================================================
          DOME LEAN (Sep 4, the crown-coverage session) — a boost DERIVED FROM
          THE DOME, never a control, never a default. Zero and byte-identical
@@ -3414,7 +3492,7 @@ export function footRing(state, acc, opts = {}) {
      and buildBloomInto indexes the ring list directly. */
   const slotRings = continuousMode ? null : (() => {
     const byLayer = [];
-    for (let L = 0; L < layerCount; L++) byLayer.push(new Array(n).fill(rings.find((r) => r.lambda === L)));
+    for (let L = 0; L < layerCount; L++) { const r = rings.find((q) => q.lambda === L); byLayer.push(new Array(r.ownCount ? r.ownCount.built : n).fill(r)); }
     return byLayer;
   })();
 
@@ -3459,11 +3537,14 @@ export function footRing(state, acc, opts = {}) {
     if (!sepalsEligible(st)) return null;
     const asked = Math.round(Number(st.sepalCount) || 0);
     if (!(asked >= 1)) return null;
-    const ceiling = fanMode ? fanCount : n;
-    const ceilingOf = fanMode ? `the fan's ${fanCount} slots` : continuousMode ? `${n} petals a turn` : `the outer whorl's ${n} petals`;
+    /* THE OUTER WHORL'S OWN COUNT (Eva's ruling, Nov 8: sepals read the outer
+       whorl's count, not the global) — `n` itself where it owns none */
+    const nOuter = !fanMode && !continuousMode && rings[0].ownCount ? rings[0].ownCount.built : n;
+    const ceiling = fanMode ? fanCount : nOuter;
+    const ceilingOf = fanMode ? `the fan's ${fanCount} slots` : continuousMode ? `${n} petals a turn` : `the outer whorl's ${nOuter} petals`;
     const count = Math.min(asked, ceiling);
     const scale = Number(st.sepalScale), breadth = Number(st.sepalFootBreadth), phaseFrac = Number(st.sepalPhase);
-    const pitchRad = fanMode ? fan.step : TAU / n;
+    const pitchRad = fanMode ? fan.step : TAU / nOuter;
     const phaseRad = phaseFrac * pitchRad;
     const outer = rings[0];
     /* THE FOOT follows the WIDTH's owner: the petal foot x size while the
@@ -3629,6 +3710,13 @@ export function footRing(state, acc, opts = {}) {
        primitive and the read-out names the plane from `mirror`. */
     mirror,
     slotCount,
+    /* A LAYER'S OWN PETAL COUNT (Nov 8): whether any whorl owns its count,
+       each ringed whorl's count (null under CONTINUOUS, where a ring is a
+       petal), and the whorls whose layer phase is INACTIVE against the whorl
+       outside them (their counts differ — Eva's ruling). */
+    countsOwned,
+    whorlCounts: continuousMode ? null : raw.map((q) => (q.ownCount ? q.ownCount.built : n)),
+    phaseInactive,
   };
 }
 
@@ -3705,7 +3793,10 @@ function varianceWave(state, fr) {
   const phaseDeg = Number(state.variancePhase);
   const phi = (phaseDeg * Math.PI) / 180;
   const fan = fr.fan;
-  const n = fr.continuousMode ? fr.sequenceLength : fr.slotCount;
+  /* where a whorl OWNS its petal count (Nov 8) the bar is the SMALLEST whorl's
+     — the whorl that aliases first (a placement made without a ruling, §19);
+     `fr.slotCount` itself where none is owned, by branch */
+  const n = fr.continuousMode ? fr.sequenceLength : fr.countsOwned ? Math.min(...fr.whorlCounts) : fr.slotCount;
   const halfSpan = fan ? (fan.spanDeg * Math.PI) / 360 : null;
   const nyquist = fan ? Math.PI / fan.step : n / 2;
   const aliased = frequency > 0 && frequency > nyquist;
@@ -29164,7 +29255,9 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
          other placement `fr.slotCount` IS `state.petalCount` — the identical
          double this line held before — so the whorl loop and its RADIAL
          azimuth divisor take the same arithmetic they always did. */
-      count: fr.slotCount,
+      /* A LAYER'S OWN PETAL COUNT (Nov 8) — the whorl's own where it owns one;
+         `fr.slotCount` itself, the same double, where it does not */
+      count: ring.ownCount ? ring.ownCount.built : fr.slotCount,
       radius: ring.radius,
       height: 0,
       sizeRamp: () => ring.scale,
@@ -29183,7 +29276,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
         /* THE SCOPE TERM (Scoping-a): which layer and petal offsets reach this
            slot, decided by the one owner and written onto the slot payload the
            way the whorl primitive writes `formTerm`. A BRANCH on `scopes`. */
-        if (scopes) slot.scopeTerm = scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: fr.slotCount, state });
+        if (scopes) slot.scopeTerm = scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: d.ownCount ? d.ownCount.built : fr.slotCount, state });
         /* THE FAN'S MIRROR PAIRS ARE MIRROR IMAGES (Eva, Oct 18): the member
            that is not its pair's canonical slot draws the pair's outline with
            its halves swapped (`resolvePetalValues`). FAN only, so RADIAL's

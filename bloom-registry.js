@@ -38,7 +38,7 @@
    in either direction.
    =================================================================== */
 import { UMBEL_FLORET_RANGE, UMBEL_HEAD_VALUES, UMBEL_DEPTH_VALUES, UMBEL_RAY_RANGE, UMBEL_RAY_LENGTH_RANGE } from './bloom-geometry.js';
-import { LAYER_RING_RANGE, LAYER_RING_STEP } from './bloom-geometry.js';
+import { LAYER_RING_RANGE, LAYER_RING_STEP, LAYER_PETAL_COUNT_RANGE } from './bloom-geometry.js';
 import { INFLORESCENCE_TYPES, FLORET_NODE_RANGE, FLORET_PETAL_RANGE, FLORET_SCALE_RANGE,
   PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE, PEDICEL_GRADIENT_RANGE, PEDICEL_CORYMB_VALUES } from './bloom-geometry.js';
 import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WALL_MM, INFILL_DENSITY_SWEEP,
@@ -1916,6 +1916,20 @@ function layerRingFmt(v, ui, shown) {
   if (p.grew) t += ` · the HUB GREW ${p.grew.fromMm.toFixed(2)} -> ${p.grew.toMm.toFixed(2)} mm to fit it`;
   return t;
 }
+/* A LAYER'S OWN PETAL COUNT'S READ-OUT (Nov 8) — from the PICKED layer's own
+   ring record (footRing()'s `ownCount` and the whorl's count, handed down as
+   `shown.pickedCount` by the page): its own count, or the global it takes; and
+   ASKED vs BUILT where a file asked for a count off the integer grid or past
+   the range. With no layer picked there is nothing to read. */
+function layerPetalCountFmt(v, ui, shown) {
+  const p = shown && shown.pickedCount;
+  if (!p) return 'a layer\'s own — pick a layer in the bar above to give it its own petal count';
+  if (!p.own) return `${p.global} — the GLOBAL Petals, live; drag to give ${p.name} its own count (set it back to ${p.global} to return it)`;
+  let t = `${p.own.built} — ${p.name}'s OWN count (the global Petals is ${p.global})`;
+  if (p.own.snapped) t += ` · asked ${p.own.asked}, built ${p.own.built} (SNAPPED to a whole count in ${LAYER_PETAL_COUNT_RANGE[0]}-${LAYER_PETAL_COUNT_RANGE[1]})`;
+  if (p.sepalsFollow) t += ' · the sepals follow this outer whorl\'s count';
+  return t;
+}
 const scopeToggleFmt = (kind) => (v, ui, shown) => {
   const sc = shown && shown.scopes;
   const list = sc ? ((kind === 'layers' ? sc.scopedLayers : sc.scopedPetals) || []) : [];
@@ -2059,8 +2073,12 @@ export const CONTROLS = [
     label: 'Petals', tier: 'standard', role: 'petal',
     fmt: (v, ui, shown) => {
       const ch = shown && shown.stemChannel;
-      if (!ch || !ch.omitted.length) return `${v}`;
-      return `${v} asked — ${ch.built} BUILT, ${ch.omitted.length} not (the stem passes through them; see STEM CHANNEL)`;
+      /* A LAYER THAT OWNS ITS PETAL COUNT (Nov 8) is not this slider's: say
+         which whorls are, and what each carries */
+      const pc = shown && shown.counts;
+      const own = pc && pc.owned ? ` — per whorl ${pc.whorlCounts.join(' / ')}: ${pc.ownedLayers.map((L) => `${pc.name} ${L + 1}`).join(', ')} own${pc.ownedLayers.length === 1 ? 's' : ''} its count, the rest take this one` : '';
+      if (!ch || !ch.omitted.length) return `${v}${own}`;
+      return `${v} asked — ${ch.built} BUILT, ${ch.omitted.length} not (the stem passes through them; see STEM CHANNEL)${own}`;
     },
     /* HIDDEN UNDER FAN, and it is the layerPhase treatment rather than a
        reinterpretation (Eva's ruling, Sep 2). A fan's petal count is DERIVED —
@@ -3751,7 +3769,15 @@ export const CONTROLS = [
      available id to put it on, since a saved `layerPhase` would then feed a
      slot fraction into an angle. It gets its own id and its own ruling. */
   { id: 'layerPhase', section: 'arrangement', kind: 'slider', min: 0, max: 1, step: 0.01, default: 0.5,
-    label: 'Layer offset', fmt: (v) => `${Number(v).toFixed(2)} slot`, tier: 'standard', role: 'arrangement',
+    /* INACTIVE BETWEEN TWO WHORLS WHOSE COUNTS DIFFER (Eva's ruling, Nov 8 —
+       footRing()'s `phaseInactive`): the read-out names every such pair */
+    label: 'Layer offset', fmt: (v, ui, shown) => {
+      const pc = shown && shown.counts;
+      const off = pc && pc.phaseInactive && pc.phaseInactive.length
+        ? ` — INACTIVE between ${pc.phaseInactive.map((L) => `${pc.name.toLowerCase()} ${L} and ${L + 1} (${pc.whorlCounts[L - 1]} vs ${pc.whorlCounts[L]} petals)`).join(', ')}: their counts differ, so there is no one pitch to offset by`
+        : '';
+      return `${Number(v).toFixed(2)} slot${off}`;
+    }, tier: 'standard', role: 'arrangement',
     /* HIDDEN UNDER FAN AS WELL AS CONTINUOUS, for a reason of its own rather
        than by analogy. Under CONTINUOUS there is one whorl and nothing to
        offset. Under FAN there are whorls, and offsetting one would be a rigid
@@ -3825,6 +3851,22 @@ export const CONTROLS = [
      from the sheet. Past 1 the hub grows to the ring (Oct 16). */
   { id: 'layerRing', section: 'arrangement', kind: 'slider', min: LAYER_RING_RANGE[0], max: LAYER_RING_RANGE[1], step: LAYER_RING_STEP, default: 1,
     label: 'Layer ring', fmt: layerRingFmt, tier: 'standard', role: 'arrangement',
+    visibleWhen: { all: [{ ref: 'scopeLayersLive' }, { ref: 'headPresent' }] } },
+
+  /* ===================================================================
+     A LAYER'S OWN PETAL COUNT (Eva's rulings of Nov 8 — option A of §18; read
+     the geometry's LAYER_PETAL_COUNT_RANGE block). How many petals the picked
+     layer's whorl carries: an OWNED VALUE that REPLACES the global Petals for
+     that whorl, never an offset. Like Layer ring it is a VIEW of the picked
+     layer: it shows that layer's own count where it owns one, else the GLOBAL
+     count it takes, so nothing moves until it is dragged; with no layer
+     picked the page greys it. Its whole-bloom value is never read (the
+     geometry reads `values.layerPetalCount` off a layer entry and nothing
+     else). RADIAL and SPIRAL only (`scopeLayersLive`): hidden under CONTINUOUS
+     and FAN by ruling. The range is Petals' own 3-40, imported — PROPOSED,
+     for Eva's ruling. */
+  { id: 'layerPetalCount', section: 'arrangement', kind: 'slider', min: LAYER_PETAL_COUNT_RANGE[0], max: LAYER_PETAL_COUNT_RANGE[1], step: 1, default: 8,
+    label: 'Layer petals', fmt: layerPetalCountFmt, tier: 'standard', role: 'arrangement',
     visibleWhen: { all: [{ ref: 'scopeLayersLive' }, { ref: 'headPresent' }] } },
 
   /* ===================================================================

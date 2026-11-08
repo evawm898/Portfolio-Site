@@ -245,11 +245,25 @@ async function boneArm() {
   return r.status !== 0 ? [`TXB: tools/verify-bloom-bone.mjs${CONTROL ? ' --control' : ''} exited ${r.status}: ${(r.stderr || '').trim().split('\n').slice(-3).join(' | ')}`] : [];
 }
 
+/* A LAYER'S OWN PETAL COUNT'S MUST-FAIL (Nov 8), spawned the same way and for
+   the same reason: tools/verify-bloom-layer-count.mjs is Node-only and imports
+   the harness (the PC family is pure; the apex table never runs the Z family),
+   and spawning it here puts it in CI with no workflow edit — which would cost
+   the frozen tag owed by the same session. Its clean arm beside the gate, its
+   seven mutants beside --control. */
+async function layerCountArm() {
+  const { spawnSync } = await import('node:child_process');
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/verify-bloom-layer-count.mjs'), ...(CONTROL ? ['--control'] : [])], { encoding: 'utf8' });
+  const tail = (r.stdout || '').trim().split('\n').slice(-1)[0];
+  console.log(`  layer petal count ${CONTROL ? 'must-fail' : 'clean'} arm: ${tail}`);
+  return r.status !== 0 ? [`PC: tools/verify-bloom-layer-count.mjs${CONTROL ? ' --control' : ''} exited ${r.status}: ${(r.stdout || '').trim().split('\n').filter((l) => /FAIL/.test(l)).slice(0, 3).join(' | ')} ${(r.stderr || '').trim().split('\n').slice(-2).join(' | ')}`] : [];
+}
+
 async function main() {
   const tree = await loadTree(ROOT);
   const matrix = buildMatrix();
-  const rootBad = [...await rootTaperArm(tree), ...await boneArm()];
-  if (rootBad.length) { console.log(`defaults bar: FAILED — ${rootBad.length} root-taper or bone finding(s)`); for (const b of rootBad) console.log('  - ' + b); process.exitCode = 1; return; }
+  const rootBad = [...await rootTaperArm(tree), ...await boneArm(), ...await layerCountArm()];
+  if (rootBad.length) { console.log(`defaults bar: FAILED — ${rootBad.length} root-taper, bone or layer-count finding(s)`); for (const b of rootBad) console.log('  - ' + b); process.exitCode = 1; return; }
   if (!CONTROL) {
     const bad = verify(tree, SHIPPED_STATES, matrix);
     if (bad.length) { console.log(`defaults bar: FAILED — ${bad.length} finding(s)`); for (const b of bad) console.log('  - ' + b); process.exitCode = 1; return; }

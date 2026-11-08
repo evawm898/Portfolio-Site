@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 /* ===================================================================
    PETAL COUNT PER WHORL — THREE OPTIONS, PROTOTYPED, MEASURED AND RENDERED
-   SIDE BY SIDE. NOTHING HERE SHIPS. (read §18 of
+   SIDE BY SIDE. NOTHING HERE SHIPS.
+   [Nov 8: option A is RULED and SHIPPED (§19). Its anchors are the code as it
+   stood at 8f6c570 and NO LONGER MATCH the shipped geometry, so on this tree
+   the tool REFUSES (an anchor matching 0 times) — run it from a worktree of
+   8f6c570 to reproduce §18. Kept as the record the ruling was made on.]
+   (read §18 of
    docs/bloom-photo-to-bloom-discovery.md; the ring options' tool,
    tools/bloom-ring-options.mjs, is this one's shape)
 

@@ -80,7 +80,7 @@
 // applied" — nothing reads it, and whether it is retired or given a meaning is
 // F3's (the first session with a live curve control) to decide, not this one's.
 import { CONTROLS, RETIRED_IDS, migrateRoles } from './bloom-registry.js';
-import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS, SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_IDS, SCOPE_STRAND_IDS, SCOPE_LAYER_VALUE_IDS, LAYER_RING_RANGE } from './bloom-geometry.js';
+import { SCOPE_UNSCOPED, SCOPE_TIER_WHORL_LEVEL_IDS, SCOPE_VALUE_IDS, SEPAL_SCOPE_VALUE_IDS, SCOPE_STRAND_IDS, SCOPE_LAYER_VALUE_IDS, LAYER_RING_RANGE, LAYER_PETAL_COUNT_RANGE } from './bloom-geometry.js';
 import { readCurveValue, cloneCurve } from './bloom-curve.js';
 import { DEFAULTS, evalPredicate } from './bloom-registry.js';   // the LOAD-AS-NEW reader only (end of file)
 
@@ -431,7 +431,18 @@ function readScopeEntry(k, e, i, notes) {
       const vals = {};
       for (const id of Object.keys(e.values)) {
         if (SCOPE_UNSCOPED.includes(id)) { notes.push(note('invalid', `${where}.values.${id}: never scoped — it is the material (Q3.6) — not applied`)); continue; }
-        if (SCOPE_LAYER_VALUE_IDS.includes(id) && k !== 'layers') { notes.push(note('invalid', `${where}.values.${id}: a ring is a layer's own — only an overrides.layers entry may own one — not applied`)); continue; }
+        if (SCOPE_LAYER_VALUE_IDS.includes(id) && k !== 'layers') { notes.push(note('invalid', `${where}.values.${id}: a ${id === 'layerRing' ? 'ring' : 'petal count'} is a layer's own — only an overrides.layers entry may own one — not applied`)); continue; }
+        /* NOV 8: A LAYER'S OWN PETAL COUNT — kept AS ASKED (a finite number);
+           off the integer grid or past the range it is told here and SNAPPED /
+           CLAMPED BY THE BUILD, whose read-out prints asked vs built */
+        if (id === 'layerPetalCount') {
+          const c = e.values[id];
+          if (typeof c !== 'number' || !Number.isFinite(c)) { notes.push(note('invalid', `${where}.values.${id} is ${JSON.stringify(c)}, not a number — not applied`)); continue; }
+          const built = Math.min(LAYER_PETAL_COUNT_RANGE[1], Math.max(LAYER_PETAL_COUNT_RANGE[0], Math.round(c)));
+          if (built !== c) notes.push(note('clamped', `${where}.values.${id} ${c} is not a whole petal count in ${LAYER_PETAL_COUNT_RANGE[0]}-${LAYER_PETAL_COUNT_RANGE[1]} — kept as asked; the build makes it ${built} and the read-out says so`));
+          vals[id] = c;
+          continue;
+        }
         /* THE RING IS KEPT AS ASKED (a finite number), and a value past the range
            is told here and CLAMPED BY THE BUILD, whose read-out prints asked vs
            built — so a re-save writes what was asked, never a silent clamp */
