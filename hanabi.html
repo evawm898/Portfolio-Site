@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hanabi — Eva Maskalenko</title>
+<meta name="description" content="Hanabi deck designer — suits, colours and symbols, three face layouts, card backs and tokens, exported as an imposed print PDF or 300 dpi PNGs.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="hanabi.css">
+<!-- PDF + ZIP export, pinned to the same cdnjs versions /cards uses. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+<header class="hb-header">
+  <a class="hb-back" href="index.html">&larr; Index</a>
+  <div class="hb-eyebrow">EM / HANABI</div>
+  <h1>Hanabi deck</h1>
+  <p class="hb-sub">Five suits of fireworks, ranks one to five <span class="hb-sep">&mdash;</span> every suit carries a symbol as well as a colour, so the deck reads in greyscale. Pick a face layout, a size and a back, then export an imposed print PDF or 300&nbsp;dpi PNGs.</p>
+</header>
+
+<main class="hb-body">
+
+<aside class="hb-panel" aria-label="Deck controls">
+
+  <details class="hb-sec" id="sec-suits" open>
+    <summary><span class="hb-num">01</span>Suits <output class="hb-val" id="deckCount"></output></summary>
+    <label class="hb-check"><input type="checkbox" id="rainbow"> Add the rainbow suit <span class="hb-dim">(+10 cards)</span></label>
+    <div id="suitRows"></div>
+    <p class="hb-note" id="clashNote" hidden></p>
+  </details>
+
+  <details class="hb-sec" id="sec-size" open>
+    <summary><span class="hb-num">02</span>Card size <output class="hb-val" id="sizeVal"></output></summary>
+    <div class="hb-row">
+      <label for="sizePreset">Preset</label>
+      <select id="sizePreset">
+        <option value="poker">Poker &mdash; 63.5 &times; 88.9 mm</option>
+        <option value="bridge">Bridge &mdash; 57.2 &times; 88.9 mm</option>
+        <option value="mini">Mini &mdash; 44 &times; 63 mm</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div class="hb-row hb-row--pair">
+      <label for="sizeW">Width mm</label><input type="number" id="sizeW" min="30" max="140" step="0.1">
+      <label for="sizeH">Height mm</label><input type="number" id="sizeH" min="30" max="140" step="0.1">
+    </div>
+    <div class="hb-row hb-row--pair">
+      <label for="bleed">Bleed mm</label><input type="number" id="bleed" min="0" max="5" step="0.25">
+      <label for="safe">Safe mm</label><input type="number" id="safe" min="0" max="8" step="0.25">
+    </div>
+  </details>
+
+  <details class="hb-sec" id="sec-face" open>
+    <summary><span class="hb-num">03</span>Face layout <output class="hb-val" id="layoutVal"></output></summary>
+    <div class="hb-seg" id="layoutSeg" role="radiogroup" aria-label="Face layout">
+      <button type="button" data-layout="A" role="radio">A</button>
+      <button type="button" data-layout="B" role="radio">B</button>
+      <button type="button" data-layout="C" role="radio">C</button>
+    </div>
+    <p class="hb-note" id="layoutNote"></p>
+    <div class="hb-row">
+      <label for="corners">Corner index</label>
+      <select id="corners">
+        <option value="inverted">Two corners, bottom inverted</option>
+        <option value="upright">Two corners, both upright</option>
+        <option value="four">All four corners</option>
+      </select>
+    </div>
+    <div class="hb-row"><label for="faceBg">Card face</label><input type="color" id="faceBg"></div>
+  </details>
+
+  <details class="hb-sec" id="sec-back">
+    <summary><span class="hb-num">04</span>Card back</summary>
+    <div class="hb-row hb-row--pair">
+      <label for="backBg">Ground</label><input type="color" id="backBg">
+      <label for="backFg">Ink</label><input type="color" id="backFg">
+    </div>
+    <div class="hb-row">
+      <label for="backPattern">Pattern</label>
+      <select id="backPattern"><option value="none">None</option><option value="stars">Stars</option><option value="dots">Dots</option><option value="stripes">Stripes</option><option value="rays">Rays</option></select>
+    </div>
+    <div class="hb-row">
+      <label for="backMark">Centre mark</label>
+      <select id="backMark"><option value="none">None</option><option value="burst">Burst</option><option value="ring">Ring</option></select>
+    </div>
+  </details>
+
+  <details class="hb-sec" id="sec-tokens">
+    <summary><span class="hb-num">05</span>Tokens <span class="hb-dim">8 clue &middot; 3 fuse</span></summary>
+    <div class="hb-row hb-row--pair">
+      <label for="clueBg">Clue ground</label><input type="color" id="clueBg">
+      <label for="clueFg">Clue ink</label><input type="color" id="clueFg">
+    </div>
+    <div class="hb-row hb-row--pair">
+      <label for="fuseBg">Fuse ground</label><input type="color" id="fuseBg">
+      <label for="fuseFg">Fuse ink</label><input type="color" id="fuseFg">
+    </div>
+    <p class="hb-note">Tokens print at the card size, on the same sheets, with the deck back.</p>
+  </details>
+
+  <details class="hb-sec" id="sec-firework">
+    <summary><span class="hb-num">06</span>Firework spec <span class="hb-dim">read only</span></summary>
+    <p class="hb-note">Each card's centre art is drawn from a spec. The visual firework builder that edits these is a later phase; for now this shows the spec the placeholder renderer draws.</p>
+    <div class="hb-row hb-row--pair">
+      <label for="specSuit">Suit</label><select id="specSuit"></select>
+      <label for="specRank">Rank</label><select id="specRank"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+    </div>
+    <pre class="hb-spec" id="specOut"></pre>
+  </details>
+
+  <details class="hb-sec" id="sec-export" open>
+    <summary><span class="hb-num">07</span>Export</summary>
+    <div class="hb-row">
+      <label for="paper">Paper</label>
+      <select id="paper"><option value="letter">Letter &mdash; 8.5 &times; 11 in</option><option value="a4">A4 &mdash; 210 &times; 297 mm</option></select>
+    </div>
+    <div class="hb-row">
+      <label for="orientation">Orientation</label>
+      <select id="orientation"><option value="auto">Auto &mdash; whichever holds more</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+    </div>
+    <div class="hb-row">
+      <label for="cut">Cutting</label>
+      <select id="cut"><option value="separate">Separate bleeds &mdash; each card its own cuts</option><option value="shared">Shared cuts &mdash; cards butted at trim</option></select>
+    </div>
+    <label class="hb-check"><input type="checkbox" id="cropMarks"> Crop marks</label>
+    <label class="hb-check"><input type="checkbox" id="duplex"> Duplex backs</label>
+    <div class="hb-row" id="flipRow">
+      <label for="flip">Flip on</label>
+      <select id="flip"><option value="long">Long edge</option><option value="short">Short edge</option></select>
+    </div>
+    <p class="hb-note" id="impositionNote"></p>
+    <div class="hb-actions">
+      <button type="button" class="hb-btn" id="exportPdf">Print PDF</button>
+      <button type="button" class="hb-btn" id="exportZip">PNG zip</button>
+    </div>
+    <p class="hb-note" id="exportStatus" role="status" aria-live="polite"></p>
+  </details>
+
+  <details class="hb-sec" id="sec-file">
+    <summary><span class="hb-num">08</span>Design file</summary>
+    <div class="hb-actions">
+      <button type="button" class="hb-btn hb-btn--ghost" id="saveJson">Save .json</button>
+      <label class="hb-btn hb-btn--ghost">Load .json<input type="file" id="loadJson" accept=".json,application/json" hidden></label>
+      <button type="button" class="hb-btn hb-btn--ghost" id="resetDesign">Reset</button>
+    </div>
+    <p class="hb-note" id="fileStatus" role="status" aria-live="polite"></p>
+  </details>
+
+</aside>
+
+<section class="hb-preview" aria-label="Preview">
+  <div class="hb-toolbar">
+    <div class="hb-seg" id="viewSeg" role="radiogroup" aria-label="Preview view">
+      <button type="button" data-view="suit" role="radio">Suit</button>
+      <button type="button" data-view="layouts" role="radio">A / B / C</button>
+      <button type="button" data-view="deck" role="radio">Full deck</button>
+    </div>
+    <select id="viewSuit" aria-label="Suit to preview"></select>
+    <label class="hb-check"><input type="checkbox" id="grayscale"> Greyscale</label>
+    <label class="hb-check"><input type="checkbox" id="guides"> Guides</label>
+    <label class="hb-zoom">Zoom <input type="range" id="zoom" min="90" max="320" step="10" value="150" aria-label="Card preview size"></label>
+  </div>
+  <p class="hb-legend" id="guideLegend" hidden>Guides <span class="hb-sep">&mdash;</span> shaded: bleed, trimmed off <span class="hb-sep">&mdash;</span> dashed: trim line <span class="hb-sep">&mdash;</span> dotted: safe zone</p>
+  <div class="hb-stage" id="stage"></div>
+</section>
+
+</main>
+
+<script type="module" src="hanabi.js"></script>
+</body>
+</html>

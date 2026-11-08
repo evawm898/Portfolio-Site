@@ -12629,3 +12629,12 @@ Reality toggles. Copy stays generic — no internal product, project or band nam
   section of this note.
 - Gate: `node tools/dyeing-proto/verify-page.mjs` (1280 and 390). Nothing runs in CI — no workflow
   names these files. Recordings: `node tools/dyeing-proto/shoot.mjs <dir>`.
+
+## `/hanabi` — the Hanabi deck designer (pointer only)
+
+Hidden page (`hanabi.html`, `hanabi.css`, `hanabi.js`, `hanabi/*.js`; `noindex`, unlinked). Read
+`docs/hanabi.md` before touching it. Phase 1: suits (colour + a SYMBOL each — colour is never the
+only cue), the 3/2/2/2/1 distribution plus the optional rainbow suit, three face layouts (A/B/C,
+Eva's to rule), back, tokens, imposed print PDF and 300 dpi PNGs. **`hanabi/firework.js` is the
+phase-2 slot** — layout code only calls `fireworkSpec()` and `renderFirework()`; the builder writes
+overrides into `design.fireworks`. Gate: `node tools/verify-hanabi.mjs` (`--negative-control`), not in CI.
