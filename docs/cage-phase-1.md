@@ -445,7 +445,15 @@ the control (the polygon's corners read off the emitted base ring) and every fra
 cases. **C6 now reads the corners off the emitted base ring** (the lattice turns), and the bands' door test
 counts the ring the sill sits on. `--negative-control` gains six mutants — the door on a polygon corner, the
 jambs between bars, the door through a shoulder ring, through a banded ring, a sill floating 3 mm above its
-ring, the frame on a flat plane — and three were re-anchored.
+ring, the frame on a flat plane — and three were re-anchored. Their collateral was measured, not assumed: a door through a shoulder
+also chords its jamb across the step, off the surface (D4); a floating sill or a door that keeps its band
+leaves band elements standing in the opening over a banded sill, where the door has taken the bars from under
+them, and one comes loose (C3, seed 18); a flat frame leaves the bars' cut ends behind on the surface (C5, C5c)
+and changes its own measured width (D5). Two older mutants now redden door clauses too, both true: with no bar on a corner the
+face-centred door has no jamb bars (D), and with no ring at a profile step the tall tiered door runs through it
+(D3, D4). **29 of 29 behave** (a full run of 30 min locally, then the three widened claims re-run); the gate
+reads 1,645 of 1,645 over 67 cages. The geometry job's control now costs ~30 min against its 45-min limit —
+reported, the workflow file left alone (editing it costs frozen tags dispatched afterwards).
 
 The diagnostic is `node tools/cage-door-diagnose.mjs`; the ruling sheet is
 `node tools/shot-cage-door.mjs <dir> --base <worktree of d0e2ed0> --png docs/img/cage-door.png` (the

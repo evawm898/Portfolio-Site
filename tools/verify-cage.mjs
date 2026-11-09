@@ -480,13 +480,13 @@ const MUTANTS = [
   { id: 'the-door-leaves-the-bars-uncut', from: "if (door && door.barU.has(j)) {", to: "if (false) {", breaks: /^(C5[bc]?|D2) / },
   { id: 'a-ring-at-the-door-is-not-cut', from: "const cr = door ? door.cross.get(rg) : null;", to: "const cr = null;", breaks: /^C5c / },
   { id: 'the-floor-is-not-applied', from: "const wireR = (mm, what) => { const r = mm / 2; if (r < floor / 2)", to: "const wireR = (mm, what) => { const r = mm / 2; if (false)", breaks: /^C4 |^C13 / },
-  { id: 'a-polygon-corner-carries-no-bar', from: "if (N && barCount % N) {", to: "if (false) {", breaks: /^C6 |^C15 / },
+  { id: 'a-polygon-corner-carries-no-bar', from: "if (N && barCount % N) {", to: "if (false) {", breaks: /^C6 |^C15 |^D[1-5] / },   // with no bar on a corner the face-centred door has no jamb bars to stand on (D)
   { id: 'the-tube-is-left-open', from: "    const c0 = mesh.vertex(...pts[0]), c1 = mesh.vertex(...pts[n - 1]);\n    for (let k = 0; k < sides; k++)", to: "    const c0 = mesh.vertex(...pts[0]), c1 = mesh.vertex(...pts[n - 1]);\n    for (let k = 0; k < 0; k++)", breaks: /^C1 |^C2 / },
   { id: 'the-mitre-is-dropped', from: "const stretch = half < 1.2 ? 1 / Math.cos(half) : 1 / Math.cos(1.2);", to: "const stretch = 1;", breaks: /^C7 / },
   { id: 'the-svg-drops-the-door', from: "const order = ['skirt', 'frame', 'ring', 'bar', 'rib', 'spoke', 'door', 'hanger'];\n  const wires = [...model.wires]", to: "const order = ['skirt', 'frame', 'ring', 'bar', 'rib', 'spoke', 'door', 'hanger'];\n  const wires = [...model.wires].filter((w) => w.kind !== 'door')", breaks: /^C10b? / },
   { id: 'the-collar-is-not-built', from: "revolve(mesh, prof, { sectors: 32, kind: 'collar', name: 'apex collar', poly: 0 });", to: "", breaks: /^C3 / },
   { id: 'clustered-rings-are-even', from: "const tc = p.ringPlace === 'clustered' ?", to: "const tc = false ?", breaks: /^C8b / },
-  { id: 'a-profile-step-gets-no-ring', from: "const shoulderZ = profileShoulders(p.profile.points, Rb, H);", to: "const shoulderZ = [];", breaks: /^C8c? / },
+  { id: 'a-profile-step-gets-no-ring', from: "const shoulderZ = profileShoulders(p.profile.points, Rb, H);", to: "const shoulderZ = [];", breaks: /^C8c? |^D[34] / },   // with no ring at the step the tall tiered door runs through it, chording across the step (D3, D4)
   { id: 'bars-pack-until-they-touch', from: "const collarPitch = 2 * rBar + floor;", to: "const collarPitch = 2 * rBar * 1.05;", breaks: /^C9b / },
   { id: 'the-scallop-cusps-leave-the-bars', from: "const u = ((th * scallops / TAU) % 1 + 1) % 1;", to: "const u = ((th * (scallops + 1) / TAU) % 1 + 1) % 1;", breaks: /^C16 / },
   // phase 2 — the ring bands
@@ -494,7 +494,7 @@ const MUTANTS = [
   { id: 'the-bead-fuse-cap-is-dropped', from: "const nMin = Math.ceil(gMax / (hiF * size) - 1e-9)", to: "const nMin = 1", breaks: /^(B3|B5) / },   // a parted run also leaves bars crossing the ring outside every element
   { id: 'the-laurel-run-parts', from: "loF = LEAF_RUN_PITCH_MIN; hiF = LEAF_RUN_PITCH_MAX;", to: "loF = LEAF_RUN_PITCH_MIN; hiF = 1.2;", breaks: /^(B3|B5) / },   // parted leaves leave bars between them
   { id: 'a-bead-floats-off-its-ring', from: "} else sphereSolid(scr, map(s0, 0, 0), size / 2, PATTERN_LAT, PATTERN_LON);", to: "} else sphereSolid(scr, map(s0, 0, size), size / 2, PATTERN_LAT, PATTERN_LON);", breaks: /^(B2|B3|B4|B5|B9|C3) / },   // floated out, the beads also sit on a wider circle, so neighbours part
-  { id: 'the-door-keeps-its-band', from: "const drop = (pts) => door && (rg.cut || rg.sill) &&", to: "const drop = (pts) => false &&", breaks: /^(B4|B7) / },   // kept in the opening, an element sits where the ring was cut away
+  { id: 'the-door-keeps-its-band', from: "const drop = (pts) => door && (rg.cut || rg.sill) &&", to: "const drop = (pts) => false &&", breaks: /^(B4|B7|C3) / },   // kept in the opening, an element sits where the ring was cut away — and over a sill on a banded ring, with the door's bars gone under it, it comes loose (C3)
   { id: 'the-band-ignores-the-profile-slope', from: "const nr = ez, nz = -er, a0 = ra(zc);", to: "er = 0; ez = 1; const nr = ez, nz = -er, a0 = ra(zc);", breaks: /^B9 / },
   { id: 'the-svg-drops-the-bands', from: "  for (const b of bands) {\n    if (b.kind === 'bead')", to: "  for (const b of []) {\n    if (b.kind === 'bead')", breaks: /^(B8|C10) / },
   { id: 'every-ring-carries-the-band', from: "const bandWants = (p, rg) => p.bandRings === 'all' ||", to: "const bandWants = (p, rg) => true ||", breaks: /^B1 / },
@@ -503,10 +503,10 @@ const MUTANTS = [
   // the door's placement (docs/cage-phase-1.md §9) — each a plausible wrong door
   { id: 'the-door-sits-on-a-polygon-corner', from: "const cIdx = N ? mod((Math.round(0.75 * N - 0.5) + 0.5) * m, barCount) :", to: "const cIdx = N ? mod(Math.round(0.75 * barCount), barCount) :", breaks: /^D[12] / },
   { id: 'the-jambs-land-between-bars', from: "const W = widthOf(k), half = k / 2;", to: "const W = widthOf(k), half = k / 2 * p.doorWidth / widthOf(k);", breaks: /^D[125] / },
-  { id: 'the-door-crosses-a-shoulder-ring', from: "R.shoulder || R.banded || R === ringPlan", to: "R.banded || R === ringPlan", breaks: /^D[35] / },
+  { id: 'the-door-crosses-a-shoulder-ring', from: "R.shoulder || R.banded || R === ringPlan", to: "R.banded || R === ringPlan", breaks: /^D[345] / },   // a jamb through a profile step chords across it, off the surface (D4)
   { id: 'the-door-crosses-a-banded-ring', from: "R.shoulder || R.banded || R === ringPlan", to: "R.shoulder || R === ringPlan", breaks: /^D[35] / },
-  { id: 'the-sill-floats-above-its-ring', from: "const z0 = ch.S.z, Dh = ch.Dh, apex = z0 + Dh;", to: "const z0 = ch.S.z + 3, Dh = ch.Dh - 3, apex = z0 + Dh;", breaks: /^D[35] / },
-  { id: 'the-frame-is-a-flat-plane', from: "const fsurf = (th, z) => surf(th, z);", to: "const fsurf = (th, z) => { const q = surf(th, z), c = Math.cos(thD), s = Math.sin(thD), d = rho(z0) * (N ? Math.cos(Math.PI / N) : 1) - (q[0] * c + q[1] * s); return [q[0] + d * c, q[1] + d * s, z]; };", breaks: /^D[24] / },
+  { id: 'the-sill-floats-above-its-ring', from: "const z0 = ch.S.z, Dh = ch.Dh, apex = z0 + Dh;", to: "const z0 = ch.S.z + 3, Dh = ch.Dh - 3, apex = z0 + Dh;", breaks: /^(D[35]|C3) / },   // the sill's ring then keeps its band elements in the opening, and one comes loose (C3)
+  { id: 'the-frame-is-a-flat-plane', from: "const fsurf = (th, z) => surf(th, z);", to: "const fsurf = (th, z) => { const q = surf(th, z), c = Math.cos(thD), s = Math.sin(thD), d = rho(z0) * (N ? Math.cos(Math.PI / N) : 1) - (q[0] * c + q[1] * s); return [q[0] + d * c, q[1] + d * s, z]; };", breaks: /^(D[1245]|C5c?) / },   // on a tapering face a flat frame also reaches past the corners (D1); the bars' cut ends stay on the surface, off the moved frame (C5); its measured width changes (D5)
   { id: 'bars-ending-at-the-ring-get-no-ribs', from: "if (!flat && barsEnd === 'ring') {", to: "if (false) {", breaks: /^C3 |^C9 / },
 ];
 if (NEG) {
