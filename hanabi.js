@@ -4,14 +4,15 @@
 
 import {
   defaultDesign, normaliseDesign, serialiseDesign, activeSuits, cardCounts, deckCards,
-  suitById, symbolClashes, imposition, SIZE_PRESETS, LAYOUTS, RANKS, COPIES, VERSION,
+  suitById, symbolClashes, imposition, copyCentreToAll, SIZE_PRESETS, INDEX_STYLES, CENTRE_LAYOUTS,
+  RANKS, COPIES, VERSION,
 } from './hanabi/deck.js';
 import { SYMBOLS, SYMBOL_IDS } from './hanabi/symbols.js';
 import { renderFace, renderBack } from './hanabi/layout.js';
-import { fireworkSpec } from './hanabi/firework.js';
+import { fireworkSpec, MOTIFS, MOTIF_IDS, TIERS, TIER_RANKS } from './hanabi/firework.js';
 import { exportPdf, exportZip, downloadBlob } from './hanabi/export.js';
 
-const STORE_KEY = 'hanabi.design.v1';
+const STORE_KEY = 'hanabi.design.v1';   // the key predates version 2; normaliseDesign migrates what it holds
 const VIEW_KEY = 'hanabi.view.v1';
 const $ = (id) => document.getElementById(id);
 
@@ -43,6 +44,14 @@ function symbolSvg(id) {
   const s = SYMBOLS[id];
   return `<svg viewBox="0 0 100 100" aria-hidden="true"><path d="${s.d}" fill="currentColor"${s.evenodd ? ' fill-rule="evenodd"' : ''}/></svg>`;
 }
+function motifOptions() {
+  const groups = {};
+  for (const id of MOTIF_IDS) (groups[MOTIFS[id].group] ||= []).push(id);
+  return Object.entries(groups).map(([g, ids]) => `<optgroup label="${g}">${ids.map((id) =>
+    `<option value="${id}">${MOTIFS[id].item ? `${MOTIFS[id].item} · ` : ''}${MOTIFS[id].label}</option>`).join('')}</optgroup>`).join('');
+}
+const CENTRE_SHORT = { single: 'One burst', count: 'Count of bursts', bleed: 'Full bleed' };
+const motifLabel = (id) => `${MOTIFS[id].item ? `${MOTIFS[id].item} · ` : ''}${MOTIFS[id].label}`;
 function buildSuitRows() {
   const root = $('suitRows');
   root.innerHTML = '';
@@ -56,14 +65,29 @@ function buildSuitRows() {
         <input type="color" aria-label="${suit.id} secondary colour" data-f="secondary">
       </div>
       <div class="hb-suit__syms" role="group" aria-label="${suit.id} symbol">${SYMBOL_IDS.map((id) =>
-        `<button type="button" class="hb-sym" data-sym="${id}" aria-label="${SYMBOLS[id].label}" title="${SYMBOLS[id].label}">${symbolSvg(id)}</button>`).join('')}</div>`;
+        `<button type="button" class="hb-sym" data-sym="${id}" aria-label="${SYMBOLS[id].label}" title="${SYMBOLS[id].label}">${symbolSvg(id)}</button>`).join('')}</div>
+      <div class="hb-suit__centre">
+        <label for="c-${suit.id}-layout">Centre</label><label for="c-${suit.id}-motif">Firework</label>
+        <select id="c-${suit.id}-layout" data-c="layout">${Object.keys(CENTRE_LAYOUTS).map((k) => `<option value="${k}" title="${CENTRE_LAYOUTS[k]}">${CENTRE_SHORT[k]}</option>`).join('')}</select>
+        <select id="c-${suit.id}-motif" data-c="motif">${motifOptions()}</select>
+        <label for="c-${suit.id}-tier">Second tier, ranks ${TIER_RANKS.join(' and ')}</label><span></span>
+        <select id="c-${suit.id}-tier" data-c="tier">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+        <button type="button" class="hb-suit__all" data-all>same centre for every suit</button>
+      </div>`;
     row.addEventListener('input', (e) => {
       const fld = e.target.dataset.f;
       if (!fld) return;
       suit[fld] = fld === 'name' ? (e.target.value || suit.id) : e.target.value.toUpperCase();
       changed();
     });
+    row.addEventListener('change', (e) => {
+      const c = e.target.dataset.c;
+      if (!c) return;
+      suit.centre[c] = e.target.value;
+      changed();
+    });
     row.addEventListener('click', (e) => {
+      if (e.target.closest('[data-all]')) { copyCentreToAll(design, suit.id); changed(); return; }
       const b = e.target.closest('.hb-sym');
       if (!b) return;
       suit.symbol = b.dataset.sym;
@@ -80,6 +104,10 @@ function syncSuitRows() {
     for (const inp of row.querySelectorAll('[data-f]')) {
       if (document.activeElement !== inp) inp.value = inp.dataset.f === 'name' ? suit.name : suit[inp.dataset.f].toLowerCase();
     }
+    for (const sel of row.querySelectorAll('[data-c]')) sel.value = suit.centre[sel.dataset.c];
+    const tier = row.querySelector('[data-c=tier]');
+    tier.disabled = suit.centre.layout !== 'single';
+    tier.title = tier.disabled ? 'A second tier sits under a single burst; this centre has none.' : '';
     for (const b of row.querySelectorAll('.hb-sym')) {
       b.setAttribute('aria-pressed', String(b.dataset.sym === suit.symbol));
       b.classList.toggle('is-taken', taken.has(b.dataset.sym) && taken.get(b.dataset.sym) !== suit.id);
@@ -134,7 +162,7 @@ function syncControls() {
   }
   const custom = design.size.preset === 'custom';
   $('sizeW').disabled = !custom; $('sizeH').disabled = !custom;
-  for (const btn of $('layoutSeg').children) btn.setAttribute('aria-checked', String(btn.dataset.layout === design.layout));
+  for (const btn of $('indexSeg').children) btn.setAttribute('aria-checked', String(btn.dataset.index === design.index));
   for (const btn of $('viewSeg').children) btn.setAttribute('aria-checked', String(btn.dataset.view === view.mode));
   syncSuitRows();
 }
@@ -143,8 +171,8 @@ function syncReadouts() {
   const n = cardCounts(design);
   $('deckCount').textContent = `${n.suits} suits — ${n.cards} cards + ${n.clue + n.fuse} tokens`;
   $('sizeVal').textContent = `${design.size.w} × ${design.size.h} mm`;
-  $('layoutVal').textContent = design.layout;
-  $('layoutNote').textContent = `${design.layout} — ${LAYOUTS[design.layout]}.`;
+  $('indexVal').textContent = design.index;
+  $('indexNote').textContent = `${INDEX_STYLES[design.index]} — the same on every suit, so the numeral and symbol are always in one place.`;
   const imp = imposition(design, design.print.paper);
   const sheets = imp.perSheet ? Math.ceil(n.total / imp.perSheet) : 0;
   $('flipRow').hidden = !design.print.duplex;
@@ -161,7 +189,7 @@ function syncReadouts() {
     sel.value = activeSuits(design).some((s) => s.id === cur) ? cur : activeSuits(design)[0].id;
   }
   view.suit = vs.value;
-  vs.hidden = view.mode !== 'suit' && view.mode !== 'layouts';
+  vs.hidden = view.mode === 'deck';
   syncSpec();
   syncControls();
 }
@@ -196,11 +224,21 @@ function renderPreview() {
   $('guideLegend').hidden = !view.guides;
   const suit = suitById(design, view.suit) || activeSuits(design)[0];
   let html = '';
+  const withCentre = (patch) => ({ ...design, suits: design.suits.map((s) => (s.id === suit.id ? { ...s, centre: { ...s.centre, ...patch } } : s)) });
+  const sep = ' <span class="hb-sep">—</span> ';
   if (view.mode === 'suit') {
-    html = suitRow(design, suit, `<b>${escapeHtml(suit.name)}</b> <span class="hb-sep">—</span> layout ${design.layout}`) + extrasRow();
+    html = suitRow(design, suit, `<b>${escapeHtml(suit.name)}</b>${sep}${CENTRE_LAYOUTS[suit.centre.layout].toLowerCase()}${sep}${escapeHtml(motifLabel(suit.centre.motif))}`) + extrasRow();
   } else if (view.mode === 'layouts') {
-    for (const L of ['A', 'B', 'C']) {
-      html += suitRow({ ...design, layout: L }, suit, `<b>Layout ${L}</b> <span class="hb-sep">—</span> ${LAYOUTS[L]}${L === design.layout ? ' <span class="hb-sep">—</span> in use' : ''}`);
+    for (const L of Object.keys(CENTRE_LAYOUTS)) {
+      html += suitRow(withCentre({ layout: L }), suit, `<b>${CENTRE_LAYOUTS[L]}</b>${sep}${escapeHtml(motifLabel(suit.centre.motif))}${L === suit.centre.layout ? `${sep}in use` : ''}`);
+    }
+  } else if (view.mode === 'fireworks') {
+    // every motif for this suit, as a single burst under the deck's corner index
+    for (const m of MOTIF_IDS) {
+      const M = MOTIFS[m], on = suit.centre.motif === m;
+      const title = `<b>${escapeHtml(motifLabel(m))}</b>${M.ref ? `${sep}catalogue № ${M.ref}` : M.note ? `${sep}${M.note}` : ''}`
+        + `<button type="button" class="hb-pick" data-pick="${m}" aria-pressed="${on}">${on ? `${escapeHtml(suit.name)} uses this` : `use for ${escapeHtml(suit.name)}`}</button>`;
+      html += suitRow(withCentre({ layout: 'single', motif: m, tier: 'none' }), suit, title);
     }
   } else {
     const cards = deckCards(design);
@@ -213,9 +251,14 @@ function renderPreview() {
 }
 
 // ---------- wiring ----------
-$('layoutSeg').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-layout]'); if (!b) return;
-  design.layout = b.dataset.layout; changed();
+$('indexSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-index]'); if (!b) return;
+  design.index = b.dataset.index; changed();
+});
+$('stage').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-pick]'); if (!b) return;
+  const suit = suitById(design, view.suit); if (!suit) return;
+  suit.centre.motif = b.dataset.pick; changed();
 });
 $('viewSeg').addEventListener('click', (e) => {
   const b = e.target.closest('[data-view]'); if (!b) return;

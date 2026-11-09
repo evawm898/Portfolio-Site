@@ -24,7 +24,7 @@
   <a class="hb-back" href="index.html">&larr; Index</a>
   <div class="hb-eyebrow">EM / HANABI</div>
   <h1>Hanabi deck</h1>
-  <p class="hb-sub">Five suits of fireworks, ranks one to five <span class="hb-sep">&mdash;</span> every suit carries a symbol as well as a colour, so the deck reads in greyscale. Pick a face layout, a size and a back, then export an imposed print PDF or 300&nbsp;dpi PNGs.</p>
+  <p class="hb-sub">Five suits of fireworks, ranks one to five <span class="hb-sep">&mdash;</span> every suit carries a symbol as well as a colour, so the deck reads in greyscale. One corner index for the whole deck, and a firework centre chosen per suit; then a size and a back, and an imposed print PDF or 300&nbsp;dpi PNGs.</p>
 </header>
 
 <main class="hb-body">
@@ -34,6 +34,7 @@
   <details class="hb-sec" id="sec-suits" open>
     <summary><span class="hb-num">01</span>Suits <output class="hb-val" id="deckCount"></output></summary>
     <label class="hb-check"><input type="checkbox" id="rainbow"> Add the rainbow suit <span class="hb-dim">(+10 cards)</span></label>
+    <p class="hb-note">Each suit picks its centre: how it is laid out, which firework, and an optional second tier under the burst at ranks 4 and 5. The <b>Fireworks</b> preview shows every firework for one suit.</p>
     <div id="suitRows"></div>
     <p class="hb-note" id="clashNote" hidden></p>
   </details>
@@ -60,15 +61,15 @@
   </details>
 
   <details class="hb-sec" id="sec-face" open>
-    <summary><span class="hb-num">03</span>Face layout <output class="hb-val" id="layoutVal"></output></summary>
-    <div class="hb-seg" id="layoutSeg" role="radiogroup" aria-label="Face layout">
-      <button type="button" data-layout="A" role="radio">A</button>
-      <button type="button" data-layout="B" role="radio">B</button>
-      <button type="button" data-layout="C" role="radio">C</button>
+    <summary><span class="hb-num">03</span>Corner index <output class="hb-val" id="indexVal"></output></summary>
+    <div class="hb-seg" id="indexSeg" role="radiogroup" aria-label="Corner index style">
+      <button type="button" data-index="large" role="radio">Large</button>
+      <button type="button" data-index="small" role="radio">Small</button>
+      <button type="button" data-index="band" role="radio">Band</button>
     </div>
-    <p class="hb-note" id="layoutNote"></p>
+    <p class="hb-note" id="indexNote"></p>
     <div class="hb-row">
-      <label for="corners">Corner index</label>
+      <label for="corners">Corners</label>
       <select id="corners">
         <option value="inverted">Two corners, bottom inverted</option>
         <option value="upright">Two corners, both upright</option>
@@ -161,7 +162,8 @@
   <div class="hb-toolbar">
     <div class="hb-seg" id="viewSeg" role="radiogroup" aria-label="Preview view">
       <button type="button" data-view="suit" role="radio">Suit</button>
-      <button type="button" data-view="layouts" role="radio">A / B / C</button>
+      <button type="button" data-view="layouts" role="radio">Centres</button>
+      <button type="button" data-view="fireworks" role="radio">Fireworks</button>
       <button type="button" data-view="deck" role="radio">Full deck</button>
     </div>
     <select id="viewSuit" aria-label="Suit to preview"></select>
