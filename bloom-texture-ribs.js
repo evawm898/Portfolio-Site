@@ -56,6 +56,20 @@ import { esincos, TEXTURE_EDGE_MM, TEXTURE_HEIGHT_RANGE } from './bloom-geometry
 /* PROPOSED (Eva's to rule, §7 of the doc). */
 export const RIB_LAWS = Object.freeze(['A', 'B']);
 export const RIB_AXIS_RULES = Object.freeze(['fade', 'start', 'thin']);
+/* THE CENTRE TREATMENTS (Eva, Nov 9): rendered all three for her ruling */
+export const RIB_CENTRES = Object.freeze(['collar', 'starburst', 'concentric']);
+/* THE ORGANS (Eva's NAMED exclusion, Nov 9 — distinct from the derived
+   visibility and curvature rules): ribs on the petals, sepals, leaves and the
+   hub's TOP; never on the stem or any rod (stamens, style, braid strands,
+   pedicels — a floret's stem — petioles, leaflet stalks). By organ NAME and the
+   pass's own rod flag, so a new rod organ must be added here. */
+export const RIB_EXCLUDED_ORGANS = Object.freeze(['stem', 'stamen', 'style', 'petiole', 'stalk']);
+export function ribExcluded(O, i) {
+  if (O.rod || RIB_EXCLUDED_ORGANS.includes(O.organ)) return true;
+  /* the hub: its TOP only — a vertex whose own normal faces down or sideways is excluded */
+  if (O.organ === 'hub') return !(O.N[i * 3 + 2] > 0);
+  return false;
+}
 export const RIB_SPACING_RANGE = Object.freeze([1.6, 8]);     // mm: A's spacing AT the reference radius, B's target spacing
 export const RIB_SPACING_DEFAULT = 2.5;
 export const RIB_CREST_RANGE = Object.freeze([0, 0.5]);       // crest rounding, a fraction of the half-pitch; 0 = SHARP (the ruled default)
@@ -88,10 +102,17 @@ export function ribParams(state = {}) {
   const axis = String(state.ribAxis ?? 'fade');
   if (!RIB_AXIS_RULES.includes(axis)) throw new Error(`ribAxis ${JSON.stringify(state.ribAxis)} is not one of ${RIB_AXIS_RULES.join(' / ')}`);
   if (law === 'B' && axis === 'thin') throw new Error("ribAxis 'thin' is B's own law (it halves inward by construction); B takes 'fade' or 'start' for its last level");
+  /* THE CENTRE (Eva, Nov 9, on #541): how the ribs end at the hub. When asked,
+     it decides the axis: STARBURST is A's thinning (B thins by definition, and
+     fades its last 4 spokes); COLLAR and CONCENTRIC end the ribs at a DERIVED
+     ring (`ribField`'s setCentre) and take the plain schedule outside it. */
+  const centre = state.ribCentre == null ? null : String(state.ribCentre);
+  if (centre !== null && !RIB_CENTRES.includes(centre)) throw new Error(`ribCentre ${JSON.stringify(state.ribCentre)} is not one of ${RIB_CENTRES.join(' / ')}`);
+  const axisUsed = centre === 'starburst' ? (law === 'A' ? 'thin' : 'fade') : centre ? 'fade' : axis;
   const s = clampTo(Number(state.ribSpacing ?? RIB_SPACING_DEFAULT), RIB_SPACING_RANGE);
   const crest = clampTo(Number(state.ribCrest ?? RIB_CREST_DEFAULT), RIB_CREST_RANGE);
   const H = clampTo(Number(state.textureHeight ?? RIB_HEIGHT_DEFAULT), TEXTURE_HEIGHT_RANGE);
-  return { law, axis, s, crest, H, sMin: RIB_SPACING_FLOOR_MM, refR: RIB_REF_RADIUS_MM, edgeMm: TEXTURE_EDGE_MM };
+  return { law, axis: axisUsed, centre, s, crest, H, sMin: RIB_SPACING_FLOOR_MM, refR: RIB_REF_RADIUS_MM, edgeMm: TEXTURE_EDGE_MM };
 }
 
 /* ------------------------------------------ engine-agreed arithmetic --- */
@@ -182,18 +203,66 @@ function uAt(n, th) {
 export function ribField(params) {
   const S = ribSchedule(params);
   const w = params.crest;
-  /* the field at (x, y): the schedule's level, the emergence blend, the axis rule */
-  const F = (p) => {
-    const x = p[0], y = p[1];
-    const r = Math.sqrt(x * x + y * y);
-    if (!(r > S.rCut)) return 0;
-    const th = eatan2(y, x);
+  /* THE CENTRE, its radius DERIVED at the start of the relief pass from the
+     organs the pass is handed (setCentre) — never typed:
+       R = max(r0, rFeet): r0 the radius where the plain schedule's spacing
+       reaches the 1.6 mm floor (A: 12.73 mm at 2.5 mm; B: 1.02 mm), rFeet the
+       petal feet's INNER EDGE (the least distance from the axis of any petal
+       vertex: where the petals stop covering the hub top). So A's ring stands
+       where A can no longer print its spokes, B's where the hub's visible disc
+       begins. Snapped to 2^-20 mm (a cut is decided on it).
+     COLLAR: a soft raised ring of half-width wC (the floor spacing, 1.6 mm) at
+       R, (1 - (d/wC)^2)^2; the ribs rise out of its outer flank over wC; the
+       disc inside R - wC is smooth.
+     CONCENTRIC: the ribs end at a sharp ring crest at R; inside, concentric
+       ridges every sc (the floor spacing — the finest the print floor
+       admits), the same sharp profile, faded to 0 inside sc/2 of the axis. */
+  const C = { type: params.centre === 'collar' || params.centre === 'concentric' ? params.centre : null, R: null, wC: RIB_SPACING_FLOOR_MM, sc: RIB_SPACING_FLOOR_MM, rFeet: null, rFloor: S.r0, from: null };
+  const setCentre = (organs) => {
+    if (!C.type) return;
+    let m = Infinity;
+    for (const O of organs) if (O.organ === 'petal') for (let i = 0; i < O.P.length; i += 3) { const x = Math.round(O.P[i] * RIB_QUANT) / RIB_QUANT, y = Math.round(O.P[i + 1] * RIB_QUANT) / RIB_QUANT, r = Math.sqrt(x * x + y * y); if (r < m) m = r; }
+    C.rFeet = Number.isFinite(m) ? m : 0;
+    const R = C.rFeet > S.r0 ? C.rFeet : S.r0;
+    C.R = Math.round(R * RIB_QUANT) / RIB_QUANT;
+    C.from = C.rFeet > S.r0 ? 'the petal feet\'s inner edge' : 'where the spacing reaches the 1.6 mm floor';
+  };
+  const circles = () => { if (C.type !== 'concentric') return []; const out = []; for (let j = 0; C.R - j * C.sc > C.sc / 2; j++) out.push(C.R - j * C.sc); return out; };
+  /* the spokes alone at (th, r): the schedule's level and its emergence */
+  const ribsAt = (th, r) => {
     const L = levelAt(S, r);
     let f = ribProfile(uAt(S.levels[L].n, th), w);
     if (L > 0) {
       const a = smoother((r - S.levels[L].rStart) / S.emerge);
       if (a < 1) f = (1 - a) * ribProfile(uAt(S.levels[L - 1].n, th), w) + a * f;
     }
+    return f;
+  };
+  const centreF = (x, y, r) => {
+    if (C.R === null) throw new Error(`ribs: the ${C.type} centre's radius was never derived (setCentre is called at the start of the relief pass)`);
+    const R = C.R;
+    if (C.type === 'collar') {
+      if (!(r > R - C.wC)) return 0;
+      const d = (r - R) / C.wC, ring = d > -1 && d < 1 ? (1 - d * d) * (1 - d * d) : 0;
+      const ribs = r > R ? ribsAt(eatan2(y, x), r) * smoother((r - R) / C.wC) : 0;
+      return ring > ribs ? ring : ribs;
+    }
+    if (r < R) {
+      const q = (R - r) / C.sc, dq = q - Math.floor(q + 0.5), u = 2 * (dq < 0 ? -dq : dq);
+      return ribProfile(u, w) * smoother(r / (C.sc / 2));
+    }
+    const ring = ribProfile((2 * (r - R)) / C.sc < 1 ? (2 * (r - R)) / C.sc : 1, w);
+    const ribs = ribsAt(eatan2(y, x), r) * smoother((r - R) / (C.sc / 2));
+    return ring > ribs ? ring : ribs;
+  };
+  /* the field at (x, y): the centre, or the schedule's level, the emergence blend, the axis rule */
+  const F = (p) => {
+    const x = p[0], y = p[1];
+    const r = Math.sqrt(x * x + y * y);
+    if (C.type) return centreF(x, y, r);
+    if (!(r > S.rCut)) return 0;
+    const th = eatan2(y, x);
+    let f = ribsAt(th, r);
     if (r < S.r0) {
       const m = S.rule === 'fade' ? smoother((r - S.r0 / 2) / (S.r0 / 2)) : smoother((r - (S.r0 - params.edgeMm)) / params.edgeMm);
       f *= m;
@@ -202,7 +271,7 @@ export function ribField(params) {
   };
   /* the local pitch (mm) at radius r: the arc between two crests of the level standing there */
   const pitchAt = (r) => (RIB_TAU * r) / S.levels[levelAt(S, r)].n;
-  return { F, S, pitchAt, params };
+  return { F, S, C, setCentre, circles, pitchAt, params };
 }
 
 /* ------------------------------------------------- the lines (mesher) --- */
@@ -218,15 +287,17 @@ export function lineSet(field, linesPerPitch, rMax = Infinity) {
   /* the level a line belongs to: the coarsest level whose grid holds it */
   const homeLevel = (jG) => { for (let L = 0; L <= LG; L++) { const step = G / (m * S.levels[L].n); if (jG % step === 0) return L; } return LG; };
   /* the radius a line begins at */
-  const rStartOf = (jG) => Math.max(S.rCut, S.levels[homeLevel(jG)].rStart);
+  const rStartOf = (jG) => Math.max(S.rCut, S.levels[homeLevel(jG)].rStart, field.C && field.C.type ? field.C.R : 0);
   /* is the line a CREST (u = 0) of the level standing at radius r? Under a
      branching schedule a quarter-pitch line of a coarse level becomes a crest
      of a finer one further out, so this is a question about a POINT */
-  const isCrestAt = (jG, r) => { const L = Math.min(LG, levelAt(S, r)); const step = G / (m * S.levels[L].n); return jG % step === 0 && ((jG / step) % m) === 0; };
+  const isCrestAt = (jG, r) => { if (jG < 0) return true; const L = Math.min(LG, levelAt(S, r)); const step = G / (m * S.levels[L].n); return jG % step === 0 && ((jG / step) % m) === 0; };
   const isCrest = (jG) => isCrestAt(jG, 0) || m === 1;
   /* the grid of the level standing at radius r (a divisor of G) */
   const gridAt = (r) => m * S.levels[Math.min(LG, levelAt(S, r))].n;
-  return { G, m, LG, homeLevel, rStartOf, isCrest, isCrestAt, gridAt };
+  /* the concentric ring crests (a CONCENTRIC centre): line id -(j + 1) for the ring at circles[j] */
+  const circles = field.circles ? field.circles() : [];
+  return { G, m, LG, homeLevel, rStartOf, isCrest, isCrestAt, gridAt, circles };
 }
 
 /* --------------------------------------------- the cutter, per organ --- */
@@ -272,7 +343,7 @@ export function cutOrgan(P0, tri, LS, field, edgeOk, opts = {}) {
       const ax = P[lo * 3], ay = P[lo * 3 + 1], bx = P[hi * 3], by = P[hi * 3 + 1];
       const ex = bx - ax, ey = by - ay, ez = P[hi * 3 + 2] - P[lo * 3 + 2], len = Math.sqrt(ex * ex + ey * ey + ez * ez);
       const rMax = rad[lo] > rad[hi] ? rad[lo] : rad[hi];
-      if (rMax > S.rCut && len > 2 * snap) {
+      if ((rMax > S.rCut || LS.circles.length) && len > 2 * snap) {
         let d = theta[hi] - theta[lo];
         if (d > Math.PI) d -= RIB_TAU; else if (d < -Math.PI) d += RIB_TAU;
         const t0 = d >= 0 ? theta[lo] : theta[lo] + d, t1 = d >= 0 ? theta[lo] + d : theta[lo];
@@ -292,6 +363,23 @@ export function cutOrgan(P0, tri, LS, field, edgeOk, opts = {}) {
           const rc = Math.sqrt(px * px + py * py);
           if (rc < LS.rStartOf(jG)) continue;
           pts.push({ t, jG });
+        }
+        /* the concentric rings: |A + t (B - A)| = Rc in the plan, both roots */
+        if (LS.circles.length) {
+          const dx = bx - ax, dy = by - ay, qa = dx * dx + dy * dy, qb = 2 * (ax * dx + ay * dy);
+          const rLo = Math.min(rad[lo], rad[hi]) - len, rHi = rMax;
+          if (qa > 0) LS.circles.forEach((Rc, j) => {
+            if (Rc < rLo || Rc > rHi) return;
+            const qc = ax * ax + ay * ay - Rc * Rc, disc = qb * qb - 4 * qa * qc;
+            if (!(disc > 0)) return;
+            const sq = Math.sqrt(disc);
+            for (const t of [(-qb - sq) / (2 * qa), (-qb + sq) / (2 * qa)]) {
+              if (!(t > 0 && t < 1) || t * len < snap || (1 - t) * len < snap) continue;
+              const ra = rad[lo] - Rc, rb = rad[hi] - Rc;
+              if ((ra < 0 ? -ra : ra) <= snap && (rb < 0 ? -rb : rb) <= snap) continue;   // the edge lies along the ring
+              pts.push({ t, jG: -(j + 1) });
+            }
+          });
         }
         pts.sort((p, q) => p.t - q.t);
         /* two lines within the snap of each other on one edge (near the axis): keep the first */
@@ -415,6 +503,8 @@ export const RIB_EDITS = Object.freeze([
     "f: refused ? null : (__RIB ? __RIB.field(state, heightMm) : (p, n) => field.F(p, n)), mp: refused ? null : (__RIB ? () => 1 : bonePatchField(b.coverage, patchScaleMm)) };"],
   ['bone2-off', "    bone2: refused ? null : { field, params, full: null },", "    bone2: refused || __RIB ? null : { field, params, full: null }, ribs: __RIB ? __RIB.stats : undefined,"],
   ['bone2-field-skip', "  const field = refused ? null : bone2Field(params);", "  const field = refused || __RIB ? null : bone2Field(params);"],
+  ['begin', "function boneReliefPass(acc, T, organs, capability = null) {\n", "function boneReliefPass(acc, T, organs, capability = null) {\n  if (__RIB && __RIB.begin) __RIB.begin(organs);\n"],
+  ['excluded', "      if (!(w0[i] > 0) || !(mc[i] > 0)) continue;\n", "      if (!(w0[i] > 0) || !(mc[i] > 0) || (__RIB && __RIB.excluded(O, i))) continue;\n"],
   ['write-hook', "  if (T.bone2) T.bone2.full = full ? bone2FullWrite(acc, T, per, G2, capability) : null;", "  if (__RIB && __RIB.write) __RIB.write(acc, T, per, capability);\n  if (T.bone2) T.bone2.full = full ? bone2FullWrite(acc, T, per, G2, capability) : null;"],
 ]);
 export function applyEdits(src, edits) {
@@ -478,6 +568,9 @@ export function ribHook({ mode = 'lattice', stats = {}, samples = null } = {}) {
       stats.schedule = { n0: FIELD.S.n0, levels: FIELD.S.levels.filter((l) => l.rStart < 400).map((l) => ({ n: l.n, rStart: +l.rStart.toFixed(4) })), r0: FIELD.S.r0, rCut: FIELD.S.rCut, emerge: FIELD.S.emerge };
       return (p) => FIELD.F(p);
     },
+    /* the start of the relief pass: the centre's radius derived from the organs it is handed */
+    begin(organs) { if (FIELD) { FIELD.setCentre(organs); stats.centre = FIELD.C.type ? { type: FIELD.C.type, R: FIELD.C.R, from: FIELD.C.from, rFeet: FIELD.C.rFeet, rFloor: FIELD.C.rFloor, wC: FIELD.C.wC, sc: FIELD.C.sc, circles: FIELD.circles() } : null; } },
+    excluded: ribExcluded,
     write(acc, T, per, capability) {
       const t0 = performance.now();
       const noRelief = !!(capability && capability.boneNoRelief);
@@ -496,7 +589,7 @@ export function ribHook({ mode = 'lattice', stats = {}, samples = null } = {}) {
       for (const X of per) for (let i = 0; i < X.nV; i++) { const x = X.O.P[i * 3], y = X.O.P[i * 3 + 1], r = Math.sqrt(x * x + y * y); if (r > rMaxAll) rMaxAll = r; }
       const crestLS = lineSet(field, 1, rMaxAll);
       const LS = mode === 'crest+flank' ? lineSet(field, RIB_FLANK_LINES, rMaxAll) : crestLS;
-      const relief = (X) => { const w = new Float64Array(X.nV); for (let i = 0; i < X.nV; i++) w[i] = X.w0[i] > 0 && X.mc[i] > 0 ? X.w0[i] * X.mc[i] : 0; return w; };
+      const relief = (X) => { const w = new Float64Array(X.nV); for (let i = 0; i < X.nV; i++) w[i] = X.w0[i] > 0 && X.mc[i] > 0 && !ribExcluded(X.O, i) ? X.w0[i] * X.mc[i] : 0; return w; };
       /* per organ: the crest samples (on the shipped lattice, the same in every mode) */
       const sampleOrgan = (X, w) => {
         if (!samples) return;
