@@ -57,3 +57,5 @@ _frame-mutant-*.js
 # verify-bloom-bone2 --control writes these and removes them
 .bone2-mutant-*
 tools/.bone2-mutant-*
+# tools/verify-hanabi.mjs --negative-control writes each mutant into .hanabi-mut-<random>/ at the repo root
+.hanabi-mut-*/
