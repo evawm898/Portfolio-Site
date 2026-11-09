@@ -765,6 +765,7 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   primitive's `count`). All three keep S1's 26 + 22 per-layer designs byte-identical (48/48; must-fail 21/22). Lotus count
   only: body h:w 1.482. Water lily 4/10 reads as the photo. The daisy is the global count (no per-whorl). Unresolved: the
   tube (C throws; A/B never meet it), the sepal ceiling and Layer phase read the global count. Eva's ruling pending.
+  **[Nov 8: RULED — option A, an owned value; SHIPPED, §19 and the block below.]**
 - **#495 (Nov 5): DISCOVERY + PROTOTYPE, NOTHING SHIPPED — §15 of the same doc.** Read it before touching `footRing()`'s
   `ringFactor`, `layerOwnedValues` or `layerSize`'s visibility.
   - Four options are prototyped by `tools/bloom-ring-options.mjs` as anchored edits of TEMPORARY copies:
@@ -795,6 +796,30 @@ route (as)).
   route (as) with four mutants (THIRTY-SIX routes).
 - Sheet: `node tools/shot-bloom-layer-ring.mjs docs/img/layer-ring-495.png --base <wt>`. The lotus with owned rings 0.64 / 0.51
   reads body h:w 1.161 -> 1.444.
+
+**A LAYER OWNS ITS PETAL COUNT UNDER PER-LAYER VALUES — AN OWNED VALUE THAT REPLACES THE GLOBAL, THE LAYER PHASE INACTIVE
+BETWEEN DIFFERING COUNTS, THE SEPALS ON THE OUTER WHORL'S COUNT** (option A of §18, Eva's rulings of Nov 8 — read §18.6
+and §19 of `docs/bloom-photo-to-bloom-discovery.md` before touching `layerOwnedCount`, `LAYER_PETAL_COUNT_RANGE`,
+`whorlCount` / `countPhases` / `phaseInactive` / `nOuter` in `footRing()`, `layerPetalCount`, bloom.js's `COUNT_IDS` /
+`pickedCountOf` / `layerCountLine`, `spiralShortTurns` / `spiralLowCount`, `petalCountClauses` (PC0–PC6),
+`ownedCountRestated` or route (at)).
+- A layer entry's `values.layerPetalCount` replaces the global for that whorl; absent, the whorl is `slotCount` itself BY
+  BRANCH. RADIAL / SPIRAL with Per-layer values ON only; hidden and inert under CONTINUOUS and FAN. The tube stays
+  unavailable under Per-layer values (SO11) — its plan reads one count, and that is why.
+- What follows the owned count, one owner each: the area rule (R0 follows the feet), the slot map, the whorl's `count`, the
+  foot cap's span, the scope term's n, the sepals (outer whorl's count), the layer phase (INACTIVE across a differing pair,
+  `phaseInactive`, told — **the inner whorl starts HALF ITS OWN PITCH over**, RULED Nov 8, PC5), the SPIRAL legibility
+  flag (**each turn's own count**, RULED Nov 8, `spiralShortTurns`, PC6), the variance aliasing bar (the smallest whorl —
+  RULED, approved as built). §19.1 lists EVERY reader, with the ones deliberately left on the global and why.
+- **The range 3–40 is RULED** (Nov 8; Petals' own; the harness refuses to load if it moves). Off-grid or past it:
+  SNAPPED and told; the file keeps what was asked.
+- **PC1 counts the azimuths WRITTEN, never a row's `.length`**: the builder pre-sizes a row to the slot map, so a whorl laid
+  with fewer slots leaves holes `.length` cannot see — found by the family's own must-fail.
+- Must-fail: `node tools/verify-bloom-layer-count.mjs --control` (9 witnessed mutants, among them the phase ALIGNED and
+  the SPIRAL flag on the global; the apex table never runs the Z family), spawned by the defaults bar. Panel route (at)
+  with seven mutants (THIRTY-SEVEN routes). Old load path 48 / 48 identical, the must-fail moving 22. Block 86 (18 rows,
+  1,685), smoke block 86 (7); `frozen/phase95` = the 1,667 rows at
+  `8f6c570`. Sheet: `node tools/shot-bloom-layer-count.mjs docs/img/layer-petal-count.png --base <wt>`.
 
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**
 (Scoping-a, Oct 13; feature map §3 and §11, Eva's rulings Q3.1–Q3.9 — read

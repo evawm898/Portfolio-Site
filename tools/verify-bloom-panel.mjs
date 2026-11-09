@@ -603,6 +603,32 @@
          whole-bloom value, the clamp never told, the derived ring never given
          back. Three edits: this entry, the block, the negative control's flags
          and banner (THIRTY-SIX routes).
+     (at) A LAYER'S OWN PETAL COUNT (Eva's rulings of Nov 8 — option A of §18;
+         §19 of docs/bloom-photo-to-bloom-discovery.md). RADIAL x 3: the Layer
+         petals control HIDES with per-layer values OFF, under FAN and under
+         CONTINUOUS (Eva's ruling: excluded there); ON with no layer picked it is
+         SHOWN AND GREYED and its read-out says to pick a layer; picking layer 2
+         enables it at the GLOBAL count and the read-out says GLOBAL; a drag to
+         12 records the NUMBER 12 on layer 2's entry, the whorl emits 12
+         azimuths (footRing()'s `ownCount` names it), the read-out says OWN, the
+         Layer offset read-out and the PETAL COUNTS line say the phase is
+         INACTIVE between layers 1-2 and 2-3; set back to the global 8 the entry
+         is PRUNED and the whorl returns to the global count with ring 2 at its
+         old radius, bit for bit; a file asking 4.6 builds 5 and both read-outs
+         say asked vs built (SNAPPED); the outer whorl owning 4 under 8 sepals
+         asked builds 4 sepals (the outer whorl's ceiling) and both read-outs say
+         the sepals follow it; deselecting greys it again. After Eva's §19.5
+         rulings (Nov 8): the inner whorl's first petal stands HALF ITS OWN
+         PITCH (pi / 12) past the outer's on the emitted azimuths and the Layer
+         offset read-out says so; under SPIRAL with turns of 13 / 8 / 5 the
+         legibility flag is SHOWN and names turn 3 (5 petals), and at 13 / 8 / 8
+         it is ABSENT though the global reads 8 either way. Seven mutants
+         (bloom.js, bloom-registry.js and bloom-geometry.js): the count never
+         greyed, a pick showing the whole-bloom value, the global never given
+         back, the snap never told, the inactive phase never told, the inactive
+         phase ALIGNED (no half pitch), the SPIRAL flag reading the global.
+         Three edits: this entry, the block, the negative control's flags and
+         banner (THIRTY-SEVEN routes).
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -5266,6 +5292,133 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   }
 }
 
+/* ---------------- (at) A LAYER'S OWN PETAL COUNT ON THE PANEL (Nov 8) ----------------
+   See the header. The control's state off the wrapper and input the page drew,
+   its words off the read-outs the page wrote, the numbers against
+   `__bloomMetrics()` (footRing()'s own `ownCount`, the emitted azimuths, the
+   sepal record) and the record against `__bloomDesign.scopes()`. */
+{
+  const tag = '[layer petals]';
+  const settle = async (pg) => { await pg.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await settleBuild(pg); };
+  const snap = (pg) => pg.evaluate(() => {
+    const el = document.getElementById('layerPetalCount'); const w = el.closest('.bl-ctrl'); const m = window.__bloomMetrics();
+    const ph = document.getElementById('layerPhase').closest('.bl-ctrl').querySelector('.bl-val').textContent;
+    return { hidden: w.hidden, disabled: el.disabled, value: el.value, said: w.querySelector('.bl-val').textContent, phaseSaid: ph,
+      rings: m.rings.map((r) => ({ radius: r.radius, own: r.ownCount })), counts: (m.slotAzimuths || []).map((a) => a.length), inactive: m.phaseInactive,
+      az0: m.slotAzimuths && m.slotAzimuths[0] ? m.slotAzimuths[0][0] : null, az1: m.slotAzimuths && m.slotAzimuths[1] ? m.slotAzimuths[1][0] : null,
+      sepal: m.sepal ? { count: m.sepal.count, ceiling: m.sepal.ceiling } : null,
+      rec: window.__bloomDesign.scopes(), readout: document.getElementById('readout').textContent };
+  });
+  const edit = async (pg, v) => { await pg.evaluate((x) => { const el = document.getElementById('layerPetalCount'); el.value = String(x); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, v); await settle(pg); };
+  const ownOf = (rec, L) => { const e = rec && (rec.layers || []).find((q) => q.layer === L); return e && e.values ? e.values.layerPetalCount : undefined; };
+  const run = async (pg, label) => {
+    const p = [];
+    let bad = await applyConfig(pg, [{ id: 'layerCount', value: '3' }, { id: 'scopeLayers', value: 'OFF' }]);
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    let r = await snap(pg);
+    if (!r.hidden) p.push('with per-layer values OFF the count control is SHOWN');
+    for (const pl of ['FAN', 'CONTINUOUS']) {
+      await applyConfig(pg, [{ id: 'placement', value: pl }, { id: 'scopeLayers', value: 'ON' }]);
+      r = await snap(pg);
+      if (!r.hidden) p.push(`under ${pl} with per-layer ON the count control is SHOWN — excluded there by ruling`);
+    }
+    bad = await applyConfig(pg, [{ id: 'placement', value: 'RADIAL' }, { id: 'scopeLayers', value: 'ON' }]);
+    r = await snap(pg);
+    if (bad.length || r.hidden) p.push(`with per-layer values ON the count control is ${r.hidden ? 'hidden' : 'shown'} (${bad.join('; ')})`);
+    if (!r.disabled) p.push('with NO layer picked the count control is enabled — a count is a layer\'s own, so it must be greyed');
+    if (!/pick a layer/.test(r.said)) p.push(`with no layer picked the read-out does not say to pick a layer: "${r.said.slice(0, 160)}"`);
+    await pg.evaluate(() => window.__bloomScopeView.select({ kind: 'layer', layer: 1, slot: 0 })); await settle(pg);
+    r = await snap(pg);
+    const before = r.rings[1].radius;
+    if (r.disabled) p.push('with layer 2 picked the count control is still greyed');
+    if (Number(r.value) !== 8) p.push(`picked, the slider shows ${r.value}, not the global 8 layer 2 takes`);
+    if (!/GLOBAL/.test(r.said)) p.push(`picked, the read-out does not say GLOBAL: "${r.said.slice(0, 160)}"`);
+    await edit(pg, 12);
+    r = await snap(pg);
+    if (ownOf(r.rec, 1) !== 12) p.push(`a drag to 12 recorded layer 2's count as ${JSON.stringify(ownOf(r.rec, 1))}, not the number 12`);
+    if (r.counts.join() !== '8,12,8') p.push(`a drag to 12 built whorls of ${r.counts.join('/')}, not 8/12/8`);
+    if (!r.rings[1].own || r.rings[1].own.built !== 12) p.push(`a drag to 12: footRing() reports ${JSON.stringify(r.rings[1].own)} on layer 2`);
+    if (!/OWN count/.test(r.said)) p.push(`a drag to 12: the read-out does not say OWN: "${r.said.slice(0, 160)}"`);
+    if ((r.inactive || []).join() !== '1,2') p.push(`a drag to 12: the phase is reported inactive at [${(r.inactive || []).join(', ')}], not between layers 1-2 and 2-3`);
+    if (!/INACTIVE between layer 1 and 2 \(8 vs 12 petals\), layer 2 and 3 \(12 vs 8 petals\)/.test(r.phaseSaid)) p.push(`a drag to 12: the Layer offset read-out does not say the phase is INACTIVE for both pairs: "${r.phaseSaid.slice(0, 220)}"`);
+    if (!/PETAL COUNTS[^\n]*layer 2 12 own[^\n]*LAYER PHASE INACTIVE/.test(r.readout)) p.push('a drag to 12: the PETAL COUNTS line does not name layer 2\'s own 12 and the inactive phase');
+    /* §19.5 item 4 (ruled Nov 8): the inner whorl starts HALF ITS OWN PITCH over */
+    {
+      const d = (((r.az1 - r.az0 - Math.PI / 12) % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+      if (!(Math.abs(d) < 1e-9)) p.push(`a drag to 12: layer 2's first petal stands ${(((r.az1 - r.az0) * 180) / Math.PI).toFixed(4)} deg past layer 1's, not half its own pitch (15 deg)`);
+      if (!/half its own pitch over/.test(r.phaseSaid)) p.push(`a drag to 12: the Layer offset read-out does not say the inner whorl starts half its own pitch over: "${r.phaseSaid.slice(0, 260)}"`);
+    }
+    await edit(pg, 8);
+    r = await snap(pg);
+    if (ownOf(r.rec, 1) !== undefined) p.push(`set back to the global 8, layer 2 still OWNS ${ownOf(r.rec, 1)} — the entry must be pruned and the layer given back to the global`);
+    if (r.counts.join() !== '8,8,8' || r.rings[1].radius !== before) p.push(`set back to 8, the whorls are ${r.counts.join('/')} and ring 2 is at ${r.rings[1].radius} mm, not the global count at ${before}`);
+    /* a count asked off the grid (a file's), told asked vs built */
+    await pg.evaluate(() => window.__bloomScopes({ layers: [{ layer: 1, offsets: {}, values: { layerPetalCount: 4.6 } }], petals: [], tiers: [], strands: [] })); await settle(pg);
+    await pg.evaluate(() => window.__bloomScopeView.select({ kind: 'layer', layer: 1, slot: 0 })); await settle(pg);
+    r = await snap(pg);
+    if (!r.rings[1].own || r.rings[1].own.asked !== 4.6 || r.rings[1].own.built !== 5 || !r.rings[1].own.snapped) p.push(`a count asked 4.6: the record reads ${JSON.stringify(r.rings[1].own)}, not asked 4.6 / built 5 / snapped`);
+    if (!/asked 4\.6, built 5 \(SNAPPED/.test(r.said)) p.push(`a count asked 4.6: the read-out does not say asked vs built: "${r.said.slice(0, 220)}"`);
+    if (!/PETAL COUNTS[^\n]*asked 4\.6, SNAPPED/.test(r.readout)) p.push('a count asked 4.6: the PETAL COUNTS line does not say it was SNAPPED');
+    /* the sepals read the OUTER whorl's own count (Eva's ruling) */
+    await pg.evaluate(() => window.__bloomScopeView.deselect()); await settle(pg);
+    await applyConfig(pg, [{ id: 'sepalCount', value: '8' }]);
+    await pg.evaluate(() => window.__bloomScopes({ layers: [{ layer: 0, offsets: {}, values: { layerPetalCount: 4 } }], petals: [], tiers: [], strands: [] })); await settle(pg);
+    await pg.evaluate(() => window.__bloomScopeView.select({ kind: 'layer', layer: 0, slot: 0 })); await settle(pg);
+    r = await snap(pg);
+    if (!r.sepal || r.sepal.count !== 4 || r.sepal.ceiling !== 4) p.push(`the outer whorl owns 4 and 8 sepals are asked: the sepals read ${JSON.stringify(r.sepal)}, not 4 on a ceiling of 4`);
+    if (!/sepals follow/.test(r.said)) p.push(`outer whorl owning 4: the read-out does not say the sepals follow it: "${r.said.slice(0, 220)}"`);
+    if (!/PETAL COUNTS[^\n]*the sepals read the outer whorl's 4/.test(r.readout)) p.push('outer whorl owning 4: the PETAL COUNTS line does not say the sepals read the outer whorl\'s 4');
+    await pg.evaluate(() => window.__bloomScopeView.deselect()); await settle(pg);
+    r = await snap(pg);
+    if (!r.disabled) p.push('deselected, the count control is enabled again');
+    await pg.evaluate(() => window.__bloomScopes(null)); await settle(pg);
+    await applyConfig(pg, [{ id: 'sepalCount', value: String(DEFAULTS.sepalCount) }]);
+    /* §19.5 item 3 (ruled Nov 8): the SPIRAL legibility flag reads EACH TURN's
+       own count — the global is 8 (not under the flag) in both states */
+    await applyConfig(pg, [{ id: 'placement', value: 'SPIRAL' }]);
+    for (const [cnts, want] of [[[13, 8, 5], true], [[13, 8, 8], false]]) {
+      await pg.evaluate((c) => window.__bloomScopes({ layers: c.map((n, L) => ({ layer: L, offsets: {}, values: n === 8 ? {} : { layerPetalCount: n } })).filter((e) => Object.keys(e.values).length), petals: [], tiers: [], strands: [] }), cnts); await settle(pg);
+      const t = await pg.evaluate(() => document.getElementById('readout').textContent);
+      const shown = /SPIRAL BELOW \d+ IN THE SEQUENCE/.test(t);
+      if (shown !== want) p.push(`SPIRAL turns ${cnts.join(' / ')} under the global 8: the legibility flag is ${shown ? 'SHOWN' : 'ABSENT'}, want ${want ? 'SHOWN (turn 3 carries 5)' : 'ABSENT'}`);
+      else if (want && !/IN THE SEQUENCE on turn 3 \(5 petals\)/.test(t)) p.push(`SPIRAL turns ${cnts.join(' / ')}: the flag does not name turn 3 (5 petals)`);
+    }
+    await pg.evaluate(() => window.__bloomScopes(null)); await settle(pg);
+    await applyConfig(pg, [{ id: 'placement', value: 'RADIAL' }]);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: hidden with per-layer OFF and under FAN / CONTINUOUS, greyed and told with no layer picked; picked, it shows the GLOBAL count; a drag records an owned number and the whorl emits that many (the phase INACTIVE on both sides, told on the Layer offset and PETAL COUNTS); back at the global the entry is pruned and the whorl and ring return bit for bit; a file's 4.6 builds 5 and says SNAPPED on both read-outs; the outer whorl's own 4 caps 8 sepals at 4, told; the inner whorl half its own pitch over, told; the SPIRAL flag on turn 3 of 13 / 8 / 5 and not on 13 / 8 / 8`);
+  };
+  const { browser: b1, page: pg1 } = await launchPage();
+  await openBloom(pg1, port);
+  await run(pg1, 'the layer petal count');
+  await b1.close();
+  if (NEGATIVE_CONTROL) {
+    const pageSrc = fs.readFileSync(new URL('../bloom.js', import.meta.url), 'utf8');
+    const regSrc = fs.readFileSync(new URL('../bloom-registry.js', import.meta.url), 'utf8');
+    const MUTANTS = [
+      { name: 'the count is never greyed', file: 'bloom.js', from: '    const ringOnly = LAYER_OWN_IDS.has(c.id);', to: '    const ringOnly = RING_IDS.has(c.id);' },
+      { name: 'a pick shows the whole-bloom value', file: 'bloom.js', from: '    if (r) eff.layerPetalCount = r.ownCount ? r.ownCount.built : Math.round(Number(ui.petalCount));', to: '' },
+      { name: 'the global is never given back', file: 'bloom.js', from: '    if (val === Math.round(Number(ui.petalCount))) {', to: '    if (false) {' },
+      { name: 'the snap is never told', file: 'bloom-registry.js', from: '  if (p.own.snapped) t += ', to: '  if (false) t += ' },
+      { name: 'the inactive phase is never told', file: 'bloom-registry.js', from: '      const off = pc && pc.phaseInactive && pc.phaseInactive.length', to: '      const off = false' },
+      { name: 'the inactive phase is aligned', file: 'bloom-geometry.js', from: 'out.push(out[L - 1] + Math.PI / raw[L].whorlCount);', to: 'out.push(out[L - 1]);' },
+      { name: 'the spiral flag reads the global', file: 'bloom.js', from: "  if (ui.placement === 'SPIRAL') return !!(fr.spiralShortTurns && fr.spiralShortTurns.length);", to: "  if (ui.placement === 'SPIRAL') return fr.sequenceLength < SPIRAL_LEGIBLE_COUNT;" },
+    ];
+    const geoSrc = fs.readFileSync(new URL('../bloom-geometry.js', import.meta.url), 'utf8');
+    const srcOf = (f) => (f === 'bloom.js' ? pageSrc : f === 'bloom-geometry.js' ? geoSrc : regSrc);
+    for (const m of MUTANTS) { const src = srcOf(m.file); if (src.split(m.from).length !== 2) note(`${tag} NEGATIVE CONTROL: the anchor of "${m.name}" does not match exactly once in ${m.file} — the mutant cannot be applied`); }
+    for (const m of MUTANTS) {
+      const src = srcOf(m.file);
+      if (src.split(m.from).length !== 2) continue;
+      const { browser: b2, page: pg } = await launchPage();
+      await pg.route(`**/${m.file}`, (rt) => rt.fulfill({ status: 200, contentType: 'text/javascript', body: src.replace(m.from, m.to) }));
+      await openBloom(pg, port);
+      await run(pg, `MUTANT (${m.name})`);
+      await b2.close();
+    }
+  }
+}
+
 await browser.close();
 server.close();
 
@@ -5417,15 +5570,23 @@ if (NEGATIVE_CONTROL) {
     const sawRingPick = fail.some((f) => /^\[layer ring\] MUTANT \(a pick shows the whole-bloom value\).*not layer 3's derived ring/.test(f));
     const sawRingClamp = fail.some((f) => /^\[layer ring\] MUTANT \(the clamp is never told\).*does not say asked vs built/.test(f));
     const sawRingBack = fail.some((f) => /^\[layer ring\] MUTANT \(the derived ring is never given back\).*must be pruned/.test(f));
-    if (sawRingGrey && sawRingPick && sawRingClamp && sawRingBack && sawRunRaceme && sawRunCrowd && sawRunPast && sawMopheadRays && sawMopheadClamp && sawDepthWrites && sawDepthKeeps && sawDepthLoad && sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
+    /* ROUTE (at), A LAYER'S OWN PETAL COUNT — one flag per mutant */
+    const sawCountGrey = fail.some((f) => /^\[layer petals\] MUTANT \(the count is never greyed\).*must be greyed/.test(f));
+    const sawCountPick = fail.some((f) => /^\[layer petals\] MUTANT \(a pick shows the whole-bloom value\).*not the global 8 layer 2 takes/.test(f));
+    const sawCountBack = fail.some((f) => /^\[layer petals\] MUTANT \(the global is never given back\).*must be pruned/.test(f));
+    const sawCountSnap = fail.some((f) => /^\[layer petals\] MUTANT \(the snap is never told\).*does not say asked vs built/.test(f));
+    const sawCountPhase = fail.some((f) => /^\[layer petals\] MUTANT \(the inactive phase is never told\).*does not say the phase is INACTIVE/.test(f));
+    const sawCountHalf = fail.some((f) => /^\[layer petals\] MUTANT \(the inactive phase is aligned\).*not half its own pitch/.test(f));
+    const sawCountSpiral = fail.some((f) => /^\[layer petals\] MUTANT \(the spiral flag reads the global\).*legibility flag is ABSENT, want SHOWN/.test(f));
+    if (sawCountGrey && sawCountPick && sawCountBack && sawCountSnap && sawCountPhase && sawCountHalf && sawCountSpiral && sawRingGrey && sawRingPick && sawRingClamp && sawRingBack && sawRunRaceme && sawRunCrowd && sawRunPast && sawMopheadRays && sawMopheadClamp && sawDepthWrites && sawDepthKeeps && sawDepthLoad && sawUmbelLabel && sawUmbelCount && sawStrandList && sawStrandBind && sawLeafSeedIgnored && sawLeafSeedSign && sawSeedIgnored && sawSeedFollows && sawFoldCup && sawFoldWords && sawSpinePick && sawSpineReset && sawSpineFrozen && sawSpineGroup && sawSpineVis && sawVisMode && sawVisPick && sawOutlinePick && sawOutlineReset && sawOutlineFrozen && sawCensus && sawPath && sawAccordion && sawVisibility && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers && sawRound && sawLeafCup && sawHatchLive && sawDeadUnhatched && sawDesign
         && sawScopeStamp && sawScopeEvery && sawScopeDeselect && sawScopePair
         && sawScopeLabels && sawScopeExact && sawScopeLoad && sawScopeReset && sawScopeTold && sawScopeKeep && sawScopeFold
         && sawCurveValidator && sawCurveClamp && sawCurveMirror && sawCurveWindow && sawCurveUnits && sawCurveFile
         && sawSpiralRadialOnly && sawSpiralFoot && sawSpiralRing && sawSpiralHold
         && sawTextureGrey && sawTextureLine
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-SIX ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}, umbel head — the label never derived: ${sawUmbelLabel}, the petal count shown: ${sawUmbelCount}, mophead — the rays at depth 1: ${sawMopheadRays}, the clamp untold: ${sawMopheadClamp}, depth 2's defaults — never written: ${sawDepthWrites}, a set control overwritten: ${sawDepthKeeps}, a load writes: ${sawDepthLoad}, node run — live under a raceme: ${sawRunRaceme}, the crowd backwards: ${sawRunCrowd}, a start past the end untold: ${sawRunPast}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL THIRTY-SEVEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}, roundness telling fired: ${sawRound}, leaf cup read-out fired: ${sawLeafCup}, roundness hatch over live travel fired: ${sawHatchLive}, roundness dead travel unhatched fired: ${sawDeadUnhatched}, design-file route fired: ${sawDesign}, scope selection — a pick stamps: ${sawScopeStamp}, an edit on every scope: ${sawScopeEvery}, deselect drops: ${sawScopeDeselect}, a pair split: ${sawScopePair}, whole-bloom read-outs: ${sawScopeLabels}, the exact offset: ${sawScopeExact}, a load ends the pick: ${sawScopeLoad}, a reset ends the pick: ${sawScopeReset}, a pre-retirement file told: ${sawScopeTold}, missing overrides kept: ${sawScopeKeep}, a member index re-keyed: ${sawScopeFold}, curve editor — validator ignored: ${sawCurveValidator}, clamped: ${sawCurveClamp}, mirror keeps right: ${sawCurveMirror}, a wall-clock double press: ${sawCurveWindow}, absolute units: ${sawCurveUnits}, file drops the curve: ${sawCurveFile}, spiral layers — RADIAL only: ${sawSpiralRadialOnly}, foot keeps the ramp: ${sawSpiralFoot}, ring keeps the ramp: ${sawSpiralRing}, ring held at the rim again: ${sawSpiralHold}, outline scopes — a pick applies: ${sawOutlinePick}, the reset leaves the curve: ${sawOutlineReset}, inherited frozen: ${sawOutlineFrozen}, outline visibility — reads the global mode: ${sawVisMode}, ignores the pick: ${sawVisPick}, spine scopes — a pick applies: ${sawSpinePick}, the reset leaves the curve: ${sawSpineReset}, inherited frozen: ${sawSpineFrozen}, the reset drops the outline: ${sawSpineGroup}, curl visibility reads the global mode: ${sawSpineVis}, fold limit — the cup never refused: ${sawFoldCup}, the read-out silent: ${sawFoldWords}, seed — never written: ${sawSeedIgnored}, follows later sliders: ${sawSeedFollows}, leaf seed — never seeded: ${sawLeafSeedIgnored}, the mirrored arch: ${sawLeafSeedSign}, strand picker — no strands: ${sawStrandList}, every pick binds strand 1: ${sawStrandBind}, texture — greying never applied: ${sawTextureGrey}, line never printed: ${sawTextureLine}, umbel head — the label never derived: ${sawUmbelLabel}, the petal count shown: ${sawUmbelCount}, mophead — the rays at depth 1: ${sawMopheadRays}, the clamp untold: ${sawMopheadClamp}, depth 2's defaults — never written: ${sawDepthWrites}, a set control overwritten: ${sawDepthKeeps}, a load writes: ${sawDepthLoad}, node run — live under a raceme: ${sawRunRaceme}, the crowd backwards: ${sawRunCrowd}, a start past the end untold: ${sawRunPast}, layer ring — never greyed: ${sawRingGrey}, pick shows the whole bloom: ${sawRingPick}, clamp untold: ${sawRingClamp}, never given back: ${sawRingBack}, layer petals — never greyed: ${sawCountGrey}, pick shows the whole bloom: ${sawCountPick}, never given back: ${sawCountBack}, snap untold: ${sawCountSnap}, inactive phase untold: ${sawCountPhase}, inactive phase aligned: ${sawCountHalf}, spiral flag on the global: ${sawCountSpiral}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

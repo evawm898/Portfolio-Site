@@ -497,14 +497,14 @@ export async function measure(page, { capability = null, wantMask = false, mutat
         let slot0Mid = null, slot0Tip = null, az0 = null;
         const ROT_TOL = 1e-7;
         mod.buildWhorlInto({
-          count: fr.slotCount, radius: ring.radius, height: 0,
+          count: ring.ownCount ? ring.ownCount.built : fr.slotCount, radius: ring.radius, height: 0,   // a layer's OWN petal count (Nov 8)
           sizeRamp: () => ring.scale, angleRamp: () => ring.tiltExtra, phase: ring.phase,
           placement: ui.placement, fan: fr.fan, sizeField, formField, spacingField,
           blade: (slot) => {
             petalsBuilt++;
             const d = slotsFor[slot.index];
             const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals, boneDetail: 'coarse' });
-            if (scopes) slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: fr.slotCount, state: ui });
+            if (scopes) slot.scopeTerm = mod.scopeOffsetsFor(scopes, { layer: d.lambda, slot: slot.index, n: d.ownCount ? d.ownCount.built : fr.slotCount, state: ui });
             if (mod.fanSlotMirrored(slot.index, fr.slotCount, ui)) slot.fanMirrored = true;
             const p = mod.buildPetalInto(acc, ui, d, slot, capParts);
             petalAccs.push(acc); petalSites.push({ p, ring: d, slot, cap: capParts });

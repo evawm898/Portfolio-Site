@@ -40,6 +40,7 @@ const CLASS = {
   scopePetals: [D, 'editor toggle that unlocks per-petal scopes — the photo schema writes no per-petal scopes'],
   scopeLayers: [B, 'the Per-layer values switch — schema v2 (S3) turns it ON exactly when it writes `overrides.layers`; v1 wrote no scopes'],
   layerRing: [D, 'the Layer ring slider (#495) is a VIEW of the picked layer and its own value is never read — a photo writes a whorl\'s ring as `values.layerRing` on its layer entry (schema v5, LAYER_SCHEMA.ring), never as this control'],
+  layerPetalCount: [D, 'the Layer petals slider (Nov 8, option A of §18) is a VIEW of the picked layer and its own value is never read — a photo writes a whorl\'s petal count as `values.layerPetalCount` on its layer entry (schema v6, PR 2), never as this control'],
   layerCount: [A, 'single / semi-double / double — but inner layers are hidden in a dense double: confidence low there'],
   layerSize: [A, 'inner petals shorter than outer'], layerPhase: [A, 'inner petals staggered into the gaps or aligned'],
   layerTilt: [B, 'inner whorls more upright than outer — needs a side or low view'],
@@ -204,13 +205,19 @@ export const LAYER_SCHEMA = Object.freeze({
      on a CURVE spine is INERT there (curl mode CURVE reads no slider curl). */
   deltas: ['petalCup', 'petalSpineCurl'],
   ring: ['layerRing'],
+  /* NOT YET IN THE SCHEMA, NAMED (Nov 8): a layer's OWN PETAL COUNT
+     (`values.layerPetalCount`, option A of §18) is a geometry layer value the
+     photo schema does not write until v6 (photo-to-bloom PR 2). Listed here
+     so the check below still holds the geometry's list exactly — a layer value
+     added to the geometry and in neither list refuses the census. */
+  notYet: ['layerPetalCount'],
 });
 {
   const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
   if (!same(LAYER_SCHEMA.offsets, SCOPE_LAYER_OWNED)) throw new Error(`LAYER_SCHEMA.offsets [${LAYER_SCHEMA.offsets}] is not the geometry's SCOPE_LAYER_OWNED [${SCOPE_LAYER_OWNED}]`);
   const owned = [...SCOPE_VALUE_GROUPS.spine, ...SCOPE_VALUE_GROUPS.outline];
   if (!same(LAYER_SCHEMA.values, owned)) throw new Error(`LAYER_SCHEMA.values [${LAYER_SCHEMA.values}] is not the geometry's spine + outline value groups [${owned}]`);
-  if (!same(LAYER_SCHEMA.ring, SCOPE_LAYER_VALUE_IDS)) throw new Error(`LAYER_SCHEMA.ring [${LAYER_SCHEMA.ring}] is not the geometry's SCOPE_LAYER_VALUE_IDS [${SCOPE_LAYER_VALUE_IDS}]`);
+  if (!same([...LAYER_SCHEMA.ring, ...LAYER_SCHEMA.notYet], SCOPE_LAYER_VALUE_IDS)) throw new Error(`LAYER_SCHEMA.ring [${LAYER_SCHEMA.ring}] + notYet [${LAYER_SCHEMA.notYet}] is not the geometry's SCOPE_LAYER_VALUE_IDS [${SCOPE_LAYER_VALUE_IDS}]`);
   if (!same(LAYER_SCHEMA.placements, SCOPE_LAYER_PLACEMENTS)) throw new Error(`LAYER_SCHEMA.placements [${LAYER_SCHEMA.placements}] is not the geometry's SCOPE_LAYER_PLACEMENTS [${SCOPE_LAYER_PLACEMENTS}]`);
   /* a delta row must be a scopeable delta (the file's own SCOPEABLE_IDS), and never an owned quantity */
   for (const id of LAYER_SCHEMA.deltas) {
