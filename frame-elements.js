@@ -164,30 +164,45 @@ export function buildShell({ size = 24, base = false } = {}) {
    its length, the tip the most) and whose tip LIFTS, with a raised midrib;
    the longest on the axis. The layout is PALMETTE, shared with the
    chains' junction motif. */
-export function buildPalmette({ size = 24, base = false } = {}) {
+export function buildPalmette({ size = 24, base = false, layout = PALMETTE, kind = 'palmette' } = {}) {
   const mesh = new Mesh(), foot = size;
   if (base) slab(mesh, size);
-  const rB = PALMETTE.boss * foot;
+  const rB = layout.boss * foot;
   // the boss: an OBLATE dome (height PALMETTE.bossRise of its radius, a
   // superellipse profile so its shoulder is full and its top flat) on a
   // collar ring a feature high and a quarter wider — a boss, not a ball
   patchSolid(mesh, discGrid([0, 0], rB * 1.25, F + 0.3), 'boss-collar');
-  patchSolid(mesh, bossGrid([0, 0], rB, PALMETTE.bossRise * rB, F + 0.3), 'boss');
-  PALMETTE.leaves.forEach((lf, k) => {
-    const L = lf.len * foot, W = PALMETTE.width * L;
-    const g = curvedBladeGrid({ at: [0.3 * rB * Math.sin(lf.angle), rB * 0.6 * Math.cos(lf.angle)], ang: Math.PI / 2 + lf.angle, L, hw: roundedHalf(W, 0.72, 0.85), crown: midribCrown(Math.max(F, PALMETTE.crown * W)), flare: lf.flare, tilt: PALMETTE.tilt * L, lift: () => F + 0.3, nu: 26, nv: 14 });
-    patchSolid(mesh, g, `palmette-leaf-${k}`);
+  patchSolid(mesh, bossGrid([0, 0], rB, layout.bossRise * rB, F + 0.3), 'boss');
+  layout.leaves.forEach((lf, k) => {
+    const L = lf.len * foot, W = layout.width * L;
+    const g = curvedBladeGrid({ at: [0.3 * rB * Math.sin(lf.angle), rB * 0.6 * Math.cos(lf.angle)], ang: Math.PI / 2 + lf.angle, L, hw: roundedHalf(W, 0.72, 0.85), crown: midribCrown(Math.max(F, layout.crown * W)), flare: lf.flare, tilt: layout.tilt * L, lift: () => F + 0.3, nu: 26, nv: 14 });
+    patchSolid(mesh, g, `${kind}-leaf-${k}`);
   });
-  return done(mesh, 'palmette', { size, boss: rB });
+  return done(mesh, kind, { size, boss: rB });
 }
+
+/* (b') THE SPRAY (phase 3e step 3, second round — Eva's ruling on the
+   sheet: "a spray of leaves splaying outward and down along the band"):
+   the palmette's own builder with its blades SPLAYED — two pairs leave the
+   boss nearly along the band (±1.0 and ±1.4 rad off the axis) and flare
+   further down it, and there is no centre blade — so laid as a crest and draped
+   along the band's outer edge (frame-vine's crest) it stays low and wide
+   and never stands up as a fan. */
+export const PALMETTE_SPRAY = {
+  leaves: [{ angle: 1.0, len: 0.9, flare: 0.9 }, { angle: -1.0, len: 0.9, flare: -0.9 }, { angle: 1.4, len: 0.78, flare: 1.1 }, { angle: -1.4, len: 0.78, flare: -1.1 }],   // no centre blade: nothing stands up
+  width: 0.3, crown: 0.16, tilt: 0.1, boss: 0.2, bossRise: 0.5,
+};
+export const buildSpray = ({ size = 24, base = false } = {}) => buildPalmette({ size, base, layout: PALMETTE_SPRAY, kind: 'spray' });
 /* a leaf's crown: a raised midrib on a cupped blade (the edges half up). Every
    blade grid scales its crown by the row's half-width over the widest, so a
    tip narrowed to the floor carries no spike — the midrib's width is a share of
    the row's, and on a 1 mm row it was a 130° crest. */
 export const midribCrown = (crown) => (u, v) => crown * (0.45 * Math.pow(Math.max(0, 1 - v * v), 0.5) + 0.55 * Math.exp(-((v / 0.22) ** 2))) * (0.7 + 0.3 * Math.sin(Math.PI * Math.min(1, u * 1.1)));
-/* an oblate dome: radius r, height h, superellipse profile z = h (1 − (ρ/r)^2.4)^(1/2.4), on seat z0 */
+/* an oblate dome: radius r, height h, superellipse profile z = h (1 − (ρ/r)^2.4)^(1/2.4), on seat z0;
+   its angular seam (the two coincident columns' walls) on −y, the element's
+   own axis — a seam off the axis showed as a crack across a placed boss */
 export function bossGrid(c, r, h, z0, nu = 10, nv = 40) {
-  const grid = []; for (let i = 0; i <= nu; i++) { const row = []; const q = i / nu, rr = r * q, z = z0 + h * Math.pow(Math.max(0, 1 - Math.pow(q, 2.4)), 1 / 2.4); for (let j = 0; j <= nv; j++) { const a = 2 * Math.PI * j / nv; row.push([c[0] + rr * Math.cos(a), c[1] + rr * Math.sin(a), z]); } grid.push(row); } return grid;
+  const grid = []; for (let i = 0; i <= nu; i++) { const row = []; const q = i / nu, rr = r * q, z = z0 + h * Math.pow(Math.max(0, 1 - Math.pow(q, 2.4)), 1 / 2.4); for (let j = 0; j <= nv; j++) { const a = -Math.PI / 2 + 2 * Math.PI * j / nv; row.push([c[0] + rr * Math.cos(a), c[1] + rr * Math.sin(a), z]); } grid.push(row); } return grid;
 }
 /* a flat disc of radius r at height z (a fan from its centre) */
 export function discGrid(c, r, z, nu = 6, nv = 40) {
@@ -295,7 +310,7 @@ function done(mesh, kind, info) {
   return { kind, positions, indices, parts: mesh.parts, scale: 1, info: { ...info, triangles: indices.length / 3, heightMm: z1 } };
 }
 
-export const ELEMENTS = { shell: buildShell, palmette: buildPalmette, rose: buildRose, rosette: buildRosette, bud: buildBud };
+export const ELEMENTS = { shell: buildShell, palmette: buildPalmette, spray: buildSpray, rose: buildRose, rosette: buildRosette, bud: buildBud };
 export function buildElement(kind, opts = {}) { return ELEMENTS[kind](opts); }
 
 
@@ -370,12 +385,32 @@ export function relift(el, lift) {
   for (let k = 2; k < P.length; k += 3) if (P[k] !== 0) P[k] += d;
   return { ...el, lift, positions: P, parts: el.parts.map((pt) => (pt.kind === 'bead' ? { ...pt, c: [pt.c[0], pt.c[1], pt.c[2] + d] } : pt)) };
 }
+/* A placed element's PLAN remapped by f([x, y]) → [x', y'] (z untouched, so
+   a base vertex stays on the base and a column stays a column): the crest's
+   squash and its drape along the band (frame-vine). f must keep the plan's
+   orientation (a positive Jacobian) or the solid turns inside out; a bead's
+   centre moves with f and its radius is kept. */
+export function remapElement(el, f) {
+  const P = Float64Array.from(el.positions);
+  for (let k = 0; k < P.length; k += 3) { const q = f([P[k], P[k + 1]]); P[k] = q[0]; P[k + 1] = q[1]; }
+  const parts = el.parts.map((pt) => (pt.kind === 'bead' ? { ...pt, c: [...f([pt.c[0], pt.c[1]]), pt.c[2]] } : pt));
+  return { ...el, positions: P, parts, loops: partLoops(P, parts), _box: undefined, _edges: undefined };
+}
+/* A placed element LIFTED VERTEX BY VERTEX by lift([x, y]) (a base vertex
+   stays on the base): the crest draped over the band's edge in z as well as
+   in plan (frame-vine). Patch parts only — a bead is a rigid sphere. */
+export function liftEach(el, lift) {
+  if (el.parts.some((pt) => pt.kind === 'bead')) throw new Error('liftEach: an element with a bead');
+  const P = Float64Array.from(el.positions); let top = 0;
+  for (let k = 0; k < P.length; k += 3) if (P[k + 2] !== 0) { const d = lift([P[k], P[k + 1]]); P[k + 2] += d; top = Math.max(top, d); }
+  return { ...el, positions: P, lift: top, liftEach: true };
+}
 /* THE mirror of a placed element: x negated (the doubles never recomputed),
    the winding reversed by the relief's own orientation pass. */
 export function mirrorElement(el) {
   const P = Float64Array.from(el.positions);
   for (let k = 0; k < P.length; k += 3) P[k] = -P[k];
-  return { ...el, at: [-el.at[0], el.at[1]], positions: P, parts: el.parts.map((pt) => (pt.kind === 'bead' ? { ...pt, c: [-pt.c[0], pt.c[1], pt.c[2]] } : pt)), loops: el.loops.map((l) => l.map(([x, y]) => [-x, y])), flip: !el.flip, mirrorOf: el };
+  return { ...el, at: [-el.at[0], el.at[1]], positions: P, parts: el.parts.map((pt) => (pt.kind === 'bead' ? { ...pt, c: [-pt.c[0], pt.c[1], pt.c[2]] } : pt)), loops: el.loops.map((l) => l.map(([x, y]) => [-x, y])), flip: !el.flip, mirrorOf: el, _box: undefined, _edges: undefined };   // the source's cached box and edges are not the mirror's
 }
 /* AN ELEMENT ON THE AXIS is its own mirror, to the bit. The builders lay
    symmetric elements (the palmette, the shell, the rosette) as mirror
@@ -426,7 +461,7 @@ export function symmetrizeElement(el) {
   }
   // a leftover takes the exact mirror of the (final) vertex at its image
   for (let v = 0; v < n; v++) if (partner[v] < 0) { const u = find(v); if (u < 0 || partner[u] < 0) return { ...el, asymmetric: true }; out[3 * v] = -out[3 * u]; out[3 * v + 1] = out[3 * u + 1]; out[3 * v + 2] = out[3 * u + 2]; }
-  return { ...el, positions: out, loops: partLoops(out, el.parts), selfMirror: true };
+  return { ...el, positions: out, loops: partLoops(out, el.parts), selfMirror: true, _box: undefined, _edges: undefined };
 }
 
 const segD = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy; let t = l2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };

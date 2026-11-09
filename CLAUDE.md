@@ -12544,7 +12544,19 @@ bud, sprig; a sunk rosette at medium zero crossings), each JOINING its stem by t
 Measured traps: the axis stop must read the stem's own y (the arch's apex is a mitre); an inward-turning run
 loops the mapped stem (`untangle` cuts and rounds it); `joinsCleanly` passes a wire that never touches;
 `node --check` does NOT catch an illegal `continue` — import the module. Six mutants; relief shards 12 → 16.
-Sheet: `node tools/shot-frame-vine.mjs <dir> [--refs <dir>]`.
+Sheet: `node tools/shot-frame-vine.mjs <dir> [--refs <dir>] [--only <regex>]`.
+**SECOND ROUND (Eva's rulings on the first sheet, charter §17.8): THE BAND IS THE CAP.** Nothing stands past the
+band's outer edge (the frame's own `plateOutline`) but the CREST, which is DRAPED on an edge frame (arc length
+along the edge × offset along its averaged normal) — at most `CREST.rise` 0.45 M past the edge, reaching
+`CREST.span` along it, lifted per vertex and falling off at 45° — a shell on a curve or straight top, the
+palmette's blades SPLAYED (the `spray` element, no centre blade) on the arch's pointed apex; the *Crest form*
+control (`ornCrestMotif`) overrides. Every other motif is placed by `placeMotif(…, { beyond, reach })` and made
+smaller until it fits the band and joins its stems; the stems' run-on past a corner is cut back inside the edge.
+Hierarchy 0 is the chains' layout (they still stand past the frame, as 3d built them — capping them is a
+lettered option). Gates CB1 / CB2, four mutants. **Ruling 5 (A): a PR runs only the relief mutants whose module
+its diff touches (`--files`), the full sweep runs on a push to `main` and nightly.** The page/Node relief mismatch
+(§17.6) is an OPEN DEFECT for its own session (ruling 6). A placed element's mirror no longer inherits its
+source's cached box (a stale box read an approach on the left as far).
 **Phase 4 (Oct 23): TEXTURE WAS BUILT, RENDERED AND NOT SHIPPED** (charter §12) — stone grain,
 weathering, cracks and hammered metal as real displacement of the molding along its TRUE normal (smoothed or
 wall-held directions fold, measured). Eva picked **none** from `docs/img/frame-texture-vocabulary.png`, so the

@@ -1157,14 +1157,26 @@ function settleChains(groups, told, region, opening) {
      that, null).
    - ON THE AXIS: made its own mirror to the bit (symmetrizeElement); an
      element that cannot be (the rose, the bud) is never placed there. */
-export function placeMotif(kind, { size, at, out, H, opening, onAxis = false, sunk = false }) {
+export function placeMotif(kind, { size, at, out, H, opening, onAxis = false, sunk = false, beyond = null, reach = 0 }) {
   // on the axis the normal IS ±y and the point IS on x = 0 (a path's own
   // last bits are not)
   if (onAxis) { out = [0, Math.sign(out[1]) || 1]; at = [0, at[1]]; }
   const angle = Math.atan2(out[1], out[0]) - Math.PI / 2;
   const Hz = (q) => Math.max(0, H(q));
   let c = at, el = null;
-  for (let k = 0; k <= 16 * size; k++) {
+  if (beyond) {
+    // CAPPED TO THE BAND (phase 3e step 3, Eva's ruling (c)): the footprint
+    // may enter neither the opening nor the world past the band's outer edge
+    // (`beyond`), so the motif is nudged along its normal, either way, up to
+    // `reach` — never pushed outward until it clears; none found, none built
+    for (let k = 0; k <= Math.ceil(reach / 0.2) * 2; k++) {
+      const d = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.2;
+      c = [at[0] + out[0] * d, at[1] + out[1] * d];
+      el = placeElement(kind, { size, at: c, angle, lift: 0 });
+      if (!footprintTouches(el, opening) && !footprintTouches(el, beyond)) break;
+      el = null;
+    }
+  } else for (let k = 0; k <= 16 * size; k++) {
     el = placeElement(kind, { size, at: c, angle, lift: 0 });
     if (!footprintTouches(el, opening)) break;
     el = null; c = [at[0] + out[0] * 0.25 * (k + 1), at[1] + out[1] * 0.25 * (k + 1)];

@@ -186,7 +186,7 @@ function writeReadout() {
       : `ornament <b>${o.groups.length}</b> groups (${o.groups.map((g) => g.anchor).join(', ')}, mirrored), `)
       + `<b>${o.curves.filter((c) => c.kind !== 'leaf').length}</b> scrolls, <b>${o.curves.filter((c) => c.kind === 'leaf').length}</b> leaves · lead <b>${o.length.toFixed(1)} mm</b>, `
       + (o.style === 'carved' ? `stroke <b>carved</b> (${o.shape}): <b>${o.groups.length ? o.groups[0].curves[0].info.wire.toFixed(2) : '—'} mm</b> body, width 0.7 × the local radius, thinning to <b>${o.tip.toFixed(2)} mm</b> at the eye` : `wire <b>${o.wire.toFixed(2)} mm</b> (${o.shape}, <b>${o.style}</b>${o.style === 'tapered' ? `, thinning to <b>${o.tip.toFixed(2)} mm</b> at the eye` : ''})`)
-      + ` — print mm; it may stand past the frame (overall height is the frame's) · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> of ${o.tris.budget.toLocaleString('en-US')} triangles`
+      + ` — print mm; ${o.layout === 'vine' ? 'held inside the band, the crest alone past its edge' : 'it may stand past the frame (overall height is the frame\'s)'} · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> of ${o.tris.budget.toLocaleString('en-US')} triangles`
       + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
     : 'ornament: none';
   const pt = model.pattern;

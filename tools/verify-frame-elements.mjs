@@ -42,6 +42,7 @@ const F = R.MIN_FEATURE_MM;
 const CAPS = {   // measured on the shipped tree: shell 78.7°, palmette 46.5°, rose 40.3°, rosette 40.8°, bud 49.0°
   shell: { tris: 16000, dihedral: 85, why: 'the ribs are cos² crests and the rim is scalloped: sharp by design' },
   palmette: { tris: 16000, dihedral: 55, why: 'blades with a raised midrib on a cushion' },
+  spray: { tris: 16000, dihedral: 55, why: "the palmette's builder, its blades splayed (phase 3e step 3, second round)" },
   rose: { tris: 40000, dihedral: 45, why: 'blunt cushioned petals, no facet' },
   rosette: { tris: 16000, dihedral: 45, why: 'flat wide petals' },
   bud: { tris: 12000, dihedral: 55, why: 'cupped leaves with a midrib' },

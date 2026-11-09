@@ -1304,7 +1304,7 @@ and at a grazing light, every caption carrying the gate's own numbers. No pixel 
 41. **A base slab is the SHEET's, not the element's** (`{ base: true }` only on the sheet) — an element
     built for placement carries no plate. *Undo:* the option.
 
-## 17. Phase 3e, step 3 — the elements wired in: one primitive each, a weight field, a continuous vine (STOPPED FOR A SHEET — rulings pending)
+## 17. Phase 3e, step 3 — the elements wired in: one primitive each, a weight field, a continuous vine (STOPPED FOR A SHEET — second round; §17.8)
 
 Read `frame-vine.js`'s header and the placement block at the end of `frame-elements.js` before touching
 `placeElement`, `placeMotif`, `symmetrizeElement`, `elementDepth`, `vineFor`, `weightAt`, `HIER` or the
@@ -1472,7 +1472,7 @@ Off the emitted mesh, over every vine row of the relief gate: **thinnest wire 1.
 1.1099 mm, root embeds 2.093–6.476 mm, stem seat depth 0.0000 mm** (every row ON the molding), items'
 least joint with their stem 1.033 mm, least motif joint 4.828 mm.
 
-**Found, pre-existing, not fixed:** the page and Node do not build the same relief. On `main` (`03d6ee3`) the
+**Found, pre-existing, not fixed — AN OPEN DEFECT for its own session (Eva's ruling 6, second round):** the page and Node do not build the same relief. On `main` (`03d6ee3`) the
 default arch is 68,460 triangles in the page and 68,076 in Node with the filigree OFF (+384 — the page's
 setParams path, not the ornament), and the oval's STL hashes differ at an equal count (last-bit
 arithmetic across the two engines). Every relief gate measures Node; nothing compares the page's STL with
@@ -1514,3 +1514,67 @@ Rulings pending (the sheet):
 - (c) The heavy corner rose stands past the band's outer edge on the rectangle and the oval (its size
     follows the molding width × weight); keep, or cap it to the band?
 - (d) Mid-run is sparse on a long run (sprigs and buds a half wave apart) — denser, or as is?
+
+### 17.8 Second round — Eva's rulings on the first sheet, and what was built for them
+
+The rulings (Nov 9, on the first vine sheet):
+1. **(c) Cap ornament to the band.** Nothing stands past the band's outer edge, with one exception: the
+   crest may rise above the top, but it spreads ALONG the band and stays low and wide — it never sticks
+   out sideways. (The first sheet's large leaves jutting out of the frame were the crest palmette, 26–28
+   mm above the top, and the corner roses, 6–9 mm past the side.)
+2. **The oval's spiky crest read as a pineapple** (upright fan blades on a soft curve). On a curve use a
+   low, wide, cupped crest that drapes along it — the shell, or a spray of leaves splaying outward and
+   down along the band; keep the palmette for the arch apex only if it reads right once its blades splay.
+3. **(a) Hierarchy 0 = the chains' layout.** Byte identity with `main` is not required (§17.4 stands as
+   the record of what moved).
+4. **(d) Mid-run density as is**, revisited after 1–2.
+5. **The mutant sweep: A.** The full relief sweep on pushes to `main` and nightly; a PR runs only the
+   mutants whose source files it touches. Built in this PR.
+6. **The page/Node build mismatch** (§17.6) is NOT fixed here: an open defect for its own session.
+
+What was built (`frame-vine.js`'s CREST block, `frame-elements.js`, `placeMotif`):
+- **The band is the cap.** `beyond(q)` is "outside the frame's own silhouette" (`plateOutline`, the
+  owner every other opening test reads). Every vine item's wire keeps its half width inside it; every
+  bud and rosette's footprint stays inside it; every junction motif other than the crest is placed by
+  `placeMotif(…, { beyond, reach })` — nudged along its normal either way (never pushed out until it
+  clears) and made 10 % smaller at a time from its weight's size until it fits between the opening and
+  the outer edge AND joins its stems; the read-out says how far (on the default rectangle the top
+  corner rose is 53 % of its weight's size, the arch springing's 48 %). The stems' run-on past an
+  interior end is cut back (30 % at a time) until its edge is inside the outer edge — it ran 2.05 mm
+  out through the rectangle's corner on the first sheet; at a 90° mitre the stem's own end already
+  passes the next run's centre line by 0.2 M, so the cut costs no joint (VN3 holds).
+- **The crest is DRAPED.** It is built about the origin, its plan scaled into the RISE (from its root
+  `CREST.hinge` = 0.7 M under the edge to `CREST.rise` = 0.45 M past it) and widened along the band by
+  at most `CREST.stretch` = 1.5 (the first cut stretched the shell 3× and its scallops became a
+  sunburst's points), then laid on the EDGE FRAME — the silhouette walked from its top crossing of the
+  axis, x the arc length along it, y the offset out along its normal, both the stations and the normals
+  averaged over ±1 M so a mitred apex rounds off instead of creasing (the first cut creased the spray's
+  boss along the axis) and the left half the right's mirror. So it follows the edge round a curve and
+  is never more than the rise past it. Its z is draped too: lifted per vertex to the molding under it
+  and falling off the edge at 45° (`crestLift`), not raised whole to the highest molding under it.
+- **The crest's form** is a new control, *Crest form* (`ornCrestMotif`): by the top (the default) — the
+  SPRAY on a pointed apex (the arch), the SHELL on a curve or a straight top (the oval, the rectangle) —
+  or either by hand. The spray is the palmette's own builder with its blades splayed
+  (`PALMETTE_SPRAY`: two pairs at ±1.0 and ±1.4 rad off the axis flaring further down the band, NO
+  centre blade); a new element kind (`spray`) the elements gate checks like the other five. The shell
+  is #479's approved shell, built at 0.9 M (its height) and draped.
+- `bossGrid`'s angular seam moved onto the element's own axis (−y): a seam off the axis showed as a
+  crack across the draped boss. The palmette's top facets turn 53.1° (was 46.5°) under its 55° cap.
+- A placed element's MIRROR no longer inherits its source's cached box and union edges (`mirrorElement`
+  and `symmetrizeElement` drop `_box`/`_edges`): a clearance read against a mirror before this read the
+  SOURCE's box, so an approach on the left could pass as far.
+- The chains (hierarchy 0) keep their own crest and motifs, standing past the frame as phase 3d built
+  them (ruling 3: hierarchy 0 is the chains' layout); capping the chains too is a lettered option.
+
+Gates: **CB1** nothing past the outer edge but the crest (every emitted wire vertex and every element
+footprint, on every vine row, read against the frame's own silhouette); **CB2** the crest past the edge
+is low (no vertex further out than 0.45 M, restated) and along (everything past it within the crest's
+span + the rise of the axis, as arc length along the edge, restated). VN2 restates the crest's form
+from the skeleton's KIND and the control, never from the module's own reading of the outline. Four
+mutants: a motif pushed past the band, the crest not draped (laid flat across the curve), the crest
+standing up (2.5 M past the edge, the first sheet's), the stem's run-on left uncut through the corner.
+
+**The sweep (ruling 5, A):** `--files=a,b,…` keeps the mutants whose module is in the list, then shards;
+`frame.yml`'s relief-mutants job hands a pull request its own diff against its base (`fetch-depth: 0`)
+and runs the full sweep on a push to `main`, nightly (`schedule`, 03:17 UTC) and by hand. Every anchor is
+still checked over ALL mutants first. A PR that moves no frame module runs none.

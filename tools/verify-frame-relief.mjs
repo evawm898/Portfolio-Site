@@ -67,6 +67,12 @@
                        is k mod n (CI runs n = 3 jobs; changing n is two
                        edits in frame.yml, the matrix list and the n).
                        Every anchor is still checked first.
+   --files=a,b,…       with --negative-control: only the mutants whose source
+                       module is in the list (Eva's ruling A, phase 3e step
+                       3: a PR runs the mutants of the modules it touches —
+                       frame.yml hands it the PR's own diff — and the full
+                       sweep runs on every push to main and nightly). Every
+                       anchor is still checked first, over ALL mutants.
 
    NOT COVERED: free ends (a relief attached at one end only is connected and
    a print hazard — none exists in this skeleton); sub-cell gaps under 0.2
@@ -486,8 +492,33 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     const clsR = (model, id) => { const a = model.info.anchors[id]; if (Math.abs(a.pt[0]) < 1e-9) return a.pt[1] > (model.box.y0 + model.box.y1) / 2 ? 'crest' : 'bottom'; return RUNS_R[model.info.kind].filter((q) => q.includes(id)).length >= 2 ? 'junction' : 'terminal'; };
     const wR = (x, L, a, b, h) => (1 - h) * HV.uniform + h * Math.max(HV.floor, HV[a] * (1 - smoothR(Math.max(0, x) / (HV.reach * L))), HV[b] * (1 - smoothR(Math.max(0, L - x) / (HV.reach * L))));
     const itemKindR = (w, at, leavesOn) => (at === 'zero' ? (w >= 0.46 && w < 0.66 ? 'rosette' : null) : w >= 0.56 ? 'cluster' : w >= 0.36 ? (leavesOn ? 'leaf' : null) : w >= 0.22 ? 'bud' : (leavesOn ? 'sprig' : null));
-    const motifKindR = (cls, w) => (w >= HV.heavy ? (cls === 'crest' ? 'palmette' : cls === 'bottom' ? 'shell' : 'rose') : w >= HV.medium ? 'rosette' : null);
-    const HEAVY = new Set(['shell', 'palmette', 'rose']);
+    // the crest (phase 3e step 3, second round): the Crest control's form,
+    // or by the skeleton — the arch's pointed apex a spray, every other top a
+    // shell (restated from the skeleton's KIND, not the module's own reading
+    // of the outline)
+    const crestKindR = (model, q) => (['shell', 'spray'].includes(q.ornCrestMotif) ? q.ornCrestMotif : model.info.kind === 'arch' ? 'spray' : 'shell');
+    const motifKindR = (cls, w, ck = 'palmette') => (w >= HV.heavy ? (cls === 'crest' ? ck : cls === 'bottom' ? 'shell' : 'rose') : w >= HV.medium ? 'rosette' : null);
+    const HEAVY = new Set(['shell', 'palmette', 'spray', 'rose']);
+    // CB, THE BAND IS THE CAP (Eva's rulings 1-2 on the first sheet),
+    // restated: the crest may stand CRR.rise of the molding width past the
+    // outer edge and reach CRR.span[kind] (+ the rise) along it from the axis
+    const CRR = { rise: 0.45, span: { shell: 1.35, spray: 1.7 } };
+    const cb1 = [], cb2 = [];
+    let cbVerts = 0, crestPast = 0, crestAlong = 0, crestsSeen = 0;
+    // the signed distance to the silhouette (positive inside) and the ARC
+    // LENGTH, from the top crossing of the axis, of the nearest point on it
+    const silGeom = (sil) => {
+      const n = sil.length; let best = null;
+      for (let i = 0; i < n; i++) { const a = sil[i], b = sil[(i + 1) % n]; if ((a[0] <= 0 && b[0] > 0) || (b[0] <= 0 && a[0] > 0)) { const t = a[0] === 0 ? 0 : b[0] === 0 ? 1 : -a[0] / (b[0] - a[0]); const y = a[1] + t * (b[1] - a[1]); if (!best || y > best.y) best = { i, t, y }; } }
+      const segL = sil.map((a, i) => Math.hypot(sil[(i + 1) % n][0] - a[0], sil[(i + 1) % n][1] - a[1])), total = segL.reduce((u, v) => u + v, 0);
+      // arc length along the loop from the crossing to segment i's start
+      const from = new Array(n); let acc = -best.t * segL[best.i]; for (let k = 0; k < n; k++) { const j = (best.i + k) % n; from[j] = acc; acc += segL[j]; }
+      return (q) => {
+        let d = Infinity, arc = 0;
+        for (let i = 0; i < n; i++) { const a = sil[i], b = sil[(i + 1) % n], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy; let t = l2 ? ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t)); const dd = Math.hypot(q[0] - a[0] - t * dx, q[1] - a[1] - t * dy); if (dd < d) { d = dd; const s0 = ((from[i] + t * segL[i]) % total + total) % total; arc = Math.min(s0, total - s0); } }
+        return { sd: pip(q, sil) ? d : -d, arc };
+      };
+    };
     // an element's footprint off the EMITTED mesh: per part, a patch's top
     // grid boundary loop (its walls stand on it), a bead's equator; the
     // union's boundary = every loop edge outside every other loop
@@ -727,7 +758,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         // HEAVY element (read off the emitted part's own kind) only at a
         // junction motif, within its own size of that anchor's stem ends
         for (const it of orn.items) { const r = runsR.get(it.run), k = itemKindR(wR(it.x, r.L, r.a, r.b, h), it.at, leavesOn); if (k !== it.kind) vn2.push(`${name}: an item at ${it.x.toFixed(1)} mm on ${it.run} is a ${it.kind}, its weight makes a ${k}`); }
-        for (const g of orn.groups.filter((gg) => gg.motif)) { const ws = [...runsR.values()].flatMap((r) => [r.from === g.anchor ? wR(0, r.L, r.a, r.b, h) : null, r.to === g.anchor ? wR(r.L, r.L, r.a, r.b, h) : null]).filter((v) => v != null); const k = motifKindR(clsR(model, g.anchor), Math.max(...ws)); if (k !== g.motif.kind) vn2.push(`${name}: the motif at ${g.anchor} is a ${g.motif.kind}, its weight makes a ${k}`); }
+        for (const g of orn.groups.filter((gg) => gg.motif)) { const ws = [...runsR.values()].flatMap((r) => [r.from === g.anchor ? wR(0, r.L, r.a, r.b, h) : null, r.to === g.anchor ? wR(r.L, r.L, r.a, r.b, h) : null]).filter((v) => v != null); const k = motifKindR(clsR(model, g.anchor), Math.max(...ws), crestKindR(model, q)); if (k !== g.motif.kind) vn2.push(`${name}: the motif at ${g.anchor} is a ${g.motif.kind}, its weight makes a ${k}`); }
         for (const e of feet2) if (HEAVY.has(e.kind)) { const r = e.rec, g = orn.groups.find((gg) => gg.motif && (gg.elements || []).some((el) => el === r || el === r.mirrorOf)); if (!g) { vn2.push(`${name}: a heavy ${e.kind} (${e.id}) placed away from every junction`); continue; } const a = model.info.anchors[g.anchor].pt, sc = rel.scale, d = Math.hypot(r.at[0] - (r.mirrorOf ? -1 : 1) * a[0] * sc, r.at[1] - a[1] * sc); if (d > r.size) vn2.push(`${name}: the heavy ${e.kind} at ${g.anchor} stands ${d.toFixed(1)} mm from it (size ${r.size.toFixed(1)})`); }
         // VN3 the stems are continuous: on the axis a stem stops a feature
         // (and the margin) short of its mirror; where two runs meet their
@@ -749,6 +780,22 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         // highest molding under that row's own vertices — never under it,
         // never more than 0.05 mm over it (a lifted stem floats)
         if (surf) for (const x of stemIdx) { const pt = parts[x]; for (let v = 0; v < pt.V; v++) { let hm = -Infinity; for (let c = 0; c < pt.C; c++) { const ix = 3 * pt.T(v, c); hm = Math.max(hm, surf(P[ix], P[ix + 1]), surf(-P[ix], P[ix + 1])); } if (hm === -Infinity) continue; const e0 = P[3 * pt.T(v, 0) + 2], gap = e0 - Math.max(hm, T0); stemSeatMax = Math.max(stemSeatMax, gap); stemSeatMin = Math.min(stemSeatMin, gap); if (gap > 1e-6 || gap < -1e-6) { vn5.push(`${name}: stem ${orn.curves[x].run} row ${v} stands ${gap.toFixed(3)} mm off the molding`); break; } } }
+        // CB1 nothing stands past the band's outer edge (the frame's own
+        // silhouette) but the crest: every emitted wire vertex and every
+        // element footprint inside it. CB2 the crest past it is LOW — no
+        // vertex further out than the rise — and ALONG the band — the nearest
+        // edge point of everything past it within the span (+ the rise) of the
+        // axis, measured as arc length along the edge
+        const geo = silGeom(sil), Mg = model.params.moldingWidth * rel.scale;
+        parts.forEach((pt, x) => { for (let v = 0; v < pt.V; v++) for (let c = 0; c < pt.C; c++) { const ix = 3 * pt.T(v, c); cbVerts++; const g2 = geo([P[ix], P[ix + 1]]); if (g2.sd < -1e-6) { cb1.push(`${name}: wire ${x} (${orn.curves[x].kind}) stands ${(-g2.sd).toFixed(3)} mm past the outer edge`); v = pt.V; break; } } });
+        for (const e of feet2) {
+          const crest = !!(e.rec.crest || e.rec.mirrorOf?.crest);
+          if (!crest) { for (const l of e.foot.loops) { const bad = l.find((qq) => geo(qq).sd < -1e-6); if (bad) { cb1.push(`${name}: the ${e.kind} ${e.id} stands ${(-geo(bad).sd).toFixed(3)} mm past the outer edge`); break; } } continue; }
+          crestsSeen++;
+          const span = CRR.span[e.kind];
+          if (!span) { cb2.push(`${name}: a crest of kind ${e.kind}`); continue; }
+          for (const pt of e.parts) { const n = 2 * pt.nu * pt.nv; for (let vv = pt.base; vv < pt.base + n; vv++) { const g2 = geo([P[3 * vv], P[3 * vv + 1]]); if (g2.sd >= 0) continue; crestPast = Math.max(crestPast, -g2.sd / Mg); crestAlong = Math.max(crestAlong, g2.arc / Mg); if (-g2.sd > CRR.rise * Mg + 1e-6) { cb2.push(`${name}: the ${e.kind} crest stands ${(-g2.sd).toFixed(3)} mm past the edge (the rise ${(CRR.rise * Mg).toFixed(3)})`); vv = Infinity; break; } if (g2.arc > (span + CRR.rise) * Mg + 1e-6) { cb2.push(`${name}: the ${e.kind} crest reaches ${g2.arc.toFixed(2)} mm along the edge from the axis past the edge (the span ${((span + CRR.rise) * Mg).toFixed(2)})`); vv = Infinity; break; } } if (cb2.length && cb2.at(-1).startsWith(name)) break; }
+        }
       }
       // OR6 filigree off is the frame itself
       const off = FL.withOrnament(G.buildFrame({ ...q, filigree: 'none' }));
@@ -773,6 +820,8 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     rec('VN3 the stems are continuous: a feature short of their mirror on the axis, overlapping where two runs meet, and reaching into every junction motif by the embed', stemsSeen > 0 && vn3.length === 0, `${stemsSeen} stems, least motif joint ${(-leastMotifJoint).toFixed(3)} mm${vn3.length ? ' — ' + vn3.slice(0, 3).join('; ') : ''}`);
     rec('VN4 every item springs from its stem: a joint of at least the embed (read off the emitted walls and footprints)', itemsSeen > 0 && vn4.length === 0, `${itemsSeen} items, least joint ${leastJoint.toFixed(3)} mm${vn4.length ? ' — ' + vn4.slice(0, 3).join('; ') : ''}`);
     rec('VN5 the stem is SEATED: every emitted row\'s edge stands ON the highest molding under its own vertices (within 1e-6 mm: a lifted stem floats, a sunk one is buried)', vn5.length === 0 && stemSeatMax > -Infinity, `stem seat depth ${stemSeatMin.toFixed(4)}–${stemSeatMax.toFixed(4)} mm${vn5.length ? ' — ' + vn5.slice(0, 3).join('; ') : ''}`);
+    rec('CB1 nothing stands past the band\'s outer edge (the frame\'s own silhouette) but the crest: every emitted wire vertex and every placed element\'s footprint inside it (Eva\'s ruling 1 on the first vine sheet)', vineRows > 0 && cbVerts > 0 && cb1.length === 0, `${cbVerts} wire vertices on ${vineRows} vine rows${cb1.length ? ' — ' + cb1.slice(0, 3).join('; ') : ''}`);
+    rec('CB2 the crest past the edge is LOW and ALONG the band: no vertex further out than 0.45 of the molding width, and everything past the edge within the crest\'s span (+ the rise) of the axis along the edge', crestsSeen > 0 && cb2.length === 0, `${crestsSeen} crests, past the edge ${crestPast.toFixed(3)} M at most, along it ${crestAlong.toFixed(3)} M${cb2.length ? ' — ' + cb2.slice(0, 3).join('; ') : ''}`);
     rec('TB1 every ornament row\'s relief is within the 1,500,000-triangle budget and within the ornament\'s own predicted bound', tb1.length === 0, `most ${mostTris.toLocaleString('en-US')} triangles${tb1.length ? ' — ' + tb1.slice(0, 3).join('; ') : ''}`);
     console.log(`     per wire style (off the emitted mesh): ${['vine', 'carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
   }
@@ -1164,6 +1213,11 @@ const MUTANTS = [
   { id: 'the-element-mirror-is-broken', file: 'elements', from: '  for (let k = 0; k < P.length; k += 3) P[k] = -P[k];', to: '  for (let k = 0; k < P.length; k += 3) P[k] = 0.02 - P[k];', breaks: ['PL2', 'PL4'] },
   { id: 'the-axis-motif-is-not-its-own-mirror', file: 'filigree', from: '  if (onAxis) { el = symmetrizeElement(el); if (el.asymmetric) return null; }', to: '', breaks: ['PL4'] },
   { id: 'the-stem-lifts-off-the-molding', file: 'vine', from: 'const finishStem = (c) => { c.lift = c.pts.map(() => 0);', to: 'const finishStem = (c) => { c.lift = c.pts.map(() => 0.5);', breaks: ['VN5'] },
+  // phase 3e step 3, second round (Eva's rulings 1-2: the band is the cap)
+  { id: 'a-motif-pushed-past-the-band', file: 'filigree', from: '  if (beyond) {\n    // CAPPED TO THE BAND', to: '  if (false) {\n    // CAPPED TO THE BAND', breaks: ['CB1'] },   // the corner roses pushed out of the opening and past the edge, as the first sheet had them
+  { id: 'the-crest-is-not-draped', file: 'vine', from: 'return { ...remapElement(flat, frame.at), at: frame.at([0, 0]) };', to: 'return { ...remapElement(flat, ([x, y]) => [x, frame.topY + y]), at: frame.at([0, 0]) };', breaks: ['CB2'] },   // laid flat across a curve, its ends stand past the rise
+  { id: 'the-crest-stands-up', file: 'vine', from: 'const k = (CREST.rise + hinge) * M / (ym - y0)', to: 'const k = (2.5 + hinge) * M / (ym - y0)', breaks: ['CB2'] },   // the upright crest of the first sheet: 2.5 molding widths past the edge
+  { id: 'the-stem-runs-on-past-the-corner', file: 'vine', from: 'if (out.A || out.B) {', to: 'if (false) {', breaks: ['CB1'] },   // the run-on past an interior end left uncut: out through the rectangle's corner
   // RETIRED in phase 3e step 3: 'the-axis-leaf-is-off-the-axis' (the chains'
   // axis LEAF is gone — the axis motif is the palmette element, its own
   // mirror by symmetrizeElement; its successor is
@@ -1198,7 +1252,15 @@ async function negativeControl() {
     if (only.length) { console.log('FAIL --shard and --only together'); process.exit(1); }
     shard = { k: +mm[1], n: +mm[2] };
   }
-  const RUN = only.length ? MUTANTS.filter((m) => only.includes(m.id)) : shard ? MUTANTS.filter((_, i) => i % shard.n === shard.k) : MUTANTS;
+  // --files=a,b,…: only the mutants whose SOURCE FILE is in the list (Eva's
+  // ruling A on the sweep: a PR runs the mutants of the modules it touches;
+  // the full sweep runs on a push to main and nightly), then sharded
+  const filesArg = (process.argv.find((a) => a.startsWith('--files=')) || '').slice(8);
+  const MOD = { geometry: 'frame-geometry.js', relief: 'frame-relief.js', filigree: 'frame-filigree.js', pattern: 'frame-pattern.js', elements: 'frame-elements.js', vine: 'frame-vine.js' };
+  const touched = filesArg ? new Set(filesArg.split(',').map((f) => path.basename(f.trim())).filter(Boolean)) : null;
+  const POOL = touched ? MUTANTS.filter((m) => touched.has(MOD[m.file])) : MUTANTS;
+  if (touched) console.log(`--files: ${POOL.length} of ${MUTANTS.length} mutants are on a touched module (${[...new Set(POOL.map((m) => MOD[m.file]))].join(', ') || 'none'}); the rest run on main and nightly`);
+  const RUN = only.length ? MUTANTS.filter((m) => only.includes(m.id)) : shard ? POOL.filter((_, i) => i % shard.n === shard.k) : POOL;
   if (only.length && RUN.length !== only.length) { console.log(`FAIL --only names a mutant that does not exist: ${only.filter((id) => !MUTANTS.some((m) => m.id === id)).join(', ')}`); process.exit(1); }
   if (shard) console.log(`shard ${shard.k}/${shard.n}: ${RUN.length} of ${MUTANTS.length} mutants — ${RUN.map((m) => m.id).join(', ')}`);
   for (const m of RUN) {
@@ -1222,7 +1284,7 @@ async function negativeControl() {
     if (!ok) bad++;
     console.log(`${ok ? ' ok ' : 'FAIL'} mutant ${m.id}: fired ${red.join(',') || 'nothing'}${missed.length ? ' MISSED ' + missed.join(',') : ''}${unclaimed.length ? ' UNCLAIMED ' + unclaimed.join(',') : ''}`);
   }
-  console.log(`\n${RUN.length - bad} of ${RUN.length} mutants behave${only.length ? ` (a SUBSET — ${MUTANTS.length - RUN.length} of ${MUTANTS.length} not run)` : shard ? ` (shard ${shard.k}/${shard.n} — the other shards run the rest)` : ''}.`);
+  console.log(`\n${RUN.length - bad} of ${RUN.length} mutants behave${only.length ? ` (a SUBSET — ${MUTANTS.length - RUN.length} of ${MUTANTS.length} not run)` : shard ? ` (shard ${shard.k}/${shard.n} — the other shards run the rest${touched ? `; ${MUTANTS.length - POOL.length} off the touched modules not run here` : ''})` : touched ? ` (${MUTANTS.length - POOL.length} off the touched modules not run)` : ''}.`);
   process.exit(bad ? 1 : 0);
 }
 
