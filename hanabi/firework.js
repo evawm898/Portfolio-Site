@@ -30,7 +30,7 @@
 //               suit's primary for a multicolour suit
 //   size        fraction of the box radius the firework reaches (0..1)
 //   seed        integer; every bit of jitter is a pure function of it
-//   tier        null, or { motif: 'rosettes' | 'streamers', count } — a second
+//   tier        null, or { motif: 'rosettes', count } — a second
 //               tier drawn under the burst at ranks 4 and 5 (layout 'single')
 // classic and the four originals also carry the version-1 fields:
 //   burstType, starCount, rings, trail, sparkles, core
@@ -65,8 +65,6 @@ export const MOTIFS = {
   dotring:       { label: 'Dot ring', group: 'Single bursts', item: 10, ref: '89, 105' },
   rosettes:      { label: 'Rosette field', group: 'Fields', item: 11, ref: '13, 15, 23, 30, 41' },
   starfield:     { label: 'Starfield', group: 'Fields', item: 12, ref: '34, 67, 86, 90' },
-  sparks:        { label: 'Spark drift', group: 'Fields', item: 13, ref: '16, 98' },
-  streamers:     { label: 'Streamers', group: 'Fields', item: 14, ref: '38, 60, 73' },
 };
 export const MOTIF_IDS = Object.keys(MOTIFS);
 
@@ -74,7 +72,6 @@ export const MOTIF_IDS = Object.keys(MOTIFS);
 export const TIERS = {
   none: 'None',
   rosettes: 'Over a rosette field',
-  streamers: 'Over streamers',
 };
 export const TIER_IDS = Object.keys(TIERS);
 export const TIER_RANKS = [4, 5];
@@ -89,7 +86,7 @@ const RANK_TABLE = {
 const SIZES = [0.42, 0.58, 0.72, 0.86, 1.0];
 // A field escalates mostly by COUNT, so it starts larger: a rank-1 field of
 // three rosettes at a burst's 0.42 is a smudge.
-const FIELD_MOTIFS = ['rosettes', 'starfield', 'sparks', 'streamers'];
+const FIELD_MOTIFS = ['rosettes', 'starfield'];
 const FIELD_SIZES = [0.72, 0.8, 0.88, 0.94, 1.0];
 // Per motif, per rank 1..5: the count, and the rings where the motif has them.
 const COUNTS = {
@@ -97,11 +94,10 @@ const COUNTS = {
   spoke: [24, 36, 50, 64, 80],        spokecore: [24, 36, 50, 64, 80],
   weeping: [16, 22, 30, 38, 48],      crowned: [16, 22, 30, 38, 48],     dome: [16, 22, 30, 38, 48],
   split: [16, 22, 30, 38, 46],        dotring: [1, 1, 2, 2, 3],
-  rosettes: [3, 5, 8, 11, 15],        starfield: [6, 10, 14, 19, 26],    sparks: [14, 24, 36, 50, 66],
-  streamers: [2, 3, 4, 5, 6],
+  rosettes: [3, 5, 8, 11, 15],        starfield: [6, 10, 14, 19, 26],
 };
 const RINGS = { teardrop: [1, 1, 1, 2, 2], doublering: [1, 2, 2, 2, 3] };
-const TIER_COUNTS = { rosettes: { 4: 5, 5: 8 }, streamers: { 4: 3, 5: 5 } };
+const TIER_COUNTS = { rosettes: { 4: 5, 5: 8 } };
 
 function hashSeed(str) {
   let h = 2166136261;
@@ -308,40 +304,6 @@ const FIELDS = {
       }
       return out.join('') + dot(p.x, p.y, Math.max(0.14, w * 0.6), col);
     }).join('');
-  },
-  sparks(rect, n, colors, w, rand) {
-    const { pts, rho } = scatter(rect, n, rand, 0.4);
-    return pts.map((p, i) => {
-      const a = Math.PI / 2 + (rand() - 0.5) * 1.3, ux = Math.cos(a), uy = Math.sin(a);
-      const h = rho * 0.5;
-      return teardrop(p.x + ux * rho * 0.5, p.y + uy * rho * 0.5, ux, uy, h, pick(colors, i));
-    }).join('');
-  },
-  // Dotted zig-zag chains (catalogue 38, 60, 73). Each chain runs across the
-  // rect from one side to the other on its own baseline, zig-zagging about it;
-  // the baseline is kept a zig's amplitude in from the top and bottom, so the
-  // chain stays inside by construction rather than by clamping.
-  streamers(rect, n, colors, w, rand) {
-    const out = [], dr = Math.max(0.2, Math.min(rect.w, rect.h) * 0.022, w * 1.2);
-    const amp = Math.min(rect.h * 0.08, rect.w * 0.16);
-    for (let c = 0; c < n; c++) {
-      const col = pick(colors, c), zigs = 3 + Math.floor(rand() * 2);
-      const slope = (rand() - 0.5) * rect.h * 0.5;
-      const lo = rect.y + dr + amp + Math.max(0, -slope / 2), hi = rect.y + rect.h - dr - amp - Math.max(0, slope / 2);
-      const base = lo + ((c + 0.2 + rand() * 0.6) / n) * Math.max(0, hi - lo);
-      const x0 = rect.x + dr + rand() * rect.w * 0.12, x1 = rect.x + rect.w - dr - rand() * rect.w * 0.12;
-      const pts = [];
-      for (let k = 0; k <= zigs; k++) {
-        const t = k / zigs;
-        pts.push([x0 + (x1 - x0) * t, base + slope * (t - 0.5) + (k % 2 ? amp : -amp) * (0.7 + rand() * 0.3)]);
-      }
-      for (let k = 0; k + 1 < pts.length; k++) {
-        const [ax, ay] = pts[k], [bx, by] = pts[k + 1];
-        const m = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / (dr * 2.8)));
-        for (let j = k ? 1 : 0; j <= m; j++) out.push(dot(ax + ((bx - ax) * j) / m, ay + ((by - ay) * j) / m, dr, col));
-      }
-    }
-    return out.join('');
   },
 };
 
