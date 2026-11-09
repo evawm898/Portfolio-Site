@@ -316,7 +316,7 @@ async function run(modulePath, { quiet = false } = {}) {
       }
     } else check(`B0b ${cs.label} plain rings: no band part`, bandParts.length === 0);
     // the SVG: one path per wire, per solid and per band element, a viewBox in millimetres that holds the drawing
-    const svg = G.exportSvg(m);
+    let svg = ''; try { svg = G.exportSvg(m); } catch (e) { svg = `<!-- threw: ${e.message} -->`; }   // a throw is C10's red, not an abort
     const paths = (svg.match(/<path /g) || []).length;
     const vb = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
     if (bandParts.length) check(`B8 ${cs.label} the SVG draws every band element (${bandParts.length})`, (svg.match(/<path class="(bead|leaf)"/g) || []).length === bandParts.length);
@@ -365,7 +365,7 @@ const MUTANTS = [
   { id: 'the-band-ignores-the-profile-slope', from: "const nr = ez, nz = -er, a0 = ra(zc);", to: "er = 0; ez = 1; const nr = ez, nz = -er, a0 = ra(zc);", breaks: /^B9 / },
   { id: 'the-svg-drops-the-bands', from: "  for (const b of bands) {\n    if (b.kind === 'bead')", to: "  for (const b of []) {\n    if (b.kind === 'bead')", breaks: /^(B8|C10) / },
   { id: 'every-ring-carries-the-band', from: "const want = (rg) => p.bandRings === 'all' ||", to: "const want = (rg) => true ||", breaks: /^B1 / },
-  { id: 'bands-build-on-plain-rings', from: "const bandOut = banded(p) ? buildBands() : null;", to: "const bandOut = buildBands();", breaks: /^B0b? / },
+  { id: 'bands-build-on-plain-rings', from: "const bandOut = banded(p) ? buildBands() : null;", to: "const bandOut = (p.bandStyle = banded(p) ? p.bandStyle : 'beading', buildBands());", breaks: /^B0b? / },
   { id: 'beads-sit-inside-their-ring', from: "size = Math.max(p.beadMm, floor, BAND_OVER_RING * 2 * rr);", to: "size = Math.max(p.beadMm, floor);", breaks: /^B6 / },
   { id: 'bars-ending-at-the-ring-get-no-ribs', from: "if (!flat && barsEnd === 'ring') {", to: "if (false) {", breaks: /^C3 |^C9 / },
 ];
