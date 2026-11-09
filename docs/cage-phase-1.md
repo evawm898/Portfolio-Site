@@ -321,3 +321,27 @@ keeps every gap inside the rule, the run is built at the fused end and told.
 "Each ring is plain or carries a band" is built as the On selector rather than a control per ring (the
 ring count moves with the profile's shoulders, so a per-ring list would change length under the hand).
 The randomizer draws the band fields LAST, so every earlier field of a seed is the sequence it was.
+
+### 8.6 Gates and cost
+
+- `node tools/verify-cage.mjs`: **997 of 997** over 48 cages (the presets, 24 seeds — about half of
+  them banded now — each preset in each band style, the three ring selections, a bead under its ring
+  and both styles at the widest spacing). The B family: B0 inert when off (byte-identical STL and SVG),
+  B1 the rings named, B2 the snap (a bead's centre within the bar's own wire at every crossing — the
+  emitted bar is a polyline, so its crossing carries the polyline's chord error, tenths of a mm on a
+  profile step), B3 fused along the run (Eva's 1.8 r; ½–¾ of a leaf, round cages), B4 fused to its
+  ring, B5 fused to every bar it crosses (a ray-parity point inside both solids), B6 the floor and
+  1.25 × proud (an element's width read as the extent of its (radius, z) cloud — its z extent alone
+  reads short on a sloped band, which is what the first cut measured), B7 clear of the door, B8 the
+  SVG, B9 on the cage's own shape (the profile restated from the control through bloom-curve.js).
+- `--negative-control`: **23 of 23** (ten band mutants). Five claims were widened on measurement,
+  every one true collateral rather than a loosening: a run whose fuse cap or laurel pitch is dropped
+  parts, so bars cross the ring outside every element (B5); beads floated outward sit on a wider circle,
+  so neighbours part (B3); a band kept in the door opening sits where the ring was cut away (B4). And
+  the plain-rings mutant was rewritten — forcing an unknown style through built elements with neither
+  a centre nor an outline and threw in the SVG writer; it now builds real beads, and an SVG throw is
+  C10's red rather than an abort. `--mutant=a,b` runs a named subset.
+- `node tools/verify-cage-page.mjs`: **18 of 18** (P11 / P11b), `--negative-control` **8 of 8**.
+- Cost, the default bell: 64,132 → **264,652** triangles with beading (12.6 MB STL), **359,044** with
+  leaves (17.1 MB); the tiered cage's eight rings 408,536 / 605,960. A bead is 360 triangles, a leaf
+  about 1,152. Build 70–170 ms. Sheet: `node tools/shot-cage-bands.mjs <dir> --png docs/img/cage-bands.png`.
