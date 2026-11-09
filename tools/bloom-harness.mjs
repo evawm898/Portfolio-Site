@@ -72,7 +72,7 @@ const { SEPAL_TWINS, SEPAL_ANGLE_RANGE, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE, S
    noises here, so a field that drifts is caught instead of agreed with. */
 export const { TEXTURE_TYPES, TEXTURE_HEIGHT_RANGE, TEXTURE_HEIGHT_STEP, TEXTURE_HEIGHT_DEFAULT, TEXTURE_EDGE_MM, TEXTURE_EDGE_CAP_MM, TEXTURE_EDGE_GRID_MM, TEXTURE_EDGE_CAP_RUNGS, textureEdgeRung, TEXTURE_SIZE_RANGE,
                TEXTURE_SIZE_STEP, TEXTURE_SIZE_DEFAULT, TEXTURE_SEED, TEXTURE_LATTICE_BAR, textureIsAbsent,
-               TEXTURE_TYPES_SHOWN, TEXTURE_TYPES_HIDDEN, BONE_CONTROL_IDS, BONE_PORE_FLOOR_MM, BONE_PORE_RANGE, BONE_DENSITY_RANGE, BONE_RATIO_RANGE, BONE_COVERAGE_RANGE, BONE_CURVATURE_RANGE, BONE_SHARED_CLEARANCE_REL } = GEOMETRY;
+               TEXTURE_TYPES_SHOWN, TEXTURE_TYPES_HIDDEN, BONE_CONTROL_IDS, RIB_CONTROL_IDS, RIB_HEIGHT_RANGE, RIB_SPACING_RANGE, RIB_LAWS, RIB_EXCLUDED_ORGANS, RIB_REF_RADIUS_MM, RIB_MIN_SPOKES, RIB_EMERGE_K, BONE_PORE_FLOOR_MM, BONE_PORE_RANGE, BONE_DENSITY_RANGE, BONE_RATIO_RANGE, BONE_COVERAGE_RANGE, BONE_CURVATURE_RANGE, BONE_SHARED_CLEARANCE_REL } = GEOMETRY;
 /* THE SEPAL'S OWN SIZE, RESTATED FROM THE CONTROLS (SP0b, SP3, SP5 — Eva's
    rulings of Oct 13, docs/bloom-sepal-own-size-outcome.md): a mm row at 0
    means the petal's x size, a set row WINS for its axis, a value under the
@@ -843,7 +843,9 @@ for (const [id, want] of Object.entries(INFLO_EXPECTED)) {
     for (const t of TEXTURE_TYPES) {
       const st = { ...DEFAULTS, petalTexture: t };
       if (evalPredicate(PREDICATES.texturePresent, st) === textureIsAbsent(st)) throw new Error(`texturePresent: the registry's predicate and the geometry's guard agree at petalTexture ${t} — they must be exact complements`);
-      if (evalPredicate(hgt.visibleWhen, st) === textureIsAbsent(st)) throw new Error(`${hgt.id} is ${textureIsAbsent(st) ? 'shown' : 'hidden'} at petalTexture ${t}`);
+      /* (RIBS, Nov 9) the shared height is every textured choice's but RIBS's, which reads its own ribHeight (0.3 mm floor) */
+      if (evalPredicate(hgt.visibleWhen, st) !== (!textureIsAbsent(st) && t !== 'RIBS')) throw new Error(`${hgt.id} is ${evalPredicate(hgt.visibleWhen, st) ? 'shown' : 'hidden'} at petalTexture ${t} (every textured choice's but RIBS's)`);
+      for (const id of RIB_CONTROL_IDS) { const c = CONTROLS.find((x) => x.id === id); if (!c || evalPredicate(c.visibleWhen, st) !== (t === 'RIBS')) throw new Error(`${id} is ${!c ? 'not a control' : t === 'RIBS' ? 'hidden' : 'shown'} at petalTexture ${t} (RIBS's own)`); }
       /* the feature size is the RETIRED patterns' own; BONE's five are BONE's */
       if (evalPredicate(siz.visibleWhen, st) !== TEXTURE_TYPES_HIDDEN.includes(t)) throw new Error(`textureSize is ${TEXTURE_TYPES_HIDDEN.includes(t) ? 'hidden' : 'shown'} at petalTexture ${t} (it is PEBBLE's and CELLULAR's alone)`);
       for (const id of BONE_CONTROL_IDS) { const c = CONTROLS.find((x) => x.id === id); if (!c || evalPredicate(c.visibleWhen, st) !== (t === 'BONE')) throw new Error(`${id} is ${!c ? 'not a control' : t === 'BONE' ? 'hidden' : 'shown'} at petalTexture ${t} (BONE's own)`); }
@@ -851,6 +853,14 @@ for (const [id, want] of Object.entries(INFLO_EXPECTED)) {
     /* BONE REPLACES PEBBLE AND CELLULAR IN THE DROPDOWN (Oct 23): their values
        are KEPT (a saved design builds as before) and HIDDEN, exactly those two */
     if (JSON.stringify(tex.options.filter((o) => !o.hidden).map((o) => o.value)) !== JSON.stringify([...TEXTURE_TYPES_SHOWN]) || JSON.stringify(tex.options.filter((o) => o.hidden).map((o) => o.value)) !== JSON.stringify([...TEXTURE_TYPES_HIDDEN])) throw new Error(`petalTexture's dropdown shows ${tex.options.filter((o) => !o.hidden).map((o) => o.value).join(' / ')} — it must show ${TEXTURE_TYPES_SHOWN.join(' / ')} and keep ${TEXTURE_TYPES_HIDDEN.join(' / ')} hidden`);
+    /* RIBS (Nov 9): Eva's ruled 0.3 mm floor and the texture's 2.5 mm maximum,
+       restated here, so a range moved on one side alone refuses to load; the
+       spacing's floor is four lattice edges (T3's) */
+    if (JSON.stringify([...RIB_HEIGHT_RANGE]) !== JSON.stringify([0.3, 2.5])) throw new Error(`RIB_HEIGHT_RANGE ${RIB_HEIGHT_RANGE.join('..')} is not Eva's ruled 0.3..2.5 mm`);
+    if (RIB_SPACING_RANGE[0] !== 4 * TEXTURE_EDGE_MM) throw new Error(`RIB_SPACING_RANGE's floor ${RIB_SPACING_RANGE[0]} is not four lattice edges (${4 * TEXTURE_EDGE_MM})`);
+    if (JSON.stringify([...RIB_EXCLUDED_ORGANS]) !== JSON.stringify(['stem', 'stamen', 'style', 'petiole', 'stalk'])) throw new Error(`RIB_EXCLUDED_ORGANS ${RIB_EXCLUDED_ORGANS.join(', ')} is not Eva's named exclusion (stem, stamen, style, petiole, stalk)`);
+    for (const [id, R] of [['ribHeight', RIB_HEIGHT_RANGE], ['ribSpacing', RIB_SPACING_RANGE]]) { const c = CONTROLS.find((x) => x.id === id); if (!c || c.min !== R[0] || c.max !== R[1]) throw new Error(`registry ${id} ${c && `${c.min}..${c.max}`} is not the geometry's ${R.join('..')}`); }
+    { const c = CONTROLS.find((x) => x.id === 'ribLaw'); if (!c || c.kind !== 'choice' || c.default !== 'A' || JSON.stringify(c.options.map((o) => o.value)) !== JSON.stringify([...RIB_LAWS])) throw new Error('registry ribLaw is not the geometry\'s choice A / B defaulting to A (Eva: A is the default)'); }
     for (const [id, R] of [['bonePoreSize', BONE_PORE_RANGE], ['bonePoreDensity', BONE_DENSITY_RANGE], ['boneBandRatio', BONE_RATIO_RANGE], ['bonePatchCoverage', BONE_COVERAGE_RANGE], ['boneCurvature', BONE_CURVATURE_RANGE]]) {
       const c = CONTROLS.find((x) => x.id === id);
       if (!c || c.min !== R[0] || c.max !== R[1]) throw new Error(`registry ${id} ${c && `${c.min}..${c.max}`} is not the geometry's ${R.join('..')}`);
@@ -1433,7 +1443,7 @@ export const REFUSED_ROW_BUILD_MS = 120000;
    the apex table's. */
 export const TEXTURE_CAP_ROW = /^TEXTURE CAP:|texture edge cap/;
 export function settleMsForRow(label) {
-  return Object.prototype.hasOwnProperty.call(EXPORT_REFUSED_XFAIL, label) || TEXTURE_CAP_ROW.test(label) || /^BONE:/.test(label) ? REFUSED_ROW_BUILD_MS : 30000;
+  return Object.prototype.hasOwnProperty.call(EXPORT_REFUSED_XFAIL, label) || TEXTURE_CAP_ROW.test(label) || /^(BONE|RIBS):/.test(label) ? REFUSED_ROW_BUILD_MS : 30000;
 }
 
 /* READ-BACK: set each value through the real input, fire the real events,
@@ -5862,6 +5872,10 @@ export function textureFieldRestated(type, lambda, seed = TEXTURE_SEED) {
   if (type === 'CELLULAR') return (p) => { const e = texWorleyRestated(p[0] * k, p[1] * k, p[2] * k, seed) / 0.35; return e >= 1 ? 1 : e * e * (3 - 2 * e); };
   throw new Error(`textureFieldRestated: ${type}`);
 }
+/* (RIBS, Nov 9) the rib height as the gate reads it: RIBS's own control,
+   clamped to its own range (0.3 mm floor) — never textureHeight */
+export function ribHeightRestated(ui) { const h = Number(ui.ribHeight ?? 0.3); return h < RIB_HEIGHT_RANGE[0] ? RIB_HEIGHT_RANGE[0] : h > RIB_HEIGHT_RANGE[1] ? RIB_HEIGHT_RANGE[1] : h; }
+const isRibsUi = (ui) => String(ui.petalTexture) === 'RIBS';
 /* the controls as the gate reads them — the registry's clamp restated */
 export function textureControlsRestated(ui) {
   if (textureIsAbsent(ui)) return null;
@@ -5870,6 +5884,10 @@ export function textureControlsRestated(ui) {
   if (type === 'BONE') {
     const B = { pore: clamp(Number(ui.bonePoreSize ?? GEOMETRY.BONE_PORE_DEFAULT), BONE_PORE_RANGE), density: clamp(Number(ui.bonePoreDensity ?? GEOMETRY.BONE_DENSITY_DEFAULT), BONE_DENSITY_RANGE), ratio: clamp(Number(ui.boneBandRatio ?? GEOMETRY.BONE_RATIO_DEFAULT), BONE_RATIO_RANGE), coverage: clamp(Number(ui.bonePatchCoverage ?? GEOMETRY.BONE_COVERAGE_DEFAULT), BONE_COVERAGE_RANGE), curvature: clamp(Number(ui.boneCurvature ?? GEOMETRY.BONE_CURVATURE_DEFAULT), BONE_CURVATURE_RANGE) };
     return { type, H, lambda: B.pore, bone: B, infillOn };
+  }
+  if (type === 'RIBS') {
+    const sA = Number(ui.ribSpacing ?? 2), s = sA < RIB_SPACING_RANGE[0] ? RIB_SPACING_RANGE[0] : sA > RIB_SPACING_RANGE[1] ? RIB_SPACING_RANGE[1] : sA;
+    return { type, H: ribHeightRestated(ui), lambda: s, ribs: { law: String(ui.ribLaw ?? 'A'), s }, bone: { curvature: GEOMETRY.BONE_CURVATURE_DEFAULT, coverage: 1 }, infillOn };
   }
   return { type, H, lambda: clamp(Number(ui.textureSize ?? TEXTURE_SIZE_DEFAULT), TEXTURE_SIZE_RANGE), infillOn };
 }
@@ -5993,6 +6011,176 @@ export function bone2FieldRestated(D, spread, density) {
     }
     return v < 0 ? 0 : v > 1 ? 1 : v;
   };
+}
+/* ===================================================================
+   RIBS, RESTATED (TXR, Nov 9 — docs/bloom-surface-texture-ribs-shipped.md).
+   The field is written a second time here from the CONTROLS, with a
+   DIFFERENT OWNER for each transcendental (Math.atan2 and Math.cos, where the
+   geometry uses its arithmetic `eatan2` and `ecos` — so this is also the
+   witness that those stand-ins compute the function); the schedule's two laws
+   are restated from Eva's rulings, never imported. The constants it needs are
+   the ruled ones (the 20 mm reference radius, four spokes, one spacing of
+   emergence) — a DECLARATION, the harness refuses to load if they move.
+     TXR0  the record is the controls: law, spacing, height (RIBS's own 0.3 mm
+           floor), the spoke count restated, the fade max(H x 15/8, e), the
+           curvature mask at BONE's default (the shipped rule), no patches, no
+           BONE v2 record and no detail split (the view IS the export, said)
+     TXR1  OUTWARD ONLY (the prototype's R0): every sample moved s >= 0 along
+           its own normal, never more than H
+     TXR2  ONE SHARED FIELD DERIVED FROM THE AXIS (R1): s = w0 x mc x H x f, f
+           restated at the vertex's WORLD (x, y) — every organ reads one field
+     TXR3  THE CURVATURE MASK (the shipped rule, not special-cased): a ridge
+           vertex takes nothing
+     TXR6  THE CENTRE CONVERGES FREELY (Eva): no fade, no thinning and no floor
+           at the axis — on a flat hub every top vertex within 2 mm of the axis
+           (clear of the feet and the rim) is raised H x f exactly
+     TXR7  EVA'S NAMED EXCLUSION, on the EMITTED stream: the stem block and the
+           centre block (stamens, style) are the untextured twin's to the bit,
+           no excluded organ is in the pass, and the hub is raised only where
+           its own normal faces up
+     TXR8  THE LAW IS A CHOICE: A a fixed count (round(2 pi 20 / s)), B 4 x 2^L
+           beginning at s / sqrt2 — the record's schedule restated level by level
+   =================================================================== */
+const RIB_RULED = Object.freeze({ refRadius: 20, minSpokes: 4, emergeK: 1 });
+if (RIB_REF_RADIUS_MM !== RIB_RULED.refRadius || RIB_MIN_SPOKES !== RIB_RULED.minSpokes || RIB_EMERGE_K !== RIB_RULED.emergeK) throw new Error(`RIBS: the geometry's reference radius / minimum spokes / emergence (${RIB_REF_RADIUS_MM} / ${RIB_MIN_SPOKES} / ${RIB_EMERGE_K}) are not the ruled 20 mm / 4 / one spacing`);
+export function ribScheduleRestated(law, s) {
+  if (law === 'A') { const K = Math.max(4, Math.round((2 * Math.PI * 20) / s)); return { n0: K, levels: [{ n: K, rStart: 0 }], emerge: s }; }
+  const levels = [{ n: 4, rStart: 0 }];
+  for (let L = 1; L <= 24; L++) { const n = 4 * 2 ** L; levels.push({ n, rStart: (n * s) / (2 * Math.PI * Math.SQRT2) }); }
+  return { n0: 4, levels, emerge: s };
+}
+export function ribFieldRestated(law, s) {
+  const S = ribScheduleRestated(law, s);
+  const wave = (n, th) => 0.5 + 0.5 * Math.cos(n * th);
+  return (p) => {
+    const r = Math.hypot(p[0], p[1]), th = Math.atan2(p[1], p[0]);
+    let L = 0; while (L + 1 < S.levels.length && S.levels[L + 1].rStart <= r) L++;
+    let f = wave(S.levels[L].n, th);
+    if (L > 0) { const x = (r - S.levels[L].rStart) / S.emerge, a = x <= 0 ? 0 : x >= 1 ? 1 : TX_EASE(x); if (a < 1) f = (1 - a) * wave(S.levels[L - 1].n, th) + a * f; }
+    return f;
+  };
+}
+/* the field's restated tolerance: Math.cos(n th) against the geometry's
+   arithmetic path is a different owner, and both are within a few ulp of the
+   true value at n th up to ~400 rad — 1e-9 mm is ~1e5 times that */
+const TXR_TOL = 1e-9;
+export function ribsRecordClauses(ui, T, readout = null) {
+  const bad = [];
+  const C = textureControlsRestated(ui);
+  if (!C || C.type !== 'RIBS') return bad;
+  const B = T.bone || null, R = T.ribs || null;
+  if (!B || !R) { bad.push(`TXR0: a RIBS build carries no ${!B ? 'bone' : 'ribs'} record`); return bad; }
+  const S = ribScheduleRestated(C.ribs.law, C.ribs.s), e = T.edgeMm, lam = txFadeWidthRestated(C.H, e);
+  if (R.law !== C.ribs.law || Math.abs(R.spacingMm - C.ribs.s) > 1e-12) bad.push(`TXR0: the record reads law ${R.law} at ${R.spacingMm} mm where the controls read ${C.ribs.law} at ${C.ribs.s} mm`);
+  if (Math.abs(T.heightMm - C.H) > 1e-12) bad.push(`TXR0: the record's height ${T.heightMm} is not ribHeight clamped to 0.3..2.5 (${C.H})`);
+  if (Math.abs(B.fadeMm - lam) > 1e-9) bad.push(`TXR0: the fade is ${B.fadeMm} where max(H x 15/8, e) is ${lam}`);
+  if (B.curvature !== C.bone.curvature) bad.push(`TXR0: the curvature mask reads ${B.curvature}/mm — the shipped rule is BONE's default ${C.bone.curvature}/mm, not special-cased`);
+  if (B.detail !== undefined || B.full !== undefined || B.fullIsCoarse !== true) bad.push(`TXR0: the record names a detail (${B.detail}) — RIBS has no refinement past the lattice, so there is no coarse/full split to report`);
+  if (readout !== null && !/no "Full detail" build/.test(readout)) bad.push('TXR0: the read-out does not say the view IS the export (no Full detail build for ribs)');
+  /* TXR8 — the law is a choice: the schedule restated */
+  if (C.ribs.law === 'A' && R.spokes !== S.n0) bad.push(`TXR8: law A builds ${R.spokes} spokes where round(2 pi 20 / ${C.ribs.s}) is ${S.n0}`);
+  if (C.ribs.law === 'B' && R.spokes !== null) bad.push(`TXR8: law B reports a fixed spoke count (${R.spokes}) — B branches`);
+  const lv = R.levels || [];
+  for (let i = 0; i < lv.length; i++) if (!S.levels[i] || lv[i].n !== S.levels[i].n || Math.abs(lv[i].rStart - S.levels[i].rStart) > 1e-9) { bad.push(`TXR8: level ${i} reads ${lv[i].n} spokes from ${lv[i].rStart} mm where law ${C.ribs.law} restates ${S.levels[i] ? `${S.levels[i].n} from ${S.levels[i].rStart}` : 'nothing'}`); break; }
+  if (Math.abs(R.emergeMm - S.emerge) > 1e-12) bad.push(`TXR8: new ribs grow over ${R.emergeMm} mm where the ruled emergence is one spacing (${S.emerge})`);
+  const F = ribFieldRestated(C.ribs.law, C.ribs.s);
+  const first = {};
+  let nLaw = 0;
+  for (const [name, o] of Object.entries(T.organs || {})) {
+    const b = o.bone;
+    if (!b) continue;
+    if (RIB_EXCLUDED_ORGANS.includes(name) || b.rod) { if (!first['excl' + name]) { first['excl' + name] = 1; bad.push(`TXR7: ${name} carries a relief record — it is in Eva's named exclusion (${RIB_EXCLUDED_ORGANS.join(', ')}, every rod)`); } }
+    if (Math.abs(b.fadeMm - lam) > 1e-9) { if (!first['fade' + name]) { first['fade' + name] = 1; bad.push(`TXR0: ${name}: the relief fades over ${b.fadeMm} mm where max(H x 15/8, e) is ${lam}`); } }
+    for (const q of [...(b.samples || []), ...(b.ridgeSamples || []), ...(b.floorSamples || [])]) {
+      const dv = [q.p1[0] - q.p0[0], q.p1[1] - q.p0[1], q.p1[2] - q.p0[2]];
+      const sd = q.s + (q.clearMm || 0);
+      const off = Math.hypot(dv[0] - sd * q.n[0], dv[1] - sd * q.n[1], dv[2] - sd * q.n[2]);
+      if (!(q.s >= 0) || off > 1e-9) { if (!first['out' + name]) { first['out' + name] = 1; bad.push(`TXR1: ${name}: a vertex at ${q.p0.map((x) => x.toFixed(4)).join(',')} moved ${(dv[0] * q.n[0] + dv[1] * q.n[1] + dv[2] * q.n[2]).toFixed(6)} mm along its normal (|p1 - p0 - s n| ${off.toExponential(2)}, s ${q.s}) — the relief is INWARD or off its normal (outward only)`); } }
+      if (q.s > C.H + 1e-9) { if (!first['peak' + name]) { first['peak' + name] = 1; bad.push(`TXR1: ${name}: a vertex raised ${q.s} mm past the ${C.H} mm peak-to-valley`); } }
+      if (q.ridge && q.s !== 0) { if (!first['ridge' + name]) { first['ridge' + name] = 1; bad.push(`TXR3: ${name}: a ridge vertex (convex curvature ${q.kappa}/mm against ${C.bone.curvature}) is raised ${q.s} mm — a ridge takes nothing`); } }
+      if (name === 'hub' && q.s > 0 && !(q.n[2] > 0)) { if (!first['hubdown']) { first['hubdown'] = 1; bad.push(`TXR7: the hub is raised ${q.s} mm at ${q.p0.map((x) => x.toFixed(4)).join(',')} where its own normal faces ${q.n[2] < 0 ? 'down' : 'sideways'} — ribs on the hub's TOP only (Eva's named exclusion)`); } }
+      if (!(q.w0 > 0) || q.ridge) continue;
+      if (name === 'hub' && !(q.n[2] > 0)) { if (q.s !== 0 && !first.hubdown2) { first.hubdown2 = 1; bad.push(`TXR7: an excluded hub vertex at ${q.p0.map((x) => x.toFixed(4)).join(',')} is raised ${q.s} mm`); } continue; }
+      const ridgeD = q.ridgeDistMm == null ? Infinity : q.ridgeDistMm;
+      const mc = ridgeD >= lam ? 1 : TX_EASE(ridgeD / lam), fR = F(q.p0);
+      const want = q.w0 * (mc * (C.H * fR));
+      nLaw++;
+      if (!(Math.abs(q.s - want) <= TXR_TOL)) { if (!first['law' + name]) { first['law' + name] = 1; bad.push(`TXR2: ${name}: at ${q.p0.map((x) => x.toFixed(4)).join(',')} the builder raised ${q.s} mm where the law restated here — w0 ${q.w0} x mc ${mc} x H ${C.H} x f ${fR} (atan2/cos restated, law ${C.ribs.law}) — says ${want}`); } }
+    }
+  }
+  if (Object.values(T.organs || {}).some((o) => o.bone && o.bone.displaced > 0) && nLaw === 0) bad.push('TXR2: no sample reached the restated law — the clause cannot run');
+  return bad;
+}
+/* TXR6 and TXR7 on a Node rebuild (they need the build's streams and a twin) */
+export function ribsBuildClauses(ui, opts, exportMode, G = GEOMETRY) {
+  const bad = [];
+  const C = textureControlsRestated(ui);
+  if (!C || C.type !== 'RIBS' || C.infillOn) return bad;
+  const acc = new G.MeshBuilder({ exportMode, boneDetail: 'coarse' });
+  const rec = G.buildBloomInto(acc, ui, opts);
+  const twin = new G.MeshBuilder({ exportMode });
+  const recU = G.buildBloomInto(twin, { ...ui, petalTexture: 'NONE' }, opts);
+  /* TXR7 — the stem block and the centre block, the untextured twin's to the bit */
+  const same = (a, aR, b, bR) => { const n = (aR[1] - aR[0]) * 9; if (n !== (bR[1] - bR[0]) * 9) return `${aR[1] - aR[0]} triangles against the twin's ${bR[1] - bR[0]}`; for (let i = 0; i < n; i++) if (!Object.is(a.positions[aR[0] * 9 + i], b.positions[bR[0] * 9 + i])) return `float ${i} reads ${a.positions[aR[0] * 9 + i]} against the twin's ${b.positions[bR[0] * 9 + i]}`; return null; };
+  const blocks = [['stem', [rec.hubTriEnd, rec.stemTriEnd], [recU.hubTriEnd, recU.stemTriEnd]], ['centre (stamens, style)', rec.centreTriRange, recU.centreTriRange]];
+  for (const [what, a, b] of blocks) { if (!a || !b) { bad.push(`TXR7: the record carries no ${what} range`); continue; } const d = same(acc, a, twin, b); if (d) bad.push(`TXR7: the ${what} block is not the untextured twin's (${d}) — the stem and every rod are Eva's named exclusion`); }
+  const inPass = (rec.t5 && rec.t5.organs) || [];
+  for (const o of inPass) if (RIB_EXCLUDED_ORGANS.includes(o)) { bad.push(`TXR7: the relief pass was handed a ${o} — Eva's named exclusion keeps it out`); break; }
+  /* TXR6 — the centre converges freely: on a FLAT hub, every top vertex within
+     2 mm of the axis is raised H x f, read against the same build relief-off */
+  /* (a style or a stamen roots THROUGH the hub top on the axis and occludes it:
+     the shipped visibility fade runs round each root, so the clause is held on
+     a hub with no centre parts — named, never loosened) */
+  const centreClear = String(ui.gynoecium ?? 'NONE') === 'NONE' && !(Number(ui.stamenCount) > 0);
+  const flat = centreClear && String(ui.hubShape ?? 'CAP') === 'CAP' && !(Number(ui.headRise) > 0) && !(rec.hubBuilt && rec.hubBuilt.absent);
+  if (flat && rec.texture && rec.texture.organs && rec.texture.organs.hub) {
+    const accN = new G.MeshBuilder({ exportMode, boneDetail: 'coarse' });
+    const recN = G.buildBloomInto(accN, ui, { ...opts, capability: { ...(opts.capability || {}), boneNoRelief: true } });
+    const F = ribFieldRestated(C.ribs.law, C.ribs.s);
+    const [h0, h1] = [rec.petalTriEnd, rec.hubTriEnd];
+    if (recN.petalTriEnd !== h0 || recN.hubTriEnd !== h1) bad.push('TXR6: the relief-off build lays the hub elsewhere — the pair is not vertex for vertex');
+    else {
+      /* the window: within 2 mm of the axis AND past the coverage fade's reach
+         from the petal feet's inner edge (read off the untextured twin's petals,
+         an owner the relief does not write) and one lattice edge more, so every
+         vertex in it is at full weight — the apex is always in it */
+      let rFeet = Infinity; for (let i = 0; i < recU.petalTriEnd * 9; i += 3) { const r = Math.hypot(twin.positions[i], twin.positions[i + 1]); if (r < rFeet) rFeet = r; }
+      const win = Math.min(2, rFeet - txFadeWidthRestated(C.H, rec.texture.edgeMm) - rec.texture.edgeMm);
+      let n = 0, worst = 0, at = null;
+      for (let i = h0 * 9; i < h1 * 9; i += 3) {
+        const x = accN.positions[i], y = accN.positions[i + 1], z = accN.positions[i + 2];
+        if (!(Math.hypot(x, y) < win) || z < 0) continue;
+        n++;
+        const d = Math.hypot(acc.positions[i] - x, acc.positions[i + 1] - y, acc.positions[i + 2] - z), want = C.H * F([x, y, z]);
+        if (Math.abs(d - want) > worst) { worst = Math.abs(d - want); at = [x, y, z, d, want]; }
+      }
+      /* TXR9 — THE CENTRE IS THE LAB'S RADIAL HATCH: inside the radius where a
+         fan sector's chord is under one lattice edge, every top vertex of the
+         ribbed hub stands ON one of the untextured hub's own spokes (a ray from
+         the apex through one of its rim vertices) — the rows split of the fan,
+         never the shipped centre's rings, which put vertices between the spokes
+         and alias 63 ribs into a moire */
+      {
+        const spokes = [];
+        for (let i = recU.petalTriEnd * 9; i < recU.hubTriEnd * 9; i += 3) { const x = twin.positions[i], y = twin.positions[i + 1], z = twin.positions[i + 2], r = Math.hypot(x, y); if (z > 0 && r > 1) spokes.push(Math.atan2(y, x)); }
+        const angs = [...new Set(spokes.map((a) => a.toFixed(9)))].map(Number).sort((a, b) => a - b);
+        const nS = angs.length, rIn = nS > 2 ? (TEXTURE_EDGE_MM * nS) / (2 * Math.PI) : 0;
+        let off = 0, seen = 0, worstOff = null;
+        for (let i = h0 * 9; i < h1 * 9; i += 3) {
+          const x = accN.positions[i], y = accN.positions[i + 1], z = accN.positions[i + 2], r = Math.hypot(x, y);
+          if (z < 0 || !(r > 1e-9) || r >= rIn) continue;
+          seen++;
+          const a = Math.atan2(y, x); let best = Infinity; for (const b of angs) { let d = Math.abs(a - b); if (d > Math.PI) d = 2 * Math.PI - d; if (d < best) best = d; }
+          if (best * r > 1e-6) { off++; if (!worstOff) worstOff = [x, y, best * r]; }
+        }
+        if (nS < 8 || !seen) bad.push(`TXR9: the untextured hub top shows ${nS} spokes and the ribbed hub ${seen} vertices inside ${rIn.toFixed(3)} mm — the clause cannot run`);
+        else if (off) bad.push(`TXR9: ${off} of ${seen} hub-top vertices inside ${rIn.toFixed(3)} mm of the axis stand OFF the hub's own ${nS} spokes (first at (${worstOff[0].toFixed(4)}, ${worstOff[1].toFixed(4)}), ${worstOff[2].toExponential(2)} mm off) — the centre is re-meshed (rings), not the rows split that draws the lab's radial hatch`);
+      }
+      if (!n) bad.push(`TXR6: no hub-top vertex within ${win.toFixed(3)} mm of the axis (inside the fade's reach from the feet) — the clause cannot run`);
+      else if (worst > TXR_TOL) bad.push(`TXR6: a hub-top vertex at (${at[0].toFixed(4)}, ${at[1].toFixed(4)}), ${Math.hypot(at[0], at[1]).toFixed(4)} mm from the axis, is raised ${at[3]} mm where H x f restated says ${at[4]} — the centre does not converge freely (a fade, a thinning or a floor at the axis)`);
+    }
+  }
+  return bad;
 }
 export function bonePoreFloorRestated() { return Math.round(Math.ceil((4 * TEXTURE_EDGE_MM / RB_RIM) / RB_STEP - 1e-9) * RB_STEP * 100) / 100; }
 /* TXB0-TXB3 and TXB5 over a build's records (the page's own, or a Node
@@ -6397,8 +6585,11 @@ export async function textureAssertions(page, row) {
   if (!anyBlade && !(row && row.capability && row.capability.noTexture)) bad.push('TX1: the texture is on and no organ carries a textured panel');
   /* BONE (Oct 28): TX2 and TX5 are the retired patterns' own law and BONE
      carries its own (TXB, restated above); TX4, TX7-TX14 hold as they are */
-  const isBone = C.type === 'BONE';
-  if (isBone) for (const msg of boneRecordClauses(ui, T, readout)) bad.push(msg);
+  /* (RIBS, Nov 9) BONE's pass carries RIBS too: TX2/TX5 are the retired
+     patterns' own law, and RIBS's restated law is TXR (above) */
+  const isBone = C.type === 'BONE' || C.type === 'RIBS';
+  if (C.type === 'BONE') for (const msg of boneRecordClauses(ui, T, readout)) bad.push(msg);
+  if (C.type === 'RIBS') for (const msg of ribsRecordClauses(ui, T, readout)) bad.push(msg);
   /* TX2 — the field restated at the builder's own samples */
   const F = isBone ? null : textureFieldRestated(C.type, C.lambda);
   if (!isBone) {
@@ -6557,7 +6748,11 @@ export async function textureAssertions(page, row) {
   for (const msg of textureOrganClauses(ui, opts, exportMode, organs, recT, acc, recU, twinAcc, C, T.edgeMm, pageMesh)) bad.push(msg);
   /* TXB on the Node rebuild too (the owner of the page's numbers is the
      page; these are the rebuild's own), and TXB6's reversed pass */
-  if (isBone && recT.texture) {
+  if (C.type === 'RIBS' && recT.texture) {
+    for (const msg of ribsRecordClauses(ui, recT.texture, null)) bad.push(`(Node rebuild) ${msg}`);
+    if (acc.triangleCount < 600000) for (const msg of ribsBuildClauses(ui, opts, exportMode)) bad.push(msg);
+  }
+  if (C.type === 'BONE' && recT.texture) {
     for (const msg of boneRecordClauses(ui, recT.texture, null, recT)) bad.push(`(Node rebuild) ${msg}`);
     if (acc.triangleCount < 600000) for (const msg of boneOrderClause(ui, opts, acc)) bad.push(msg);
   }
@@ -6679,7 +6874,8 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
      there too — the rule restated, an owner the lattice does not write */
   const decideU = !exportMode && Number(ui.sheetThickness) < GEOMETRY.MIN_FEATURE_MM ? (() => { const a = new GEOMETRY.MeshBuilder({ exportMode: true }); const r = GEOMETRY.buildBloomInto(a, { ...ui, petalTexture: 'NONE' }, opts); return { acc: a, rec: r }; })() : { acc: twinAcc, rec: recU };
   if (recU.hubBuilt && !recU.hubBuilt.absent) want.push(['hub', [[recU.petalTriEnd, recU.hubTriEnd]]]);
-  if (recU.stem && recU.stem.present) want.push(['stem', [[recU.hubTriEnd, recU.stemTriEnd]]]);
+  /* (RIBS) the stem is Eva's named exclusion: it takes no lattice and no record (TXR7) */
+  if (recU.stem && recU.stem.present && C.type !== 'RIBS') want.push(['stem', [[recU.hubTriEnd, recU.stemTriEnd]]]);
   const rings = (recU.tube && recU.tube.rings) || [];
   if (rings.length) want.push(['tube', rings.map((r) => [r.triFrom, r.triTo])]);
   const RT = recT.texture && recT.texture.organs ? recT.texture.organs : {};
@@ -6774,7 +6970,7 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
        relieved sample's weight is the restated ease of its own fade distance
        over that width */
     {
-      const lam = txFadeWidthRestated(Number(ui.textureHeight), edgeMm);
+      const lam = txFadeWidthRestated(isRibsUi(ui) ? ribHeightRestated(ui) : Number(ui.textureHeight), edgeMm);
       if (!(Math.abs(O.fadeMm - lam) <= 1e-9)) bad.push(`TX13: ${name}: the fade is ${O.fadeMm} mm where max(H x 15/8, e) = max(${ui.textureHeight} x 1.875, ${edgeMm}) = ${lam} mm — the fade width is not the derived one`);
       let off = 0, firstOff = null;
       for (const q of o.skinSamples || []) {
@@ -6813,7 +7009,7 @@ export function textureOrganClauses(ui, opts, exportMode, organs, recT, accT, re
        organ record's `cover` does not share; the harness's own segment test,
        its own grid, the relief-withheld mesh; the height from the CONTROL,
        never the builder's record. */
-    const Hc = Number(ui.textureHeight);
+    const Hc = isRibsUi(ui) ? ribHeightRestated(ui) : Number(ui.textureHeight);
     /* (BONE, Eva's Oct 26 ruling) the SEPAL feet cover as the petal feet do */
     const sepalFeet = C.type === 'BONE' && recOff.sepals && recOff.sepals.tiers ? recOff.sepals.tiers.flatMap((Tr) => ((Tr && Tr.built) || []).filter((p) => p && p.triRange).map((p) => p.triRange)) : [];
     const feet = name === 'hub' ? [...(recOff.petalsAll || []).filter((p) => p && p.triRange).map((p) => p.triRange), ...sepalFeet] : [];
@@ -15981,7 +16177,7 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
      [w, w + 2H] — a reading UNDER the law's thickness is the relief thinning
      the sheet, which it may never do, and one past w + 2H is a relief past
      its own height. H is the CONTROL's, never the record's. */
-  const texH = !textureIsAbsent(ui) && !evalPredicate(PREDICATES.infillPresent, ui) ? Math.min(Math.max(Number(ui.textureHeight ?? TEXTURE_HEIGHT_DEFAULT), TEXTURE_HEIGHT_RANGE[0]), TEXTURE_HEIGHT_RANGE[1]) : 0;
+  const texH = !textureIsAbsent(ui) && !evalPredicate(PREDICATES.infillPresent, ui) ? isRibsUi(ui) ? ribHeightRestated(ui) : Math.min(Math.max(Number(ui.textureHeight ?? TEXTURE_HEIGHT_DEFAULT), TEXTURE_HEIGHT_RANGE[0]), TEXTURE_HEIGHT_RANGE[1]) : 0;
   const offLaw = (d, w) => (texH ? (d < w - ROOT_TAPER_FILE_TOL_MM ? d - w : d > w + 2 * texH + ROOT_TAPER_FILE_TOL_MM ? d - w - 2 * texH : 0) : (Math.abs(d - w) > ROOT_TAPER_FILE_TOL_MM ? d - w : 0));
   const texWords = texH ? ` (textured: the band is [w, w + 2 x ${texH} mm], outward only)` : '';
   /* the panel that carries the blade from its root: 'full', the fringe's 'base',
@@ -16058,7 +16254,7 @@ export function rootTaperAssertions(positions, row, m, ui, out = null) {
          weakening on textured rows (a thin plate under its own relief would
          read thick); untextured the line holds exactly the two corners and
          the reading is the shipped one */
-      const relH = ui.petalTexture && ui.petalTexture !== 'NONE' ? Number(ui.textureHeight) || 0 : 0;
+      const relH = ui.petalTexture && ui.petalTexture !== 'NONE' ? (isRibsUi(ui) ? ribHeightRestated(ui) : Number(ui.textureHeight) || 0) : 0;
       const plateT = Math.max(MIN_FEATURE_MM, rec.hubBuilt && typeof rec.hubBuilt.thickness === 'number' ? rec.hubBuilt.thickness : rec.hub.thickness);
       for (let k = 0; k < N && hubT === null; k++) {
         const th = (k * 2 * Math.PI) / N;
@@ -16272,7 +16468,7 @@ export function stemTopClauses(positions, m, ui, row = null) {
      bar for the STEM's vertices carries the height, and the HUB range — whose
      relieved skin IS the head's top skin — is read by name and skipped, ST9's
      precedent (a declared blindness: a relieved hub is TX10's subject). */
-  const relH = ui.petalTexture && ui.petalTexture !== 'NONE' ? Number(ui.textureHeight) || 0 : 0;
+  const relH = ui.petalTexture && ui.petalTexture !== 'NONE' ? (isRibsUi(ui) ? ribHeightRestated(ui) : Number(ui.textureHeight) || 0) : 0;
   const stemRelieved = relH > 0 && !!(m.texture && m.texture.organs && m.texture.organs.stem);
   const hubRelieved = relH > 0 && !!(m.texture && m.texture.organs && m.texture.organs.hub);
   const stemSlack = stemRelieved ? relH : 0;
@@ -16370,7 +16566,7 @@ export function stemChannelAssertions(positions, row, m, ui) {
      and L + H above the stem's LOWEST material within outerR + H, and the tip
      is the control's length below THAT — the same two owners, read through
      the relief. Untextured, H is 0 and this is the shipped search verbatim. */
-  const relH = ui.petalTexture && ui.petalTexture !== 'NONE' ? Number(ui.textureHeight) || 0 : 0;
+  const relH = ui.petalTexture && ui.petalTexture !== 'NONE' ? (isRibsUi(ui) ? ribHeightRestated(ui) : Number(ui.textureHeight) || 0) : 0;
   let tipZ = levels[0][0];
   if (relH > 0) { for (let i = 0; i < positions.length; i += 3) if (Math.hypot(positions[i], positions[i + 1]) <= outerR + relH + TOL && positions[i + 2] < tipZ) tipZ = positions[i + 2]; }
   const rootLevel = levels.find(([z, n]) => n >= 3 && (relH > 0 ? z - (tipZ + lengthMm) >= -1e-2 && z - (tipZ + lengthMm) <= relH + 1e-2 : Math.abs(z - (tipZ + lengthMm)) <= 1e-2));
@@ -22023,6 +22219,46 @@ export function buildMatrix() {
   ]) {
     rows.push({ label: name, set: ringed(sets, layers) });
   }
+
+  /* 87. RIBS — RADIAL SPOKE RIBBING, THE THIRD TEXTURE CHOICE (Nov 9, Eva's
+        rulings; docs/bloom-surface-texture-ribs-shipped.md). One soft wave
+        about the bloom's axis — the October lab's look — law A (a fixed
+        count, fanning: 63 spokes at the default 2.0 mm) the default and law B
+        (constant spacing, branching) a choice; converging freely at the
+        centre; outward only, 0.3 mm the floor (UNVALIDATED for SLS). On the
+        petals, sepals, leaves and the hub's TOP; never on the stem or any rod
+        (Eva's NAMED exclusion — TXR7 holds those blocks to the untextured
+        twin's bytes). The rows: the ruled defaults; law B; the height's
+        maximum both ways; the spacing's ends and Eva's lab screenshot (5.75);
+        leaves and sepals; the exclusion (stem, stamens, style, braid,
+        compound leaf); a dome and the sphere; a tube; three whorls; the thin
+        sheet; an umbel, a raceme and THE MOPHEAD; RIBS beside the infill
+        (refused, told); and the GATED rows — the three at their extremes under
+        NONE and under BONE (hidden AND inert). TX / TXR on every one. */
+  const rb = (label, sets) => rows.push({ label: `RIBS: ${label}`, set: Object.entries({ petalTexture: 'RIBS', ...sets }).map(([id, value]) => ({ id, value: String(value) })) });
+  rb('the ruled defaults (law A, 63 spokes 2.0 mm apart 20 mm out, 0.3 mm — the October lab\'s look)', {});
+  rb('law B (constant spacing near 2.0 mm, branching)', { ribLaw: 'B' });
+  rb('height max (2.5)', { ribHeight: 2.5 });
+  rb('law B x height max (2.5)', { ribLaw: 'B', ribHeight: 2.5 });
+  rb('spacing min (1.6 mm, 79 spokes)', { ribSpacing: 1.6 });
+  rb('spacing max (8 mm, 16 spokes)', { ribSpacing: 8 });
+  rb('law B x spacing max (8 mm)', { ribLaw: 'B', ribSpacing: 8 });
+  rb('5.75 mm spacing (22 spokes: the lab screenshot Eva sent)', { ribSpacing: 5.75 });
+  rb('x 5 sepals and simple leaves on a 60 mm stem (every sheet takes it; the stem and the petioles do not)', { stemLength: 60, sepalCount: 5, leafLength: 30 });
+  rb('x 12 stamens and the style on a 60 mm stem (Eva\'s named exclusion)', { stemLength: 60, stamenCount: 12, gynoecium: 'STYLE' });
+  rb('x the braid (6 strands)', { stamenCount: 6, stamenCoil: 'BRAIDED', gynoecium: 'STYLE' });
+  rb('x a compound leaf on a 60 mm stem (the petiole, rachis and stalks excluded)', { stemLength: 60, leafLength: 30, leafType: 'COMPOUND' });
+  rb('x a domed hub (headRise 0.5)', { headRise: 0.5 });
+  rb('x the SPHERE head x a stem', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 60 });
+  rb('x a closed tube (6 petals, k 0)', { petalCount: 6, tubeLayer1: 0 });
+  rb('x 16 petals x 3 whorls', { petalCount: 16, layerCount: 3 });
+  rb('x sheetThickness 0.60 x a stem x stamens (every count decided on the export twin)', { sheetThickness: 0.6, stemLength: 60, stamenCount: 6 });
+  rb('x an UMBEL, head ON (floret petals and hubs in the world frame, the pedicels excluded)', { inflorescence: 'UMBEL', umbelHead: 'ON', stemLength: 60 });
+  rb('x a RACEME on 120 mm (the pedicels excluded)', { inflorescence: 'RACEME', stemLength: 120 });
+  rb('x THE MOPHEAD (depth 2)', { ...MOP, ...UMBEL_DEPTH2_DEFAULTS });
+  rb('x the VORONOI infill (refused with the word infill, told)', { petalInfill: 'VORONOI' });
+  rows.push({ label: 'RIBS: GATED — the three at their extremes under NONE (hidden AND inert)', set: [{ id: 'ribLaw', value: 'B' }, { id: 'ribSpacing', value: '8' }, { id: 'ribHeight', value: '2.5' }] });
+  rows.push({ label: 'RIBS: GATED — the three at their extremes under BONE (hidden AND inert)', set: [{ id: 'petalTexture', value: 'BONE' }, { id: 'ribLaw', value: 'B' }, { id: 'ribSpacing', value: '8' }, { id: 'ribHeight', value: '2.5' }] });
 
   return rows.map(storedRow);
 }

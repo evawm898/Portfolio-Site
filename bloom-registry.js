@@ -47,6 +47,7 @@ import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WA
   INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
 import { BONE_PORE_RANGE, BONE_PORE_STEP, BONE_PORE_DEFAULT, BONE_PORE_FLOOR_MM, BONE_DENSITY_RANGE, BONE_DENSITY_STEP, BONE_DENSITY_DEFAULT, BONE_RATIO_RANGE, BONE_RATIO_STEP, BONE_RATIO_DEFAULT,
   BONE_COVERAGE_RANGE, BONE_COVERAGE_STEP, BONE_COVERAGE_DEFAULT, BONE_CURVATURE_RANGE, BONE_CURVATURE_STEP, BONE_CURVATURE_DEFAULT, TEXTURE_TYPES_HIDDEN, bonePoreReadsMm } from './bloom-geometry.js';
+import { RIB_LAWS, RIB_LAW_DEFAULT, RIB_HEIGHT_RANGE, RIB_HEIGHT_STEP, RIB_HEIGHT_DEFAULT, RIB_HEIGHT_HELP, RIB_SPACING_RANGE, RIB_SPACING_STEP, RIB_SPACING_DEFAULT, RIB_REF_RADIUS_MM, RIB_EXCLUDED_ORGANS, ribSchedule } from './bloom-geometry.js';
 import { TEXTURE_TYPES, TEXTURE_HEIGHT_RANGE, TEXTURE_HEIGHT_STEP, TEXTURE_HEIGHT_DEFAULT, TEXTURE_SIZE_RANGE, TEXTURE_SIZE_STEP, TEXTURE_SIZE_DEFAULT, TEXTURE_EDGE_MM, TEXTURE_LATTICE_BAR, TEXTURE_HEIGHT_HELP } from './bloom-geometry.js';
 import { STAMEN_LENGTH_RANGE, STAMEN_LENGTH_VARIANCE_RANGE, STAMEN_COIL_RADIUS_RANGE, STAMEN_COIL_TURNS_RANGE, STAMEN_COIL_RADIUS_DEFAULT, STAMEN_COIL_TURNS_DEFAULT } from './bloom-geometry.js';
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS, SEPAL_TWIN_BOUNDS, sepalOutlineWidthScale, SEPAL_LENGTH_RANGE, SEPAL_WIDTH_RANGE, SEPAL_TIER_RANGE, SEPAL_TIER_DEFAULT } from './bloom-geometry.js';
@@ -858,7 +859,11 @@ export const PREDICATES = {
      `textureIsAbsent`, checked against it at harness load (the infill's
      relation). ONE TERM: the guard is a CHOICE whose off value is NONE, so
      the blanket sweep never reaches it and `ALL MAX` stays untextured. */
-  texturePresent: { all: [{ id: 'petalTexture', oneOf: ['BONE', 'PEBBLE', 'CELLULAR'] }] },
+  texturePresent: { all: [{ id: 'petalTexture', oneOf: ['BONE', 'RIBS', 'PEBBLE', 'CELLULAR'] }] },
+  /* RIBS (Nov 9): the third shown choice, with its own height (0.3 mm floor) */
+  textureRibs: { all: [{ id: 'petalTexture', oneOf: ['RIBS'] }] },
+  /* the shared height slider: every textured choice but RIBS (which reads ribHeight) */
+  textureHeightLive: { all: [{ id: 'petalTexture', oneOf: ['BONE', 'PEBBLE', 'CELLULAR'] }] },
   /* BONE (Oct 28) and the two it REPLACED in the dropdown, kept for saved designs */
   textureBone: { all: [{ id: 'petalTexture', oneOf: ['BONE'] }] },
   textureLegacy: { all: [{ id: 'petalTexture', oneOf: ['PEBBLE', 'CELLULAR'] }] },
@@ -2698,6 +2703,7 @@ export const CONTROLS = [
     options: [
       { value: 'NONE', label: 'None (a smooth sheet)' },
       { value: 'BONE', label: 'Bone' },
+      { value: 'RIBS', label: 'Ribs (radial spokes)' },
       { value: 'PEBBLE', label: 'Pebble (retired — kept for saved designs)', hidden: true },
       { value: 'CELLULAR', label: 'Cellular (retired — kept for saved designs)', hidden: true },
     ],
@@ -2714,6 +2720,13 @@ export const CONTROLS = [
         const parts = Object.entries(o).filter(([, q]) => q.bone).map(([k, q]) => `${k} ${q.bone.displaced}`);
         const sm = (B.smoothRods || []).length;
         return `bone over ${parts.join(', ') || 'nothing'} (vertices raised) — outward only, pore floors on the sheet, ${T.heightMm.toFixed(2)} mm peak to valley on a ${T.edgeMm.toFixed(2)} mm lattice; smooth where the surface curves past ${B.curvature !== undefined ? B.curvature.toFixed(2) : '—'}/mm and outside the patches${sm ? ` · ${sm} rod${sm === 1 ? '' : 's'} left smooth by the curvature mask` : ''}`;
+      }
+      if (String(v) === 'RIBS') {
+        if (!T) return 'radial ribs — not built on this bloom';
+        if (T.refused === 'infill') return 'ribs — NOT BUILT: the petals are infilled, and texture and infill are exclusive (Q9); told, not picked';
+        const o = T.organs || {};
+        const parts = Object.entries(o).filter(([, q]) => q.bone).map(([k, q]) => `${k} ${q.bone.displaced}`);
+        return `radial ribs over ${parts.join(', ') || 'nothing'} (vertices raised) — one soft wave about the bloom's axis, outward only, converging freely at the centre; never on the stem or a rod (Eva's named exclusion)`;
       }
       const word = String(v) === 'PEBBLE' ? 'pebble (retired)' : 'cellular (retired)';
       if (!T) return `${word} relief over the petals, sepals and leaves — not built on this blade`;
@@ -2742,7 +2755,42 @@ export const CONTROLS = [
       return `${h.toFixed(2)} mm peak to valley${floor}${deep} · the sheet stands up to ${mx.toFixed(3)} mm proud, never thinner`;
     },
     help: TEXTURE_HEIGHT_HELP,
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'texturePresent' } },
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureHeightLive' } },
+  /* RIBS'S THREE (Nov 9, Eva's rulings). Every range IMPORTED. The spacing law
+     is a CHOICE (A the default; B an alternative); the height is RIBS's own,
+     its floor 0.3 mm (BONE keeps 0.4), UNVALIDATED for SLS. */
+  { id: 'ribLaw', section: 'texture', kind: 'choice', default: RIB_LAW_DEFAULT,
+    options: [
+      { value: 'A', label: 'Fixed count — spokes fan out (A)' },
+      { value: 'B', label: 'Constant spacing — spokes branch (B)' },
+    ],
+    label: 'Rib spacing',
+    fmt: (v, ui) => {
+      const s = Number(ui && ui.ribSpacing || RIB_SPACING_DEFAULT);
+      if (String(v) === 'A') { const K = ribSchedule('A', s).n0; return `${K} spokes, a fixed count: ${s.toFixed(2)} mm apart ${RIB_REF_RADIUS_MM} mm from the axis, wider outward, converging freely at the centre`; }
+      return `constant spacing near ${s.toFixed(2)} mm: four spokes at the centre, doubling outward, each new rib growing over one spacing`;
+    },
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureRibs' } },
+  { id: 'ribSpacing', section: 'texture', kind: 'slider',
+    min: RIB_SPACING_RANGE[0], max: RIB_SPACING_RANGE[1], step: RIB_SPACING_STEP, default: RIB_SPACING_DEFAULT,
+    label: 'Spacing',
+    fmt: (v, ui) => String(ui && ui.ribLaw || RIB_LAW_DEFAULT) === 'A'
+      ? `${Number(v).toFixed(2)} mm between crests at ${RIB_REF_RADIUS_MM} mm from the axis (${ribSchedule('A', Number(v)).n0} spokes)`
+      : `${Number(v).toFixed(2)} mm between crests, held near-constant by branching`,
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureRibs' } },
+  { id: 'ribHeight', section: 'texture', kind: 'slider',
+    min: RIB_HEIGHT_RANGE[0], max: RIB_HEIGHT_RANGE[1], step: RIB_HEIGHT_STEP, default: RIB_HEIGHT_DEFAULT,
+    label: 'Rib height',
+    fmt: (v, ui, shown) => {
+      const h = Number(v);
+      const floor = h <= RIB_HEIGHT_RANGE[0] + 1e-9 ? ' — the floor, UNVALIDATED for SLS (under the ~0.35-0.4 mm detail it is assumed to resolve)' : '';
+      const T = shown && shown.texture;
+      if (!T || T.refused || T.type !== 'RIBS') return `${h.toFixed(2)} mm peak to valley${floor}`;
+      const mx = Math.max(0, ...Object.values(T.organs || {}).map((q) => q.reliefMaxMm));
+      return `${h.toFixed(2)} mm peak to valley${floor} · the sheet stands up to ${mx.toFixed(3)} mm proud, never thinner`;
+    },
+    help: RIB_HEIGHT_HELP,
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'textureRibs' } },
   /* THE FEATURE SIZE: its floor is four lattice edges (λ >= 4e, §10 T3). */
   { id: 'textureSize', section: 'texture', kind: 'slider',
     min: TEXTURE_SIZE_RANGE[0], max: TEXTURE_SIZE_RANGE[1], step: TEXTURE_SIZE_STEP, default: TEXTURE_SIZE_DEFAULT,

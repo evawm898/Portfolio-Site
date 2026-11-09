@@ -217,6 +217,9 @@ const ROW_DEF_MOVED_BY_PRED = {
     },
   },
   bone: { added: 20, rows: {} },
+  /* RIBS (Nov 9): block 87's twenty-three rows; no base row is redefined — the
+     choice guard keeps every slider sweep where it was. */
+  ribs: { added: 23, rows: {} },
   /* BONE v2 (Nov 2): no row added; block 79's three TEXTURE CAP rows are
      redefined (their states no longer reach the 2.0 M cap) and block 82's
      ruled-defaults, maxima, minima, 40 x 3 and two GATED rows take v2's ranges. */
@@ -362,6 +365,13 @@ const PREDICATE_MOVERS = {
      PEBBLE / CELLULAR take their shipped expressions by branch. Written from
      the CONTROLS, never from either tree's guard. */
   bone: (st) => String(st.petalTexture) === 'BONE' && String(st.petalInfill ?? 'NONE') === 'NONE',
+  /* RIBS (Nov 9): a row moves iff its texture is RIBS and the infill is NONE —
+     and every such row is one of block 87's ADDED rows, which the base tree
+     cannot build, so on the base's own rows the predicate names NO mover: every
+     shipped row (BONE, PEBBLE, CELLULAR, the default) holds to the bit. The
+     three branches RIBS adds (the hub's centre fan, the stem's lattice, the
+     rods' capture) are each `ribs`-guarded, and this is their witness. */
+  ribs: (st) => String(st.petalTexture) === 'RIBS' && String(st.petalInfill ?? 'NONE') === 'NONE',
   /* BONE v2 (Nov 2) — the v2 field, the hybrid mesher, coarse/full, and the
      ONE export cap (EXPORT_TRI_CAP, 2,000,000, provisional, Eva's PreForm
      ruling) replacing the 1,500,000 budget. A row moves iff (a) its texture is

@@ -2110,6 +2110,44 @@ export const SMOKE_BLOCKS = [
         path: "PC6 the SPIRAL legibility flag on turn 3's own 5 (the global 8 is not under it), SV1 each turn's golden-angle sequence from its phase" },
     ],
   },
+  {
+    n: 87, title: 'RIBS — radial spoke ribbing, the third texture choice (Nov 9)',
+    anchor: "RIBS: the ruled defaults (law A, 63 spokes 2.0 mm apart 20 mm out, 0.3 mm — the October lab's look)",
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       RIBS arm of `textureFor` (its own field, no patch mask, no BONE v2
+       record), the named exclusion inside BONE's one deferred pass (no rod
+       captured, the stem not latticed, the hub's underside carrying nothing),
+       the hub's centre fan on the rows split rather than rings (the lab's
+       radial hatch), law B's branching schedule, and the read-out's ribs line.
+       The anchor is the ruled defaults (the petals and the hub top); the
+       subset adds law B at the height's maximum, the exclusion (a stem,
+       stamens and the style), a compound leaf (petiole, rachis, stalks), the
+       sepals and leaves, the sphere's poles, an umbel's florets in the world
+       frame, the infill refusal and a GATED row. --conn is REQUIRED: the
+       relief must not open a gap at any join, and the voxel fill is that
+       witness. */
+    conn: true,
+    rows: [
+      { label: "RIBS: the ruled defaults (law A, 63 spokes 2.0 mm apart 20 mm out, 0.3 mm — the October lab's look)",
+        path: "TXR1 every sample raised outward along its own normal and never past H, TXR3 the bead and the nib ridges raising nothing (the curvature mask at 1/mm), TXR0 the record against the controls (law, spacing, the 0.3 mm height, the fade, the curvature at BONE's default, no detail split, the read-out's words), TXR2 the soft field restated through Math.atan2 and Math.cos on every sample, TXR6 the centre converges freely (every hub-top vertex within 2 mm of the axis raised H x f), TXR7 the hub's underside raises nothing, TXR8 law A's 63 spokes restated, TX10 the hub's lattice (its centre fan on the rows split)" },
+      { label: 'RIBS: law B x height max (2.5)',
+        path: "TXR8 law B's 4 x 2^L schedule level by level and its one-spacing emergence, TXR2 the branching field restated, TXR6 at 2.5 mm, TX1 the relief within the 2.5 mm peak" },
+      { label: "RIBS: x 12 stamens and the style on a 60 mm stem (Eva's named exclusion)",
+        path: "TXR7 the stem block and the centre block (stamens, style) the untextured twin's to the bit, and no excluded organ in the pass; TX10 the stem expected absent under RIBS" },
+      { label: 'RIBS: x a compound leaf on a 60 mm stem (the petiole, rachis and stalks excluded)',
+        path: "TXR2 the leaflets' sheets on the one field, TXR7 the stem block unmoved and no rod in the pass" },
+      { label: 'RIBS: x 5 sepals and simple leaves on a 60 mm stem (every sheet takes it; the stem and the petioles do not)',
+        path: "TXR2 the sepal and leaf sheets on the one field, TX12 the hub under the sepal feet covered" },
+      { label: 'RIBS: x the SPHERE head x a stem',
+        path: "TXR2 the hub's top half on the one field, TXR7 its lower half (its own normal down) raising nothing" },
+      { label: 'RIBS: x an UMBEL, head ON (floret petals and hubs in the world frame, the pedicels excluded)',
+        path: "TXR2 the floret petals and hubs relieved in the WORLD frame on the parent's one pass, TXR7 the pedicels not in the pass" },
+      { label: 'RIBS: x the VORONOI infill (refused with the word infill, told)',
+        path: "TX6 the texture refused with the word infill and told on the read-out" },
+      { label: 'RIBS: GATED — the three at their extremes under BONE (hidden AND inert)',
+        path: "TX0 the registry and the guard agree; TXB0 BONE's own record, untouched by the three" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

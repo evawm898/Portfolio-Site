@@ -2859,6 +2859,7 @@ function lobeLine(petals) {
 function textureLine(T) {
   if (!T) return '';
   if (T.type === 'BONE') return boneLine(T);
+  if (T.type === 'RIBS') return ribsLine(T);
   const word = T.type === 'PEBBLE' ? 'PEBBLE (retired)' : 'CELLULAR (retired)';
   if (T.refused === 'infill') return `TEXTURE NOT BUILT — ${word} asked while the petals are INFILLED: texture and infill are exclusive (Q9); told, not picked. Set one of them to None.\n`;
   const organs = Object.entries(T.organs || {});
@@ -2916,6 +2917,29 @@ function boneLine(T) {
     ? `FULL DETAIL — ${fmtTris(F.tris)} tris, ${(100 * F.tris / F.capTris).toFixed(1)}% of the ${fmtTris(F.capTris)} cap (provisional); full pores on ${(100 * F.fullShare).toFixed(1)}% of the porous area (${F.selectedCells} of ${F.cells} cells, ranked by their exposure to the viewing hemisphere — where the surface shows), the rest COARSE${F.allFullTris <= F.capTris ? ' (everything fits: no cell left coarse)' : ` (all full would be ${fmtTris(F.allFullTris)})`}${F.fits ? '' : ' — DOES NOT FIT'}`
     : 'COARSE PREVIEW — the pores drawn at the 0.4 mm lattice\'s own vertices (unround, v1\'s cost); "Full detail" and the export draw them round with their own rings where they show';
   return `TEXTURE BONE v2: ${detail}. ${T.heightMm.toFixed(2)} mm peak to valley${T.heightMm > 1.5 + 1e-9 ? ' (DEEP: the smallest pores are blind wells, UNVALIDATED for powder removal)' : ''}, merging pores ${Number(B.poreMm).toFixed(2)} to ${Number(B.largePoreMm).toFixed(2)} mm with nested pits, ${edgeWords}${clamp}, outward only, pore floors on the sheet — ${parts.join(' · ') || 'no organ carries it'}${smWords}. Smooth where the surface curves tighter than ${(1 / B.curvature).toFixed(2)} mm and outside the patches; the relief fades in over ${Number(B.fadeMm).toFixed(2)} mm.\n`;
+}
+/* THE RIBS LINE (Nov 9): the law and its spokes, every organ's raised
+   vertices and why the rest are smooth, Eva's named exclusion, and that the
+   view IS the export (no refinement past the lattice, so no "Full detail"). */
+function ribsLine(T) {
+  if (T.refused === 'infill') return 'TEXTURE NOT BUILT — RIBS asked while the petals are INFILLED: texture and infill are exclusive (Q9); told, not picked. Set one of them to None.\n';
+  const B = T.bone || {}, R = T.ribs || {};
+  const fmtTris = (n) => Number(n).toLocaleString('en-US');
+  const organs = Object.entries(T.organs || {}).filter(([, q]) => q.bone);
+  const parts = organs.map(([k, q]) => {
+    const b = q.bone;
+    const lat = q.organ ? `${fmtTris(q.organ.shippedTris)} -> ${fmtTris(q.organ.refinedTris)} tris, ` : '';
+    const hidden = b.sheet ? '' : `, ${b.buried} buried${b.covered ? `, ${b.covered} covered by a foot` : ''}`;
+    return `${k}: ${lat}${b.displaced} of ${b.vertices} vertices raised (${b.ridgeOff} on a ridge${hidden}), up to ${q.reliefMaxMm.toFixed(3)} mm`;
+  });
+  const C = T.edgeCap;
+  const edgeWords = C && C.pinned ? `on a ${T.edgeMm.toFixed(2)} mm lattice (PINNED by a capability hook — the budget cap is off)`
+    : C && C.usedMm !== C.askedMm
+      ? `on a ${C.usedMm.toFixed(2)} mm lattice — COARSENED from the ruled ${C.askedMm.toFixed(2)} mm to fit the ${fmtTris(C.budget)} export budget (${C.trials.map((t) => `${t.edgeMm.toFixed(2)} mm: ${fmtTris(t.tris)}`).join(', ')}; the finest edge that fits, never past ${C.capMm.toFixed(2)})${C.fits ? '' : ` — EVEN ${C.capMm.toFixed(2)} mm DOES NOT FIT (${fmtTris(C.trials[C.trials.length - 1].tris)} tris): the export will be REFUSED`}`
+      : `on the ${T.edgeMm.toFixed(2)} mm lattice`;
+  const law = R.law === 'A' ? `law A, ${R.spokes} spokes (a fixed count, ${Number(R.spacingMm).toFixed(2)} mm apart ${R.refRadiusMm} mm out, fanning)` : `law B, constant spacing near ${Number(R.spacingMm).toFixed(2)} mm (4 spokes at the centre, doubling outward)`;
+  const clamp = (T.heightClamped ? ' · height CLAMPED to its range' : '') + (T.sizeClamped ? ' · spacing CLAMPED to its range' : '');
+  return `TEXTURE RIBS: ${law}, a soft wave ${T.heightMm.toFixed(2)} mm peak to valley${T.heightMm <= 0.3 + 1e-9 ? ' (the 0.3 mm floor, UNVALIDATED for SLS)' : ''}, ${edgeWords}${clamp}, outward only, converging freely at the centre — ${parts.join(' · ') || 'no organ carries it'}. NEVER on the stem or a rod (stamens, style, braid, pedicels, petioles, stalks — Eva's named exclusion), nor the hub's underside. Smooth where the surface curves tighter than ${(1 / B.curvature).toFixed(2)} mm (the bead, the nib) and under the feet; the relief fades in over ${Number(B.fadeMm).toFixed(2)} mm. The view IS the export: ribs need no refinement past the lattice, so there is no "Full detail" build.\n`;
 }
 function infillLine(petals) {
   const F = petals && petals[0] && petals[0].infill;
