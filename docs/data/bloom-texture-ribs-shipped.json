@@ -190,5 +190,61 @@
    "nearAxisFolds": 0,
    "degenerateBarMm2": 1e-9
   }
+ ],
+ "browser": [
+  {
+   "key": "default",
+   "law": "A",
+   "chromiumMs": 654,
+   "nodeMs": 916,
+   "tris": 161200,
+   "agree": true,
+   "heapGB": 0.1
+  },
+  {
+   "key": "default",
+   "law": "B",
+   "chromiumMs": 623,
+   "nodeMs": 820,
+   "tris": 161200,
+   "agree": true,
+   "heapGB": 0.09
+  },
+  {
+   "key": "umbel",
+   "law": "A",
+   "chromiumMs": 2277,
+   "nodeMs": 2975,
+   "tris": 478294,
+   "agree": true,
+   "heapGB": 0.23
+  },
+  {
+   "key": "umbel",
+   "law": "B",
+   "chromiumMs": 2156,
+   "nodeMs": 2677,
+   "tris": 478294,
+   "agree": true,
+   "heapGB": 0.23
+  },
+  {
+   "key": "mophead",
+   "law": "A",
+   "chromiumMs": 24618,
+   "nodeMs": 30578,
+   "tris": 1970874,
+   "agree": true,
+   "heapGB": 0.89
+  },
+  {
+   "key": "mophead",
+   "law": "B",
+   "chromiumMs": 24297,
+   "nodeMs": 29848,
+   "tris": 1970874,
+   "agree": true,
+   "heapGB": 0.95
+  }
  ]
 }

@@ -155,7 +155,18 @@ microns apart), but none degenerates and none folds. At 2.5 mm the centre reads 
 row 6): the wave averages 0.5 at the axis, so the hub top stands about H/2 there. That is what converging
 freely builds, and it is not clamped.
 
-BROWSER_PLACEHOLDER
+**Release build in Chromium** (the page's own module, EXPORT, one build; the float32 hash against Node's):
+
+| state | law A | law B | Node | engines agree |
+|---|---|---|---|---|
+| default | 0.65 s | 0.62 s | 0.8–0.9 s | yes, to the float32 |
+| umbel | 2.28 s | 2.16 s | 2.7–3.0 s | yes |
+| mophead | **24.6 s** | 24.3 s | 30–31 s | yes (heap 0.9 GB) |
+
+- RIBS has no full-detail build, so this is both the release build and the export.
+- The mophead's 24 s is a held slider's cost on that state: drag-light drops only the infill, and a
+  mophead has none. That is the same open question the mophead's own §12b recorded for its untextured
+  11–17 s.
 
 ## 5. Edges: the shipped rules, reported, not special-cased
 
@@ -231,7 +242,15 @@ It is spawned by `verify-bloom-defaults-bar.mjs` in both arms, so it rides in CI
 **Byte partition** (`verify-bloom-surface-bytes --movers-predicate ribs`, against a worktree of
 `0458880`, both modes):
 
-BYTES_PLACEHOLDER
+- **Predeclared from the guard predicate:** a row moves iff it builds RIBS with the infill off. That is
+  exactly block 87's 23 rows, all ADDED, and none has a base counterpart. Every other row is a holder:
+  every BONE, PEBBLE and CELLULAR row, and the shipping default. No row definition moved.
+- **Rows 0–599: PASS.** 0 floats moved on the 600 holders, positionally under `Object.is`, over
+  858,053,196 export floats and 65,498,834 captured-grid values in both modes.
+- **Rows 600–1,707 were still running when this commit was pushed.** They are reported in the PR
+  conversation.
+- Every change made to `bloom-geometry.js` after that run started sits inside a `T.ribs` branch (the
+  owner key, the shared flag), so no holder's bytes can depend on it.
 
 **`frozen/phase96`** is the 1,685 rows at `0458880`, registered in both maps.
 
