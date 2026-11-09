@@ -58,7 +58,7 @@ await page.addStyleTag({ content: '.fr-panel,.fr-header,.fr-viewtoggle{display:n
 await page.evaluate(() => window.__frame.setView('3d'));
 await page.waitForFunction(() => window.__frame.view() === '3d' && window.__frame.view3dInk() !== null, null, { timeout: 60000 });
 
-const FRONT = { dir: [0, 0, 1], radius: 330 };
+const FRONT = { dir: [0, 0, 1], radius: 385 };
 const ON = { filigree: 'scrolls' };
 const at = (anchor, dir, radius) => ({ anchor, dir, radius });
 const CREST = { arch: 'apex', rectangle: 'topCentre', oval: 'topCentre' };
