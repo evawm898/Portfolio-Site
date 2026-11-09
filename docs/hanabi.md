@@ -20,6 +20,16 @@ them: **the corner index is constant across the deck, and the centre varies per 
   - `tier`: `none` / `rosettes` — a second tier under a `single` burst at ranks 4 and 5 (the
     catalogue's two-part cards, item 21).
 
+The rainbow suit adds one more choice: `suit.numeral` — `solid` (the suit's primary, the
+default) or `rainbow` (Eva, Nov 9). The rainbow numeral runs top to bottom through the OTHER
+suits' primaries in hue order from red, leaving out near-greys (white has no hue), so it
+follows the deck when a suit is recoloured; with fewer than two hued suits it uses a fixed
+spectrum. The gradient is in the numeral's own 60 × 100 box (`userSpaceOnUse`), because a
+bounding-box gradient on a "1" has almost no width to run across. The symbol under it stays
+the suit colour. Its halo is decided by the stop that stands off the card worst. Under the
+band index the control is disabled: the band is already the rainbow and the numeral is ink on
+it. A saved file without the field reads as `solid`; an unknown value is told.
+
 A version-1 file's `layout` A/B/C is read as (large, single), (small, count), (band, bleed)
 on every suit, and is told. **Every phase-1 face renders byte-identically under that reading**
 — measured over 3,564 faces (all three layouts × three corner modes × three sizes, with and
@@ -116,10 +126,10 @@ each face sheet, each back in the slot mirrored for a long- or short-edge flip.
 
 ## Verify
 
-`node tools/verify-hanabi.mjs` — H1–H13 in Node, B1–B5 in Chromium (the PDF is rasterised by
+`node tools/verify-hanabi.mjs` — H1–H14 in Node, B1–B6 in Chromium (the PDF is rasterised by
 `pdftoppm` and its crop marks and edges read against an imposition RESTATED in the gate).
 H10 holds the corner index to one style across suits, H11 a suit's centre to its own cards,
-H12 the tier to ranks 4–5 and clear of the index, H13 every motif to its box — read off every
+H12 the tier to ranks 4–5 and clear of the index, H13 every motif to its box, H14 the rainbow numeral (B6 its control) — read off every
 point it draws (paths are absolute M/L/Q/C/Z by contract, and the gate refuses anything else).
-`--negative-control` runs fifteen mutants; `--keep <dir>` saves the PDFs. Not in CI.
+`--negative-control` runs eighteen mutants; `--keep <dir>` saves the PDFs. Not in CI.
 Dev deps: `npm i --no-save jspdf@2.5.1 jszip@3.10.1 playwright-core`; needs `pdfinfo`/`pdftoppm`.

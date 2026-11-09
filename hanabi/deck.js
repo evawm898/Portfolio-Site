@@ -35,6 +35,11 @@ export const SIZE_LIMITS = { min: 30, max: 140 };   // custom size bounds, mm
 export const BLEED_LIMITS = { min: 0, max: 5 };
 export const SAFE_LIMITS = { min: 0, max: 8 };
 
+// How the rainbow suit's corner numeral is filled: its own primary, or a
+// gradient through the other suits' colours (layout.js numeralColours()).
+// Only a multicolour suit carries the field.
+export const NUMERAL_FILLS = { solid: 'Solid', rainbow: 'Rainbow gradient' };
+
 export const INDEX_STYLES = {
   large: 'Large numeral + symbol',
   small: 'Small numeral + symbol',
@@ -75,7 +80,7 @@ export function defaultSuits() {
     { id: 'blue',    name: 'Blue',    primary: '#3E8EF0', secondary: '#9BD3F7', symbol: 'drop', centre: defaultCentre() },
     { id: 'yellow',  name: 'Yellow',  primary: '#F2C230', secondary: '#FFF0A8', symbol: 'star', centre: defaultCentre() },
     { id: 'green',   name: 'Green',   primary: '#3DBA6B', secondary: '#B6E8A0', symbol: 'triangle', centre: defaultCentre() },
-    { id: 'rainbow', name: 'Rainbow', primary: '#E8D9FF', secondary: '#FFB1E0', symbol: 'sparkle', multicolor: true, centre: defaultCentre() },
+    { id: 'rainbow', name: 'Rainbow', primary: '#E8D9FF', secondary: '#FFB1E0', symbol: 'sparkle', multicolor: true, numeral: 'solid', centre: defaultCentre() },
   ];
 }
 
@@ -185,6 +190,10 @@ export function normaliseDesign(raw, symbolIds) {
       s.secondary = hex(r.secondary, s.secondary);
       if (symbolIds.includes(r.symbol)) s.symbol = r.symbol;
       else notes.push(`suit ${s.id}: unknown symbol "${r.symbol}" — default kept`);
+      if (s.multicolor && r.numeral !== undefined) {
+        if (NUMERAL_FILLS[r.numeral]) s.numeral = r.numeral;
+        else notes.push(`suit ${s.id}: unknown numeral fill "${r.numeral}" — solid kept`);
+      }
       if (legacy) s.centre.layout = legacy.layout;
       else if (r.centre && typeof r.centre === 'object') {
         const c = r.centre;
