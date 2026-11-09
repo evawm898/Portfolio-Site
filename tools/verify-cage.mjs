@@ -131,6 +131,7 @@ async function run(modulePath, { quiet = false } = {}) {
   check('C0c every registry slider default agrees with the default preset (one owner, not two)', G.PARAM_SPEC.filter((s) => s.id in G.PRESETS.bell).every((s) => s.default === G.PRESETS.bell[s.id]));
   check('C0d the default bar sits at or above the print floor, so no floor binds on it', G.DEFAULTS.barMm >= G.MIN_FEATURE_MM && G.PRESET_IDS.every((id) => G.PRESETS[id].barMm === 1.1));
   check('C0e the onion carries a ring in its neck taper (the upper of three, at 0.75 H)', G.PRESETS.onion.ringCount === 3);
+  check('C0f the default cage has plain rings (Eva, Nov 9): no preset names a band', G.DEFAULTS.bandStyle === 'none' && G.PRESET_IDS.every((id) => !('bandStyle' in G.PRESETS[id])));
 
   let sumTris = 0, worstFloor = Infinity;
   for (const cs of cases) {

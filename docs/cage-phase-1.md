@@ -251,8 +251,10 @@ palmette and rosette with the chain motifs has not happened.
 ## 8. Phase 2, step 1 — ring bands: beading and the leaf-tip run (Nov 9)
 
 Eva's ruling (Nov 9): go ahead with **beading and the leaf-tip run only**; the rosette and palmette
-bands wait until /frame places those elements (frame charter §16). Nothing here is the default yet —
-`bandStyle` ships `none`, so a cage with plain rings is the Phase 1 cage to the byte (B0).
+bands wait until /frame places those elements (frame charter §16). **RULED Nov 9, from the sheet: the
+default stays PLAIN** — `bandStyle` ships `none`, so the default cage is the Phase 1 cage to the byte (B0),
+and C0f pins it (no preset names a band). Both styles ship as offered; the leaf-tip run reading as a rope
+at full size was put to Eva with the sheet and not asked to be reworked.
 
 ### 8.1 What is imported, unchanged
 
