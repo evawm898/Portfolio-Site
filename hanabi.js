@@ -4,12 +4,12 @@
 
 import {
   defaultDesign, normaliseDesign, serialiseDesign, activeSuits, cardCounts, deckCards,
-  suitById, symbolClashes, imposition, copyCentreToAll, SIZE_PRESETS, INDEX_STYLES, CENTRE_LAYOUTS, NUMERAL_FILLS,
-  RANKS, COPIES, VERSION,
+  suitById, symbolClashes, imposition, copyCentreToAll, SIZE_PRESETS, INDEX_STYLES, COMPOSE, COUNT_MODES, NUMERAL_FILLS,
+  RANKS, COPIES, VERSION, SCENES, cellHasOverride, cellOf, clearCell, applyArrangementToRank, ITEM_LIMITS,
 } from './hanabi/deck.js';
 import { SYMBOLS, SYMBOL_IDS } from './hanabi/symbols.js';
-import { renderFace, renderBack } from './hanabi/layout.js';
-import { fireworkSpec, MOTIFS, MOTIF_IDS, TIERS, TIER_RANKS } from './hanabi/firework.js';
+import { renderFace, renderBack, placementFor, cellItems } from './hanabi/layout.js';
+import { fireworkSpec, defaultSpec, renderFirework, motifParams, MOTIFS, MOTIF_IDS, TIERS, TIER_RANKS, TYPES, PARAMS } from './hanabi/firework.js';
 import { exportPdf, exportZip, downloadBlob } from './hanabi/export.js';
 
 const STORE_KEY = 'hanabi.design.v1';   // the key predates version 2; normaliseDesign migrates what it holds
@@ -25,7 +25,7 @@ function loadStored() {
   } catch { return defaultDesign(); }
 }
 let design = loadStored();
-let view = { mode: 'suit', suit: 'red', grayscale: false, guides: false, zoom: 150 };
+let view = { mode: 'suit', suit: 'red', grayscale: false, guides: false, zoom: 150, cell: { suit: 'red', rank: 1 }, scope: 'row' };
 try { Object.assign(view, JSON.parse(localStorage.getItem(VIEW_KEY) || '{}')); } catch { /* storage unavailable */ }
 
 let saveTimer = 0;
@@ -50,7 +50,7 @@ function motifOptions() {
   return Object.entries(groups).map(([g, ids]) => `<optgroup label="${g}">${ids.map((id) =>
     `<option value="${id}">${MOTIFS[id].item ? `${MOTIFS[id].item} · ` : ''}${MOTIFS[id].label}</option>`).join('')}</optgroup>`).join('');
 }
-const CENTRE_SHORT = { single: 'One burst', count: 'Count of bursts', bleed: 'Full bleed' };
+const COMPOSE_SHORT = { count: 'Count', countscale: 'Count + scale', scale: 'Scale', column: 'Column (phase 1)', bleed: 'Full bleed' };
 const motifLabel = (id) => `${MOTIFS[id].item ? `${MOTIFS[id].item} · ` : ''}${MOTIFS[id].label}`;
 function buildSuitRows() {
   const root = $('suitRows');
@@ -67,8 +67,8 @@ function buildSuitRows() {
       <div class="hb-suit__syms" role="group" aria-label="${suit.id} symbol">${SYMBOL_IDS.map((id) =>
         `<button type="button" class="hb-sym" data-sym="${id}" aria-label="${SYMBOLS[id].label}" title="${SYMBOLS[id].label}">${symbolSvg(id)}</button>`).join('')}</div>
       <div class="hb-suit__centre">
-        <label for="c-${suit.id}-layout">Centre</label><label for="c-${suit.id}-motif">Firework</label>
-        <select id="c-${suit.id}-layout" data-c="layout">${Object.keys(CENTRE_LAYOUTS).map((k) => `<option value="${k}" title="${CENTRE_LAYOUTS[k]}">${CENTRE_SHORT[k]}</option>`).join('')}</select>
+        <label for="c-${suit.id}-compose">Rank shown by</label><label for="c-${suit.id}-motif">Firework</label>
+        <select id="c-${suit.id}-compose" data-c="compose">${Object.keys(COMPOSE).map((k) => `<option value="${k}" title="${COMPOSE[k]}">${COMPOSE_SHORT[k]}</option>`).join('')}</select>
         <select id="c-${suit.id}-motif" data-c="motif">${motifOptions()}</select>
         <label for="c-${suit.id}-tier">Second tier, ranks ${TIER_RANKS.join(' and ')}</label>${suit.multicolor
           ? `<label for="c-${suit.id}-numeral">Corner index</label>` : '<span></span>'}
@@ -76,24 +76,27 @@ function buildSuitRows() {
           ? `<select id="c-${suit.id}-numeral" data-n>${Object.entries(NUMERAL_FILLS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>` : ''}
         <button type="button" class="hb-suit__all" data-all>same centre for every suit</button>
       </div>`;
+    // Each handler looks its suit up when it fires: Reset and Load replace the
+    // design, and a suit object captured here would be an orphan after either.
+    const me = () => suitById(design, suit.id);
     row.addEventListener('input', (e) => {
       const fld = e.target.dataset.f;
       if (!fld) return;
-      suit[fld] = fld === 'name' ? (e.target.value || suit.id) : e.target.value.toUpperCase();
+      me()[fld] = fld === 'name' ? (e.target.value || suit.id) : e.target.value.toUpperCase();
       changed();
     });
     row.addEventListener('change', (e) => {
-      if (e.target.matches('[data-n]')) { suit.numeral = e.target.value; changed(); return; }
+      if (e.target.matches('[data-n]')) { me().numeral = e.target.value; changed(); return; }
       const c = e.target.dataset.c;
       if (!c) return;
-      suit.centre[c] = e.target.value;
+      me().centre[c] = e.target.value;
       changed();
     });
     row.addEventListener('click', (e) => {
       if (e.target.closest('[data-all]')) { copyCentreToAll(design, suit.id); changed(); return; }
       const b = e.target.closest('.hb-sym');
       if (!b) return;
-      suit.symbol = b.dataset.sym;
+      me().symbol = b.dataset.sym;
       changed();
     });
     root.appendChild(row);
@@ -109,8 +112,8 @@ function syncSuitRows() {
     }
     for (const sel of row.querySelectorAll('[data-c]')) sel.value = suit.centre[sel.dataset.c];
     const tier = row.querySelector('[data-c=tier]');
-    tier.disabled = suit.centre.layout !== 'single';
-    tier.title = tier.disabled ? 'A second tier sits under a single burst; this centre has none.' : '';
+    tier.disabled = suit.centre.compose !== 'scale';
+    tier.title = tier.disabled ? 'A second tier sits under a single burst (Scale); this centre has none.' : '';
     const num = row.querySelector('[data-n]');
     if (num) {
       num.value = suit.numeral;
@@ -151,6 +154,10 @@ const bindings = [
   bindValue('safe', () => design.safe, (v) => { if (+v >= 0 && +v <= 8) design.safe = +v; }, 'change'),
   bindValue('corners', () => design.corners, (v) => { design.corners = v; }, 'change'),
   bindValue('faceBg', () => design.face.bg.toLowerCase(), (v) => { design.face.bg = v.toUpperCase(); }),
+  bindValue('sceneOn', () => design.scene.on, (v) => { design.scene.on = v; }, 'change'),
+  bindValue('sceneKind', () => design.scene.kind, (v) => { design.scene.kind = v; }, 'change'),
+  bindValue('sceneColor', () => design.scene.color.toLowerCase(), (v) => { design.scene.color = v.toUpperCase(); }),
+  bindValue('sceneHeight', () => Math.round(design.scene.height * 100), (v) => { design.scene.height = +v / 100; }),
   bindValue('backBg', () => design.back.bg.toLowerCase(), (v) => { design.back.bg = v.toUpperCase(); }),
   bindValue('backFg', () => design.back.fg.toLowerCase(), (v) => { design.back.fg = v.toUpperCase(); }),
   bindValue('backPattern', () => design.back.pattern, (v) => { design.back.pattern = v; }, 'change'),
@@ -186,6 +193,8 @@ function syncReadouts() {
   const imp = imposition(design, design.print.paper);
   const sheets = imp.perSheet ? Math.ceil(n.total / imp.perSheet) : 0;
   $('flipRow').hidden = !design.print.duplex;
+  $('sceneRows').hidden = !design.scene.on;
+  $('sceneVal').textContent = design.scene.on ? `${SCENES[design.scene.kind].toLowerCase()}, ${Math.round(design.scene.height * 100)}%` : 'off';
   $('impositionNote').textContent = imp.perSheet
     ? `${imp.paper.label} ${imp.paper.orientation}: ${imp.cols} × ${imp.rows} = ${imp.perSheet} cards a sheet — ${n.total} faces on ${sheets} sheet${sheets === 1 ? '' : 's'}${design.print.duplex ? `, each followed by its back sheet (${2 * sheets} pages)` : ', + 1 sheet of backs'}.`
       + (design.print.cut === 'shared' ? ' Shared cuts: one cut between neighbours; bleed only round the outside.' : ` Each card keeps its ${design.bleed} mm bleed.`)
@@ -199,7 +208,7 @@ function syncReadouts() {
     sel.value = activeSuits(design).some((s) => s.id === cur) ? cur : activeSuits(design)[0].id;
   }
   view.suit = vs.value;
-  vs.hidden = view.mode === 'deck';
+  vs.hidden = view.mode === 'deck' || view.mode === 'fireworks';
   syncSpec();
   syncControls();
 }
@@ -232,23 +241,17 @@ function renderPreview() {
   stage.classList.toggle('is-gray', view.grayscale);
   document.documentElement.style.setProperty('--hb-card-w', `${view.zoom}px`);
   $('guideLegend').hidden = !view.guides;
+  if (view.mode === 'fireworks') { renderBoard(); return; }
+  board.sig = null;
   const suit = suitById(design, view.suit) || activeSuits(design)[0];
   let html = '';
   const withCentre = (patch) => ({ ...design, suits: design.suits.map((s) => (s.id === suit.id ? { ...s, centre: { ...s.centre, ...patch } } : s)) });
   const sep = ' <span class="hb-sep">—</span> ';
   if (view.mode === 'suit') {
-    html = suitRow(design, suit, `<b>${escapeHtml(suit.name)}</b>${sep}${CENTRE_LAYOUTS[suit.centre.layout].toLowerCase()}${sep}${escapeHtml(motifLabel(suit.centre.motif))}`) + extrasRow();
+    html = suitRow(design, suit, `<b>${escapeHtml(suit.name)}</b>${sep}${COMPOSE[suit.centre.compose].toLowerCase()}${sep}${escapeHtml(motifLabel(suit.centre.motif))}`) + extrasRow();
   } else if (view.mode === 'layouts') {
-    for (const L of Object.keys(CENTRE_LAYOUTS)) {
-      html += suitRow(withCentre({ layout: L }), suit, `<b>${CENTRE_LAYOUTS[L]}</b>${sep}${escapeHtml(motifLabel(suit.centre.motif))}${L === suit.centre.layout ? `${sep}in use` : ''}`);
-    }
-  } else if (view.mode === 'fireworks') {
-    // every motif for this suit, as a single burst under the deck's corner index
-    for (const m of MOTIF_IDS) {
-      const M = MOTIFS[m], on = suit.centre.motif === m;
-      const title = `<b>${escapeHtml(motifLabel(m))}</b>${M.ref ? `${sep}catalogue № ${M.ref}` : M.note ? `${sep}${M.note}` : ''}`
-        + `<button type="button" class="hb-pick" data-pick="${m}" aria-pressed="${on}">${on ? `${escapeHtml(suit.name)} uses this` : `use for ${escapeHtml(suit.name)}`}</button>`;
-      html += suitRow(withCentre({ layout: 'single', motif: m, tier: 'none' }), suit, title);
+    for (const L of Object.keys(COMPOSE)) {
+      html += suitRow(withCentre({ compose: L }), suit, `<b>${COMPOSE[L]}</b>${sep}${escapeHtml(motifLabel(suit.centre.motif))}${L === suit.centre.compose ? `${sep}in use` : ''}`);
     }
   } else {
     const cards = deckCards(design);
@@ -260,22 +263,257 @@ function renderPreview() {
   stage.innerHTML = html;
 }
 
+// ---------- the Firework board ----------
+//
+// Rows are the suits in play, columns ranks 1-5; every cell is a live
+// thumbnail of that card's centre art. Clicking a cell opens the editor beside
+// the board. Three levels, each a scope the editor writes to:
+//   the suit's firework (type + parameters)   suit.centre.motif, suit.firework
+//   the rank composition                      suit.centre.compose; the rank
+//                                             column's arrangement under Count
+//   this card                                 design.fireworks[suit][rank],
+//                                             per key, and its own arrangement
+// The editor's controls are rebuilt only when its STRUCTURE changes (another
+// cell, type, composition or scope), so a slider being dragged is never
+// replaced under the pointer; everything else repaints in place.
+const board = { sig: null, drag: null, raf: 0 };
+const fmtParam = (k, v) => (PARAMS[k].unit ? `${Math.round(v)}${PARAMS[k].unit}` : PARAMS[k].step >= 1 ? String(Math.round(v)) : (+v).toFixed(2));
+
+function selCell() {
+  const suits = activeSuits(design);
+  let { suit, rank } = view.cell || {};
+  if (!suits.some((s) => s.id === suit)) suit = suits[0].id;
+  if (!RANKS.includes(rank)) rank = 1;
+  view.cell = { suit, rank };
+  return { suit: suitById(design, suit), rank };
+}
+function selectCell(suitId, rank) { view.cell = { suit: suitId, rank }; persistView(); renderBoard(); }
+
+function motifThumb(suit, m) {
+  const spec = defaultSpec(suit, 5, design.suits, m, 'none', 'scale');
+  return `<svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" fill="${design.face.bg}"/>${renderFirework(spec, { cx: 20, cy: 20, r: 18.5 })}</svg>`;
+}
+
+function boardSkeleton() {
+  const ranks = RANKS.map((r) => `<div class="hb-board__rank">${r}<span class="hb-dim"> ×${COPIES[r]}</span></div>`).join('');
+  const rows = activeSuits(design).map((s) => `<div class="hb-board__suit" data-row="${s.id}"></div>`
+    + RANKS.map((r) => `<button type="button" class="hb-cell" data-cell="${s.id}:${r}"></button>`).join('')).join('');
+  return `<div class="hb-boardwrap">
+    <div class="hb-boardcol">
+      <div class="hb-board__bar"><p class="hb-group__title"><b>Firework board</b> <span class="hb-sep">—</span> every suit × rank</p>
+        <label class="hb-check"><input type="checkbox" id="boardGray"> Greyscale</label></div>
+      <div class="hb-board" role="grid" aria-label="Firework board"><div></div>${ranks}${rows}</div>
+      <p class="hb-note">A dot marks a card with settings of its own. Edits to a suit reach every card in its row that has not overridden that setting.</p>
+    </div>
+    <div class="hb-editor" id="editor" aria-label="Card editor"></div>
+  </div>`;
+}
+
+function paintBoard() {
+  const { suit: sel, rank: selR } = selCell();
+  $('boardGray').checked = view.grayscale;
+  for (const s of activeSuits(design)) {
+    const head = $('stage').querySelector(`[data-row="${s.id}"]`);
+    if (head) head.innerHTML = `<span class="hb-board__sym" style="color:${s.primary}">${symbolSvg(s.symbol)}</span>`
+      + `<span><b>${escapeHtml(s.name)}</b><br><span class="hb-dim">${escapeHtml(MOTIFS[s.centre.motif].label)} · ${COMPOSE_SHORT[s.centre.compose]}</span></span>`;
+    for (const r of RANKS) {
+      const cell = $('stage').querySelector(`[data-cell="${s.id}:${r}"]`);
+      const own = cellHasOverride(design, s.id, r);
+      cell.innerHTML = renderFace(design, { kind: 'card', suitId: s.id, rank: r }, { centreOnly: true, idPrefix: `b${s.id}${r}` })
+        + (own ? '<span class="hb-cell__mark" aria-hidden="true"></span>' : '');
+      cell.setAttribute('aria-pressed', String(s.id === sel.id && r === selR));
+      cell.setAttribute('aria-label', `${s.name} ${r}${own ? ', has its own settings' : ''}`);
+      cell.classList.toggle('is-own', own);
+    }
+  }
+}
+
+function renderBoard() {
+  const stage = $('stage');
+  const suitsSig = activeSuits(design).map((s) => s.id).join();
+  if (!stage.querySelector('.hb-boardwrap') || board.suitsSig !== suitsSig) {
+    stage.innerHTML = boardSkeleton();
+    board.suitsSig = suitsSig; board.sig = null;
+  }
+  paintBoard();
+  const { suit, rank } = selCell();
+  const over = fireworkSpec(design, suit, rank);
+  const sig = [suit.id, rank, over.motif, suit.centre.compose, view.scope].join('|');
+  if (sig !== board.sig) { buildEditor(suit, rank); board.sig = sig; }
+  paintEditor(suit, rank);
+}
+
+function paramControl(k) {
+  const P = PARAMS[k];
+  const clear = `<button type="button" class="hb-clear" data-clear="${k}" title="Back to the suit's value">↺</button>`;
+  if (P.kind === 'bool') return `<label class="hb-param hb-check" data-param="${k}"><input type="checkbox" data-p="${k}"> ${P.label}${clear}</label>`;
+  if (P.kind === 'color') return `<div class="hb-param" data-param="${k}"><label for="p-${k}">${P.label}</label><input type="color" id="p-${k}" data-p="${k}">${clear}</div>`;
+  return `<div class="hb-param" data-param="${k}"><label for="p-${k}">${P.label}</label>`
+    + `<input type="range" id="p-${k}" data-p="${k}" min="${P.min}" max="${P.max}" step="${P.step}"><output data-o="${k}"></output>${clear}</div>`;
+}
+
+function buildEditor(suit, rank) {
+  const spec = fireworkSpec(design, suit, rank), card = view.scope === 'card';
+  const groups = {};
+  for (const id of MOTIF_IDS) (groups[MOTIFS[id].group] ||= []).push(id);
+  const gallery = Object.entries(groups).map(([g, ids]) => `<p class="hb-ed__label">${g}</p><div class="hb-types">${ids.map((m) =>
+    `<button type="button" class="hb-type" data-type="${m}" title="${escapeHtml(MOTIFS[m].label)}${MOTIFS[m].note ? ` — ${escapeHtml(MOTIFS[m].note)}` : ''}">${motifThumb(suit, m)}<span>${escapeHtml(MOTIFS[m].label)}</span></button>`).join('')}</div>`).join('');
+  const counting = COUNT_MODES.includes(suit.centre.compose);
+  $('editor').innerHTML = `
+    <div class="hb-ed__head"><p class="hb-ed__title"><b>${escapeHtml(suit.name)} ${rank}</b></p>
+      <button type="button" class="hb-btn hb-btn--ghost" id="edReset">Reset to suit</button></div>
+    <p class="hb-ed__own" id="edOwn"></p>
+    <div class="hb-ed__card" id="edCard"></div>
+    <p class="hb-note" id="edHint">${counting ? 'Drag a firework to move it; drag its square to resize it and its round handle to turn it.' : 'One firework: switch the row to Count to arrange several.'}</p>
+    ${counting ? `<div class="hb-actions">
+      <button type="button" class="hb-btn hb-btn--ghost" id="edApplyRank">Use for every ${rank}</button>
+      <button type="button" class="hb-btn hb-btn--ghost" id="edResetItems">Reset arrangement</button>
+      <button type="button" class="hb-btn hb-btn--ghost" id="edResetRank">Rank ${rank} column to default</button></div>` : ''}
+    <div class="hb-ed__sec"><p class="hb-ed__label">Rank composition <span class="hb-dim">— ${escapeHtml(suit.name)} row</span></p>
+      <div class="hb-row"><label for="edCompose">Rank shown by</label><select id="edCompose">${Object.keys(COMPOSE).map((k) => `<option value="${k}" title="${COMPOSE[k]}">${COMPOSE_SHORT[k]}</option>`).join('')}</select></div>
+      <div class="hb-row"><label for="edTier">Second tier</label><select id="edTier">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div></div>
+    <div class="hb-ed__sec"><div class="hb-seg" id="edScope" role="radiogroup" aria-label="Edit scope">
+        <button type="button" role="radio" data-scope="row">${escapeHtml(suit.name)} row</button><button type="button" role="radio" data-scope="card">This card only</button></div>
+      <p class="hb-note">${card ? `Changes here belong to ${escapeHtml(suit.name)} ${rank} alone; ↺ hands a setting back to the suit.` : `Changes here reach every ${escapeHtml(suit.name)} card that has not set its own.`}</p>
+      <p class="hb-ed__label">Firework type <span class="hb-dim" id="edTypeName"></span></p>${gallery}
+      <p class="hb-ed__label">Parameters</p><div class="hb-params">${motifParams(spec.motif).map(paramControl).join('') || '<p class="hb-note">This firework has no parameters.</p>'}</div></div>`;
+}
+
+function paintEditor(suit, rank) {
+  const ed = $('editor'); if (!ed.firstElementChild) return;
+  const spec = fireworkSpec(design, suit, rank), own = cellOf(design, suit.id, rank) || {}, card = view.scope === 'card';
+  const counting = COUNT_MODES.includes(suit.centre.compose);
+  const keys = Object.keys(own);
+  $('edOwn').textContent = keys.length ? `Its own ${keys.map((k) => (k === 'items' ? 'arrangement' : PARAMS[k] ? PARAMS[k].label.toLowerCase() : k)).join(', ')}` : `As the ${suit.name} row`;
+  $('edReset').disabled = !keys.length;
+  let svg = renderFace(design, { kind: 'card', suitId: suit.id, rank }, { idPrefix: 'ed' });
+  if (counting) svg = svg.replace(/<\/svg>$/, handlesSvg(placementFor(design, suit, rank)) + '</svg>');
+  $('edCard').innerHTML = svg;
+  $('edCard').classList.toggle('is-gray', view.grayscale);
+  $('edCompose').value = suit.centre.compose;
+  $('edTier').value = suit.centre.tier; $('edTier').disabled = suit.centre.compose !== 'scale';
+  for (const b of $('edScope').children) b.setAttribute('aria-checked', String(b.dataset.scope === view.scope));
+  $('edTypeName').textContent = `— ${MOTIFS[spec.motif].label}${own.motif ? ' (this card)' : ''}`;
+  for (const b of ed.querySelectorAll('[data-type]')) b.setAttribute('aria-pressed', String(b.dataset.type === spec.motif));
+  const rowVal = (k) => { const v = suit.firework[k]; return v !== undefined && v !== '' ? v : defaultSpec(suit, 5, design.suits, spec.motif)[k]; };
+  for (const el of ed.querySelectorAll('[data-p]')) {
+    const k = el.dataset.p, P = PARAMS[k];
+    let v = card ? spec[k] : rowVal(k);
+    if (P.kind === 'color') v = v || (k === 'coreColor' ? spec.colors[1] || spec.colors[0] : spec.colors[0]);
+    else if (v === undefined) v = P.kind === 'bool' ? false : k === 'rotation' ? 0 : P.min;   // a motif with no default of its own
+    if (document.activeElement !== el || el.type === 'checkbox') { if (el.type === 'checkbox') el.checked = !!v; else el.value = P.kind === 'color' ? v.toLowerCase() : v; }
+    const out = ed.querySelector(`[data-o="${k}"]`); if (out) out.textContent = fmtParam(k, v);
+    const has = card ? own[k] !== undefined : suit.firework[k] !== undefined && suit.firework[k] !== '';
+    el.closest('[data-param]').classList.toggle('is-own', has);
+  }
+  for (const [id, on] of [['edApplyRank', true], ['edResetItems', !!own.items], ['edResetRank', !!design.arrangements[rank]]]) if ($(id)) $(id).disabled = !on;
+}
+
+// The drag handles over the editor's card, in card mm.
+function handlesSvg(pl) {
+  const h = Math.max(0.9, pl.unit * 0.07), sw = h * 0.28;
+  return '<g class="hb-handles">' + `<rect x="${pl.field.x}" y="${pl.field.y}" width="${pl.field.w}" height="${pl.field.h}" fill="none" stroke="#2FA3A3" stroke-opacity="0.35" stroke-width="${sw}" stroke-dasharray="${sw * 3} ${sw * 3}" pointer-events="none"/>`
+    + pl.items.map((it, i) => {
+      const a = ((it.rot - 90) * Math.PI) / 180, rx = it.cx + Math.cos(a) * (it.r + h * 2.4), ry = it.cy + Math.sin(a) * (it.r + h * 2.4);
+      return `<circle data-h="move" data-i="${i}" cx="${it.cx}" cy="${it.cy}" r="${it.r}" fill="#FFFFFF" fill-opacity="0.001" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="${sw}" stroke-dasharray="${sw * 2} ${sw * 2}"/>`
+        + `<line x1="${it.cx}" y1="${it.cy}" x2="${rx}" y2="${ry}" stroke="#2FA3A3" stroke-width="${sw}" stroke-opacity="0.6" pointer-events="none"/>`
+        + `<rect data-h="size" data-i="${i}" x="${it.cx + it.r - h}" y="${it.cy - h}" width="${2 * h}" height="${2 * h}" fill="#2FA3A3"/>`
+        + `<circle data-h="rot" data-i="${i}" cx="${rx}" cy="${ry}" r="${h}" fill="#2FA3A3"/>`;
+    }).join('') + '</g>';
+}
+
+function editorWrite(k, v) {
+  const { suit, rank } = selCell();
+  if (view.scope === 'card') cellOf(design, suit.id, rank, true)[k] = v;
+  else suit.firework[k] = v;
+  changed();
+}
+function onEditor(e) {
+  const { suit, rank } = selCell();
+  const t = e.target;
+  if (t.dataset.p) {
+    const P = PARAMS[t.dataset.p];
+    editorWrite(t.dataset.p, P.kind === 'bool' ? t.checked : P.kind === 'color' ? t.value.toUpperCase() : +t.value);
+  } else if (t.id === 'edCompose') { suit.centre.compose = t.value; changed(); }
+  else if (t.id === 'edTier') { suit.centre.tier = t.value; changed(); }
+}
+function onEditorClick(e) {
+  const { suit, rank } = selCell();
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.scope) { view.scope = b.dataset.scope; persistView(); renderBoard(); return; }
+  if (b.dataset.type) {
+    if (view.scope === 'card') { if (b.dataset.type === suit.centre.motif) clearCell(design, suit.id, rank, 'motif'); else cellOf(design, suit.id, rank, true).motif = b.dataset.type; }
+    else suit.centre.motif = b.dataset.type;
+    changed(); return;
+  }
+  if (b.dataset.clear) {
+    if (view.scope === 'card') clearCell(design, suit.id, rank, b.dataset.clear); else delete suit.firework[b.dataset.clear];
+    changed(); return;
+  }
+  if (b.id === 'edReset') { clearCell(design, suit.id, rank); changed(); }
+  else if (b.id === 'edApplyRank') { applyArrangementToRank(design, rank, cellItems(design, suit.id, rank)); changed(); }
+  else if (b.id === 'edResetItems') { clearCell(design, suit.id, rank, 'items'); changed(); }
+  else if (b.id === 'edResetRank') { delete design.arrangements[rank]; changed(); }
+}
+
+// Dragging a firework: the pointer is captured on the card's container (the
+// svg inside it is redrawn on every move), and the cell's own arrangement is
+// written as fractions of the field.
+function svgPoint(e) {
+  const svg = $('edCard').querySelector('svg');
+  return new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+}
+function onDragStart(e) {
+  const h = e.target.closest('[data-h]'); if (!h) return;
+  const { suit, rank } = selCell();
+  const pl = placementFor(design, suit, rank), i = +h.dataset.i, p = svgPoint(e), it = pl.items[i];
+  board.drag = { kind: h.dataset.h, i, pl, items: cellItems(design, suit.id, rank).map((x) => ({ ...x })), dx: p.x - it.cx, dy: p.y - it.cy };
+  $('edCard').setPointerCapture(e.pointerId);
+  e.preventDefault();
+}
+function onDragMove(e) {
+  const d = board.drag; if (!d) return;
+  const p = svgPoint(e), it = d.items[d.i], c = d.pl.items[d.i], F = d.pl.field;
+  const cl = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  if (d.kind === 'move') { it.x = +cl((p.x - d.dx - F.x) / F.w, 0, 1).toFixed(4); it.y = +cl((p.y - d.dy - F.y) / F.h, 0, 1).toFixed(4); }
+  else if (d.kind === 'size') it.s = +cl(Math.hypot(p.x - c.cx, p.y - c.cy) / d.pl.unit, ...ITEM_LIMITS.s).toFixed(3);
+  else { let a = (Math.atan2(p.y - c.cy, p.x - c.cx) * 180) / Math.PI + 90; if (a > 180) a -= 360; it.rot = Math.round(a / 5) * 5; }
+  const { suit, rank } = selCell();
+  cellOf(design, suit.id, rank, true).items = d.items.map((x) => ({ ...x }));
+  if (!board.raf) board.raf = requestAnimationFrame(() => { board.raf = 0; paintBoard(); paintEditor(suit, rank); });
+}
+function onDragEnd() { if (!board.drag) return; board.drag = null; changed(); }
+
+$('stage').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-cell]');
+  if (c) { const [s, r] = c.dataset.cell.split(':'); selectCell(s, +r); return; }
+  if (e.target.closest('#editor')) onEditorClick(e);
+});
+$('stage').addEventListener('input', (e) => { if (e.target.closest('#editor') && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') onEditor(e); });
+$('stage').addEventListener('change', (e) => {
+  if (e.target.id === 'boardGray') { setGray(e.target.checked); return; }
+  if (e.target.closest('#editor') && (e.target.type === 'checkbox' || e.target.tagName === 'SELECT')) onEditor(e);
+});
+$('stage').addEventListener('pointerdown', (e) => { if (e.target.closest('#edCard')) onDragStart(e); });
+// A press on the card must not start a text selection: its autoscroll moves the
+// editor under the pointer mid-drag.
+$('stage').addEventListener('mousedown', (e) => { if (e.target.closest('#edCard [data-h]')) e.preventDefault(); });
+$('stage').addEventListener('pointermove', onDragMove);
+$('stage').addEventListener('pointerup', onDragEnd);
+$('stage').addEventListener('pointercancel', onDragEnd);
+
 // ---------- wiring ----------
 $('indexSeg').addEventListener('click', (e) => {
   const b = e.target.closest('[data-index]'); if (!b) return;
   design.index = b.dataset.index; changed();
-});
-$('stage').addEventListener('click', (e) => {
-  const b = e.target.closest('[data-pick]'); if (!b) return;
-  const suit = suitById(design, view.suit); if (!suit) return;
-  suit.centre.motif = b.dataset.pick; changed();
 });
 $('viewSeg').addEventListener('click', (e) => {
   const b = e.target.closest('[data-view]'); if (!b) return;
   view.mode = b.dataset.view; persistView(); syncReadouts(); renderPreview();
 });
 $('viewSuit').addEventListener('change', (e) => { view.suit = e.target.value; persistView(); renderPreview(); });
-$('grayscale').addEventListener('change', (e) => { view.grayscale = e.target.checked; persistView(); renderPreview(); });
+function setGray(on) { view.grayscale = on; $('grayscale').checked = on; persistView(); renderPreview(); }
+$('grayscale').addEventListener('change', (e) => setGray(e.target.checked));
 $('guides').addEventListener('change', (e) => { view.guides = e.target.checked; persistView(); renderPreview(); });
 $('zoom').addEventListener('input', (e) => {
   view.zoom = +e.target.value; persistView();
@@ -330,6 +568,8 @@ window.__hanabi = {
   design: () => JSON.parse(JSON.stringify(design)),
   setDesign: (d) => { const n = normaliseDesign(d, SYMBOL_IDS); if (n.design) { design = n.design; changed(); } return n.notes; },
   view: () => ({ ...view }),
+  select: (suit, rank) => selectCell(suit, rank),
+  placement: (suit, rank) => placementFor(design, suitById(design, suit), rank),
   exportPdf: (o) => exportPdf(design, o),
   exportZip: (o) => exportZip(design, o),
 };

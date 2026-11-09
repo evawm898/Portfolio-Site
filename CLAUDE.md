@@ -12741,8 +12741,14 @@ Reality toggles. Copy stays generic — no internal product, project or band nam
 Hidden page (`hanabi.html`, `hanabi.css`, `hanabi.js`, `hanabi/*.js`; `noindex`, unlinked). Read
 `docs/hanabi.md` before touching it. Suits carry colour + a SYMBOL each (colour is never the only cue).
 **A face is two choices (Eva, on #528): ONE corner index for the deck (`design.index`: large / small /
-band), and a centre PER SUIT (`suit.centre`: layout single / count / bleed, a firework motif, an optional
-tier at ranks 4–5).** Phase 1's layouts A/B/C are those pairs, and a v1 file migrates byte-identically.
-Motifs are the five originals plus 12 drawn after the Hirayama catalogue; hanging/falling pieces are ruled
-out, and Spark drift / Streamers were removed (Nov 9; one tier left, rosettes). The rainbow suit's corner index (numeral and symbol) is a gradient through the other suits' colours by default (`suit.numeral`, `solid` to turn it off; not under the band index). **`hanabi/firework.js` is the phase-2 slot** — layout code only calls `fireworkSpec()`,
-`renderFirework()` and `renderTier()`. Gate: `node tools/verify-hanabi.mjs` (`--negative-control`), not in CI.
+band), and a centre PER SUIT (`suit.centre`: compose, a firework, an optional tier under Scale).**
+**Phase 2 (schema v3) is the FIREWORK BOARD** — the Fireworks tab: suits × ranks as live thumbnails, an
+editor beside it, three levels of inheritance (suit type + `suit.firework` params → rank composition and
+`design.arrangements[rank]` → the cell's per-key override and own `items` in `design.fireworks`). Rank is
+shown by COUNT by default (`compose`: count / countscale / scale / column / bleed); nine distinct firework
+TYPES (peony, chrysanthemum, ring, willow, palm, crossette, dahlia, glitter, blossom) are pure functions of
+their spec; the default deck gives every suit a different type. **Old designs open unchanged**: v1 A/B/C →
+(scale / column / bleed), v2 single/count/bleed → scale/column/bleed, phase-1 `peony` etc. → `radial-…`;
+H15 renders 9,000+ faces byte-identical to `d5cd4ef` read from git. Hanging/falling pieces stay ruled out.
+Optional scene band (`design.scene`, off). Gate: `node tools/verify-hanabi.mjs` (H1–H20, B1–B8;
+`--negative-control` 39 mutants, `--mutant=a,b` a subset), not in CI.
