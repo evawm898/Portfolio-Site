@@ -32,7 +32,14 @@
    looks along +y from −y, so x reads left to right on the drawing). */
 
 import { curveFunction, curveShapeRefusal, cloneCurve } from './bloom-curve.js';
-import { Mesh, exportStl as writeStl } from './frame-relief.js';
+import { Mesh, exportStl as writeStl, bandSolid, sphereSolid, PATTERN_LAT, PATTERN_LON } from './frame-relief.js';
+/* PHASE 2 — the ring bands consume /frame's band pattern UNCHANGED (docs/frame-charter.md §15):
+   the bead is frame-relief's sphereSolid on its own lattice, the leaf is frame-filigree's
+   buildLeaf swept by frame-relief's bandSolid in its own leaf section, and the rules — beads
+   fused at ≤ BEAD_FUSE × r, a laurel run's pitch inside [LEAF_RUN_PITCH_MIN, MAX] × the leaf,
+   one lobe, sixteen stations — are frame-pattern's own constants, imported, never restated. */
+import { BEAD_FUSE, LEAF_RUN_PITCH_MIN, LEAF_RUN_PITCH_MAX, LEAF_RUN_LOBES, PATTERN_LEAF_STATIONS } from './frame-pattern.js';
+import { buildLeaf, leafProfile, LEAF_ASPECT, LEAF_RELIEF } from './frame-filigree.js';
 
 export const MIN_FEATURE_MM = 1.0;
 export const PRINT_NOTE = `${MIN_FEATURE_MM.toFixed(1)} mm minimum wire, assumed for SLS PA12 (a declared guess: nothing printed yet)`;
@@ -45,7 +52,11 @@ export const CAP_STEP_MM = 1.0;          // and over the top cap, where the curv
    neighbouring bars are ONE PRINTABLE GAP apart (pitch = bar diameter + the floor), never until
    they touch — the pack is derived from the floor and the bar, not typed (phase 1's 1.05-diameter
    pack constant is retired). The collar is a turned BOSS with a bead, and the hanger stands on it. */
-export const SHOULDER_DEG = 25;          // ruling 5: a profile knot whose chords turn by at least this (in mm) is a shoulder and auto-places a ring
+export const SHOULDER_DEG = 25;
+/* A band reads as a band only if its element stands proud of the ring it rides: a bead's
+   diameter, and a leaf's width, are held at or over this multiple of the ring's own diameter
+   (a decision made without a ruling — told when it binds). */
+export const BAND_OVER_RING = 1.25;          // ruling 5: a profile knot whose chords turn by at least this (in mm) is a shoulder and auto-places a ring
 
 /* ---- the profile curve (bloom-curve.js's own kind) ---- */
 export const PROFILE_SPEC = Object.freeze({ modes: ['single'], x: [0, 1], y: [0.08, 1], points: [2, 10], lock: { first: 'x', last: 'x' }, monotoneX: true, owner: 'heightMm' });
@@ -57,6 +68,7 @@ export const SECTIONS = [
   { id: 'top', label: 'Top', open: true },
   { id: 'bars', label: 'Bars', open: true },
   { id: 'rings', label: 'Rings', open: true },
+  { id: 'bands', label: 'Ring bands', open: true },
   { id: 'door', label: 'Door', open: true },
   { id: 'base', label: 'Base', open: false },
   { id: 'hanger', label: 'Hanger', open: false },
@@ -71,6 +83,7 @@ export const PRESET_IDS = ['cylinder', 'bell', 'cone', 'onion', 'tiered', 'hexLa
 export const PRESET_LABELS = { custom: 'Custom', cylinder: 'Cylinder', bell: 'Bell', cone: 'Pyramid / cone', onion: 'Onion', tiered: 'Tiered dome on drum', hexLantern: 'Hex lantern' };
 const notFlat = (p) => p.topShape !== 'flat';
 const hasDoor = (p) => p.doorShape !== 'none';
+const banded = (p) => p.bandStyle && p.bandStyle !== 'none';
 
 export const PARAM_SPEC = [
   C('preset', 'body', 'Preset', ['custom', ...PRESET_IDS].map((k) => [k, PRESET_LABELS[k]]), 'bell'),
@@ -85,6 +98,11 @@ export const PARAM_SPEC = [
   R('ringCount', 'rings', 'Rings between base and top', 0, 8, 1, 3),
   C('ringPlace', 'rings', 'Placement', [['even', 'even'], ['clustered', 'clustered toward the ends']], 'even'),
   R('ringMm', 'rings', 'Ring thickness', 0.8, 4, 0.1, 1.8, 'mm'),
+  C('bandStyle', 'bands', 'Band', [['none', 'plain rings'], ['beading', 'beading'], ['leaf', 'leaf-tip run']], 'none'),
+  C('bandRings', 'bands', 'On', [['all', 'every ring'], ['inner', 'the rings between'], ['ends', 'base and top rings'], ['top', 'top ring only']], 'all', banded),
+  R('beadMm', 'bands', 'Bead diameter', 1.5, 6, 0.1, 3.0, 'mm', (p) => p.bandStyle === 'beading'),
+  R('leafMm', 'bands', 'Leaf length', 3, 14, 0.5, 8, 'mm', (p) => p.bandStyle === 'leaf'),
+  R('bandSpacing', 'bands', 'Spacing (× the bead or leaf; snapped so one sits on every bar)', 0.5, 0.9, 0.01, 0.7, '', banded),
   C('doorShape', 'door', 'Door', [['none', 'none'], ['rect', 'rectangle'], ['arch', 'round arch'], ['gothic', 'gothic point'], ['ogee', 'ogee']], 'arch'),
   R('doorWidth', 'door', 'Door width', 10, 90, 1, 28, 'mm', hasDoor),
   R('doorHeight', 'door', 'Door height', 10, 180, 1, 46, 'mm', hasDoor),
@@ -154,6 +172,9 @@ export function randomParams(seed) {
   pts = pts.map(([x, y], i) => [x, Math.min(1, Math.max(0.3, y + (i && i < pts.length - 1 ? j() : 0)))]);
   p.profile = { mode: 'single', points: pts };
   if (curveShapeRefusal(p.profile, PROFILE_SPEC)) p.profile = cloneCurve(PRESETS.cylinder.profile);
+  // phase 2: drawn LAST, so every field above is the sequence it always was
+  p.bandStyle = pick(['none', 'none', 'beading', 'leaf']); p.bandRings = pick(['all', 'inner', 'ends', 'top']);
+  p.beadMm = within(2, 4.5, 0.1); p.leafMm = within(5, 11, 0.5); p.bandSpacing = within(0.55, 0.85, 0.01);
   return p;
 }
 
@@ -465,7 +486,9 @@ export function buildCage(paramsIn) {
   }
   ringZ.sort((a, b) => a - b);
   if (shoulderZ.length) told.push(`${shoulderZ.length} profile shoulder${shoulderZ.length > 1 ? 's' : ''} (${shoulderZ.map((z) => z.toFixed(0) + ' mm').join(', ')}) carr${shoulderZ.length > 1 ? 'y' : 'ies'} a ring`);
+  const ringRec = [];      // every ring built: { z, r, kind, name, cut } — the bands read it
   const ringLoop = (z, rr, kind, name) => {
+    ringRec.push({ z, r: rr, kind, name, cut: !!(door && z > door.z0 && z < door.top(0)) });
     // a polygon ring samples each face too (16 a face, the corners exact), so a door on a face can cut it
     const M = N ? N * 16 : RING_SECTORS;
     const pts = [];
@@ -489,6 +512,7 @@ export function buildCage(paramsIn) {
   ringLoop(0, rFrame, 'frame', 'base ring');
   ringLoop(H, rFrame, 'frame', 'top ring');
   ringZ.forEach((z, i) => ringLoop(z, rRing, 'ring', `ring ${i + 1}`));
+  const bandOut = banded(p) ? buildBands() : null;
 
   /* the collar at the apex, or the flat top's spokes and hub */
   const rH = wireR(Math.max(p.barMm, 1.2), 'hanger wire');
@@ -575,15 +599,108 @@ export function buildCage(paramsIn) {
     for (let i = 1; i < pts.length; i++) noteSlope(sub(pts[i], pts[i - 1]), 'the hanger ring');
   }
 
+  /* PHASE 2 — THE RING BANDS. Each banded ring carries a running ornament: beads strung on
+     it, or a laurel run of overlapping leaves lying across it. Every element is built by
+     /frame's own code in a flat development (along the ring s, across it t, out of the
+     surface w — the bead in 3D directly) and mapped onto the CONE SEGMENT through the ring:
+     the frustum through the ring's centreline whose slope is the chord of the profile across
+     the band (docs/cage-phase-1.md §5.10 — a bell's sections are not developable; the cylinder
+     and the polygon's faces are exact). On a round section the map is the exact development of
+     that cone (the arc at slant t is θ·r(t)); on a polygon each face is a plane and the along
+     distance x from the face's centre is kept, so it is exact on every face and folds at the
+     corners. THE COUNT SNAPS TO THE BARS: every bar gap holds the same n elements, the first ON
+     the bar (a bead's centre on the bar crossing; a leaf's base), so the motif never runs at a
+     random phase to the bars; told when the built spacing is not the asked one. A ring the door
+     cuts drops every element that would reach into the opening. */
+  function buildBands() {
+    const style = p.bandStyle, out = { style, rings: [], elements: [], sagMax: 0 };
+    const cN = N ? Math.cos(Math.PI / N) : 1, tN = N ? Math.tan(Math.PI / N) : 0;
+    const ra = (z) => rho(z) * cN;                       // the apothem (the radius on a round cage)
+    const want = (rg) => p.bandRings === 'all' || (p.bandRings === 'inner' && rg.kind === 'ring') || (p.bandRings === 'ends' && rg.kind === 'frame') || (p.bandRings === 'top' && rg.name === 'top ring');
+    const snapped = [], raised = [];
+    const barTh = Array.from({ length: barCount }, (_, j) => TAU * j / barCount);
+    for (const rg of ringRec) {
+      if (!want(rg)) continue;
+      const zc = rg.z, rr = rg.r;
+      // the element, floored and held proud of its ring
+      let size, half, loF, hiF;
+      if (style === 'beading') { size = Math.max(p.beadMm, floor, BAND_OVER_RING * 2 * rr); if (size > p.beadMm + 1e-9) raised.push(`${rg.name} ${p.beadMm.toFixed(1)} → ${size.toFixed(2)} mm`); half = size / 2; loF = 0.5; hiF = BEAD_FUSE / 2; }
+      else { const Lmin = Math.max(floor, BAND_OVER_RING * 2 * rr) / LEAF_ASPECT; size = Math.max(p.leafMm, Lmin); if (size > p.leafMm + 1e-9) raised.push(`${rg.name} ${p.leafMm.toFixed(1)} → ${size.toFixed(2)} mm`); half = LEAF_ASPECT * size / 2; loF = LEAF_RUN_PITCH_MIN; hiF = LEAF_RUN_PITCH_MAX; }
+      // the cone segment: the chord slope of the apothem profile across the band, through the ring
+      let er = 0, ez = 1;
+      for (let k = 0; k < 4; k++) { const dzz = Math.max(1e-6, half * ez); const dr = ra(zc + dzz) - ra(zc - dzz); const l = Math.hypot(dr, 2 * dzz); er = dr / l; ez = 2 * dzz / l; }
+      const nr = ez, nz = -er, a0 = ra(zc);
+      let sag = 0; for (let k = -8; k <= 8; k++) { const t = half * k / 8; sag = Math.max(sag, Math.abs((ra(zc + t * ez) - (a0 + t * er)) * ez)); }
+      out.sagMax = Math.max(out.sagMax, sag);
+      const side0 = 2 * a0 * tN, L0 = N ? N * side0 : TAU * a0;
+      const map = (s, t, w) => {
+        const a = a0 + t * er + w * nr, z = zc + t * ez + w * nz;
+        if (!N) { const th = s / a0; return [a * Math.cos(th), a * Math.sin(th), z]; }
+        const ss = ((s % L0) + L0) % L0; let k = Math.floor(ss / side0), x = ss - (k + 0.5) * side0;
+        const hl = (a0 + t * er) * tN;                     // the face's half length at this slant
+        if (x > hl) { k += 1; x -= 2 * hl; } else if (x < -hl) { k -= 1; x += 2 * hl; }
+        const ph = (2 * k + 1) * Math.PI / N, ux = Math.cos(ph), uy = Math.sin(ph);
+        return [a * ux - x * uy, a * uy + x * ux, z];
+      };
+      const sOfTheta = (th) => { th = ((th % TAU) + TAU) % TAU; if (!N) return th * a0; const k = Math.min(N - 1, Math.floor(th / (TAU / N))); return k * side0 + side0 / 2 + a0 * Math.tan(th - (2 * k + 1) * Math.PI / N); };
+      // the snap: n elements in every bar gap, the first on the bar
+      const sb = barTh.map(sOfTheta), gaps = sb.map((v, j) => (j + 1 < sb.length ? sb[j + 1] : sb[0] + L0) - v);
+      const gMax = Math.max(...gaps), gMin = Math.min(...gaps), asked = p.bandSpacing * size;
+      const nMin = Math.ceil(gMax / (hiF * size) - 1e-9), nMax = Math.floor(gMin / (loF * size) + 1e-9);
+      let n = Math.max(1, Math.round((L0 / barCount) / asked));
+      n = nMin > nMax ? Math.max(1, nMin) : Math.min(nMax, Math.max(nMin, n));
+      const pMin = gMin / n / size, pMax = gMax / n / size;
+      if (Math.abs(pMin - p.bandSpacing) > 0.02 || Math.abs(pMax - p.bandSpacing) > 0.02) snapped.push(`${rg.name} ${n} a bar (${(n * barCount)}), spacing ${pMin.toFixed(2)}${pMax - pMin > 0.005 ? '–' + pMax.toFixed(2) : ''}`);
+      if (nMin > nMax) told.push(`${rg.name}: the bars are too uneven for one ${style === 'beading' ? 'bead' : 'leaf'} count to hold every gap inside ${loF}–${hiF} × the ${style === 'beading' ? 'bead' : 'leaf'}; built ${n} a bar`);
+      const rec = { z: zc, r: rr, kind: rg.kind, name: rg.name, n, count: 0, dropped: 0, size, spacing: [pMin, pMax], sag, er, ez };
+      const drop = (pts) => door && rg.cut && pts.some((q) => door.inside(door.sOf(Math.atan2(q[1], q[0]), q[2]), q[2]));
+      const lf = style === 'leaf' ? buildLeaf({ length: size, width: LEAF_ASPECT * size, side: 1, curl: 0, lobes: LEAF_RUN_LOBES, step: size / PATTERN_LEAF_STATIONS, minStations: PATTERN_LEAF_STATIONS }) : null;
+      const prof2 = lf ? leafProfile() : null, depth = lf ? Math.max(floor, LEAF_RELIEF * LEAF_ASPECT * size) : 0;
+      for (let j = 0; j < sb.length; j++) for (let k = 0; k < n; k++) {
+        const s0 = sb[j] + gaps[j] * k / n, pitch = gaps[j] / n;
+        const scr = new Mesh();
+        if (lf) {
+          // the laurel stack: each base lies a crown over the previous leaf's tip (frame's own law)
+          const over = Math.max(1e-9, size - pitch);
+          const lift = lf.u.map((u) => rr + depth * Math.max(0, 1 - u / over));
+          bandSolid(scr, { id: 'leaf', pts: lf.pts, nrm: lf.nrm, bandWidth: LEAF_ASPECT * size, widthScale: lf.w.map((x) => x / (LEAF_ASPECT * size)), baseLift: lift }, prof2, { scale: 1, plateT: 0, reliefDepth: depth });
+        } else sphereSolid(scr, map(s0, 0, 0), size / 2, PATTERN_LAT, PATTERN_LON);
+        const vs = []; for (let i = 0; i < scr.pos.length; i += 3) vs.push(lf ? map(s0 + scr.pos[i], scr.pos[i + 1], scr.pos[i + 2]) : [scr.pos[i], scr.pos[i + 1], scr.pos[i + 2]]);
+        if (drop(vs)) { rec.dropped++; continue; }
+        beginPart(mesh, style === 'beading' ? 'bead' : 'leaf', `${rg.name} ${style} ${rec.count}`);
+        const base = mesh.pos.length / 3;
+        for (const q of vs) mesh.vertex(q[0], q[1], q[2]);
+        for (const i of scr.idx) mesh.idx.push(base + i);
+        endPart(mesh);
+        const el = { kind: style === 'beading' ? 'bead' : 'leaf', ring: out.rings.length, s: s0, onBar: k === 0 ? j : -1 };
+        if (lf) {
+          // the planform for the drawing: the blade's two margins at their crown
+          const top = (u, i, sgn) => map(s0 + lf.pts[i][0], sgn * lf.w[i] / 2, lift0(i));
+          const lift0 = (i) => rr + depth * (0.5 + Math.max(0, 1 - lf.u[i] / Math.max(1e-9, size - pitch)));
+          el.outline = [...lf.u.map((u, i) => top(u, i, 1)), ...lf.u.map((u, i) => top(u, i, -1)).reverse()];
+          el.len = size; el.width = LEAF_ASPECT * size;
+        } else { el.c = map(s0, 0, 0); el.r = size / 2; }
+        out.elements.push(el); rec.count++;
+      }
+      out.rings.push(rec);
+    }
+    if (snapped.length) told.push(`${style === 'beading' ? 'beading' : 'leaf-tip run'} snapped to the bars — ${snapped.join('; ')}`);
+    if (raised.length) told.push(`${style === 'beading' ? 'beads' : 'leaves'} held ${BAND_OVER_RING}× proud of their ring — ${raised.join('; ')}`);
+    if (out.rings.some((r) => r.dropped)) told.push(`the door takes ${out.rings.reduce((a, r) => a + r.dropped, 0)} band elements where it cuts a ring`);
+    if (!out.rings.length) told.push(`no ring matches "${p.bandRings}" — no band built`);
+    return out;
+  }
+
   const lowZ = p.baseStyle === 'tray' ? -Math.max(floor, 1.6) : p.baseStyle === 'skirt' ? -p.skirtMm : p.baseStyle === 'feet' ? -7 : -rFrame;
   const triangles = mesh.idx.length / 3;
   const info = {
     barCount, ribCount, barsEnd, ringZ, shoulderZ, scallops, rTop, Hc, collar, door: door ? { W: door.W, Dh: door.Dh, z0: door.z0, shape: door.shape } : null,
     heightMm: topZ - lowZ, widthMm: 2 * Math.max(...stations.map((z) => rho(z))) + (p.baseStyle === 'tray' ? 7 : 0),
     triangles, parts: mesh.parts.length, floor, process: 'SLS PA12 (assumed)',
+    bands: bandOut ? { style: bandOut.style, elements: bandOut.elements.length, sagMax: bandOut.sagMax, rings: bandOut.rings.map(({ er, ez, ...r }) => r) } : null,
     overhang: { deg: +overhang.deg.toFixed(1), where: overhang.where, fdmSupport: overhang.deg < FDM_OVERHANG_DEG },
   };
-  return { mesh: { positions: mesh.pos, indices: mesh.idx, parts: mesh.parts }, wires, solids, told, info, params: p };
+  return { mesh: { positions: mesh.pos, indices: mesh.idx, parts: mesh.parts }, wires, solids, bands: bandOut ? bandOut.elements : [], bandRings: bandOut ? bandOut.rings : [], told, info, params: p };
 }
 
 /* ---- STL: frame-relief's writer over this model's own buffers ---- */
@@ -600,6 +717,8 @@ export function exportSvg(model, { margin = 4 } = {}) {
   const see = (x, z) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); };
   for (const w of model.wires) for (const q of w.pts) { see(q[0] - w.r, q[2] - w.r); see(q[0] + w.r, q[2] + w.r); }
   for (const s of model.solids) for (const [r, z] of s.profile) { const cx = s.cx || 0; see(cx - r, z); see(cx + r, z); }
+  const bands = model.bands || [];
+  for (const b of bands) if (b.kind === 'bead') { see(b.c[0] - b.r, b.c[2] - b.r); see(b.c[0] + b.r, b.c[2] + b.r); } else for (const q of b.outline) see(q[0], q[2]);
   const W = x1 - x0 + 2 * margin, Hh = z1 - z0 + 2 * margin;
   const X = (x) => fx(x - x0 + margin), Z = (z) => fx(z1 - z + margin);
   const paths = [];
@@ -608,6 +727,11 @@ export function exportSvg(model, { margin = 4 } = {}) {
   for (const w of wires) {
     const d = w.pts.map((q, i) => `${i ? 'L' : 'M'}${X(q[0])} ${Z(q[2])}`).join(' ') + (w.closed ? ' Z' : '');
     paths.push(`<path class="${w.kind}" d="${d}" stroke-width="${fx(2 * w.r)}"/>`);
+  }
+  // phase 2: the band elements as outlines — a bead's silhouette circle, a leaf's projected planform
+  for (const b of bands) {
+    if (b.kind === 'bead') { const r = fx(b.r); paths.push(`<path class="bead" d="M${X(b.c[0] - b.r)} ${Z(b.c[2])} A${r} ${r} 0 1 0 ${X(b.c[0] + b.r)} ${Z(b.c[2])} A${r} ${r} 0 1 0 ${X(b.c[0] - b.r)} ${Z(b.c[2])} Z" stroke-width="0.25"/>`); }
+    else paths.push(`<path class="leaf" d="${b.outline.map((q, i) => `${i ? 'L' : 'M'}${X(q[0])} ${Z(q[2])}`).join(' ')} Z" stroke-width="0.25"/>`);
   }
   for (const s of model.solids) {
     const cx = s.cx || 0;

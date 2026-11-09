@@ -9,7 +9,13 @@
    frame, the polygon's corners, the rings' placement, the mitre's stretch,
    the SVG's census, and byte determinism.
 
-   `--negative-control` serves thirteen mutants of cage-geometry.js and requires
+   PHASE 2 (the B family): the ring bands — on the rings the control names (B1), snapped to
+   the bars (B2), fused along the run at Eva's 1.8 r / a laurel pitch of ½–¾ (B3), fused to
+   their ring (B4) and to every bar they cross (B5, a ray-parity point inside both solids),
+   floored and proud of their ring (B6), clear of the door (B7), drawn in the SVG (B8), lying
+   on the cage's own shape restated from the control (B9), and inert when off (B0).
+
+   `--negative-control` serves twenty-three mutants of cage-geometry.js and requires
    each to redden exactly the clauses it names (and nothing else); every
    anchor is checked before any mutant runs.
 
@@ -24,20 +30,27 @@ const args = process.argv.slice(2);
 const NEG = args.includes('--negative-control');
 const SEEDS = args.includes('--seeds') ? +args[args.indexOf('--seeds') + 1] : 24;
 const MOD = args.includes('--module') ? args[args.indexOf('--module') + 1] : null;
+// --mutant=a,b runs only those mutants (every anchor is still checked first); the run says it is a subset
+const ONLY = (args.find((a) => a.startsWith('--mutant=')) || '').slice(9).split(',').filter(Boolean);
 
 const { analyzeStl } = await import(path.join(ROOT, 'frame-relief.js'));
+// the profile's own law (bloom-curve.js, the CONTROL's owner) — B9 restates the surface from the control's points with it
+const { curveFunction } = await import(path.join(ROOT, 'bloom-curve.js'));
 
 /* ---- instruments that read the artefact and share no code with the builder ---- */
 function partClosed(mesh, q) {
-  // every edge of the part's triangles carried by exactly two of them, in opposite directions
-  const I = mesh.indices, P = mesh.positions, key = (i) => `${P[3 * i]},${P[3 * i + 1]},${P[3 * i + 2]}`;
-  const dir = new Map();
+  // every edge of the part's triangles carried by exactly two of them, in opposite directions. Vertices are
+  // matched by POSITION (two indices at one point are one vertex), keyed once per vertex rather than once per
+  // triangle corner, and an edge is a packed number rather than a string — the same test, a third of the time
+  const I = mesh.indices, P = mesh.positions, canon = new Map(), id = new Map();
+  const cid = (i) => { let c = id.get(i); if (c === undefined) { const k = `${P[3 * i]},${P[3 * i + 1]},${P[3 * i + 2]}`; c = canon.get(k); if (c === undefined) { c = canon.size; canon.set(k, c); } id.set(i, c); } return c; };
+  const B = 2 ** 22, dir = new Map();
   for (let t = q.t0; t < q.t1; t++) {
-    const v = [I[3 * t], I[3 * t + 1], I[3 * t + 2]].map(key);
-    for (let k = 0; k < 3; k++) { const e = `${v[k]}|${v[(k + 1) % 3]}`; dir.set(e, (dir.get(e) || 0) + 1); }
+    const v = [cid(I[3 * t]), cid(I[3 * t + 1]), cid(I[3 * t + 2])];
+    for (let k = 0; k < 3; k++) { const e = v[k] * B + v[(k + 1) % 3]; dir.set(e, (dir.get(e) || 0) + 1); }
   }
   let bad = 0;
-  for (const [e, n] of dir) { const [a, b] = e.split('|'); if (n !== 1 || dir.get(`${b}|${a}`) !== 1) bad++; }
+  for (const [e, n] of dir) { const a = Math.floor(e / B), b = e - a * B; if (n !== 1 || dir.get(b * B + a) !== 1) bad++; }
   return bad;
 }
 function voxelRegions(mesh, cell) {
@@ -65,6 +78,36 @@ function voxelRegions(mesh, cell) {
   return { comps, sizes: sizes.sort((a, b) => b - a) };
 }
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+/* POINT IN A CLOSED PART: ray parity (Möller–Trumbore) over the part's own triangles, along an
+   irrational direction so no edge or vertex is grazed. The fusion witness: a point inside a band
+   element AND inside the wire it must fuse to means the two solids overlap — not merely touch. */
+function insidePart(mesh, q, Q) {
+  const P = mesh.positions, I = mesh.indices, d = [0.5773, 0.3321, 0.7458];
+  let hits = 0;
+  for (let t = q.t0; t < q.t1; t++) {
+    const a = 3 * I[3 * t], b = 3 * I[3 * t + 1], c = 3 * I[3 * t + 2];
+    const e1 = [P[b] - P[a], P[b + 1] - P[a + 1], P[b + 2] - P[a + 2]], e2 = [P[c] - P[a], P[c + 1] - P[a + 1], P[c + 2] - P[a + 2]];
+    const h = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]];
+    const det = e1[0] * h[0] + e1[1] * h[1] + e1[2] * h[2]; if (Math.abs(det) < 1e-14) continue;
+    const f = 1 / det, sv = [Q[0] - P[a], Q[1] - P[a + 1], Q[2] - P[a + 2]];
+    const u = f * (sv[0] * h[0] + sv[1] * h[1] + sv[2] * h[2]); if (u < 0 || u > 1) continue;
+    const qq = [sv[1] * e1[2] - sv[2] * e1[1], sv[2] * e1[0] - sv[0] * e1[2], sv[0] * e1[1] - sv[1] * e1[0]];
+    const v = f * (d[0] * qq[0] + d[1] * qq[1] + d[2] * qq[2]); if (v < 0 || u + v > 1) continue;
+    if (f * (e2[0] * qq[0] + e2[1] * qq[1] + e2[2] * qq[2]) > 1e-12) hits++;
+  }
+  return hits % 2 === 1;
+}
+const partVerts = (mesh, q) => { const P = mesh.positions, out = []; for (let v = q.v0; v < q.v1; v++) out.push([P[3 * v], P[3 * v + 1], P[3 * v + 2]]); return out; };
+const bbox = (vs) => vs.reduce((b, v) => [Math.min(b[0], v[0]), Math.min(b[1], v[1]), Math.min(b[2], v[2]), Math.max(b[3], v[0]), Math.max(b[4], v[1]), Math.max(b[5], v[2])], [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity]);
+const inBox = (b, Q, m = 0) => Q[0] >= b[0] - m && Q[0] <= b[3] + m && Q[1] >= b[1] - m && Q[1] <= b[4] + m && Q[2] >= b[2] - m && Q[2] <= b[5] + m;
+const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+/* the bar's centreline at height z, interpolated along the emitted polyline (null where the bar does not reach z) */
+const barAt = (pts, z) => { for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; if ((a[2] - z) * (b[2] - z) <= 0 && a[2] !== b[2]) { const t = (z - a[2]) / (b[2] - a[2]); return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1]), z]; } } return null; };
+/* Eva's rulings and this gate's own restatements — never imported from the builder */
+const RULED_BEAD_FUSE = 1.8;                 // frame §15.0: beading fused at ≤ 1.8 r
+const RULED_LEAF_PITCH = [0.5, 0.75];        // frame §15: a laurel run's pitch, × the leaf
+const RESTATED_OVER_RING = 1.25;             // a band element stands 1.25 × proud of its ring (cage §8)
+
 const nearestOnPolyline = (q, pts) => { let best = Infinity; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2 || 1; let t = ((q[0] - a[0]) * ab[0] + (q[1] - a[1]) * ab[1] + (q[2] - a[2]) * ab[2]) / l2; t = Math.max(0, Math.min(1, t)); best = Math.min(best, dist(q, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t])); } return best; };
 
 /* ---- the run ---- */
@@ -74,6 +117,12 @@ async function run(modulePath, { quiet = false } = {}) {
   const check = (name, ok, detail = '') => { out.push(`${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`); if (!ok) fails.push(name); };
   const cases = G.PRESET_IDS.map((id) => ({ label: `preset ${id}`, params: G.applyPreset(G.defaultParams(), id) }));
   for (let s = 1; s <= SEEDS; s++) cases.push({ label: `seed ${s}`, params: G.randomParams(s) });
+  // phase 2: every preset in each band style, the ring selections, a bead under its ring, the fuse cap at its edge
+  for (const st of ['beading', 'leaf']) for (const id of G.PRESET_IDS) cases.push({ label: `${st} on ${id}`, params: { ...G.applyPreset(G.defaultParams(), id), bandStyle: st, bandRings: 'all' } });
+  for (const on of ['inner', 'ends', 'top']) cases.push({ label: `beading on the bell, ${on}`, params: { ...G.defaultParams(), bandStyle: 'beading', bandRings: on } });
+  cases.push({ label: 'beads asked under their ring (1.5 mm)', params: { ...G.defaultParams(), bandStyle: 'beading', beadMm: 1.5 } });
+  cases.push({ label: 'beading at the widest spacing (0.90)', params: { ...G.defaultParams(), bandStyle: 'beading', bandSpacing: 0.9 } });
+  cases.push({ label: 'leaf run at the widest spacing (0.90)', params: { ...G.defaultParams(), bandStyle: 'leaf', bandSpacing: 0.9 } });
 
   // C0 the registry and the presets
   const ids = new Set(G.PARAM_SPEC.map((s) => s.id));
@@ -82,6 +131,7 @@ async function run(modulePath, { quiet = false } = {}) {
   check('C0c every registry slider default agrees with the default preset (one owner, not two)', G.PARAM_SPEC.filter((s) => s.id in G.PRESETS.bell).every((s) => s.default === G.PRESETS.bell[s.id]));
   check('C0d the default bar sits at or above the print floor, so no floor binds on it', G.DEFAULTS.barMm >= G.MIN_FEATURE_MM && G.PRESET_IDS.every((id) => G.PRESETS[id].barMm === 1.1));
   check('C0e the onion carries a ring in its neck taper (the upper of three, at 0.75 H)', G.PRESETS.onion.ringCount === 3);
+  check('C0f the default cage has plain rings (Eva, Nov 9): no preset names a band', G.DEFAULTS.bandStyle === 'none' && G.PRESET_IDS.every((id) => !('bandStyle' in G.PRESETS[id])));
 
   let sumTris = 0, worstFloor = Infinity;
   for (const cs of cases) {
@@ -175,11 +225,108 @@ async function run(modulePath, { quiet = false } = {}) {
       const asked = Math.round(cs.params.scallopCount);
       check(`C16 ${cs.label} skirt: ${cusps.length} scallop cusps, a divisor of ${m.info.barCount} bars nearest the asked ${asked}, every cusp on a bar`, cusps.length === m.info.scallops && m.info.barCount % cusps.length === 0 && onBar && (cusps.length === asked || m.told.some((t) => /scallops built as/.test(t))));
     }
-    // the SVG: one path per wire and per solid, a viewBox in millimetres that holds the drawing
-    const svg = G.exportSvg(m);
+    // ---- PHASE 2: the ring bands, judged on the emitted parts ----
+    const bandParts = m.mesh.parts.filter((q) => q.kind === 'bead' || q.kind === 'leaf');
+    const style = cs.params.bandStyle || 'none';
+    if (style !== 'none') {
+      const isBead = style === 'beading';
+      const rings = m.wires.filter((w) => w.kind === 'ring' || w.kind === 'frame');
+      const ringZs = [...new Set(rings.map((w) => +w.pts[0][2].toFixed(6)))].sort((a, b) => a - b);
+      const ringR = (z) => rings.find((w) => Math.abs(w.pts[0][2] - z) < 1e-6).r;
+      const kindAt = (z) => rings.find((w) => Math.abs(w.pts[0][2] - z) < 1e-6).kind;
+      const H = cs.params.heightMm, sel = cs.params.bandRings;
+      const expected = ringZs.filter((z) => sel === 'all' || (sel === 'inner' && kindAt(z) === 'ring') || (sel === 'ends' && kindAt(z) === 'frame') || (sel === 'top' && Math.abs(z - H) < 1e-6));
+      const els = bandParts.map((q) => { const vs = partVerts(m.mesh, q), b = bbox(vs), c = vs.reduce((a, v) => [a[0] + v[0] / vs.length, a[1] + v[1] / vs.length, a[2] + v[2] / vs.length], [0, 0, 0]); return { q, vs, b, c, z: ringZs.reduce((best, z) => (Math.abs(z - c[2]) < Math.abs(best - c[2]) ? z : best), ringZs[0]) }; });
+      const onRing = new Map(); for (const e of els) { if (!onRing.has(e.z)) onRing.set(e.z, []); onRing.get(e.z).push(e); }
+      // B1 the rings the control names carry the band, and no other ring does (restated from the emitted rings)
+      const got = [...onRing.keys()].sort((a, b) => a - b);
+      check(`B1 ${cs.label} the band rides exactly the rings "${sel}" names (${got.length} of ${ringZs.length})`, got.length === expected.length && got.every((z, i) => Math.abs(z - expected[i]) < 1e-6) && els.length > 0);
+      const bars = m.wires.filter((w) => w.kind === 'bar');
+      const B = m.info.barCount, Nside = +cs.params.sides | 0;
+      const doorCut = (z) => m.info.door && z > m.info.door.z0 && z < m.info.door.z0 + m.info.door.Dh;
+      let notOn = 0, notMult = 0, fuseBad = [], pitchBad = [], ringBad = 0, barBad = 0, exempt = 0, crossings = 0, floorBad = 0, shapeBad = 0, worstShape = 0;
+      for (const [z, list] of onRing) {
+        const rr = ringR(z);
+        const cross = bars.map((w) => barAt(w.pts, z)).filter(Boolean);
+        // a bead sits ON a bar when its centre is inside the bar's own wire (the emitted bar is a polyline,
+        // so its crossing carries the polyline's chord error — on a profile step that is tenths of a mm)
+        const barR = bars.length ? bars[0].r : 0;
+        // B2 the snap: on a ring the door leaves whole, the count is the bars times a whole number, and
+        // (beading) a bead's centre sits ON every bar's crossing
+        if (!doorCut(z) && list.length % B !== 0) notMult++;
+        if (isBead && !doorCut(z)) for (const X of cross) if (!list.some((e) => Math.hypot(e.c[0] - X[0], e.c[1] - X[1], e.c[2] - X[2]) < barR)) notOn++;
+        // B3 the run is fused: neighbours (by azimuth) within Eva's 1.8 r for beads, a leaf's pitch inside ½–¾ of it (round cages)
+        const byAz = [...list].sort((a, b) => Math.atan2(a.c[1], a.c[0]) - Math.atan2(b.c[1], b.c[0]));
+        for (let i = 0; i < byAz.length; i++) {
+          const a = byAz[i], b = byAz[(i + 1) % byAz.length]; if (a === b) continue;
+          if (isBead) {
+            const r = (a.b[5] - a.b[2]) / 2, d = Math.hypot(a.c[0] - b.c[0], a.c[1] - b.c[1], a.c[2] - b.c[2]);
+            if (d > 3 * r) continue;                                     // the two ends either side of the door
+            if (d > RULED_BEAD_FUSE * r + 1e-6) fuseBad.push(`${d.toFixed(2)} > ${(RULED_BEAD_FUSE * r).toFixed(2)}`);
+          } else if (!Nside) {
+            // on a round cage the development is θ = s / a0, so a leaf's angular extent times the ring's radius IS its length
+            const R0 = Math.hypot(...rings.find((w) => Math.abs(w.pts[0][2] - z) < 1e-6).pts[0].slice(0, 2));
+            const ext = (e) => { const th0 = Math.atan2(e.c[1], e.c[0]); let lo = 0, hi = 0; for (const v of e.vs) { const d = angDiff(Math.atan2(v[1], v[0]), th0); lo = Math.min(lo, d); hi = Math.max(hi, d); } return (hi - lo) * R0; };
+            const L = ext(a), pitch = Math.abs(angDiff(Math.atan2(b.c[1], b.c[0]), Math.atan2(a.c[1], a.c[0]))) * R0;
+            if (pitch > L) continue;                                     // across the door's gap
+            if (pitch / L > RULED_LEAF_PITCH[1] + 0.02 || pitch / L < RULED_LEAF_PITCH[0] - 0.02) pitchBad.push((pitch / L).toFixed(3));
+          }
+        }
+        // B4 every element is fused to its ring: a point of the ring's centreline, a quarter-ring out, lies inside it
+        const ringW = rings.filter((w) => Math.abs(w.pts[0][2] - z) < 1e-6);
+        for (const e of list) {
+          if (isBead) { const dc = Math.min(...ringW.map((w) => nearestOnPolyline(e.c, w.closed ? [...w.pts, w.pts[0]] : w.pts))); if (dc > rr) ringBad++; }
+          else { const th = Math.atan2(e.c[1], e.c[0]), R0 = Math.hypot(...ringW[0].pts[0].slice(0, 2)); const rad = Nside ? null : R0; const Q = rad ? [(rad + rr / 2) * Math.cos(th), (rad + rr / 2) * Math.sin(th), z] : null; if (Q && !insidePart(m.mesh, e.q, Q)) ringBad++; }
+          // B6 the floor: an element at or over the floor and 1.25 × its ring's diameter across the ring, read off its own
+          // vertices as the width of their (radius, z) cloud — its extent along the widest of 64 directions in that plane
+          // (a sloped band's z extent alone reads short)
+          let across = 0; const rz = e.vs.map((v) => [Math.hypot(v[0], v[1]), v[2]]);
+          for (let k = 0; k < 64; k++) { const c = Math.cos(Math.PI * k / 64), sn = Math.sin(Math.PI * k / 64); let lo = Infinity, hi = -Infinity; for (const [R, zz] of rz) { const pr = R * c + zz * sn; lo = Math.min(lo, pr); hi = Math.max(hi, pr); } across = Math.max(across, hi - lo); }
+          if (across < (Math.max(floor, RESTATED_OVER_RING * 2 * rr)) * Math.cos(Math.PI / 128) - 1e-6) floorBad++;
+        }
+        // B5 fused to every bar it crosses: the crossing, nudged outward by half the thinner wire, lies inside an element
+        for (const X of cross) {
+          crossings++;
+          const R = Math.hypot(X[0], X[1]), k = (R + Math.min(...bars.map((w) => w.r), rr) / 2) / R, Q = [X[0] * k, X[1] * k, z];
+          const host = list.filter((e) => inBox(e.b, Q)).some((e) => insidePart(m.mesh, e.q, Q));
+          if (!host) { if (doorCut(z) && Math.abs(angDiff(Math.atan2(X[1], X[0]), -Math.PI / 2)) < (m.info.door.W / R) + 4 * Math.PI / B) exempt++; else barBad++; }
+        }
+        // B9 the band follows the cage's shape (round cages): every leaf's underside lies on the cone segment through its
+        // ring — within twice the profile's own chord sagitta across the leaf's height, the profile restated from the
+        // CONTROL's points; a bead's centre lies on the surface of revolution
+        if (!Nside) {
+          const f = curveFunction(cs.params.profile.points, G.PROFILE_SPEC), rho = (zz) => cs.params.widthMm / 2 * f(Math.min(1, Math.max(0, zz / H)));
+          for (const e of list) {
+            if (isBead) { const d = Math.abs(Math.hypot(e.c[0], e.c[1]) - rho(e.c[2])); worstShape = Math.max(worstShape, d); if (d > 1e-6) shapeBad++; continue; }
+            const z0 = e.b[2], z1 = e.b[5]; let sag = 0; for (let i = 0; i <= 16; i++) { const zz = z0 + (z1 - z0) * i / 16; sag = Math.max(sag, Math.abs(rho(zz) - (rho(z0) + (rho(z1) - rho(z0)) * i / 16))); }
+            let under = Infinity; for (const v of e.vs) under = Math.min(under, Math.hypot(v[0], v[1]) - rho(v[2]));
+            worstShape = Math.max(worstShape, Math.abs(under)); if (Math.abs(under) > 2 * sag + 1e-6) shapeBad++;
+          }
+        }
+      }
+      check(`B2 ${cs.label} the count snaps to the bars: ${isBead ? 'a bead on every bar crossing, ' : ''}a whole number a bar on every unbroken ring${m.told.some((t) => /snapped to the bars/.test(t)) ? ' (told)' : ''}`, notOn === 0 && notMult === 0, `${notOn} crossings without a bead, ${notMult} rings off the multiple`);
+      check(`B3 ${cs.label} the run is fused (${isBead ? `beads within ${RULED_BEAD_FUSE} r` : `leaf pitch ${RULED_LEAF_PITCH.join('–')} × the leaf`})`, (isBead ? fuseBad.length : pitchBad.length) === 0 || m.told.some((t) => /too uneven/.test(t)), (isBead ? fuseBad : pitchBad).slice(0, 4).join(', '));
+      check(`B4 ${cs.label} every element is fused to its ring (${els.length} elements)`, ringBad === 0, `${ringBad} off their ring`);
+      check(`B5 ${cs.label} the band is fused to every bar it crosses (${crossings} crossings, ${exempt} beside the door)`, barBad === 0, `${barBad} crossings outside every element`);
+      check(`B6 ${cs.label} every element is at or over the floor and ${RESTATED_OVER_RING} × its ring across it`, floorBad === 0 && (!isBead || cs.params.beadMm >= RESTATED_OVER_RING * Math.max(floor, cs.params.ringMm) || m.told.some((t) => /proud of their ring/.test(t))), `${floorBad} under`);
+      if (!Nside) check(`B9 ${cs.label} the band lies on the cage's own shape (worst ${worstShape.toFixed(4)} mm off the profile restated from the control)`, shapeBad === 0, `${shapeBad} off`);
+      // B7 nothing of the band reaches into the door opening (the opening restated from the emitted frame, as C5c)
+      if (m.info.door) {
+        const fr = m.wires.find((w) => w.kind === 'door').pts, frR = m.wires.find((w) => w.kind === 'door').r;
+        const rhoF = fr.reduce((a, q) => a + Math.hypot(q[0], q[1]), 0) / fr.length, thF = fr.reduce((a, q) => a + Math.atan2(q[1], q[0]), 0) / fr.length;
+        const arcOf = (q) => angDiff(Math.atan2(q[1], q[0]), thF) * rhoF, poly = fr.map((q) => [arcOf(q), q[2]]);
+        const inPoly = (x, y) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+        const edgeDist = (x, y) => { let b = Infinity; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; const dx = xj - xi, dy = yj - yi, l2 = dx * dx + dy * dy || 1; const t = Math.max(0, Math.min(1, ((x - xi) * dx + (y - yi) * dy) / l2)); b = Math.min(b, Math.hypot(x - xi - dx * t, y - yi - dy * t)); } return b; };
+        let into = 0; for (const e of els) if (Math.abs(angDiff(Math.atan2(e.c[1], e.c[0]), thF)) < Math.PI / 2) for (const v of e.vs) { const x = arcOf(v), y = v[2]; if (inPoly(x, y) && edgeDist(x, y) > frR + 1e-6) into++; }
+        check(`B7 ${cs.label} no band vertex lies inside the door opening`, into === 0, `${into} inside`);
+      }
+    } else check(`B0b ${cs.label} plain rings: no band part`, bandParts.length === 0);
+    // the SVG: one path per wire, per solid and per band element, a viewBox in millimetres that holds the drawing
+    let svg = ''; try { svg = G.exportSvg(m); } catch (e) { svg = `<!-- threw: ${e.message} -->`; }   // a throw is C10's red, not an abort
     const paths = (svg.match(/<path /g) || []).length;
     const vb = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
-    check(`C10 ${cs.label} SVG: ${paths} paths = ${m.wires.length} wires + ${m.solids.length} solids, viewBox in mm`, paths === m.wires.length + m.solids.length && vb && +vb[2] > m.info.heightMm - 1e-3 && +vb[2] < m.info.heightMm + 2 * 4 + 6 && /width="[\d.]+mm"/.test(svg));
+    if (bandParts.length) check(`B8 ${cs.label} the SVG draws every band element (${bandParts.length})`, (svg.match(/<path class="(bead|leaf)"/g) || []).length === bandParts.length);
+    check(`C10 ${cs.label} SVG: ${paths} paths = ${m.wires.length} wires + ${m.solids.length} solids + ${bandParts.length} band elements, viewBox in mm`, paths === m.wires.length + m.solids.length + bandParts.length && vb && +vb[2] > m.info.heightMm - 1e-3 && +vb[2] < m.info.heightMm + 2 * 4 + 6 && /width="[\d.]+mm"/.test(svg));
     if (m.info.door) check(`C10b ${cs.label} the SVG carries the door frame`, /class="door"/.test(svg));
     // determinism
     const m2 = G.buildCage(cs.params); const stl2 = G.exportStl(m2);
@@ -187,6 +334,10 @@ async function run(modulePath, { quiet = false } = {}) {
     // overhang: the report names a place and a number between 0 and 90
     check(`C12 ${cs.label} the overhang report names its wire`, m.info.overhang.deg >= 0 && m.info.overhang.deg <= 90 && !!m.info.overhang.where);
   }
+  // B0 PLAIN RINGS ARE THE PHASE-1 CAGE, by branch: band fields moved while the band is off move no byte
+  { const a = G.defaultParams(), b = { ...a, bandStyle: 'none', bandRings: 'top', beadMm: 5.5, leafMm: 12, bandSpacing: 0.52 };
+    const ma = G.buildCage(a), mb = G.buildCage(b), sa = G.exportStl(ma), sb = G.exportStl(mb);
+    check('B0 plain rings build no band part, and the band controls are inert while it is off (byte-identical STL)', a.bandStyle === 'none' && sa.length === sb.length && sa.every((x, i) => x === sb[i]) && !ma.mesh.parts.some((q) => q.kind === 'bead' || q.kind === 'leaf') && G.exportSvg(ma) === G.exportSvg(mb)); }
   // C13 the floor clamp is TOLD: a bar asked under the floor is raised and said
   { const p = G.defaultParams(); p.barMm = 0.8; p.minFeature = 1.0; const m = G.buildCage(p); const bar = m.wires.find((w) => w.kind === 'bar'); check('C13 a 0.8 mm bar under a 1.0 mm floor is raised to it and told', Math.abs(2 * bar.r - 1.0) < 1e-9 && m.told.some((t) => /bar 0.80 mm raised/.test(t))); }
   // C14 a profile the spec refuses throws, by name
@@ -211,6 +362,17 @@ const MUTANTS = [
   { id: 'a-profile-step-gets-no-ring', from: "const shoulderZ = profileShoulders(p.profile.points, Rb, H);", to: "const shoulderZ = [];", breaks: /^C8c? / },
   { id: 'bars-pack-until-they-touch', from: "const collarPitch = 2 * rBar + floor;", to: "const collarPitch = 2 * rBar * 1.05;", breaks: /^C9b / },
   { id: 'the-scallop-cusps-leave-the-bars', from: "const u = ((th * scallops / TAU) % 1 + 1) % 1;", to: "const u = ((th * (scallops + 1) / TAU) % 1 + 1) % 1;", breaks: /^C16 / },
+  // phase 2 — the ring bands
+  { id: 'the-band-runs-at-a-random-phase-to-the-bars', from: "const s0 = sb[j] + gaps[j] * k / n, pitch = gaps[j] / n;", to: "const s0 = sb[j] + gaps[j] * (k + 0.37) / n, pitch = gaps[j] / n;", breaks: /^B2 / },
+  { id: 'the-bead-fuse-cap-is-dropped', from: "const nMin = Math.ceil(gMax / (hiF * size) - 1e-9)", to: "const nMin = 1", breaks: /^(B3|B5) / },   // a parted run also leaves bars crossing the ring outside every element
+  { id: 'the-laurel-run-parts', from: "loF = LEAF_RUN_PITCH_MIN; hiF = LEAF_RUN_PITCH_MAX;", to: "loF = LEAF_RUN_PITCH_MIN; hiF = 1.2;", breaks: /^(B3|B5) / },   // parted leaves leave bars between them
+  { id: 'a-bead-floats-off-its-ring', from: "} else sphereSolid(scr, map(s0, 0, 0), size / 2, PATTERN_LAT, PATTERN_LON);", to: "} else sphereSolid(scr, map(s0, 0, size), size / 2, PATTERN_LAT, PATTERN_LON);", breaks: /^(B2|B3|B4|B5|B9|C3) / },   // floated out, the beads also sit on a wider circle, so neighbours part
+  { id: 'the-door-keeps-its-band', from: "const drop = (pts) => door && rg.cut &&", to: "const drop = (pts) => false &&", breaks: /^(B4|B7) / },   // kept in the opening, an element sits where the ring was cut away
+  { id: 'the-band-ignores-the-profile-slope', from: "const nr = ez, nz = -er, a0 = ra(zc);", to: "er = 0; ez = 1; const nr = ez, nz = -er, a0 = ra(zc);", breaks: /^B9 / },
+  { id: 'the-svg-drops-the-bands', from: "  for (const b of bands) {\n    if (b.kind === 'bead')", to: "  for (const b of []) {\n    if (b.kind === 'bead')", breaks: /^(B8|C10) / },
+  { id: 'every-ring-carries-the-band', from: "const want = (rg) => p.bandRings === 'all' ||", to: "const want = (rg) => true ||", breaks: /^B1 / },
+  { id: 'bands-build-on-plain-rings', from: "const bandOut = banded(p) ? buildBands() : null;", to: "const bandOut = (p.bandStyle = banded(p) ? p.bandStyle : 'beading', buildBands());", breaks: /^B0b? / },
+  { id: 'beads-sit-inside-their-ring', from: "size = Math.max(p.beadMm, floor, BAND_OVER_RING * 2 * rr);", to: "size = Math.max(p.beadMm, floor);", breaks: /^B6 / },
   { id: 'bars-ending-at-the-ring-get-no-ribs', from: "if (!flat && barsEnd === 'ring') {", to: "if (false) {", breaks: /^C3 |^C9 / },
 ];
 if (NEG) {
@@ -219,7 +381,9 @@ if (NEG) {
   const base = await run(path.join(ROOT, 'cage-geometry.js'), { quiet: true });
   if (base.fails.length) { console.error('the clean tree fails:', base.fails); process.exit(1); }
   let bad = 0;
-  for (const m of MUTANTS) {
+  const RUN = ONLY.length ? MUTANTS.filter((m) => ONLY.includes(m.id)) : MUTANTS;
+  if (ONLY.length && RUN.length !== ONLY.length) { console.error(`--mutant names ${ONLY.length - RUN.length} mutant(s) not in the table`); process.exit(1); }
+  for (const m of RUN) {
     const file = path.join(ROOT, `cage-geometry.__mutant__.js`);
     fs.writeFileSync(file, src.replace(m.from, m.to));
     let r; try { r = await run(file, { quiet: true }); } catch (e) { r = { fails: ['<threw>'], out: [String(e)] }; }
@@ -229,7 +393,7 @@ if (NEG) {
     if (!ok) bad++;
     console.log(`${ok ? 'CAUGHT' : 'BAD   '} ${m.id}: ${claimed.length} named clauses red${stray.length ? `, ${stray.length} UNCLAIMED (${stray.slice(0, 3).join('; ')})` : ''}${r.fails.includes('<threw>') ? ' — THREW: ' + r.out[0].slice(0, 120) : ''}`);
   }
-  console.log(`\n${MUTANTS.length - bad} of ${MUTANTS.length} mutants behave`);
+  console.log(`\n${RUN.length - bad} of ${RUN.length} mutants behave${ONLY.length ? ` (a SUBSET of ${MUTANTS.length})` : ''}`);
   process.exit(bad ? 1 : 0);
 } else {
   const r = await run(MOD ? path.resolve(MOD) : path.join(ROOT, 'cage-geometry.js'));
