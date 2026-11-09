@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hanabi — Eva Maskalenko</title>
-<meta name="description" content="Hanabi deck designer — suits, colours and symbols, three face layouts, card backs and tokens, exported as an imposed print PDF or 300 dpi PNGs.">
+<meta name="description" content="Hanabi deck designer — suits, colours and symbols, a firework board for every suit and rank, card backs and tokens, exported as an imposed print PDF or 300 dpi PNGs.">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
@@ -24,7 +24,7 @@
   <a class="hb-back" href="index.html">&larr; Index</a>
   <div class="hb-eyebrow">EM / HANABI</div>
   <h1>Hanabi deck</h1>
-  <p class="hb-sub">Five suits of fireworks, ranks one to five <span class="hb-sep">&mdash;</span> every suit carries a symbol as well as a colour, so the deck reads in greyscale. One corner index for the whole deck, and a firework centre chosen per suit; then a size and a back, and an imposed print PDF or 300&nbsp;dpi PNGs.</p>
+  <p class="hb-sub">Five suits of fireworks, ranks one to five <span class="hb-sep">&mdash;</span> every suit carries a symbol and its own firework as well as a colour, so the deck reads in greyscale. One corner index for the whole deck; the <b>Fireworks</b> board designs the art of every suit &times; rank; then a size and a back, and an imposed print PDF or 300&nbsp;dpi PNGs.</p>
 </header>
 
 <main class="hb-body">
@@ -34,7 +34,7 @@
   <details class="hb-sec" id="sec-suits" open>
     <summary><span class="hb-num">01</span>Suits <output class="hb-val" id="deckCount"></output></summary>
     <label class="hb-check"><input type="checkbox" id="rainbow"> Add the rainbow suit <span class="hb-dim">(+10 cards)</span></label>
-    <p class="hb-note">Each suit picks its centre: how it is laid out, which firework, and an optional second tier under the burst at ranks 4 and 5. The <b>Fireworks</b> preview shows every firework for one suit.</p>
+    <p class="hb-note">Each suit picks how its rank is shown (a count of fireworks by default, or one firework growing with rank), which firework type it draws, and under Scale an optional second tier at ranks 4 and 5. The <b>Fireworks</b> board edits every card.</p>
     <div id="suitRows"></div>
     <p class="hb-note" id="clashNote" hidden></p>
   </details>
@@ -77,6 +77,14 @@
       </select>
     </div>
     <div class="hb-row"><label for="faceBg">Card face</label><input type="color" id="faceBg"></div>
+    <label class="hb-check"><input type="checkbox" id="sceneOn"> Scene band behind the fireworks <output class="hb-val" id="sceneVal"></output></label>
+    <div id="sceneRows">
+      <div class="hb-row"><label for="sceneKind">Silhouette</label><select id="sceneKind"><option value="treeline">Treeline</option><option value="rooftops">Rooftops</option></select></div>
+      <div class="hb-row hb-row--pair">
+        <label for="sceneColor">Colour</label><input type="color" id="sceneColor">
+        <label for="sceneHeight">Height %</label><input type="range" id="sceneHeight" min="8" max="45" step="1">
+      </div>
+    </div>
   </details>
 
   <details class="hb-sec" id="sec-back">
@@ -110,7 +118,7 @@
 
   <details class="hb-sec" id="sec-firework">
     <summary><span class="hb-num">06</span>Firework spec <span class="hb-dim">read only</span></summary>
-    <p class="hb-note">Each card's centre art is drawn from a spec. The visual firework builder that edits these is a later phase; for now this shows the spec the placeholder renderer draws.</p>
+    <p class="hb-note">Each card's centre art is drawn from a spec: the type's defaults, then the suit's parameters, then the card's own. The <b>Fireworks</b> board edits them; this shows the merged spec for one card.</p>
     <div class="hb-row hb-row--pair">
       <label for="specSuit">Suit</label><select id="specSuit"></select>
       <label for="specRank">Rank</label><select id="specRank"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>

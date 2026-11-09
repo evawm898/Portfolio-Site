@@ -24,49 +24,115 @@
 // own line style, never traced. `item` is the number in the list Eva ruled
 // on (#528's follow-up); `ref` the catalogue cards it stands for.
 //
-// SPEC SCHEMA (version 2) — every field is plain data, JSON-safe:
+// SPEC SCHEMA (version 3) — every field is plain data, JSON-safe:
 //   motif       a MOTIFS id
 //   colors      array of hex colours: [primary, secondary], or every standard
 //               suit's primary for a multicolour suit
 //   size        fraction of the box radius the firework reaches (0..1)
 //   seed        integer; every bit of jitter is a pure function of it
 //   tier        null, or { motif: 'rosettes', count } — a second
-//               tier drawn under the burst at ranks 4 and 5 (layout 'single')
-// classic and the four originals also carry the version-1 fields:
+//               tier drawn under the burst at ranks 4 and 5 (Scale only)
+//   outerColor, coreColor   optional hex: replace colors[0] / colors[1]
+//   rotation    optional degrees about the burst's centre
+// classic and the four phase-1 radial bursts also carry the version-1 fields:
 //   burstType, starCount, rings, trail, sparkles, core
-// every other motif carries:
+// the catalogue motifs carry:
 //   count       how many stars / lines / pieces (the rank's escalation)
 //   rings       concentric rings, where the motif has them
 //   core        a bright core at the centre
+// the nine FIREWORK TYPES (phase 2, TYPES below) carry their PARAMS:
+//   count, length, trail, starSize, tips, core, density — and `rank`, the rank
+//   the count escalates to (5 under Count: the rank is told by how many).
 //
-// Rank must read visually: 1 is small and sparse, escalating to 5, the
-// fullest. Duplicate cards of one suit+rank share one spec, so they render
-// identically by default.
+// INHERITANCE (the Firework board): the type's defaults <- the suit's own
+// parameters (suit.firework, only the keys the type takes) <- the cell's
+// override (design.fireworks[suitId][rank], per key; `items` there is the
+// cell's arrangement and never reaches the spec). Duplicate cards of one
+// suit+rank share one spec, so they render identically.
+//
+// Every renderer is deterministic: the same spec always draws the same SVG.
 
-export const SPEC_VERSION = 2;
+export const SPEC_VERSION = 3;
 export const BURST_TYPES = ['peony', 'chrysanthemum', 'willow', 'crossette'];
+// Phase 1's four one-type radial bursts. Their ids now name the phase-2 TYPES,
+// so a version-2 design's 'peony' is read as 'radial-peony' (hanabi/deck.js)
+// and draws exactly what it drew.
+export const LEGACY_RADIAL = Object.fromEntries(BURST_TYPES.map((t) => [t, `radial-${t}`]));
+const RADIAL_IDS = Object.values(LEGACY_RADIAL);
+
+// The parameters a firework type can take, with their ranges. One table:
+// the editor builds its controls from it, and deck.js validates a saved
+// suit's parameters against it.
+export const PARAMS = {
+  count:      { label: 'Arms / stars', min: 3, max: 60, step: 1, note: 'fewer at lower ranks under Scale' },
+  length:     { label: 'Length', min: 0.3, max: 1, step: 0.05 },
+  trail:      { label: 'Trail length', min: 0, max: 1, step: 0.05 },
+  starSize:   { label: 'Star size', min: 0.4, max: 2.5, step: 0.1 },
+  density:    { label: 'Density', min: 0.4, max: 2, step: 0.1 },
+  rotation:   { label: 'Rotation', min: -180, max: 180, step: 5, unit: '°' },
+  tips:       { label: 'Tip dots', kind: 'bool' },
+  core:       { label: 'Core', kind: 'bool' },
+  outerColor: { label: 'Outer colour', kind: 'color' },
+  coreColor:  { label: 'Core colour', kind: 'color' },
+};
+const COLOR_PARAMS = ['outerColor', 'coreColor'];
+
+// THE NINE FIREWORK TYPES. Each is a distinct SILHOUETTE, not a recolour — the
+// gate holds every pair apart in greyscale (H16). `escalate`: whether the count
+// grows with rank under Scale.
+export const TYPES = {
+  peony:         { label: 'Peony', note: 'rings of stars, no trails', escalate: true,
+                   params: ['count', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 20, starSize: 1, density: 1, core: true, rotation: 0 } },
+  chrysanthemum: { label: 'Chrysanthemum', note: 'trailed arms', escalate: true,
+                   params: ['count', 'length', 'trail', 'starSize', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 26, length: 1, trail: 0.75, starSize: 1, tips: true, core: true, rotation: 0 } },
+  ring:          { label: 'Ring', note: 'a hollow ring of stars', escalate: true,
+                   params: ['count', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 22, starSize: 1, density: 1, core: false, rotation: 0 } },
+  willow:        { label: 'Willow', note: 'trails that droop', escalate: true,
+                   params: ['count', 'length', 'trail', 'starSize', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 18, length: 1, trail: 0.7, starSize: 1, tips: true, core: false, rotation: 0 } },
+  palm:          { label: 'Palm', note: 'a few thick curving arms', escalate: false,
+                   params: ['count', 'length', 'starSize', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 6, length: 1, starSize: 1, tips: true, core: true, rotation: 0 } },
+  crossette:     { label: 'Crossette', note: 'arms that split', escalate: true,
+                   params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 8, length: 1, starSize: 1, density: 1, tips: true, core: true, rotation: 0 } },
+  dahlia:        { label: 'Dahlia', note: 'thick petals', escalate: true,
+                   params: ['count', 'length', 'starSize', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 12, length: 1, starSize: 1, core: true, rotation: 0 } },
+  glitter:       { label: 'Glitter', note: 'a cloud of strobing sparks', escalate: true,
+                   params: ['count', 'starSize', 'density', 'core', ...COLOR_PARAMS], defaults: { count: 34, starSize: 1, density: 1, core: false } },
+  blossom:       { label: 'Blossom', note: 'a five-petal flower', escalate: false,
+                   params: ['count', 'length', 'starSize', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 5, length: 1, starSize: 1, core: true, rotation: 0 } },
+};
+export const TYPE_IDS = Object.keys(TYPES);
+
 
 // group: the panel's optgroup. item: the number in the ruled list.
 export const MOTIFS = {
-  classic:       { label: 'Classic', group: 'Originals', note: 'peony at 1-2, chrysanthemum at 3-4, crossette at 5' },
-  peony:         { label: 'Peony', group: 'Originals' },
-  chrysanthemum: { label: 'Chrysanthemum', group: 'Originals' },
-  willow:        { label: 'Willow', group: 'Originals' },
-  crossette:     { label: 'Crossette', group: 'Originals' },
-  teardrop:      { label: 'Teardrop peony', group: 'Single bursts', item: 1, ref: '1, 3, 5, 17' },
-  doublering:    { label: 'Double-ring peony', group: 'Single bursts', item: 2, ref: '4, 9, 27, 36' },
-  sparklecore:   { label: 'Sparkle-core peony', group: 'Single bursts', item: 3, ref: '2, 18, 78, 93' },
-  spoke:         { label: 'Spoke disc', group: 'Single bursts', item: 4, ref: '7, 25, 66, 70' },
-  spokecore:     { label: 'Spoke disc with a core', group: 'Single bursts', item: 5, ref: '12, 19, 36' },
-  weeping:       { label: 'Weeping willow', group: 'Single bursts', item: 6, ref: '8, 53, 72, 98' },
-  crowned:       { label: 'Willow with a crown', group: 'Single bursts', item: 7, ref: '10, 11, 35' },
-  dome:          { label: 'Dome', group: 'Single bursts', item: 8, ref: '39, 40' },
-  split:         { label: 'Split burst', group: 'Single bursts', item: 9, ref: '105' },
-  dotring:       { label: 'Dot ring', group: 'Single bursts', item: 10, ref: '89, 105' },
-  rosettes:      { label: 'Rosette field', group: 'Fields', item: 11, ref: '13, 15, 23, 30, 41' },
-  starfield:     { label: 'Starfield', group: 'Fields', item: 12, ref: '34, 67, 86, 90' },
+  ...Object.fromEntries(TYPE_IDS.map((id) => [id, { label: TYPES[id].label, group: 'Firework types', note: TYPES[id].note }])),
+  classic:       { label: 'Classic', group: 'Phase 1', note: 'peony at 1-2, chrysanthemum at 3-4, crossette at 5' },
+  'radial-peony':         { label: 'Radial peony', group: 'Phase 1' },
+  'radial-chrysanthemum': { label: 'Radial chrysanthemum', group: 'Phase 1' },
+  'radial-willow':        { label: 'Radial willow', group: 'Phase 1' },
+  'radial-crossette':     { label: 'Radial crossette', group: 'Phase 1' },
+  teardrop:      { label: 'Teardrop peony', group: 'Catalogue', item: 1, ref: '1, 3, 5, 17' },
+  doublering:    { label: 'Double-ring peony', group: 'Catalogue', item: 2, ref: '4, 9, 27, 36' },
+  sparklecore:   { label: 'Sparkle-core peony', group: 'Catalogue', item: 3, ref: '2, 18, 78, 93' },
+  spoke:         { label: 'Spoke disc', group: 'Catalogue', item: 4, ref: '7, 25, 66, 70' },
+  spokecore:     { label: 'Spoke disc with a core', group: 'Catalogue', item: 5, ref: '12, 19, 36' },
+  weeping:       { label: 'Weeping willow', group: 'Catalogue', item: 6, ref: '8, 53, 72, 98' },
+  crowned:       { label: 'Willow with a crown', group: 'Catalogue', item: 7, ref: '10, 11, 35' },
+  dome:          { label: 'Dome', group: 'Catalogue', item: 8, ref: '39, 40' },
+  split:         { label: 'Split burst', group: 'Catalogue', item: 9, ref: '105' },
+  dotring:       { label: 'Dot ring', group: 'Catalogue', item: 10, ref: '89, 105' },
+  rosettes:      { label: 'Rosette field', group: 'Catalogue fields', item: 11, ref: '13, 15, 23, 30, 41' },
+  starfield:     { label: 'Starfield', group: 'Catalogue fields', item: 12, ref: '34, 67, 86, 90' },
 };
 export const MOTIF_IDS = Object.keys(MOTIFS);
+// The parameters each motif takes: a type its own list; a catalogue burst or a
+// phase-1 burst colours and rotation; a field colours only (a rotated field
+// would leave its rect).
+export function motifParams(motif) {
+  if (TYPES[motif]) return TYPES[motif].params;
+  if (MOTIFS[motif] && FIELD_MOTIFS.includes(motif)) return COLOR_PARAMS;
+  return MOTIFS[motif] ? ['rotation', ...COLOR_PARAMS] : [];
+}
 
 // The second tier under a burst (items 21 and 24 of the ruled list).
 export const TIERS = {
@@ -109,30 +175,55 @@ function rng(seed) {
   return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
 
-// The default spec for a suit's rank under a motif and tier. The seed is the
-// suit and rank only, so changing a suit's motif never re-rolls another card.
-export function defaultSpec(suit, rank, allSuits, motif = 'classic', tier = 'none') {
+// Count+Scale: N fireworks, each growing with rank.
+export const COUNTSCALE_SIZES = [0.62, 0.72, 0.82, 0.91, 1.0];
+
+// The default spec for a suit's rank under a motif, tier and composition. The
+// seed is the suit and rank only, so changing a suit's motif never re-rolls
+// another card. compose: 'scale' (and 'column', 'bleed') escalate the firework
+// with rank as phase 1 did; 'count' draws every firework at rank 5's fullness
+// (the rank is the count); 'countscale' escalates and shrinks to the ramp above.
+export function defaultSpec(suit, rank, allSuits, motif = 'classic', tier = 'none', compose = 'scale') {
   const colors = suit.multicolor
     ? allSuits.filter((s) => !s.multicolor).map((s) => s.primary)
     : [suit.primary, suit.secondary];
   const seed = hashSeed(`${suit.id}:${rank}`);
   const m = MOTIFS[motif] ? motif : 'classic';
+  const er = compose === 'count' ? 5 : rank;      // the rank the firework escalates to
   let spec;
-  if (m === 'classic') spec = { version: SPEC_VERSION, motif: m, ...RANK_TABLE[rank], colors, seed };
-  else if (BURST_TYPES.includes(m)) spec = { version: SPEC_VERSION, motif: m, ...RANK_TABLE[rank], burstType: m, colors, seed };
+  if (m === 'classic') spec = { version: SPEC_VERSION, motif: m, ...RANK_TABLE[er], colors, seed };
+  else if (RADIAL_IDS.includes(m)) spec = { version: SPEC_VERSION, motif: m, ...RANK_TABLE[er], burstType: m.slice(7), colors, seed };
+  else if (TYPES[m]) spec = { version: SPEC_VERSION, motif: m, size: SIZES[er - 1], colors, seed, rank: er, ...TYPES[m].defaults };
   else {
-    spec = { version: SPEC_VERSION, motif: m, size: (FIELD_MOTIFS.includes(m) ? FIELD_SIZES : SIZES)[rank - 1], count: COUNTS[m][rank - 1], colors, seed, core: rank >= 3 };
-    if (RINGS[m]) spec.rings = RINGS[m][rank - 1];
+    spec = { version: SPEC_VERSION, motif: m, size: (FIELD_MOTIFS.includes(m) ? FIELD_SIZES : SIZES)[er - 1], count: COUNTS[m][er - 1], colors, seed, core: er >= 3 };
+    if (RINGS[m]) spec.rings = RINGS[m][er - 1];
   }
+  if (compose === 'count') spec.size = 1;
+  else if (compose === 'countscale') spec.size = COUNTSCALE_SIZES[rank - 1];
+  if (compose === 'count' || compose === 'countscale') spec.trail = TYPES[m] ? spec.trail : false;
   spec.tier = TIERS[tier] && tier !== 'none' && TIER_RANKS.includes(rank) ? { motif: tier, count: TIER_COUNTS[tier][rank] } : null;
   return spec;
 }
 
+// The cell's own override, less its arrangement.
+export function cellOverride(design, suitId, rank) {
+  const o = design.fireworks && design.fireworks[suitId] && design.fireworks[suitId][rank];
+  if (!o || typeof o !== 'object') return null;
+  const { items, ...rest } = o;
+  return rest;
+}
+
 export function fireworkSpec(design, suit, rank) {
   const c = suit.centre || {};
-  const tier = c.layout === undefined || c.layout === 'single' ? c.tier : 'none';
-  const spec = defaultSpec(suit, rank, design.suits, c.motif, tier);
-  const over = design.fireworks && design.fireworks[suit.id] && design.fireworks[suit.id][rank];
+  const compose = c.compose || 'scale';
+  const tier = compose === 'scale' ? c.tier : 'none';
+  const over = cellOverride(design, suit.id, rank);
+  // a cell may override the type itself; the defaults are then that type's
+  const motif = over && MOTIFS[over.motif] ? over.motif : c.motif;
+  const spec = defaultSpec(suit, rank, design.suits, motif, tier, compose);
+  const takes = motifParams(spec.motif);
+  const mine = suit.firework && typeof suit.firework === 'object' ? suit.firework : {};
+  for (const k of takes) if (mine[k] !== undefined && mine[k] !== '') spec[k] = mine[k];
   return over ? { ...spec, ...over } : spec;
 }
 const f = (v) => +v.toFixed(3);
@@ -394,19 +485,38 @@ function fieldRect(box, R, size) {
 
 // box = { cx, cy, r } in the caller's units (mm on a card).
 export function renderFirework(spec, box) {
+  spec = withColours(spec);
   const m = spec.motif;
-  if (!m || m === 'classic' || BURST_TYPES.includes(m) || !(m in MOTIFS)) return drawRadial(spec, box);
+  if (!m || m === 'classic' || RADIAL_IDS.includes(m) || !(m in MOTIFS)) return rotated(drawRadial(spec, box), spec, box);
   const { cx, cy, r } = box;
   const R = r * Math.max(0.05, Math.min(1, spec.size));
   const rand = rng(spec.seed);
   const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];
+  if (TYPES[m]) return `<g class="hb-firework" data-motif="${m}">${drawType(spec, cx, cy, R, Math.max(0.26, r * 0.022), rand, colors)}</g>`;
   const w = Math.max(0.26, r * 0.022);
   const s = { ...spec, colors };
   const sz = Math.max(0.05, Math.min(1, spec.size));
   // A burst is laid out on R less one stroke, so its outermost dots and line
   // caps land inside r rather than on it.
   const body = FIELDS[m] ? FIELDS[m](fieldRect(box, R, sz), s.count, colors, w, rand) : BURSTS[m](s, cx, cy, R - w, w, rand);
-  return `<g class="hb-firework" data-motif="${m}">${body}</g>`;
+  return rotated(`<g class="hb-firework" data-motif="${m}">${body}</g>`, FIELDS[m] ? {} : spec, box);
+}
+
+// A phase-1 or catalogue burst turned by spec.rotation: about its centre, so
+// it still reaches no further than r. Nothing is wrapped at rotation 0, so an
+// unrotated burst is the markup it always was.
+function rotated(svg, spec, box) {
+  const a = +spec.rotation || 0;
+  if (!a) return svg;
+  return svg.replace(/^<g class="hb-firework"/, `<g class="hb-firework" transform="rotate(${f(a)} ${f(box.cx)} ${f(box.cy)})"`);
+}
+// outerColor / coreColor replace the first two colours; unset, nothing moves.
+function withColours(spec) {
+  if (!spec.outerColor && !spec.coreColor) return spec;
+  const colors = [...(spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'])];
+  if (spec.outerColor) colors[0] = spec.outerColor;
+  if (spec.coreColor) { if (colors.length < 2) colors.push(spec.coreColor); else colors[1] = spec.coreColor; }
+  return { ...spec, colors };
 }
 
 // The second tier, inside rect = { x, y, w, h }. Nothing when spec.tier is null.
@@ -416,4 +526,215 @@ export function renderTier(spec, rect) {
   const w = Math.max(0.26, Math.min(rect.w, rect.h) * 0.02);
   const rand = rng((spec.seed ^ 0x9e3779b9) >>> 0);
   return `<g class="hb-tier" data-tier="${spec.tier.motif}">${FIELDS[spec.tier.motif](rect, spec.tier.count, [...colors.slice(1), colors[0]], w, rand)}</g>`;
+}
+
+// ---------------------------------------------------------------- the nine types
+// Each type builds PRIMITIVES in a unit frame — the burst's centre at (0, 0),
+// its reach about 1, y down — with stroke widths and dot radii in mm. drawType
+// rotates them by spec.rotation, scales them to R (shrinking only, so nothing
+// reaches past R including its stroke), and emits absolute coordinates only:
+// lines, circles, and paths of M/L/C/Z, which the gate reads point by point.
+
+const clampN = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+// How many arms / stars a type draws at a rank: the base count at rank 5,
+// one step fewer per rank below, never under 3.
+export function escalatedCount(type, base, rank) {
+  const n = Math.max(3, Math.round(+base || 3));
+  if (!TYPES[type] || !TYPES[type].escalate) return n;
+  const step = Math.max(1, Math.round(n * 0.12));
+  return Math.max(3, n - (5 - clampN(rank | 0 || 5, 1, 5)) * step);
+}
+
+const pol = (a, d) => [Math.cos(a) * d, Math.sin(a) * d];
+// a cubic split at t: the second piece's control points
+function cubicTail(p0, p1, p2, p3, t) {
+  const L = (a, b) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const a = L(p0, p1), b = L(p1, p2), c = L(p2, p3), d = L(a, b), e = L(b, c), g = L(d, e);
+  return [g, e, c, p3];
+}
+function cubicHead(p0, p1, p2, p3, t) {
+  const L = (a, b) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const a = L(p0, p1), b = L(p1, p2), c = L(p2, p3), d = L(a, b), e = L(b, c), g = L(d, e);
+  return [p0, a, d, g];
+}
+function cubicAt(p0, p1, p2, p3, t) {
+  const u = 1 - t;
+  return [u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+          u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]];
+}
+
+const TYPE_DRAW = {
+  // concentric rings of round stars; no lines at all
+  peony(s, n, w, rand, o, c) {
+    const out = [], ss = s.starSize, rings = clampN(Math.round(1 + 2 * (s.density ?? 1)), 1, 5);
+    const dr = w * 1.55 * ss;
+    for (let k = 0; k < rings; k++) {
+      const rr = 1 - k / (rings + 0.6), nk = Math.max(5, Math.round(n * rr)), ph = rand() * Math.PI * 2;
+      for (let i = 0; i < nk; i++) out.push({ k: 'dot', p: pol(ph + (i / nk) * Math.PI * 2, rr), r: dr * (1 - k * 0.12), col: k % 2 ? c : o });
+    }
+    if (s.core) out.push({ k: 'dot', p: [0, 0], r: dr * 1.5, col: c });
+    return out;
+  },
+  // long straight arms, a faint trail behind each bright head
+  chrysanthemum(s, n, w, rand, o, c) {
+    const out = [], len = s.length ?? 1, tr = clampN(s.trail ?? 0.75, 0, 1), ph = rand() * Math.PI * 2;
+    const r0 = Math.max(0.08, len * (1 - tr)), wd = Math.max(0.16, w * 0.62 * s.starSize);
+    for (let i = 0; i < n; i++) {
+      const a = ph + (i / n) * Math.PI * 2 + (rand() - 0.5) * 0.06, l = len * (0.92 + rand() * 0.08);
+      if (r0 > 0.1) out.push({ k: 'line', a: pol(a, 0.06), b: pol(a, r0), w: wd * 0.5, col: o, op: 0.4 });
+      out.push({ k: 'line', a: pol(a, r0), b: pol(a, l), w: wd, col: i % 2 ? c : o });
+      if (s.tips) out.push({ k: 'dot', p: pol(a, l), r: wd * 1.35, col: o });
+    }
+    if (s.core) out.push({ k: 'dot', p: [0, 0], r: w * 1.6, col: c });
+    return out;
+  },
+  // one hollow ring of stars (two at high density); nothing inside but a core
+  ring(s, n, w, rand, o, c) {
+    const out = [], dr = w * 1.35 * s.starSize, ph = rand() * Math.PI * 2;
+    for (let i = 0; i < n; i++) out.push({ k: 'dot', p: pol(ph + (i / n) * Math.PI * 2, 1), r: dr, col: o });
+    if ((s.density ?? 1) > 1.25) {
+      const m = Math.round(n * 0.84);
+      for (let i = 0; i < m; i++) out.push({ k: 'dot', p: pol(ph + ((i + 0.5) / m) * Math.PI * 2, 0.84), r: dr * 0.7, col: c });
+    }
+    if (s.core) out.push({ k: 'dot', p: [0, 0], r: dr * 1.2, col: c });
+    return out;
+  },
+  // arms thrown out that fall: every trail droops toward the ground
+  willow(s, n, w, rand, o, c) {
+    const out = [], len = s.length ?? 1, tr = clampN(s.trail ?? 0.7, 0.1, 1), ph = rand() * Math.PI * 2;
+    const wd = Math.max(0.16, w * 0.55 * s.starSize);
+    for (let i = 0; i < n; i++) {
+      const a = ph + (i / n) * Math.PI * 2, cs = Math.cos(a), sn = Math.sin(a), L = len * (0.9 + rand() * 0.1);
+      const p0 = [cs * 0.05, sn * 0.05], p1 = [cs * L * 0.6, sn * L * 0.6];
+      const p2 = [cs * L * 0.82, sn * L * 0.42 + L * 0.3], p3 = [cs * L * 0.74, sn * L * 0.28 + L * 0.62];
+      const t0 = 1 - tr;
+      if (t0 > 0.02) out.push({ k: 'cubic', pts: cubicHead(p0, p1, p2, p3, t0), w: wd * 0.6, col: o, op: 0.35 });
+      out.push({ k: 'cubic', pts: cubicTail(p0, p1, p2, p3, t0), w: wd, col: i % 2 ? c : o });
+      if (s.tips) out.push({ k: 'dot', p: p3, r: wd * 1.3, col: o });
+    }
+    if (s.core) out.push({ k: 'dot', p: [0, 0], r: w * 1.5, col: c });
+    return out;
+  },
+  // a few thick tapered fronds, each rising and curling over
+  palm(s, n, w, rand, o, c) {
+    const out = [], len = s.length ?? 1, ph = -Math.PI / 2 + (rand() - 0.5) * 0.2;
+    const W = w * 3.4 * s.starSize;
+    for (let i = 0; i < n; i++) {
+      const a = ph + (i / n) * Math.PI * 2, cs = Math.cos(a), sn = Math.sin(a), L = len;
+      const p0 = [0, 0], p1 = [cs * L * 0.55, sn * L * 0.55], p2 = [cs * L * 0.95, sn * L * 0.78 + L * 0.12], p3 = [cs * L * 0.9, sn * L * 0.62 + L * 0.3];
+      const pts = [], hw = [];
+      for (let k = 0; k <= 14; k++) {
+        const t = k / 14;
+        pts.push(cubicAt(p0, p1, p2, p3, t));
+        hw.push((W / 2) * Math.sin(Math.PI * (0.1 + 0.9 * t)) + W * 0.08);   // thickest mid-frond, narrowing to the tip
+      }
+      out.push({ k: 'ribbon', pts, hw, col: i % 2 ? c : o });
+      if (s.tips) out.push({ k: 'dot', p: p3, r: W * 0.3, col: o });
+    }
+    if (s.core) out.push({ k: 'dot', p: [0, 0], r: W * 0.55, col: c });
+    return out;
+  },
+  // arms that split near their end into a fork (three tines at high density)
+  crossette(s, n, w, rand, o, c) {
+    const out = [], len = s.length ?? 1, ph = rand() * Math.PI * 2, wd = Math.max(0.16, w * 0.62 * s.starSize);
+    const tines = (s.density ?? 1) > 1.3 ? [-0.55, 0, 0.55] : [-0.5, 0.5];
+    for (let i = 0; i < n; i++) {
+      const a = ph + (i / n) * Math.PI * 2, j = pol(a, len * 0.56);
+      out.push({ k: 'line', a: pol(a, 0.08), b: j, w: wd, col: o });
+      for (const da of tines) {
+        const e = [j[0] + Math.cos(a + da) * len * 0.4, j[1] + Math.sin(a + da) * len * 0.4];
+        out.push({ k: 'line', a: j, b: e, w: wd * 0.85, col: c });
+        if (s.tips) out.push({ k: 'dot', p: e, r: wd * 1.3, col: c });
+      }
+    }
+    if (s.core) out.push({ k: 'dot', p: [0, 0], r: w * 1.6, col: c });
+    return out;
+  },
+  // short, fat petals of light round a core, gaps between them
+  dahlia(s, n, w, rand, o, c) {
+    const out = [], len = s.length ?? 1, ph = rand() * Math.PI * 2, W = w * 3.4 * s.starSize;
+    for (let i = 0; i < n; i++) {
+      const a = ph + (i / n) * Math.PI * 2;
+      out.push({ k: 'line', a: pol(a, len * 0.36), b: pol(a, len * 0.86), w: W, col: i % 2 ? c : o });
+    }
+    if (s.core) {
+      const m = Math.max(6, Math.round(n * 0.75));
+      for (let i = 0; i < m; i++) out.push({ k: 'dot', p: pol(ph + (i / m) * Math.PI * 2, len * 0.17), r: w * 0.8, col: c });
+      out.push({ k: 'dot', p: [0, 0], r: w * 1.3, col: o });
+    }
+    return out;
+  },
+  // a cloud of four-point sparks with no structure at all
+  glitter(s, n, w, rand, o, c) {
+    const out = [], m = Math.max(6, Math.round(n * (s.density ?? 1)));
+    for (let i = 0; i < m; i++) {
+      const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * 0.94, p = pol(a, d), z = (0.05 + rand() * 0.07) * s.starSize;
+      const col = i % 3 === 2 ? c : o, wd = Math.max(0.16, w * 0.62);
+      if (i % 4 === 3) { out.push({ k: 'dot', p, r: wd * 1.2, col }); continue; }
+      out.push({ k: 'line', a: [p[0] - z, p[1]], b: [p[0] + z, p[1]], w: wd, col });
+      out.push({ k: 'line', a: [p[0], p[1] - z], b: [p[0], p[1] + z], w: wd, col });
+    }
+    if (s.core) out.push({ k: 'dot', p: [0, 0], r: w * 1.5, col: c });
+    return out;
+  },
+  // solid notched petals (the sakura blossom), stamens at the centre
+  blossom(s, n, w, rand, o, c) {
+    const out = [], len = s.length ?? 1, ph = -Math.PI / 2, k = Math.min(1, 5 / n) * clampN(s.starSize, 0.5, 1.6);
+    for (let i = 0; i < n; i++) {
+      const a = ph + (i / n) * Math.PI * 2, cs = Math.cos(a), sn = Math.sin(a);
+      const at = (u, v) => [(cs * u - sn * v * k) * len, (sn * u + cs * v * k) * len];
+      out.push({ k: 'petal', segs: [at(0.13, 0),
+        [at(0.3, 0.3), at(0.7, 0.44), at(0.97, 0.15)], at(0.87, 0), at(0.97, -0.15),
+        [at(0.7, -0.44), at(0.3, -0.3), at(0.13, 0)]], col: o });
+    }
+    if (s.core) {
+      for (let i = 0; i < n; i++) {
+        const a = ph + ((i + 0.5) / n) * Math.PI * 2;
+        out.push({ k: 'line', a: [0, 0], b: pol(a, len * 0.3), w: Math.max(0.14, w * 0.4), col: c });
+        out.push({ k: 'dot', p: pol(a, len * 0.3), r: w * 0.7, col: c });
+      }
+      out.push({ k: 'dot', p: [0, 0], r: w * 1.2, col: c });
+    }
+    return out;
+  },
+};
+
+function drawType(spec, cx, cy, R, w, rand, colors) {
+  const s = { ...TYPES[spec.motif].defaults, ...spec };
+  s.starSize = clampN(+s.starSize || 1, PARAMS.starSize.min, PARAMS.starSize.max);
+  const n = escalatedCount(spec.motif, s.count, s.rank);
+  const o = colors[0], c = pick(colors, 1);
+  const prims = TYPE_DRAW[spec.motif](s, n, w, rand, o, c);
+  // fit: the unit frame is scaled to R, shrinking until every point plus its
+  // stroke or radius lands inside R
+  let k = R;
+  const each = (fn) => { for (const p of prims) {
+    if (p.k === 'dot') fn(p.p, p.r);
+    else if (p.k === 'line') { fn(p.a, p.w / 2); fn(p.b, p.w / 2); }
+    else if (p.k === 'cubic') for (const q of p.pts) fn(q, p.w / 2);
+    else if (p.k === 'ribbon') p.pts.forEach((q, i) => fn(q, p.hw[i]));
+    else for (const g of p.segs) for (const q of (Array.isArray(g[0]) ? g : [g])) fn(q, 0);
+  } };
+  each((q, pad) => { const d = Math.hypot(q[0], q[1]); if (d > 1e-9) k = Math.min(k, (R - pad) / d); });
+  k = Math.max(k, R * 0.05);
+  const rot = ((+spec.rotation || 0) * Math.PI) / 180, cs = Math.cos(rot), sn = Math.sin(rot);
+  const T = (q) => [cx + (q[0] * cs - q[1] * sn) * k, cy + (q[0] * sn + q[1] * cs) * k];
+  const Pq = (q) => { const t = T(q); return P(t[0], t[1]); };
+  const op = (p) => (p.op ? ` stroke-opacity="${p.op}"` : '');
+  return prims.map((p) => {
+    if (p.k === 'dot') { const t = T(p.p); return dot(t[0], t[1], p.r, p.col); }
+    if (p.k === 'line') { const a = T(p.a), b = T(p.b); return line(a[0], a[1], b[0], b[1], p.col, p.w, op(p)); }
+    if (p.k === 'cubic') return `<path d="M${Pq(p.pts[0])} C${Pq(p.pts[1])} ${Pq(p.pts[2])} ${Pq(p.pts[3])}" fill="none" stroke="${p.col}" stroke-width="${f(p.w)}" stroke-linecap="round"${op(p)}/>`;
+    if (p.k === 'ribbon') {
+      // the centreline in mm, then offset by each sample's half-width (mm)
+      const c = p.pts.map(T), left = [], right = [];
+      c.forEach((q, i) => {
+        const a = c[Math.max(0, i - 1)], b = c[Math.min(c.length - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], dl = Math.hypot(dx, dy) || 1;
+        left.push(P(q[0] - (dy / dl) * p.hw[i], q[1] + (dx / dl) * p.hw[i])); right.push(P(q[0] + (dy / dl) * p.hw[i], q[1] - (dx / dl) * p.hw[i]));
+      });
+      return `<path d="M${[...left, ...right.reverse()].join(' L')} Z" fill="${p.col}"/>`;
+    }
+    const sg = p.segs;
+    return `<path d="M${Pq(sg[0])} C${sg[1].map(Pq).join(' ')} L${Pq(sg[2])} L${Pq(sg[3])} C${sg[4].map(Pq).join(' ')} Z" fill="${p.col}"/>`;
+  }).join('');
 }
