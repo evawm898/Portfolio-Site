@@ -607,7 +607,14 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       // stretch of every wire within 2F of the band (2 × MIN_FEATURE_MM —
       // restated, never the module's CHAIN_GAP) reaches an embed; an approach
       // that comes near and does not touch reads as a slit
-      const sil = RL.plateOutline(model).map(([x, y]) => [x * rel.scale, y * rel.scale]);
+      // the FRAME's silhouette (the model before the ornament): the ornamented
+      // model's box grows to carry what stands past the frame, and its plate
+      // with it, so the plate under a motif past the frame's edge read as
+      // opening (found by a mutant: a sill rosette 0.07 mm past the sill's
+      // foot, on plate the relief builds for it). The module's own opening is
+      // this one (frame-filigree.js, frame-vine.js: plateOutline(model) of
+      // the frame before the ornament)
+      const sil = RL.plateOutline(G.buildFrame(q)).map(([x, y]) => [x * rel.scale, y * rel.scale]);
       W.forEach((w, x) => {
         // the chains' rule; the phase-3a groups are counted and reported
         for (const q of w.c) if (pip(q, sil) && depthIn(fs_, q) < 0) { if (!/(chains|vine)$/.test(name)) { groupOpen++; break; } or7.push(`${name}: wire ${x} reaches into the opening at (${q[0].toFixed(1)}, ${q[1].toFixed(1)})`); opened++; break; }
@@ -1120,7 +1127,7 @@ const MUTANTS = [
   { id: 'a-scroll-detached', file: 'filigree', from: 'return { curves: cs, push: d };', to: 'return { curves: at(d - 3), push: d };', breaks: ['OR1', 'OR4'] },
   { id: 'the-graze-rule-removed', file: 'filigree', from: '    if (!g.length) break;', to: '    break;', breaks: ['OR4'] },
   { id: 'the-group-clearance-removed', file: 'filigree', from: 'if (worst < MIN_FEATURE_MM) { told.push(', to: 'if (false) { told.push(', breaks: ['OR3'] },
-  { id: 'the-mirror-is-broken', file: 'filigree', from: 'export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [-x, y])', to: 'export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [0.02 - x, y])', breaks: ['OR5', 'OR3'] },   // the crest pair stands exactly a feature apart, so 0.02 mm closes it under the floor
+  { id: 'the-mirror-is-broken', file: 'filigree', from: 'export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [-x, y])', to: 'export const mirrorCurve = (c) => ({ ...c, pts: c.pts.map(([x, y]) => [0.02 - x, y])', breaks: ['OR5', 'OR3', 'OR9'] },   // the crest pair stands exactly a feature apart, so 0.02 mm closes it under the floor; and the vine's left stem, seated by its right's lift (lift 0, read at the emitted vertices), stands 0.02 mm off the molding it was read on (OR9)
   { id: 'the-rect-seam-offset-0.1mm', file: 'geometry', from: 'push(0, yb, 0, 1, false); anchorIdx.bottom = 0;', to: 'push(0.1, yb, 0, 1, false); anchorIdx.bottom = 0;', breaks: ['Q'] },
   // phase 3c, the carved primitives: the self-similar width law broken two
   // ways, the arris section swapped, the leaf's width law broken two ways,
@@ -1136,11 +1143,11 @@ const MUTANTS = [
   { id: 'the-budget-give-way-removed', file: 'filigree', from: 'if (tris + gTris > triBudget) { told.push(`the ${g} group', to: 'if (false) { told.push(`the ${g} group', breaks: ['TB2'] },
   { id: 'the-chain-budget-give-way-removed', file: 'filigree', from: 'if (tris + gTris > triBudget) { told.push(`the ${run.id} chain', to: 'if (false) { told.push(`the ${run.id} chain', breaks: ['TB2'] },
   // phase 3d — the chains
-  { id: 'the-chain-is-not-seated', file: 'filigree', from: '    if (c.lift) spine.baseLift = orn.H ?', to: '    if (false) spine.baseLift = orn.H ?', breaks: ['OR9', 'CL1'] },   // unseated, a chain's leaves no longer stand on their host's crown (CL1)
+  { id: 'the-chain-is-not-seated', file: 'filigree', from: '    if (c.lift) spine.baseLift = orn.H ?', to: '    if (false) spine.baseLift = orn.H ?', breaks: ['OR9', 'CL1', 'VN5'] },   // unseated, a chain's leaves no longer stand on their host's crown (CL1)
   { id: 'the-chain-slit-rule-removed', file: 'filigree', from: 'export function slitWorst(c, region) {\n  let worst = -Infinity;', to: 'export function slitWorst(c, region) {\n  return -Infinity;\n  let worst = -Infinity;', breaks: ['OR8', 'OR4', 'OR3'] },   // unpushed, an element grazes the band (OR4) and its neighbours (OR3)
   { id: 'the-chain-opening-check-removed', file: 'filigree', from: 'const intrusion = (o) => { if (!opening) return 0;', to: 'const intrusion = (o) => { return 0;', breaks: ['OR7', 'OR3'] },   // left in the opening, elements also crowd each other (OR3)
   { id: 'the-mapped-tangent-wraps', file: 'filigree', from: '  for (let i = 1; i < m; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', to: '  for (let i = 1; i < 0; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', breaks: ['OR3'] },   // the coil check blind where a mapped coil closes (found in the 3d build)
-  { id: 'the-seat-is-read-off-the-centreline', file: 'filigree', from: 'spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth) : c.lift;', to: 'spine.baseLift = c.lift;', breaks: ['OR9'] },   // the seat read on the centreline's span, not at the emitted columns: crowns 0.989 mm where the floor is 1
+  { id: 'the-seat-is-read-off-the-centreline', file: 'filigree', from: 'spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth) : c.lift;', to: 'spine.baseLift = c.lift;', breaks: ['OR9', 'VN5'] },   // the seat read on the centreline's span, not at the emitted columns: crowns 0.989 mm where the floor is 1
   { id: 'a-folded-element-is-built', file: 'filigree', from: ": selfGap(on).gap < F + CHAIN_MARGIN ? 'laid across", to: ": false ? 'laid across", breaks: ['OR3'] },   // an element the path folds (across an ear) is built anyway
   // PHASE 3e — the band pattern (frame-pattern.js)
   { id: 'the-bead-pitch-cap-removed', file: 'pattern', from: 'if (pt > BEAD_FUSE * r) {', to: 'if (false) {', breaks: ['PT2'] },   // 2 mm beads asked 3 mm apart are built 3 mm apart: no neck

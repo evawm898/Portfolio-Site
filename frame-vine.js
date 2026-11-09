@@ -50,7 +50,7 @@ import {
   CHAIN_RUNS, CHAIN_SEAT, runPath, mapToPath, bandRegion, moldingHeightField, seatOn, slitWorst, mirrorCurve,
   wireClear, wireClearBound, joinsCleanly, buildScroll, buildLeaf, carvedCap, LEAF_ASPECT, wAt, selfGap, profileFor, rigid, pip, placeMotif, wireHeight, wireProfile, LEAF_RELIEF,
 } from './frame-filigree.js';
-import { placeElement, relift, mirrorElement, wireElementContact, elementClear, elementDepth } from './frame-elements.js';
+import { placeElement, relift, mirrorElement, wireElementContact, elementClear, elementDepth, footprintTouches } from './frame-elements.js';
 
 /* the field's constants (one each, every one a measured choice in §17) */
 export const HIER = {
@@ -415,7 +415,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       const ang = -c.side * 1.15, dir = [Math.cos(ang) * T[0] + Math.sin(ang) * N[0], Math.cos(ang) * T[1] + Math.sin(ang) * N[1]];
       const at = [P[0] + dir[0] * 0.7 * R, P[1] + dir[1] * 0.7 * R];
       let el = placeElement('bud', { size, at, angle: Math.atan2(dir[1], dir[0]) - Math.PI / 2, lift: 0 });
-      if (el.loops.some((l) => l.some((q) => opening(q)))) return null;
+      if (footprintTouches(el, opening)) return null;
       let lift = 0; const Pp = el.positions; for (let k = 0; k < Pp.length; k += 3) if (Pp[k + 2] !== 0) lift = Math.max(lift, Hz([Pp[k], Pp[k + 1]]), Hz([-Pp[k], Pp[k + 1]]));
       el = relift(el, lift);
       return { el };

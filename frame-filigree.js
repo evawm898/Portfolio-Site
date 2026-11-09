@@ -48,7 +48,7 @@
 import { offsetCurve, outerEdge, innerEdge, sweepSpine } from './frame-geometry.js';
 import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound, plateOutline } from './frame-relief.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
-import { placeElement, relift, mirrorElement, symmetrizeElement, wireElementContact, elementClear } from './frame-elements.js';
+import { placeElement, relift, mirrorElement, symmetrizeElement, wireElementContact, elementClear, footprintTouches } from './frame-elements.js';
 import { vineFor } from './frame-vine.js';
 
 export const SCROLL_STEP_DEG = 3;
@@ -1166,7 +1166,7 @@ export function placeMotif(kind, { size, at, out, H, opening, onAxis = false, su
   let c = at, el = null;
   for (let k = 0; k <= 16 * size; k++) {
     el = placeElement(kind, { size, at: c, angle, lift: 0 });
-    if (!el.loops.some((l) => l.some((q) => opening(q)))) break;
+    if (!footprintTouches(el, opening)) break;
     el = null; c = [at[0] + out[0] * 0.25 * (k + 1), at[1] + out[1] * 0.25 * (k + 1)];
   }
   if (!el) return null;

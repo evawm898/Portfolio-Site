@@ -1472,6 +1472,25 @@ Off the emitted mesh, over every vine row of the relief gate: **thinnest wire 1.
 1.1099 mm, root embeds 2.093–6.476 mm, stem seat depth 0.0000 mm** (every row ON the molding), items'
 least joint with their stem 1.033 mm, least motif joint 4.828 mm.
 
+**Found, pre-existing, not fixed:** the page and Node do not build the same relief. On `main` (`03d6ee3`) the
+default arch is 68,460 triangles in the page and 68,076 in Node with the filigree OFF (+384 — the page's
+setParams path, not the ornament), and the oval's STL hashes differ at an equal count (last-bit
+arithmetic across the two engines). Every relief gate measures Node; nothing compares the page's STL with
+it. On this tree the same +384 shows on the arch at every hierarchy, and the oval differs by hash only.
+That is its own session (an X0-style clause for the frame).
+
+**The relief gate's opening was the ORNAMENTED model's silhouette** (`plateOutline` of the model after
+`withOrnament`, whose box grows to carry what stands past the frame) — so the plate the relief builds
+under a motif past the sill's foot read as opening, and three filigree mutants reddened PL3 for it (a
+sill rosette 0.07 mm past the sill). OR7 and PL3 read the frame's own silhouette now, as both modules
+do. Placement tests a bead's equator at 96 points (`footprintTouches`), a multiple of every coarser
+sampling a reader takes.
+
+**The sweep:** all 46 relief mutants behave. 40 did on the first full run; three widened honestly
+(`the-mirror-is-broken` +OR9, `the-chain-is-not-seated` +VN5, `the-seat-is-read-off-the-centreline`
++VN5 — the vine's stem is seated by the same `seatEmitted`), and the three PL3 extras went with the
+gate's silhouette fix and were re-run clean.
+
 ### 17.7 Decisions made without a ruling, and what is Eva's
 
 Decisions:

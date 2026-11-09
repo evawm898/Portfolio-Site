@@ -334,6 +334,22 @@ function partLoops(P, parts) {
   });
 }
 
+/* Does any point of the element's footprint satisfy `test` (the opening)?
+   A patch's boundary is its emitted vertices; a bead's equator is sampled
+   at 96 points — a multiple of every coarser sampling a reader takes (the
+   loops' own 24, the relief gate's 32), so a bead that clears here clears
+   for every one of them (the 24-gon's chords cut inside the 32-gon's
+   points by up to 0.017 mm on a 2 mm bead, enough for a placed rosette to
+   read as clear here and into the opening there — found by a mutant). */
+export function footprintTouches(el, test) {
+  for (let i = 0; i < el.parts.length; i++) {
+    const pt = el.parts[i];
+    if (pt.kind === 'bead') { for (let k = 0; k < 96; k++) { const a = 2 * Math.PI * k / 96; if (test([pt.c[0] + pt.r * Math.cos(a), pt.c[1] + pt.r * Math.sin(a)])) return true; } }
+    else if (el.loops[i].some((q) => test(q))) return true;
+  }
+  return false;
+}
+
 /* PLACE: kind at size, rotated by `angle` (its local +y — the axis every
    builder grows along — to the direction angle + π/2), its origin to `at`,
    every non-base vertex raised by `lift`. Positions in print mm with z
