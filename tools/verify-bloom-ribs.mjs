@@ -45,11 +45,15 @@
          here, never imported.
      R8  THE STARBURST REACHES THE EDGE (Nov 9, third round) — on a starburst
          at its ruled 'edge' reach, every hub-top vertex (normal up) between
-         the petal feet's inner edge + one lattice edge and three lattice
-         edges inside the hub's rim (both radii read off the LATTICE build's
-         petals and hub) carries full weight: the coverage under the feet and
-         the rim's curvature fade both stand down there, and the ribs run to
-         the rim. Asked on the plain starburst rows: a rod rooted through
+         the petal feet's inner edge + one lattice edge and the rim's EASE
+         + two lattice edges inside the hub's rim (both radii read off the
+         LATTICE build's petals and hub) carries full weight: the coverage
+         under the feet stands down and the ribs run to the rim. The ease is
+         restated (Eva, "ease off"): min(max(H x 15/8, e), max(15/8, e)) — the
+         ruled fade at H 1.0 at every height, never wider than the ruled one —
+         and where it is wider than three lattice edges, some hub-top vertex
+         inside it must be short of full weight (the ease exists; a drop in one
+         lattice edge does not pass). Asked on the plain starburst rows: a rod rooted through
          the hub top occludes it, and the shipped fade around the root stands.
    THE CENTRE (Nov 9): under COLLAR and CONCENTRIC, R1 restates the ring at
    R = max(the plain schedule's r0, the petal feet's inner edge read off the
@@ -346,17 +350,22 @@ async function runClauses(R, rows, log = true) {
       const e = R.RIB_SPACING_FLOOR_MM / 4;   // the lattice edge (the floor spacing is four of them)
       let rFeet = Infinity, rRim = 0;
       for (const g of L.stats.repl) { const PP = g.O.P; for (let i = 0; i < PP.length; i += 3) { const rr = Math.hypot(PP[i], PP[i + 1]); if (g.organ === 'petal') rFeet = Math.min(rFeet, rr); if (g.organ === 'hub') rRim = Math.max(rRim, rr); } }
+      const PEAK = 15 / 8;   // the ruled fade's peak slope, restated (TEXTURE_FADE_PEAK_SLOPE)
+      const ease = Math.min(Math.max(p.H * PEAK, e), Math.max(PEAK, e));
       const h = r.stats.repl.find((g) => g.organ === 'hub');
-      let n = 0, short = 0, worst = 1;
+      let n = 0, short = 0, worst = 1, inEase = 0, eased = 0;
       for (let i = 0; i < h.X.nV; i++) {
         if (!(h.O.N[i * 3 + 2] > 0.9)) continue;
         const rr = Math.hypot(h.O.P[i * 3], h.O.P[i * 3 + 1]);
-        if (rr < rFeet + e || rr > rRim - 3 * e) continue;
-        n++; const w = h.X.w0[i] * h.X.mc[i]; if (w < 1 - 1e-12) { short++; worst = Math.min(worst, w); }
+        const w = h.X.w0[i] * h.X.mc[i];
+        if (rr > rFeet + e && rRim - rr > 2 * e && rRim - rr < ease - e) { inEase++; if (h.X.mc[i] < 1 - 1e-12) eased++; }
+        if (rr < rFeet + e || rr > rRim - ease - 2 * e) continue;
+        n++; if (w < 1 - 1e-12) { short++; worst = Math.min(worst, w); }
       }
+      if (ease > 3 * e && !eased) bad.push(`R8 ${row.id}: no hub-top vertex inside the rim's ${ease.toFixed(3)} mm ease is short of full weight (${inEase} looked at): the ribs drop at the rim instead of easing off`);
       if (!n) bad.push(`R8 ${row.id}: no hub-top vertex between the feet's edge ${rFeet.toFixed(3)} and the rim ${rRim.toFixed(3)} mm (vacuous)`);
       if (short) bad.push(`R8 ${row.id}: ${short} of ${n} hub-top vertices between the feet's edge and the rim fall short of full weight (least ${worst.toFixed(3)})`);
-      say(`  R8 ${row.id}: ${n} hub-top vertices from the feet's edge ${rFeet.toFixed(3)} + e to the rim ${rRim.toFixed(3)} - 3e mm, every one at full weight`);
+      say(`  R8 ${row.id}: ${n} hub-top vertices from the feet's edge ${rFeet.toFixed(3)} + e to the rim ${rRim.toFixed(3)} - ease ${ease.toFixed(3)} - 2e mm, every one at full weight; ${eased} of ${inEase} inside the ease easing`);
     }
     /* R3 + R4 */
     const cl = closure(P), clL = closure(L.acc.positions);
@@ -453,7 +462,9 @@ const MUTANTS = [
     witness: async (M) => { const b = await M.ribsBuild(DEFAULTS, { ribLaw: 'B', ribCentre: 'concentric', textureHeight: 2.5 }, { mode: 'crest' }); return !b.stats.crestEdges.some((e) => e.jG < 0); } },
   { id: 'the-starburst-stops-at-the-feet', clause: 'R8', row: 'A-starburst', from: 'if (__cov[i] && O.relievable[i]) w0[i] = 1; }', to: 'if (__cov[i] && O.relievable[i]) w0[i] = 0; }',
     witness: async (M) => { const b = await M.ribsBuild(DEFAULTS, { ribLaw: 'A', ribCentre: 'starburst', textureHeight: 1 }, { mode: 'lattice' }); const h = b.stats.repl.find((g) => g.organ === 'hub'); for (let i = 0; i < h.X.nV; i++) { const rr = Math.hypot(h.O.P[i * 3], h.O.P[i * 3 + 1]); if (h.O.N[i * 3 + 2] > 0.9 && rr > 6.5 && rr < 7.5 && h.X.w0[i] === 0) return true; } return false; } },
-  { id: 'the-rim-fades-over-the-45-degree-length', clause: 'R8', row: 'B-starburst', from: "O.organ === 'hub' ? T.edgeMm : Lam;", to: "O.organ === 'hub' ? Lam : Lam;",
+  { id: 'the-rim-drops-in-one-lattice-edge', clause: 'R8', row: 'A-starburst', from: "O.organ === 'hub' ? Math.min(Lam, textureFadeWidthMm(1, T.edgeMm)) : Lam;", to: "O.organ === 'hub' ? T.edgeMm : Lam;",
+    witness: async (M) => { const b = await M.ribsBuild(DEFAULTS, { ribLaw: 'A', ribCentre: 'starburst', textureHeight: 1 }, { mode: 'lattice' }); const h = b.stats.repl.find((g) => g.organ === 'hub'); for (let i = 0; i < h.X.nV; i++) { const rr = Math.hypot(h.O.P[i * 3], h.O.P[i * 3 + 1]); if (h.O.N[i * 3 + 2] > 0.9 && rr > 7.4 && rr < 7.9 && h.X.mc[i] >= 1) return true; } return false; } },
+  { id: 'the-rim-fades-over-the-45-degree-length', clause: 'R8', row: 'B-starburst', from: "O.organ === 'hub' ? Math.min(Lam, textureFadeWidthMm(1, T.edgeMm)) : Lam;", to: "O.organ === 'hub' ? Lam : Lam;",
     witness: async (M) => { const b = await M.ribsBuild(DEFAULTS, { ribLaw: 'B', ribCentre: 'starburst', textureHeight: 2.5 }, { mode: 'lattice' }); const h = b.stats.repl.find((g) => g.organ === 'hub'); for (let i = 0; i < h.X.nV; i++) { const rr = Math.hypot(h.O.P[i * 3], h.O.P[i * 3 + 1]); if (h.O.N[i * 3 + 2] > 0.9 && rr > 7.2 && rr < 7.6 && h.X.mc[i] < 1) return true; } return false; } },
 ];
 /* R1 on the mutated module must restate from the CLEAN schedule: the gate

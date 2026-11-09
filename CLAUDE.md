@@ -1805,9 +1805,10 @@ session). No shipped bloom file moved.
 - **RULED Nov 9 (third round): STARBURST, "further along the center closer to the edges"** (`ribStarburstReach` 'edge',
   sheet `docs/img/bloom-texture-ribs-starburst.png`). The flat octagon was the petal FEET (flush with the hub top, zero
   weight) and the covered hub top (seeding the fade), plus the hub RIM read as a ridge by the curvature mask. Built: the
-  covered hub top is ribbed and seeds nothing, and on the hub the rim's curvature fade is one lattice edge (0.4 mm)
-  instead of `max(H x 15/8, e)` — a decision WITHOUT a ruling that narrows BONE's ruled 45-degree fade there. 0 → 783 of
-  981 hub-top vertices beyond the feet at full weight (H 1); 0 within-shell pairs, 0 flips, both laws, H 1 and 2.5.
+  covered hub top is ribbed and seeds nothing. **RULED Nov 9 (fourth round): "ease off"** — on the hub the rim's
+  curvature fade is the ruled fade AT H 1.0, `max(15/8, e)` = 1.875 mm, at every height (never wider than the ruled
+  `max(H x 15/8, e)`; a 53-degree ease at H 2.5); the third round's 0.4 mm drop is withdrawn. 0 → 376 of 981 hub-top
+  vertices beyond the feet at full height (H 1), the rest the ease; 0 within-shell pairs, 0 flips, both laws, H 1 and 2.5.
   **Ribbing the feet's own top skin was tried and withdrawn: it folds at the foot-to-blade crease (161 pairs, H 2.5).**
   Gate R8 holds the reach.
 - **RULED Nov 9 (on #541):** A is the default and B a "spacing" choice under RIBS; ribs on petals, sepals, leaves and
@@ -1844,7 +1845,7 @@ session). No shipped bloom file moved.
 - Budget with crest lines: the mophead 94.7% (A) / 98.0% (B) of the cap; crest+flank is over it. Chromium: the crest
   build 1.5-2.0 s on the default, 46-47 s on the mophead; 12 of 12 builds agree with Node to the bit. The shipped
   curvature rule (1 /mm) smooths every stamen, the style, the braid, the bead and the nib (questions 6 and 8).
-- Gate `node tools/verify-bloom-ribs.mjs` (R0-R8 over ten rows, `--negative-control` twelve witnessed mutants,
+- Gate `node tools/verify-bloom-ribs.mjs` (R0-R8 over ten rows, `--negative-control` thirteen witnessed mutants,
   `--browser`); not in CI. R1 restates the centre radius from the LATTICE build's petal points.
   The junction rule is unreachable on every default row, so R4 carries a written-down two-part fixture. Measure:
   `tools/bloom-texture-ribs-measure.mjs`, `tools/bloom-texture-ribs-browser.mjs`. Sheet:

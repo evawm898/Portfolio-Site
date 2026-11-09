@@ -8,7 +8,7 @@ answer, §7 for the questions. **§10 is the second round (Eva's rulings of Nov 
 A the default, the stem and rods excluded by name, and the three centre treatments for
 her ruling** — sheet `docs/img/bloom-texture-ribs-centre.png`. **§12 is the third round: Eva
 chose STARBURST and asked it to reach further toward the edges** — sheet
-`docs/img/bloom-texture-ribs-starburst.png`. §2–§6 and the main sheet are
+`docs/img/bloom-texture-ribs-starburst.png`. **§13: the rim eases off (Eva, fourth round).** §2–§6 and the main sheet are
 the first round's record and predate the exclusion (their stem rows are fluted).
 
 ## 0. The rulings in force
@@ -471,7 +471,7 @@ round's, kept for the before/after):
    seed of the coverage fade, and takes full weight (edits `cover-decl`, `cover-mark`,
    `cover-seed`, `cover-full`). The feet stay as shipped beneath the raised hub top; at a
    flute floor the two surfaces are one plane, so nothing shows between them.
-2. **The rim crease keeps its smoothing but over one lattice edge** (`rim-ridge`): on the
+2. **[SUPERSEDED by §13: the rim eases off over 1.875 mm.]** **The rim crease keeps its smoothing but over one lattice edge** (`rim-ridge`): on the
    hub, under the edge reach, the curvature fade's length is `e` (0.4 mm) instead of
    `max(H × 15/8, e)`. **A decision made without a ruling**, and the one thing here that
    moves a ruled law: the 45° fade is BONE's (and T5's), and under it the burst cannot reach
@@ -523,6 +523,32 @@ still takes `ribCentre` explicitly; unset is the first round's axis rule, so §2
 Whether the rim's 0.4 mm drop is right, or a softer one (say the fade at H 1's 1.88 mm at any
 height), is Eva's from the sheet. §8's other questions stay open.
 
+## 13. Fourth round: the rim eases off
+
+**RULED (Eva, Nov 9): "ease off"** — §12's 0.4 mm drop at the hub's rim is withdrawn. On the
+hub, under the edge reach, the curvature mask's fade from the rim crease is now **the ruled
+fade at H 1.0, `max(1 × 15/8, e)` = 1.875 mm, at every height**, never wider than the ruled
+`max(H × 15/8, e)` (so at H ≤ 1 it IS the ruled 45° fade; at H 2.5 it is a 53° ease where the
+ruled 4.69 mm would be wider than the 3.5 mm band between the feet and the rim). One edit
+(`rim-ridge`) changed: `T.edgeMm` → `Math.min(Lam, textureFadeWidthMm(1, T.edgeMm))`.
+
+| law | H | tris | within-shell pairs | open / doubled / degen | flipped | full height beyond the feet |
+|---|---|---|---|---|---|---|
+| A | 1.0 | 190,110 | 0 | 0 / 0 / 0 | 0 | 376 of 981 |
+| A | 2.5 | 190,110 | 0 | 0 / 0 / 0 | 0 | — |
+| B | 1.0 | 190,154 | 0 | 0 / 0 / 0 | 0 | — |
+| B | 2.5 | 190,154 | 0 | 0 / 0 / 0 | 0 | 326 of 981 |
+
+The rest of the band is the ease (and, at H 2.5, 50 vertices at the feet's edge). The
+sheet `docs/img/bloom-texture-ribs-starburst.png` is re-rendered: the medallion's toothed
+edge at H 2.5 is gone, the ribs round off into the rim.
+
+**R8 restated** — full weight from the feet's edge + e to the rim − ease − 2e (188 of 188 on
+both starburst rows), and, where the ease is wider than three lattice edges, some vertex
+inside it short of full weight (121 of 121 easing). A thirteenth mutant,
+`the-rim-drops-in-one-lattice-edge` (§12's drop restored), must fire it; the 45-degree mutant
+is re-anchored. MUTANTS13
+
 ## 9. Not done
 
 No shipped file, no registry row, no control, no matrix row, no CI. Sepals and leaves
@@ -536,7 +562,7 @@ length, the floor spacing and A's reference radius are proposals (questions 4, 7
 ```bash
 npm i --no-save three@0.161.0 playwright-core
 node tools/verify-bloom-ribs.mjs                    # R0-R8 on the clean module
-node tools/verify-bloom-ribs.mjs --negative-control # twelve mutants
+node tools/verify-bloom-ribs.mjs --negative-control # thirteen mutants
 node tools/verify-bloom-ribs.mjs --browser          # + Node vs Chromium
 node --max-old-space-size=12000 tools/bloom-texture-ribs-measure.mjs --resume
 node --max-old-space-size=12000 tools/bloom-texture-ribs-browser.mjs --resume

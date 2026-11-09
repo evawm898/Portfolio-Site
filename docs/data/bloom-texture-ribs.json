@@ -3195,7 +3195,7 @@
    "reach": "edge",
    "H": 1,
    "tris": 190110,
-   "ms": 2632,
+   "ms": 2525,
    "centreRec": null,
    "schedule": {
     "n0": 4,
@@ -3241,7 +3241,7 @@
    "reach": "edge",
    "H": 2.5,
    "tris": 190110,
-   "ms": 2112,
+   "ms": 2095,
    "centreRec": null,
    "schedule": {
     "n0": 4,
@@ -3287,7 +3287,7 @@
    "reach": "edge",
    "H": 1,
    "tris": 190154,
-   "ms": 2133,
+   "ms": 2031,
    "centreRec": null,
    "schedule": {
     "n0": 4,
@@ -3349,7 +3349,7 @@
    "reach": "edge",
    "H": 2.5,
    "tris": 190154,
-   "ms": 2146,
+   "ms": 1989,
    "centreRec": null,
    "schedule": {
     "n0": 4,
