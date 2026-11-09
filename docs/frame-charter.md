@@ -1393,3 +1393,20 @@ PL / VN families.
   graze nothing, or it is remade 10 % smaller up to eight times. The shell's hinge sits a quarter of its
   size inward of the stems' meeting point (its narrow hinge took them by 0.46 mm; its fan takes them by
   2.13).
+- **A run that turns INWARD loops the mapped stem, and the loop is cut** (`untangle`). The stem is mapped
+  onto its run by offsetting each station along the path's normal; past an inside corner's radius that is
+  a swallow-tail (the notched rectangle's jogs, measured: every stem of `rect notched dense` folded onto
+  itself at every meander share, so the first build drew NO vine there). The loop is cut where the stem
+  crosses itself and the kink left is rounded by a windowed relaxation until the stem's half width is
+  under its radius of curvature everywhere; told on the read-out.
+- **The axis stop reads the stem's own y.** The bisection that stops a stem AXIS_GAP short of the axis
+  first read the mapped x at the extremum's height; the end station is not the extremum (the phase is
+  anchored at x = 0) and on the arch's mitred apex the mapped x moves with y, so the stem ended 1.562 mm
+  off the axis against a 1.5625 floor — its mirror 0.999 mm away (OR3, VN3). It reads `yOf(x)` now,
+  iterated with the phase until both ends settle.
+- **An item must JOIN its stem, not merely not graze it.** `joinsCleanly` passes a wire that never comes
+  within a feature of the other; near a rounded kink an item was laid 3 mm off its stem and passed it
+  (VN4 caught it). `fits` asks for an overlap of the embed (`wireClear ≤ −E`) first.
+- **A leaf's crest is aimed a hundredth over the feature** (`LEAF_CREST_MARGIN` 0.01 mm): the seat reads
+  the molding's RASTER and OR9 the emitted surface, 1.4e-4 mm apart at worst (measured), and a crest
+  aimed exactly at F landed that much under it on 46 leaf rows.

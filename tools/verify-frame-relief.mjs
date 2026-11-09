@@ -452,8 +452,8 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     // each skeleton
     for (const r of OROWS.splice(0)) { OROWS.push(...(/crowded|round wire/.test(r[0]) ? [] : [[`${r[0]} · vine`, { ...r[1], ornLayout: 'chains', ornHierarchy: 1 }]]), [`${r[0]} · chains`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'chains', ornHierarchy: 0 }], [`${r[0]} · carved`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'groups' }], [`${r[0]} · tapered`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'tapered', ornLeaves: 'off', ornLayout: 'groups' }], [`${r[0]} · constant`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'constant', ornLeaves: 'off', ornLayout: 'groups' }]); }
     OROWS.push(['arch default, hierarchy ½ · vine', { ...ON, ornHierarchy: 0.5 }], ['rect dense, hierarchy ½ · vine', { skeleton: 'rect', ...DENSE, ornHierarchy: 0.5 }], ['oval default, bottom on, hierarchy ½ · vine', { skeleton: 'oval', ...ON, ornBottom: 'on', ornHierarchy: 0.5 }]);
-    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : /(carved|chains|vine)$/.test(name) ? 'carved' : 'constant');
-    const ST = { carved: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, constant: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, tapered: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 } };
+    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : /vine$/.test(name) ? 'vine' : /(carved|chains)$/.test(name) ? 'carved' : 'constant');
+    const ST = { vine: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, carved: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, constant: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, tapered: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 } };
     // CL / TB (phase 3c): a leaf lies OVER its host; the relief never passes the budget
     const cl1 = [], tb1 = []; let leavesSeen = 0, leastLap = Infinity, mostTris = 0;
     const BUDGET = 1500000;   // the ruled budget, restated (the bloom's precedent)
@@ -682,7 +682,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         // PL1 closed (W covers the file) and STANDING: every base vertex on the
         // back (z = 0 exactly) and every other on the plate or above
         let base = 0, low = Infinity, zMax = -Infinity, topUnder = -Infinity;
-        for (const pt of e.parts) { if (pt.part === 'bead') zMax = Math.max(zMax, P[3 * pt.base + 2]);   // a bead's first vertex is its top pole (sphereSolid) const v0 = pt.base, n = pt.part === 'bead' ? null : 2 * pt.nu * pt.nv; if (n) for (let v = v0; v < v0 + n; v++) { const z = P[3 * v + 2]; if (z === 0) base++; else { low = Math.min(low, z); zMax = Math.max(zMax, z); if (surf) { const hh = surf(P[3 * v], P[3 * v + 1]); if (hh > -Infinity) topUnder = Math.max(topUnder, hh - z); } } } }
+        for (const pt of e.parts) { if (pt.part === 'bead') zMax = Math.max(zMax, P[3 * pt.base + 2]); /* a bead's first vertex is its top pole (sphereSolid) */ const v0 = pt.base, n = pt.part === 'bead' ? null : 2 * pt.nu * pt.nv; if (n) for (let v = v0; v < v0 + n; v++) { const z = P[3 * v + 2]; if (z === 0) base++; else { low = Math.min(low, z); zMax = Math.max(zMax, z); if (surf) { const hh = surf(P[3 * v], P[3 * v + 1]); if (hh > -Infinity) topUnder = Math.max(topUnder, hh - z); } } } }
         if (!base || low < T0 - 1e-9) pl1.push(`${name}: ${e.kind} ${e.id} — ${base} base vertices, lowest top ${low.toFixed(3)} under the plate ${T0}`);
         // PL1 seated: a PROUD element's every top vertex over the molding under
         // it; a SUNK one's crest a feature over the molding at its centre
@@ -767,7 +767,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     rec('VN4 every item springs from its stem: a joint of at least the embed (read off the emitted walls and footprints)', itemsSeen > 0 && vn4.length === 0, `${itemsSeen} items, least joint ${leastJoint.toFixed(3)} mm${vn4.length ? ' — ' + vn4.slice(0, 3).join('; ') : ''}`);
     rec('VN5 the stem is SEATED: every emitted row\'s edge stands ON the highest molding under its own vertices (within 1e-6 mm: a lifted stem floats, a sunk one is buried)', vn5.length === 0 && stemSeatMax > -Infinity, `stem seat depth ${stemSeatMin.toFixed(4)}–${stemSeatMax.toFixed(4)} mm${vn5.length ? ' — ' + vn5.slice(0, 3).join('; ') : ''}`);
     rec('TB1 every ornament row\'s relief is within the 1,500,000-triangle budget and within the ornament\'s own predicted bound', tb1.length === 0, `most ${mostTris.toLocaleString('en-US')} triangles${tb1.length ? ' — ' + tb1.slice(0, 3).join('; ') : ''}`);
-    console.log(`     per wire style (off the emitted mesh): ${['carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
+    console.log(`     per wire style (off the emitted mesh): ${['vine', 'carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
   }
 
   // CV / AR / LF / TB2 — the CARVED primitives (phase 3c, Eva's rulings on

@@ -180,7 +180,7 @@ function writeReadout() {
   const ornLine = o
     ? (o.layout === 'vine'
       ? `ornament <b>a vine</b> — one stem per run (${o.weight.runs.map((r) => `${r.from}→${r.to}`).join(', ')}, mirrored), seated on the molding · hierarchy <b>${o.weight.h.toFixed(2)}</b>: `
-        + `junction motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · along the stems <b>${['cluster', 'rosette', 'leaf', 'bud', 'sprig'].map((k) => [k, o.items.filter((it) => it.kind === k).length]).filter(([, n]) => n).map(([k, n]) => `${n} ${k}${n > 1 ? 's' : ''}`).join(', ') || 'the bare stem'}</b> (per side) · `
+        + `junction motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · along the stems <b>${['cluster', 'rosette', 'leaf', 'bud', 'sprig'].map((k) => [k, o.items.filter((it) => it.kind === k).length]).filter(([, n]) => n).map(([k, n]) => `${n} ${n > 1 ? (k === 'leaf' ? 'leaves' : k + 's') : k}`).join(', ') || 'the bare stem'}</b> (per side) · `
       : o.layout === 'chains'
       ? `ornament <b>${o.groups.filter((g) => g.chain).length}</b> running chains (${o.groups.filter((g) => g.chain).map((g) => g.anchor).join(', ')}, mirrored) seated on the molding, <b>${o.groups.filter((g) => !g.chain).length}</b> junction motifs, `
       : `ornament <b>${o.groups.length}</b> groups (${o.groups.map((g) => g.anchor).join(', ')}, mirrored), `)

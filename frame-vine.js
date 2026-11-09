@@ -60,17 +60,15 @@ export const HIER = {
   uniform: 0.5,                                              // what h → 0 blends toward
   heavy: 0.68, medium: 0.4,                                  // the class thresholds on w_h
 };
-export const CURVE_K = 1.2;
+export const CURVE_K = 1.2;            // the curvature compression: c = 1 / (1 + CURVE_K · M · |κ|)
 /* the stem and the items, × the molding width M, each [base, slope in w_h] */
 export const STEM_W = [0.15, 0.08];     // the stem's width
 export const STEM_A = [0.12, 0.2];      // its meander's amplitude
 export const STEM_P = [1.1, 0.9];       // its half wavelength (an item every half wave)
-export const ITEM = { tendril: [0.7, 0.45], leaf: [0.62, 0.4], sprig: 0.45, bud: [0.6, 0.3], rosette: 0.85 };            // the curvature compression: c = 1 / (1 + CURVE_K · M · |κ|)
-export const VINE_MARGIN = 0.1;
+export const ITEM = { tendril: [0.7, 0.45], leaf: [0.62, 0.4], sprig: 0.45, bud: [0.6, 0.3], rosette: 0.85 };   // each item's size law
+export const VINE_MARGIN = 0.1;       // mm: the build's clearances stand this far past F
 export const AXIS_GAP = 0.1;          // mm past the half feature: where a stem stops short of its mirror
 export const VINE_LEAF_CURL = 1.2;   // rad: a vine leaf's turn (the chains' 2.2 curls a short leaf back onto its stem)
-export let TFLIP = false; export const setFlip = (v) => { TFLIP = v; };
-export let DEBUG = null; export const setDebug = (d) => { DEBUG = d; };        // mm: the build's clearances stand this far past F
 const smooth = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
 /* the CLASS of an anchor, from the skeleton alone: on the axis (the upper
@@ -144,6 +142,47 @@ function lay(c, root, phi, flip, path) {
 
 /* THE VINE: the same record chainsFor returns, plus the weight field and the
    items placed (what the gate restates). */
+/* A stem mapped onto a run whose path turns INWARD (a notched corner's
+   jogs) loops back on itself: the mapping offsets every station along the
+   path's own normal, and an offset larger than an inside corner's radius is a
+   swallow-tail. The loop is cut where the stem crosses itself and the kink
+   left behind is rounded — a windowed relaxation of the stations within a
+   few stem widths of it, its ends held — until the stem's half width is under
+   its radius of curvature everywhere (a carved wire never folds, CV3's law).
+   Returns the kept source stations beside the new points, or null. */
+function untangle(c, xs, ys) {
+  let pts = c.pts.map((q) => q.slice()), X = xs.slice(), Y = ys.slice(), w = c.w.slice(), N0 = c.nrm.slice(), cut = 0;
+  const cross = (a, b, p2, q) => { const d = (b[0] - a[0]) * (q[1] - p2[1]) - (b[1] - a[1]) * (q[0] - p2[0]); if (Math.abs(d) < 1e-15) return null; const t = ((p2[0] - a[0]) * (q[1] - p2[1]) - (p2[1] - a[1]) * (q[0] - p2[0])) / d, u = ((p2[0] - a[0]) * (b[1] - a[1]) - (p2[1] - a[1]) * (b[0] - a[0])) / d; return t > 0 && t < 1 && u > 0 && u < 1 ? t : null; };
+  for (let guard = 0; guard < 50; guard++) {
+    let hit = null;
+    for (let i = 0; i < pts.length - 1 && !hit; i++) for (let j = i + 2; j < pts.length - 1; j++) { const t = cross(pts[i], pts[i + 1], pts[j], pts[j + 1]); if (t !== null) { hit = [i, j, t]; break; } }
+    if (!hit) break;
+    const [i, j, t] = hit, at = [pts[i][0] + t * (pts[i + 1][0] - pts[i][0]), pts[i][1] + t * (pts[i + 1][1] - pts[i][1])];
+    const xx = X[i] + t * (X[i + 1] - X[i]), yy = Y[i] + t * (Y[i + 1] - Y[i]), ww = w[i] + t * (w[i + 1] - w[i]);
+    pts.splice(i + 1, j - i, at); X.splice(i + 1, j - i, xx); Y.splice(i + 1, j - i, yy); w.splice(i + 1, j - i, ww); N0.splice(i + 1, j - i, N0[i]);
+    cut++;
+  }
+  if (!cut) return null;
+  const n = pts.length;
+  const turnAt = (k) => { const a = pts[k - 1], b = pts[k], q = pts[k + 1]; return Math.abs(Math.atan2((b[0] - a[0]) * (q[1] - b[1]) - (b[1] - a[1]) * (q[0] - b[0]), (b[0] - a[0]) * (q[0] - b[0]) + (b[1] - a[1]) * (q[1] - b[1]))); };
+  const rho = (k) => { const a = pts[k - 1], b = pts[k], q = pts[k + 1]; const A2 = Math.hypot(q[0] - b[0], q[1] - b[1]), B2 = Math.hypot(a[0] - q[0], a[1] - q[1]), C2 = Math.hypot(a[0] - b[0], a[1] - b[1]); const ar = Math.abs((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / 2; return ar > 1e-15 ? A2 * B2 * C2 / (4 * ar) : Infinity; };
+  const kinks = []; for (let k = 1; k < n - 1; k++) if (turnAt(k) > 0.35) kinks.push(k);
+  let ok = false;
+  for (let pass = 0; pass < 8 && !ok; pass++) {
+    for (const k of kinks) {
+      const span = Math.ceil((3 + 2 * pass) * w[k] / Math.max(1e-6, Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1])));
+      const lo = Math.max(1, k - span), hi = Math.min(n - 2, k + span);
+      for (let it = 0; it < 60; it++) { const nxt = pts.map((q) => q.slice()); for (let m = lo; m <= hi; m++) { nxt[m][0] = (pts[m - 1][0] + 2 * pts[m][0] + pts[m + 1][0]) / 4; nxt[m][1] = (pts[m - 1][1] + 2 * pts[m][1] + pts[m + 1][1]) / 4; } pts = nxt; }
+    }
+    ok = true; for (let k = 1; k < n - 1; k++) if (w[k] / 2 >= 0.9 * rho(k)) { ok = false; break; }
+  }
+  if (!ok) return null;
+  const tan = pts.map((_, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)]; return Math.atan2(b[1] - a[1], b[0] - a[0]); });
+  for (let i = 1; i < n; i++) { while (tan[i] - tan[i - 1] > Math.PI) tan[i] -= 2 * Math.PI; while (tan[i] - tan[i - 1] < -Math.PI) tan[i] += 2 * Math.PI; }
+  const nrm = tan.map((f, i) => { const nn = [-Math.sin(f), Math.cos(f)]; return nn[0] * N0[i][0] + nn[1] * N0[i][1] >= 0 ? nn : [-nn[0], -nn[1]]; });
+  return { curve: { ...c, pts, tan, nrm, w }, xs: X, ys: Y, cut };
+}
+
 export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = null } = {}) {
   const p = model.params, kind = model.info.kind, F = MIN_FEATURE_MM, Fm = F + VINE_MARGIN, E = EMBED_MM;
   const frameH = model.box.y1 - model.box.y0, scale = p.printHeight / frameH;
@@ -189,25 +228,39 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     // on the axis the stem stops where its MAPPED end stands AXIS_GAP off
     // x = 0 (the path's arc length is not the distance to the axis where the
     // band turns — the arch's apex is a mitre), found by bisection
-    const mappedX = (x, end) => Math.abs(mapToPath({ pts: [[x, yc + ampOfX(end ? L : 0)]], nrm: [[0, 1]], tan: [0], info: {} }, path, 0).pts[0][0]);
-    const axisStop = (end) => { const want = (F + (end ? wsL : ws0)) / 2 + AXIS_GAP; let lo = 0, hi = Math.min(L / 2, 6 * want); for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2, xx = end ? L - m : m; if (mappedX(xx, end) < want) lo = m; else hi = m; } return hi; };
-    const x0 = axisA ? axisStop(false) : -(E + ws0 + Math.abs(yc));
-    const x1 = axisB ? L - axisStop(true) : L + E + wsL + Math.abs(yc);
     // the phase: θ' = π / P(x), scaled so the ends land where they must —
     // an EXTREMUM on the axis (the stem symmetric there), a ZERO at an
     // interior end (the stem on the band's centre line where runs meet)
-    const n = Math.max(8, Math.ceil((x1 - x0) / 0.4));
-    const xs = [], raw = [0];
-    for (let k = 0; k <= n; k++) xs.push(x0 + (x1 - x0) * k / n);
-    for (let k = 1; k <= n; k++) { const xm = (xs[k - 1] + xs[k]) / 2; raw.push(raw[k - 1] + Math.PI / P0(Math.min(L, Math.max(0, xm))) * (xs[k] - xs[k - 1])); }
-    // phase at x = 0 and x = L by interpolation of the raw integral
-    const rawAt = (x) => { const t = (x - x0) / (x1 - x0) * n, k = Math.min(n - 1, Math.max(0, Math.floor(t))); return raw[k] + (raw[k + 1] - raw[k]) * (t - k); };
     const th0 = axisA ? Math.PI / 2 : 0;
-    const span = rawAt(L) - rawAt(0);
-    const want = axisB ? Math.max(1, Math.round((span - (th0 % Math.PI) - Math.PI / 2) / Math.PI)) * Math.PI + Math.PI / 2 - th0 % Math.PI : Math.max(1, Math.round(span / Math.PI - (axisA ? 0.5 : 0))) * Math.PI + (axisA ? Math.PI / 2 : 0);
-    const sc = want / span;
+    const wantOf = (sp) => (axisB ? Math.max(1, Math.round((sp - (th0 % Math.PI) - Math.PI / 2) / Math.PI)) * Math.PI + Math.PI / 2 - th0 % Math.PI : Math.max(1, Math.round(sp / Math.PI - (axisA ? 0.5 : 0))) * Math.PI + (axisA ? Math.PI / 2 : 0));
+    // on the axis the stem stops where its MAPPED end stands AXIS_GAP off
+    // x = 0 — read on the side of the centre line its end ACTUALLY lies (the
+    // head is a crest, sin = +1; the far end's sign is the phase's: taking
+    // the nearer of the two put a stem 4.1 mm off the axis on the arch)
+    let x0, x1, n, xs, raw, span, want, sc, sB = 1;
+    // (and, once a phase exists, at the stem's own y there: the end station
+    // is not the extremum itself — the phase is anchored at x = 0 — and on the
+    // arch's mitred apex the mapped x moves with y)
+    const mappedX = (x, end) => Math.abs(mapToPath({ pts: [[x, raw ? yOf(x) : yc + (end ? sB : 1) * ampOfX(end ? L : 0)]], nrm: [[0, 1]], tan: [0], info: {} }, path, 0).pts[0][0]);
+    const axisStop = (end) => { const wnt = (F + (end ? wsL : ws0)) / 2 + AXIS_GAP; let lo = 0, hi = Math.min(L / 2, 6 * wnt); for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2, xx = end ? L - m : m; if (mappedX(xx, end) < wnt) lo = m; else hi = m; } return hi; };
+    const rawAt = (x) => { const t = (x - x0) / (x1 - x0) * n, k = Math.min(n - 1, Math.max(0, Math.floor(t))); return raw[k] + (raw[k + 1] - raw[k]) * (t - k); };
     const theta = (x) => th0 + (rawAt(x) - rawAt(0)) * sc;
     const yOf = (x) => yc + ampOfX(Math.min(L, Math.max(0, x))) * Math.sin(theta(x));
+    const layout = () => {
+      raw = null;
+      for (let pass = 0; pass < 6; pass++) {
+        const px0 = x0, px1 = x1, pB = sB;
+        x0 = axisA ? axisStop(false) : -(E + ws0 + Math.abs(yc));
+        x1 = axisB ? L - axisStop(true) : L + E + wsL + Math.abs(yc);
+        n = Math.max(8, Math.ceil((x1 - x0) / 0.4));
+        xs = []; raw = [0];
+        for (let k = 0; k <= n; k++) xs.push(x0 + (x1 - x0) * k / n);
+        for (let k = 1; k <= n; k++) { const xm = (xs[k - 1] + xs[k]) / 2; raw.push(raw[k - 1] + Math.PI / P0(Math.min(L, Math.max(0, xm))) * (xs[k] - xs[k - 1])); }
+        span = rawAt(L) - rawAt(0); want = wantOf(span); sc = want / span;
+        sB = Math.sign(Math.sin(th0 + want)) || 1;
+        if (pass && sB === pB && Math.abs(x0 - px0) < 1e-9 && Math.abs(x1 - px1) < 1e-9) return;
+      }
+    };
     // the stem curve, local then mapped. Where the run's own path turns hard
     // (a notched corner's jogs) the meander can bring the stem back within a
     // feature of itself: its share is lowered — 1, 0.6, 0.3, 0 — until the
@@ -215,16 +268,20 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     let stem = null, lp = null;
     for (const a of [1, 0.6, 0.3, 0]) {
       ak = a;
+      layout();
       lp = xs.map((x) => [x, yOf(x)]);
       const tanL = lp.map((_, i) => { const q0 = lp[Math.max(0, i - 1)], q1 = lp[Math.min(n, i + 1)]; return Math.atan2(q1[1] - q0[1], q1[0] - q0[0]); });
       const local = { kind: 'stem', pts: lp, nrm: tanL.map((f) => [-Math.sin(f), Math.cos(f)]), tan: tanL, w: xs.map((x) => wsOf(Math.min(L, Math.max(0, x)))), root: 0, info: { kind: 'stem', role: 'stem', wire: 0, tip: 0 } };
       local.info.wire = Math.max(...local.w); local.info.tip = Math.min(...local.w);
-      const cand = mapToPath(local, path, 0);
-      if (selfGap(cand).gap >= Fm) { stem = cand; break; }
+      let cand = mapToPath(local, path, 0), kx = xs, ky = lp.map((q) => q[1]);
+      // a run that turns inward (a notched corner) loops the mapped stem:
+      // cut the loop and round the kink, told (untangle)
+      const un = untangle(cand, xs, ky);
+      if (un) { cand = un.curve; kx = un.xs; ky = un.ys; }
+      if (selfGap(cand).gap >= Fm) { stem = cand; stem.localX = kx; stem.localY = ky; if (un) told.push(`the ${run.id} stem is cut where the run's inward turn would loop it (${un.cut} loop${un.cut > 1 ? 's' : ''}) and rounded there`); break; }
     }
     if (!stem) { told.push(`the ${run.id} stem is not built — the run folds it onto itself at any meander`); continue; }
     if (ak < 1) told.push(`the ${run.id} stem meanders at ${(100 * ak).toFixed(0)}% — the run's own turns would bring it within a feature of itself`);
-    stem.localY = lp.map((q) => q[1]); stem.localX = xs.slice();
     stem.run = run.id; stem.meander = ak;
     runs.push({ run, path, L, Aa, Ab, cFrom, cTo, axisA, axisB, wOf, cOf, wsOf, ampOfX, theta, yOf, stem, sc, x0, x1, want });
   }
@@ -273,7 +330,6 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       el = placeMotif(mk, { ...spec, size: size * f });
       if (!el) break;
       const mates = onAxis ? [el] : [el, mirrorElement(el)];
-      if (DEBUG) DEBUG.push(`motif ${mk}@${id} f=${f.toFixed(2)} pushed ${el.pushed.toFixed(2)}: ` + e.items.map((q2) => { const c = wireElementContact(q2.r.stem, el, E); return `stem ${q2.r.run.id} clear ${c.clear.toFixed(2)} graze ${c.graze.toFixed(2)}`; }).join('; ') + ' | others ' + stems.map((st) => { const c = wireElementContact(st, el, E), c2 = wireElementContact(mirrorCurve(st), el, E); return `${st.run} ${c.graze.toFixed(2)}/${c2.graze.toFixed(2)}`; }).join(' '));
       const ok = e.items.every((q2) => { const c = wireElementContact(q2.r.stem, el, E); return c.graze === -Infinity && c.clear <= -E; })
         && mates.every((m) => stems.every((s) => wireElementContact(s, m, E).graze === -Infinity && wireElementContact(mirrorCurve(s), m, E).graze === -Infinity))
         && elements.every((o) => [o.el, o.mirror].filter(Boolean).every((oe) => mates.every((m) => elementClear(m, oe) >= Fm)));
@@ -365,7 +421,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       return { el };
     };
     const fits = (it) => {
-      const why = (m) => { if (DEBUG) DEBUG.push(`${kd}@${c.x.toFixed(1)}: ${m}`); return false; };
+      const why = () => false;   // (the reason is the argument: kept for reading the code, not reported)
       if (!it) return why('make null');
       if (it.el) {
         const e = it.el, m = mirrorElement(e);
@@ -378,7 +434,8 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       for (const cv of it.curves) {
         if (cv.kind === 'tendril' && selfGap(cv).gap < Fm) return why(`self gap ${selfGap(cv).gap.toFixed(2)}`);
         if (!bandOK(cv)) return why(`band: opening ${cv.pts.some((q) => opening(q))} slit ${slitWorst(cv, near(cv))}`);
-        if (!joinsCleanly(cv, stem)) { if (DEBUG) { const runs = (a, b) => { const out = []; let run = null; a.pts.forEach((q, i) => { let d = Infinity; for (let k = 0; k < b.pts.length - 1; k++) { const A = b.pts[k], B = b.pts[k + 1], dx = B[0] - A[0], dy = B[1] - A[1], l2 = dx * dx + dy * dy; let t = l2 ? ((q[0] - A[0]) * dx + (q[1] - A[1]) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t)); d = Math.min(d, Math.hypot(q[0] - A[0] - t * dx, q[1] - A[1] - t * dy) - (wAt(a, i) + Math.max(wAt(b, k), wAt(b, k + 1))) / 2); } if (d < F) { if (!run) run = { i, min: d }; run.min = Math.min(run.min, d); } else if (run) { out.push(run); run = null; } }); if (run) out.push(run); return out.map((r) => `${r.i}:${r.min.toFixed(2)}`).join(','); }; DEBUG.push(`  runs tendril→stem [${runs(cv, stem)}] stem→tendril [${runs(stem, cv)}] n=${cv.pts.length}`); } return why(`${cv.kind} not joined to stem`); }
+        if (wireClear(cv, stem) > -E + 1e-9) return why(`${cv.kind} not on its stem (${(-wireClear(cv, stem)).toFixed(2)} mm of overlap)`);   // a joint, not merely no graze (joinsCleanly passes a wire that never touches)
+        if (!joinsCleanly(cv, stem)) return why(`${cv.kind} not joined to stem`); }
         const mates = [cv, mirrorCurve(cv)];
         if (clearOf(mates[0], mates[1]) < Fm) return why('own mirror');
         for (const m of mates) {
@@ -404,6 +461,11 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
 
   // ---- 5. seat the items: on the molding, their root riding on the stem ----
   const leafPeak = Math.max(...wireProfile('leaf').z);
+  // aimed a hundredth over the feature: the seat reads the molding's
+  // RASTER and the gate the emitted surface, which differ by up to 1.4e-4 mm
+  // (measured on the arch default) — a crest aimed exactly at F lands that
+  // much under it
+  const LEAF_CREST_MARGIN = 0.01;
   for (const it of items) {
     const r = runs.find((q) => q.run.id === it.run), stem = r.stem;
     const k0 = stem.localX.reduce((b, q, i) => (Math.abs(q - it.x) < Math.abs(stem.localX[b] - it.x) ? i : b), 0);
@@ -415,7 +477,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       // wireProfile('leaf') tops out under 1), so a leaf is lifted by the
       // shortfall to stand a feature over the molding, as a chain's leaf
       // stands on its host's crown
-      const extra = cv.kind === 'leaf' ? Math.max(0, F - leafPeak * Math.max(F, LEAF_RELIEF * cv.info.wire * p.ornProjection)) : 0;
+      const extra = cv.kind === 'leaf' ? Math.max(0, F + LEAF_CREST_MARGIN - leafPeak * Math.max(F, LEAF_RELIEF * cv.info.wire * p.ornProjection)) : 0;
       cv.lift = cv.pts.map((_, i) => Math.max(Math.max(0, seatOn(H, cv, i)) + extra, ride * (1 - smooth(sAt[i] / (2 * ws)))));
     }
   }
