@@ -452,7 +452,7 @@ them, and one comes loose (C3, seed 18); a flat frame leaves the bars' cut ends 
 and changes its own measured width (D5). Two older mutants now redden door clauses too, both true: with no bar on a corner the
 face-centred door has no jamb bars (D), and with no ring at a profile step the tall tiered door runs through it
 (D3, D4). **29 of 29 behave** (a full run of 30 min locally, then the three widened claims re-run); the gate
-reads 1,645 of 1,645 over 67 cages. The geometry job's control now costs ~30 min against its 45-min limit —
+reads 1,476 of 1,476 over 59 cages. The geometry job's control now costs ~30 min against its 45-min limit —
 reported, the workflow file left alone (editing it costs frozen tags dispatched afterwards).
 
 The diagnostic is `node tools/cage-door-diagnose.mjs`; the ruling sheet is
