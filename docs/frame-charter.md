@@ -1578,3 +1578,12 @@ standing up (2.5 M past the edge, the first sheet's), the stem's run-on left unc
 `frame.yml`'s relief-mutants job hands a pull request its own diff against its base (`fetch-depth: 0`)
 and runs the full sweep on a push to `main`, nightly (`schedule`, 03:17 UTC) and by hand. Every anchor is
 still checked over ALL mutants first. A PR that moves no frame module runs none.
+
+The second-round sheet is `docs/img/frame-vine-sheet-2.png` (`node tools/shot-frame-vine.mjs <dir>`): each
+skeleton full-frame at its default, front-on; the crest close up on all three, front-on and from above and
+the side; one corner / springing / shoulder on each; the crest's two forms on each skeleton. The first
+round's sheet stays as it was rendered, the record of what the rulings were made on.
+
+**CB1 found one real case on its first run**: on the dense EARED rectangle the side stem's meander swung
+0.075 mm past the outer edge mid-run, where an ear's notch pinches the band. A meander past the edge along
+the run is now lowered as a self-folding one is (60 % there, told).
