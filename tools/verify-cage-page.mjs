@@ -54,14 +54,14 @@ async function run({ mutant = null, quiet = false } = {}) {
     check('P4 Top height and the converge toggle hide on a flat top and show on a dome', hidFlat.every(Boolean) && hidDome.every((h) => !h));
     // P11 the ring bands: the Band select builds a banded cage, the read-out says what it built, and each
     // style shows its own size control while plain rings hide them all (registry-driven panel)
-    const pick = async (v) => { const b0 = await page.evaluate(() => window.__cage.builds()); await page.evaluate((x) => { const el = document.getElementById('bandStyle'); el.value = x; el.dispatchEvent(new Event('input', { bubbles: true })); }, v); await page.waitForFunction((b) => window.__cage.builds() > b, b0, { timeout: 20000 }); };
+    const pick = async (v) => { const b0 = await page.evaluate(() => window.__cage.builds()); await page.evaluate((x) => { const el = document.getElementById('bandStyle'); el.value = x; el.dispatchEvent(new Event('input', { bubbles: true })); }, v); await page.waitForFunction((b) => window.__cage.builds() > b, b0, { timeout: 20000 }).catch(() => {}); };   // a select that does not rebuild is P11's to report, not a crash
     await pick('beading');
     const bead = await page.evaluate(() => ({ info: window.__cage.info().bands, text: document.getElementById('readout').textContent, vis: ['bandRings', 'beadMm', 'leafMm', 'bandSpacing'].map((id) => !document.getElementById(id).closest('.cg-ctrl').hidden) }));
     await pick('leaf');
     const leaf = await page.evaluate(() => ({ info: window.__cage.info().bands, text: document.getElementById('readout').textContent, vis: ['bandRings', 'beadMm', 'leafMm', 'bandSpacing'].map((id) => !document.getElementById(id).closest('.cg-ctrl').hidden) }));
     await pick('none');
     const plain = await page.evaluate(() => ({ info: window.__cage.info().bands, text: document.getElementById('readout').textContent, vis: ['bandRings', 'beadMm', 'leafMm', 'bandSpacing'].map((id) => !document.getElementById(id).closest('.cg-ctrl').hidden) }));
-    check('P11 the Band select builds beading and a leaf-tip run, the read-out names each, plain rings build none', bead.info && bead.info.style === 'beading' && bead.info.elements > 0 && /band beading on \d+ rings? — \d+ elements/.test(bead.text) && leaf.info && leaf.info.style === 'leaf' && /band leaf-tip run on/.test(leaf.text) && plain.info === null && /rings plain/.test(plain.text), `${JSON.stringify([bead.info && bead.info.elements, leaf.info && leaf.info.elements])}`);
+    check('P11 the Band select builds beading and a leaf-tip run, the read-out names each, plain rings build none', bead.info && bead.info.style === 'beading' && bead.info.elements > 0 && /band beading on \d+ rings?\D{1,5}\d+ elements/.test(bead.text) && leaf.info && leaf.info.style === 'leaf' && /band leaf-tip run on/.test(leaf.text) && plain.info === null && /rings plain/.test(plain.text), `${JSON.stringify([bead.info && bead.info.elements, leaf.info && leaf.info.elements])}`);
     check('P11b each band style shows its own size control; plain rings hide every band control', bead.vis.join() === 'true,true,false,true' && leaf.vis.join() === 'true,false,true,true' && plain.vis.every((v) => !v), JSON.stringify([bead.vis, leaf.vis, plain.vis]));
     // P5 the SVG toggle shows the export's own text
     await page.click('#viewToggle [data-main="svg"]');
@@ -132,7 +132,7 @@ async function run({ mutant = null, quiet = false } = {}) {
 }
 
 const MUTANTS = [
-  { id: 'a-slider-no-longer-rebuilds', from: "    writeInputs(); scheduleBuild();\n  });\n  const body = secEl[s.section]", to: "    writeInputs();\n  });\n  const body = secEl[s.section]", breaks: /^P2 / },
+  { id: 'a-slider-no-longer-rebuilds', from: "    writeInputs(); scheduleBuild();\n  });\n  const body = secEl[s.section]", to: "    writeInputs();\n  });\n  const body = secEl[s.section]", breaks: /^P2 |^P11 / },
   { id: 'an-edit-keeps-the-preset', from: "if (PRESET_FIELD_IDS.includes(s.id)) params.preset = 'custom';", to: "", breaks: /^P2b / },
   { id: 'the-svg-view-shows-a-stale-drawing', from: "if (svg) svgStage.innerHTML = exportSvg(model).replace(/ width=\"[^\"]*mm\" height=\"[^\"]*mm\"/, '');", to: "if (svg && !svgStage.innerHTML) svgStage.innerHTML = exportSvg({ ...model, wires: model.wires.filter((w) => w.kind !== 'door') });", breaks: /^P5 / },
   { id: 'the-canvas-keeps-its-own-ground', from: "scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--color-ground').trim() || '#060707');", to: "scene.background = new THREE.Color(0x0a0a0c);", breaks: /^P5d / },
