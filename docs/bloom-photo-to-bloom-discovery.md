@@ -2814,6 +2814,8 @@ node tools/shot-bloom-layer-count.mjs docs/img/layer-petal-count.png --base <wor
 
 ## 20. S7 — a layer's own petal count on the photos (schema v6, Nov 9)
 
+**[Nov 9: RULED — the count stage PASSES and lotus v12 stands (no v13). Shipped as `48139fc` (#535). §20.8.]**
+
 #1 on §17.6's ranking was the petal count per whorl. §19 shipped it on the bloom (option A); this stage lets a photo
 write it. **No bloom page code changed** (`bloom*.js`, `bloom.html`, `bloom.css` are `main`'s at `ec28c25`).
 
@@ -2939,12 +2941,13 @@ they tile the petal list), and the equal split otherwise — **every earlier ver
 layer offset). **Open on the count, recorded:** a Nymphaea carries more petals in a spiral than a crop shows; the stage
 counts what is visible.
 
-### 20.8 For Eva's ruling
+### 20.8 Rulings — RULED (Eva, Nov 9)
 
-- Does the count stage pass on the sheet (lotus v12, water lily v8)?
+- Does the count stage pass on the sheet (lotus v12, water lily v8)? **RULED: it passes.**
 - Lotus v12's body overshoots slightly (1.492 against ≈ 1.45) where v11 undershot (1.413). Accept, or one ring
-  iteration (v13)?
-- The counts were read from 150 px crops. Re-read them if the full photos come back?
+  iteration (v13)? **RULED: v12 stands; no v13.**
+- The counts were read from 150 px crops. Re-read them if the full photos come back? **Not ruled — left open.** The
+  counts stand as read from the crops.
 
 ### 20.9 Reproduce
 

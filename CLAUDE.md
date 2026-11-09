@@ -775,6 +775,8 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   (Eva, Nov 9: go ahead with the crops). Lotus v12 counts 4/5/5/3 (body h:w 1.413 → 1.492 against ≈ 1.45, no v13);
   water lily v8 re-counted 4/8 (v7 8+8; §18 assumed 4/10); daisy stays v7. 0 within-shell pairs. `bloom-photo-s2.mjs`'s
   body measure read layers as equal whorls — it reads `whorlCounts` now. §20.7 is the ranking (splay is #1).
+  **[Nov 9: RULED — the count stage PASSES and lotus v12 stands (no v13); merged as `48139fc`. Re-reading the counts
+  from the full photos is left open. Next on §20.7's ranking: the outer whorls' splay.]**
 - **#495 (Nov 5): DISCOVERY + PROTOTYPE, NOTHING SHIPPED — §15 of the same doc.** Read it before touching `footRing()`'s
   `ringFactor`, `layerOwnedValues` or `layerSize`'s visibility.
   - Four options are prototyped by `tools/bloom-ring-options.mjs` as anchored edits of TEMPORARY copies:
