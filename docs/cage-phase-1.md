@@ -247,3 +247,77 @@ leaf-tip run are merged and follow the frame (`frame-pattern.js`, #477), but the
 rose, rosette and bud (`frame-elements.js`, #479) are standalone primitives placed on no frame,
 their rulings still pending (frame charter §16), and the wiring session that reconciles the
 palmette and rosette with the chain motifs has not happened.
+
+## 8. Phase 2, step 1 — ring bands: beading and the leaf-tip run (Nov 9)
+
+Eva's ruling (Nov 9): go ahead with **beading and the leaf-tip run only**; the rosette and palmette
+bands wait until /frame places those elements (frame charter §16). Nothing here is the default yet —
+`bandStyle` ships `none`, so a cage with plain rings is the Phase 1 cage to the byte (B0).
+
+### 8.1 What is imported, unchanged
+
+Every element is /frame's own code, called as it ships (frame charter §15):
+
+- a **bead** is frame-relief's `sphereSolid` on its own lattice (`PATTERN_LAT` × `PATTERN_LON`);
+- a **leaf** is frame-filigree's `buildLeaf` (one lobe, no curl, sixteen stations — frame-pattern's
+  `LEAF_RUN_LOBES` / `PATTERN_LEAF_STATIONS`) swept by frame-relief's `bandSolid` in frame-filigree's
+  `leafProfile`, its width `LEAF_ASPECT` × its length and its crown `max(floor, LEAF_RELIEF × width)`;
+- the **rules** are frame-pattern's constants: beads fused at ≤ `BEAD_FUSE` (1.8) × r and no closer than r;
+  a laurel run's pitch inside [`LEAF_RUN_PITCH_MIN`, `LEAF_RUN_PITCH_MAX`] = ½–¾ of a leaf, each base
+  stacked a crown over the previous tip (frame's own lift law).
+
+Nothing in frame-*.js moved. **Note for the gate's path filter:** `cage-gate.yml` names frame-relief,
+frame-geometry and frame-registry but not frame-pattern or frame-filigree, which the cage now imports, so
+a change to either of those alone runs no cage gate. Adding them is a workflow edit, left for a session
+that can pay its frozen-tag cost (CLAUDE.md, "editing an existing workflow file costs frozen tags").
+
+### 8.2 The mapping — the cone segment, through the ring
+
+Each element is built flat by /frame's code in a development (along the ring `s`, across it `t`, out of
+the surface `w`; a bead directly in 3D) and every vertex is mapped onto the **cone segment through the
+ring**: the frustum through the ring's own centreline whose slope is the chord of the profile across the
+band's height (§5 item 10). On a **round** section the map is the exact development of that cone — the
+arc at slant `t` is `θ · r(t)`, so a leaf laid along the developed parallel lands with every length
+kept; on a cylinder it is the identity. On a **polygon** each face is a plane: the along-distance from
+the face's centre is kept, so the map is exact on every face and folds at the corners.
+
+**A decision made without a ruling:** §5 item 10 named the frustum through the band's two EDGE rings;
+this uses the frustum through the RING with the same slope, i.e. the edge-ring frustum moved outward by
+the profile's sagitta across the band. It puts every bead's centre exactly on its ring and every leaf's
+underside through it; the cost is that the band's edges stand off the true surface by at most that
+sagitta (reported per build: ≤ 0.11 mm on the bell, ≤ 0.39 mm on the tiered cage's step). B9 bounds it.
+
+### 8.3 The snap — one on every bar
+
+Every bar gap holds the same number `n` of elements, the first ON the bar — a bead's centre on the bar's
+crossing with the ring, a leaf's base on it — so the run never sits at a random phase to the bars.
+`n` comes from the asked spacing (× the bead's diameter or the leaf's length) and is then held inside
+the run's own rule over every gap; the built spacing is told whenever it differs from the asked by more
+than 0.02 ("snapped to the bars — ring 2 5 a bar (110), spacing 0.75"). On a polygon the bars sit at
+equal AZIMUTHS, so the gaps along a face are unequal and the spacing is a range; where no single `n`
+keeps every gap inside the rule, the run is built at the fused end and told.
+
+### 8.4 The other rules
+
+- **Proud of the ring** (a decision made without a ruling, `BAND_OVER_RING` 1.25): a bead's diameter
+  and a leaf's width are held at or over 1.25 × the ring's own diameter, told. Under it a bead
+  disappears into its ring.
+- **Fused**: a bead's centre is on the ring's centreline, so the ring passes through every bead; a
+  leaf's column stands from the ring's centreline outward (its crown lifted by the ring's radius), so
+  the ring runs through every leaf; and every bar crossing the ring passes through an element.
+- **The door** drops every element any of whose vertices would lie in the opening.
+- **The SVG** draws a bead as its silhouette circle and a leaf as its projected planform, thin.
+
+### 8.5 Controls (a new top-level section, "Ring bands")
+
+| control | default | range |
+|---|---|---|
+| Band | plain rings | plain / beading / leaf-tip run |
+| On | every ring | every ring / the rings between / base and top / top ring only |
+| Bead diameter | 3.0 mm | 1.5–6 |
+| Leaf length | 8 mm | 3–14 |
+| Spacing | 0.70 × | 0.50–0.90, snapped |
+
+"Each ring is plain or carries a band" is built as the On selector rather than a control per ring (the
+ring count moves with the profile's shoulders, so a per-ring list would change length under the hand).
+The randomizer draws the band fields LAST, so every earlier field of a seed is the sequence it was.
