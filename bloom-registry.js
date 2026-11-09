@@ -3774,7 +3774,7 @@ export const CONTROLS = [
     label: 'Layer offset', fmt: (v, ui, shown) => {
       const pc = shown && shown.counts;
       const off = pc && pc.phaseInactive && pc.phaseInactive.length
-        ? ` — INACTIVE between ${pc.phaseInactive.map((L) => `${pc.name.toLowerCase()} ${L} and ${L + 1} (${pc.whorlCounts[L - 1]} vs ${pc.whorlCounts[L]} petals)`).join(', ')}: their counts differ, so there is no one pitch to offset by`
+        ? ` — INACTIVE between ${pc.phaseInactive.map((L) => `${pc.name.toLowerCase()} ${L} and ${L + 1} (${pc.whorlCounts[L - 1]} vs ${pc.whorlCounts[L]} petals)`).join(', ')}: their counts differ, so there is no one pitch to offset by — the inner whorl starts half its own pitch over`
         : '';
       return `${Number(v).toFixed(2)} slot${off}`;
     }, tier: 'standard', role: 'arrangement',

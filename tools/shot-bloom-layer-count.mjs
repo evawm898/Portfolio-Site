@@ -81,7 +81,10 @@ for (let fi = 0; fi < FLOWERS.length; fi++) {
     const counts = Bc.b.slotAzimuths.map((a) => a.length).join('/');
     const tris = Bc.P.length / 9;
     console.log(`${fl} ${v} + owned counts ${counts}: ${tris} tris (default ${Bh.P.length / 9}) · body h:w ${body(Bc).toFixed(3)} (default ${body(Bh).toFixed(3)})`);
-    cells.push([`PR 1 + COUNTS ${counts}`, Bc, fl === 'lotus' ? `BODY H:W ${body(Bc).toFixed(2)} (WAS ${body(Bh).toFixed(2)})` : `${tris} TRIS (WAS ${Bh.P.length / 9})`]);
+    /* §19.5 item 4 (ruled Nov 8): the inner whorl's first petal half its own pitch over the outer's */
+    const az = Bc.b.slotAzimuths, off = ((((az[1][0] - az[0][0]) * 180) / Math.PI) % 360 + 360) % 360;
+    console.log(`${fl} ${v} + owned counts: whorl 2's first petal stands ${off.toFixed(4)} deg past whorl 1's (half its own pitch: ${(180 / az[1].length).toFixed(4)})`);
+    cells.push([`PR 1 + COUNTS ${counts}`, Bc, fl === 'lotus' ? `BODY H:W ${body(Bc).toFixed(2)} (WAS ${body(Bh).toFixed(2)})` : `INNER PETAL 1 AT ${off.toFixed(1)} DEG = HALF PITCH`]);
   }
   /* one frame per flower, from the MAIN build */
   let mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];

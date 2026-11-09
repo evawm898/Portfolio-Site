@@ -2828,8 +2828,10 @@ export function footRing(state, acc, opts = {}) {
      INACTIVE between two whorls whose counts differ. Layer phase turns whorl L
      by `layerPhase` of ONE PITCH against whorl L-1, and between a 4-petal and a
      10-petal whorl "a pitch" has no single meaning — so across such a pair the
-     inner whorl takes the outer one's phase unchanged (no offset), and a run of
-     equal-count whorls below it steps by its OWN pitch from there. footRing()
+     inner whorl starts HALF ITS OWN PITCH over the outer one's phase (Eva's
+     ruling of Nov 8 on §19.5 item 4: not aligned on the same angle — that was
+     the first build, superseded), and a run of equal-count whorls below it
+     steps by its OWN pitch from there. footRing()
      owns the law and names every inactive pair (`phaseInactive`, the inner
      whorl's 0-based index); the read-out says so. WHERE NO LAYER OWNS A COUNT
      this array is null and the descriptor takes the pre-existing expression
@@ -2840,7 +2842,7 @@ export function footRing(state, acc, opts = {}) {
     const out = [];
     let start = 0;
     for (let L = 0; L < raw.length; L++) {
-      if (L > 0 && raw[L].whorlCount !== raw[L - 1].whorlCount) { start = L; out.push(out[L - 1]); phaseInactive.push(L); continue; }
+      if (L > 0 && raw[L].whorlCount !== raw[L - 1].whorlCount) { start = L; out.push(out[L - 1] + Math.PI / raw[L].whorlCount); phaseInactive.push(L); continue; }
       out.push(start === 0 ? (raw[L].lambda * state.layerPhase * TAU) / raw[L].whorlCount : out[start] + ((L - start) * state.layerPhase * TAU) / raw[L].whorlCount);
     }
     return out;
@@ -3717,6 +3719,16 @@ export function footRing(state, acc, opts = {}) {
     countsOwned,
     whorlCounts: continuousMode ? null : raw.map((q) => (q.ownCount ? q.ownCount.built : n)),
     phaseInactive,
+    /* THE SPIRAL LEGIBILITY FLAG READS EACH TURN'S OWN COUNT (Eva's ruling of
+       Nov 8 on §19.5 item 3): under SPIRAL every turn runs its own golden-angle
+       sequence, so a 5-petal turn in 13/8/5 is a sequence of five whatever the
+       global says. The turns (0-based) whose own count is under
+       SPIRAL_LEGIBLE_COUNT, with that count; null off SPIRAL. With no count
+       owned every turn carries `n`, so the list is non-empty exactly when the
+       old `sequenceLength < SPIRAL_LEGIBLE_COUNT` held — the flag unchanged. */
+    spiralShortTurns: state.placement === 'SPIRAL' && !continuousMode && !fanMode
+      ? raw.map((q, L) => ({ turn: L, count: q.ownCount ? q.ownCount.built : n })).filter((t) => t.count < SPIRAL_LEGIBLE_COUNT)
+      : null,
   };
 }
 

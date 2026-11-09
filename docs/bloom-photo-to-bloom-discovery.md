@@ -2680,7 +2680,7 @@ the last column is what this PR did.
 | `petalGroupCount` / the role context | registry | **no** — FAN | none |
 | `tightestPitch`, `neighbourFlag`, the crowding feet (`footsOf`) | geometry | already read the emitted azimuths / the slot map | none needed |
 | the inflorescence's floret `petalCount` | geometry | **no** — a floret is a separate build with no scopes | none |
-| the SPIRAL legibility flag (`sequenceLength`) | page read-out | arguably — **left on the global**, flagged (§19.5) | none |
+| the SPIRAL legibility flag (`sequenceLength`) | page read-out, geometry | **yes, by ruling (§19.5 item 3)** — each turn's own count | footRing()'s `spiralShortTurns`, named on the flag |
 | the Petals read-out and the summary's `petals N` | registry, page | **yes** — told per whorl | per-whorl counts named |
 | the Layer offset read-out | registry | **yes, by ruling** — names each inactive pair | done |
 | the harness's "every petal accounted for" validity check | `junctionAssertions` | **yes** — found by the export gate on the first block-86 run (12 rows dropped) | restated whorl counts |
@@ -2700,10 +2700,15 @@ the last column is what this PR did.
 
 - **The area rule** sums each whorl's own feet, so R0 follows the count (the lotus at 6/5/3/3: 17.39 → 16.27 mm) and
   every owned ring, a fraction of R0, moves with it — §18.3's finding, now shipped.
-- **The layer phase is INACTIVE between two whorls whose counts differ**: across such a pair the inner whorl keeps the
-  outer one's phase unchanged (no offset); a run of equal counts below it steps by its own pitch from there. With no
-  count owned the phase is the old expression verbatim, by branch. **Consequence on the water lily (4/10): the inner
-  whorl's petal 1 stands on the outer's petal 1's azimuth** (no offset between them) — the ruling read literally.
+- **The layer phase is INACTIVE between two whorls whose counts differ**: across such a pair the inner whorl starts
+  **HALF ITS OWN PITCH** over the outer one's phase (ruled Nov 8, §19.5 item 4 — the first build put it on the same
+  angle); a run of equal counts below it steps by its own pitch from there. With no count owned the phase is the old
+  expression verbatim, by branch. On the water lily (4/10) the inner whorl's petal 1 stands **18°** past the outer's
+  petal 1 (π / 10); on the lotus (6/5/3/3) layer 2's stands 36° past layer 1's.
+- **The SPIRAL legibility flag reads EACH TURN's own count** (ruled Nov 8, §19.5 item 3): footRing() reports
+  `spiralShortTurns` (the turns under `SPIRAL_LEGIBLE_COUNT`, with their counts) and the flag names them —
+  `SPIRAL BELOW 8 IN THE SEQUENCE on turn 3 (5 petals)` on turns of 13/8/5 under a global 8. With no count owned every
+  turn carries the global, so the flag and its line are the old ones to the character.
 - **The sepals read the outer whorl's own count** (ceiling, pitch, interleave): 8 sepals asked over an outer whorl of 4
   build 4, told.
 - **Read-outs:** the Layer petals control (GLOBAL / OWN, asked vs built when SNAPPED, "the sepals follow this outer
@@ -2715,23 +2720,33 @@ the last column is what this PR did.
 - **PC0–PC4, a new family** (`petalCountClauses`, pure, carried in both STL gates through `zygoAssertions`): the record
   both ways (asked / built / snapped); each whorl's EMITTED azimuth count against the count restated from the row's
   `@scopes`; the inactive phase pairs; the AREA RULE restated over the per-whorl counts (ULP-bounded); the sepals'
-  ceiling and pitch on the outer whorl's restated count. **SV1** holds every emitted azimuth to the restated phase law,
+  ceiling and pitch on the outer whorl's restated count. **PC5** (Nov 8): across every restated inactive pair the inner
+  whorl's first EMITTED azimuth stands π / its restated count past the outer's. **PC6** (Nov 8): the turns under the
+  SPIRAL legibility bar, restated from each turn's own count, against the build's `spiralShortTurns` and the page's own
+  `spiralFlagShown`, both ways. **SV1** holds every emitted azimuth to the restated phase law (half pitch included),
   exactly. **PC1 counts the azimuths WRITTEN, not the row's length** — its own must-fail found that a whorl laid with
   fewer slots than its map leaves a pre-sized row with holes, which `.length` reads as the map.
 - **`node tools/verify-bloom-layer-count.mjs [--control]`** — the must-fail, because the apex table never runs the Z
-  family: 7 states clean; **7 of 7 mutants fire the clause they name, each witnessed on its mutated module** (the area
+  family: 9 states clean; **9 of 9 mutants fire the clause they name, each witnessed on its mutated module** (the area
   rule summing the global; the single-whorl arm likewise; the whorl keeping the global count; the phase staying active
-  across counts; the inactive pairs never named; the snap never recorded; the sepals reading the global). Spawned by
+  across counts; the inactive pairs never named; **the inactive phase ALIGNED** — the first build, PC5 + SV1, witnessed
+  on the water lily's inner first petal at 0°; **the SPIRAL flag reading the global** — PC6, witnessed on 13/8/5 reporting
+  no short turn; the snap never recorded; the sepals reading the global). The inactive-pairs mutant was RE-ANCHORED onto
+  the half-pitch line and re-run (it fires PC2). Spawned by
   `verify-bloom-defaults-bar.mjs` in both arms — no workflow edit.
 - **Panel route (at)** (THIRTY-SEVEN routes): hidden with per-layer OFF, under FAN and under CONTINUOUS; greyed with no
   pick; the pick shows the global; a drag owns and the whorl emits that many; the INACTIVE read-outs; give-back prunes and
-  the ring returns to the bit; a file's 4.6 builds 5, SNAPPED on both read-outs; the outer whorl's 4 caps 8 sepals. Five
-  mutants, each firing its clause.
-- **Matrix block 86** (17 rows, 1,684): the default; layer 2 owning 12 (inactive both sides); a run of equal owned
+  the ring returns to the bit; a file's 4.6 builds 5, SNAPPED on both read-outs; the outer whorl's 4 caps 8 sepals; the
+  inner whorl's first petal half its own pitch over on the emitted azimuths, told; under SPIRAL the flag SHOWN on turns
+  of 13/8/5 (naming turn 3) and ABSENT on 13/8/8, the global 8 either way. Seven mutants, each firing its clause (the two
+  new ones: the inactive phase aligned — a `bloom-geometry.js` mutant —, and the SPIRAL flag reading the global).
+- **Matrix block 86** (18 rows, 1,685): the default; layer 2 owning 12 (inactive both sides); a run of equal owned
   counts below an inactive pair; the range's two ends; two SNAPPED asks; the single-whorl arm; the outer whorl owning 4
   under 8 sepals; the photo lotus at 6/5/3/3 (v11's own widths — the widened variant folds, §18.3); the photo water lily
-  at 4/10 with its sepals; SPIRAL turns of 13/8/5; Voronoi infill and BONE texture on differing counts; three GATED
-  records (FAN, CONTINUOUS, per-layer OFF). **Smoke block 86** (6 rows, `--conn`). **`frozen/phase95`** = the 1,667
+  at 4/10 with its sepals (the half-pitch witness); SPIRAL turns of 13/8/5 (a short turn the flag catches) and 13/8/8
+  (none, not flagged); Voronoi infill and BONE texture on differing counts; three GATED
+  records (FAN, CONTINUOUS, per-layer OFF). **Smoke block 86** (7 rows, `--conn`; the SPIRAL 13/8/5 row claims PC6, the
+  water lily PC5). **`frozen/phase95`** = the 1,667
   rows at `8f6c570`, proved deep-equal.
 - **Photo census**: `layerPetalCount` is class d (a view; a photo writes `values.layerPetalCount`, schema v6 — PR 2);
   the census refuses to load if the geometry's layer values are not `ring` + `notYet`. Runs clean.
@@ -2744,22 +2759,35 @@ the last column is what this PR did.
 | its `--control` (petalCup + 0.05) | moved ui, save and STL |
 | must-fail: layer 2 takes one petal more with nothing asked (a copy of this tree) | **22 DIFFER** — every per-layer design; the gated CONTINUOUS row and every non-per-layer sample hold |
 | the sheet's default column (lotus v11, daisy v7, water lily v7, main vs PR) | **0 floats differ** on all three |
-| block 86, export gate | PASS 17 / 17 watertight, every clause silent |
-| block 86, connectedness | PASS 17 / 17 one piece |
-| block 86, census (Node) | 0 within-shell pairs on all 17 |
-| panel gate | PASS (route (at) and its five mutants) |
+| block 86, export gate (re-run after the §19.5 rulings) | PASS 18 / 18 watertight, every clause silent (X2's census included) |
+| block 86, connectedness (re-run) | PASS 18 / 18 one piece |
+| block 86, census (Node, first build) | 0 within-shell pairs on all 17 |
+| panel gate | PASS (route (at) and its five mutants); re-run after the rulings: route (at) and the SPIRAL flag route (e) clean, **7 of 7 (at) mutants fire** |
+| PC must-fail after the rulings | 9 states clean, 9 of 9 mutants |
+| old load path after the rulings | **48 of 48 identical** (the half pitch acts only where counts differ, which no saved design has) |
 | scopes gate, and its 22 mutants | PASS; 22 of 22 |
 | design-file gate (Node) | PASS — F2 expects the reader's told note on the two SNAPPED rows |
 | root-taper must-fail (FC1 re-pointed onto the own count) | 10 of 10 |
-| apex table anchors | 273 of 273 match exactly once — no mutant needed re-anchoring |
-| smoke census and its negative control | PASS, 251 families |
+| apex table anchors | 273 of 273 match exactly once — no mutant needed re-anchoring (re-checked after the rulings) |
+| smoke census and its negative control | PASS, 253 families (PC5, PC6 claimed) |
 
 Block 86, EXPORT triangles: default 73,680 · own 12: 85,928 · 8/5/5: 55,308 · min 3: 58,370 · max 40: 171,664 · single
 whorl 5: 15,502 · lotus 6/5/3/3: **52,246** (v11 61,432) · water lily 4/10: **100,108** (v7 106,232) · SPIRAL 13/8/5: 79,804
-· infill 5/9/5: 175,048 · BONE 5/9: 1,976,738 (98.8% of the 2.0 M cap, the allocator's own fill).
+· SPIRAL 13/8/8: 88,990 · infill 5/9/5: 175,048 · BONE 5/9: 1,980,258 (99.0% of the 2.0 M cap, the allocator's own fill;
+1,976,738 before the half pitch moved the inner whorl). Every other count is unmoved by the rulings.
 
-### 19.5 Made without a ruling — for Eva
+### 19.5 Made without a ruling — RULED (Eva, Nov 8)
 
+**Rulings:**
+1. **Layer petals range 3–40: approved.**
+2. **The variance aliasing threshold reads the smallest whorl's count: approved as built.**
+3. **The SPIRAL legibility flag reads EACH TURN's own count** (a 5-petal turn in 13/8/5 must be flagged) — **built**:
+   `spiralShortTurns`, PC6, panel route (at), the mutant `the-spiral-flag-reads-the-global` (both tools).
+4. **Phase inactive: a whorl whose count differs from the whorl outside it starts HALF ITS OWN PITCH over** (not
+   aligned on the same angle) — **built**: one line in `countPhases` and its restatement, PC5, the mutant
+   `the-inactive-phase-is-aligned` (both tools). The water lily's inner first petal now stands 18° past the outer's.
+
+**The questions, as asked:**
 1. **The range 3–40** (Petals' own). An owned whorl of 1 or 2 is not offered.
 2. **The variance field's aliasing bar reads the SMALLEST whorl count** — the whorl that aliases first. The alternative
    is a bar per whorl, which changes the told line's shape.

@@ -7099,8 +7099,9 @@ export function nominalAzimuthRestated(m, ui, L, i, row = null) {
   if (m.continuousMode) return 0 + i * SV_GOLDEN;
   /* NOV 8: A WHORL THAT OWNS ITS PETAL COUNT — the RADIAL divisor is its own
      count, and the LAYER PHASE is INACTIVE between two whorls whose counts
-     differ (Eva's ruling): across such a pair the inner whorl keeps the outer
-     one's phase, and a run of equal counts steps by its own pitch from there.
+     differ (Eva's ruling): across such a pair the inner whorl starts HALF ITS
+     OWN PITCH over the outer one's phase (ruled Nov 8, §19.5 item 4), and a
+     run of equal counts steps by its own pitch from there.
      Restated from the row's own `@scopes` record, never footRing()'s. Where no
      whorl owns a count this is the pre-existing law, character for character. */
   const layers = Math.round(Number(ui.layerCount));
@@ -7110,7 +7111,7 @@ export function nominalAzimuthRestated(m, ui, L, i, row = null) {
     const ph = [];
     let start = 0;
     for (let k = 0; k <= L; k++) {
-      if (k > 0 && cnt[k] !== cnt[k - 1]) { start = k; ph.push(ph[k - 1]); continue; }
+      if (k > 0 && cnt[k] !== cnt[k - 1]) { start = k; ph.push(ph[k - 1] + Math.PI / cnt[k]); continue; }
       ph.push(start === 0 ? (k * Number(ui.layerPhase) * SV_TAU) / cnt[k] : ph[start] + ((k - start) * Number(ui.layerPhase) * SV_TAU) / cnt[k]);
     }
     return ui.placement === 'RADIAL' ? ph[L] + (i * SV_TAU) / cnt[L] : ph[L] + i * SV_GOLDEN;
@@ -7386,7 +7387,17 @@ export function petalCountClauses(m, ui, row) {
             rule, since every ring is then a fraction of the wrong R0 and Z3
             reads its R0 off ring 0. Bounded in ULP of the radius (the two
             routes are the same sum in another order of evaluation);
-       PC4  the SEPALS' ceiling and pitch read the OUTER whorl's own count. */
+       PC4  the SEPALS' ceiling and pitch read the OUTER whorl's own count;
+       PC5  across every restated inactive pair the inner whorl's FIRST EMITTED
+            azimuth stands HALF ITS OWN PITCH (pi / its restated count) past the
+            outer whorl's first (Eva's ruling of Nov 8 on §19.5 item 4 — not on
+            the same angle), read off the emitted azimuths where no spacing
+            field remaps them; SV1 holds every other slot to the same law;
+       PC6  the SPIRAL legibility flag reads EACH TURN's own count (Eva's ruling
+            of Nov 8 on §19.5 item 3): the turns under SPIRAL_LEGIBLE_COUNT
+            restated from the row's `@scopes` against the build's
+            `spiralShortTurns` and the page's own `spiralFlagShown`, both ways
+            (a 5-petal turn in 13/8/5 is flagged; 13/8/8 is not). */
   const bad = [];
   const cont = m.continuousMode === true;
   const rings = m.rings || [];
@@ -7430,6 +7441,32 @@ export function petalCountClauses(m, ui, row) {
       if (S.ceiling !== want[0]) bad.push(`PC4: the sepals' ceiling is ${S.ceiling}; the outer whorl carries ${want[0]} (${owned[0] ? 'its own count' : 'the global Petals'}) — the sepals must read the OUTER whorl's count`);
       if (typeof S.pitchRad === 'number' && Math.abs(S.pitchRad - (2 * Math.PI) / want[0]) > 1e-12) bad.push(`PC4: the sepals' pitch is ${S.pitchRad} rad, not 2 pi / the outer whorl's ${want[0]}`);
     }
+    /* PC5 — THE INACTIVE PHASE STARTS HALF THE INNER WHORL'S OWN PITCH OVER.
+       Read off the EMITTED first azimuths (slot 0 of each whorl IS the whorl's
+       phase under RADIAL and SPIRAL alike), the half pitch from the RESTATED
+       count; skipped only where a spacing field remaps the azimuths (SV1's). */
+    const spacingOn = Number(ui.varianceSpacing) > 0;
+    if (anyOwned && !m.fan && !spacingOn) {
+      for (const k of wantOff) {
+        const a0 = az[k - 1] && az[k - 1][0], a1 = az[k] && az[k][0];
+        if (typeof a0 !== 'number' || typeof a1 !== 'number') { bad.push(`PC5: whorl ${k} or ${k + 1} emitted no first azimuth to compare`); continue; }
+        const half = Math.PI / want[k];
+        let d = (a1 - a0 - half) % (2 * Math.PI);
+        if (d > Math.PI) d -= 2 * Math.PI; else if (d < -Math.PI) d += 2 * Math.PI;
+        if (Math.abs(d) > 1e-9) bad.push(`PC5: whorl ${k + 1}'s first petal stands ${(((a1 - a0) * 180) / Math.PI).toFixed(4)} deg past whorl ${k}'s; the ruling puts it HALF ITS OWN PITCH over, ${((half * 180) / Math.PI).toFixed(4)} deg (pi / ${want[k]})`);
+      }
+    }
+  }
+  /* PC6 — THE SPIRAL LEGIBILITY FLAG READS EACH TURN'S OWN COUNT. */
+  if (!cont && !m.fan && 'spiralShortTurns' in m) {
+    const spiral = String(ui.placement) === 'SPIRAL';
+    const L = rings.length;
+    const counts = whorlCountsRestated(row, ui, L, null);
+    const wantShort = spiral ? counts.map((c, k) => ({ turn: k, count: c })).filter((t) => t.count < SPIRAL_LEGIBLE_COUNT) : null;
+    const got = m.spiralShortTurns;
+    const fmt = (l) => (l === null ? 'null' : `[${l.map((t) => `turn ${t.turn + 1}: ${t.count}`).join(', ')}]`);
+    if (fmt(got) !== fmt(wantShort)) bad.push(`PC6: the build's short turns are ${fmt(got)}; restated from each turn's own count ${fmt(wantShort)} (SPIRAL_LEGIBLE_COUNT ${SPIRAL_LEGIBLE_COUNT}${spiral ? `, turns ${counts.join('/')}` : ''})`);
+    if ('spiralFlagShown' in m && spiral && m.spiralFlagShown !== (wantShort.length > 0)) bad.push(`PC6: the SPIRAL legibility flag is ${m.spiralFlagShown ? 'SHOWN' : 'ABSENT'}; turns ${counts.join('/')} want it ${wantShort.length ? `SHOWN (turn ${wantShort[0].turn + 1} carries ${wantShort[0].count})` : 'ABSENT'}`);
   }
   return bad;
 }
@@ -21975,8 +22012,9 @@ export function buildMatrix() {
     ['LAYER PETALS: one whorl — layer 1 owns 5 under the global 8 (the area rule\'s single-whorl arm)', { layerCount: 1, scopeLayers: 'ON' }, [ownN(0, 5)]],
     ['LAYER PETALS: the outer whorl owns 4, 8 sepals asked (built 4 — the sepals read the OUTER whorl\'s count, told)', { ...COUNT3, sepalCount: 8 }, [ownN(0, 4)]],
     ['LAYER PETALS: the photo LOTUS (S6 v11) at 6 / 5 / 3 / 3, its own widths (body h:w 1.413 -> 1.482)', LOTUS_V11, lotusV11Layers([6, 5, 3, 3])],
-    ['LAYER PETALS: the photo WATER LILY (v7) at 4 / 10 with its four sepals (on the outer whorl\'s pitch)', LILY_V7, lilyLayers(4, 10)],
-    ['LAYER PETALS: SPIRAL x 3 turns of 13 / 8 / 5', { placement: 'SPIRAL', layerCount: 3, petalCount: 8, scopeLayers: 'ON' }, [ownN(0, 13), ownN(2, 5)]],
+    ['LAYER PETALS: the photo WATER LILY (v7) at 4 / 10 with its four sepals (on the outer whorl\'s pitch; the inner whorl\'s first petal half its own pitch over)', LILY_V7, lilyLayers(4, 10)],
+    ['LAYER PETALS: SPIRAL x 3 turns of 13 / 8 / 5 (turn 3 below the legibility flag — flagged)', { placement: 'SPIRAL', layerCount: 3, petalCount: 8, scopeLayers: 'ON' }, [ownN(0, 13), ownN(2, 5)]],
+    ['LAYER PETALS: SPIRAL x 3 turns of 13 / 8 / 8 (every turn at or above the legibility flag — not flagged)', { placement: 'SPIRAL', layerCount: 3, petalCount: 8, scopeLayers: 'ON' }, [ownN(0, 13)]],
     ['LAYER PETALS: Voronoi infill on 5 / 9 / 5', { ...COUNT3, petalInfill: 'VORONOI' }, [ownN(0, 5), ownN(1, 9), ownN(2, 5)]],
     ['LAYER PETALS: BONE texture on 5 / 9', { layerCount: 2, scopeLayers: 'ON', petalTexture: 'BONE' }, [ownN(0, 5), ownN(1, 9)]],
     ['LAYER PETALS: GATED — FAN with per-layer ON and a layer count record (kept and inert)', { placement: 'FAN', layerCount: 2, scopeLayers: 'ON' }, [ownN(1, 12)]],

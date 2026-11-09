@@ -2251,9 +2251,19 @@ function showingLine(mode) {
    the number and this reads it, so SPIRAL's behaviour is unchanged to the
    character (sequenceLength IS petalCount there) while the claim stays true
    in the new mode. */
+/* NOV 8 (Eva's ruling on §19.5 item 3): UNDER SPIRAL EACH TURN RUNS ITS OWN
+   SEQUENCE, so the flag reads EACH TURN'S OWN COUNT — footRing()'s
+   `spiralShortTurns` — and a 5-petal turn in 13/8/5 is flagged. With no count
+   owned every turn carries the global, so this is the old predicate exactly. */
 function spiralLowCount(ui, fr) {
-  return (ui.placement === 'SPIRAL' || ui.placement === 'CONTINUOUS')
-    && fr.sequenceLength < SPIRAL_LEGIBLE_COUNT;
+  if (ui.placement === 'SPIRAL') return !!(fr.spiralShortTurns && fr.spiralShortTurns.length);
+  return ui.placement === 'CONTINUOUS' && fr.sequenceLength < SPIRAL_LEGIBLE_COUNT;
+}
+/* which turns, named — only where a turn owns its count (the old line is
+   unchanged to the character where none does) */
+function spiralShortWhere(ui, fr) {
+  if (ui.placement !== 'SPIRAL' || !fr.countsOwned || !fr.spiralShortTurns || !fr.spiralShortTurns.length) return '';
+  return ` on ${fr.spiralShortTurns.map((t) => `turn ${t.turn + 1} (${t.count} petals)`).join(', ')}`;
 }
 
 /* THE FOOT-FLOOR RANGE, and why it is a RANGE now. Under the ringed arm
@@ -2390,7 +2400,7 @@ function layerCountLine(fr, mode, ui) {
   const word = String(ui.placement) === 'SPIRAL' ? 'turn' : 'layer';
   const per = (fr.rings || []).map((r) => `${word} ${Math.round(r.lambda) + 1} ${r.ownCount ? `${r.ownCount.built} own${r.ownCount.snapped ? ` (asked ${r.ownCount.asked}, SNAPPED)` : ''}` : `${Math.round(Number(ui.petalCount))} global`}`);
   const off = fr.phaseInactive && fr.phaseInactive.length
-    ? ` · LAYER PHASE INACTIVE between ${fr.phaseInactive.map((L) => `${word}s ${L} and ${L + 1} (${fr.whorlCounts[L - 1]} vs ${fr.whorlCounts[L]})`).join(', ')} — their counts differ`
+    ? ` · LAYER PHASE INACTIVE between ${fr.phaseInactive.map((L) => `${word}s ${L} and ${L + 1} (${fr.whorlCounts[L - 1]} vs ${fr.whorlCounts[L]})`).join(', ')} — their counts differ, so the inner one starts half its own pitch over`
     : '';
   const sep = fr.sepals && fr.rings[0] && fr.rings[0].ownCount ? ` · the sepals read the outer whorl's ${fr.rings[0].ownCount.built}` : '';
   return `PETAL COUNTS (${mode}, per ${word}): ${per.join('; ')}${off}${sep}\n`;
@@ -3950,7 +3960,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (built && built.leaf && built.leaf.present ? leafLine(built.leaf, built.leavesBuilt) : '')
        + (built && built.inflorescence && built.inflorescence.present ? infloLine(built.inflorescence, built.inflorescenceBuilt) : '')
        + (built ? sepalLine(ui, built, mode) : '')
-       + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
+       + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE${spiralShortWhere(ui, fr)}: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + (built && built.neighbour ? neighbourLine(built.neighbour, mode) : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
 }
@@ -5567,6 +5577,9 @@ window.__bloomMetrics = () => ({
      `placement` would be a second copy of the branch. */
   continuousMode: lastFoot.continuousMode,
   sequenceLength: lastFoot.sequenceLength,
+  /* the turns the SPIRAL legibility flag names (each turn's own count, Nov 8) */
+  spiralShortTurns: lastFoot.spiralShortTurns || null,
+  spiralFlagShown: spiralLowCount({ placement: lastPlacement }, lastFoot),
   /* ===================================================================
      THE ARRANGEMENT'S POSITION AROUND THE AXIS — J7's and Z4b's only input,
      and the reason this session had to ship an instrument at all.

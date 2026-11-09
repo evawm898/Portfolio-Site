@@ -2087,7 +2087,9 @@ export const SMOKE_BLOCKS = [
        whorl's count; the single-whorl area-rule arm; and the snap. The subset:
        the anchor (inactive on both sides of an owned count), a run of equal
        owned counts below an inactive pair, the single-whorl arm, the outer
-       whorl owning 4 under 8 sepals asked, the snap, and the photo water lily.
+       whorl owning 4 under 8 sepals asked, the snap, the photo water lily (the
+       half-pitch phase, Nov 8) and a SPIRAL with one short turn (the flag on
+       each turn's own count, Nov 8).
        --conn is REQUIRED: fewer or more feet move R0 and every ring with it,
        and the voxel fill is what says every foot still reaches the hub. */
     conn: true,
@@ -2102,8 +2104,10 @@ export const SMOKE_BLOCKS = [
         path: "PC4 the sepal descriptor's ceiling and pitch on the outer whorl's restated 4, SP2 the ceiling the outer whorl's 4, SP4 the sepal pitch 2 pi / 4 off the outer petals' own azimuths" },
       { label: 'LAYER PETALS: SNAPPED — layer 3 asks 55 (built 40, told)',
         path: "PC0 asked 55 / built 40 / snapped, PC1 whorl 3 emits 40" },
-      { label: 'LAYER PETALS: the photo WATER LILY (v7) at 4 / 10 with its four sepals (on the outer whorl\'s pitch)',
-        path: "PC1 4 / 10, SP4 four sepals interleaved on the 4-petal outer whorl, OC5 the scoped outline unmoved by the count" },
+      { label: 'LAYER PETALS: the photo WATER LILY (v7) at 4 / 10 with its four sepals (on the outer whorl\'s pitch; the inner whorl\'s first petal half its own pitch over)',
+        path: "PC1 4 / 10, PC5 the inner whorl's first petal half its own pitch (pi / 10) past the outer's, SP4 four sepals interleaved on the 4-petal outer whorl, OC5 the scoped outline unmoved by the count" },
+      { label: 'LAYER PETALS: SPIRAL x 3 turns of 13 / 8 / 5 (turn 3 below the legibility flag — flagged)',
+        path: "PC6 the SPIRAL legibility flag on turn 3's own 5 (the global 8 is not under it), SV1 each turn's golden-angle sequence from its phase" },
     ],
   },
 ];

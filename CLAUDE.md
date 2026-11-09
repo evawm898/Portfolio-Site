@@ -801,21 +801,24 @@ route (as)).
 BETWEEN DIFFERING COUNTS, THE SEPALS ON THE OUTER WHORL'S COUNT** (option A of §18, Eva's rulings of Nov 8 — read §18.6
 and §19 of `docs/bloom-photo-to-bloom-discovery.md` before touching `layerOwnedCount`, `LAYER_PETAL_COUNT_RANGE`,
 `whorlCount` / `countPhases` / `phaseInactive` / `nOuter` in `footRing()`, `layerPetalCount`, bloom.js's `COUNT_IDS` /
-`pickedCountOf` / `layerCountLine`, `petalCountClauses` (PC0–PC4), `ownedCountRestated` or route (at)).
+`pickedCountOf` / `layerCountLine`, `spiralShortTurns` / `spiralLowCount`, `petalCountClauses` (PC0–PC6),
+`ownedCountRestated` or route (at)).
 - A layer entry's `values.layerPetalCount` replaces the global for that whorl; absent, the whorl is `slotCount` itself BY
   BRANCH. RADIAL / SPIRAL with Per-layer values ON only; hidden and inert under CONTINUOUS and FAN. The tube stays
   unavailable under Per-layer values (SO11) — its plan reads one count, and that is why.
 - What follows the owned count, one owner each: the area rule (R0 follows the feet), the slot map, the whorl's `count`, the
   foot cap's span, the scope term's n, the sepals (outer whorl's count), the layer phase (INACTIVE across a differing pair,
-  `phaseInactive`, told), the variance aliasing bar (the smallest whorl — no ruling). §19.1 lists EVERY reader, with the
-  ones deliberately left on the global and why.
-- **The range 3–40 is PROPOSED** (Petals' own; the harness refuses to load if it moves). Off-grid or past it: SNAPPED and
-  told; the file keeps what was asked.
+  `phaseInactive`, told — **the inner whorl starts HALF ITS OWN PITCH over**, RULED Nov 8, PC5), the SPIRAL legibility
+  flag (**each turn's own count**, RULED Nov 8, `spiralShortTurns`, PC6), the variance aliasing bar (the smallest whorl —
+  RULED, approved as built). §19.1 lists EVERY reader, with the ones deliberately left on the global and why.
+- **The range 3–40 is RULED** (Nov 8; Petals' own; the harness refuses to load if it moves). Off-grid or past it:
+  SNAPPED and told; the file keeps what was asked.
 - **PC1 counts the azimuths WRITTEN, never a row's `.length`**: the builder pre-sizes a row to the slot map, so a whorl laid
   with fewer slots leaves holes `.length` cannot see — found by the family's own must-fail.
-- Must-fail: `node tools/verify-bloom-layer-count.mjs --control` (7 witnessed mutants; the apex table never runs the Z
-  family), spawned by the defaults bar. Panel route (at) with five mutants (THIRTY-SEVEN routes). Old load path 48 / 48
-  identical, the must-fail moving 22. Block 86 (17 rows, 1,684), smoke block 86 (6); `frozen/phase95` = the 1,667 rows at
+- Must-fail: `node tools/verify-bloom-layer-count.mjs --control` (9 witnessed mutants, among them the phase ALIGNED and
+  the SPIRAL flag on the global; the apex table never runs the Z family), spawned by the defaults bar. Panel route (at)
+  with seven mutants (THIRTY-SEVEN routes). Old load path 48 / 48 identical, the must-fail moving 22. Block 86 (18 rows,
+  1,685), smoke block 86 (7); `frozen/phase95` = the 1,667 rows at
   `8f6c570`. Sheet: `node tools/shot-bloom-layer-count.mjs docs/img/layer-petal-count.png --base <wt>`.
 
 **PARAMETER SCOPING HAS A STATE MODEL AND NOTHING ELSE YET — ZERO CONTROLS, ZERO ROWS, ZERO BYTES**

@@ -40,7 +40,9 @@ const LABELS = [
   "LAYER PETALS: one whorl — layer 1 owns 5 under the global 8 (the area rule's single-whorl arm)",
   "LAYER PETALS: the outer whorl owns 4, 8 sepals asked (built 4 — the sepals read the OUTER whorl's count, told)",
   'LAYER PETALS: SNAPPED — layer 2 asks 4.6 (built 5, told)',
-  'LAYER PETALS: SPIRAL x 3 turns of 13 / 8 / 5',
+  'LAYER PETALS: SPIRAL x 3 turns of 13 / 8 / 5 (turn 3 below the legibility flag — flagged)',
+  'LAYER PETALS: SPIRAL x 3 turns of 13 / 8 / 8 (every turn at or above the legibility flag — not flagged)',
+  "LAYER PETALS: the photo WATER LILY (v7) at 4 / 10 with its four sepals (on the outer whorl's pitch; the inner whorl's first petal half its own pitch over)",
   'LAYER PETALS: the default — RADIAL x 3 layers, per-layer ON, no layer owns its count (every whorl the global 8)',
 ];
 const MATRIX = H.buildMatrix();
@@ -70,6 +72,7 @@ function metricsOf(G, st, row) {
     derivedRadius: fr.rings[0].derivedRadius, countsOwned: fr.countsOwned === true, whorlCounts: fr.whorlCounts, phaseInactive: fr.phaseInactive || [],
     slotAzimuths: b.slotAzimuths.map((a) => [...a]), spacingVariance: b.spacingVariance ?? null, varianceSpacingAbsent: b.varianceSpacingAbsent ?? true,
     sepal: fr.sepals ? { ceiling: fr.sepals.ceiling, pitchRad: fr.sepals.pitchRad, count: fr.sepals.count } : null,
+    spiralShortTurns: fr.spiralShortTurns ?? null,
   };
 }
 function clausesOn(G, row) {
@@ -90,7 +93,7 @@ async function loadGeometry(mut) {
   return import(pathToFileURL(path.join(dir, 'bloom-geometry.js')).href);
 }
 
-const LILY4 = ROWS[3], RUN = ROWS[1], ONE = ROWS[2], SNAP = ROWS[4], TWELVE = ROWS[0];
+const LILY4 = ROWS[3], RUN = ROWS[1], ONE = ROWS[2], SNAP = ROWS[4], TWELVE = ROWS[0], SPIRAL5 = ROWS[5], LILY = ROWS[7];
 const MUTANTS = [
   { id: 'the-area-rule-sums-the-global', names: ['PC3'], why: 'the whorl carries its own count but the area rule still sums the global — R0, and every ring a fraction of it, stands on feet that are not there',
     find: '    const footCount = whorlCount;', into: '    const footCount = slotCount;',
@@ -98,14 +101,24 @@ const MUTANTS = [
   { id: 'the-whorl-keeps-the-global-count', names: ['PC1', 'SV1'], why: 'the record names the owned count and the whorl primitive lays the global number of petals — the control reads 12 over a whorl of 8, watertight and one piece',
     find: '      count: ring.ownCount ? ring.ownCount.built : fr.slotCount,', into: '      count: fr.slotCount,',
     witness: (M) => { const a = metricsOf(M, stateOf(TWELVE), TWELVE).slotAzimuths[1].filter((x) => x !== undefined).length; return a === 8 ? null : `whorl 2 still emits ${a}`; } },
-  { id: 'the-phase-stays-active-across-counts', names: ['SV1'], why: 'the record still names the inactive pairs, but every whorl takes the old global-pitch phase — 0.5 of an 8-petal pitch on a 12-petal whorl, the pairing Eva ruled has no meaning',
+  { id: 'the-phase-stays-active-across-counts', names: ['SV1', 'PC5'], why: 'the record still names the inactive pairs, but every whorl takes the old global-pitch phase — 0.5 of an 8-petal pitch on a 12-petal whorl, the pairing Eva ruled has no meaning',
     find: '      phase: (continuousMode || fanMode) ? 0 : countPhases ? countPhases[L] : (p.lambda * state.layerPhase * TAU) / state.petalCount,',
     into: '      phase: (continuousMode || fanMode) ? 0 : (p.lambda * state.layerPhase * TAU) / state.petalCount,',
     witness: (M, C) => { const a = metricsOf(M, stateOf(RUN), RUN).rings[1].phase, b = metricsOf(C, stateOf(RUN), RUN).rings[1].phase; return a !== b ? null : `whorl 2's phase ${a} did not move`; } },
   { id: 'the-inactive-pairs-are-never-named', names: ['PC2'], why: 'the phase law runs but the record names no inactive pair — the read-out the ruling asks for says nothing',
-    find: '      if (L > 0 && raw[L].whorlCount !== raw[L - 1].whorlCount) { start = L; out.push(out[L - 1]); phaseInactive.push(L); continue; }',
-    into: '      if (L > 0 && raw[L].whorlCount !== raw[L - 1].whorlCount) { start = L; out.push(out[L - 1]); continue; }',
+    find: '      if (L > 0 && raw[L].whorlCount !== raw[L - 1].whorlCount) { start = L; out.push(out[L - 1] + Math.PI / raw[L].whorlCount); phaseInactive.push(L); continue; }',
+    into: '      if (L > 0 && raw[L].whorlCount !== raw[L - 1].whorlCount) { start = L; out.push(out[L - 1] + Math.PI / raw[L].whorlCount); continue; }',
     witness: (M) => { const a = metricsOf(M, stateOf(TWELVE), TWELVE).phaseInactive; return a.length === 0 ? null : `the record still names ${a}`; } },
+  /* §19.5 item 4 (ruled Nov 8): the phase the FIRST build shipped — the inner
+     whorl on the outer's angle, no half pitch */
+  { id: 'the-inactive-phase-is-aligned', names: ['PC5', 'SV1'], why: "across a pair whose counts differ the inner whorl's first petal lands ON the outer's angle — the first build, which Eva's ruling replaced with half the inner whorl's own pitch",
+    find: 'out.push(out[L - 1] + Math.PI / raw[L].whorlCount);', into: 'out.push(out[L - 1]);',
+    witness: (M) => { const a = metricsOf(M, stateOf(LILY), LILY).slotAzimuths; return Math.abs(a[1][0] - a[0][0]) < 1e-12 ? null : `the water lily's inner first petal stands ${a[1][0] - a[0][0]} rad past the outer's`; } },
+  /* §19.5 item 3 (ruled Nov 8): the flag the FIRST build shipped — the global */
+  { id: 'the-spiral-flag-reads-the-global', names: ['PC6'], why: 'a 5-petal turn in 13 / 8 / 5 under a global 8 is not flagged — the short turn reads as phyllotaxis it cannot be',
+    find: '      ? raw.map((q, L) => ({ turn: L, count: q.ownCount ? q.ownCount.built : n })).filter((t) => t.count < SPIRAL_LEGIBLE_COUNT)',
+    into: '      ? raw.map((q, L) => ({ turn: L, count: n })).filter((t) => t.count < SPIRAL_LEGIBLE_COUNT)',
+    witness: (M) => { const t = metricsOf(M, stateOf(SPIRAL5), SPIRAL5).spiralShortTurns; return t && t.length === 0 ? null : `the short turns read ${JSON.stringify(t)}`; } },
   { id: 'the-snap-is-never-recorded', names: ['PC0'], why: 'a file asking 4.6 builds 5 and the record says nothing snapped — the asked-vs-built read-out goes silent',
     find: '  return { asked, built, snapped: built !== asked };', into: '  return { asked, built, snapped: false };',
     witness: (M) => { const r = metricsOf(M, stateOf(SNAP), SNAP).rings[1].ownCount; return r && r.snapped === false && r.built === 5 ? null : `the record reads ${JSON.stringify(r)}`; } },
