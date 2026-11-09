@@ -71,7 +71,7 @@ function buildSuitRows() {
         <select id="c-${suit.id}-layout" data-c="layout">${Object.keys(CENTRE_LAYOUTS).map((k) => `<option value="${k}" title="${CENTRE_LAYOUTS[k]}">${CENTRE_SHORT[k]}</option>`).join('')}</select>
         <select id="c-${suit.id}-motif" data-c="motif">${motifOptions()}</select>
         <label for="c-${suit.id}-tier">Second tier, ranks ${TIER_RANKS.join(' and ')}</label>${suit.multicolor
-          ? `<label for="c-${suit.id}-numeral">Numeral</label>` : '<span></span>'}
+          ? `<label for="c-${suit.id}-numeral">Corner index</label>` : '<span></span>'}
         <select id="c-${suit.id}-tier" data-c="tier">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>${suit.multicolor
           ? `<select id="c-${suit.id}-numeral" data-n>${Object.entries(NUMERAL_FILLS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>` : ''}
         <button type="button" class="hb-suit__all" data-all>same centre for every suit</button>
@@ -115,8 +115,8 @@ function syncSuitRows() {
     if (num) {
       num.value = suit.numeral;
       num.disabled = design.index === 'band';
-      num.title = num.disabled ? 'With the band index the band itself is the rainbow; the numeral is drawn in ink on it.'
-        : 'Solid: the suit colour. Rainbow gradient: the other suits\' colours, top to bottom.';
+      num.title = num.disabled ? 'With the band index the band itself is the rainbow; the numeral and symbol are drawn in ink on it.'
+        : 'Solid: the suit colour. Rainbow gradient: the numeral and symbol run through the other suits\' colours, top to bottom.';
     }
     for (const b of row.querySelectorAll('.hb-sym')) {
       b.setAttribute('aria-pressed', String(b.dataset.sym === suit.symbol));

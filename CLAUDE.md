@@ -12674,5 +12674,5 @@ Hidden page (`hanabi.html`, `hanabi.css`, `hanabi.js`, `hanabi/*.js`; `noindex`,
 band), and a centre PER SUIT (`suit.centre`: layout single / count / bleed, a firework motif, an optional
 tier at ranks 4–5).** Phase 1's layouts A/B/C are those pairs, and a v1 file migrates byte-identically.
 Motifs are the five originals plus 12 drawn after the Hirayama catalogue; hanging/falling pieces are ruled
-out, and Spark drift / Streamers were removed (Nov 9; one tier left, rosettes). The rainbow suit's numeral can be a gradient through the other suits' colours (`suit.numeral`, corner index only). **`hanabi/firework.js` is the phase-2 slot** — layout code only calls `fireworkSpec()`,
+out, and Spark drift / Streamers were removed (Nov 9; one tier left, rosettes). The rainbow suit's corner index (numeral and symbol) is a gradient through the other suits' colours by default (`suit.numeral`, `solid` to turn it off; not under the band index). **`hanabi/firework.js` is the phase-2 slot** — layout code only calls `fireworkSpec()`,
 `renderFirework()` and `renderTier()`. Gate: `node tools/verify-hanabi.mjs` (`--negative-control`), not in CI.
