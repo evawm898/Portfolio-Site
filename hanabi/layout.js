@@ -143,7 +143,7 @@ function guideMarks(g) {
 // The index decides where the centre may draw: 'large' and 'small' sit in the
 // safe rect's corners and leave the centre the whole safe rect to share;
 // 'band' takes a strip at top and bottom and gives the centre what is between.
-// Phase 1's layouts A/B/C are (large, single), (small, count), (band, bleed),
+// Phase 1's layouts A/B/C are (large, scale), (small, column), (band, bleed),
 // and each pair draws exactly the markup phase 1 drew.
 
 export const INDEX_DIGIT = { large: 0.13, small: 0.095 };   // numeral height, fraction of card height
@@ -212,24 +212,74 @@ export function tierLayout(area, corner) {
   return { burst: { cy, r }, rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } };
 }
 
+// ---- Count: the rank as N fireworks, laid out like pips ----
+//
+// An arrangement is one { x, y, s, rot } per firework: x and y fractions of
+// the centre FIELD (the area less the corner-index columns, fieldArea()), s a
+// radius as a fraction of half the field's shorter side, rot degrees added to
+// the firework's own rotation. Sizes vary within a card on purpose, and
+// neighbours may overlap. The same fractions serve every card size: a
+// firework is held inside the field (its radius never reaches past an edge),
+// so no preset puts one on the corner index.
+export const DEFAULT_PIPS = {
+  1: [{ x: 0.5, y: 0.5, s: 0.98, rot: 0 }],
+  2: [{ x: 0.42, y: 0.27, s: 0.8, rot: 0 }, { x: 0.58, y: 0.73, s: 0.68, rot: 0 }],
+  3: [{ x: 0.36, y: 0.2, s: 0.6, rot: 0 }, { x: 0.58, y: 0.5, s: 0.74, rot: 0 }, { x: 0.38, y: 0.8, s: 0.56, rot: 0 }],
+  4: [{ x: 0.5, y: 0.15, s: 0.52, rot: 0 }, { x: 0.27, y: 0.42, s: 0.56, rot: 0 }, { x: 0.73, y: 0.58, s: 0.56, rot: 0 }, { x: 0.5, y: 0.85, s: 0.5, rot: 0 }],
+  5: [{ x: 0.27, y: 0.17, s: 0.46, rot: 0 }, { x: 0.73, y: 0.17, s: 0.42, rot: 0 }, { x: 0.5, y: 0.5, s: 0.62, rot: 0 }, { x: 0.27, y: 0.83, s: 0.42, rot: 0 }, { x: 0.73, y: 0.83, s: 0.46, rot: 0 }],
+};
+// The arrangement a cell draws: its own, else its rank column's, else the pips.
+export function cellItems(design, suitId, rank) {
+  const o = design.fireworks && design.fireworks[suitId] && design.fireworks[suitId][rank];
+  if (o && Array.isArray(o.items) && o.items.length === rank) return o.items;
+  const col = design.arrangements && design.arrangements[rank];
+  if (Array.isArray(col) && col.length === rank) return col;
+  return DEFAULT_PIPS[rank];
+}
+// Where each firework of a Count cell lands, in card mm: { field, unit,
+// items: [{ cx, cy, r, rot }] }. r is the asked radius held inside the field.
+export function countPlacement(field, items) {
+  const unit = Math.min(field.w, field.h) / 2;
+  return { field, unit, items: items.map((it) => {
+    const cx = field.x + it.x * field.w, cy = field.y + it.y * field.h;
+    const room = Math.max(0.5, Math.min(cx - field.x, field.x + field.w - cx, cy - field.y, field.y + field.h - cy));
+    return { cx, cy, r: Math.min(it.s * unit, room), rot: it.rot || 0 };
+  }) };
+}
+// A phase-1 radial burst reaches past r by its outer stars and sparks (about
+// 13%); the catalogue and the types stay within r.
+const REACH = (spec) => (!spec.motif || spec.motif === 'classic' || spec.motif.startsWith('radial-') ? 1.14 : 1);
+
+export function placementFor(design, suit, rank) {
+  const g = cardGeom(design);
+  const ix = indexArt(design, suit, rank, g, 'pl', false);
+  return countPlacement(fieldArea(ix.area, ix.corner), cellItems(design, suit.id, rank));
+}
+
 function centreArt(design, suit, rank, g, ix) {
-  const layout = (suit.centre && suit.centre.layout) || 'single';
+  const compose = (suit.centre && suit.centre.compose) || 'scale';
   const spec = fireworkSpec(design, suit, rank);
   const cx = g.fullW / 2, cy = g.fullH / 2, a = ix.area, k = ix.corner;
-  if (layout === 'bleed') {
+  if (compose === 'bleed') {
     // Full bleed: the burst is sized to the card's half-diagonal and runs off
     // every edge; the svg viewport clips it at the bleed line. A field fills
     // the trim, so no piece is cut in half by the knife.
     return renderFirework(spec, { cx, cy, r: Math.hypot(g.fullW, g.fullH) / 2 * 0.98, rect: g.trim });
   }
-  if (layout === 'count') {
+  if (compose === 'column') {
+    // phase 1's 'count': the rank as a stack, always sized for five
     const one = { ...spec, size: 1, trail: false };
-    const slot = a.h / 5;                       // always sized for five, so the count reads
+    const slot = a.h / 5;
     const r = Math.min(slot * 0.46, (a.w - 2 * k.w) * 0.42);
     const top = cy - (rank * slot) / 2;
     let art = '';
     for (let i = 0; i < rank; i++) art += renderFirework({ ...one, seed: one.seed + i * 7919 }, { cx, cy: top + slot * (i + 0.5), r });
     return art;
+  }
+  if (compose === 'count' || compose === 'countscale') {
+    const pl = countPlacement(fieldArea(a, k), cellItems(design, suit.id, rank)), reach = REACH(spec);
+    return pl.items.map((it, i) => renderFirework({ ...spec, seed: spec.seed + i * 7919, rotation: (+spec.rotation || 0) + it.rot },
+      { cx: it.cx, cy: it.cy, r: it.r / reach })).join('');
   }
   if (spec.tier) {
     const t = tierLayout(a, k);
@@ -239,6 +289,43 @@ function centreArt(design, suit, rank, g, ix) {
     ? Math.min(a.w * 0.46, a.h * 0.46)
     : Math.min(a.w * 0.46, (a.h - 2 * k.h) * 0.5 + k.h * 0.35, a.h * 0.4);
   return renderFirework(spec, { cx, cy: design.index === 'band' ? a.y + a.h / 2 : cy, r, rect: fieldArea(a, k) });
+}
+
+// ---- the scene band: a silhouette along the bottom, behind the fireworks ----
+// Deterministic (a fixed seed per kind), drawn from the bleed's left edge to
+// its right and up to `height` of the card, closed along the bleed bottom.
+export function sceneArt(design, g) {
+  const sc = design.scene;
+  if (!sc || !sc.on) return '';
+  const H = g.fullH * sc.height, base = g.fullH, W = g.fullW;
+  let st = sc.kind === 'rooftops' ? 7 : 3;
+  const rand = () => { st = (Math.imul(st, 1103515245) + 12345) >>> 0; return st / 4294967296; };
+  const pts = [[0, base]];
+  if (sc.kind === 'rooftops') {
+    let x = 0;
+    while (x < W) {
+      const bw = W * (0.1 + rand() * 0.12), h = H * (0.45 + rand() * 0.5), roof = rand();
+      const x1 = Math.min(W, x + bw);
+      pts.push([x, base - h]);
+      if (roof < 0.45) pts.push([(x + x1) / 2, base - h - H * 0.16]);
+      else if (roof < 0.6) pts.push([x + bw * 0.2, base - h], [x + bw * 0.2, base - h - H * 0.12], [x + bw * 0.32, base - h - H * 0.12], [x + bw * 0.32, base - h]);
+      pts.push([x1, base - h]);
+      x = x1;
+    }
+  } else {
+    // pines: triangles of varied height along a low ridge
+    let x = -W * 0.04;
+    pts.push([0, base - H * 0.3]);
+    while (x < W) {
+      const tw = W * (0.07 + rand() * 0.07), h = H * (0.5 + rand() * 0.5);
+      pts.push([x, base - H * 0.3], [x + tw * 0.5, base - h], [x + tw, base - H * 0.3]);
+      x += tw * (0.6 + rand() * 0.3);
+    }
+    pts.push([W, base - H * 0.3]);
+  }
+  pts.push([W, base]);
+  const cl = pts.map(([x, y]) => [Math.min(W, Math.max(0, x)), Math.max(base - H, y)]);
+  return `<path class="hb-scene" d="M${cl.map(([x, y]) => `${f(x)} ${f(y)}`).join(' L')} Z" fill="${sc.color}"/>`;
 }
 
 // ---- public renderers ----
@@ -253,9 +340,13 @@ export function renderFace(design, card, opts = {}) {
   const bg = `<rect x="0" y="0" width="${f(g.fullW)}" height="${f(g.fullH)}" fill="${design.face.bg}"/>`;
   // A full-bleed centre runs under a corner index, so the index sits on a
   // plate of the face colour; a band index carries its own ground.
-  const plate = suit.centre && suit.centre.layout === 'bleed';
+  const plate = suit.centre && suit.centre.compose === 'bleed';
   const ix = indexArt(design, suit, card.rank, g, idPrefix, plate);
-  return frame(g, bg + centreArt(design, suit, card.rank, g, ix) + ix.svg, { ...opts, defs: ix.defs });
+  // opts.centreOnly: the board's thumbnails — the card's ground, scene and
+  // centre art, without the corner index.
+  const art = bg + sceneArt(design, g) + centreArt(design, suit, card.rank, g, ix);
+  if (opts.centreOnly) return frame(g, art, opts);
+  return frame(g, art + ix.svg, { ...opts, defs: ix.defs });
 }
 
 function backPattern(design, g) {

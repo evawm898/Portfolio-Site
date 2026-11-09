@@ -9,15 +9,29 @@
 // A face is two independent choices (Eva's ruling on #528's three layouts):
 //   design.index        the CORNER INDEX, one style for the whole deck, so the
 //                       numeral and symbol are always found in the same place
-//   suit.centre         the CENTRE, per suit: how it is laid out (one burst, the
-//                       rank as a count of bursts, or full bleed), which firework
-//                       motif it draws, and an optional lower tier at ranks 4-5
-// Phase 1's layouts A/B/C are exactly (large, single), (small, count) and
-// (band, bleed); a version-1 file is read that way (LEGACY_LAYOUTS).
+//   suit.centre         the CENTRE, per suit: the RANK COMPOSITION (compose —
+//                       count, count+scale, scale, column or full bleed), which
+//                       firework type it draws, and an optional lower tier at
+//                       ranks 4-5 under Scale
+//
+// THE FIREWORK BOARD (phase 2, schema version 3) designs every suit x rank:
+//   suit.firework              the suit's own type PARAMETERS (a partial over
+//                              the type's defaults; firework.js PARAMS)
+//   design.arrangements[rank]  the rank column's arrangement under Count: one
+//                              { x, y, s, rot } per firework, x/y fractions of
+//                              the centre field, s of half its shorter side
+//   design.fireworks[suit][rank]  the CELL override: any spec key, per key,
+//                              and `items`, that cell's own arrangement
+//   design.scene               an optional silhouette band behind the fireworks
+//
+// Phase 1's layouts A/B/C are exactly (large, scale), (small, column) and
+// (band, bleed); a version-1 file is read that way (LEGACY_LAYOUTS), and a
+// version-2 file's single/count/bleed as scale/column/bleed (V2_LAYOUTS), so
+// every saved design opens looking as it did.
 
-import { MOTIF_IDS, TIER_IDS } from './firework.js';
+import { MOTIF_IDS, TIER_IDS, LEGACY_RADIAL, PARAMS } from './firework.js';
 
-export const VERSION = 2;
+export const VERSION = 3;
 
 // The standard per-suit distribution: three 1s, two 2s, two 3s, two 4s, one 5.
 // The optional rainbow suit uses the same distribution (10 more cards).
@@ -46,18 +60,32 @@ export const INDEX_STYLES = {
   small: 'Small numeral + symbol',
   band:  'Coloured band, top and bottom',
 };
-export const CENTRE_LAYOUTS = {
-  single: 'One burst in the middle',
-  count:  'The rank as a count of bursts',
-  bleed:  'Full-bleed burst',
+// The rank composition: how a suit's rank is told on its cards.
+export const COMPOSE = {
+  count:      'Count — rank N is N fireworks',
+  countscale: 'Count + scale — N fireworks, growing with rank',
+  scale:      'Scale — one firework, growing with rank',
+  column:     'Column — N in a stack (phase 1)',
+  bleed:      'Full bleed — one firework off the edges',
 };
+export const COUNT_MODES = ['count', 'countscale'];
 // Phase 1's layouts, as the pair of choices each one was.
 export const LEGACY_LAYOUTS = {
-  A: { index: 'large', layout: 'single' },
-  B: { index: 'small', layout: 'count' },
-  C: { index: 'band',  layout: 'bleed' },
+  A: { index: 'large', compose: 'scale' },
+  B: { index: 'small', compose: 'column' },
+  C: { index: 'band',  compose: 'bleed' },
 };
-export const defaultCentre = () => ({ layout: 'single', motif: 'classic', tier: 'none' });
+// A version-2 suit's centre layout, as the composition that draws it unchanged.
+export const V2_LAYOUTS = { single: 'scale', count: 'column', bleed: 'bleed' };
+// The default pairing (phase 2): every suit its own firework type, so the suits
+// read apart in greyscale by silhouette as well as by symbol.
+export const DEFAULT_TYPES = { white: 'ring', red: 'peony', blue: 'willow', yellow: 'chrysanthemum', green: 'palm', rainbow: 'glitter' };
+export const defaultCentre = (motif = 'classic') => ({ compose: 'count', motif, tier: 'none' });
+// What a phase-1 file meant by "no centre given".
+export const legacyCentre = () => ({ compose: 'scale', motif: 'classic', tier: 'none' });
+export const SCENES = { treeline: 'Treeline', rooftops: 'Rooftops' };
+export const SCENE_HEIGHT = { min: 0.08, max: 0.45 };
+export const ITEM_LIMITS = { s: [0.15, 1.25], rot: [-180, 180] };
 export const CORNER_MODES = {
   inverted: 'Two corners, bottom inverted',
   upright:  'Two corners, both upright',
@@ -76,12 +104,12 @@ export const PAPERS = {
 // and only enters the deck when `rainbow` is on.
 export function defaultSuits() {
   return [
-    { id: 'white',   name: 'White',   primary: '#EDEAE0', secondary: '#9FB4C8', symbol: 'crescent', centre: defaultCentre() },
-    { id: 'red',     name: 'Red',     primary: '#E5484D', secondary: '#F5A97A', symbol: 'heart', centre: defaultCentre() },
-    { id: 'blue',    name: 'Blue',    primary: '#3E8EF0', secondary: '#9BD3F7', symbol: 'drop', centre: defaultCentre() },
-    { id: 'yellow',  name: 'Yellow',  primary: '#F2C230', secondary: '#FFF0A8', symbol: 'star', centre: defaultCentre() },
-    { id: 'green',   name: 'Green',   primary: '#3DBA6B', secondary: '#B6E8A0', symbol: 'triangle', centre: defaultCentre() },
-    { id: 'rainbow', name: 'Rainbow', primary: '#E8D9FF', secondary: '#FFB1E0', symbol: 'sparkle', multicolor: true, numeral: 'rainbow', centre: defaultCentre() },
+    { id: 'white',   name: 'White',   primary: '#EDEAE0', secondary: '#9FB4C8', symbol: 'crescent', centre: defaultCentre('ring'), firework: {} },
+    { id: 'red',     name: 'Red',     primary: '#E5484D', secondary: '#F5A97A', symbol: 'heart', centre: defaultCentre('peony'), firework: {} },
+    { id: 'blue',    name: 'Blue',    primary: '#3E8EF0', secondary: '#9BD3F7', symbol: 'drop', centre: defaultCentre('willow'), firework: {} },
+    { id: 'yellow',  name: 'Yellow',  primary: '#F2C230', secondary: '#FFF0A8', symbol: 'star', centre: defaultCentre('chrysanthemum'), firework: {} },
+    { id: 'green',   name: 'Green',   primary: '#3DBA6B', secondary: '#B6E8A0', symbol: 'triangle', centre: defaultCentre('palm'), firework: {} },
+    { id: 'rainbow', name: 'Rainbow', primary: '#E8D9FF', secondary: '#FFB1E0', symbol: 'sparkle', multicolor: true, numeral: 'rainbow', centre: defaultCentre('glitter'), firework: {} },
   ];
 }
 
@@ -98,10 +126,12 @@ export function defaultDesign() {
     face: { bg: '#0B1018' },
     back: { bg: '#10202A', fg: '#2FA3A3', pattern: 'stars', mark: 'burst' },
     tokens: { clueBg: '#1A3E66', clueFg: '#CFE6FF', fuseBg: '#3A1414', fuseFg: '#FF8A5C' },
-    // PHASE 2 SLOT. The firework builder writes per-card overrides here,
-    // { [suitId]: { [rank]: partialSpec } }, merged over fireworkSpec()'s
-    // default. Phase 1 never writes it, and saves/loads it verbatim.
+    // The CELL overrides the Firework board writes: { [suitId]: { [rank]:
+    // partialSpec + optional items } }, merged per key over the suit's spec.
     fireworks: {},
+    // The rank columns' arrangements under Count: { [rank]: items }.
+    arrangements: {},
+    scene: { on: false, kind: 'treeline', color: '#16222E', height: 0.18 },
     print: { paper: 'letter', orientation: 'auto', cut: 'separate', duplex: false, flip: 'long', cropMarks: true },
   };
 }
@@ -176,11 +206,16 @@ export function normaliseDesign(raw, symbolIds) {
   if (typeof raw.version === 'number' && raw.version > VERSION) {
     return { design: null, notes: [`version ${raw.version} is newer than this page (${VERSION}) — refused`] };
   }
+  const ver = typeof raw.version === 'number' ? raw.version : 1;
   // A version-1 file chose one layout for the whole deck; it becomes that
   // layout's corner index plus that layout's centre on every suit.
-  const legacy = !(typeof raw.version === 'number' && raw.version >= 2) && LEGACY_LAYOUTS[raw.layout]
-    ? LEGACY_LAYOUTS[raw.layout] : null;
-  if (legacy) notes.push(`version-1 layout ${raw.layout} read as the ${legacy.index} corner index with a ${legacy.layout} centre on every suit`);
+  const legacy = ver < 2 && LEGACY_LAYOUTS[raw.layout] ? LEGACY_LAYOUTS[raw.layout] : null;
+  if (legacy) notes.push(`version-1 layout ${raw.layout} read as the ${legacy.index} corner index with a ${legacy.compose} centre on every suit`);
+  // A file older than the board keeps phase 1's centres where it names none,
+  // and its renamed radial bursts.
+  if (ver < 3) for (const s of d.suits) s.centre = legacyCentre();
+  const motifOf = (m) => (ver < 3 && LEGACY_RADIAL[m] ? LEGACY_RADIAL[m] : m);
+  let renamed = 0;
   d.rainbow = !!raw.rainbow;
   if (Array.isArray(raw.suits)) {
     for (const s of d.suits) {
@@ -195,15 +230,26 @@ export function normaliseDesign(raw, symbolIds) {
         if (NUMERAL_FILLS[r.numeral]) s.numeral = r.numeral;
         else notes.push(`suit ${s.id}: unknown numeral fill "${r.numeral}" — ${s.numeral} kept`);
       }
-      if (legacy) s.centre.layout = legacy.layout;
+      if (legacy) s.centre.compose = legacy.compose;
       else if (r.centre && typeof r.centre === 'object') {
         const c = r.centre;
-        s.centre.layout = pick(c.layout, Object.keys(CENTRE_LAYOUTS), s.centre.layout);
-        if (MOTIF_IDS.includes(c.motif)) s.centre.motif = c.motif;
-        else notes.push(`suit ${s.id}: unknown firework "${c.motif}" — classic kept`);
+        if (ver < 3) s.centre.compose = V2_LAYOUTS[c.layout] || s.centre.compose;
+        else if (COMPOSE[c.compose]) s.centre.compose = c.compose;
+        else notes.push(`suit ${s.id}: unknown composition "${c.compose}" — ${s.centre.compose} kept`);
+        const m = motifOf(c.motif);
+        if (m !== c.motif) renamed++;
+        if (MOTIF_IDS.includes(m)) s.centre.motif = m;
+        else notes.push(`suit ${s.id}: unknown firework "${c.motif}" — ${s.centre.motif} kept`);
         if (c.tier === undefined || TIER_IDS.includes(c.tier)) s.centre.tier = pick(c.tier, TIER_IDS, s.centre.tier);
         else notes.push(`suit ${s.id}: unknown second tier "${c.tier}" — none kept`);
       } else if (raw.version >= 2) notes.push(`suit ${s.id}: no centre — default kept`);
+      if (ver >= 3 && r.firework && typeof r.firework === 'object') {
+        for (const [k, v] of Object.entries(r.firework)) {
+          const ok = readParam(k, v);
+          if (ok === undefined) notes.push(`suit ${s.id}: firework parameter ${k}=${JSON.stringify(v)} not understood — dropped`);
+          else s.firework[k] = ok;
+        }
+      }
     }
   }
   if (raw.size && typeof raw.size === 'object') {
@@ -225,7 +271,37 @@ export function normaliseDesign(raw, symbolIds) {
     d.back.mark = pick(raw.back.mark, BACK_MARKS, d.back.mark);
   }
   if (raw.tokens) for (const k of Object.keys(d.tokens)) d.tokens[k] = hex(raw.tokens[k], d.tokens[k]);
-  if (raw.fireworks && typeof raw.fireworks === 'object') d.fireworks = JSON.parse(JSON.stringify(raw.fireworks));
+  if (renamed) notes.push(`${renamed} phase-1 firework${renamed === 1 ? '' : 's'} read as the radial burst${renamed === 1 ? '' : 's'} it drew (the plain names are the phase-2 types now)`);
+  if (raw.fireworks && typeof raw.fireworks === 'object') {
+    d.fireworks = JSON.parse(JSON.stringify(raw.fireworks));
+    for (const [sid, ranks] of Object.entries(d.fireworks)) {
+      if (!ranks || typeof ranks !== 'object') { delete d.fireworks[sid]; continue; }
+      for (const [rk, o] of Object.entries(ranks)) {
+        if (!o || typeof o !== 'object') { delete ranks[rk]; continue; }
+        if (o.motif !== undefined) o.motif = motifOf(o.motif);
+        if (o.items !== undefined) {
+          const it = readItems(o.items, +rk);
+          if (it) o.items = it;
+          else { delete o.items; notes.push(`${sid} ${rk}: an arrangement of ${Array.isArray(o.items) ? o.items.length : 'no'} fireworks for rank ${rk} — dropped`); }
+        }
+        if (!Object.keys(o).length) delete ranks[rk];
+      }
+      if (!Object.keys(ranks).length) delete d.fireworks[sid];
+    }
+  }
+  if (raw.arrangements && typeof raw.arrangements === 'object') {
+    for (const [rk, items] of Object.entries(raw.arrangements)) {
+      const it = RANKS.includes(+rk) ? readItems(items, +rk) : null;
+      if (it) d.arrangements[rk] = it;
+      else notes.push(`rank ${rk}: arrangement not understood — the default kept`);
+    }
+  }
+  if (raw.scene && typeof raw.scene === 'object') {
+    d.scene.on = !!raw.scene.on;
+    d.scene.kind = pick(raw.scene.kind, Object.keys(SCENES), d.scene.kind);
+    d.scene.color = hex(raw.scene.color, d.scene.color);
+    d.scene.height = clamp(num(raw.scene.height, d.scene.height), SCENE_HEIGHT.min, SCENE_HEIGHT.max);
+  }
   if (raw.print) {
     d.print.paper = pick(raw.print.paper, Object.keys(PAPERS), d.print.paper);
     d.print.orientation = pick(raw.print.orientation, ORIENTATIONS, d.print.orientation);
@@ -241,10 +317,53 @@ export function serialiseDesign(design) {
   return JSON.stringify({ format: 'hanabi-deck', ...design, version: VERSION }, null, 2);
 }
 
-// Set one suit's centre on every suit (the panel's "same for every suit").
+// One firework parameter, read back onto its range; undefined if not one.
+export function readParam(k, v) {
+  const P = PARAMS[k];
+  if (!P) return undefined;
+  if (P.kind === 'bool') return typeof v === 'boolean' ? v : undefined;
+  if (P.kind === 'color') return v === '' ? '' : typeof v === 'string' && HEX.test(v) ? v.toUpperCase() : undefined;
+  return typeof v === 'number' && Number.isFinite(v) ? clamp(v, P.min, P.max) : undefined;
+}
+// An arrangement: exactly `rank` fireworks, each clamped onto the field.
+export function readItems(items, rank) {
+  if (!Array.isArray(items) || items.length !== rank) return null;
+  const out = [];
+  for (const it of items) {
+    if (!it || typeof it !== 'object' || ![it.x, it.y, it.s].every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
+    out.push({ x: clamp(it.x, 0, 1), y: clamp(it.y, 0, 1), s: clamp(it.s, ...ITEM_LIMITS.s), rot: clamp(num(it.rot, 0), ...ITEM_LIMITS.rot) });
+  }
+  return out;
+}
+
+// Set one suit's centre (and its firework parameters) on every suit.
 export function copyCentreToAll(design, fromId) {
   const from = suitById(design, fromId);
-  for (const s of design.suits) s.centre = { ...from.centre };
+  for (const s of design.suits) { s.centre = { ...from.centre }; s.firework = { ...(from.firework || {}) }; }
+}
+
+// ---- the board's cell edits
+export function cellHasOverride(design, suitId, rank) {
+  const o = design.fireworks && design.fireworks[suitId] && design.fireworks[suitId][rank];
+  return !!(o && Object.keys(o).length);
+}
+export function cellOf(design, suitId, rank, create = false) {
+  if (!create) return (design.fireworks[suitId] && design.fireworks[suitId][rank]) || null;
+  design.fireworks[suitId] ||= {};
+  return (design.fireworks[suitId][rank] ||= {});
+}
+// Drop one key of a cell's override (or the whole cell), pruning empties.
+export function clearCell(design, suitId, rank, key) {
+  const o = cellOf(design, suitId, rank);
+  if (!o) return;
+  if (key) delete o[key]; else delete design.fireworks[suitId][rank];
+  if (design.fireworks[suitId][rank] && !Object.keys(design.fireworks[suitId][rank]).length) delete design.fireworks[suitId][rank];
+  if (!Object.keys(design.fireworks[suitId]).length) delete design.fireworks[suitId];
+}
+// The rank column takes this arrangement, and no cell of that rank keeps its own.
+export function applyArrangementToRank(design, rank, items) {
+  design.arrangements[rank] = items.map((it) => ({ ...it }));
+  for (const s of design.suits) clearCell(design, s.id, rank, 'items');
 }
 
 // ---- imposition: where each card sits on a sheet, in mm ----
