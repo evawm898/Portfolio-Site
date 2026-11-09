@@ -401,16 +401,19 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       // THE BAND IS THE CAP: the run-on past an interior end (where the next
       // run's stem crosses it) may not leave the band — cut back 30 % at a
       // time until its edge is inside the outer edge, then to none
-      const out = { A: false, B: false };
-      cand.pts.forEach((q, i) => { if (silDistance(sil, q) < cand.w[i] / 2 - 1e-9) { if (kx[i] < 0) out.A = true; else if (kx[i] > L) out.B = true; } });
+      const out = { A: false, B: false, mid: false };
+      cand.pts.forEach((q, i) => { if (silDistance(sil, q) < cand.w[i] / 2 - 1e-9) { if (kx[i] < 0) out.A = true; else if (kx[i] > L) out.B = true; else out.mid = true; } });
       if (out.A || out.B) { if (out.A) eA = eA > 0.05 ? eA * 0.7 : 0; if (out.B) eB = eB > 0.05 ? eB * 0.7 : 0; if (cut < 9) continue; }
+      // a meander that swings past the edge along the run (an ear's notch
+      // pinches the band) is lowered, as a meander that folds is
+      if (out.mid) break;
       if (selfGap(cand).gap >= Fm) { stem = cand; stem.localX = kx; stem.localY = ky; if (un) told.push(`the ${run.id} stem is cut where the run's inward turn would loop it (${un.cut} loop${un.cut > 1 ? 's' : ''}) and rounded there`); }
       break;
     }
     if (stem) break;
     }
     if (!stem) { told.push(`the ${run.id} stem is not built — the run folds it onto itself at any meander`); continue; }
-    if (ak < 1) told.push(`the ${run.id} stem meanders at ${(100 * ak).toFixed(0)}% — the run's own turns would bring it within a feature of itself`);
+    if (ak < 1) told.push(`the ${run.id} stem meanders at ${(100 * ak).toFixed(0)}% — at full swing it would come within a feature of itself or past the band's edge`);
     stem.run = run.id; stem.meander = ak;
     runs.push({ run, path, L, Aa, Ab, cFrom, cTo, axisA, axisB, wOf, cOf, wsOf, ampOfX, theta, yOf, stem, sc, x0, x1, want });
   }
