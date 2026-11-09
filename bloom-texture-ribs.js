@@ -517,7 +517,14 @@ function fanConvex(pc, allP) {
         at a flute floor the two surfaces are one plane), with no fade inward of
         the feet's edge. Tried first and withdrawn: ribbing the feet's own top
         skin, which folded at the foot-to-blade crease (161 within-shell pairs at
-        H 2.5) and at the feet's buried inner wall. */
+        H 2.5) and at the feet's buried inner wall.
+     8  (Nov 9, fourth round: "ease off") on the hub, under the edge reach,
+        the curvature mask's fade from the rim crease is the ruled fade at
+        H 1.0, max(1 x 15/8, e) = 1.875 mm, at EVERY height — never wider than
+        the ruled max(H x 15/8, e) (so at H <= 1 it IS the ruled fade), and at
+        H 2.5 a 53-degree ease where the ruled 45-degree one (4.69 mm) is
+        wider than the band between the feet and the rim. The third round's
+        one-lattice-edge drop (0.4 mm) is withdrawn. */
 export const RIB_EDITS = Object.freeze([
   ['hook-slot', "import { curveSamples,", "let __RIB = null;\nexport function __setRibs(x) { __RIB = x; }\nimport { curveSamples,"],
   ['field', 'f: refused ? null : (p, n) => field.F(p, n), mp: refused ? null : bonePatchField(b.coverage, patchScaleMm) };',
@@ -532,7 +539,7 @@ export const RIB_EDITS = Object.freeze([
   ['cover-full', "      for (let i = 0; i < nV; i++) if (O.relievable[i] && vis[i]) w0[i] = visDist[i] >= Lam ? 1 : rimEase(visDist[i] / Lam);\n    }",
     "      for (let i = 0; i < nV; i++) if (O.relievable[i] && vis[i]) w0[i] = visDist[i] >= Lam ? 1 : rimEase(visDist[i] / Lam);\n      if (__cov) { const vs = new Uint8Array(nV); for (let i = 0; i < nV; i++) if (w0[i] > 0) vs[i] = 1; const dIn = boneGeodesic(O.P, adj, vs, nV, Lam); for (let i = 0; i < nV; i++) if (__cov[i] && O.relievable[i]) w0[i] = 1; }\n    }"],
   ['rim-ridge', "    for (let i = 0; i < nV; i++) { const d = ridgeDist ? ridgeDist[i] : Infinity; mc[i] = d >= Lam ? 1 : rimEase(d / Lam); }",
-    "    const __Lr = __RIB && __RIB.coverFull && O.organ === 'hub' ? T.edgeMm : Lam;\n    for (let i = 0; i < nV; i++) { const d = ridgeDist ? ridgeDist[i] : Infinity; mc[i] = d >= __Lr ? 1 : rimEase(d / __Lr); }"],
+    "    const __Lr = __RIB && __RIB.coverFull && O.organ === 'hub' ? Math.min(Lam, textureFadeWidthMm(1, T.edgeMm)) : Lam;\n    for (let i = 0; i < nV; i++) { const d = ridgeDist ? ridgeDist[i] : Infinity; mc[i] = d >= __Lr ? 1 : rimEase(d / __Lr); }"],
   ['write-hook', "  if (T.bone2) T.bone2.full = full ? bone2FullWrite(acc, T, per, G2, capability) : null;", "  if (__RIB && __RIB.write) __RIB.write(acc, T, per, capability);\n  if (T.bone2) T.bone2.full = full ? bone2FullWrite(acc, T, per, G2, capability) : null;"],
 ]);
 export function applyEdits(src, edits) {

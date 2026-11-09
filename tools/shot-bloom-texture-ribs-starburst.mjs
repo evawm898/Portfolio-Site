@@ -10,7 +10,8 @@
    Rows: A and B, BEFORE (the second round's starburst: the hub top faded out
    ~1.9 mm inside the petal feet's edge and the rim's curvature fade took the
    rest) and AFTER (the ruled reach: the hub top ribbed over the feet to its
-   rim), at H 1.0; then the AFTER at H 2.5. Columns: from directly above at
+   rim, easing off the rim over the ruled fade at H 1.0, 1.875 mm — Eva's "ease
+   off", fourth round), at H 1.0; then the AFTER at H 2.5. Columns: from directly above at
    raking light, at 45 degrees, and the exact radial section along a petal's
    midline (ribbed in cyan against nothing raised in grey; the feet's inner
    edge and the hub's rim in amber). The default bloom, EXPORT, crest lines;
@@ -54,7 +55,7 @@ for (const [law, reach, H] of ROWS) {
   const q = row(law, reach, H);
   const tag = `${law}${law === 'A' ? ' (default)' : ''} STARBURST, ${reach === 'edge' ? 'AFTER: reaches the edge' : 'BEFORE: the second round'}, H ${H}`;
   push(render(P, W, Hc, { center: [0, 0, 0], dir: [0, 0, 1], up: [0, 1, 0], halfHeight: half }, { ...RAKE }),
-    [`${tag}. From directly above, ${2 * half} mm across, raking light`, reach === 'edge' ? `the hub top ribbed over the feet to its rim (${rRim.toFixed(2)} mm); the rim crease smooth over one lattice edge` : `the ribs fade out ~${(H * 15 / 8).toFixed(2)} mm inside the feet's edge (${rFeet.toFixed(2)} mm); the flat ring is the feet`]);
+    [`${tag}. From directly above, ${2 * half} mm across, raking light`, reach === 'edge' ? `the hub top ribbed over the feet to its rim (${rRim.toFixed(2)} mm), easing off the rim over ${Math.min(Math.max(H * 15 / 8, 0.4), 15 / 8).toFixed(2)} mm` : `the ribs fade out ~${(H * 15 / 8).toFixed(2)} mm inside the feet's edge (${rFeet.toFixed(2)} mm); the flat ring is the feet`]);
   push(render(P, W, Hc, { center: [0, 0, 0], dir: [0, -Math.SQRT1_2, Math.SQRT1_2], up: [0, 0, 1], halfHeight: half }, { ...RAKE }),
     [`${law} ${reach.toUpperCase()} at 45 degrees, the same build`, q ? `${stat(q)}` : '(not measured)', q ? `${q.flips} flipped triangles` : '']);
   const img = Buffer.alloc(W * Hc * 3, 26);
