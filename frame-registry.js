@@ -117,9 +117,14 @@ export const PARAM_SPEC = [
   // phase-3a GROUPS at the anchors
   { id: 'ornLayout', section: 'ornament', label: 'Layout', kind: 'choice', default: 'chains', visibleWhen: ornOn,
     options: [['chains', 'Running chains — along the band'], ['groups', 'Groups — at the anchors']] },
+  // phase 3e step 3: the SCALE HIERARCHY (frame-vine.js). 0 is phase 3d's
+  // chains, by branch; above it the continuous vine, its weight field's
+  // contrast (heavy at the crest, the corners and the bottom; light mid-run)
+  // scaled by this strength. Default 1.
+  R('ornHierarchy', 'ornament', 'Hierarchy (0 = separate chains)', 0, 1, 0.05, 1, '', (p) => ornOn(p) && chains(p)),
   { id: 'ornCrest', section: 'ornament', label: 'Crest (top centre)', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },
   { id: 'ornCorners', section: 'ornament', label: 'Corners / springings', kind: 'choice', default: 'on', visibleWhen: (p) => ornOn(p) && !isOval(p), options: ON_OFF },
-  { id: 'ornSides', section: 'ornament', label: 'Sides', kind: 'choice', default: 'off', visibleWhen: ornOn, options: ON_OFF },
+  { id: 'ornSides', section: 'ornament', label: 'Sides', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },   // ON since phase 3e step 3 (Eva: the rectangle default was bare)
   { id: 'ornBottom', section: 'ornament', label: 'Bottom centre', kind: 'choice', default: 'off', visibleWhen: (p) => ornOn(p) && !(isArch(p) && (p.sill === 'none' || chains(p))), options: ON_OFF },   // an arch's chains run head and jamb: there is no bottom run
 
   // --- 4. print — the relief STL, the PRIMARY output (phase 2, ruling 1).

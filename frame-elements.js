@@ -298,3 +298,154 @@ function done(mesh, kind, info) {
 export const ELEMENTS = { shell: buildShell, palmette: buildPalmette, rose: buildRose, rosette: buildRosette, bud: buildBud };
 export function buildElement(kind, opts = {}) { return ELEMENTS[kind](opts); }
 
+
+/* ================================================================== */
+/* PLACEMENT (phase 3e, step 3 — the wiring). An element is built about  */
+/* its origin by the builders above, untouched, and PLACED by one rigid   */
+/* motion in plan and one lift in z: a vertex on the base (z exactly 0,   */
+/* every patch column's foot) stays on the base, every other vertex is    */
+/* raised by `lift` — so a placed element's columns stand from the back   */
+/* all the way up through the molding it sits on, and the two shells      */
+/* overlap by construction. The chains' junction motifs (phase 3d) and    */
+/* the vine's elements are both made here: ONE primitive each (Eva's      */
+/* ruling on §15/16). Charter §17.                                        */
+/* ================================================================== */
+
+const elementMemo = new Map();
+/* the built element at a size, memoised on (kind, size): pure */
+export function elementAt(kind, size) {
+  const key = `${kind}|${size}`;
+  if (!elementMemo.has(key)) elementMemo.set(key, buildElement(kind, { size }));
+  return elementMemo.get(key);
+}
+
+/* A part's plan FOOTPRINT: a patch's top-grid boundary loop (the column
+   walls stand on it), a bead's equator. Closed (the first point repeated). */
+function partLoops(P, parts) {
+  return parts.map((pt) => {
+    if (pt.kind === 'bead') { const out = []; for (let k = 0; k <= 24; k++) { const a = 2 * Math.PI * k / 24; out.push([pt.c[0] + pt.r * Math.cos(a), pt.c[1] + pt.r * Math.sin(a)]); } return out; }
+    const at = (i, j) => { const k = 3 * (pt.base + i * pt.nv + j); return [P[k], P[k + 1]]; };
+    const loop = [];
+    for (let j = 0; j < pt.nv; j++) loop.push(at(0, j));
+    for (let i = 1; i < pt.nu; i++) loop.push(at(i, pt.nv - 1));
+    for (let j = pt.nv - 2; j >= 0; j--) loop.push(at(pt.nu - 1, j));
+    for (let i = pt.nu - 2; i >= 0; i--) loop.push(at(i, 0));
+    return loop;
+  });
+}
+
+/* PLACE: kind at size, rotated by `angle` (its local +y — the axis every
+   builder grows along — to the direction angle + π/2), its origin to `at`,
+   every non-base vertex raised by `lift`. Positions in print mm with z
+   relative to the plate's top (the relief adds plateT to every z > 0). */
+export function placeElement(kind, { size, at = [0, 0], angle = 0, lift = 0 } = {}) {
+  const e = elementAt(kind, size);
+  const ca = Math.cos(angle), sa = Math.sin(angle), src = e.positions, P = new Float64Array(src.length);
+  for (let k = 0; k < src.length; k += 3) {
+    const x = src[k], y = src[k + 1], z = src[k + 2];
+    P[k] = at[0] + ca * x - sa * y; P[k + 1] = at[1] + sa * x + ca * y; P[k + 2] = z === 0 ? 0 : z + lift;
+  }
+  const parts = e.parts.map((pt) => (pt.kind === 'bead' ? { ...pt, c: [at[0] + ca * pt.c[0] - sa * pt.c[1], at[1] + sa * pt.c[0] + ca * pt.c[1], pt.c[2] + lift] } : { ...pt }));
+  return { kind, size, at, angle, lift, positions: P, indices: e.indices, parts, loops: partLoops(P, parts), flip: false };
+}
+/* the same element raised to a new lift (the plan untouched) */
+export function relift(el, lift) {
+  const P = Float64Array.from(el.positions), d = lift - el.lift;
+  for (let k = 2; k < P.length; k += 3) if (P[k] !== 0) P[k] += d;
+  return { ...el, lift, positions: P, parts: el.parts.map((pt) => (pt.kind === 'bead' ? { ...pt, c: [pt.c[0], pt.c[1], pt.c[2] + d] } : pt)) };
+}
+/* THE mirror of a placed element: x negated (the doubles never recomputed),
+   the winding reversed by the relief's own orientation pass. */
+export function mirrorElement(el) {
+  const P = Float64Array.from(el.positions);
+  for (let k = 0; k < P.length; k += 3) P[k] = -P[k];
+  return { ...el, at: [-el.at[0], el.at[1]], positions: P, parts: el.parts.map((pt) => (pt.kind === 'bead' ? { ...pt, c: [-pt.c[0], pt.c[1], pt.c[2]] } : pt)), loops: el.loops.map((l) => l.map(([x, y]) => [-x, y])), flip: !el.flip, mirrorOf: el };
+}
+/* AN ELEMENT ON THE AXIS is its own mirror, to the bit. The builders lay
+   symmetric elements (the palmette, the shell, the rosette) as mirror
+   pairs of blades only to the last bit (cos(π/2 + a) is not −cos(π/2 − a)),
+   so every vertex is paired with the vertex at (−x, y, z) within 1e-6 mm
+   and the pair set exactly symmetric (the average, x negated; a vertex
+   that is its own partner on x = 0). An element with an unpaired vertex is
+   NOT symmetric and is returned unchanged with `asymmetric` set (the gate
+   reads the emitted bits, never this flag). */
+export function symmetrizeElement(el) {
+  const P = Float64Array.from(el.positions), n = P.length / 3, q = 1e6;
+  const key = (x, y, z) => `${Math.round(x * q)},${Math.round(y * q)},${Math.round(z * q)}`;
+  const map = new Map();
+  for (let v = 0; v < n; v++) { const k = key(P[3 * v], P[3 * v + 1], P[3 * v + 2]); if (!map.has(k)) map.set(k, []); map.get(k).push(v); }
+  const find = (v) => {
+    const x = -P[3 * v], y = P[3 * v + 1], z = P[3 * v + 2];
+    for (const dx of [0, -1, 1]) for (const dy of [0, -1, 1]) for (const dz of [0, -1, 1]) {
+      const k = `${Math.round(x * q) + dx},${Math.round(y * q) + dy},${Math.round(z * q) + dz}`;
+      for (const u of map.get(k) || []) if (Math.abs(P[3 * u] - x) < 1e-6 && Math.abs(P[3 * u + 1] - y) < 1e-6 && Math.abs(P[3 * u + 2] - z) < 1e-6) return u;
+    }
+    return -1;
+  };
+  const partner = new Int32Array(n);
+  for (let v = 0; v < n; v++) { partner[v] = find(v); if (partner[v] < 0) return { ...el, asymmetric: true }; }
+  const out = Float64Array.from(P);
+  for (let v = 0; v < n; v++) {
+    const u = partner[v];
+    if (u === v || Math.abs(P[3 * v]) < 1e-9) { out[3 * v] = 0; out[3 * v + 1] = P[3 * v + 1]; out[3 * v + 2] = P[3 * v + 2]; continue; }
+    const lo = Math.min(u, v), hi = Math.max(u, v);
+    const x = (P[3 * lo] - P[3 * hi]) / 2, y = (P[3 * lo + 1] + P[3 * hi + 1]) / 2, z = (P[3 * lo + 2] + P[3 * hi + 2]) / 2;
+    out[3 * lo] = x; out[3 * lo + 1] = y; out[3 * lo + 2] = z; out[3 * hi] = -x; out[3 * hi + 1] = y; out[3 * hi + 2] = z;
+  }
+  return { ...el, positions: out, loops: partLoops(out, el.parts), selfMirror: true };
+}
+
+const segD = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy; let t = l2 ? ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };
+const inLoop = (pt, poly) => { let ins = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > pt[1]) !== (yj > pt[1]) && pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi) ins = !ins; } return ins; };
+const boxOfLoops = (el) => { if (el._box) return el._box; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const l of el.loops) for (const [x, y] of l) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } return (el._box = { x0, y0, x1, y1 }); };
+/* The element's footprint is the UNION of its parts' loops; its boundary is
+   every loop edge that lies outside every OTHER loop (an edge buried in a
+   neighbouring petal is interior to the union). Computed once per placed
+   element (cached on it). */
+function unionEdges(el) {
+  if (el._edges) return el._edges;
+  const edges = [];
+  el.loops.forEach((l, li) => {
+    const out = l.map((q) => !el.loops.some((m, mi) => mi !== li && inLoop(q, m)));
+    for (let k = 0; k < l.length - 1; k++) if (out[k] || out[k + 1]) edges.push([l[k], l[k + 1]]);
+  });
+  return (el._edges = edges);
+}
+/* The signed DEPTH of a plan point in an element's footprint (the union of
+   its parts' loops): inside, the distance to the union's boundary; outside,
+   minus it. Beyond `reach` of the element's box, minus the box distance. */
+export function elementDepth(el, q, reach = Infinity) {
+  const B = boxOfLoops(el);
+  const gx = Math.max(0, B.x0 - q[0], q[0] - B.x1), gy = Math.max(0, B.y0 - q[1], q[1] - B.y1);
+  if (Math.hypot(gx, gy) > reach) return -Math.hypot(gx, gy);
+  let d = Infinity; for (const [a, b] of unionEdges(el)) d = Math.min(d, segD(q, a, b));
+  return el.loops.some((l) => inLoop(q, l)) ? d : -d;
+}
+/* A wire against an element: per station the CLEARANCE (the plan gap from
+   the wire's edge to the footprint, negative an overlap); the runs within
+   a feature, each of which must reach an overlap of `need` (a JOINT) or it
+   is a GRAZE. Returns { clear: the least clearance, graze: the worst run
+   that does not reach `need` (−Infinity when none) }. */
+export function wireElementContact(c, el, need, F = MIN_FEATURE_MM) {
+  let clear = Infinity, graze = -Infinity, run = null;
+  const wAt = (i) => (c.w ? c.w[i] : c.info.wire);
+  c.pts.forEach((q, i) => {
+    const cl = -elementDepth(el, q, F + 2 * wAt(i)) - wAt(i) / 2;
+    clear = Math.min(clear, cl);
+    if (cl < F) { if (!run) run = { min: cl }; run.min = Math.min(run.min, cl); }
+    else if (run) { if (run.min > -need) graze = Math.max(graze, run.min); run = null; }
+  });
+  if (run && run.min > -need) graze = Math.max(graze, run.min);
+  return { clear, graze };
+}
+/* Two elements: the least plan clearance between their footprints (the
+   loops' vertices against the other's loops), negative an overlap. */
+export function elementClear(a, b) {
+  const A = boxOfLoops(a), B = boxOfLoops(b);
+  const gx = Math.max(0, A.x0 - B.x1, B.x0 - A.x1), gy = Math.max(0, A.y0 - B.y1, B.y0 - A.y1);
+  if (gx > 0 || gy > 0) return Math.hypot(gx, gy);
+  let m = Infinity;
+  for (const l of a.loops) for (const q of l) m = Math.min(m, -elementDepth(b, q));
+  for (const l of b.loops) for (const q of l) m = Math.min(m, -elementDepth(a, q));
+  return m;
+}

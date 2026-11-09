@@ -1303,3 +1303,93 @@ and at a grazing light, every caption carrying the gate's own numbers. No pixel 
 40. **The rose is 21 petals on the golden angle**, seed 7. *Undo:* `ROSE_PETALS`, `seed`.
 41. **A base slab is the SHEET's, not the element's** (`{ base: true }` only on the sheet) — an element
     built for placement carries no plate. *Undo:* the option.
+
+## 17. Phase 3e, step 3 — the elements wired in: one primitive each, a weight field, a continuous vine (STOPPED FOR A SHEET — rulings pending)
+
+Read `frame-vine.js`'s header and the placement block at the end of `frame-elements.js` before touching
+`placeElement`, `placeMotif`, `symmetrizeElement`, `elementDepth`, `vineFor`, `weightAt`, `HIER` or the
+PL / VN families.
+
+### 17.0 The brief (Eva, Nov 9) and what was checked first
+
+- **Step 0** (§16's heading) was already done on `main` (#532, `03d6ee3`) when the session began — checked,
+  not redone.
+- **Step 1, one primitive each.** The chains' junction motifs (phase 3d: a three-leaf palmette, a five-petal
+  rosette, both leaf curves) are gone; the axis motif is `buildElement('palmette')` and an interior
+  junction's `buildElement('rosette')` (#479's forms, untouched), placed by `placeMotif` — the law the vine
+  places every element by.
+- **Step 2, the weight field**, and **step 3, the vine** — below.
+- **Sides ON by default** (`ornSides`), as asked.
+
+### 17.1 Placing an element (`frame-elements.js`, `frame-filigree.js` `placeMotif`)
+
+- **One rigid motion and one lift.** The element is built about its origin by the #479 builders, unchanged,
+  and placed: rotated so its local +y (the axis every builder grows along) lies along the outward normal,
+  translated, and every vertex NOT on the base (z = 0 exactly — every patch column's foot) raised by `lift`.
+  So a placed element's columns stand from the back up through the molding: it and the molding overlap
+  all the way down, by construction (`appendElement` in `frame-relief.js`).
+- **PROUD** (the palmette, the shell, the rose, the bud): lifted to the highest molding under any of its
+  emitted top vertices (read at each vertex and its mirror image, the chains' seat law), so every top vertex
+  stands its own height over the molding.
+- **SUNK** (the rosette — Eva: "rosettes sink into the molding rather than standing proud"): lifted only so
+  its own crest stands a feature over the molding at its centre; its petals lie down in the profile.
+- **Nothing in the opening:** pushed outward in 0.25 mm steps until no footprint vertex is in the opening.
+- **On the axis, its own mirror to the bit** (`symmetrizeElement`): the builders lay a symmetric element's
+  blades as mirror pairs only to the last bit (cos(π/2 + a) is not −cos(π/2 − a)), so every vertex is paired
+  with the vertex at (−x, y, z) within 1e-6 mm and the pair set exactly symmetric. The rose and the bud are
+  not symmetric and are never placed on the axis. **The footprint** is the union of the parts' loops
+  (each patch's top-grid boundary, each bead's equator); its depth is the distance to the union's boundary
+  — every loop edge outside every OTHER loop (`elementDepth`). The first version took the deepest single
+  petal and read a rosette's centre as 0.9 mm deep where it is 3.4.
+- **The SVG draws each element's footprint outline** (decision 42); its relief is the STL's.
+
+### 17.2 The weight field w(s) (`frame-vine.js`)
+
+- **From the skeleton's named anchors, never placed per frame.** Each anchor a run begins or ends at
+  carries an amplitude by its CLASS: the **crest** (on the axis, upper half) 1.0; a **junction** (an anchor
+  two of the skeleton's runs share — a springing, a corner, an oval's side) 0.75; the **bottom** (on the
+  axis, lower half) 0.7; a **terminal** (an anchor one run reaches — an arch's sill end) 0.3.
+- **Along a run** of length L: the larger of the two ends' amplitudes, each falling off as
+  1 − smoothstep(d / (0.55 L)), floored at 0.15 — highest at the crest, secondary peaks at the corners /
+  springings / sides / bottom, lowest mid-run.
+- **The hierarchy strength** h (`ornHierarchy`, 0–1, default 1) blends it toward a uniform ½:
+  w_h = (1 − h)·½ + h·w. **h = 0 is not the vine at all**: phase 3d's chains run, by branch.
+- **Classes on w_h:** heavy ≥ 0.68, medium ≥ 0.4, light below.
+  - Junction motifs: heavy — the palmette at the crest, the shell at the bottom, the rose at a junction;
+    medium — a sunk rosette; light — none.
+  - Along a run, at the meander's extrema: a scroll-and-leaf CLUSTER (a carved tendril and a leaf from one
+    root) at w_h ≥ 0.56; a LEAF at ≥ 0.36; a BUD at ≥ 0.22; a SPRIG (a small leaf) below. At its zero
+    crossings, a SUNK ROSETTE ON the stem at 0.46 ≤ w_h < 0.66.
+- **Scale, meander and density follow w_h**, × the molding width M: the stem's width (0.15 + 0.08 w) M,
+  its meander amplitude (0.12 + 0.2 w) M (held on the band), its half wavelength — one item per half wave —
+  (1.1 + 0.9 w) M ÷ the density (0.6 + 0.2 × `ornDensity`); every item's size its own law in `ITEM`.
+- **Curvature-aware:** everything along a run is scaled by c = 1 / (1 + 1.2 · M · |κ|), κ the path's own
+  curvature over one molding width — compressed on the oval's ends and the arch's head, full on a straight.
+- **Mirror symmetry is exact:** the left is the right negated (curves by `mirrorCurve`, elements by
+  `mirrorElement`), the axis motif its own mirror.
+
+### 17.3 The vine
+
+- **One stem per run**, in the run's own path frame (`runPath`, the chains' — `offsetCurve` inside the
+  band's outer edge): y = y_c + A(x) sin θ(x), θ' = π / P(x), about the band's centre line. The phase is
+  scaled so an AXIS end is an extremum (the stem symmetric there) and an interior end a zero (on the centre
+  line where runs meet).
+- **Its ends:** on the axis a stem stops a feature (and 0.15 mm) short of its own mirror — the axis motif
+  takes both ends; at an interior junction it runs on past the anchor along its own tangent until it crosses
+  the next run's stem. All of one side's stems and items are ONE group, so stems JOIN where runs meet (an
+  overlap of the embed, VN3), never graze.
+- **Seated** by the chains' law (the molding's own height field, read at the emitted columns); VN5 measures
+  how far over it each row stands.
+- **Items spring from the stem** at its extrema, each into the bay the stem bends around and grown forward
+  (away from the crest). A wire item's root starts back across the stem by ¾ of the stem's width along its
+  own heading, so the joint is a full overlap; its root rides on the stem's crown and falls to the molding
+  over two stem widths. A tendril curls back into its bay (curling forward put its eye 0.9 mm from the stem
+  ahead — measured); a vine leaf turns 1.2 rad (`VINE_LEAF_CURL`; the chains' 2.2 curled a 4 mm leaf back
+  onto its stem). An element item (a bud, a sunk rosette) is placed by the same law as a motif.
+- **Settled heaviest first:** every item JOINS its stem (≥ the embed) and stands a feature (and 0.1 mm)
+  clear of every other wire, element, side and the opening; one that does not is made 15 % smaller up to
+  five times, then not built — told as a count.
+- **The motifs join the stems:** a junction motif must take every stem that ends at it by the embed and
+  graze nothing, or it is remade 10 % smaller up to eight times. The shell's hinge sits a quarter of its
+  size inward of the stems' meeting point (its narrow hinge took them by 0.46 mm; its fan takes them by
+  2.13).

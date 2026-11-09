@@ -433,7 +433,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
   // wire part's first and last column = its two walls), against the gate's
   // OWN band footprints (outerEdge / innerEdge, the boundaries' owner — never
   // frame-filigree's bandRegion), MIN_FEATURE_MM and EMBED_MM.
-  if (FL && (label === 'shipped' || MUTANTS.find((m) => m.id === label)?.file === 'filigree')) {
+  if (FL && (label === 'shipped' || ['filigree', 'vine', 'elements'].includes(MUTANTS.find((m) => m.id === label)?.file))) {
     const F = R.MIN_FEATURE_MM, E = RL.EMBED_MM;
     const ON = { filigree: 'scrolls' };
     const DENSE = { filigree: 'scrolls', ornDensity: 5, ornCrest: 'on', ornCorners: 'on', ornSides: 'on', ornBottom: 'on' };
@@ -447,8 +447,12 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     ];
     // the default (phase 3d): carved RUNNING CHAINS; beside it the phase-3c
     // carved GROUPS with their clusters, and the tapered and constant groups
-    for (const r of OROWS.splice(0)) { OROWS.push([`${r[0]} · chains`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'chains' }], [`${r[0]} · carved`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'groups' }], [`${r[0]} · tapered`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'tapered', ornLeaves: 'off', ornLayout: 'groups' }], [`${r[0]} · constant`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'constant', ornLeaves: 'off', ornLayout: 'groups' }]); }
-    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : /(carved|chains)$/.test(name) ? 'carved' : 'constant');
+    // phase 3e step 3: the default is the VINE (hierarchy 1); the chains of
+    // phase 3d are hierarchy 0, kept beside it; a hierarchy-½ vine row on
+    // each skeleton
+    for (const r of OROWS.splice(0)) { OROWS.push(...(/crowded|round wire/.test(r[0]) ? [] : [[`${r[0]} · vine`, { ...r[1], ornLayout: 'chains', ornHierarchy: 1 }]]), [`${r[0]} · chains`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'chains', ornHierarchy: 0 }], [`${r[0]} · carved`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'groups' }], [`${r[0]} · tapered`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'tapered', ornLeaves: 'off', ornLayout: 'groups' }], [`${r[0]} · constant`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'constant', ornLeaves: 'off', ornLayout: 'groups' }]); }
+    OROWS.push(['arch default, hierarchy ½ · vine', { ...ON, ornHierarchy: 0.5 }], ['rect dense, hierarchy ½ · vine', { skeleton: 'rect', ...DENSE, ornHierarchy: 0.5 }], ['oval default, bottom on, hierarchy ½ · vine', { skeleton: 'oval', ...ON, ornBottom: 'on', ornHierarchy: 0.5 }]);
+    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : /(carved|chains|vine)$/.test(name) ? 'carved' : 'constant');
     const ST = { carved: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, constant: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, tapered: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 } };
     // CL / TB (phase 3c): a leaf lies OVER its host; the relief never passes the budget
     const cl1 = [], tb1 = []; let leavesSeen = 0, leastLap = Infinity, mostTris = 0;
@@ -465,6 +469,44 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     // wider end of B's segment — the stricter reading)
     const minDL = (A, tA, B, tB) => { let m = Infinity; for (let i = 0; i < A.length; i++) for (let k = 0; k < B.length - 1; k++) m = Math.min(m, dseg(A[i], B[k], B[k + 1]) - (tA[i] + Math.max(tB[k], tB[k + 1])) / 2); return m; };
     const or1 = [], or2 = [], or3 = [], or4 = [], or5 = [], or6 = [], or7 = [], or8 = [], or9 = [];
+    // PL / VN (phase 3e step 3): the PLACED ELEMENTS and the VINE. Every law
+    // restated here from the charter's §17 numbers; every quantity read off
+    // the EMITTED mesh (an element's parts by the relief's own part records,
+    // a wire's walls), the module's records used only to know which part is
+    // which and what was ASKED (the weight a record claims is checked against
+    // the restated field, never trusted)
+    const pl1 = [], pl2 = [], pl3 = [], pl4 = [], pl5 = [], vn1 = [], vn2 = [], vn3 = [], vn4 = [], vn5 = [];
+    let elSeen = 0, vineRows = 0, itemsSeen = 0, leastJoint = Infinity, worstVnW = 0, stemSeatMax = -Infinity, stemSeatMin = Infinity, leastElClear = Infinity, leastMotifJoint = Infinity, stemsSeen = 0;
+    // the field, restated (charter §17): anchor amplitudes by class, the
+    // falloff, the floor, the blend, the class and item thresholds, and the
+    // skeleton's runs (which anchors two runs share)
+    const HV = { crest: 1.0, junction: 0.75, bottom: 0.7, terminal: 0.3, floor: 0.15, reach: 0.55, uniform: 0.5, heavy: 0.68, medium: 0.4 };
+    const RUNS_R = { arch: [['apex', 'springR'], ['springR', 'sillR']], rect: [['topCentre', 'cornerTR'], ['cornerTR', 'cornerBR'], ['cornerBR', 'bottomCentre']], oval: [['topCentre', 'sideR'], ['sideR', 'bottomCentre']] };
+    const smoothR = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+    const clsR = (model, id) => { const a = model.info.anchors[id]; if (Math.abs(a.pt[0]) < 1e-9) return a.pt[1] > (model.box.y0 + model.box.y1) / 2 ? 'crest' : 'bottom'; return RUNS_R[model.info.kind].filter((q) => q.includes(id)).length >= 2 ? 'junction' : 'terminal'; };
+    const wR = (x, L, a, b, h) => (1 - h) * HV.uniform + h * Math.max(HV.floor, HV[a] * (1 - smoothR(Math.max(0, x) / (HV.reach * L))), HV[b] * (1 - smoothR(Math.max(0, L - x) / (HV.reach * L))));
+    const itemKindR = (w, at, leavesOn) => (at === 'zero' ? (w >= 0.46 && w < 0.66 ? 'rosette' : null) : w >= 0.56 ? 'cluster' : w >= 0.36 ? (leavesOn ? 'leaf' : null) : w >= 0.22 ? 'bud' : (leavesOn ? 'sprig' : null));
+    const motifKindR = (cls, w) => (w >= HV.heavy ? (cls === 'crest' ? 'palmette' : cls === 'bottom' ? 'shell' : 'rose') : w >= HV.medium ? 'rosette' : null);
+    const HEAVY = new Set(['shell', 'palmette', 'rose']);
+    // an element's footprint off the EMITTED mesh: per part, a patch's top
+    // grid boundary loop (its walls stand on it), a bead's equator; the
+    // union's boundary = every loop edge outside every other loop
+    const elFoot = (rel, parts) => {
+      const P = rel.positions, loops = parts.map((pt) => {
+        if (pt.part === 'bead') { const o = []; for (let k = 0; k <= 32; k++) { const a = 2 * Math.PI * k / 32; o.push([pt.c[0] + pt.r * Math.cos(a), pt.c[1] + pt.r * Math.sin(a)]); } return o; }
+        const at = (i, j) => { const k = 3 * pt.T(i, j); return [P[k], P[k + 1]]; }, l = [];
+        for (let j = 0; j < pt.nv; j++) l.push(at(0, j)); for (let i = 1; i < pt.nu; i++) l.push(at(i, pt.nv - 1)); for (let j = pt.nv - 2; j >= 0; j--) l.push(at(pt.nu - 1, j)); for (let i = pt.nu - 2; i >= 0; i--) l.push(at(i, 0));
+        return l;
+      });
+      const edges = []; loops.forEach((l, li) => { const out = l.map((q) => !loops.some((m, mi) => mi !== li && pip(q, m))); for (let k = 0; k < l.length - 1; k++) if (out[k] || out[k + 1]) edges.push([l[k], l[k + 1]]); });
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const l of loops) for (const [x, y] of l) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+      const depth = (q) => { const gx = Math.max(0, x0 - q[0], q[0] - x1), gy = Math.max(0, y0 - q[1], q[1] - y1); if (Math.hypot(gx, gy) > 6) return -Math.hypot(gx, gy); let d = Infinity; for (const [a, b] of edges) d = Math.min(d, dseg(q, a, b)); return loops.some((l) => pip(q, l)) ? d : -d; };
+      return { loops, depth, box: { x0, y0, x1, y1 } };
+    };
+    // a wire (emitted centres and widths) against an element footprint: the
+    // least clearance, and the worst run within a feature that does not
+    // reach an overlap of `need` (a graze)
+    const contact = (w, foot, need) => { let clear = Infinity, graze = -Infinity, run = null; w.c.forEach((q, i) => { const cl = -foot.depth(q) - w.t[i] / 2; clear = Math.min(clear, cl); if (cl < F) { if (!run) run = { min: cl }; run.min = Math.min(run.min, cl); } else if (run) { if (run.min > -need + 1e-6) graze = Math.max(graze, run.min); run = null; } }); if (run && run.min > -need + 1e-6) graze = Math.max(graze, run.min); return { clear, graze }; };
     let seatRows = 0, leastCrown = Infinity, worstSink = -Infinity;
     let worstSlit = -Infinity, slitRuns = 0, opened = 0, groupSlits = 0, groupOpen = 0;
     let leastWire = Infinity, leastGap = Infinity, leastEmbed = Infinity, deepest = 0, built = 0, notBuilt = 0;
@@ -493,7 +535,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       // motif's leaf has none (the crossing rule throughout)
       const hostOf = (x) => {
         const c = orn.curves[x];
-        if (!leafAt[x] || /^(axis|palmette|rosette)$/.test(c.info.role || '')) return -1;
+        if (!leafAt[x] || /^(axis|palmette|rosette|vine-leaf)$/.test(c.info.role || '')) return -1;
         if (c.chainIndex != null) return owner.findIndex((o, y) => o.gi === owner[x].gi && o.side === owner[x].side && !leafAt[y] && orn.curves[y].chainIndex === c.chainIndex);
         return owner.findIndex((o) => o.gi === owner[x].gi && o.side === owner[x].side && o.i === 0);
       };
@@ -568,13 +610,13 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       const sil = RL.plateOutline(model).map(([x, y]) => [x * rel.scale, y * rel.scale]);
       W.forEach((w, x) => {
         // the chains' rule; the phase-3a groups are counted and reported
-        for (const q of w.c) if (pip(q, sil) && depthIn(fs_, q) < 0) { if (!/chains$/.test(name)) { groupOpen++; break; } or7.push(`${name}: wire ${x} reaches into the opening at (${q[0].toFixed(1)}, ${q[1].toFixed(1)})`); opened++; break; }
+        for (const q of w.c) if (pip(q, sil) && depthIn(fs_, q) < 0) { if (!/(chains|vine)$/.test(name)) { groupOpen++; break; } or7.push(`${name}: wire ${x} reaches into the opening at (${q[0].toFixed(1)}, ${q[1].toFixed(1)})`); opened++; break; }
         let run = null; const runs = [];
         w.c.forEach((qq, i) => { const cl = -depthIn(fs_, qq) - w.t[i] / 2; if (cl < 2 * F) { if (!run) run = { min: cl }; run.min = Math.min(run.min, cl); } else if (run) { runs.push(run); run = null; } });
         if (run) runs.push(run);
         // the CHAINS' rule (phase 3d); the phase-3a groups float by design — their
         // slits are what the ruling replaced, counted and reported, not asserted
-        for (const r of runs) { slitRuns++; if (r.min > -E + 1e-6) { if (/chains$/.test(name)) { worstSlit = Math.max(worstSlit, r.min); or8.push(`${name}: wire ${x} comes ${r.min.toFixed(3)} mm from the band without joining it`); } else groupSlits++; break; } }
+        for (const r of runs) { slitRuns++; if (r.min > -E + 1e-6) { if (/(chains|vine)$/.test(name)) { worstSlit = Math.max(worstSlit, r.min); or8.push(`${name}: wire ${x} comes ${r.min.toFixed(3)} mm from the band without joining it`); } else groupSlits++; break; } }
       });
       // OR9 SEATED ON THE MOLDING (phase 3d, Eva's 2B), the chains only: the
       // molding surface is read off the EMITTED band solids (their top grids,
@@ -583,7 +625,8 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       // root stands on the height field — nothing of the band shows through),
       // and every ornament row's crest clears the highest molding under that row
       // by the feature (the top clears the molding top)
-      if (/chains$/.test(name)) {
+      let surf = null;
+      if (/(chains|vine)$/.test(name)) {
         const cell = 2, grid = new Map(), key = (i, j) => i * 100003 + j, tris = [];
         for (const bp of rel.parts.filter((x) => x.kind === 'band' && !/^orn/.test(x.id))) {   // the MOLDING: the ornament solids are bands too
           const last = bp.closed ? bp.V : bp.V - 1;
@@ -596,7 +639,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
             }
           }
         }
-        const surf = (x, y) => { let h = -Infinity; for (const ti of grid.get(key(Math.floor(x / cell), Math.floor(y / cell))) || []) { const [A, B, C2] = tris[ti]; const d = (B[1] - C2[1]) * (A[0] - C2[0]) + (C2[0] - B[0]) * (A[1] - C2[1]); if (Math.abs(d) < 1e-14) continue; const l1 = ((B[1] - C2[1]) * (x - C2[0]) + (C2[0] - B[0]) * (y - C2[1])) / d, l2 = ((C2[1] - A[1]) * (x - C2[0]) + (A[0] - C2[0]) * (y - C2[1])) / d, l3 = 1 - l1 - l2; if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) h = Math.max(h, l1 * A[2] + l2 * B[2] + l3 * C2[2]); } return h; };
+        surf = (x, y) => { let h = -Infinity; for (const ti of grid.get(key(Math.floor(x / cell), Math.floor(y / cell))) || []) { const [A, B, C2] = tris[ti]; const d = (B[1] - C2[1]) * (A[0] - C2[0]) + (C2[0] - B[0]) * (A[1] - C2[1]); if (Math.abs(d) < 1e-14) continue; const l1 = ((B[1] - C2[1]) * (x - C2[0]) + (C2[0] - B[0]) * (y - C2[1])) / d, l2 = ((C2[1] - A[1]) * (x - C2[0]) + (A[0] - C2[0]) * (y - C2[1])) / d, l3 = 1 - l1 - l2; if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) h = Math.max(h, l1 * A[2] + l2 * B[2] + l3 * C2[2]); } return h; };
         parts.forEach((pt, x) => {
           for (let v = 0; v < pt.V; v++) {
             let crest = -Infinity, under = -Infinity;
@@ -628,6 +671,78 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
           if (bad) or5.push(`${name}: ${g.group} wire ${i}'s mirror is not its source with x negated`);
         }
       });
+      // ---- PL: the placed elements, on every row that has them ----
+      const elParts = new Map(); for (const pt of rel.parts) if (pt.kind === 'element') { if (!elParts.has(pt.element)) elParts.set(pt.element, []); elParts.get(pt.element).push(pt); }
+      const recs = orn.elements || [];
+      if (elParts.size !== recs.length) pl1.push(`${name}: ${elParts.size} element solids for ${recs.length} placed`);
+      const feet2 = [...elParts.keys()].sort((a, b) => +a.slice(2) - +b.slice(2)).map((k, i) => ({ id: k, rec: recs[i], parts: elParts.get(k), kind: elParts.get(k)[0].elKind, foot: elFoot(rel, elParts.get(k)) }));
+      const T0 = rel.plateT;
+      for (const e of feet2) {
+        elSeen++;
+        // PL1 closed (W covers the file) and STANDING: every base vertex on the
+        // back (z = 0 exactly) and every other on the plate or above
+        let base = 0, low = Infinity, zMax = -Infinity, topUnder = -Infinity;
+        for (const pt of e.parts) { const v0 = pt.base, n = pt.part === 'bead' ? null : 2 * pt.nu * pt.nv; if (n) for (let v = v0; v < v0 + n; v++) { const z = P[3 * v + 2]; if (z === 0) base++; else { low = Math.min(low, z); zMax = Math.max(zMax, z); if (surf) { const hh = surf(P[3 * v], P[3 * v + 1]); if (hh > -Infinity) topUnder = Math.max(topUnder, hh - z); } } } }
+        if (!base || low < T0 - 1e-9) pl1.push(`${name}: ${e.kind} ${e.id} — ${base} base vertices, lowest top ${low.toFixed(3)} under the plate ${T0}`);
+        // PL1 seated: a PROUD element's every top vertex over the molding under
+        // it; a SUNK one's crest a feature over the molding at its centre
+        if (surf) {
+          if (e.rec.sunk) { const c = e.rec.at, hc = Math.max(T0, surf(c[0], c[1])); if (zMax < hc + F - 1e-6) pl1.push(`${name}: sunk ${e.kind} ${e.id}'s crest ${(zMax - hc).toFixed(3)} mm over the molding at its centre`); }
+          else if (topUnder > 1e-6) pl1.push(`${name}: ${e.kind} ${e.id} has a top vertex ${topUnder.toFixed(3)} mm under the molding`);
+        }
+        // PL3 nothing in the opening
+        if (e.foot.loops.some((l) => l.some((q) => pip(q, sil) && depthIn(fs_, q) < 0))) pl3.push(`${name}: ${e.kind} ${e.id} reaches into the opening`);
+        // PL2 no graze: every wire against it a feature clear or a joint (an
+        // overlap of the embed; a leaf's crossing LEAF_CROSS)
+        W.forEach((w, x) => { const q = contact(w, e.foot, leafAt[x] ? F / 2 : E); leastElClear = Math.min(leastElClear, q.clear); if (q.graze > -Infinity) pl2.push(`${name}: wire ${x} (${orn.curves[x].kind}) grazes the ${e.kind} ${e.id} at ${q.graze.toFixed(3)} mm`); });
+      }
+      // PL4 the mirror: an element's left copy is its right with x negated, to
+      // the bit; an element on the axis is its own mirror (its vertex set)
+      for (let i = 0; i < feet2.length; i++) {
+        const e = feet2[i], r = e.rec;
+        const vs = (pts) => { const out = []; for (const pt of pts) { const n = pt.part === 'bead' ? (pt.r ? null : null) : 2 * pt.nu * pt.nv; if (n) for (let v = pt.base; v < pt.base + n; v++) out.push([P[3 * v], P[3 * v + 1], P[3 * v + 2]]); } return out; };
+        if (r.selfMirror) { const A = vs(e.parts), set = new Set(A.map((q) => `${q[0]},${q[1]},${q[2]}`)); const miss = A.filter((q) => !set.has(`${-q[0] === 0 ? 0 : -q[0]},${q[1]},${q[2]}`) && !set.has(`${-q[0]},${q[1]},${q[2]}`)).length; if (miss) pl4.push(`${name}: the ${e.kind} on the axis has ${miss} vertices with no mirror image`); }
+        else if (r.mirrorOf) { const j = recs.indexOf(r.mirrorOf); if (j < 0) { pl4.push(`${name}: a mirrored ${e.kind} with no source`); continue; } const A = vs(feet2[j].parts), B = vs(e.parts); if (A.length !== B.length || A.some((q, k) => B[k][0] !== -q[0] || B[k][1] !== q[1] || B[k][2] !== q[2])) pl4.push(`${name}: the left ${e.kind} is not the right with x negated`); }
+        else if (!recs.some((o) => o.mirrorOf === r)) pl4.push(`${name}: the ${e.kind} at (${r.at[0].toFixed(1)}, ${r.at[1].toFixed(1)}) has no mirror and is not on the axis`);
+      }
+      // ---- VN: the vine ----
+      if (orn.layout === 'vine') {
+        vineRows++;
+        const h = q.ornHierarchy ?? 1, leavesOn = (q.ornLeaves ?? 'on') === 'on';
+        const vg = orn.groups.find((g) => g.group === 'vine');
+        const runsR = new Map(vg.chain.runs.map((r) => [r.id, { ...r, a: clsR(model, r.from), b: clsR(model, r.to) }]));
+        // VN1 the field: the anchors' classes restated, and every placed
+        // item's claimed weight the restated w_h at its station
+        for (const r of runsR.values()) if (r.a !== r.cFrom || r.b !== r.cTo) vn1.push(`${name}: run ${r.id}'s anchors read ${r.cFrom}/${r.cTo}, restated ${r.a}/${r.b}`);
+        for (const it of orn.items) { const r = runsR.get(it.run), wr = wR(it.x, r.L, r.a, r.b, h); worstVnW = Math.max(worstVnW, Math.abs(wr - it.w)); if (Math.abs(wr - it.w) > 1e-9) { vn1.push(`${name}: an item at ${it.x.toFixed(1)} mm on ${it.run} claims w ${it.w.toFixed(4)}, restated ${wr.toFixed(4)}`); break; } }
+        // VN2 the classes: every item is the kind its restated weight makes
+        // it; every motif the kind its anchor's restated weight makes it; a
+        // HEAVY element (read off the emitted part's own kind) only at a
+        // junction motif, within its own size of that anchor's stem ends
+        for (const it of orn.items) { const r = runsR.get(it.run), k = itemKindR(wR(it.x, r.L, r.a, r.b, h), it.at, leavesOn); if (k !== it.kind) vn2.push(`${name}: an item at ${it.x.toFixed(1)} mm on ${it.run} is a ${it.kind}, its weight makes a ${k}`); }
+        for (const g of orn.groups.filter((gg) => gg.motif)) { const ws = [...runsR.values()].flatMap((r) => [r.from === g.anchor ? wR(0, r.L, r.a, r.b, h) : null, r.to === g.anchor ? wR(r.L, r.L, r.a, r.b, h) : null]).filter((v) => v != null); const k = motifKindR(clsR(model, g.anchor), Math.max(...ws)); if (k !== g.motif.kind) vn2.push(`${name}: the motif at ${g.anchor} is a ${g.motif.kind}, its weight makes a ${k}`); }
+        for (const e of feet2) if (HEAVY.has(e.kind)) { const r = e.rec, g = orn.groups.find((gg) => gg.motif && (gg.elements || []).some((el) => el === r || el === r.mirrorOf)); if (!g) { vn2.push(`${name}: a heavy ${e.kind} (${e.id}) placed away from every junction`); continue; } const a = model.info.anchors[g.anchor].pt, sc = rel.scale, d = Math.hypot(r.at[0] - (r.mirrorOf ? -1 : 1) * a[0] * sc, r.at[1] - a[1] * sc); if (d > r.size) vn2.push(`${name}: the heavy ${e.kind} at ${g.anchor} stands ${d.toFixed(1)} mm from it (size ${r.size.toFixed(1)})`); }
+        // VN3 the stems are continuous: on the axis a stem stops a feature
+        // (and the margin) short of its mirror; where two runs meet their
+        // emitted stems OVERLAP (≥ the embed)
+        const stemIdx = []; orn.curves.forEach((c, x) => { if (c.kind === 'stem') stemIdx.push(x); });
+        const stemOf = new Map(); for (const x of stemIdx) stemOf.set(`${orn.curves[x].run}|${owner[x].side}`, x);
+        for (const x of stemIdx) { stemsSeen++; const c = orn.curves[x], r = runsR.get(c.run), w = W[x]; for (const [cls, k] of [[r.a, 0], [r.b, w.c.length - 1]]) if (cls === 'crest' || cls === 'bottom') { const ax = Math.abs(w.c[k][0]); if (ax < (F + w.t[k]) / 2 - 1e-6 || ax > (F + w.t[k]) / 2 + 0.15 + 1e-3) vn3.push(`${name}: stem ${c.run} ends ${ax.toFixed(3)} mm off the axis (want ${((F + w.t[k]) / 2).toFixed(3)}–${((F + w.t[k]) / 2 + 0.15).toFixed(3)})`); } }
+        for (const [a, b] of RUNS_R[model.info.kind].map((q, i, arr) => (i ? [arr[i - 1], q] : null)).filter(Boolean)) {
+          for (const side of ['R', 'L']) { const ra = [...runsR.values()].find((r) => r.from === a[0] && r.to === a[1]), rb = [...runsR.values()].find((r) => r.from === b[0] && r.to === b[1]); if (!ra || !rb) continue; const xa = stemOf.get(`${ra.id}|${side}`), xb = stemOf.get(`${rb.id}|${side}`); const d = minDL(W[xa].c, W[xa].t, W[xb].c, W[xb].t); if (d > -E + 1e-6) vn3.push(`${name}: the ${ra.id} and ${rb.id} stems (${side}) meet at ${d.toFixed(3)} mm — no overlap of the embed`); }
+        }
+        // the stems JOIN the motifs at their junctions (an overlap ≥ the embed)
+        for (const g of orn.groups.filter((gg) => gg.motif)) for (const el of g.elements) { const e = feet2.find((f2) => f2.rec === el); for (const r of [...runsR.values()].filter((rr) => rr.from === g.anchor || rr.to === g.anchor)) { const x = stemOf.get(`${r.id}|${el.mirrorOf ? 'L' : 'R'}`); const cq = contact(W[x], e.foot, E); leastMotifJoint = Math.min(leastMotifJoint, cq.clear); if (!(cq.clear <= -E + 1e-6)) vn3.push(`${name}: the ${r.id} stem does not reach into the ${g.motif.kind} at ${g.anchor} (${cq.clear.toFixed(3)} mm)`); } }
+        // VN4 every item springs from its stem: a wire's emitted walls overlap
+        // the stem's by the embed; an element's footprint takes the stem's
+        // walls by the embed
+        orn.curves.forEach((c, x) => { if (!c.vineItem) return; itemsSeen++; const sx = stemOf.get(`${c.vineItem.run}|${owner[x].side}`); const d = minDL(W[x].c, W[x].t, W[sx].c, W[sx].t); leastJoint = Math.min(leastJoint, -d); if (d > -E + 1e-6) vn4.push(`${name}: a ${c.kind} off its stem — overlap ${(-d).toFixed(3)} mm`); });
+        for (const e of feet2) { const it = e.rec.vineItem || e.rec.mirrorOf?.vineItem; if (!it) continue; itemsSeen++; const sx = stemOf.get(`${it.run}|${e.rec.mirrorOf ? 'L' : 'R'}`); const cq = contact(W[sx], e.foot, E); leastJoint = Math.min(leastJoint, -cq.clear); if (!(cq.clear <= -E + 1e-6)) vn4.push(`${name}: a ${e.kind} off its stem — overlap ${(-cq.clear).toFixed(3)} mm`); }
+        // VN5 the stem is SEATED: every emitted row's edge stands on the
+        // highest molding under that row's own vertices — never under it,
+        // never more than 0.05 mm over it (a lifted stem floats)
+        if (surf) for (const x of stemIdx) { const pt = parts[x]; for (let v = 0; v < pt.V; v++) { let hm = -Infinity; for (let c = 0; c < pt.C; c++) { const ix = 3 * pt.T(v, c); hm = Math.max(hm, surf(P[ix], P[ix + 1]), surf(-P[ix], P[ix + 1])); } if (hm === -Infinity) continue; const e0 = P[3 * pt.T(v, 0) + 2], gap = e0 - Math.max(hm, T0); stemSeatMax = Math.max(stemSeatMax, gap); stemSeatMin = Math.min(stemSeatMin, gap); if (gap > 0.05 || gap < -1e-6) { vn5.push(`${name}: stem ${orn.curves[x].run} row ${v} stands ${gap.toFixed(3)} mm off the molding`); break; } } }
+      }
       // OR6 filigree off is the frame itself
       const off = FL.withOrnament(G.buildFrame({ ...q, filigree: 'none' }));
       if (off.ornament || G.exportSvg(off).svg !== G.exportSvg(G.buildFrame({ ...q, filigree: 'none' })).svg) or6.push(`${name}: off is not the frame`);
@@ -642,6 +757,15 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     rec('OR7 the CHAINS reach nothing into the OPENING: no chain vertex inside the frame\'s silhouette and in no band\'s footprint', or7.length === 0, `${opened} chain wires in the opening; the phase-3a groups put ${groupOpen} there (reported)${or7.length ? ' — ' + or7.slice(0, 3).join('; ') : ''}`);
     rec('OR8 no visible gap between the CHAINS and the band: every stretch of every chain wire within 2F of the band reaches an embed', or8.length === 0, `${slitRuns} approaches${worstSlit > -Infinity ? `, worst ${worstSlit.toFixed(3)} mm` : ', every chain one an embed'}; the phase-3a groups leave ${groupSlits} slits (reported)${or8.length ? ' — ' + or8.slice(0, 3).join('; ') : ''}`);
     rec('CL1 every leaf lies OVER its host scroll: its emitted top at its root stands above the host\'s crown at the host\'s root', leavesSeen > 0 && cl1.length === 0, `${leavesSeen} leaves, least lap ${leastLap.toFixed(4)} mm${cl1.length ? ' — ' + cl1.slice(0, 3).join('; ') : ''}`);
+    rec('PL1 every placed element (the junction motifs, the vine\'s buds and rosettes) stands on the back through the molding: base on z = 0, every other vertex on the plate or above; a proud one wholly over the molding, a sunk one\'s crest a feature over it at its centre', elSeen > 0 && pl1.length === 0, `${elSeen} elements${pl1.length ? ' — ' + pl1.slice(0, 3).join('; ') : ''}`);
+    rec('PL2 no wire grazes a placed element: every approach within a feature is an overlap of the embed (a leaf\'s of F/2)', pl2.length === 0, `least clearance ${leastElClear.toFixed(3)} mm${pl2.length ? ' — ' + pl2.slice(0, 3).join('; ') : ''}`);
+    rec('PL3 no placed element reaches into the opening (the frame\'s silhouette less the bands, the gate\'s own footprints)', pl3.length === 0, pl3.slice(0, 3).join('; '));
+    rec('PL4 the placed elements are mirror-symmetric to the bit: a left copy is its right with x negated; an element on the axis is its own mirror', pl4.length === 0, pl4.slice(0, 3).join('; '));
+    rec('VN1 the vine\'s weight field is the restated law: anchor classes (crest 1, junction 0.75, bottom 0.7, terminal 0.3), falloff over 0.55 of the run, floor 0.15, blended to ½ by the hierarchy; every item\'s weight the restated one', vineRows > 0 && vn1.length === 0, `${vineRows} vine rows, worst |w| ${worstVnW.toExponential(1)}${vn1.length ? ' — ' + vn1.slice(0, 3).join('; ') : ''}`);
+    rec('VN2 the classes follow the weight: every item the kind its restated weight makes, every junction motif the kind its anchor\'s weight makes, and a heavy element (shell, palmette, rose — read off the emitted part) only at a junction', vn2.length === 0, vn2.slice(0, 3).join('; '));
+    rec('VN3 the stems are continuous: a feature short of their mirror on the axis, overlapping where two runs meet, and reaching into every junction motif by the embed', stemsSeen > 0 && vn3.length === 0, `${stemsSeen} stems, least motif joint ${(-leastMotifJoint).toFixed(3)} mm${vn3.length ? ' — ' + vn3.slice(0, 3).join('; ') : ''}`);
+    rec('VN4 every item springs from its stem: a joint of at least the embed (read off the emitted walls and footprints)', itemsSeen > 0 && vn4.length === 0, `${itemsSeen} items, least joint ${leastJoint.toFixed(3)} mm${vn4.length ? ' — ' + vn4.slice(0, 3).join('; ') : ''}`);
+    rec('VN5 the stem is SEATED: every emitted row stands on the highest molding under its own vertices, 0–0.05 mm over it', vn5.length === 0 && stemSeatMax > -Infinity, `stem seat depth ${stemSeatMin.toFixed(4)}–${stemSeatMax.toFixed(4)} mm${vn5.length ? ' — ' + vn5.slice(0, 3).join('; ') : ''}`);
     rec('TB1 every ornament row\'s relief is within the 1,500,000-triangle budget and within the ornament\'s own predicted bound', tb1.length === 0, `most ${mostTris.toLocaleString('en-US')} triangles${tb1.length ? ' — ' + tb1.slice(0, 3).join('; ') : ''}`);
     console.log(`     per wire style (off the emitted mesh): ${['carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
   }
@@ -1023,7 +1147,18 @@ const MUTANTS = [
   { id: 'the-leaf-run-parts', file: 'pattern', from: 'if (pt > LEAF_RUN_PITCH_MAX * len) {', to: 'if (false) {', breaks: ['PT5'] },   // 6 mm leaves asked 6 mm apart are built end to end: no overlap
   { id: 'the-leaves-are-not-stacked', file: 'pattern', from: '(k > 0 ? depth * Math.max(0, 1 - x / Math.max(1e-9, over)) : 0)', to: '0', breaks: ['PT5'] },   // a leaf's base at the molding, under the previous tip
   { id: 'the-seam-is-not-closed', file: 'pattern', from: 'const usable = path.closedPair ? path.L : path.L - endClear;', to: 'const usable = path.closedPair ? path.L - 0.7 * pitch : path.L - endClear;', breaks: ['PT2', 'PT4', 'PT5'] },   // a closed run stops short of the seam: the gap there is 1.4 pitches
-  { id: 'the-axis-leaf-is-off-the-axis', file: 'filigree', from: 'lf.pts.map(([, y]) => [0, y])', to: 'lf.pts.map(([, y]) => [0.05, y])', breaks: ['OR5'] },
+  // phase 3e step 3 — the placed elements and the vine (PL / VN). Each one a
+  // failure the brief named; each claims what it must redden
+  { id: 'an-element-floats-off-its-stem', file: 'vine', from: 'curves: it.curves || [], el: it.el || null };', to: 'curves: it.curves || [], el: it.el ? { ...it.el, positions: it.el.positions.map((v, k) => (k % 3 === 1 && v !== 0 ? v + 0 : k % 3 === 0 ? v + 4 : v)), loops: it.el.loops.map((l) => l.map(([x, y]) => [x + 4, y])) } : null };', breaks: [] },
+  { id: 'the-weight-is-a-constant', file: 'vine', from: 'export function weightAt(x, L, Aa, Ab) {', to: 'export function weightAt(x, L, Aa, Ab) {\n  return 0.5;', breaks: [] },
+  { id: 'a-heavy-element-mid-run', file: 'vine', from: "let el = placeElement('bud', {", to: "let el = placeElement('rose', {", breaks: [] },
+  { id: 'the-element-mirror-is-broken', file: 'elements', from: '  for (let k = 0; k < P.length; k += 3) P[k] = -P[k];', to: '  for (let k = 0; k < P.length; k += 3) P[k] = 0.02 - P[k];', breaks: [] },
+  { id: 'the-axis-motif-is-not-its-own-mirror', file: 'filigree', from: '  if (onAxis) { el = symmetrizeElement(el); if (el.asymmetric) return null; }', to: '', breaks: [] },
+  { id: 'the-stem-lifts-off-the-molding', file: 'vine', from: 'const finishStem = (c) => { c.lift = c.pts.map((_, i) => Math.max(0, seatOn(H, c, i)));', to: 'const finishStem = (c) => { c.lift = c.pts.map((_, i) => 0.5 + Math.max(0, seatOn(H, c, i)));', breaks: [] },
+  // RETIRED in phase 3e step 3: 'the-axis-leaf-is-off-the-axis' (the chains'
+  // axis LEAF is gone — the axis motif is the palmette element, its own
+  // mirror by symmetrizeElement; its successor is
+  // 'the-axis-motif-is-not-its-own-mirror' above)
 ];
 
 
@@ -1032,9 +1167,11 @@ async function negativeControl() {
   const srcR = fs.readFileSync(path.join(ROOT, 'frame-relief.js'), 'utf8');
   const srcF = fs.readFileSync(path.join(ROOT, 'frame-filigree.js'), 'utf8');
   const srcP = fs.readFileSync(path.join(ROOT, 'frame-pattern.js'), 'utf8');
+  const srcE = fs.readFileSync(path.join(ROOT, 'frame-elements.js'), 'utf8');
+  const srcV = fs.readFileSync(path.join(ROOT, 'frame-vine.js'), 'utf8');
   const R = await import(pathToFileURL(path.join(ROOT, 'frame-registry.js')).href);
   for (const m of MUTANTS) {
-    const n = (m.file === 'relief' ? srcR : m.file === 'filigree' ? srcF : m.file === 'pattern' ? srcP : srcG).split(m.from).length - 1;
+    const n = (m.file === 'relief' ? srcR : m.file === 'filigree' ? srcF : m.file === 'pattern' ? srcP : m.file === 'elements' ? srcE : m.file === 'vine' ? srcV : srcG).split(m.from).length - 1;
     if (n !== 1) { console.log(`FAIL anchor ${m.id}: matches ${n} times`); process.exit(1); }
   }
   let bad = 0;
@@ -1056,19 +1193,20 @@ async function negativeControl() {
   if (only.length && RUN.length !== only.length) { console.log(`FAIL --only names a mutant that does not exist: ${only.filter((id) => !MUTANTS.some((m) => m.id === id)).join(', ')}`); process.exit(1); }
   if (shard) console.log(`shard ${shard.k}/${shard.n}: ${RUN.length} of ${MUTANTS.length} mutants — ${RUN.map((m) => m.id).join(', ')}`);
   for (const m of RUN) {
-    const gPath = path.join(ROOT, `_frame-geometry-mutant-${m.id}.js`), rPath = path.join(ROOT, `_frame-relief-mutant-${m.id}.js`);
-    fs.writeFileSync(gPath, m.file === 'geometry' ? srcG.replace(m.from, m.to) : srcG);
-    fs.writeFileSync(rPath, (m.file === 'relief' ? srcR.replace(m.from, m.to) : srcR).replace("from './frame-geometry.js'", `from './${path.basename(gPath)}'`));
-    const fPath = path.join(ROOT, `_frame-filigree-mutant-${m.id}.js`);
-    fs.writeFileSync(fPath, (m.file === 'filigree' ? srcF.replace(m.from, m.to) : srcF).replace("from './frame-geometry.js'", `from './${path.basename(gPath)}'`).replace("from './frame-relief.js'", `from './${path.basename(rPath)}'`));
-    const G = await import(pathToFileURL(gPath).href + `?${Date.now()}`);
-    const RL = await import(pathToFileURL(rPath).href + `?${Date.now()}`);
-    const FL = await import(pathToFileURL(fPath).href + `?${Date.now()}`);
-    const pPath = path.join(ROOT, `_frame-pattern-mutant-${m.id}.js`);
-    fs.writeFileSync(pPath, (m.file === 'pattern' ? srcP.replace(m.from, m.to) : srcP).replace("from './frame-geometry.js'", `from './${path.basename(gPath)}'`).replace("from './frame-relief.js'", `from './${path.basename(rPath)}'`).replace("from './frame-filigree.js'", `from './${path.basename(fPath)}'`));
-    const PT = await import(pathToFileURL(pPath).href + `?${Date.now()}`);
+    // every module copied, each one's imports of the others rewired to the
+    // copies (the vine and the filigree import each other; the elements
+    // import the relief), the one named mutated
+    const SRC = { geometry: srcG, relief: srcR, filigree: srcF, pattern: srcP, elements: srcE, vine: srcV };
+    const pathOf = (k) => path.join(ROOT, `_frame-${k}-mutant-${m.id}.js`);
+    for (const [k, src] of Object.entries(SRC)) {
+      let t = m.file === k ? src.replace(m.from, m.to) : src;
+      for (const j of Object.keys(SRC)) t = t.split(`from './frame-${j}.js'`).join(`from './${path.basename(pathOf(j))}'`);
+      fs.writeFileSync(pathOf(k), t);
+    }
+    const imp = (k) => import(pathToFileURL(pathOf(k)).href);
+    const G = await imp('geometry'), RL = await imp('relief'), FL = await imp('filigree'), PT = await imp('pattern');
     const out = await run(G, R, RL, m.id, FL, PT);
-    fs.unlinkSync(gPath); fs.unlinkSync(rPath); fs.unlinkSync(fPath); fs.unlinkSync(pPath);
+    for (const k of Object.keys(SRC)) fs.unlinkSync(pathOf(k));
     const red = out.filter((r) => !r.ok).map((r) => r.name.split(' ')[0]);
     const missed = m.breaks.filter((c) => !red.includes(c)), unclaimed = red.filter((c) => !m.breaks.includes(c));
     const ok = missed.length === 0 && unclaimed.length === 0;

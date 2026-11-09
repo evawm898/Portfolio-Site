@@ -178,7 +178,10 @@ function writeReadout() {
     + `floor: ${r.floorNote}${floorWarn ? '\n' + floorWarn : ''}`;
   const o = model.ornament;
   const ornLine = o
-    ? (o.layout === 'chains'
+    ? (o.layout === 'vine'
+      ? `ornament <b>a vine</b> — one stem per run (${o.weight.runs.map((r) => `${r.from}→${r.to}`).join(', ')}, mirrored), seated on the molding · hierarchy <b>${o.weight.h.toFixed(2)}</b>: `
+        + `junction motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · along the stems <b>${['cluster', 'rosette', 'leaf', 'bud', 'sprig'].map((k) => [k, o.items.filter((it) => it.kind === k).length]).filter(([, n]) => n).map(([k, n]) => `${n} ${k}${n > 1 ? 's' : ''}`).join(', ') || 'the bare stem'}</b> (per side) · `
+      : o.layout === 'chains'
       ? `ornament <b>${o.groups.filter((g) => g.chain).length}</b> running chains (${o.groups.filter((g) => g.chain).map((g) => g.anchor).join(', ')}, mirrored) seated on the molding, <b>${o.groups.filter((g) => !g.chain).length}</b> junction motifs, `
       : `ornament <b>${o.groups.length}</b> groups (${o.groups.map((g) => g.anchor).join(', ')}, mirrored), `)
       + `<b>${o.curves.filter((c) => c.kind !== 'leaf').length}</b> scrolls, <b>${o.curves.filter((c) => c.kind === 'leaf').length}</b> leaves · lead <b>${o.length.toFixed(1)} mm</b>, `

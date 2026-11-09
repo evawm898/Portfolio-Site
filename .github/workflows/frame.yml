@@ -25,9 +25,11 @@ on:
       - frame-filigree.js
       - frame-pattern.js
       - frame-elements.js
+      - frame-vine.js
       - tools/verify-frame.mjs
       - tools/verify-frame-elements.mjs
       - tools/shot-frame-elements.mjs
+      - tools/shot-frame-vine.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
@@ -50,9 +52,11 @@ on:
       - frame-filigree.js
       - frame-pattern.js
       - frame-elements.js
+      - frame-vine.js
       - tools/verify-frame.mjs
       - tools/verify-frame-elements.mjs
       - tools/shot-frame-elements.mjs
+      - tools/shot-frame-vine.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
