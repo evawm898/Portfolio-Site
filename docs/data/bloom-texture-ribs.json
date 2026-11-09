@@ -1911,6 +1911,480 @@
    "open": 0,
    "doubled": 0,
    "degen": 0
+  },
+  {
+   "key": "mophead",
+   "law": "B",
+   "latticeTris": 1762254,
+   "latticePct": 88.1,
+   "latticeMs": 64761,
+   "crestTris": 1960690,
+   "crestPct": 98,
+   "crestMs": 70999,
+   "crestPassMs": 15396,
+   "flankTris": 2586968,
+   "flankPct": 129.3,
+   "flankMs": 77314,
+   "shells": 458,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  }
+ ],
+ "rods": [
+  {
+   "state": "rods",
+   "curvature": 1,
+   "smoothRods": [
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      179010,
+      179570
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      179570,
+      180130
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666663,
+     "triRange": [
+      180130,
+      180690
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      180690,
+      181250
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      181250,
+      181810
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      181810,
+      182370
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      182370,
+      182930
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      182930,
+      183490
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666665,
+     "triRange": [
+      183490,
+      184050
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      184050,
+      184610
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      184610,
+      185170
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      185170,
+      185730
+     ]
+    },
+    {
+     "organ": "style",
+     "tris": 960,
+     "kappaMin": 1.0416666666666665,
+     "triRange": [
+      185730,
+      186690
+     ]
+    }
+   ],
+   "parts": {
+    "petal": {
+     "vertices": 75816,
+     "relievable": 75336,
+     "ridges": 11000,
+     "displaced": 64336,
+     "displacedShare": 0.849,
+     "ridgeOff": 11000,
+     "rod": false,
+     "sheet": true
+    },
+    "hub": {
+     "vertices": 6906,
+     "relievable": 5388,
+     "ridges": 853,
+     "displaced": 1541,
+     "displacedShare": 0.223,
+     "ridgeOff": 42,
+     "rod": false,
+     "sheet": false
+    },
+    "stem": {
+     "vertices": 8321,
+     "relievable": 8225,
+     "ridges": 447,
+     "displaced": 7600,
+     "displacedShare": 0.913,
+     "ridgeOff": 381,
+     "rod": false,
+     "sheet": false
+    }
+   }
+  },
+  {
+   "state": "rods",
+   "curvature": 4,
+   "smoothRods": [],
+   "parts": {
+    "petal": {
+     "vertices": 75816,
+     "relievable": 75336,
+     "ridges": 1080,
+     "displaced": 74256,
+     "displacedShare": 0.979,
+     "ridgeOff": 1080,
+     "rod": false,
+     "sheet": true
+    },
+    "hub": {
+     "vertices": 6906,
+     "relievable": 5388,
+     "ridges": 0,
+     "displaced": 1583,
+     "displacedShare": 0.229,
+     "ridgeOff": 0,
+     "rod": false,
+     "sheet": false
+    },
+    "stem": {
+     "vertices": 8321,
+     "relievable": 8225,
+     "ridges": 32,
+     "displaced": 7949,
+     "displacedShare": 0.955,
+     "ridgeOff": 32,
+     "rod": false,
+     "sheet": false
+    },
+    "stamen": {
+     "vertices": 12048,
+     "relievable": 11952,
+     "ridges": 0,
+     "displaced": 8671,
+     "displacedShare": 0.72,
+     "ridgeOff": 0,
+     "rod": true,
+     "sheet": false
+    },
+    "style": {
+     "vertices": 1608,
+     "relievable": 1600,
+     "ridges": 0,
+     "displaced": 1146,
+     "displacedShare": 0.713,
+     "ridgeOff": 0,
+     "rod": true,
+     "sheet": false
+    }
+   }
+  },
+  {
+   "state": "braid",
+   "curvature": 1,
+   "smoothRods": [
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.0416666666666665,
+     "triRange": [
+      179010,
+      180530
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.0416666666666663,
+     "triRange": [
+      180530,
+      182050
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.0416666666666659,
+     "triRange": [
+      182050,
+      183570
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.0416666666666663,
+     "triRange": [
+      183570,
+      185090
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.041666666666666,
+     "triRange": [
+      185090,
+      186610
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      186610,
+      188130
+     ]
+    },
+    {
+     "organ": "style",
+     "tris": 960,
+     "kappaMin": 1.0416666666666665,
+     "triRange": [
+      188130,
+      189090
+     ]
+    }
+   ],
+   "parts": {
+    "petal": {
+     "vertices": 75816,
+     "relievable": 75336,
+     "ridges": 11000,
+     "displaced": 64336,
+     "displacedShare": 0.849,
+     "ridgeOff": 11000,
+     "rod": false,
+     "sheet": true
+    },
+    "hub": {
+     "vertices": 6906,
+     "relievable": 5388,
+     "ridges": 853,
+     "displaced": 1597,
+     "displacedShare": 0.231,
+     "ridgeOff": 42,
+     "rod": false,
+     "sheet": false
+    },
+    "stem": {
+     "vertices": 8321,
+     "relievable": 8225,
+     "ridges": 447,
+     "displaced": 7612,
+     "displacedShare": 0.915,
+     "ridgeOff": 363,
+     "rod": false,
+     "sheet": false
+    }
+   }
+  },
+  {
+   "state": "default",
+   "curvature": 1,
+   "smoothRods": [],
+   "parts": {
+    "petal": {
+     "vertices": 75816,
+     "relievable": 75336,
+     "ridges": 11000,
+     "displaced": 64336,
+     "displacedShare": 0.849,
+     "ridgeOff": 11000,
+     "rod": false,
+     "sheet": true
+    },
+    "hub": {
+     "vertices": 6694,
+     "relievable": 3658,
+     "ridges": 842,
+     "displaced": 1204,
+     "displacedShare": 0.18,
+     "ridgeOff": 36,
+     "rod": false,
+     "sheet": false
+    }
+   }
+  },
+  {
+   "state": "default",
+   "curvature": 4,
+   "smoothRods": [],
+   "parts": {
+    "petal": {
+     "vertices": 75816,
+     "relievable": 75336,
+     "ridges": 1080,
+     "displaced": 74256,
+     "displacedShare": 0.979,
+     "ridgeOff": 1080,
+     "rod": false,
+     "sheet": true
+    },
+    "hub": {
+     "vertices": 6694,
+     "relievable": 3658,
+     "ridges": 0,
+     "displaced": 1240,
+     "displacedShare": 0.185,
+     "ridgeOff": 0,
+     "rod": false,
+     "sheet": false
+    }
+   }
+  }
+ ],
+ "browser": [
+  {
+   "key": "default",
+   "law": "A",
+   "mode": "lattice",
+   "node": {
+    "tris": 158912,
+    "hash": "794f799e",
+    "s": 1.25
+   },
+   "chromium": {
+    "tris": 158912,
+    "hash": "794f799e",
+    "s": 0.8,
+    "heapEndGB": 0.11
+   },
+   "agree": true
+  },
+  {
+   "key": "default",
+   "law": "A",
+   "mode": "crest",
+   "node": {
+    "tris": 189836,
+    "hash": "d6649a26",
+    "s": 2.26
+   },
+   "chromium": {
+    "tris": 189836,
+    "hash": "d6649a26",
+    "s": 1.45,
+    "heapEndGB": 0.14
+   },
+   "agree": true
+  },
+  {
+   "key": "default",
+   "law": "B",
+   "mode": "lattice",
+   "node": {
+    "tris": 158912,
+    "hash": "34dc78d2",
+    "s": 1.03
+   },
+   "chromium": {
+    "tris": 158912,
+    "hash": "34dc78d2",
+    "s": 0.89,
+    "heapEndGB": 0.11
+   },
+   "agree": true
+  },
+  {
+   "key": "default",
+   "law": "B",
+   "mode": "crest",
+   "node": {
+    "tris": 190130,
+    "hash": "a7f2914",
+    "s": 2.58
+   },
+   "chromium": {
+    "tris": 190130,
+    "hash": "a7f2914",
+    "s": 1.96,
+    "heapEndGB": 0.08
+   },
+   "agree": true
+  },
+  {
+   "key": "umbel",
+   "law": "A",
+   "mode": "lattice",
+   "node": {
+    "tris": 530634,
+    "hash": "b3685d2f",
+    "s": 4.76
+   },
+   "chromium": {
+    "tris": 530634,
+    "hash": "b3685d2f",
+    "s": 3.84,
+    "heapEndGB": 0.36
+   },
+   "agree": true
   }
  ]
 }
