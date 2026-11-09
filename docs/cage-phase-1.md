@@ -214,3 +214,36 @@ Measured: C0–C16 455 of 455 (four new C0 clauses), 13 of 13 mutants; the page 
 sector count does not change, so the delta is the tube's vertex count in the collar pack); the
 bell's +3,080 is 20 mm more bar. The sheet `docs/img/cage-phase-1.png` is re-rendered on these
 defaults. No bar of any preset is floored.
+
+## 7. The design-system re-skin (Nov 9) — chrome only, no geometry
+
+#511 had already put `/cage` on `tokens.css` (Fraunces + Plex Mono, every chrome colour a token,
+`EM / CAGE` eyebrow kept). What was left, and is done here:
+
+1. **The canvas ground is the ground token** (`#060707`, read from `--color-ground` at boot), not
+   the page's old `#0A0A0C`. The cage's metal material and lights are artwork and keep their colours.
+2. **The read-out's separators are em-dashes in faint** (DESIGN.md rule 3), where they were `·` in dim.
+   The told list's `·` bullets are line markers, not separators, and stay.
+3. **The SVG view's stage is ground; only the SVG's own paper rect is light.** The whole stage was
+   `#EDEDE8` paper with the header text recoloured `#55554f` and the ground colour over it — chrome
+   text outside the six text tokens, in the one view the palette gate does not render. The stage
+   now pads left past the header column (and down past it at phone width), so the light sheet never
+   sits under chrome text.
+
+Nothing in `cage-geometry.js` moved; C0–C16 read 455 of 455 unchanged. The page gate gains
+**P5c** (SVG mode: the stage is ground, every header text a text token) and **P5d** (the canvas
+ground pixel is `6,7,7`; the separators are faint em-dashes and no ` · ` is left), with three
+mutants — the canvas keeping its own ground, the dots back, the paper stage back (the first
+mutant in that table on `cage.css`; a mutant now names its file). 16 of 16, 7 of 7.
+`cage-gate.yml`'s comment still says "four broken copies of cage.js": left alone on purpose, since
+editing an existing workflow file costs frozen tags dispatched afterwards.
+
+The default comparison asked for (90 × 110 on 1.4 mm bars against 90 × 140 on 1.1 mm) is on the
+sheet for the eye; the second is already the shipped default (§6, ruled Oct 29). Sheet:
+`node tools/shot-cage-reskin.mjs <dir> --png docs/img/cage-reskin.png`.
+
+**Phase 2 (decorative ring bands) did not start**: of /frame's seven elements, beading and the
+leaf-tip run are merged and follow the frame (`frame-pattern.js`, #477), but the shell, palmette,
+rose, rosette and bud (`frame-elements.js`, #479) are standalone primitives placed on no frame,
+their rulings still pending (frame charter §16), and the wiring session that reconciles the
+palmette and rosette with the chain motifs has not happened.

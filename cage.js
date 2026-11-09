@@ -18,7 +18,9 @@ const canvas = document.getElementById('cage-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0a0c);
+// the canvas ground is the site's ground token (tokens.css), read once; the cage's own
+// material and lights below are artwork and keep their colours (DESIGN.md rule 9)
+scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--color-ground').trim() || '#060707');
 const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 5000);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = false;
@@ -237,16 +239,17 @@ function rebuild() {
   if (mainMode === 'svg') drawMain(); else render();
   profileEditor.render();
 }
+const SEP = '<span class="cg-sep"> — </span>';   // DESIGN.md rule 3: em-dash separators are faint
 function writeReadout() {
   const i = model.info;
   const t = document.getElementById('told'); t.textContent = model.told.length ? model.told.map((s) => `· ${s}`).join('\n') : ''; t.hidden = !model.told.length;
   const over = i.overhang.fdmSupport ? `<b class="bad">${i.overhang.deg.toFixed(0)}° from horizontal at ${i.overhang.where}</b> — under ${FDM_OVERHANG_DEG}°, so an FDM print wants support there; SLS does not` : `${i.overhang.deg.toFixed(0)}° from horizontal at ${i.overhang.where}`;
   const door = i.door ? `${i.door.shape} ${i.door.W.toFixed(0)} × ${i.door.Dh.toFixed(0)} mm, sill ${i.door.z0.toFixed(1)} mm up` : 'none';
   document.getElementById('readout').innerHTML = [
-    `<b>${i.widthMm.toFixed(0)} × ${i.heightMm.toFixed(0)} mm</b> overall · ${i.triangles.toLocaleString()} triangles · ${i.parts} closed parts`,
-    `bars <b>${i.barCount}</b>${i.ribCount ? ` + ${i.ribCount} dome ribs` : ''} (${i.barsEnd === 'apex' ? 'converge at the apex' : 'end at the top ring'}) · rings ${i.ringZ.length} between base and top`,
+    `<b>${i.widthMm.toFixed(0)} × ${i.heightMm.toFixed(0)} mm</b> overall${SEP}${i.triangles.toLocaleString()} triangles${SEP}${i.parts} closed parts`,
+    `bars <b>${i.barCount}</b>${i.ribCount ? ` + ${i.ribCount} dome ribs` : ''} (${i.barsEnd === 'apex' ? 'converge at the apex' : 'end at the top ring'})${SEP}rings ${i.ringZ.length} between base and top`,
     i.collar ? `collar boss r ${i.collar.rc.toFixed(1)} mm (bead ${(i.collar.rc * 1.14).toFixed(1)}), the bars meeting it ${i.collar.pitch.toFixed(2)} mm apart at ${(100 * (1 - i.collar.sC)).toFixed(0)}% of the cap; the hanger stands on it` : 'flat top',
-    `${i.shoulderZ.length ? `${i.shoulderZ.length} profile shoulder${i.shoulderZ.length > 1 ? 's' : ''} auto-ringed` : 'no profile shoulder'}${i.scallops ? ` · skirt: ${i.scallops} scallops, cusps on bars` : ''}`,
+    `${i.shoulderZ.length ? `${i.shoulderZ.length} profile shoulder${i.shoulderZ.length > 1 ? 's' : ''} auto-ringed` : 'no profile shoulder'}${i.scallops ? `${SEP}skirt: ${i.scallops} scallops, cusps on bars` : ''}`,
     `door ${door}`,
     `print: ${PRINT_NOTE}; shallowest wire ${over}`,
   ].join('\n');

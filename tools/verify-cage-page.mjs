@@ -8,10 +8,13 @@
    text on screen; the page's STL bytes equal a Node build of the same state
    (the two engines agree, through float32); a REAL pointer drag on a profile
    point moves it and rebuilds, and a drag past the box is refused with the
-   point left where it was; the two export buttons produce real downloads.
+   point left where it was; the two export buttons produce real downloads;
+   and the chrome is on the site's tokens in BOTH views (P5c/P5d: the SVG
+   stage is ground around its paper sheet, the canvas ground is #060707, the
+   read-out's separators are faint em-dashes).
 
-   `--negative-control` re-serves four broken copies of cage.js and requires
-   each to redden exactly the checks it names. */
+   `--negative-control` re-serves seven broken copies of cage.js / cage.css
+   and requires each to redden exactly the checks it names. */
 import fs from 'node:fs';
 import path from 'node:path';
 import { openCage, ROOT } from './cage-page-harness.mjs';
@@ -52,7 +55,18 @@ async function run({ mutant = null, quiet = false } = {}) {
     await page.click('#viewToggle [data-main="svg"]');
     const shown = await page.evaluate(() => ({ hidden: document.getElementById('svgStage').hidden, inner: document.getElementById('svgStage').innerHTML, text: window.__cage.svgText(), mode: window.__cage.mainMode() }));
     check('P5 SVG mode shows the export (the same paths, stage visible)', !shown.hidden && shown.mode === 'svg' && shown.inner.includes('class="door"') && (shown.inner.match(/<path /g) || []).length === (shown.text.match(/<path /g) || []).length);
+    // P5c the chrome stays on the site's tokens in SVG mode too (DESIGN.md): the stage around the
+    // sheet is ground and only the SVG's own paper rect is light, and the header text is a text token
+    // (the palette gate renders the default view only, so this view is held here)
+    const TEXT = ['rgb(233, 236, 236)', 'rgb(167, 175, 175)', 'rgb(139, 148, 148)', 'rgb(86, 95, 95)', 'rgb(47, 163, 163)', 'rgb(111, 183, 174)'];
+    const svgChrome = await page.evaluate(() => ({ stage: getComputedStyle(document.getElementById('svgStage')).backgroundColor, text: ['.cg-header h1', '.cg-sub', '.cg-back', '.cg-eyebrow'].map((q) => getComputedStyle(document.querySelector(q)).color) }));
+    check('P5c SVG mode: the stage is ground and every header text is a text token', svgChrome.stage === 'rgb(6, 7, 7)' && svgChrome.text.every((c) => TEXT.includes(c)), JSON.stringify(svgChrome));
     await page.click('#viewToggle [data-main="render"]');
+    // P5d the render's canvas ground is the ground token (the cage's material is artwork; the
+    // ground is not), and the read-out's separators are em-dashes in faint (DESIGN.md rule 3)
+    const ground = await page.evaluate(() => { const c = document.getElementById('cage-canvas'); const k = document.createElement('canvas'); k.width = 4; k.height = 4; const g = k.getContext('2d'); g.drawImage(c, 0, 0, 4, 4, 0, 0, 4, 4); return Array.from(g.getImageData(1, 1, 1, 1).data.slice(0, 3)); });
+    const seps = await page.evaluate(() => { const s = [...document.querySelectorAll('#readout .cg-sep')]; return { n: s.length, dash: s.every((e) => e.textContent.trim() === '\u2014'), colour: [...new Set(s.map((e) => getComputedStyle(e).color))], dots: document.getElementById('readout').textContent.includes(' \u00b7 ') }; });
+    check('P5d the canvas ground is #060707 and the read-out separators are faint em-dashes', ground.join() === '6,7,7' && seps.n >= 3 && seps.dash && !seps.dots && seps.colour.length === 1 && seps.colour[0] === 'rgb(86, 95, 95)', `ground ${ground} · ${JSON.stringify(seps)}`);
     // P6 the page's STL is the Node build's, byte for byte
     await page.evaluate(() => window.__cage.setPreset('bell'));
     const pageBytes = Uint8Array.from(await page.evaluate(() => window.__cage.stlBytes()));
@@ -109,23 +123,29 @@ const MUTANTS = [
   { id: 'a-slider-no-longer-rebuilds', from: "    writeInputs(); scheduleBuild();\n  });\n  const body = secEl[s.section]", to: "    writeInputs();\n  });\n  const body = secEl[s.section]", breaks: /^P2 / },
   { id: 'an-edit-keeps-the-preset', from: "if (PRESET_FIELD_IDS.includes(s.id)) params.preset = 'custom';", to: "", breaks: /^P2b / },
   { id: 'the-svg-view-shows-a-stale-drawing', from: "if (svg) svgStage.innerHTML = exportSvg(model).replace(/ width=\"[^\"]*mm\" height=\"[^\"]*mm\"/, '');", to: "if (svg && !svgStage.innerHTML) svgStage.innerHTML = exportSvg({ ...model, wires: model.wires.filter((w) => w.kind !== 'door') });", breaks: /^P5 / },
+  { id: 'the-canvas-keeps-its-own-ground', from: "scene.background = new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue('--color-ground').trim() || '#060707');", to: "scene.background = new THREE.Color(0x0a0a0c);", breaks: /^P5d / },
+  { id: 'the-readout-separators-are-dots-again', from: "const SEP = '<span class=\"cg-sep\"> — </span>';", to: "const SEP = ' · ';", breaks: /^P5d / },
+  { id: 'the-svg-stage-is-paper-again', file: 'cage.css', from: "#svgStage{position:fixed;inset:0;right:330px;z-index:2;background:var(--color-ground);", to: "body.is-svg .cg-sub,body.is-svg .cg-back{color:#55554f;}\n#svgStage{position:fixed;inset:0;right:330px;z-index:2;background:#EDEDE8;", breaks: /^P5c / },
   { id: 'a-refused-drag-is-clamped-instead', from: "if (!r.accepted) { refusal = r.reason; counts.refused++; render(); return false; }", to: "if (!r.accepted) { render(); return false; }", breaks: /^P7b / },
 ];
 if (NEG) {
-  const file = path.join(ROOT, 'cage.js'), src = fs.readFileSync(file, 'utf8');
-  for (const m of MUTANTS) { const n = src.split(m.from).length - 1; if (n !== 1) { console.error(`ANCHOR ${m.id}: matches ${n} times`); process.exit(1); } }
+  // a mutant names its file (cage.js by default); every anchor is checked before any mutant runs
+  const srcs = {}; const srcOf = (f) => (srcs[f] ??= fs.readFileSync(path.join(ROOT, f), 'utf8'));
+  for (const m of MUTANTS) { const n = srcOf(m.file || 'cage.js').split(m.from).length - 1; if (n !== 1) { console.error(`ANCHOR ${m.id}: matches ${n} times`); process.exit(1); } }
   const base = await run({ quiet: true });
   if (base.fails.length) { console.error('the clean page fails:', base.fails); process.exit(1); }
   let bad = 0;
   try {
     for (const m of MUTANTS) {
-      fs.writeFileSync(file, src.replace(m.from, m.to));
+      const f = m.file || 'cage.js';
+      for (const k of Object.keys(srcs)) fs.writeFileSync(path.join(ROOT, k), srcs[k]);
+      fs.writeFileSync(path.join(ROOT, f), srcOf(f).replace(m.from, m.to));
       const r = await run({ mutant: m.id, quiet: true });
       const claimed = r.fails.filter((f) => m.breaks.test(f)), stray = r.fails.filter((f) => !m.breaks.test(f));
       const ok = claimed.length > 0 && stray.length === 0; if (!ok) bad++;
       console.log(`${ok ? 'CAUGHT' : 'BAD   '} ${m.id}: ${claimed.length} named red${stray.length ? `, UNCLAIMED: ${stray.join('; ')}` : ''}`);
     }
-  } finally { fs.writeFileSync(file, src); }
+  } finally { for (const k of Object.keys(srcs)) fs.writeFileSync(path.join(ROOT, k), srcs[k]); }
   console.log(`\n${MUTANTS.length - bad} of ${MUTANTS.length} mutants behave`);
   process.exit(bad ? 1 : 0);
 } else { const r = await run(); process.exit(r.fails.length ? 1 : 0); }
