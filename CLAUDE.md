@@ -766,6 +766,15 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   only: body h:w 1.482. Water lily 4/10 reads as the photo. The daisy is the global count (no per-whorl). Unresolved: the
   tube (C throws; A/B never meet it), the sepal ceiling and Layer phase read the global count. Eva's ruling pending.
   **[Nov 8: RULED — option A, an owned value; SHIPPED, §19 and the block below.]**
+- **S7, the petal-count stage (Nov 9), is §20 of the same doc.** Schema v6 adds `LAYER_SCHEMA.count`
+  (`values.layerPetalCount` on a layer entry, an integer 3–40 that REPLACES the global; checked with `ring` against the
+  geometry's `SCOPE_LAYER_VALUE_IDS`). The validator gains clause **V10** (every count the file names is footRing()'s built
+  `ownCount`, the ring's `whorlCount` AND the azimuths the whorl emitted; no unnamed count owned), W2 on a count off the
+  grid or past the range; seven fixtures (39), the negative controls `COUNT_INERT` / `COUNT_FAN` / `COUNT_CONTINUOUS`
+  (inert, V7, never V10); page mutant `the-build-drops-the-layer-count`. **The photos were 150 px crops of the §18 sheet**
+  (Eva, Nov 9: go ahead with the crops). Lotus v12 counts 4/5/5/3 (body h:w 1.413 → 1.492 against ≈ 1.45, no v13);
+  water lily v8 re-counted 4/8 (v7 8+8; §18 assumed 4/10); daisy stays v7. 0 within-shell pairs. `bloom-photo-s2.mjs`'s
+  body measure read layers as equal whorls — it reads `whorlCounts` now. §20.7 is the ranking (splay is #1).
 - **#495 (Nov 5): DISCOVERY + PROTOTYPE, NOTHING SHIPPED — §15 of the same doc.** Read it before touching `footRing()`'s
   `ringFactor`, `layerOwnedValues` or `layerSize`'s visibility.
   - Four options are prototyped by `tools/bloom-ring-options.mjs` as anchored edits of TEMPORARY copies:

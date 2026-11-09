@@ -110,6 +110,24 @@
      W2  also: a ring outside LAYER_RING_RANGE (the reader tells it as a
          clamp, V1; this says so from the file alone).
      TOLD also: HUB GROWN — a ring past 1 grows the hub (Oct 16), on the read-out.
+   SCHEMA v6 (photo-to-bloom PR 2, Nov 9) — a layer's OWN PETAL COUNT (§19,
+     option A of §18), `LAYER_SCHEMA.count`: `values.layerPetalCount` on a layer
+     entry, an integer 3..40 that replaces the global Petals for that whorl.
+     W1 no longer fires on it.
+     V10 (a CLAUSE) every count the file names on a layer the build reaches is
+         the count footRing() BUILT — `rings[i].ownCount` (asked = the file's
+         number, built = it rounded and clamped to LAYER_PETAL_COUNT_RANGE),
+         the ring's `whorlCount` is that built count, and the whorl EMITTED
+         that many azimuths (`slotAzimuths[i]`, the builder's own record, a
+         second owner beside footRing()'s); no count is owned that the file
+         does not name; and no whorl the file does not count emits other than
+         the global. V4 cannot see a page that keeps the count in its scopes
+         and builds without it (`the-build-drops-the-layer-count`).
+     W2  also: a count off the integer grid or outside LAYER_PETAL_COUNT_RANGE
+         (the build snaps it; this says so from the file alone).
+     The negative controls (Eva's brief): a count with Per-layer values OFF,
+     and one on a FAN or CONTINUOUS bloom, where Per-layer values is hidden —
+     each is inert, V7, and never V10.
    NOT BUILT, by the same ruling: a self-intersection check.
    A name that is not a control at all is V1's (`unknown`), never a warning.
 
@@ -119,7 +137,7 @@
                       with its `controls` put in the v1 envelope; the dropped
                       keys are named. The raw file is still validated as it is.
          node tools/verify-bloom-photo-subset.mjs --self
-                      the thirty-two written-down fixtures below (five added for schema v2, S3; six for v3, S4; five for v4, S5; one for the CUP CLAMPED ruling; five for v5, S6), each against its
+                      the thirty-nine written-down fixtures below (five added for schema v2, S3; six for v3, S4; five for v4, S5; one for the CUP CLAMPED ruling; five for v5, S6; seven for v6, PR 2), each against its
                       expected clause, warning AND told sets, then two fixtures
                       through a SPAWNED copy of this validator: the off-schema
                       one must list W1 and exit 0, the away-from-tip clamp W4
@@ -288,10 +306,12 @@ function schemaWarnings(obj) {
       const mode = e.values && 'petalCurlMode' in e.values ? e.values.petalCurlMode : glob('petalCurlMode');
       if (id === 'petalSpineCurl' && mode === 'CURVE') inert.push(`layers[${i}].offsets.petalSpineCurl=${JSON.stringify(d)} (the layer's petals are drawn on a CURVE spine, which reads no slider curl)`);
     }
-    for (const id of Object.keys(e.values || {})) if (!LAYER_SCHEMA.values.includes(id) && !LAYER_SCHEMA.ring.includes(id)) off.push(`layers[${i}].values.${id} (not a per-layer value in schema v5)`);
+    for (const id of Object.keys(e.values || {})) if (!LAYER_SCHEMA.values.includes(id) && !LAYER_SCHEMA.ring.includes(id) && !LAYER_SCHEMA.count.includes(id)) off.push(`layers[${i}].values.${id} (not a per-layer value in schema v6)`);
     /* schema v5: a ring past LAYER_RING_RANGE is clamped by the build — the reader tells it
        (V1), and this says so from the file alone, a second owner beside the reader's note */
     for (const id of LAYER_SCHEMA.ring) if (e.values && id in e.values && typeof e.values[id] === 'number' && (e.values[id] < G.LAYER_RING_RANGE[0] || e.values[id] > G.LAYER_RING_RANGE[1])) out.push(`layers[${i}] owns ${id} ${e.values[id]} (range ${G.LAYER_RING_RANGE[0]}..${G.LAYER_RING_RANGE[1]}: built at the nearest end)`);
+    /* schema v6: a count off the integer grid or past LAYER_PETAL_COUNT_RANGE is SNAPPED by the build */
+    for (const id of LAYER_SCHEMA.count) if (e.values && id in e.values && typeof e.values[id] === 'number' && (!Number.isInteger(e.values[id]) || e.values[id] < G.LAYER_PETAL_COUNT_RANGE[0] || e.values[id] > G.LAYER_PETAL_COUNT_RANGE[1])) out.push(`layers[${i}] owns ${id} ${e.values[id]} (integers ${G.LAYER_PETAL_COUNT_RANGE[0]}..${G.LAYER_PETAL_COUNT_RANGE[1]}: snapped by the build)`);
   });
   /* schema v3: a petal or sepal outline point the BUILD lifts to the floor */
   const lifted = outlineLifts(obj);
@@ -401,6 +421,24 @@ const FIXTURES = [
   { id: 'RING_GROWS', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: {}, values: { layerRing: 1.3 } }] } }, expect: [], told: ['HUB GROWN'] },
   { id: 'RING_INERT', file: { ...ENV, controls: { ...CLEAN }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerRing: 0.6 } }] } }, expect: ['V7'] },
   { id: 'RING_PAST', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerRing: 2.6 } }] } }, expect: ['V1', 'V5'], warn: ['W2'], told: ['HUB GROWN'] },
+  /* SCHEMA v6 (PR 2): a layer's OWN PETAL COUNT. An intended count loads clean
+     (V10 reads footRing()'s record AND the azimuths the whorl emitted); a
+     count-only entry builds; the NEGATIVE CONTROLS Eva's brief names — a count
+     with Per-layer values OFF, and one on a FAN or a CONTINUOUS bloom, where
+     Per-layer values is hidden — are inert (V7, never V10); a count past the
+     range or off the grid is snapped, told by the reader and warned (W2). */
+  { id: 'COUNT_OWNED', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 0, offsets: { petalTilt: -10 }, values: { layerPetalCount: 6 } }, { layer: 1, offsets: { petalTilt: 15 }, values: { layerPetalCount: 9 } }] } }, expect: [] },
+  { id: 'COUNT_ONLY', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerPetalCount: 8 } }] } }, expect: [] },
+  { id: 'COUNT_INERT', file: { ...ENV, controls: { ...CLEAN }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerPetalCount: 8 } }] } }, expect: ['V7'] },
+  /* FAN and CONTINUOUS: the file's own controls are hidden there too (on a FAN the
+     global Petals is per side's; under CONTINUOUS the Per-layer switch itself
+     hides), so the reader tells them (V1 / V5), the page keeps their defaults
+     (V2) and does not show them (V3) — the hidden rule doing its job — and the
+     count is inert (V7). Never V10: there is no live layer for it to reach. */
+  { id: 'COUNT_FAN', file: { ...ENV, controls: { ...SCOPED, placement: 'FAN' }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerPetalCount: 8 } }] } }, expect: ['V1', 'V2', 'V3', 'V5', 'V7'] },
+  { id: 'COUNT_CONTINUOUS', file: { ...ENV, controls: { ...SCOPED, placement: 'CONTINUOUS' }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerPetalCount: 8 } }] } }, expect: ['V1', 'V2', 'V3', 'V5', 'V7'] },
+  { id: 'COUNT_PAST', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerPetalCount: 44 } }] } }, expect: ['V1', 'V5'], warn: ['W2'] },
+  { id: 'COUNT_OFFGRID', file: { ...ENV, controls: { ...SCOPED }, overrides: { layers: [{ layer: 1, offsets: {}, values: { layerPetalCount: 7.5 } }] } }, expect: ['V1', 'V5'], warn: ['W2'] },
   { id: 'NO_ENVELOPE', file: { views: ['front'], controls: { ...CLEAN }, frame: 1 }, expect: ['V0', 'V1', 'V2', 'V3', 'V4', 'V5'] },   // V3: the dirty page's own layerSize hides under Per-layer values
 ];
 
@@ -423,7 +461,10 @@ const MUTANTS = [
       /* S5: the cup/curl fixtures, the S3 mechanisms again (SCOPED_CUPCURL_OFF is SCOPED_INERT's shape) */
       'SCOPED_CUPCURL:V2', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V7', 'SCOPED_CUP_CLAMPED:V2', 'SCOPED_CUP_AWAY:V2', 'SCOPED_DELTA_RANGE:V2', 'SCOPED_CURL_INERT:V2',
       /* S6: the ring fixtures, the same mechanisms (RING_INERT is SCOPED_INERT's shape) */
-      'RING_OWNED:V2', 'RING_ONLY:V2', 'RING_GROWS:V2', 'RING_PAST:V2', 'RING_INERT:V2', 'RING_INERT:V3', 'RING_INERT:V7'],
+      'RING_OWNED:V2', 'RING_ONLY:V2', 'RING_GROWS:V2', 'RING_PAST:V2', 'RING_INERT:V2', 'RING_INERT:V3', 'RING_INERT:V7',
+      /* PR 2: the count fixtures, the same mechanisms (COUNT_INERT is SCOPED_INERT's
+         shape; FAN / CONTINUOUS already fire V2 / V3 / V7) */
+      'COUNT_OWNED:V2', 'COUNT_ONLY:V2', 'COUNT_PAST:V2', 'COUNT_OFFGRID:V2', 'COUNT_INERT:V2', 'COUNT_INERT:V3', 'COUNT_INERT:V7'],
   },
   {
     id: 'the-scopes-survive-a-new-design', file: 'bloom.js',
@@ -438,7 +479,12 @@ const MUTANTS = [
       'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL:V7', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_CUP_AWAY:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4',
       /* S6: V4 on every ring fixture; V7 where the file's layers are not [1]; V9 wherever the
          file's ring is replaced by the leftover entry, which owns none (RING_INERT builds no layer) */
-      'RING_OWNED:V4', 'RING_OWNED:V7', 'RING_OWNED:V9', 'RING_ONLY:V4', 'RING_ONLY:V9', 'RING_GROWS:V4', 'RING_GROWS:V7', 'RING_GROWS:V9', 'RING_PAST:V4', 'RING_PAST:V9', 'RING_INERT:V4'],
+      'RING_OWNED:V4', 'RING_OWNED:V7', 'RING_OWNED:V9', 'RING_ONLY:V4', 'RING_ONLY:V9', 'RING_GROWS:V4', 'RING_GROWS:V7', 'RING_GROWS:V9', 'RING_PAST:V4', 'RING_PAST:V9', 'RING_INERT:V4',
+      /* PR 2: the count fixtures as the ring ones — V4 on every one; V7 on COUNT_OWNED
+         (layers [0, 1]); V10 wherever the file's count is replaced by the leftover,
+         which owns none (the three inert ones build no live layer) */
+      'COUNT_OWNED:V4', 'COUNT_OWNED:V7', 'COUNT_OWNED:V10', 'COUNT_ONLY:V4', 'COUNT_ONLY:V10', 'COUNT_PAST:V4', 'COUNT_PAST:V10', 'COUNT_OFFGRID:V4', 'COUNT_OFFGRID:V10',
+      'COUNT_INERT:V4', 'COUNT_FAN:V4', 'COUNT_CONTINUOUS:V4'],
   },
   {
     /* S3: the page MERGES the leftover scope into the file's — the plausible
@@ -455,7 +501,10 @@ const MUTANTS = [
       'SCOPED_CUPCURL:V4', 'SCOPED_CUPCURL_OFF:V4', 'SCOPED_CUP_CLAMPED:V4', 'SCOPED_CUP_AWAY:V4', 'SCOPED_DELTA_RANGE:V4', 'SCOPED_CURL_INERT:V4',
       /* S6: V4 on every ring fixture; V7 on RING_GROWS, whose own layers are [0]. No V9: the
          merged leftover owns no ring, and every ring the file names is still built */
-      'RING_OWNED:V4', 'RING_ONLY:V4', 'RING_GROWS:V4', 'RING_GROWS:V7', 'RING_PAST:V4', 'RING_INERT:V4'],
+      'RING_OWNED:V4', 'RING_ONLY:V4', 'RING_GROWS:V4', 'RING_GROWS:V7', 'RING_PAST:V4', 'RING_INERT:V4',
+      /* PR 2: V4 on every count fixture (each names layer 1, or [0, 1]). No V10: the
+         merged leftover owns no count, and every count the file names is still built */
+      'COUNT_OWNED:V4', 'COUNT_ONLY:V4', 'COUNT_PAST:V4', 'COUNT_OFFGRID:V4', 'COUNT_INERT:V4', 'COUNT_FAN:V4', 'COUNT_CONTINUOUS:V4'],
   },
   {
     id: 'hidden-controls-are-applied', file: 'bloom-file.js',
@@ -463,7 +512,10 @@ const MUTANTS = [
     breaks: ['HIDDEN_CONTROL:V1', 'HIDDEN_CONTROL:V2', 'HIDDEN_CONTROL:V5', 'HIDDEN_OPTION:V1', 'HIDDEN_OPTION:V2', 'HIDDEN_OPTION:V5',
       /* S4: the two outline negative controls rest on THIS rule — a curve with
          the mode off, lobes/fringe under CURVE (V3 stays: the page still hides them) */
-      'OUTLINE_MODE_OFF:V1', 'OUTLINE_MODE_OFF:V2', 'OUTLINE_MODE_OFF:V5', 'LOBES_UNDER_CURVE:V1', 'LOBES_UNDER_CURVE:V2', 'LOBES_UNDER_CURVE:V5'],
+      'OUTLINE_MODE_OFF:V1', 'OUTLINE_MODE_OFF:V2', 'OUTLINE_MODE_OFF:V5', 'LOBES_UNDER_CURVE:V1', 'LOBES_UNDER_CURVE:V2', 'LOBES_UNDER_CURVE:V5',
+      /* PR 2: the FAN / CONTINUOUS count negative controls rest on it too (the hidden
+         Petals / Per-layer switch is applied). V7 stays: no live layer either way */
+      'COUNT_FAN:V1', 'COUNT_FAN:V2', 'COUNT_FAN:V5', 'COUNT_CONTINUOUS:V1', 'COUNT_CONTINUOUS:V2', 'COUNT_CONTINUOUS:V5'],
   },
   {
     id: 'a-reader-note-is-dropped', file: 'bloom-file.js',
@@ -471,7 +523,11 @@ const MUTANTS = [
     breaks: ['OUT_OF_RANGE:V1', 'OUT_OF_RANGE:V5', 'UNKNOWN_FIELD:V1', 'UNKNOWN_FIELD:V5', 'OFF_STEP:V1', 'OFF_STEP:V5', 'SIDECAR_INSIDE:V1', 'SIDECAR_INSIDE:V5',
       /* S6: the reader's clamp note on a ring past the range — with it gone the file passes
          every clause, and only W2 (pure, from the file) still says so */
-      'RING_PAST:V1', 'RING_PAST:V5'],
+      'RING_PAST:V1', 'RING_PAST:V5',
+      /* PR 2: the reader's SNAP note on a count past the range or off the grid —
+         the same: only W2 (from the file) still says so; V10 holds (the build
+         snapped exactly as the file's number restated) */
+      'COUNT_PAST:V1', 'COUNT_PAST:V5', 'COUNT_OFFGRID:V1', 'COUNT_OFFGRID:V5'],
   },
   {
     id: 'the-subset-is-composed-over-the-page', file: 'bloom.js',
@@ -495,7 +551,11 @@ const MUTANTS = [
       'SCOPED_CURL_INERT:V1', 'SCOPED_CURL_INERT:V2', 'SCOPED_CURL_INERT:V5', 'SCOPED_CUPCURL_OFF:V1', 'SCOPED_CUPCURL_OFF:V2', 'SCOPED_CUPCURL_OFF:V3', 'SCOPED_CUPCURL_OFF:V5', 'SCOPED_CUPCURL_OFF:V7',
       /* S6: the ring fixtures as the scoped ones (RING_PAST's V1/V5 already fire); RING_INERT as SCOPED_INERT */
       'RING_OWNED:V1', 'RING_OWNED:V2', 'RING_OWNED:V5', 'RING_ONLY:V1', 'RING_ONLY:V2', 'RING_ONLY:V5', 'RING_GROWS:V1', 'RING_GROWS:V2', 'RING_GROWS:V5', 'RING_PAST:V2',
-      'RING_INERT:V1', 'RING_INERT:V2', 'RING_INERT:V3', 'RING_INERT:V5', 'RING_INERT:V7'],
+      'RING_INERT:V1', 'RING_INERT:V2', 'RING_INERT:V3', 'RING_INERT:V5', 'RING_INERT:V7',
+      /* PR 2: the count fixtures as the ring ones (PAST / OFFGRID's V1/V5 already fire);
+         COUNT_INERT as SCOPED_INERT; FAN / CONTINUOUS already fire V1 V2 V3 V5 V7 */
+      'COUNT_OWNED:V1', 'COUNT_OWNED:V2', 'COUNT_OWNED:V5', 'COUNT_ONLY:V1', 'COUNT_ONLY:V2', 'COUNT_ONLY:V5', 'COUNT_PAST:V2', 'COUNT_OFFGRID:V2',
+      'COUNT_INERT:V1', 'COUNT_INERT:V2', 'COUNT_INERT:V3', 'COUNT_INERT:V5', 'COUNT_INERT:V7'],
   },
   {
     /* S6 (schema v5): the page builds WITHOUT the layer rings it holds — the
@@ -507,6 +567,17 @@ const MUTANTS = [
     from: '  return { layers, petals, tiers, strands, bounds: scopeBounds() };',
     to: "  return { layers: layers.map((e) => (e.values && 'layerRing' in e.values ? { ...e, values: Object.fromEntries(Object.entries(e.values).filter(([k]) => k !== 'layerRing')) } : e)), petals, tiers, strands, bounds: scopeBounds() };",
     breaks: ['RING_OWNED:V9', 'RING_ONLY:V7', 'RING_ONLY:V9', 'RING_GROWS:V7', 'RING_GROWS:V9', 'RING_PAST:V7', 'RING_PAST:V9'],
+  },
+  {
+    /* PR 2 (schema v6): the page builds WITHOUT the layer petal counts it holds
+       — the reader keeps them (V4 sees the file's scopes on the page) and every
+       whorl takes the global count. Only V10 reads footRing()'s record and the
+       emitted azimuths; a count-only entry is left with no value at all, so its
+       layer stops reaching the build (V7) too. */
+    id: 'the-build-drops-the-layer-count', file: 'bloom-file.js',
+    from: '  return { layers, petals, tiers, strands, bounds: scopeBounds() };',
+    to: "  return { layers: layers.map((e) => (e.values && 'layerPetalCount' in e.values ? { ...e, values: Object.fromEntries(Object.entries(e.values).filter(([k]) => k !== 'layerPetalCount')) } : e)), petals, tiers, strands, bounds: scopeBounds() };",
+    breaks: ['COUNT_OWNED:V10', 'COUNT_ONLY:V7', 'COUNT_ONLY:V10', 'COUNT_PAST:V7', 'COUNT_PAST:V10', 'COUNT_OFFGRID:V7', 'COUNT_OFFGRID:V10'],
   },
 ];
 
@@ -534,7 +605,9 @@ async function validate(page, port, text, name, dirtyOver = null) {
     await settleBuild(page, 120000);
     const after = await page.evaluate(([ids]) => ({
       ui: window.__bloomUIState(), scopes: window.__bloomDesign.scopes(), built: (window.__bloomMetrics() || {}).scopes || null,
-      rings: ((window.__bloomMetrics() || {}).rings || []).map((r) => ({ index: r.index, ownRing: r.ownRing || null })),
+      rings: ((window.__bloomMetrics() || {}).rings || []).map((r) => ({ index: r.index, ownRing: r.ownRing || null, ownCount: r.ownCount || null, whorlCount: r.whorlCount ?? null })),
+      emitted: ((window.__bloomMetrics() || {}).slotAzimuths || []).map((row) => (row || []).filter((a) => typeof a === 'number').length),
+      globalCount: Math.round(Number((window.__bloomUIState() || {}).petalCount)),
       status: document.getElementById('designStatus').textContent,
       readout: (document.getElementById('readout') || {}).textContent || '',
       hidden: ids.filter((id) => { const el = document.getElementById(id); const w = el && el.closest('.bl-ctrl'); return !w || w.hidden; }),
@@ -585,6 +658,27 @@ async function validate(page, port, text, name, dirtyOver = null) {
       }
       for (const r of after.rings) if (r.ownRing && !asked.has(r.index)) bad9.push(`layer ${r.index}: footRing() built an owned ring ${r.ownRing.built} the file does not name`);
       if (bad9.length) fired.V9 = `the ring the build placed is not the file's: ${bad9.join('; ')}`;
+      /* V10 (schema v6): every count the file names on a live layer is the count
+         footRing() BUILT (asked = the file's, built = rounded and clamped to
+         LAYER_PETAL_COUNT_RANGE, imported into Node), its whorl's `whorlCount`,
+         and the number of azimuths the whorl EMITTED (`slotAzimuths`, the
+         builder's own record — a second owner). Conversely, no count is owned
+         the file does not name, and an uncounted whorl emits the global. */
+      const askedN = new Map();
+      for (const e of (obj && obj.overrides && Array.isArray(obj.overrides.layers) ? obj.overrides.layers : [])) {
+        if (e && e.values && LAYER_SCHEMA.count.some((k) => k in e.values)) askedN.set(e.layer, e.values.layerPetalCount);
+      }
+      const [nlo, nhi] = G.LAYER_PETAL_COUNT_RANGE;
+      const bad10 = [];
+      for (const r of after.rings) {
+        const v = askedN.has(r.index) ? askedN.get(r.index) : null;
+        const want = v === null ? after.globalCount : Math.min(nhi, Math.max(nlo, Math.round(v)));
+        if (v !== null && (!r.ownCount || r.ownCount.asked !== v || r.ownCount.built !== want)) bad10.push(`layer ${r.index}: the file asks ${v} (built ${want}), footRing() ${r.ownCount ? `asked ${r.ownCount.asked}, built ${r.ownCount.built}` : 'owns no count — the global was built'}`);
+        if (v === null && r.ownCount) bad10.push(`layer ${r.index}: footRing() built an owned count ${r.ownCount.built} the file does not name`);
+        if (r.whorlCount !== want) bad10.push(`layer ${r.index}: whorlCount ${r.whorlCount}, want ${want}`);
+        if (after.emitted[r.index] !== undefined && after.emitted[r.index] !== want) bad10.push(`layer ${r.index}: the whorl emitted ${after.emitted[r.index]} azimuths, want ${want}`);
+      }
+      if (bad10.length) fired.V10 = `the petal count the build laid is not the file's: ${bad10.join('; ')}`;
     }
     /* TOLD (schema v4, S5) — what the page's READ-OUT says it clamped, which no
        reader note carries: the fold clamp on the section (CUP CLAMPED) and on

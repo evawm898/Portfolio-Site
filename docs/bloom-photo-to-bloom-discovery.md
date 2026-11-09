@@ -2408,7 +2408,7 @@ is the export contract's overlap, and spreads the nearest feet further apart.
 
 ### 17.6 §12's ranking, revised after S6
 
-1. **A petal count per whorl.** (was #2 — the water lily's 4 long outer and ~10 short inner petals; the largest visible miss now)
+1. **A petal count per whorl.** (was #2 — the water lily's 4 long outer and ~10 short inner petals; the largest visible miss now) **[Nov 9: CLOSED by §19 and S7 — §20.7 is the current ranking.]**
 2. **The outer whorls' splay.** (new) The lotus's whole-flower h:w is 0.655 against 1.16 while the body is at 1.413: the outer
    boats and L1 open too wide. It is read with per-layer tilt and spine, already on the schema, so it is a reading miss to
    look at, not a mechanism.
@@ -2811,3 +2811,161 @@ node tools/shot-bloom-layer-count.mjs docs/img/layer-petal-count.png --base <wor
 ```
 
 ![A layer's own petal count — main against this PR at the default, and the lotus and water lily with owned counts](img/layer-petal-count.png)
+
+## 20. S7 — a layer's own petal count on the photos (schema v6, Nov 9)
+
+#1 on §17.6's ranking was the petal count per whorl. §19 shipped it on the bloom (option A); this stage lets a photo
+write it. **No bloom page code changed** (`bloom*.js`, `bloom.html`, `bloom.css` are `main`'s at `ec28c25`).
+
+| file | what |
+|---|---|
+| `docs/photo-to-bloom/eva-set/lotus/lotus-v12.*` | v11 + each whorl's own count, 4 / 5 / 5 / 3 |
+| `docs/photo-to-bloom/eva-set/waterlily/waterlily-v8.*` | v7 + each whorl's own count, 4 / 8 |
+| `tools/bloom-photo-census.mjs` | schema v6: `LAYER_SCHEMA.count` (the `notYet` placeholder §19 left is gone) |
+| `tools/verify-bloom-photo-subset.mjs` | V10, W2 on a count, seven fixtures (39 in all), the page mutant `the-build-drops-the-layer-count` |
+| `tools/bloom-photo-s2.mjs` | the body measure reads each whorl's own count; captions show a layer's `n` and an added field as `none→` |
+| `docs/img/photo-to-bloom-s7.png` | the sheet (placeholders for the photos) |
+
+### 20.1 The photos — crops of the §18 sheet
+
+The full photos were not re-attached. Eva sent the §18 options sheet, whose left column carries them at about 150 px a
+cell, and ruled (Nov 9): **go ahead with the crops.** The four cells (lotus and water lily, front and side) were cropped
+and enlarged 5× in the session's scratchpad; **none committed**. Every count read from them says so in its sidecar
+`reading`, and the confidences are set for a thumbnail, not a photo.
+
+### 20.2 Schema v6 — a layer's own petal count
+
+- `LAYER_SCHEMA.count = ['layerPetalCount']`: `values.layerPetalCount` on a layer entry, an integer 3–40 that REPLACES
+  the global Petals for that whorl (a value, never an offset).
+- Checked at module load with `ring` against the geometry's `SCOPE_LAYER_VALUE_IDS`, both ways. The `notYet` row §19
+  carried to keep that check exact is gone.
+- **The `Layer petals` CONTROL stays class d** (a view of the picked layer); a photo writes the count on the layer entry.
+
+### 20.3 The validator
+
+- **W1** no longer fires on `values.layerPetalCount`.
+- **V10 (a clause):** every count the file names on a live layer is the count footRing() BUILT (`rings[i].ownCount`:
+  asked = the file's number, built = it rounded and clamped to `LAYER_PETAL_COUNT_RANGE`); the ring's `whorlCount` is that
+  count; and the whorl EMITTED that many azimuths (`slotAzimuths`, the builder's own record, a second owner beside
+  footRing()'s). Conversely no count is owned that the file does not name, and an uncounted whorl emits the global.
+- **W2** also: a count off the integer grid or past 3–40 (the build snaps it; the reader tells it as V1 / V5).
+
+**Seven fixtures**, `--self` 39 of 39 plus the two exit-code legs, each loaded onto the DIRTY page. The three negative
+controls Eva's brief names are `COUNT_INERT`, `COUNT_FAN` and `COUNT_CONTINUOUS`:
+
+| fixture | what | fires | warns |
+|---|---|---|---|
+| `COUNT_OWNED` | layers 0 and 1 own 6 and 9, beside tilt offsets | — | — |
+| `COUNT_ONLY` | an entry that owns only a count | — | — |
+| `COUNT_INERT` | a count with Per-layer values OFF | **V7** | — |
+| `COUNT_FAN` | a count on a FAN (Per-layer values hidden; the global Petals hidden too) | **V1 V2 V3 V5 V7** | — |
+| `COUNT_CONTINUOUS` | a count under CONTINUOUS (the Per-layer switch itself hidden) | **V1 V2 V3 V5 V7** | — |
+| `COUNT_PAST` | 44, past the range (built 40) | **V1 V5** | W2 |
+| `COUNT_OFFGRID` | 7.5 (built 8) | **V1 V5** | W2 |
+
+- On FAN and CONTINUOUS the file's own controls are hidden too, so the hidden rule talks (V1 / V5 / V2 / V3) beside the
+  inert count (V7). **V10 never fires on an inert count**: there is no live layer for it to reach.
+
+**The negative control: all eight page mutants and all three validator mutants behave**, each run alone against a saved
+base, and the five whose lists widened run again after widening.
+
+- **`the-build-drops-the-layer-count` (new):** the page keeps the counts in its scopes and builds every whorl at the
+  global. V4 cannot see it. It moves V10 on every live count fixture, and V7 on the three count-only ones.
+- **The existing mutants widen to the count fixtures by the ring fixtures' own mechanisms** (§17.2), measured, never
+  guessed: V4 on every count fixture where the leftover scope survives or is merged; V10 where the leftover REPLACES the
+  file's count (it owns none); V1 / V5 on `COUNT_PAST` / `COUNT_OFFGRID` when the reader's snap note is dropped (only W2
+  still says so); and on `hidden-controls-are-applied`, V1 / V2 / V5 on FAN and CONTINUOUS (V7 stays: no live layer
+  either way).
+
+### 20.4 The versions
+
+**The daisy stays at v7.** Its two ray tiers carry one count (the global 13 — §18.3); nothing per-whorl to write.
+
+| | layer | v11 / v7 | v12 / v8 (read from the crops) | confidence |
+|---|---|---|---|---|
+| **lotus** | L0, the outer boats | 5 (global) | **4**: four splayed boats in the front, two either side in the side | medium |
+| | L1, the bud's wrap | 5 | **5**: the wrap reads as a pentagon | low |
+| | L2 | 5 | **5**: the next ring of tips, about five | low |
+| | L3, the core | 5 | **3**: about three tips at the centre | low |
+| **water lily** | L0 | 8 (global) | **4**: four long violet petals on the axes, between the four sepals | medium |
+| | L1 | 8 | **8**: eight shorter petals, one either side of each long one | medium |
+
+- **The water lily was re-counted, not assumed:** §18's prototype used 4 / 10; the crop shows twelve petals, 4 + 8.
+  Under the inactive-phase ruling (§19.5) the inner whorl starts half its own pitch over — 22.5° past the long petals —
+  which puts one short petal either side of each long one, as in the photo. The four sepals read the OUTER count (4) and
+  interleave on the diagonals, as in the photo.
+- **The lotus counts all four whorls**, the two that equal the global (5) included, so the sidecar carries a reading for
+  every whorl. Equal-to-the-global owned counts build the same bloom as the global.
+- **No render iteration (no v13).** v12's body sits at 1.492 against the photo's ≈ 1.45 — within the reading's own
+  resolution, as v11 sat below it. What the render still misses is the outer whorls' splay (L1 opens with L0), §17.6's
+  #2, which is per-layer tilt / spine, not count; an iteration here would be tuning a stage it does not belong to.
+- **The validator reads lotus v12 and water lily v8 PASS, 0 notes, 0 warnings**; the lotus is told `CUP CLAMPED` (the nib,
+  as every lotus since v6). Sidecars: 26 versions PASS (`--check`).
+
+### 20.5 Measured (EXPORT mesh)
+
+| | whorl counts | triangles | closed body h : w | whole h : w | within-shell pairs | cross-shell pairs | layer phase inactive |
+|---|---|---|---|---|---|---|---|
+| **lotus photo** | — | — | **≈ 1.45** | 1.16 | | | |
+| lotus v11 | 5 / 5 / 5 / 5 | 61,432 | 1.413 | 0.655 | **0** | 39,921 | — |
+| lotus v12 | 4 / 5 / 5 / 3 | 52,246 | **1.492** | 0.681 | **0** | 27,848 | L0/L1, L2/L3 |
+| water lily v7 | 8 / 8 | 106,232 | 0.665 | 0.352 | **0** | 40,515 | — |
+| water lily v8 | 4 / 8 | 93,984 | 0.704 | 0.364 | **0** | 47,152 | L0/L1 |
+
+- **No fold on either version.** v11's 39,921 cross-shell pairs reproduce §17.5's figure exactly, so the instrument is
+  the same.
+- **The lotus body narrows (31.6 → 29.9 mm) because the feet are fewer**: the area rule places R0 from the feet (§19.2),
+  so four outer and three core petals pull every ring in.
+
+### 20.6 Found — the sheet's body measure assumed equal whorls
+
+`bloom-photo-s2.mjs` gave each petal its layer as `index / (petals / rings)`, true only while every whorl has the same
+count. Under owned counts it mislabels petals across the body boundary. It reads footRing()'s own `whorlCounts` now (when
+they tile the petal list), and the equal split otherwise — **every earlier version measures exactly as before** (lotus v11
+1.413).
+
+### 20.7 §12's ranking, revised after S7
+
+1. **The outer whorls' splay.** (was #2) The lotus's whole-flower h:w is 0.681 against 1.16: L1 opens with the outer boats
+   where the photo's wraps the bud. Read with per-layer tilt and spine, already on the schema — a reading miss to look at.
+2. **Disc florets.** (unchanged)
+3. **The sepals' cup.** (unchanged)
+4. **Petal irregularity.** (unchanged)
+5. **Imbrication, tip features under the floor, strap stamens.** (unchanged — the water lily's petaloid stamens are here)
+6. **Colour.** (unchanged)
+
+**The petal count per whorl (S6's #1) is CLOSED by §19 and this stage:** the water lily now reads as the photo's star
+(4 long, 4 sepals, 8 short), and the lotus's outer whorl is four. Breadth per whorl was already ownable (`petalWidth` as a
+layer offset). **Open on the count, recorded:** a Nymphaea carries more petals in a spiral than a crop shows; the stage
+counts what is visible.
+
+### 20.8 For Eva's ruling
+
+- Does the count stage pass on the sheet (lotus v12, water lily v8)?
+- Lotus v12's body overshoots slightly (1.492 against ≈ 1.45) where v11 undershot (1.413). Accept, or one ring
+  iteration (v13)?
+- The counts were read from 150 px crops. Re-read them if the full photos come back?
+
+### 20.9 Reproduce
+
+```bash
+node tools/bloom-photo-census.mjs
+```
+
+```bash
+node tools/verify-bloom-photo-subset.mjs --self
+```
+
+```bash
+node tools/verify-bloom-photo-subset.mjs --negative-control --mutant=the-build-drops-the-layer-count
+```
+
+```bash
+node tools/bloom-photo-s2.mjs --check
+```
+
+```bash
+node tools/bloom-photo-s2.mjs /tmp/s7 --versions lotus:v11,lotus:v12,waterlily:v7,waterlily:v8,daisy:v7 --title "Photo to bloom S7 — a layer's own petal count (schema v6). Lotus v12 and water lily v8 count each whorl from the photos (read from crops of the §18 sheet); the daisy stays at v7. Loaded AS A NEW DESIGN, zero notes; PRINT PREVIEW on." --subtitle "lotus v11 / water lily v7 = the previous stage; v12 / v8 = + each whorl's own petal count (lotus 4/5/5/3, water lily 4/8). Cameras match the photo angles. No pixel delta is quoted." --sheet-bare docs/img/photo-to-bloom-s7.png
+```
+
+![S7 — a layer's own petal count](img/photo-to-bloom-s7.png)
