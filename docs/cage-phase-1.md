@@ -266,10 +266,14 @@ Every element is /frame's own code, called as it ships (frame charter §15):
   a laurel run's pitch inside [`LEAF_RUN_PITCH_MIN`, `LEAF_RUN_PITCH_MAX`] = ½–¾ of a leaf, each base
   stacked a crown over the previous tip (frame's own lift law).
 
-Nothing in frame-*.js moved. **Note for the gate's path filter:** `cage-gate.yml` names frame-relief,
-frame-geometry and frame-registry but not frame-pattern or frame-filigree, which the cage now imports, so
-a change to either of those alone runs no cage gate. Adding them is a workflow edit, left for a session
-that can pay its frozen-tag cost (CLAUDE.md, "editing an existing workflow file costs frozen tags").
+Nothing in frame-*.js moved. **`cage-gate.yml` now names frame-pattern.js and frame-filigree.js** in its
+path filter (the cage imports both), and the geometry job's limit rose 20 → 45 min: the 48 cages and
+23 mutants made the negative control ~25 min, and the first CI run on this branch was cancelled at the
+old limit. **This is an edit to an existing workflow file**, so a frozen tag dispatched after this merges
+from a base that predates it will be refused (CLAUDE.md's rule of thumb). Every registered phase was
+published before this change (through phase95), so none is owed today. The gate's own per-part
+closedness check was also made ~3× faster (vertices keyed by position once, edges packed as numbers),
+which took the local gate from 86 s to 59 s with the same answer.
 
 ### 8.2 The mapping — the cone segment, through the ring
 

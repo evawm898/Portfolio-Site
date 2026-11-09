@@ -39,15 +39,18 @@ const { curveFunction } = await import(path.join(ROOT, 'bloom-curve.js'));
 
 /* ---- instruments that read the artefact and share no code with the builder ---- */
 function partClosed(mesh, q) {
-  // every edge of the part's triangles carried by exactly two of them, in opposite directions
-  const I = mesh.indices, P = mesh.positions, key = (i) => `${P[3 * i]},${P[3 * i + 1]},${P[3 * i + 2]}`;
-  const dir = new Map();
+  // every edge of the part's triangles carried by exactly two of them, in opposite directions. Vertices are
+  // matched by POSITION (two indices at one point are one vertex), keyed once per vertex rather than once per
+  // triangle corner, and an edge is a packed number rather than a string — the same test, a third of the time
+  const I = mesh.indices, P = mesh.positions, canon = new Map(), id = new Map();
+  const cid = (i) => { let c = id.get(i); if (c === undefined) { const k = `${P[3 * i]},${P[3 * i + 1]},${P[3 * i + 2]}`; c = canon.get(k); if (c === undefined) { c = canon.size; canon.set(k, c); } id.set(i, c); } return c; };
+  const B = 2 ** 22, dir = new Map();
   for (let t = q.t0; t < q.t1; t++) {
-    const v = [I[3 * t], I[3 * t + 1], I[3 * t + 2]].map(key);
-    for (let k = 0; k < 3; k++) { const e = `${v[k]}|${v[(k + 1) % 3]}`; dir.set(e, (dir.get(e) || 0) + 1); }
+    const v = [cid(I[3 * t]), cid(I[3 * t + 1]), cid(I[3 * t + 2])];
+    for (let k = 0; k < 3; k++) { const e = v[k] * B + v[(k + 1) % 3]; dir.set(e, (dir.get(e) || 0) + 1); }
   }
   let bad = 0;
-  for (const [e, n] of dir) { const [a, b] = e.split('|'); if (n !== 1 || dir.get(`${b}|${a}`) !== 1) bad++; }
+  for (const [e, n] of dir) { const a = Math.floor(e / B), b = e - a * B; if (n !== 1 || dir.get(b * B + a) !== 1) bad++; }
   return bad;
 }
 function voxelRegions(mesh, cell) {
