@@ -1151,12 +1151,12 @@ const MUTANTS = [
   { id: 'the-seam-is-not-closed', file: 'pattern', from: 'const usable = path.closedPair ? path.L : path.L - endClear;', to: 'const usable = path.closedPair ? path.L - 0.7 * pitch : path.L - endClear;', breaks: ['PT2', 'PT4', 'PT5'] },   // a closed run stops short of the seam: the gap there is 1.4 pitches
   // phase 3e step 3 — the placed elements and the vine (PL / VN). Each one a
   // failure the brief named; each claims what it must redden
-  { id: 'an-element-floats-off-its-stem', file: 'vine', from: 'curves: it.curves || [], el: it.el || null };', to: 'curves: it.curves || [], el: it.el ? { ...it.el, positions: it.el.positions.map((v, k) => (k % 3 === 1 && v !== 0 ? v + 0 : k % 3 === 0 ? v + 4 : v)), loops: it.el.loops.map((l) => l.map(([x, y]) => [x + 4, y])) } : null };', breaks: [] },
-  { id: 'the-weight-is-a-constant', file: 'vine', from: 'export function weightAt(x, L, Aa, Ab) {', to: 'export function weightAt(x, L, Aa, Ab) {\n  return 0.5;', breaks: [] },
-  { id: 'a-heavy-element-mid-run', file: 'vine', from: "let el = placeElement('bud', {", to: "let el = placeElement('rose', {", breaks: [] },
-  { id: 'the-element-mirror-is-broken', file: 'elements', from: '  for (let k = 0; k < P.length; k += 3) P[k] = -P[k];', to: '  for (let k = 0; k < P.length; k += 3) P[k] = 0.02 - P[k];', breaks: [] },
-  { id: 'the-axis-motif-is-not-its-own-mirror', file: 'filigree', from: '  if (onAxis) { el = symmetrizeElement(el); if (el.asymmetric) return null; }', to: '', breaks: [] },
-  { id: 'the-stem-lifts-off-the-molding', file: 'vine', from: 'const finishStem = (c) => { c.lift = c.pts.map(() => 0);', to: 'const finishStem = (c) => { c.lift = c.pts.map(() => 0.5);', breaks: [] },
+  { id: 'an-element-floats-off-its-stem', file: 'vine', from: 'curves: it.curves || [], el: it.el || null };', to: 'curves: it.curves || [], el: it.el ? { ...it.el, positions: it.el.positions.map((v, k) => (k % 3 === 1 && v !== 0 ? v + 0 : k % 3 === 0 ? v + 4 : v)), loops: it.el.loops.map((l) => l.map(([x, y]) => [x + 4, y])) } : null };', breaks: ['PL2', 'VN4'] },
+  { id: 'the-weight-is-a-constant', file: 'vine', from: 'export function weightAt(x, L, Aa, Ab) {', to: 'export function weightAt(x, L, Aa, Ab) {\n  return 0.5;', breaks: ['VN1', 'VN2'] },
+  { id: 'a-heavy-element-mid-run', file: 'vine', from: "let el = placeElement('bud', {", to: "let el = placeElement('rose', {", breaks: ['VN2'] },
+  { id: 'the-element-mirror-is-broken', file: 'elements', from: '  for (let k = 0; k < P.length; k += 3) P[k] = -P[k];', to: '  for (let k = 0; k < P.length; k += 3) P[k] = 0.02 - P[k];', breaks: ['PL2', 'PL4'] },
+  { id: 'the-axis-motif-is-not-its-own-mirror', file: 'filigree', from: '  if (onAxis) { el = symmetrizeElement(el); if (el.asymmetric) return null; }', to: '', breaks: ['PL4'] },
+  { id: 'the-stem-lifts-off-the-molding', file: 'vine', from: 'const finishStem = (c) => { c.lift = c.pts.map(() => 0);', to: 'const finishStem = (c) => { c.lift = c.pts.map(() => 0.5);', breaks: ['VN5'] },
   // RETIRED in phase 3e step 3: 'the-axis-leaf-is-off-the-axis' (the chains'
   // axis LEAF is gone — the axis motif is the palmette element, its own
   // mirror by symmetrizeElement; its successor is

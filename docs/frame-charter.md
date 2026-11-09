@@ -1410,3 +1410,88 @@ PL / VN families.
 - **A leaf's crest is aimed a hundredth over the feature** (`LEAF_CREST_MARGIN` 0.01 mm): the seat reads
   the molding's RASTER and OR9 the emitted surface, 1.4e-4 mm apart at worst (measured), and a crest
   aimed exactly at F landed that much under it on 46 leaf rows.
+
+### 17.4 Hierarchy 0 is NOT byte-identical to `main`, and cannot be with step 1 (a conflict in the brief)
+
+The brief asks for both: step 1 makes the chains' junction motifs the #479 elements, and hierarchy 0 is
+"today's chains (byte-identical to main)". Those cannot both hold — hierarchy 0 IS the chains, and step 1
+changes the chains' motifs. What hierarchy 0 keeps, measured against a worktree of `main` (`03d6ee3`) over
+five skeletons (the scratch `bytes.mjs`; main's own defaults, sides off, for the comparison):
+
+| skeleton | filigree off | groups | chains default (STL tris main → here) | chains dense |
+|---|---|---|---|---|
+| arch | identical (STL + SVG) | identical (STL + SVG) | 225,236 → 212,916; scrolls identical, leaves 25 → 12, 3 elements | 569,332 → 546,148; scrolls identical, leaves 69 → 46, 5 elements |
+| rect | identical (STL + SVG) | identical (STL + SVG) | 142,824 → 131,592; scrolls identical, leaves 23 → 10, 3 elements | 626,464 → 604,000; scrolls identical, leaves 72 → 46, 6 elements |
+| rect eared | identical (STL + SVG) | identical (STL + SVG) | 118,232 → 107,000; scrolls identical, leaves 21 → 8, 3 elements | 903,512 → 881,048; scrolls identical, leaves 124 → 98, 6 elements |
+| oval | identical (STL + SVG) | identical (STL + SVG) | 212,088 → 196,912; scrolls identical, leaves 25 → 12, 3 elements | 563,776 → 553,264; scrolls identical, leaves 52 → 36, 4 elements |
+| circle | identical (STL + SVG) | identical (STL + SVG) | 243,004 → 231,568; scrolls identical, leaves 29 → 16, 3 elements | 762,016 → 751,504; scrolls identical, leaves 90 → 74, 4 elements |
+
+**What moved and why:** the junction motifs' leaf curves (#474's palmette and rosette) are replaced by the
+placed #479 elements, so those solids are gone and the elements are added; the chain leaves that settle
+against a motif now settle against an element of a different footprint, so some land elsewhere. Every
+chain SCROLL is emitted bit-identically. Filigree off and the groups layout are byte-identical, STL and
+SVG. Reading "hierarchy 0 = main" as the chains' scrolls and runs rather than as bytes, it holds; as
+bytes it cannot, and which of the two Eva meant is ruling (a) below.
+
+### 17.5 The gates
+
+- **PL1–PL4** (placed elements, in the relief gate): base on z = 0 and every other vertex on the plate or
+  above, a proud one wholly over the molding and a sunk one's crest a feature over it; no wire grazes an
+  element; nothing in the opening; mirror symmetry to the bit, an axis element its own mirror.
+- **VN1–VN5** (the vine): the weight law restated in the gate (anchor classes, falloff, floor, the
+  hierarchy blend) against every item's weight; the classes follow the weight and a heavy element (read
+  off the emitted part) stands only at a junction; the stems are continuous (a feature short of the axis,
+  joined where runs meet, into every junction motif by the embed); every item joins its stem by the embed
+  off the emitted walls; the stem's every emitted row stands ON the highest molding under it (1e-6 mm).
+- **OR rows** now run a `· vine` (hierarchy 1) and a `· chains` (hierarchy 0) variant of every skeleton,
+  plus three hierarchy-½ rows; TB2's give-way is exercised for the vine, the chains and the groups.
+- **Six new mutants, each caught by the check it names and nothing else:**
+  `an-element-floats-off-its-stem` (PL2, VN4), `the-weight-is-a-constant` (VN1, VN2),
+  `a-heavy-element-mid-run` (VN2), `the-element-mirror-is-broken` (PL2, PL4),
+  `the-axis-motif-is-not-its-own-mirror` (PL4), `the-stem-lifts-off-the-molding` (VN5).
+  `the-axis-leaf-is-off-the-axis` is retired with the chain leaf motif it mutated.
+- The relief negative control is 46 mutants; CI's shards go 12 → 16 (a shard holds at most three). That
+  is an edit to `frame.yml` — see 17.7.
+
+### 17.6 Numbers (relief, Node, this tree)
+
+Relief triangles (export), every row boundary 0 and one voxel region; builds 0.7–3.9 s in Node:
+
+| skeleton | default (h 1) | dense (h 1) | h ½ | h 0 (chains) |
+|---|---|---|---|---|
+| arch | 383,044 | 423,492 | 355,260 | 344,876 |
+| rectangle (mitre) | 398,600 | 554,608 | 361,584 | 344,696 |
+| rectangle notched | 380,192 | 475,000 | 344,536 | 345,856 |
+| rectangle eared | 554,536 | 567,480 | 473,504 | 307,728 |
+| oval | 261,056 | 526,808 | 304,496 | 196,912 |
+| circle | 289,136 | 580,664 | 316,592 | 231,568 |
+
+The heaviest state per skeleton: arch 423,492 (dense), rectangle 567,480 (eared, dense), oval 580,664
+(circle, dense) — 39 % of the 1.5 M budget at most; the vine's give-way never fires at the shipped budget on any measured row.
+Off the emitted mesh, over every vine row of the relief gate: **thinnest wire 1.0000 mm, smallest gap
+1.1099 mm, root embeds 2.093–6.476 mm, stem seat depth 0.0000 mm** (every row ON the molding), items'
+least joint with their stem 1.033 mm, least motif joint 4.828 mm.
+
+### 17.7 Decisions made without a ruling, and what is Eva's
+
+Decisions:
+42. The engraving (SVG) draws each placed element's footprint outline; its relief is the STL's.
+43. The weight's anchor amplitudes, falloff (0.55 L) and floor (0.15) and the class thresholds are
+    this session's numbers, chosen so the default arch reads crest > springing > mid-jamb on the sheet.
+44. The rose (not the shell) is the heavy motif at a corner / springing / oval side; the shell takes
+    the bottom centre.
+45. A sunk rosette stands ON the stem at a zero crossing (medium weight); buds and leaves at the
+    extrema.
+46. Items grow forward (away from the crest) into the bay the stem bends around.
+47. A stem that a run's inward turn loops is cut and rounded (told), not refused.
+48. `frame.yml`'s relief mutant shards 12 → 16, and its path filters gain `frame-vine.js` and the
+    sheet tool. **This edits an existing workflow file**, which costs
+    a frozen tag dispatched afterwards from a base predating the edit (CLAUDE.md's frozen-tag rule) — no
+    frame phase registers a frozen tag, so nothing is owed here, but the rule is the repo's and is said.
+
+Rulings pending (the sheet):
+- (a) Hierarchy 0: is "today's chains" the chains' law (holds) or main's bytes (cannot, with step 1)?
+- (b) The default look: the weight field's peaks and the item mix at hierarchy 1 and ½.
+- (c) The heavy corner rose stands past the band's outer edge on the rectangle and the oval (its size
+    follows the molding width × weight); keep, or cap it to the band?
+- (d) Mid-run is sparse on a long run (sprigs and buds a half wave apart) — denser, or as is?

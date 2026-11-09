@@ -435,7 +435,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
         if (cv.kind === 'tendril' && selfGap(cv).gap < Fm) return why(`self gap ${selfGap(cv).gap.toFixed(2)}`);
         if (!bandOK(cv)) return why(`band: opening ${cv.pts.some((q) => opening(q))} slit ${slitWorst(cv, near(cv))}`);
         if (wireClear(cv, stem) > -E + 1e-9) return why(`${cv.kind} not on its stem (${(-wireClear(cv, stem)).toFixed(2)} mm of overlap)`);   // a joint, not merely no graze (joinsCleanly passes a wire that never touches)
-        if (!joinsCleanly(cv, stem)) return why(`${cv.kind} not joined to stem`); }
+        if (!joinsCleanly(cv, stem)) return why(`${cv.kind} not joined to stem`);
         const mates = [cv, mirrorCurve(cv)];
         if (clearOf(mates[0], mates[1]) < Fm) return why('own mirror');
         for (const m of mates) {
