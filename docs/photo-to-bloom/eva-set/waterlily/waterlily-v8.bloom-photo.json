@@ -1,0 +1,415 @@
+{
+  "format": "bloom-photo",
+  "version": 1,
+  "design": "waterlily-v8.subset.bloom-design.json",
+  "designSha256": "f896abf17ceeaa0e304a6cbbf721bcb9a8b6792d66c18726d7a6ef198372e454",
+  "photos": [
+    {
+      "id": "p1",
+      "role": "face",
+      "name": "waterlily/front"
+    },
+    {
+      "id": "p2",
+      "role": "side",
+      "name": "waterlily/side"
+    }
+  ],
+  "questions": [
+    {
+      "id": "Q-profile",
+      "asked": "WATER LILY: seen from the side, is it a flat star, a shallow bowl, a deep cup, or a closed globe?",
+      "answer": "Flat star",
+      "resolves": [
+        "petalTilt",
+        "petalSpineCurl",
+        "layerTilt"
+      ],
+      "outcome": {
+        "petalTilt": "overridden by p2: 10 -> 40",
+        "petalSpineCurl": "answer kept (side photo agrees)",
+        "layerTilt": "overridden by p2: 5 -> 30"
+      }
+    }
+  ],
+  "controls": {
+    "petalCount": {
+      "value": 8,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "layerCount": {
+      "value": 2,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalWidth": {
+      "value": 9,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "petalTilt": {
+      "value": 40,
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "petalCup": {
+      "value": 0.15,
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "stamenCount": {
+      "value": 80,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "stamenLayout": {
+      "value": "DISC",
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "stamenLength": {
+      "value": 6,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "sepalCount": {
+      "value": 4,
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "sepalScale": {
+      "value": 1,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    "sepalAngle": {
+      "value": -5,
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p2"
+      ]
+    },
+    "scopeLayers": {
+      "value": "ON",
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ],
+      "note": "the per-layer stage's switch: on because the subset writes overrides.layers"
+    },
+    "petalOutlineMode": {
+      "value": "CURVE",
+      "confidence": "high",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ]
+    },
+    "petalOutlineCurve": {
+      "value": {
+        "mode": "symmetric",
+        "points": [
+          [
+            0,
+            0.08
+          ],
+          [
+            0.18,
+            0.17
+          ],
+          [
+            0.36,
+            0.205
+          ],
+          [
+            0.6,
+            0.175
+          ],
+          [
+            0.82,
+            0.1
+          ],
+          [
+            0.95,
+            0.06
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1"
+      ],
+      "note": "the sixth point raised 0.035 -> 0.06 so it clears the 0.8 mm floor on both whorls (0.06 x 35 x 9/16 = 1.18 mm; x 30 x 8/16 = 0.90 mm); the render showed nothing else to change"
+    },
+    "sepalOutlineMode": {
+      "value": "CURVE",
+      "confidence": "medium",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ],
+      "note": "the sepal controls (count, size, angle) are on the schema, so the sepal outline is (v3)"
+    },
+    "sepalOutlineCurve": {
+      "value": {
+        "mode": "symmetric",
+        "points": [
+          [
+            0,
+            0.1
+          ],
+          [
+            0.25,
+            0.25
+          ],
+          [
+            0.45,
+            0.28
+          ],
+          [
+            0.7,
+            0.22
+          ],
+          [
+            0.9,
+            0.1
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      "confidence": "low",
+      "source": "photo",
+      "question": null,
+      "photos": [
+        "p1",
+        "p2"
+      ],
+      "note": "front photo: the four sepals broader than the petals, boat-shaped, to a point"
+    }
+  },
+  "unmapped": [
+    {
+      "feature": "colour, colour pattern, veining, blotches",
+      "nearest": "nothing (violet tips over white, green-white sepals, yellow stamens)",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "petaloid, incurved stamens (yellow, strap-like, curling over the centre)",
+      "nearest": "straight round rods with pill anthers",
+      "photos": [
+        "p1",
+        "p2"
+      ]
+    },
+    {
+      "feature": "leaves, stem, sepals visible but not classifiable from this photo",
+      "nearest": "no stem (a design choice, outside the v1 schema)",
+      "photos": [
+        "p2"
+      ]
+    },
+    {
+      "feature": "petals hidden under the visible twelve",
+      "nearest": "counted 4 + 8 from the visible tips; a Nymphaea usually carries more in a spiral, which a crop cannot show",
+      "photos": [
+        "p1"
+      ]
+    }
+  ],
+  "revisedFrom": {
+    "design": "waterlily-v7.subset.bloom-design.json",
+    "why": "photo-to-bloom PR 2 (schema v6): each whorl owns the count re-counted from the photo — 4 long outer petals between the sepals, 8 shorter inner ones (v7 drew 8 + 8; §18's prototype assumed 4 + 10). Read from the §18 sheet's crops (Eva, Nov 9).",
+    "changes": {},
+    "layerChanges": [
+      {
+        "layer": 0,
+        "field": "values.layerPetalCount",
+        "from": null,
+        "to": 4
+      },
+      {
+        "layer": 1,
+        "field": "values.layerPetalCount",
+        "from": null,
+        "to": 8
+      }
+    ],
+    "notes": [
+      "L0 values.layerPetalCount 4 (the long petals between the sepals)",
+      "L1 values.layerPetalCount 8 (the short petals flanking them)"
+    ]
+  },
+  "layers": [
+    {
+      "layer": 0,
+      "whorl": "outer violet petals (between the sepals)",
+      "offsets": {
+        "petalLength": {
+          "offset": 0,
+          "value": 35,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1",
+            "p2"
+          ],
+          "reading": "the longest petals (front tips ~3.2 disc radii); kept at the anchor so the sepals (sepalScale 1) stay as long"
+        },
+        "petalTilt": {
+          "offset": -10,
+          "value": 30,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "~28-45 deg above the horizontal (side photo)"
+        },
+        "petalWidth": {
+          "offset": 0,
+          "value": 9,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "the outer petals' width (front photo); owned so its ring is R0"
+        }
+      },
+      "values": {
+        "layerPetalCount": {
+          "value": 4,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1",
+            "p2"
+          ],
+          "reading": "four long violet petals on the axes, between the four sepals (front); re-counted, not assumed (read from a ~150 px crop of the §18 sheet — the full photo was not re-attached; Eva, Nov 9: go ahead with the crops)"
+        }
+      }
+    },
+    {
+      "layer": 1,
+      "whorl": "inner violet petals",
+      "offsets": {
+        "petalLength": {
+          "offset": -5,
+          "value": 30,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1",
+            "p2"
+          ],
+          "reading": "shorter than the outer (side photo); the front photo foreshortens them"
+        },
+        "petalTilt": {
+          "offset": 25,
+          "value": 65,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p2"
+          ],
+          "reading": "fanning 45-85 deg, mean ~65 (side photo)"
+        },
+        "petalWidth": {
+          "offset": -1,
+          "value": 8,
+          "confidence": "low",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "a little narrower than the outer (front photo); owned to place the ring (the hidden layerSize cannot)"
+        }
+      },
+      "values": {
+        "layerPetalCount": {
+          "value": 8,
+          "confidence": "medium",
+          "source": "photo",
+          "question": null,
+          "photos": [
+            "p1"
+          ],
+          "reading": "eight shorter petals, one either side of each long one — at half the inner pitch past the outer, the inactive-phase ruling (§19.5) (read from a ~150 px crop of the §18 sheet — the full photo was not re-attached; Eva, Nov 9: go ahead with the crops)"
+        }
+      }
+    }
+  ]
+}

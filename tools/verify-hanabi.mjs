@@ -60,7 +60,7 @@ const MODULES = ['deck.js', 'symbols.js', 'firework.js', 'layout.js', 'export.js
 
 const MUTANTS = [
   { id: 'distribution-wrong', file: 'deck.js', from: "COPIES = { 1: 3, 2: 2, 3: 2, 4: 2, 5: 1 }", to: "COPIES = { 1: 3, 2: 2, 3: 2, 4: 2, 5: 2 }", breaks: ['H1'] },
-  { id: 'corner-drops-symbol', file: 'layout.js', from: "+ symbol(suit.symbol, (w - sym) / 2, digitH * 1.08, sym, suit.primary, halo);", to: ";", breaks: ['H2'] },
+  { id: 'corner-drops-symbol', file: 'layout.js', from: "+ symbol(suit.symbol, (w - sym) / 2, digitH * 1.08, sym, symFill, numHalo);", to: ";", breaks: ['H2', 'H14'] },
   { id: 'rank-does-not-escalate', file: 'firework.js', from: "4: { burstType: 'chrysanthemum', starCount: 18, rings: 3, size: 0.86", to: "4: { burstType: 'chrysanthemum', starCount: 12, rings: 1, size: 0.58", breaks: ['H3'] },
   { id: 'override-ignored', file: 'firework.js', from: "return over ? { ...spec, ...over } : spec;", to: "return spec;", breaks: ['H4'] },
   { id: 'crop-mark-off-trim', file: 'deck.js', from: "xs.add(+s.trimX.toFixed(6));", to: "xs.add(+(s.trimX - g.bleed).toFixed(6));", breaks: ['H6', 'B3'] },
@@ -68,12 +68,17 @@ const MUTANTS = [
   { id: 'shared-cut-keeps-inner-bleed', file: 'deck.js', from: "const l = c === 0 ? b : 0,", to: "const l = b,", breaks: ['H6'] },
   { id: 'no-halo', file: 'layout.js', from: "const halo = contrast(suit.primary, faceBg) < HALO_BELOW ? haloFor(suit.primary) : null;", to: "const halo = null;", breaks: ['H8'] },
   { id: 'centre-is-deck-wide', file: 'firework.js', from: "const c = suit.centre || {};", to: "const c = design.suits[0].centre || {};", breaks: ['H11'] },
-  { id: 'index-follows-the-centre', file: 'layout.js', from: "g.h * (INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate)", to: "g.h * (plate ? INDEX_DIGIT.small : INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate)", breaks: ['H10'] },
+  { id: 'index-follows-the-centre', file: 'layout.js', from: "g.h * (INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral)", to: "g.h * (plate ? INDEX_DIGIT.small : INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral)", breaks: ['H10'] },
   { id: 'tier-at-every-rank', file: 'firework.js', from: "tier !== 'none' && TIER_RANKS.includes(rank) ?", to: "tier !== 'none' && rank >= 1 ?", breaks: ['H12'] },
   { id: 'tier-over-the-index', file: 'layout.js', from: "const x0 = area.x + corner.w + gap, x1 = area.x + area.w - corner.w - gap;", to: "const x0 = area.x + gap, x1 = area.x + area.w - gap;", breaks: ['H12'] },
   { id: 'motif-does-not-escalate', file: 'firework.js', from: "weeping: [16, 22, 30, 38, 48],", to: "weeping: [30, 30, 30, 30, 30],", breaks: ['H3'] },
   // a tier is drawn by the same field painters, so H12 sees the escape too
   { id: 'field-escapes-its-rect', file: 'firework.js', from: "const x = rect.x + rho + rand() * (rect.w - 2 * rho),", to: "const x = rect.x + rand() * (rect.w + 2 * rho),", breaks: ['H13', 'H12'] },
+  { id: 'rainbow-symbol-ignored', file: 'layout.js', from: "numFill = numeral.fill; symFill = numeral.symFill;", to: "numFill = numeral.fill;", breaks: ['H14'] },
+  { id: 'rainbow-index-not-the-default', file: 'deck.js', from: "numeral: 'rainbow', centre: defaultCentre() },", to: "numeral: 'solid', centre: defaultCentre() },", breaks: ['H14'] },
+  { id: 'rainbow-numeral-ignored', file: 'layout.js', from: "numFill = numeral.fill; symFill", to: "numFill = suit.primary; symFill", breaks: ['H14'] },
+  { id: 'rainbow-numeral-on-every-suit', file: 'layout.js', from: "if (suit.multicolor && suit.numeral === 'rainbow') {", to: "if (design.suits.some((x) => x.numeral === 'rainbow')) {", breaks: ['H14'] },
+  { id: 'rainbow-numeral-not-saved', file: 'deck.js', from: "if (NUMERAL_FILLS[r.numeral]) s.numeral = r.numeral;", to: "if (NUMERAL_FILLS[r.numeral]) s.numeral = 'solid';", breaks: ['H9', 'H14'] },
   { id: 'v1-layout-misread', file: 'deck.js', from: "C: { index: 'band',  layout: 'bleed' },", to: "C: { index: 'band',  layout: 'single' },", breaks: ['H9'] },
 ];
 
@@ -380,6 +385,54 @@ async function partOne(dir) {
     }
     return true;
   });
+
+  check('H14', "the rainbow index: numeral and symbol through the other suits' colours, by default, on the rainbow suit only, saved", () => {
+    const d = D.defaultDesign(); d.rainbow = true;
+    const rb = D.suitById(d, 'rainbow');
+    if (rb.numeral !== 'rainbow') return `the default index fill is ${rb.numeral}, not rainbow`;
+    rb.numeral = 'solid';
+    const numeralStroke = (svg) => (svg.match(/<g class="hb-index">[\s\S]*?<path d="M[^"]*" fill="none"[^>]*stroke="([^"]+)" stroke-width="11"/) || [])[1];
+    const solid = L.renderFace(d, { kind: 'card', suitId: 'rainbow', rank: 3 }, { idPrefix: 'x' });
+    if (numeralStroke(solid) !== rb.primary || /id="x(num|sym)"/.test(solid)) return 'a solid rainbow numeral is not drawn in the suit primary';
+    if (!solid.includes(`<path d="${S.SYMBOLS[rb.symbol].d}" fill="${rb.primary}"`)) return 'a solid rainbow symbol is not drawn in the suit primary';
+    const redBefore = L.renderFace(d, { kind: 'card', suitId: 'red', rank: 3 }, { idPrefix: 'x' });
+    rb.numeral = 'rainbow';
+    for (const index of ['large', 'small']) {
+      d.index = index;
+      const svg = L.renderFace(d, { kind: 'card', suitId: 'rainbow', rank: 3 }, { idPrefix: 'x' });
+      if (numeralStroke(svg) !== 'url(#xnum)') return `${index}: the numeral is stroked ${numeralStroke(svg)}, not the gradient`;
+      const grad = (svg.match(/<linearGradient id="xnum"[\s\S]*?<\/linearGradient>/) || [])[0];
+      if (!grad) return `${index}: no numeral gradient`;
+      if (!/gradientUnits="userSpaceOnUse"/.test(grad)) return 'the gradient is in bounding-box units (a "1" has almost no width)';
+      const stops = [...grad.matchAll(/stop-color="([^"]+)"/g)].map((m) => m[1]);
+      // restated: the hued suits in hue order from red; white has no hue.
+      const want = ['#E5484D', '#F2C230', '#3DBA6B', '#3E8EF0'];
+      if (stops.join() !== want.join()) return `stops ${stops.join(' ')} — expected ${want.join(' ')}`;
+      if ((svg.match(/stroke="url\(#xnum\)"/g) || []).length !== 2) return `${index}: the gradient numeral is not in both corners`;
+      const sgrad = (svg.match(/<linearGradient id="xsym"[\s\S]*?<\/linearGradient>/) || [])[0];
+      if (!sgrad || [...sgrad.matchAll(/stop-color="([^"]+)"/g)].map((m) => m[1]).join() !== want.join()) return `${index}: the symbol has no gradient through the same colours`;
+      if ((svg.match(new RegExp(`<path d="${S.SYMBOLS[rb.symbol].d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" fill="url\\(#xsym\\)"`, 'g')) || []).length !== 2) return `${index}: the gradient symbol is not in both corners`;
+    }
+    d.index = 'large';
+    if (L.renderFace(d, { kind: 'card', suitId: 'red', rank: 3 }, { idPrefix: 'x' }) !== redBefore) return 'the rainbow numeral reached the red suit';
+    d.index = 'band';
+    if (/url\(#x(num|sym)\)/.test(L.renderFace(d, { kind: 'card', suitId: 'rainbow', rank: 3 }, { idPrefix: 'x' }))) return 'a band index drew the gradient index on the rainbow band';
+    d.index = 'large';
+    D.suitById(d, 'blue').primary = '#8E5CF0';
+    const moved = L.renderFace(d, { kind: 'card', suitId: 'rainbow', rank: 3 }, { idPrefix: 'x' });
+    if (!/stop-color="#8E5CF0"/.test(moved) || /stop-color="#3E8EF0"/.test(moved)) return 'recolouring a suit did not move the gradient';
+    D.suitById(d, 'blue').primary = '#3E8EF0';
+    D.suitById(d, 'green').primary = '#10301C';   // a stop that does not stand off the dark card
+    if (!/stroke="#FFFFFF" stroke-width="18"/.test(L.renderFace(d, { kind: 'card', suitId: 'rainbow', rank: 3 }, { idPrefix: 'x' }))) return 'a gradient with a dark stop got no halo';
+    const back = D.normaliseDesign(JSON.parse(D.serialiseDesign(d)), S.SYMBOL_IDS);
+    if (D.suitById(back.design, 'rainbow').numeral !== 'rainbow' || back.notes.length) return `the numeral fill did not round-trip: ${back.notes.join('; ')}`;
+    const odd = JSON.parse(D.serialiseDesign(d)); odd.suits.find((x) => x.id === 'rainbow').numeral = 'plaid';
+    const o = D.normaliseDesign(odd, S.SYMBOL_IDS);
+    if (D.suitById(o.design, 'rainbow').numeral !== 'rainbow' || !o.notes.some((n) => n.includes('"plaid"'))) return 'an unknown index fill loaded without a note, or not as the default';
+    const bare = JSON.parse(D.serialiseDesign(d)); bare.suits.forEach((x) => { delete x.numeral; });
+    if (D.suitById(D.normaliseDesign(bare, S.SYMBOL_IDS).design, 'rainbow').numeral !== 'rainbow') return 'a file without the field did not get the rainbow default';
+    return true;
+  });
   return res;
 }
 
@@ -465,6 +518,27 @@ async function partTwo(overrides = {}) {
       const rows = await page.$$eval('#stage .hb-group', (gs) => gs.map((g) => g.querySelectorAll('svg').length));
       await page.click('[data-view=suit]');
       return JSON.stringify(rows) === '[5,5,5]' || JSON.stringify(rows);
+    });
+
+    await check('B6', 'the rainbow suit\'s index control paints the preview (rainbow by default), and stands down under a band', async () => {
+      await page.check('#rainbow');
+      await page.selectOption('#viewSuit', 'rainbow');
+      const others = await page.$$eval('select[data-n]', (s) => s.map((x) => x.id));
+      if (others.join() !== 'c-rainbow-numeral') return `index controls: ${others.join() || 'none'}`;
+      const dflt = await page.$eval('#c-rainbow-numeral', (s) => s.value);
+      if (dflt !== 'rainbow') return `the control opens on ${dflt}, not rainbow`;
+      const strokes = await page.$$eval('#stage .hb-index path[stroke^="url("]', (p) => p.length);
+      const fills = await page.$$eval('#stage .hb-index path[fill$="sym)"]', (p) => p.length);
+      await page.selectOption('#c-rainbow-numeral', 'solid');
+      const solid = await page.$$eval('#stage .hb-index path[stroke^="url("], #stage .hb-index path[fill^="url("]', (p) => p.length);
+      await page.selectOption('#c-rainbow-numeral', 'rainbow');
+      const stops = await page.$$eval('#stage linearGradient[id$="num"]', (g) => g.length);
+      await page.click('[data-index=band]');
+      const disabled = await page.$eval('#c-rainbow-numeral', (s) => s.disabled);
+      const bandStrokes = await page.$$eval('#stage .hb-index path[stroke$="num)"]', (p) => p.length);
+      await page.click('[data-index=large]');
+      await page.uncheck('#rainbow');
+      return (strokes === 10 && fills === 10 && solid === 0 && stops === 5 && disabled && bandStrokes === 0) || `gradient numerals ${strokes} and symbols ${fills} (want 10 each), after solid ${solid}, gradients ${stops} (want 5), band: disabled ${disabled}, strokes ${bandStrokes}`;
     });
 
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hanabi-'));

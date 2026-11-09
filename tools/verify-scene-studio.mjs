@@ -34,6 +34,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SCENE = path.join(REPO, 'scene');
 const STUDIO = ['studio-room.js', 'studio-cat.js', 'studio-rig.js', 'studio-cats.js', 'studio-draw.js', 'studio-dev.js', 'scene-studio.js'];
+// what the studio imports from outside itself: copied into every mutant tree, never scanned or mutated as studio code
+const STUDIO_DEPS = ['beach-brush.js'];
 const argv = process.argv.slice(2);
 const NO_BROWSER = argv.includes('--no-browser');
 const NEG = argv.includes('--negative-control');
@@ -609,6 +611,46 @@ async function partOne(M) {
     return rows.join(', ');
   });
 
+  // THE CATS ARE THE ONLY TRUE BLACKS (Eva's palette brief, Nov 9): the cats
+  // stay #000 and nothing else the scene paints reaches that value. Read two
+  // ways: every named colour but the cat's sits above a luminance floor (a
+  // contrast of 1.3 against black), and every fill the FRONT plane actually
+  // makes over a stretch of the director — the furniture's replayed brush
+  // marks, the shadows, the cats — is the cat's ink, its eyes, a shadow, or a
+  // named palette colour.
+  check('the cats are the only true blacks: every other colour is a named palette colour above a floor', () => {
+    const lum = (hex) => {
+      const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+    };
+    const FLOOR = 0.015;
+    assert(draw.PALETTE.cat === '#000000', `the cat ink is ${draw.PALETTE.cat}`);
+    const named = new Set(), low = [];
+    for (const [k, v] of Object.entries(draw.PALETTE)) {
+      if (typeof v !== 'string' || !/^#[0-9a-f]{6}$/i.test(v)) continue;
+      named.add(v.toLowerCase());
+      if (k !== 'cat' && lum(v) < FLOOR) low.push(`${k} ${v} (${lum(v).toFixed(4)})`);
+    }
+    assert(!low.length, `reaches the cats' value: ${low.join(', ')}`);
+    const D = C.createDirector({ seed: 5 });
+    const seen = new Map(), stray = new Set();
+    for (let f = 0; f < 240; f++) {
+      for (let k = 0; k < 4; k++) C.stepDirector(D, 1 / 120);
+      const { ctx, ops } = recorder();
+      draw.drawActors(ctx, view, D.cats, [], D.cats.map(rig.solveRig));
+      for (const o of ops) {
+        const f2 = String(o.fill).toLowerCase();
+        if (f2 === draw.PALETTE.cat || f2 === draw.PALETTE.eye || f2.startsWith(`rgba(${draw.PALETTE.shadow},`)) continue;
+        if (!named.has(f2)) stray.add(f2);
+        seen.set(f2, (seen.get(f2) || 0) + 1);
+      }
+    }
+    assert(!stray.size, `fills outside the palette table: ${[...stray].join(', ')}`);
+    assert(seen.size >= 6, `only ${seen.size} furniture colours seen — the recorder no longer sees the furniture`);
+    const darkest = [...seen.keys()].reduce((a, b) => (lum(b) < lum(a) ? b : a));
+    return `${named.size} named colours, the cat alone at #000; ${seen.size} furniture colours over 240 frames, the darkest ${darkest} (luminance ${lum(darkest).toFixed(4)}, floor ${FLOOR})`;
+  });
+
   section = 'director';
   // one long soak, every rule watched at every step
   const soak = (() => {
@@ -1077,7 +1119,9 @@ async function main() {
     const tmp = path.join(SCENE, `__studio_mutant__${seq++}`);
     fs.rmSync(tmp, { recursive: true, force: true });
     fs.mkdirSync(tmp);
-    for (const f of STUDIO) fs.copyFileSync(path.join(SCENE, f), path.join(tmp, f));
+    // beach-brush.js rides along: the room draws every mark through its
+    // `brush`, imported relatively, and it is scene 3's — never mutated here
+    for (const f of [...STUDIO, ...STUDIO_DEPS]) fs.copyFileSync(path.join(SCENE, f), path.join(tmp, f));
     let src = fs.readFileSync(path.join(SCENE, m.file), 'utf8');
     for (const [from, to] of m.edits || [[m.from, m.to]]) src = src.replace(from, to);
     fs.writeFileSync(path.join(tmp, m.file), src);

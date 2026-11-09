@@ -40,7 +40,7 @@ const CLASS = {
   scopePetals: [D, 'editor toggle that unlocks per-petal scopes — the photo schema writes no per-petal scopes'],
   scopeLayers: [B, 'the Per-layer values switch — schema v2 (S3) turns it ON exactly when it writes `overrides.layers`; v1 wrote no scopes'],
   layerRing: [D, 'the Layer ring slider (#495) is a VIEW of the picked layer and its own value is never read — a photo writes a whorl\'s ring as `values.layerRing` on its layer entry (schema v5, LAYER_SCHEMA.ring), never as this control'],
-  layerPetalCount: [D, 'the Layer petals slider (Nov 8, option A of §18) is a VIEW of the picked layer and its own value is never read — a photo writes a whorl\'s petal count as `values.layerPetalCount` on its layer entry (schema v6, PR 2), never as this control'],
+  layerPetalCount: [D, 'the Layer petals slider (Nov 8, option A of §18) is a VIEW of the picked layer and its own value is never read — a photo writes a whorl\'s petal count as `values.layerPetalCount` on its layer entry (schema v6, LAYER_SCHEMA.count), never as this control'],
   layerCount: [A, 'single / semi-double / double — but inner layers are hidden in a dense double: confidence low there'],
   layerSize: [A, 'inner petals shorter than outer'], layerPhase: [A, 'inner petals staggered into the gaps or aligned'],
   layerTilt: [B, 'inner whorls more upright than outer — needs a side or low view'],
@@ -187,7 +187,14 @@ export const SCHEMA = [
    entry naming it is refused by the geometry). Listed apart from `values`
    because it is not a spine or outline value, and checked against the
    geometry's SCOPE_LAYER_VALUE_IDS both ways for the same reason as the rest. */
-export const SCHEMA_VERSION = 5;
+/* SCHEMA v6 (photo-to-bloom PR 2, Nov 9) — a layer's OWN PETAL COUNT (§19,
+   option A of §18): `values.layerPetalCount`, an integer 3..40 that REPLACES the
+   global Petals for that whorl outright (a value, never an offset). Live only
+   under Per-layer values on RADIAL / SPIRAL; hidden and inert under CONTINUOUS
+   and FAN. Listed apart from `ring` because it reaches the PETALS (the slot map,
+   the area rule, the sepals on the outer whorl) where the ring is footRing()'s
+   alone; checked against SCOPE_LAYER_VALUE_IDS with the ring, both ways. */
+export const SCHEMA_VERSION = 6;
 export const LAYER_SCHEMA = Object.freeze({
   switch: 'scopeLayers',
   placements: ['RADIAL', 'SPIRAL'],
@@ -205,19 +212,14 @@ export const LAYER_SCHEMA = Object.freeze({
      on a CURVE spine is INERT there (curl mode CURVE reads no slider curl). */
   deltas: ['petalCup', 'petalSpineCurl'],
   ring: ['layerRing'],
-  /* NOT YET IN THE SCHEMA, NAMED (Nov 8): a layer's OWN PETAL COUNT
-     (`values.layerPetalCount`, option A of §18) is a geometry layer value the
-     photo schema does not write until v6 (photo-to-bloom PR 2). Listed here
-     so the check below still holds the geometry's list exactly — a layer value
-     added to the geometry and in neither list refuses the census. */
-  notYet: ['layerPetalCount'],
+  count: ['layerPetalCount'],
 });
 {
   const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
   if (!same(LAYER_SCHEMA.offsets, SCOPE_LAYER_OWNED)) throw new Error(`LAYER_SCHEMA.offsets [${LAYER_SCHEMA.offsets}] is not the geometry's SCOPE_LAYER_OWNED [${SCOPE_LAYER_OWNED}]`);
   const owned = [...SCOPE_VALUE_GROUPS.spine, ...SCOPE_VALUE_GROUPS.outline];
   if (!same(LAYER_SCHEMA.values, owned)) throw new Error(`LAYER_SCHEMA.values [${LAYER_SCHEMA.values}] is not the geometry's spine + outline value groups [${owned}]`);
-  if (!same([...LAYER_SCHEMA.ring, ...LAYER_SCHEMA.notYet], SCOPE_LAYER_VALUE_IDS)) throw new Error(`LAYER_SCHEMA.ring [${LAYER_SCHEMA.ring}] + notYet [${LAYER_SCHEMA.notYet}] is not the geometry's SCOPE_LAYER_VALUE_IDS [${SCOPE_LAYER_VALUE_IDS}]`);
+  if (!same([...LAYER_SCHEMA.ring, ...LAYER_SCHEMA.count], SCOPE_LAYER_VALUE_IDS)) throw new Error(`LAYER_SCHEMA.ring [${LAYER_SCHEMA.ring}] + count [${LAYER_SCHEMA.count}] is not the geometry's SCOPE_LAYER_VALUE_IDS [${SCOPE_LAYER_VALUE_IDS}]`);
   if (!same(LAYER_SCHEMA.placements, SCOPE_LAYER_PLACEMENTS)) throw new Error(`LAYER_SCHEMA.placements [${LAYER_SCHEMA.placements}] is not the geometry's SCOPE_LAYER_PLACEMENTS [${SCOPE_LAYER_PLACEMENTS}]`);
   /* a delta row must be a scopeable delta (the file's own SCOPEABLE_IDS), and never an owned quantity */
   for (const id of LAYER_SCHEMA.deltas) {
@@ -250,7 +252,7 @@ for (const r of SCHEMA) {
   if (r.range && c.kind === 'slider' && (r.range[0] < c.min || r.range[1] > c.max)) bad.push(`schema row ${r.id} widens the registry range`);
 }
 if (CLASS[LAYER_SCHEMA.switch] && CLASS[LAYER_SCHEMA.switch][0] === D) bad.push(`the per-layer switch ${LAYER_SCHEMA.switch} is class d — never set`);
-for (const id of [...LAYER_SCHEMA.offsets, ...LAYER_SCHEMA.deltas, ...LAYER_SCHEMA.values, ...LAYER_SCHEMA.ring, LAYER_SCHEMA.switch]) if (!byId[id]) bad.push(`per-layer schema row ${id} is not a control`);
+for (const id of [...LAYER_SCHEMA.offsets, ...LAYER_SCHEMA.deltas, ...LAYER_SCHEMA.values, ...LAYER_SCHEMA.ring, ...LAYER_SCHEMA.count, LAYER_SCHEMA.switch]) if (!byId[id]) bad.push(`per-layer schema row ${id} is not a control`);
 if (bad.length) { console.error('CENSUS INVALID:\n  ' + bad.join('\n  ')); process.exit(2); }
 
 const secLabel = Object.fromEntries(SECTIONS.map((s) => [s.id, s.label || s.id]));
@@ -263,7 +265,7 @@ const neverTrue = (c) => c.visibleWhen && JSON.stringify(c.visibleWhen).includes
 const counts = { a: 0, b: 0, c: 0, d: 0 };
 for (const c of CONTROLS) counts[CLASS[c.id][0]]++;
 if (!process.argv.includes('--md')) {
-  console.log(`CENSUS: ${CONTROLS.length} controls — a ${counts.a} · b ${counts.b} · c ${counts.c} · d ${counts.d}; schema v${SCHEMA_VERSION}: ${SCHEMA.length} global rows (${SCHEMA.filter((r) => !r.since).length} v1 + ${SCHEMA.filter((r) => r.since === 3).length} outline, v3) + per-layer (${LAYER_SCHEMA.switch} ON under ${LAYER_SCHEMA.placements.join('/')}; owned offsets ${LAYER_SCHEMA.offsets.join(', ')}; delta offsets ${LAYER_SCHEMA.deltas.join(', ')} (v4); values ${LAYER_SCHEMA.values.join(', ')}; the ring ${LAYER_SCHEMA.ring.join(', ')} (v5)); every control classified, every class an id`);
+  console.log(`CENSUS: ${CONTROLS.length} controls — a ${counts.a} · b ${counts.b} · c ${counts.c} · d ${counts.d}; schema v${SCHEMA_VERSION}: ${SCHEMA.length} global rows (${SCHEMA.filter((r) => !r.since).length} v1 + ${SCHEMA.filter((r) => r.since === 3).length} outline, v3) + per-layer (${LAYER_SCHEMA.switch} ON under ${LAYER_SCHEMA.placements.join('/')}; owned offsets ${LAYER_SCHEMA.offsets.join(', ')}; delta offsets ${LAYER_SCHEMA.deltas.join(', ')} (v4); values ${LAYER_SCHEMA.values.join(', ')}; the ring ${LAYER_SCHEMA.ring.join(', ')} (v5); the petal count ${LAYER_SCHEMA.count.join(', ')} (v6)); every control classified, every class an id`);
   process.exit(0);
 }
 console.log(`| control | kind | section | range / options | default | class | why |\n|---|---|---|---|---|---|---|`);

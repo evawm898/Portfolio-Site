@@ -766,6 +766,17 @@ PAGE; CONFIDENCES LIVE IN A SIDECAR** (photo-to-bloom S1, Nov 3 — Eva's ruling
   only: body h:w 1.482. Water lily 4/10 reads as the photo. The daisy is the global count (no per-whorl). Unresolved: the
   tube (C throws; A/B never meet it), the sepal ceiling and Layer phase read the global count. Eva's ruling pending.
   **[Nov 8: RULED — option A, an owned value; SHIPPED, §19 and the block below.]**
+- **S7, the petal-count stage (Nov 9), is §20 of the same doc.** Schema v6 adds `LAYER_SCHEMA.count`
+  (`values.layerPetalCount` on a layer entry, an integer 3–40 that REPLACES the global; checked with `ring` against the
+  geometry's `SCOPE_LAYER_VALUE_IDS`). The validator gains clause **V10** (every count the file names is footRing()'s built
+  `ownCount`, the ring's `whorlCount` AND the azimuths the whorl emitted; no unnamed count owned), W2 on a count off the
+  grid or past the range; seven fixtures (39), the negative controls `COUNT_INERT` / `COUNT_FAN` / `COUNT_CONTINUOUS`
+  (inert, V7, never V10); page mutant `the-build-drops-the-layer-count`. **The photos were 150 px crops of the §18 sheet**
+  (Eva, Nov 9: go ahead with the crops). Lotus v12 counts 4/5/5/3 (body h:w 1.413 → 1.492 against ≈ 1.45, no v13);
+  water lily v8 re-counted 4/8 (v7 8+8; §18 assumed 4/10); daisy stays v7. 0 within-shell pairs. `bloom-photo-s2.mjs`'s
+  body measure read layers as equal whorls — it reads `whorlCounts` now. §20.7 is the ranking (splay is #1).
+  **[Nov 9: RULED — the count stage PASSES and lotus v12 stands (no v13); merged as `48139fc`. Re-reading the counts
+  from the full photos is left open. Next on §20.7's ranking: the outer whorls' splay.]**
 - **#495 (Nov 5): DISCOVERY + PROTOTYPE, NOTHING SHIPPED — §15 of the same doc.** Read it before touching `footRing()`'s
   `ringFactor`, `layerOwnedValues` or `layerSize`'s visibility.
   - Four options are prototyped by `tools/bloom-ring-options.mjs` as anchored edits of TEMPORARY copies:
@@ -11239,6 +11250,14 @@ never the same kind within 4 s, the floor shared at 55 cm, dozes 8–20 s. A cat
 fill on true capsule tangents; painter's order by separating planes per part. The browser
 gate holds frame cost (p99 < 8 ms, worst < 16.7 ms) under the director.
 `tools/record-scene-studio.mjs ambient|jump` makes exact-frame videos (not committed).
+**The room treatment (Nov 9, Eva's brief — the "room treatment" section of the doc):** every room mark
+goes through scene 3's `brush` (beach-brush.js, imported, never forked; its `P.runs` pool now grows rather
+than being replaced, identical for scene 3) as a LINE, a MASS with brush edges, or a paper CUT; light
+areas are bare paper. One named `PALETTE` (cream walls, honey oak, high-key green beyond the glass,
+trim as drawn line, dark warm brown furniture by tone top/front/side); the cats are the only true blacks
+(`draw/the-cats-are-the-only-true-blacks…`, a 0.015 luminance floor). The room still draws once per
+resize; the furniture's marks are computed once per view and replayed per frame. Mutant trees copy
+`beach-brush.js` (`STUDIO_DEPS`). Gallery wall, lamps, rain, day/night, scroll and object cycles are NOT built.
 
 ## Artist Tracker (`artist-tracker.html`)
 
@@ -12693,5 +12712,5 @@ Hidden page (`hanabi.html`, `hanabi.css`, `hanabi.js`, `hanabi/*.js`; `noindex`,
 band), and a centre PER SUIT (`suit.centre`: layout single / count / bleed, a firework motif, an optional
 tier at ranks 4–5).** Phase 1's layouts A/B/C are those pairs, and a v1 file migrates byte-identically.
 Motifs are the five originals plus 12 drawn after the Hirayama catalogue; hanging/falling pieces are ruled
-out, and Spark drift / Streamers were removed (Nov 9; one tier left, rosettes). **`hanabi/firework.js` is the phase-2 slot** — layout code only calls `fireworkSpec()`,
+out, and Spark drift / Streamers were removed (Nov 9; one tier left, rosettes). The rainbow suit's corner index (numeral and symbol) is a gradient through the other suits' colours by default (`suit.numeral`, `solid` to turn it off; not under the band index). **`hanabi/firework.js` is the phase-2 slot** — layout code only calls `fireworkSpec()`,
 `renderFirework()` and `renderTier()`. Gate: `node tools/verify-hanabi.mjs` (`--negative-control`), not in CI.

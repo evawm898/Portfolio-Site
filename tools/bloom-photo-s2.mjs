@@ -192,10 +192,15 @@ async function bbox(state, overrides) {
      triangle range, read from the builder's record. */
   const ext = (tris) => { let zl = Infinity, zh = -Infinity, r = 0; for (const [a, b] of tris) for (let t = a; t < b; t++) for (let j = 0; j < 9; j += 3) { const i = t * 9 + j; zl = Math.min(zl, P[i + 2]); zh = Math.max(zh, P[i + 2]); r = Math.max(r, Math.hypot(P[i], P[i + 1])); } return { h: zh - zl, w: 2 * r }; };
   /* the BODY is the inner half of the layers (layer >= ceil(n/2)): petalsAll is
-     built ring by ring, one ring per layer, so a petal's layer is its index over
-     the per-ring count — read off the builder's own list, scoped or not */
+     built ring by ring, one ring per layer, so a petal's layer follows from the
+     per-ring counts. Since a layer can OWN its petal count (§19, schema v6) the
+     rings are no longer equal: the counts are footRing()'s own `whorlCounts`
+     where it reports them (and they tile the list), the equal split otherwise —
+     read off the builder's own record, scoped or not */
   const all = built.petalsAll || [], nRings = (built.rings || []).length || 1, per = all.length / nRings;
-  const tagged = all.map((p, i) => ({ p, layer: Math.floor(i / per) })).filter((x) => x.p && x.p.triRange);
+  const wc = built.foot && Array.isArray(built.foot.whorlCounts) && built.foot.whorlCounts.length === nRings && built.foot.whorlCounts.reduce((x, y) => x + y, 0) === all.length ? built.foot.whorlCounts : null;
+  const layerOf = (i) => { if (!wc) return Math.floor(i / per); let L = 0, c = wc[0]; while (i >= c && L < nRings - 1) c += wc[++L]; return L; };
+  const tagged = all.map((p, i) => ({ p, layer: layerOf(i) })).filter((x) => x.p && x.p.triRange);
   const whole = ext(tagged.map((x) => x.p.triRange)), inner = ext(tagged.filter((x) => x.layer >= Math.ceil(nRings / 2)).map((x) => x.p.triRange));
   return { lo, hi, petalsHW: +(whole.h / whole.w).toFixed(3), petalsHmm: +whole.h.toFixed(1), petalsWmm: +whole.w.toFixed(1), bodyLayers: `${Math.ceil(nRings / 2)}..${nRings - 1}`, bodyHW: nRings > 1 ? +(inner.h / inner.w).toFixed(3) : null, bodyHmm: +inner.h.toFixed(1), bodyWmm: +inner.w.toFixed(1) };
 }
@@ -275,8 +280,8 @@ async function sheet(browser, report, SHEET, PHOTOS) {
     for (const r of Object.values(report).filter((x) => x.flower === f)) {
       const sc = JSON.parse(fs.readFileSync(path.join(SET, f, `${f}-${r.v}.bloom-photo.json`), 'utf8'));
       const val = (x) => (x && typeof x === 'object' ? 'curve' : x);
-      const ch = sc.revisedFrom ? [...Object.entries(sc.revisedFrom.changes).map(([id, c]) => `${id} ${val(c.from)}→${val(c.to)}`), ...((sc.revisedFrom.layerChanges || []).map((c) => `L${c.layer} ${c.field.replace(/^offsets\./, '').replace(/^values\./, '')} ${typeof c.from === 'object' && c.from ? 'curve' : c.from}→${typeof c.to === 'object' && c.to ? 'curve' : c.to}`))].join(', ') : 'first pass';
-      const own = (sc.layers || []).map((L) => `L${L.layer}: ${['petalLength', 'petalTilt', 'petalCup', 'petalSpineCurl'].filter((k) => L.offsets && L.offsets[k]).map((k) => `${({ petalLength: 'len', petalTilt: 'tilt', petalCup: 'cup', petalSpineCurl: 'curl' })[k]} ${L.offsets[k].value}`).join(' ')}${L.values && L.values.petalSpineCurve ? ' +spine' : ''}${L.values && L.values.petalOutlineCurve ? ' +outline' : ''}${L.values && L.values.layerRing ? ` ring ${L.values.layerRing.value}` : ''}`).join(' · ');
+      const ch = sc.revisedFrom ? [...Object.entries(sc.revisedFrom.changes).map(([id, c]) => `${id} ${val(c.from)}→${val(c.to)}`), ...((sc.revisedFrom.layerChanges || []).map((c) => `L${c.layer} ${c.field.replace(/^offsets\./, '').replace(/^values\./, '')} ${typeof c.from === 'object' && c.from ? 'curve' : c.from === null ? 'none' : c.from}→${typeof c.to === 'object' && c.to ? 'curve' : c.to}`))].join(', ') : 'first pass';
+      const own = (sc.layers || []).map((L) => `L${L.layer}: ${['petalLength', 'petalTilt', 'petalCup', 'petalSpineCurl'].filter((k) => L.offsets && L.offsets[k]).map((k) => `${({ petalLength: 'len', petalTilt: 'tilt', petalCup: 'cup', petalSpineCurl: 'curl' })[k]} ${L.offsets[k].value}`).join(' ')}${L.values && L.values.petalSpineCurve ? ' +spine' : ''}${L.values && L.values.petalOutlineCurve ? ' +outline' : ''}${L.values && L.values.layerRing ? ` ring ${L.values.layerRing.value}` : ''}${L.values && L.values.layerPetalCount ? ` n ${L.values.layerPetalCount.value}` : ''}`).join(' · ');
       for (const [v, file] of Object.entries(r.shots)) {
         html += `<div style="width:${W}px"><img src="${img(file)}" style="width:${W}px;height:${W}px"><div>${r.v} · ${v} · ${r.named} named · ${(r.exportTris || 0).toLocaleString('en-US')} tris (export)</div>${v === 'front' ? `<div style="color:#9ab;font-size:10px">${ch}</div>` : `<div style="color:#cb9;font-size:10px">${own || 'no per-layer values'}${r.proportions && r.proportions.bodyHW ? ` · inner-half h:w ${r.proportions.bodyHW}` : ''} · petals h:w ${r.proportions ? r.proportions.petalsHW : '?'}</div>`}</div>`;
       }
