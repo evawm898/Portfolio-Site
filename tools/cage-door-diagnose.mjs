@@ -40,9 +40,9 @@ const nearSeg = (q, pts) => { let best = Infinity; for (let i = 1; i < pts.lengt
 
 export function diagnose(G, params) {
   const m = G.buildCage(params);
-  const issues = [];
+  const issues = [], marks = [];
   const d = m.info.door;
-  if (!d) return { m, issues: ['no door'] };
+  if (!d) return { m, issues: ['no door'], marks, out: {} };
   const N = +params.sides | 0, H = params.heightMm, Rb = params.widthMm / 2;
   const f = curveFunction(params.profile.points, G.PROFILE_SPEC);
   const rho = (z) => Rb * f(Math.min(1, Math.max(0, z / H)));
@@ -60,6 +60,7 @@ export function diagnose(G, params) {
   if (N) {
     const corners = Array.from({ length: N }, (_, k) => phase + TAU * k / N);
     const inside = corners.filter((c) => { const a = wrap(c - thC); return a > thMin + 1e-6 && a < thMax - 1e-6; });
+    for (const c of inside) marks.push({ type: 'corner', th: c, z0: zSill, z1: zHead });
     if (inside.length) issues.push(`CORNER: ${inside.length} corner${inside.length > 1 ? 's' : ''} inside the door (at ${inside.map((c) => (wrap(c - thC) * 180 / Math.PI).toFixed(1) + '°').join(', ')} from its centre) — the opening folds across faces`);
     const faceOff = Math.min(...Array.from({ length: N }, (_, k) => Math.abs(wrap(phase + TAU * (k + 0.5) / N - thC)))) * 180 / Math.PI;
     out.faceOffDeg = faceOff;
@@ -89,7 +90,7 @@ export function diagnose(G, params) {
       if (e[2] < 1e-6 || e[2] > H - 1e-6) continue;
       if (nearSeg(e, closedFp) > frame.r + 1e-6) continue;
       // a cut end on a jamb's straight run, clear of the sill (the jamb's foot) by more than the frame wire
-      if (partOf(e) === 'jamb' && e[2] > zSill + 2 * frame.r) { jambCuts++; jambEnds.push(+e[2].toFixed(1)); }
+      if (partOf(e) === 'jamb' && e[2] > zSill + 2 * frame.r) { jambCuts++; jambEnds.push(+e[2].toFixed(1)); marks.push({ type: 'dot', p: e }); }
     }
     // a run inside the door's azimuth span between sill and head that is shorter than a pitch: a stub
     const inSpan = w.pts.every((q) => { const a = wrap(ang(q) - thC); return a > thMin - 1e-6 && a < thMax + 1e-6 && q[2] >= zSill - 1e-6 && q[2] <= zHead + 1e-6; });
@@ -99,7 +100,7 @@ export function diagnose(G, params) {
     if (full) {
       const jambA = [thMin, thMax];
       const gap = Math.min(...jambA.map((j) => Math.abs(th0 - j))) * rho(zSill);
-      if (gap > 1e-3 && gap < pitchAt(zSill) / 3) nearMiss++;
+      if (gap > 1e-3 && gap < pitchAt(zSill) / 3) { nearMiss++; marks.push({ type: 'bar', pts: w.pts }); }
     }
   }
   if (jambCuts) issues.push(`JAMB: ${jambCuts} bar end${jambCuts > 1 ? 's' : ''} cut on a jamb (z ${[...new Set(jambEnds)].slice(0, 4).join(', ')} mm) — the jamb cuts a bar mid-height instead of replacing it`);
@@ -113,15 +114,18 @@ export function diagnose(G, params) {
   const shoulders = (m.info.shoulderZ || []).map((sz) => ringZs.reduce((b, z) => (Math.abs(z - sz) < Math.abs(b - sz) ? z : b), ringZs[0]));
   const bandZ = (m.bandRings || []).map((r) => r.z);
   const headZ = zHead, sillZ = zSill;
+  for (const z of [...shoulders, ...bandZ]) if (z > sillZ + 1e-6 && z < headZ - 1e-6) marks.push({ type: 'ring', z });
   for (const z of shoulders) if (z > sillZ + 1e-6 && z < headZ - 1e-6) issues.push(`RING: the door crosses the shoulder ring at ${z.toFixed(1)} mm`);
   for (const z of bandZ) if (z > sillZ + 1e-6 && z < headZ - 1e-6) issues.push(`RING: the door crosses the banded ring at ${z.toFixed(1)} mm`);
   const graze = rRing + frame.r;
   for (const z of ringZs) {
+    if ((Math.abs(z - sillZ) > 1e-3 && Math.abs(z - sillZ) < graze) || (z > sillZ && Math.abs(z - headZ) < graze && Math.abs(z - headZ) > 1e-3)) marks.push({ type: 'ring', z });
     if (Math.abs(z - sillZ) > 1e-3 && Math.abs(z - sillZ) < graze) issues.push(`RING: the ring at ${z.toFixed(1)} grazes the sill (${Math.abs(z - sillZ).toFixed(2)} mm off, under ${graze.toFixed(2)})`);
     if (z > sillZ && Math.abs(z - headZ) < graze && Math.abs(z - headZ) > 1e-3) issues.push(`RING: the ring at ${z.toFixed(1)} grazes the head (${Math.abs(z - headZ).toFixed(2)} mm off)`);
   }
   const onRing = ringZs.some((z) => Math.abs(z - sillZ) < 1e-3);
   if (!onRing) out.sillFloat = Math.min(...ringZs.map((z) => Math.abs(z - sillZ)));
+  if (!onRing) marks.push({ type: 'sill', z: sillZ });
   if (!onRing) issues.push(`SILL: the sill sits on no ring (${out.sillFloat.toFixed(1)} mm from the nearest)`);
   out.sillOnRing = onRing;
   // SURF: the frame on the surface
@@ -129,7 +133,7 @@ export function diagnose(G, params) {
   for (const q of fp) { const th = ang(q), r = Math.hypot(q[0], q[1]); worst = Math.max(worst, Math.abs(r - poly(rho(q[2]), th))); }
   out.surfMm = worst;
   if (worst > 1e-3) issues.push(`SURF: frame up to ${worst.toFixed(3)} mm off the surface`);
-  return { m, issues, out };
+  return { m, issues, marks, out };
 }
 
 export function diagnosticCases(G) {

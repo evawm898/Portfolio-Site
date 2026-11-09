@@ -12386,6 +12386,14 @@ onion has three rings, the upper in its neck taper — §6 of the doc]** and the
 `MIN_FEATURE_MM` floor (SLS PA12 assumed) stand, both brackets having been left unfilled.
 Phase 2 (decorative ring bands and door infill from /frame's filigree) is NOT built and waits on
 /frame's ornament rework; a curved band will be approximated as a cone segment (doc §5.10).**
+**THE DOOR IS CUT WHERE THE LATTICE IS (Nov 9, §9 of the doc — read it before touching the door block,
+`ringPlan`, the turn or the D family).** Its jambs ARE bars (k whole gaps, snapped from the asked width at the
+sill, told); it is centred at the front on a bar/gap, or on a polygon's FACE centre — the lattice is laid with
+the door at `thD` and everything but the hanger turns once at the end (4-/8-gons turn 45° / 22.5°); its sill
+sits on a ring and its head stays `ring + frame + floor` under the first shoulder ring, banded ring or the top
+ring; every bar and ring cut ends on a frame VERTEX. Gates D1–D5 (`verify-cage.mjs`, also over the whole
+preset × section × shape matrix), six mutants; C6 reads corners off the emitted base ring. Diagnostic
+`node tools/cage-door-diagnose.mjs`; sheet `node tools/shot-cage-door.mjs <dir> --base <wt>`.
 
 ## `/frame` — the Parametric Frame (pointer only)
 

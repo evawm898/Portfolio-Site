@@ -15,7 +15,13 @@
    floored and proud of their ring (B6), clear of the door (B7), drawn in the SVG (B8), lying
    on the cage's own shape restated from the control (B9), and inert when off (B0).
 
-   `--negative-control` serves twenty-three mutants of cage-geometry.js and requires
+   THE DOOR (the D family, docs/cage-phase-1.md §9): at the front and centred on a face of a polygon,
+   no corner inside it (D1); its jambs are bars and every bar of it stops on the sill and starts on
+   the head at a frame vertex (D2); its sill on a ring, its head a printable gap clear of every
+   shoulder, band and the top ring (D3); its frame on the cage's surface (D4); every snap told (D5) —
+   on every full case with a door and over the whole preset × section × shape matrix.
+
+   `--negative-control` serves twenty-nine mutants of cage-geometry.js and requires
    each to redden exactly the clauses it names (and nothing else); every
    anchor is checked before any mutant runs.
 
@@ -110,6 +116,106 @@ const RESTATED_OVER_RING = 1.25;             // a band element stands 1.25 × pr
 
 const nearestOnPolyline = (q, pts) => { let best = Infinity; for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i]; const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2 || 1; let t = ((q[0] - a[0]) * ab[0] + (q[1] - a[1]) * ab[1] + (q[2] - a[2]) * ab[2]) / l2; t = Math.max(0, Math.min(1, t)); best = Math.min(best, dist(q, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t])); } return best; };
 
+/* ---- THE D FAMILY: the door's placement, judged on the emitted frame, bars and rings ----
+   D1 the door is at the front (ruling 4) and on a FACE of a polygon — no corner of the emitted base
+      ring strictly inside its span, and the two corners either side of it symmetric about its centre;
+      on a round cage centred on a bar or on the middle of a gap
+   D2 its jambs ARE bars: each extreme azimuth of the frame is an emitted bar's; every bar end on the
+      frame is a frame VERTEX, the lowest or the highest at that bar's azimuth (it stops on the sill and
+      starts on the head — never a jamb cutting a bar part-way); and no bar in the span, jambs included,
+      has a sample between the sill and the head at its azimuth
+   D3 the sill sits ON an emitted ring; the head stays one printable gap (the two wires and the floor)
+      under the first shoulder ring (restated from the control's chords), banded ring (restated from
+      the control's selection) and the top ring; no other ring grazes the sill or the apex
+   D4 the frame lies on the cage: every frame vertex on the surface restated from the control (the
+      polygon's corners read off the emitted base ring), every frame segment's midpoint within 0.05 mm
+   D5 a snap is told: the built width, sill and height against the asked ones */
+function doorClauses(G, m, P, label) {
+  const res = [];
+  const C = (id, name, ok, detail = '') => res.push([`${id} ${label} ${name}`, ok, detail]);
+  const fr = m.wires.find((w) => w.kind === 'door');
+  if (!fr) return res;
+  const fp = fr.pts, N = +P.sides | 0, H = P.heightMm, Rb = P.widthMm / 2;
+  const floor = Math.max(G.MIN_FEATURE_MM, P.minFeature || 0);
+  const ang = (q) => Math.atan2(q[1], q[0]);
+  const thF = ang(fp.reduce((s, q) => [s[0] + q[0], s[1] + q[1]], [0, 0]));
+  const rel = (th) => angDiff(th, thF);
+  const azs = fp.map((q) => rel(ang(q))), lo = Math.min(...azs), hi = Math.max(...azs);
+  const zSill = Math.min(...fp.map((q) => q[2])), apex = Math.max(...fp.map((q) => q[2]));
+  const bars = m.wires.filter((w) => w.kind === 'bar');
+  const barAz = [...new Set(bars.map((w) => +ang(w.pts[0]).toFixed(12)))];
+  // the base ring's corners, read off its emitted points (the polygon's radius maxima)
+  const baseRing = m.wires.find((w) => w.kind === 'frame' && Math.abs(w.pts[0][2]) < 1e-9);
+  let corners = [];
+  if (N && baseRing) { const bp = baseRing.pts, rs = bp.map((q) => Math.hypot(q[0], q[1])), rMax = Math.max(...rs); corners = bp.filter((q, i) => rs[i] > rMax - 1e-9).map(ang); }
+  // D1
+  const front = Math.abs(angDiff(thF, -Math.PI / 2)) < 1e-6;
+  if (N) {
+    const inside = corners.filter((c) => rel(c) > lo + 1e-7 && rel(c) < hi - 1e-7).length;
+    const cr = corners.map(rel), left = Math.max(...cr.filter((a) => a < 1e-9)), right = Math.min(...cr.filter((a) => a > -1e-9));
+    const onFace = Math.abs(left + right) < 1e-6 && right > 1e-6;
+    C('D1', `the door is at the front, centred on a face of the ${N}-gon, no corner inside it`, front && inside === 0 && onFace, `front ${front}, ${inside} corners inside, corners either side at ${(left * 180 / Math.PI).toFixed(3)}° / ${(right * 180 / Math.PI).toFixed(3)}°`);
+  } else {
+    const ra = barAz.map(rel), nb = Math.min(...ra.map(Math.abs)), l = Math.max(...ra.filter((a) => a < -1e-9)), r = Math.min(...ra.filter((a) => a > 1e-9));
+    C('D1', 'the door is at the front, centred on a bar or on the middle of a bar gap', front && (nb < 1e-9 || Math.abs(l + r) < 1e-9), `front ${front}, nearest bar ${(nb * 180 / Math.PI).toFixed(4)}°`);
+  }
+  // D2
+  const jambsOnBars = [lo, hi].every((j) => barAz.some((b) => Math.abs(angDiff(rel(b), j)) < 1e-9));
+  let badEnd = 0, inSpan = 0, ends = 0;
+  for (const w of bars) {
+    const thb = ang(w.pts[0]), a = rel(thb);
+    if (a < lo - 1e-9 || a > hi + 1e-9) continue;
+    const atAz = fp.filter((q) => Math.abs(angDiff(ang(q), thb)) < 1e-9).map((q) => q[2]);
+    const zLo = Math.min(...atAz), zHi = Math.max(...atAz);
+    for (const e of [w.pts[0], w.pts[w.pts.length - 1]]) {
+      if (e[2] < 1e-9 || e[2] > H - 1e-9) continue;
+      ends++;
+      const onVertex = fp.some((q) => dist(q, e) < 1e-9);
+      if (!onVertex || !(Math.abs(e[2] - zLo) < 1e-9 || Math.abs(e[2] - zHi) < 1e-9)) badEnd++;
+    }
+    for (const q of w.pts) if (q[2] > zLo + 1e-9 && q[2] < zHi - 1e-9) inSpan++;
+  }
+  C('D2', `the jambs are bars and every bar of the door stops on the sill and starts on the head (${ends} cut ends)`, jambsOnBars && badEnd === 0 && inSpan === 0 && ends > 0, `jambs on bars ${jambsOnBars}, ${badEnd} ends off a sill/head vertex, ${inSpan} bar samples inside`);
+  // D3
+  const loops = m.wires.filter((w) => w.kind === 'ring' || w.kind === 'frame');
+  const ringZs = [...new Set(loops.map((w) => w.pts[0][2]))].sort((a, b) => a - b);
+  const rOf = (z) => Math.max(...loops.filter((w) => Math.abs(w.pts[0][2] - z) < 1e-9).map((w) => w.r));
+  const kindOf = (z) => loops.find((w) => Math.abs(w.pts[0][2] - z) < 1e-9).kind;
+  const gap = (z) => rOf(z) + fr.r + floor;
+  const onRing = ringZs.some((z) => Math.abs(z - zSill) < 1e-9);
+  const pp = P.profile.points, shoulders = [];
+  for (let i = 1; i < pp.length - 1; i++) { const a0 = Math.atan2(Rb * (pp[i][1] - pp[i - 1][1]), H * (pp[i][0] - pp[i - 1][0])), a1 = Math.atan2(Rb * (pp[i + 1][1] - pp[i][1]), H * (pp[i + 1][0] - pp[i][0])); if (Math.abs(a1 - a0) * 180 / Math.PI >= G.SHOULDER_DEG - 1e-9) shoulders.push(H * pp[i][0]); }
+  const shoulderRings = shoulders.map((sz) => ringZs.reduce((b, z) => (Math.abs(z - sz) < Math.abs(b - sz) ? z : b)));
+  const sel = P.bandRings, bandOn = P.bandStyle && P.bandStyle !== 'none';
+  const bandRings = bandOn ? ringZs.filter((z) => sel === 'all' || (sel === 'inner' && kindOf(z) === 'ring') || (sel === 'ends' && kindOf(z) === 'frame') || (sel === 'top' && Math.abs(z - H) < 1e-9)) : [];
+  const stops = [...new Set([...shoulderRings, ...bandRings, H])].filter((z) => z > zSill + 1e-9);
+  const crossed = stops.filter((z) => apex > z - gap(z) + 1e-9);
+  const graze = ringZs.filter((z) => z > zSill + 1e-9 && (z - zSill < gap(z) - 1e-9 || Math.abs(z - apex) < gap(z) - 1e-9));
+  C('D3', `the sill sits on a ring, the head is clear of every shoulder, band and the top ring, and no ring grazes the door`, onRing && crossed.length === 0 && graze.length === 0, `sill on a ring ${onRing}; crossed ${crossed.map((z) => z.toFixed(1)).join(',') || '-'}; grazing ${graze.map((z) => z.toFixed(1)).join(',') || '-'}`);
+  // D4
+  const f = curveFunction(pp, G.PROFILE_SPEC), rho = (z) => Rb * f(Math.min(1, Math.max(0, z / H)));
+  const ph = N && corners.length ? corners[0] : 0;
+  const surfR = (th, z) => { const r = rho(z); if (!N) return r; const fc = Math.PI / N; const a = ((th - ph) % (2 * fc) + 2 * fc) % (2 * fc) - fc; return r * Math.cos(fc) / Math.cos(a); };   // from the nearest face centre, a corner + π/N
+  let worstV = 0, worstM = 0;
+  for (let i = 0; i < fp.length; i++) {
+    const q = fp[i], q2 = fp[(i + 1) % fp.length];
+    worstV = Math.max(worstV, Math.abs(Math.hypot(q[0], q[1]) - surfR(ang(q), q[2])));
+    const mq = [(q[0] + q2[0]) / 2, (q[1] + q2[1]) / 2, (q[2] + q2[2]) / 2];
+    worstM = Math.max(worstM, Math.abs(Math.hypot(mq[0], mq[1]) - surfR(ang(mq), mq[2])));
+  }
+  C('D4', `the frame lies on the cage's own surface (vertices ${worstV.toExponential(1)} mm, chords ${worstM.toFixed(3)} mm)`, worstV < 1e-7 && worstM < 0.05);
+  // D5
+  const sl = fp.filter((q) => Math.abs(q[2] - zSill) < 1e-9);
+  const cL = sl.reduce((b, q) => (rel(ang(q)) < rel(ang(b)) ? q : b)), cR = sl.reduce((b, q) => (rel(ang(q)) > rel(ang(b)) ? q : b));
+  const built = N ? Math.hypot(cR[0] - cL[0], cR[1] - cL[1]) : (hi - lo) * rho(zSill);
+  const Dh0 = Math.min(P.doorHeight, 0.92 * H), zAsk = P.doorY * (H - Dh0);
+  const tW = Math.abs(built - P.doorWidth) <= 0.5 || m.told.some((t) => /door width .* snapped/.test(t));
+  const tS = Math.abs(zSill - zAsk) <= 0.5 || m.told.some((t) => /door sill on/.test(t));
+  const tH = apex - zSill >= Dh0 - 0.5 || m.told.some((t) => /door height .* shortened/.test(t));
+  C('D5', `every snap is told (width ${built.toFixed(1)} of ${P.doorWidth}, sill ${zSill.toFixed(1)} of ${zAsk.toFixed(1)}, height ${(apex - zSill).toFixed(1)} of ${Dh0.toFixed(1)} mm)`, tW && tS && tH, `width told ${tW}, sill told ${tS}, height told ${tH}`);
+  return res;
+}
+
 /* ---- the run ---- */
 async function run(modulePath, { quiet = false } = {}) {
   const G = await import(`${modulePath}?${Date.now()}`);
@@ -123,6 +229,14 @@ async function run(modulePath, { quiet = false } = {}) {
   cases.push({ label: 'beads asked under their ring (1.5 mm)', params: { ...G.defaultParams(), bandStyle: 'beading', beadMm: 1.5 } });
   cases.push({ label: 'beading at the widest spacing (0.90)', params: { ...G.defaultParams(), bandStyle: 'beading', bandSpacing: 0.9 } });
   cases.push({ label: 'leaf run at the widest spacing (0.90)', params: { ...G.defaultParams(), bandStyle: 'leaf', bandSpacing: 0.9 } });
+  // the door (docs/cage-phase-1.md §9): every cross-section with two door shapes in full (each shape on a round
+  // and on a polygon; the presets taken in turn — the D family runs over the whole matrix below),
+  // and the door's own extremes — a tall door under a shoulder, a wide door on a square, a door asked at the top
+  const SIDES = ['0', '4', '6', '8'], SHAPES = ['rect', 'arch', 'gothic', 'ogee'];
+  SIDES.forEach((sd, i) => SHAPES.filter((_, j) => j % 2 === i % 2).forEach((sh, j) => { const id = G.PRESET_IDS[(i * 2 + j) % G.PRESET_IDS.length]; cases.push({ label: `door ${sh} on ${id} ${sd === '0' ? 'round' : sd + '-gon'}`, params: { ...G.applyPreset(G.defaultParams(), id), sides: sd, doorShape: sh } }); }));
+  cases.push({ label: 'door 120 mm tall on the tiered cage (under its shoulder)', params: { ...G.applyPreset(G.defaultParams(), 'tiered'), doorHeight: 120 } });
+  cases.push({ label: 'door 90 mm wide on a 4-gon', params: { ...G.defaultParams(), sides: '4', doorWidth: 90 } });
+  cases.push({ label: 'door asked at the top (position 1)', params: { ...G.defaultParams(), doorY: 1 } });
 
   // C0 the registry and the presets
   const ids = new Set(G.PARAM_SPEC.map((s) => s.id));
@@ -175,13 +289,16 @@ async function run(modulePath, { quiet = false } = {}) {
       const cutBars = m.wires.filter((w) => w.kind === 'bar' && !w.closed && w.pts.some((q) => Math.abs(q[2] - cs.params.heightMm) < 1e-6)).length;
       check(`C5b ${cs.label} the door cuts through bars (bars reaching the top but not the base: ${cutBars})`, cutBars >= 1);
     }
+    if (m.info.door) for (const [n, ok, d] of doorClauses(G, m, cs.params, cs.label)) check(n, ok, d);
     // the polygon: bars a multiple of N, every corner carrying one
     const N = +cs.params.sides | 0;
     if (N) {
       const az = m.wires.filter((w) => w.kind === 'bar').map((w) => Math.atan2(w.pts[0][1], w.pts[0][0]));
-      const corners = Array.from({ length: N }, (_, k) => 2 * Math.PI * k / N);
+      // the corners read off the emitted base ring (its radius maxima): the lattice turns so the door sits on a face (D1)
+      const bp = m.wires.find((w) => w.kind === 'frame' && w.closed && Math.abs(w.pts[0][2]) < 1e-9).pts, brs = bp.map((q) => Math.hypot(q[0], q[1])), brMax = Math.max(...brs);
+      const corners = bp.filter((q, i) => brs[i] > brMax - 1e-9).map((q) => Math.atan2(q[1], q[0]));
       const hit = corners.every((c) => az.some((t) => Math.abs(Math.atan2(Math.sin(t - c), Math.cos(t - c))) < 1e-6));
-      check(`C6 ${cs.label} ${N}-gon: ${m.info.barCount} bars, a multiple of ${N}, every corner carrying one`, m.info.barCount % N === 0 && hit);
+      check(`C6 ${cs.label} ${N}-gon: ${m.info.barCount} bars, a multiple of ${N}, every corner carrying one`, m.info.barCount % N === 0 && corners.length === N && hit, `${corners.length} corners`);
       // the mitre: a corner section is stretched by 1 / cos(π/N) along the bend — read off the base ring's own vertices
       const base = m.mesh.parts.find((q) => q.name === 'base ring'), P = m.mesh.positions;
       const r = m.wires.find((w) => w.kind === 'frame').r, R = Math.hypot(...m.wires.find((w) => w.kind === 'frame' && w.closed).pts[0].slice(0, 2));
@@ -243,7 +360,7 @@ async function run(modulePath, { quiet = false } = {}) {
       check(`B1 ${cs.label} the band rides exactly the rings "${sel}" names (${got.length} of ${ringZs.length})`, got.length === expected.length && got.every((z, i) => Math.abs(z - expected[i]) < 1e-6) && els.length > 0);
       const bars = m.wires.filter((w) => w.kind === 'bar');
       const B = m.info.barCount, Nside = +cs.params.sides | 0;
-      const doorCut = (z) => m.info.door && z > m.info.door.z0 && z < m.info.door.z0 + m.info.door.Dh;
+      const doorCut = (z) => m.info.door && z > m.info.door.z0 - 1e-9 && z < m.info.door.z0 + m.info.door.Dh;   // the ring the sill sits on gives the door its elements too
       let notOn = 0, notMult = 0, fuseBad = [], pitchBad = [], ringBad = 0, barBad = 0, exempt = 0, crossings = 0, floorBad = 0, shapeBad = 0, worstShape = 0;
       for (const [z, list] of onRing) {
         const rr = ringR(z);
@@ -334,6 +451,16 @@ async function run(modulePath, { quiet = false } = {}) {
     // overhang: the report names a place and a number between 0 and 90
     check(`C12 ${cs.label} the overhang report names its wire`, m.info.overhang.deg >= 0 && m.info.overhang.deg <= 90 && !!m.info.overhang.where);
   }
+  // THE DOOR MATRIX: every preset × every cross-section × every door shape, the D family alone (the full
+  // family runs on the eight cells above)
+  { let n = 0, bad = []; for (const id of G.PRESET_IDS) for (const sd of SIDES) for (const sh of SHAPES) {
+      const P = { ...G.applyPreset(G.defaultParams(), id), sides: sd, doorShape: sh };
+      let mm; try { mm = G.buildCage(P); } catch (e) { bad.push(`${id}/${sd}/${sh} threw`); continue; }
+      if (!mm.info.door) { bad.push(`${id}/${sd}/${sh} no door`); continue; }
+      for (const [nm, ok, d] of doorClauses(G, mm, P, `${id} ${sd}/${sh}`)) { n++; if (!ok) bad.push(`${nm} — ${d}`); }
+    }
+    for (const fam of ['D1', 'D2', 'D3', 'D4', 'D5']) { const b = bad.filter((x) => x.startsWith(fam) || / threw| no door/.test(x)); check(`${fam} the door matrix (${G.PRESET_IDS.length} presets × 4 sections × 4 shapes)`, b.length === 0, b.slice(0, 3).join('; ')); }
+  }
   // B0 PLAIN RINGS ARE THE PHASE-1 CAGE, by branch: band fields moved while the band is off move no byte
   { const a = G.defaultParams(), b = { ...a, bandStyle: 'none', bandRings: 'top', beadMm: 5.5, leafMm: 12, bandSpacing: 0.52 };
     const ma = G.buildCage(a), mb = G.buildCage(b), sa = G.exportStl(ma), sb = G.exportStl(mb);
@@ -350,8 +477,8 @@ async function run(modulePath, { quiet = false } = {}) {
 
 /* ---- negative control ---- */
 const MUTANTS = [
-  { id: 'the-door-leaves-the-bars-uncut', from: "const barInside = door ? (q) => { const th = Math.atan2(q[1], q[0]); return door.inside(door.sOf(th, q[2]), q[2]); } : () => false;", to: "const barInside = () => false;", breaks: /^C5[bc]? / },
-  { id: 'a-ring-at-the-door-is-not-cut', from: "if (door && z > door.z0 && z < door.top(0)) {", to: "if (false) {", breaks: /^C5c / },
+  { id: 'the-door-leaves-the-bars-uncut', from: "if (door && door.barU.has(j)) {", to: "if (false) {", breaks: /^(C5[bc]?|D2) / },
+  { id: 'a-ring-at-the-door-is-not-cut', from: "const cr = door ? door.cross.get(rg) : null;", to: "const cr = null;", breaks: /^C5c / },
   { id: 'the-floor-is-not-applied', from: "const wireR = (mm, what) => { const r = mm / 2; if (r < floor / 2)", to: "const wireR = (mm, what) => { const r = mm / 2; if (false)", breaks: /^C4 |^C13 / },
   { id: 'a-polygon-corner-carries-no-bar', from: "if (N && barCount % N) {", to: "if (false) {", breaks: /^C6 |^C15 / },
   { id: 'the-tube-is-left-open', from: "    const c0 = mesh.vertex(...pts[0]), c1 = mesh.vertex(...pts[n - 1]);\n    for (let k = 0; k < sides; k++)", to: "    const c0 = mesh.vertex(...pts[0]), c1 = mesh.vertex(...pts[n - 1]);\n    for (let k = 0; k < 0; k++)", breaks: /^C1 |^C2 / },
@@ -367,12 +494,19 @@ const MUTANTS = [
   { id: 'the-bead-fuse-cap-is-dropped', from: "const nMin = Math.ceil(gMax / (hiF * size) - 1e-9)", to: "const nMin = 1", breaks: /^(B3|B5) / },   // a parted run also leaves bars crossing the ring outside every element
   { id: 'the-laurel-run-parts', from: "loF = LEAF_RUN_PITCH_MIN; hiF = LEAF_RUN_PITCH_MAX;", to: "loF = LEAF_RUN_PITCH_MIN; hiF = 1.2;", breaks: /^(B3|B5) / },   // parted leaves leave bars between them
   { id: 'a-bead-floats-off-its-ring', from: "} else sphereSolid(scr, map(s0, 0, 0), size / 2, PATTERN_LAT, PATTERN_LON);", to: "} else sphereSolid(scr, map(s0, 0, size), size / 2, PATTERN_LAT, PATTERN_LON);", breaks: /^(B2|B3|B4|B5|B9|C3) / },   // floated out, the beads also sit on a wider circle, so neighbours part
-  { id: 'the-door-keeps-its-band', from: "const drop = (pts) => door && rg.cut &&", to: "const drop = (pts) => false &&", breaks: /^(B4|B7) / },   // kept in the opening, an element sits where the ring was cut away
+  { id: 'the-door-keeps-its-band', from: "const drop = (pts) => door && (rg.cut || rg.sill) &&", to: "const drop = (pts) => false &&", breaks: /^(B4|B7) / },   // kept in the opening, an element sits where the ring was cut away
   { id: 'the-band-ignores-the-profile-slope', from: "const nr = ez, nz = -er, a0 = ra(zc);", to: "er = 0; ez = 1; const nr = ez, nz = -er, a0 = ra(zc);", breaks: /^B9 / },
   { id: 'the-svg-drops-the-bands', from: "  for (const b of bands) {\n    if (b.kind === 'bead')", to: "  for (const b of []) {\n    if (b.kind === 'bead')", breaks: /^(B8|C10) / },
-  { id: 'every-ring-carries-the-band', from: "const want = (rg) => p.bandRings === 'all' ||", to: "const want = (rg) => true ||", breaks: /^B1 / },
+  { id: 'every-ring-carries-the-band', from: "const bandWants = (p, rg) => p.bandRings === 'all' ||", to: "const bandWants = (p, rg) => true ||", breaks: /^B1 / },
   { id: 'bands-build-on-plain-rings', from: "const bandOut = banded(p) ? buildBands() : null;", to: "const bandOut = (p.bandStyle = banded(p) ? p.bandStyle : 'beading', buildBands());", breaks: /^B0b? / },
   { id: 'beads-sit-inside-their-ring', from: "size = Math.max(p.beadMm, floor, BAND_OVER_RING * 2 * rr);", to: "size = Math.max(p.beadMm, floor);", breaks: /^B6 / },
+  // the door's placement (docs/cage-phase-1.md §9) — each a plausible wrong door
+  { id: 'the-door-sits-on-a-polygon-corner', from: "const cIdx = N ? mod((Math.round(0.75 * N - 0.5) + 0.5) * m, barCount) :", to: "const cIdx = N ? mod(Math.round(0.75 * barCount), barCount) :", breaks: /^D[12] / },
+  { id: 'the-jambs-land-between-bars', from: "const W = widthOf(k), half = k / 2;", to: "const W = widthOf(k), half = k / 2 * p.doorWidth / widthOf(k);", breaks: /^D[125] / },
+  { id: 'the-door-crosses-a-shoulder-ring', from: "R.shoulder || R.banded || R === ringPlan", to: "R.banded || R === ringPlan", breaks: /^D[35] / },
+  { id: 'the-door-crosses-a-banded-ring', from: "R.shoulder || R.banded || R === ringPlan", to: "R.shoulder || R === ringPlan", breaks: /^D[35] / },
+  { id: 'the-sill-floats-above-its-ring', from: "const z0 = ch.S.z, Dh = ch.Dh, apex = z0 + Dh;", to: "const z0 = ch.S.z + 3, Dh = ch.Dh - 3, apex = z0 + Dh;", breaks: /^D[35] / },
+  { id: 'the-frame-is-a-flat-plane', from: "const fsurf = (th, z) => surf(th, z);", to: "const fsurf = (th, z) => { const q = surf(th, z), c = Math.cos(thD), s = Math.sin(thD), d = rho(z0) * (N ? Math.cos(Math.PI / N) : 1) - (q[0] * c + q[1] * s); return [q[0] + d * c, q[1] + d * s, z]; };", breaks: /^D[24] / },
   { id: 'bars-ending-at-the-ring-get-no-ribs', from: "if (!flat && barsEnd === 'ring') {", to: "if (false) {", breaks: /^C3 |^C9 / },
 ];
 if (NEG) {
