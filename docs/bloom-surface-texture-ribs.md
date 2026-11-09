@@ -547,7 +547,7 @@ edge at H 2.5 is gone, the ribs round off into the rim.
 both starburst rows), and, where the ease is wider than three lattice edges, some vertex
 inside it short of full weight (121 of 121 easing). A thirteenth mutant,
 `the-rim-drops-in-one-lattice-edge` (§12's drop restored), must fire it; the 45-degree mutant
-is re-anchored. MUTANTS13
+is re-anchored. **13 of 13 mutants behave**: the new one fires R8 with "no hub-top vertex inside the rim's 1.875 mm ease is short of full weight (121 looked at)".
 
 ## 9. Not done
 
