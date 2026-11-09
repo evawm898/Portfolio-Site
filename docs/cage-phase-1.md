@@ -247,3 +247,107 @@ leaf-tip run are merged and follow the frame (`frame-pattern.js`, #477), but the
 rose, rosette and bud (`frame-elements.js`, #479) are standalone primitives placed on no frame,
 their rulings still pending (frame charter §16), and the wiring session that reconciles the
 palmette and rosette with the chain motifs has not happened.
+
+## 8. Phase 2, step 1 — ring bands: beading and the leaf-tip run (Nov 9)
+
+Eva's ruling (Nov 9): go ahead with **beading and the leaf-tip run only**; the rosette and palmette
+bands wait until /frame places those elements (frame charter §16). **RULED Nov 9, from the sheet: the
+default stays PLAIN** — `bandStyle` ships `none`, so the default cage is the Phase 1 cage to the byte (B0),
+and C0f pins it (no preset names a band). Both styles ship as offered; the leaf-tip run reading as a rope
+at full size was put to Eva with the sheet and not asked to be reworked.
+
+### 8.1 What is imported, unchanged
+
+Every element is /frame's own code, called as it ships (frame charter §15):
+
+- a **bead** is frame-relief's `sphereSolid` on its own lattice (`PATTERN_LAT` × `PATTERN_LON`);
+- a **leaf** is frame-filigree's `buildLeaf` (one lobe, no curl, sixteen stations — frame-pattern's
+  `LEAF_RUN_LOBES` / `PATTERN_LEAF_STATIONS`) swept by frame-relief's `bandSolid` in frame-filigree's
+  `leafProfile`, its width `LEAF_ASPECT` × its length and its crown `max(floor, LEAF_RELIEF × width)`;
+- the **rules** are frame-pattern's constants: beads fused at ≤ `BEAD_FUSE` (1.8) × r and no closer than r;
+  a laurel run's pitch inside [`LEAF_RUN_PITCH_MIN`, `LEAF_RUN_PITCH_MAX`] = ½–¾ of a leaf, each base
+  stacked a crown over the previous tip (frame's own lift law).
+
+Nothing in frame-*.js moved. **`cage-gate.yml` now names frame-pattern.js and frame-filigree.js** in its
+path filter (the cage imports both), and the geometry job's limit rose 20 → 45 min: the 48 cages and
+23 mutants made the negative control ~25 min, and the first CI run on this branch was cancelled at the
+old limit. **This is an edit to an existing workflow file**, so a frozen tag dispatched after this merges
+from a base that predates it will be refused (CLAUDE.md's rule of thumb). Every registered phase was
+published before this change (through phase95), so none is owed today. The gate's own per-part
+closedness check was also made ~3× faster (vertices keyed by position once, edges packed as numbers),
+which took the local gate from 86 s to 59 s with the same answer.
+
+### 8.2 The mapping — the cone segment, through the ring
+
+Each element is built flat by /frame's code in a development (along the ring `s`, across it `t`, out of
+the surface `w`; a bead directly in 3D) and every vertex is mapped onto the **cone segment through the
+ring**: the frustum through the ring's own centreline whose slope is the chord of the profile across the
+band's height (§5 item 10). On a **round** section the map is the exact development of that cone — the
+arc at slant `t` is `θ · r(t)`, so a leaf laid along the developed parallel lands with every length
+kept; on a cylinder it is the identity. On a **polygon** each face is a plane: the along-distance from
+the face's centre is kept, so the map is exact on every face and folds at the corners.
+
+**A decision made without a ruling:** §5 item 10 named the frustum through the band's two EDGE rings;
+this uses the frustum through the RING with the same slope, i.e. the edge-ring frustum moved outward by
+the profile's sagitta across the band. It puts every bead's centre exactly on its ring and every leaf's
+underside through it; the cost is that the band's edges stand off the true surface by at most that
+sagitta (reported per build: ≤ 0.11 mm on the bell, ≤ 0.39 mm on the tiered cage's step). B9 bounds it.
+
+### 8.3 The snap — one on every bar
+
+Every bar gap holds the same number `n` of elements, the first ON the bar — a bead's centre on the bar's
+crossing with the ring, a leaf's base on it — so the run never sits at a random phase to the bars.
+`n` comes from the asked spacing (× the bead's diameter or the leaf's length) and is then held inside
+the run's own rule over every gap; the built spacing is told whenever it differs from the asked by more
+than 0.02 ("snapped to the bars — ring 2 5 a bar (110), spacing 0.75"). On a polygon the bars sit at
+equal AZIMUTHS, so the gaps along a face are unequal and the spacing is a range; where no single `n`
+keeps every gap inside the rule, the run is built at the fused end and told.
+
+### 8.4 The other rules
+
+- **Proud of the ring** (a decision made without a ruling, `BAND_OVER_RING` 1.25): a bead's diameter
+  and a leaf's width are held at or over 1.25 × the ring's own diameter, told. Under it a bead
+  disappears into its ring.
+- **Fused**: a bead's centre is on the ring's centreline, so the ring passes through every bead; a
+  leaf's column stands from the ring's centreline outward (its crown lifted by the ring's radius), so
+  the ring runs through every leaf; and every bar crossing the ring passes through an element.
+- **The door** drops every element any of whose vertices would lie in the opening.
+- **The SVG** draws a bead as its silhouette circle and a leaf as its projected planform, thin.
+
+### 8.5 Controls (a new top-level section, "Ring bands")
+
+| control | default | range |
+|---|---|---|
+| Band | plain rings | plain / beading / leaf-tip run |
+| On | every ring | every ring / the rings between / base and top / top ring only |
+| Bead diameter | 3.0 mm | 1.5–6 |
+| Leaf length | 8 mm | 3–14 |
+| Spacing | 0.70 × | 0.50–0.90, snapped |
+
+"Each ring is plain or carries a band" is built as the On selector rather than a control per ring (the
+ring count moves with the profile's shoulders, so a per-ring list would change length under the hand).
+The randomizer draws the band fields LAST, so every earlier field of a seed is the sequence it was.
+
+### 8.6 Gates and cost
+
+- `node tools/verify-cage.mjs`: **997 of 997** over 48 cages (the presets, 24 seeds — about half of
+  them banded now — each preset in each band style, the three ring selections, a bead under its ring
+  and both styles at the widest spacing). The B family: B0 inert when off (byte-identical STL and SVG),
+  B1 the rings named, B2 the snap (a bead's centre within the bar's own wire at every crossing — the
+  emitted bar is a polyline, so its crossing carries the polyline's chord error, tenths of a mm on a
+  profile step), B3 fused along the run (Eva's 1.8 r; ½–¾ of a leaf, round cages), B4 fused to its
+  ring, B5 fused to every bar it crosses (a ray-parity point inside both solids), B6 the floor and
+  1.25 × proud (an element's width read as the extent of its (radius, z) cloud — its z extent alone
+  reads short on a sloped band, which is what the first cut measured), B7 clear of the door, B8 the
+  SVG, B9 on the cage's own shape (the profile restated from the control through bloom-curve.js).
+- `--negative-control`: **23 of 23** (ten band mutants). Five claims were widened on measurement,
+  every one true collateral rather than a loosening: a run whose fuse cap or laurel pitch is dropped
+  parts, so bars cross the ring outside every element (B5); beads floated outward sit on a wider circle,
+  so neighbours part (B3); a band kept in the door opening sits where the ring was cut away (B4). And
+  the plain-rings mutant was rewritten — forcing an unknown style through built elements with neither
+  a centre nor an outline and threw in the SVG writer; it now builds real beads, and an SVG throw is
+  C10's red rather than an abort. `--mutant=a,b` runs a named subset.
+- `node tools/verify-cage-page.mjs`: **18 of 18** (P11 / P11b), `--negative-control` **8 of 8**.
+- Cost, the default bell: 64,132 → **264,652** triangles with beading (12.6 MB STL), **359,044** with
+  leaves (17.1 MB); the tiered cage's eight rings 408,536 / 605,960. A bead is 360 triangles, a leaf
+  about 1,152. Build 70–170 ms. Sheet: `node tools/shot-cage-bands.mjs <dir> --png docs/img/cage-bands.png`.
