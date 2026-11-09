@@ -93,23 +93,29 @@ true crest), the crest height lost, triangles / mm².
 | option | what | default bloom, triangles |
 |---|---|---|
 | (i) lattice | the field on the shipped 0.4 mm lattice — BONE's release build | 158,912 (A and B) |
-| (ii) crest | every crest half-plane cut into each organ's lattice as constraint edges | A 189,836 · B 190,130 (+19.5 %) |
+| (ii) crest | every crest half-plane cut into each organ's lattice as constraint edges | A 189,836 · B 190,130 (+19.5–19.6 %) |
 | (ii+) crest + flank | crest, half-flank and valley lines (4 a pitch) | A 282,608 · B 297,464 (+78–87 %) |
 | (iii) split | (i) live, (ii) on export | — (a policy over (i) and (ii)) |
 
-**Crest quality, the petal (law B; A reads the same within a few degrees):**
+**Crest quality, the petal** (60 samples a row, medians; the asked angle differs
+between the laws because their pitch at the sampled radii differs):
 
-| H | option | crest built (asked) | zigzag median / max | height lost | tris/mm² |
-|---|---|---|---|---|---|
-| 0.4 | lattice | 141.2° (122.6°) | 0.083 / 0.169 mm | 0.052 mm (13 %) | 20.6 |
-| 0.4 | crest | 123.7° (122.6°) | 0 / 0 | 0 | 24.7 |
-| 0.4 | crest + flank | 123.7° (122.6°) | 0 / 0 | 0 | 38.9 |
-| 2.5 | lattice | **82.0° (29.1°)** | 0.138 / 0.165 mm | **0.558 mm (22 %)** | 20.6 |
-| 2.5 | crest | 30.5° (29.1°) | 0 / 0 | 0 | 24.7 |
-| 2.5 | crest + flank | 30.5° (29.1°) | 0 / 0 | 0 | 38.9 |
+| law | H | option | crest built (asked) | zigzag median / max | height lost | tris/mm² |
+|---|---|---|---|---|---|---|
+| A | 0.4 | lattice | 143.8° (126.4°) | 0.093 / 0.169 mm | 0.055 mm (14 %) | 20.6 |
+| A | 0.4 | crest | 127.3° (126.4°) | 0 / 0 | 0 | 24.8 |
+| A | 2.5 | lattice | **72.0° (33.3°)** | 0.111 / 0.166 mm | **0.480 mm (19 %)** | 20.6 |
+| A | 2.5 | crest | 34.3° (33.3°) | 0 / 0 | 0 | 24.8 |
+| B | 0.4 | lattice | 141.0° (124.6°) | 0.074 / 0.171 mm | 0.048 mm (12 %) | 20.6 |
+| B | 0.4 | crest | 124.4° (124.6°) | 0 / 0 | 0 | 24.7 |
+| B | 2.5 | lattice | **53.8° (30.2°)** | 0.082 / 0.166 mm | **0.436 mm (17 %)** | 20.6 |
+| B | 2.5 | crest | 30.8° (30.2°) | 0 / 0 | 0 | 24.7 |
+
+Crest + flank lines read the crest identically to crest lines (A 127.3° / 34.3°, B
+124.4° / 30.8°) at 37.4 / 38.9 tris/mm².
 
 **The hub top (B, H 2.5):** lattice 49.3° (asked 21.5°), zigzag 0.045 mm, 0.78 mm of
-crest lost; crest lines 21.5° (21.5°), 0, 0. **The stem (B):** the shipped stem lattice's
+crest lost; crest lines 21.5° (21.5°), no zigzag, 0.02 mm (40 samples each). **The stem (B):** the shipped stem lattice's
 48 sector columns already stand on B's 8 flutes, so all three options build the same
 crest — 137.3° (asked 140.0°) at H 0.4 and **67.5° (asked 47.4°) at H 2.5**. That gap
 is not meshing: on a 3 mm cylinder the relief radiates along the normals, so a flank
@@ -118,9 +124,9 @@ open; the restated "asked" figure is taken on the tangent line and does not carr
 surface's curvature. A's stem has no samples: it is smooth (§1).
 
 **Findings.** (i) is not a sharp crest: on the lattice the arris falls between lattice
-vertices, so the drawn ridge zigzags laterally by up to 0.17 mm and loses up to 22 % of
-its height — at H 2.5 the crest reads 82° where 29° is asked. (ii) puts every crest on a
-mesh edge and reproduces the asked angle to ~1–2° with no zigzag, for **+19.5 %
+vertices, so the drawn ridge zigzags laterally by up to 0.17 mm and loses up to 19 % of
+its height — at H 2.5 the crest reads 72° (A) and 54° (B) where 33° and 30° are asked. (ii)
+puts every crest on a mesh edge and reproduces the asked angle to ~1° with no zigzag, for **+19.5 %
 triangles** on the default. (ii+) buys nothing at the crest (identical angles) — its
 quarter-pitch lines sample the concave flank, which the shipped lattice already samples
 at four-plus edges a pitch — for +80 % more. (iii) is available and cheap either way:
@@ -157,10 +163,10 @@ The default bloom, EXPORT, at H 0.4 and 2.5, both laws, lattice and crest:
 | A | lattice | 2.5 | 158,912 | 0 | 9 | 0 / 0 / 0 | 0 of 28,772 | — |
 | A | crest | 0.4 | 189,836 | 0 | 9 | 0 / 0 / 0 | 0 of 9,865 | 0 |
 | A | crest | 2.5 | 189,836 | 0 | 9 | 0 / 0 / 0 | 0 of 39,983 | 0 |
-| B | lattice | 0.4 | 158,912 | 0 | 9 | 0 / 0 / 0 | 0 | — |
-| B | lattice | 2.5 | 158,912 | 0 | 9 | 0 / 0 / 0 | 0 | — |
-| B | crest | 0.4 | 190,130 | 0 | 9 | 0 / 0 / 0 | 0 | 0 |
-| B | crest | 2.5 | 190,130 | 0 | 9 | 0 / 0 / 0 | 0 | 0 |
+| B | lattice | 0.4 | 158,912 | 0 | 9 | 0 / 0 / 0 | 0 of 7,606 | — |
+| B | lattice | 2.5 | 158,912 | 0 | 9 | 0 / 0 / 0 | 0 of 31,062 | — |
+| B | crest | 0.4 | 190,130 | 0 | 9 | 0 / 0 / 0 | 0 of 9,190 | 0 |
+| B | crest | 2.5 | 190,130 | 0 | 9 | 0 / 0 / 0 | 0 of 41,063 | 0 |
 
 (Gaps: every third triangle's relieved vertices against every other part within 1 + H,
 on the same mesh built with nothing raised; `boneNoRelief`, paired vertex for vertex.)
@@ -179,15 +185,67 @@ printer (question 5).
 
 Node, EXPORT; % of the cap:
 
-BUDGET_TABLE
+| state | law | lattice (release) | crest (export) | the cut alone | crest + flank |
+|---|---|---|---|---|---|
+| default | A | 158,912 · 7.9 % · 1.3 s | 189,836 · 9.5 % · 1.8 s | 0.9 s | 282,608 · 14.1 % |
+| default | B | 158,912 · 7.9 % · 1.1 s | 190,130 · 9.5 % · 2.4 s | 1.4 s | 297,464 · 14.9 % |
+| umbel (head ON) | A | 530,634 · 26.5 % · 5.3 s | 597,696 · 29.9 % · 9.5 s | 4.6 s | 808,832 · 40.4 % |
+| umbel (head ON) | B | 530,634 · 26.5 % · 5.3 s | 609,962 · 30.5 % · 9.3 s | 4.7 s | 870,238 · 43.5 % |
+| mophead (depth 2) | A | 1,762,254 · 88.1 % · 61 s | 1,894,982 · **94.7 %** · 73 s | 16.2 s | 2,300,482 · **115 % OVER** |
+| mophead (depth 2) | B | 1,762,254 · 88.1 % · 65 s | 1,960,690 · **98.0 %** · 71 s | 15.4 s | 2,586,968 · **129 % OVER** |
+
+Every crest build closes: 0 open, 0 doubled, 0 degenerate directed edges; shells 9 /
+53 / 458, the lattice build's. **The mophead fits the cap with crest lines and only
+just** (B leaves 39,310 triangles); crest + flank lines do not fit it. The lattice build
+IS BONE's coarse count to the triangle (the same lattice, a different field). There is
+no allocator: were a heavier state over the cap, the export would be refused as any
+over-cap build is today.
 
 ## 5. Release and full times in Chromium; engine agreement
 
-BROWSER_TABLE
+`tools/bloom-texture-ribs-browser.mjs`: a fresh Chromium page per build, the
+prototype's own module, EXPORT; Node beside it. AGREE = the same triangle count and the
+same FNV-1a hash of every float32.
+
+| state | law | lattice (release): Chromium · Node | crest (full): Chromium · Node | heap at the end | engines |
+|---|---|---|---|---|---|
+| default | A | 0.80 s · 1.25 s | 1.45 s · 2.26 s | 0.11 / 0.14 GB | AGREE |
+| default | B | 0.89 s · 1.03 s | 1.96 s · 2.58 s | 0.11 / 0.08 GB | AGREE |
+| umbel | A | 3.84 s · 4.76 s | 5.54 s · 7.84 s | 0.36 / 0.32 GB | AGREE |
+| umbel | B | 3.62 s · 4.69 s | 5.84 s · 8.09 s | 0.24 / 0.28 GB | AGREE |
+| mophead | A | 41.7 s · 52.7 s | 46.4 s · 62.9 s | 0.85 / 1.30 GB | AGREE |
+| mophead | B | 42.6 s · 53.3 s | 47.4 s · 62.8 s | 1.11 / 0.74 GB | AGREE |
+
+12 of 12 agree to the bit. The crest build costs the default +0.6–1.1 s and the mophead
++4.7–4.8 s over the release build in Chromium; unlike BONE v2's full build (38.8 s on
+the default, a crashed page on the mophead) it is cheap enough to be the live build too
+(question 3). The mophead's 42 s release build is BONE's coarse cost, not the ribs'.
 
 ## 6. What the shipped curvature and visibility rules do under ribs (reported, not special-cased)
 
-RODS_TEXT
+`node tools/bloom-texture-ribs-measure.mjs --section rods` (law B, the lattice build;
+"relieved" = vertices carrying any relief):
+
+| state | boneCurvature | relieved: petal / hub / stem | rods |
+|---|---|---|---|
+| default | 1 /mm (BONE's default) | 64,336 / 75,816 (84.9 %) · 1,204 / 6,694 (18.0 %) | — |
+| default | 4 /mm (its maximum) | 74,256 / 75,816 (97.9 %) · 1,240 / 6,694 (18.5 %) | — |
+| 12 stamens + style + 60 mm stem | 1 | 84.9 % · 22.3 % · 91.3 % | **all 13 smooth** (every vertex a ridge, κ ≥ 1.04 /mm) |
+| the same | 4 | 97.9 % · 22.9 % · 95.5 % | stamens 72.0 %, style 71.3 % relieved |
+| 6 braided stamens + style | 1 | 84.9 % · 23.1 % · 91.5 % | **all 7 smooth** |
+
+- **Rods.** At BONE's default 1 /mm the curvature rule smooths every stamen, the style
+  and every braided strand (their tightest curvature is 1.04 /mm). At 4 /mm they take the
+  spokes; on a stamen near the axis that is a few flutes round a 1.2 mm rod.
+- **Bead and nib.** At 1 /mm, 11,000 petal vertices are ridges (the bead's half-round,
+  0.45 mm radius, and the nib) and are smoothed with a geodesic fade; at 4 /mm only 1,080
+  are. Row 9 of the sheet shows the tip both ways.
+- **Visibility.** Everywhere visible is the shipped definition: the petals' and the hub's
+  undersides carry spokes, and the hub top under the feet is covered and smooth (only
+  18 % of the hub's vertices are relieved on the default). The fade at a covered edge is
+  max(H × 15/8, e): 0.75 mm at H 0.4, 4.7 mm at 2.5.
+
+Nothing was special-cased; questions 6 and 8 ask.
 
 ## 7. The gate (`tools/verify-bloom-ribs.mjs`, local only, not in CI)
 
@@ -204,7 +262,7 @@ Every clause reads its reference from an owner the module under test does not wr
 | R6 the axis rule | no vertex inside the schedule's cut radius carries relief |
 
 Rows: A at H 0.4, B at 2.5, A-THIN with crest + flank at 2.5, B-START with a 40 mm stem.
-**PASS on all four**; R5's browser half AGREES on both rows it builds.
+**PASS on all four.** R5's browser half: the tool in §5 builds 12 rows in both engines, all AGREE.
 
 **Seven mutants, each with a witness on the mutated module** (never the gate asked
 whether the gate fired) — **7 of 7 behave**:
@@ -239,8 +297,8 @@ already zeroes inside the cut radius), so the mutant drops the whole rule.
 2. **The axis rule for the chosen law.** B: (a) FADE (recommended: a soft 4-spoke cross,
    no flat disc) or (b) START (crisp, ending on a ~1 mm flat disc). A: THIN, FADE, START.
 3. **Meshing.** (a) crest lines as edges in both the live build and the export
-   (recommended: +19.5 % on the default, 0.9–1.4 s; the lattice blunts a sharp crest to
-   82° at H 2.5); (b) the BONE split — lattice live, crest lines on export; (c) crest +
+   (recommended: +19.5 % on the default, +0.6–1.1 s in Chromium; the lattice blunts a
+   sharp crest to 54–72° where 30–33° is asked at H 2.5); (b) the BONE split — lattice live, crest lines on export; (c) crest +
    flank lines on export (no crest gain; over the cap on the mophead).
 4. **Spacing range and default** (proposals): 1.6–8 mm, default 2.5; A's count taken at
    a 20 mm reference radius. The 1.6 mm floor is four 0.4 mm lattice edges.
