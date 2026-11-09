@@ -1222,7 +1222,13 @@ closed run stopping short of the seam (PT2, PT4, PT5).
     are held nowhere. *Undo:* two registry rows.
 37. **The arch's mullions carry no pattern.** *Undo:* `patternPaths`.
 
-## 16. Phase 3e, step 2 — the placed elements, refined (Eva's rulings pending)
+## 16. Phase 3e, step 2 — the placed elements, refined (APPROVED — all five)
+
+**RULED (Eva, approved on the sheet before #479 merged as `abb736e`; confirmed Nov 9): (a) the shell, (b) the
+palmette with boss, (c) the rose, (d) the rosette and (e) the bud are all APPROVED as built — none is to be
+redone.** This heading read "rulings pending" until Nov 9 although the approval was recorded in #479's squash
+message. The next frame session is the WIRING: placing the elements into the chains (and a hierarchy), and
+making the palmette and the rosette ONE primitive each with phase 3d's chain motifs (below).
 
 `frame-elements.js` builds the five PLACED ELEMENTS Eva ruled in (the openwork stays out), each a
 closed relief solid about the origin on a flat base in print mm, as pure Node-importable functions —
@@ -1260,7 +1266,7 @@ an oblate dome (`bossGrid`, a superellipse profile) on a collar disc.
   seeded hash so no two match; a small dome at the heart. 33,120 triangles. **Does it still read as a
   lotus? Said plainly: no longer a faceted star — the petals are round-ended and overlap — but from
   front-on it reads nearer a camellia or a flat peony than a cabbage rose; the spiral is legible,
-  the cup is shallow.** Eva's call.
+  the cup is shallow.** Eva's call — **approved as built** (the ruling at the head of this section).
 - **(d) The rosette**: eight wide blunt petals (1.55 × their share of the circle at half radius, so
   neighbours overlap), alternate petals lifted 0.4 crown so the overlap stacks, a low flat cushion
   crown, a boss at the centre. 10,664 triangles, 4.08 mm high — flat and wide.
