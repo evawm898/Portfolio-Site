@@ -2505,5 +2505,677 @@
    },
    "agree": true
   }
+ ],
+ "centre": [
+  {
+   "law": "A",
+   "centre": "collar",
+   "H": 1,
+   "tris": 185564,
+   "ms": 2035,
+   "centreRec": {
+    "type": "collar",
+    "R": 12.73239517211914,
+    "from": "where the spacing reaches the 1.6 mm floor",
+    "rFeet": 5.318688144335204,
+    "rFloor": 12.732395447351628,
+    "wC": 1.6,
+    "sc": 1.6,
+    "circles": []
+   },
+   "schedule": {
+    "n0": 50,
+    "levels": [
+     {
+      "n": 50,
+      "rStart": 0
+     }
+    ],
+    "r0": 12.732395447351628,
+    "rCut": 6.366197723675814,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15983,
+   "flips": 0,
+   "withdrawn": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "A",
+   "centre": "collar",
+   "H": 2.5,
+   "tris": 185564,
+   "ms": 1732,
+   "centreRec": {
+    "type": "collar",
+    "R": 12.73239517211914,
+    "from": "where the spacing reaches the 1.6 mm floor",
+    "rFeet": 5.318688144335204,
+    "rFloor": 12.732395447351628,
+    "wC": 1.6,
+    "sc": 1.6,
+    "circles": []
+   },
+   "schedule": {
+    "n0": 50,
+    "levels": [
+     {
+      "n": 50,
+      "rStart": 0
+     }
+    ],
+    "r0": 12.732395447351628,
+    "rCut": 6.366197723675814,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15983,
+   "flips": 0,
+   "withdrawn": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "A",
+   "centre": "starburst",
+   "H": 1,
+   "tris": 189642,
+   "ms": 2175,
+   "centreRec": null,
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.0372
+     },
+     {
+      "n": 16,
+      "rStart": 4.0744
+     },
+     {
+      "n": 32,
+      "rStart": 8.1487
+     },
+     {
+      "n": 64,
+      "rStart": 16.2975
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15785,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "A",
+   "centre": "starburst",
+   "H": 2.5,
+   "tris": 189642,
+   "ms": 2070,
+   "centreRec": null,
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.0372
+     },
+     {
+      "n": 16,
+      "rStart": 4.0744
+     },
+     {
+      "n": 32,
+      "rStart": 8.1487
+     },
+     {
+      "n": 64,
+      "rStart": 16.2975
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15785,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "A",
+   "centre": "concentric",
+   "H": 1,
+   "tris": 190080,
+   "ms": 1657,
+   "centreRec": {
+    "type": "concentric",
+    "R": 12.73239517211914,
+    "from": "where the spacing reaches the 1.6 mm floor",
+    "rFeet": 5.318688144335204,
+    "rFloor": 12.732395447351628,
+    "wC": 1.6,
+    "sc": 1.6,
+    "circles": [
+     12.73239517211914,
+     11.132395172119141,
+     9.532395172119141,
+     7.93239517211914,
+     6.33239517211914,
+     4.732395172119141,
+     3.132395172119139,
+     1.5323951721191396
+    ]
+   },
+   "schedule": {
+    "n0": 50,
+    "levels": [
+     {
+      "n": 50,
+      "rStart": 0
+     }
+    ],
+    "r0": 12.732395447351628,
+    "rCut": 6.366197723675814,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15661,
+   "flips": 0,
+   "withdrawn": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "A",
+   "centre": "concentric",
+   "H": 2.5,
+   "tris": 190080,
+   "ms": 1514,
+   "centreRec": {
+    "type": "concentric",
+    "R": 12.73239517211914,
+    "from": "where the spacing reaches the 1.6 mm floor",
+    "rFeet": 5.318688144335204,
+    "rFloor": 12.732395447351628,
+    "wC": 1.6,
+    "sc": 1.6,
+    "circles": [
+     12.73239517211914,
+     11.132395172119141,
+     9.532395172119141,
+     7.93239517211914,
+     6.33239517211914,
+     4.732395172119141,
+     3.132395172119139,
+     1.5323951721191396
+    ]
+   },
+   "schedule": {
+    "n0": 50,
+    "levels": [
+     {
+      "n": 50,
+      "rStart": 0
+     }
+    ],
+    "r0": 12.732395447351628,
+    "rCut": 6.366197723675814,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15661,
+   "flips": 0,
+   "withdrawn": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "B",
+   "centre": "collar",
+   "H": 1,
+   "tris": 189364,
+   "ms": 1978,
+   "centreRec": {
+    "type": "collar",
+    "R": 5.31868839263916,
+    "from": "the petal feet's inner edge",
+    "rFeet": 5.318688144335204,
+    "rFloor": 1.0185916357881302,
+    "wC": 1.6,
+    "sc": 1.6,
+    "circles": []
+   },
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.2508
+     },
+     {
+      "n": 16,
+      "rStart": 4.5016
+     },
+     {
+      "n": 32,
+      "rStart": 9.0032
+     },
+     {
+      "n": 64,
+      "rStart": 18.0063
+     },
+     {
+      "n": 128,
+      "rStart": 36.0127
+     },
+     {
+      "n": 256,
+      "rStart": 72.0253
+     },
+     {
+      "n": 512,
+      "rStart": 144.0506
+     },
+     {
+      "n": 1024,
+      "rStart": 288.1012
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15777,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "B",
+   "centre": "collar",
+   "H": 2.5,
+   "tris": 189364,
+   "ms": 2170,
+   "centreRec": {
+    "type": "collar",
+    "R": 5.31868839263916,
+    "from": "the petal feet's inner edge",
+    "rFeet": 5.318688144335204,
+    "rFloor": 1.0185916357881302,
+    "wC": 1.6,
+    "sc": 1.6,
+    "circles": []
+   },
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.2508
+     },
+     {
+      "n": 16,
+      "rStart": 4.5016
+     },
+     {
+      "n": 32,
+      "rStart": 9.0032
+     },
+     {
+      "n": 64,
+      "rStart": 18.0063
+     },
+     {
+      "n": 128,
+      "rStart": 36.0127
+     },
+     {
+      "n": 256,
+      "rStart": 72.0253
+     },
+     {
+      "n": 512,
+      "rStart": 144.0506
+     },
+     {
+      "n": 1024,
+      "rStart": 288.1012
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15777,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "B",
+   "centre": "starburst",
+   "H": 1,
+   "tris": 189706,
+   "ms": 2065,
+   "centreRec": null,
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.2508
+     },
+     {
+      "n": 16,
+      "rStart": 4.5016
+     },
+     {
+      "n": 32,
+      "rStart": 9.0032
+     },
+     {
+      "n": 64,
+      "rStart": 18.0063
+     },
+     {
+      "n": 128,
+      "rStart": 36.0127
+     },
+     {
+      "n": 256,
+      "rStart": 72.0253
+     },
+     {
+      "n": 512,
+      "rStart": 144.0506
+     },
+     {
+      "n": 1024,
+      "rStart": 288.1012
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15785,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "B",
+   "centre": "starburst",
+   "H": 2.5,
+   "tris": 189706,
+   "ms": 2042,
+   "centreRec": null,
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.2508
+     },
+     {
+      "n": 16,
+      "rStart": 4.5016
+     },
+     {
+      "n": 32,
+      "rStart": 9.0032
+     },
+     {
+      "n": 64,
+      "rStart": 18.0063
+     },
+     {
+      "n": 128,
+      "rStart": 36.0127
+     },
+     {
+      "n": 256,
+      "rStart": 72.0253
+     },
+     {
+      "n": 512,
+      "rStart": 144.0506
+     },
+     {
+      "n": 1024,
+      "rStart": 288.1012
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15785,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "B",
+   "centre": "concentric",
+   "H": 1,
+   "tris": 190060,
+   "ms": 2093,
+   "centreRec": {
+    "type": "concentric",
+    "R": 5.31868839263916,
+    "from": "the petal feet's inner edge",
+    "rFeet": 5.318688144335204,
+    "rFloor": 1.0185916357881302,
+    "wC": 1.6,
+    "sc": 1.6,
+    "circles": [
+     5.31868839263916,
+     3.71868839263916,
+     2.11868839263916
+    ]
+   },
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.2508
+     },
+     {
+      "n": 16,
+      "rStart": 4.5016
+     },
+     {
+      "n": 32,
+      "rStart": 9.0032
+     },
+     {
+      "n": 64,
+      "rStart": 18.0063
+     },
+     {
+      "n": 128,
+      "rStart": 36.0127
+     },
+     {
+      "n": 256,
+      "rStart": 72.0253
+     },
+     {
+      "n": 512,
+      "rStart": 144.0506
+     },
+     {
+      "n": 1024,
+      "rStart": 288.1012
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15818,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "B",
+   "centre": "concentric",
+   "H": 2.5,
+   "tris": 190060,
+   "ms": 2086,
+   "centreRec": {
+    "type": "concentric",
+    "R": 5.31868839263916,
+    "from": "the petal feet's inner edge",
+    "rFeet": 5.318688144335204,
+    "rFloor": 1.0185916357881302,
+    "wC": 1.6,
+    "sc": 1.6,
+    "circles": [
+     5.31868839263916,
+     3.71868839263916,
+     2.11868839263916
+    ]
+   },
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.2508
+     },
+     {
+      "n": 16,
+      "rStart": 4.5016
+     },
+     {
+      "n": 32,
+      "rStart": 9.0032
+     },
+     {
+      "n": 64,
+      "rStart": 18.0063
+     },
+     {
+      "n": 128,
+      "rStart": 36.0127
+     },
+     {
+      "n": 256,
+      "rStart": 72.0253
+     },
+     {
+      "n": 512,
+      "rStart": 144.0506
+     },
+     {
+      "n": 1024,
+      "rStart": 288.1012
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15818,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  }
  ]
 }

@@ -4,7 +4,10 @@ Nov 9. A prototype and a sheet for Eva's spacing ruling. **No shipped bloom file
 changes**: `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`, `bloom.html` are
 untouched. The sheet is `docs/img/bloom-texture-ribs.png`; every number below is in
 `docs/data/bloom-texture-ribs.json`. Read §1 for what was built, §2 for the meshing
-answer, §7 for the questions.
+answer, §7 for the questions. **§10 is the second round (Eva's rulings of Nov 9 on #541): law
+A the default, the stem and rods excluded by name, and the three centre treatments for
+her ruling** — sheet `docs/img/bloom-texture-ribs-centre.png`. §2–§6 and the main sheet are
+the first round's record and predate the exclusion (their stem rows are fluted).
 
 ## 0. The rulings in force
 
@@ -286,6 +289,10 @@ already zeroes inside the cut radius), so the mutant drops the whole rule.
 
 ## 8. Questions for Eva (numbered, with options; my recommendation first)
 
+**[Nov 9: questions 1 and 8 are RULED — A is the default, B an alternative; both faces.
+Question 6's rods are moot (excluded by name, §10.1). Question 2 is now the CENTRE (§10).
+The rest stay open for the shipping prompt.]**
+
 1. **The spacing law — A or B?** (the sheet's rows 1–5)
    - **(a) B, constant spacing (recommended).** It alone keeps a near-constant pitch from
      the hub to the leaf tips (1.8–3.5 mm), ribs the hub top and fluted the stem with no
@@ -315,6 +322,124 @@ already zeroes inside the cut radius), so the mutant drops the whole rule.
 9. **Height default.** 0.4 mm (the texture floor) reads faintly on ribs (a 124° crest):
    keep, or a ribs default nearer 1.0?
 
+## 10. Second round: Eva's rulings of Nov 9, and the centre
+
+### 10.1 What was ruled, and what it changed
+
+1. **SPACING.** Law A (a fixed count, fanning) is the DEFAULT; law B (constant spacing,
+   branching) ships as an alternative, a "spacing" choice under RIBS. Both stay in the
+   prototype (`ribLaw`, default `'A'`).
+2. **ORGANS — EVA'S NAMED EXCLUSION.** Ribs on the petals, sepals, leaves and the hub's
+   TOP. The stem and every rod — stamens, style, braid, pedicels, petioles, a compound
+   leaf's stalks — are excluded **by name**: `RIB_EXCLUDED_ORGANS` (`stem`, `stamen`,
+   `style`, `petiole`, `stalk`) plus any organ the shipped pass marks as a rod, and the
+   hub's vertices whose own normal does not point up (its underside and side wall). This
+   is a LIST Eva ruled, recorded as such; it is not the derived visibility rule and not
+   the derived curvature mask (both still act, unchanged, on what remains). One new
+   anchored edit carries it (`excluded`, in `boneReliefPass`'s weight loop) and the
+   hook's relief weight reads the same predicate, so an excluded vertex is neither raised
+   nor cut. **A's stem fade and B's stem flutes are moot**; §6's rod findings now apply
+   only to the leaf blades and the bead/nib.
+3. **UNDERSIDES.** Both faces of petals and sepals, as prototyped (question 8 answered).
+4. **CENTRE.** Three treatments rendered for Eva's ruling (below).
+
+The default bloom carries no stem and no rods, so ruling 2 changed only its hub: the
+underside is no longer raised (R7 counts the hub corners that move — all upward).
+
+### 10.2 The three centres, and the derived radius
+
+`ribCentre`: `'collar'`, `'starburst'`, `'concentric'` (in `RIB_CENTRES`). When one is
+asked it decides the axis rule (STARBURST takes A-THIN under A and B's own branching
+under B; COLLAR and CONCENTRIC take the plain schedule outside a ring).
+
+**The ring radius is derived at the start of the relief pass, never typed:**
+
+    R = max(r0, rFeet)
+
+- `r0` — where the plain schedule's spacing reaches the 1.6 mm floor (four 0.4 mm lattice
+  edges): `n0 × 1.6 / 2π`. A: 50 spokes → **12.73 mm**. B: 4 spokes → **1.02 mm**.
+- `rFeet` — the petal feet's INNER EDGE: the least distance from the axis of any petal
+  vertex the pass is handed, i.e. where the petals stop covering the hub top. **5.32 mm**
+  on the default bloom.
+- Snapped to 2^-20 mm (a cut is decided on it).
+
+So **A's ring is its floor radius** (it can print its 50 spokes no closer) and **B's ring
+is the feet's inner edge** (where the visible hub disc begins). The ring's half-width
+(collar) and the concentric pitch are the same floor spacing, 1.6 mm.
+
+| treatment | how the ribs end | inside |
+|---|---|---|
+| COLLAR | ribs rise out of a soft raised ring's outer flank, `(1 − (d/1.6)²)²`, over 1.6 mm | smooth inside R − 1.6 |
+| STARBURST | every other rib drops inward where the spacing meets the floor (A-THIN; B's levels run the other way); the last 4 fade inside r0/2 | the 4-spoke cross |
+| CONCENTRIC | ribs end at a sharp ring crest at R | sharp concentric ridges every 1.6 mm, faded inside 0.8 mm; cut into the mesh as constraint circles (line ids −1, −2, …) |
+
+### 10.3 What it looks like (the centre sheet)
+
+The default bloom, petal feet in place, EXPORT, crest lines, H 1.0. Per treatment × law:
+from directly above at raking light, at 45°, and the exact radial section along a petal's
+midline (the emitted triangles cut by a vertical half-plane, ribbed against the same mesh
+with nothing raised, R marked).
+
+- **A's ring lands OUTSIDE the hub** (12.73 mm against a hub of ~8.8 mm): on the petal
+  bases, both faces. Under A-COLLAR the whole visible hub top is smooth; under
+  A-CONCENTRIC it carries the rings that fall on relieved surface (6 of 8: the two at
+  7.93 and 6.33 mm are wholly under the feet).
+- **B's ring sits at the feet's inner edge, inside T5's coverage fade.** The fade is
+  `max(H × 15/8, e)` — 1.875 mm at H 1, 4.69 mm at H 2.5 — measured from the feet, so
+  B's collar comes out only ~0.15 mm tall on the section at H 1, and at H 2.5 no hub
+  vertex inside it reaches full weight. The ring is there; the coverage rule is what
+  shades it. Moving R outward of the fade would put it under the feet.
+- **STARBURST** is a 4/8/16/32-spoke run inward on the hub (A at 2.04 / 4.07 / 8.15 mm,
+  B at 2.25 / 4.50 / 9.00 mm) — the two laws look alike on the hub top and differ on the
+  petals.
+
+| law | centre | R (from) | tris | within-shell pairs | open / doubled / degenerate | shells | withdrawn |
+|---|---|---|---|---|---|---|---|
+| A | collar | 12.73 (the floor) | 185,564 | 0 | 0 / 0 / 0 | 9 | 0 |
+| A | starburst | — | 189,642 | 0 | 0 / 0 / 0 | 9 | 64 |
+| A | concentric | 12.73 (the floor) | 190,080 | 0 | 0 / 0 / 0 | 9 | 0 |
+| B | collar | 5.32 (the feet) | 189,364 | 0 | 0 / 0 / 0 | 9 | 64 |
+| B | starburst | — | 189,706 | 0 | 0 / 0 / 0 | 9 | 64 |
+| B | concentric | 5.32 (the feet) | 190,060 | 0 | 0 / 0 / 0 | 9 | 64 |
+
+Identical at H 1.0 and H 2.5 (the cut does not depend on the height); 0 folded triangles
+everywhere. "Withdrawn" counts edges the cutter gave up because a new point's float32 key
+coincided with another part's (the junction rule).
+
+### 10.4 The gate, second round
+
+R0–R6 unchanged in meaning; R1 now restates the centre (R from the plain schedule's r0
+and the petal feet read off the LATTICE build — a different build from the one under
+test — and requires the build's own R to equal it); R2 holds every concentric ring
+crest's ends on its restated circle (≤ 3.6e-15 mm) and every relieved lattice triangle a
+ring crosses to carry its chord (A 1,624 / 1,624, B 272 / 272); R6 holds the collar's
+smooth disc; **R7 is new: Eva's named exclusion** — every stem and rod triangle equals
+the unraised twin's to the bit, and every hub corner that moves moves up. Eight rows
+(the four of §7 plus A-COLLAR, A-CONCENTRIC, B-CONCENTRIC, and B-STARBURST on a bloom with
+a 40 mm stem, 24 stamens and a style — 11,838 stem/rod triangles unmoved). **PASS on all
+eight.**
+
+Two over-strict first drafts of the ring clause, both corrected by measurement: "every
+circle carries an edge" failed on A's two rings that lie wholly under the feet, and
+"full-weight triangles" was vacuous on B, whose rings all sit in the coverage fade.
+
+**Ten mutants, 10 of 10 behave** — the seven of §7 (unchanged figures) plus three for the
+second round, each with a witness on the mutated module:
+
+| mutant | fires | witness |
+|---|---|---|
+| `the-named-exclusion-is-dropped` | R7 (31,963 stem/rod corners moved; R1 too) | the mutated build raises a stem vertex |
+| `the-centre-radius-is-typed` (R = 10) | R1 (the build's R 10 against the restated 12.73; R6 too, 2,556 vertices in the collar's disc) | the mutated build reports R 10 |
+| `the-rings-are-not-cut` | R2 (ring chords on 0 of 272 relieved triangles) | the mutated build claims no ring edge |
+
+## 11. Not done (second round)
+
+No shipped file. The centre's ring is drawn at every azimuth, between the petals and
+under them alike; whether it should stop at the feet is part of the centre ruling. The
+main sheet and §2–§6 were not re-measured after the exclusion (the default bloom has
+neither a stem nor rods; the mophead's budget will fall by its pedicels' and stamens'
+cut triangles).
+
 ## 9. Not done
 
 No shipped file, no registry row, no control, no matrix row, no CI. Sepals and leaves
@@ -327,10 +452,12 @@ length, the floor spacing and A's reference radius are proposals (questions 4, 7
 
 ```bash
 npm i --no-save three@0.161.0 playwright-core
-node tools/verify-bloom-ribs.mjs                    # R0-R6 on the clean module
-node tools/verify-bloom-ribs.mjs --negative-control # seven mutants
+node tools/verify-bloom-ribs.mjs                    # R0-R7 on the clean module
+node tools/verify-bloom-ribs.mjs --negative-control # ten mutants
 node tools/verify-bloom-ribs.mjs --browser          # + Node vs Chromium
 node --max-old-space-size=12000 tools/bloom-texture-ribs-measure.mjs --resume
 node --max-old-space-size=12000 tools/bloom-texture-ribs-browser.mjs --resume
 node tools/shot-bloom-texture-ribs.mjs docs/img/bloom-texture-ribs.png
+node --max-old-space-size=12000 tools/bloom-texture-ribs-measure.mjs --section centre --resume
+node --max-old-space-size=12000 tools/shot-bloom-texture-ribs-centre.mjs docs/img/bloom-texture-ribs-centre.png
 ```
