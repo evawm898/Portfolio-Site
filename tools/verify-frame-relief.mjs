@@ -682,7 +682,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         // PL1 closed (W covers the file) and STANDING: every base vertex on the
         // back (z = 0 exactly) and every other on the plate or above
         let base = 0, low = Infinity, zMax = -Infinity, topUnder = -Infinity;
-        for (const pt of e.parts) { const v0 = pt.base, n = pt.part === 'bead' ? null : 2 * pt.nu * pt.nv; if (n) for (let v = v0; v < v0 + n; v++) { const z = P[3 * v + 2]; if (z === 0) base++; else { low = Math.min(low, z); zMax = Math.max(zMax, z); if (surf) { const hh = surf(P[3 * v], P[3 * v + 1]); if (hh > -Infinity) topUnder = Math.max(topUnder, hh - z); } } } }
+        for (const pt of e.parts) { if (pt.part === 'bead') zMax = Math.max(zMax, P[3 * pt.base + 2]);   // a bead's first vertex is its top pole (sphereSolid) const v0 = pt.base, n = pt.part === 'bead' ? null : 2 * pt.nu * pt.nv; if (n) for (let v = v0; v < v0 + n; v++) { const z = P[3 * v + 2]; if (z === 0) base++; else { low = Math.min(low, z); zMax = Math.max(zMax, z); if (surf) { const hh = surf(P[3 * v], P[3 * v + 1]); if (hh > -Infinity) topUnder = Math.max(topUnder, hh - z); } } } }
         if (!base || low < T0 - 1e-9) pl1.push(`${name}: ${e.kind} ${e.id} — ${base} base vertices, lowest top ${low.toFixed(3)} under the plate ${T0}`);
         // PL1 seated: a PROUD element's every top vertex over the molding under
         // it; a SUNK one's crest a feature over the molding at its centre
@@ -741,7 +741,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         // VN5 the stem is SEATED: every emitted row's edge stands on the
         // highest molding under that row's own vertices — never under it,
         // never more than 0.05 mm over it (a lifted stem floats)
-        if (surf) for (const x of stemIdx) { const pt = parts[x]; for (let v = 0; v < pt.V; v++) { let hm = -Infinity; for (let c = 0; c < pt.C; c++) { const ix = 3 * pt.T(v, c); hm = Math.max(hm, surf(P[ix], P[ix + 1]), surf(-P[ix], P[ix + 1])); } if (hm === -Infinity) continue; const e0 = P[3 * pt.T(v, 0) + 2], gap = e0 - Math.max(hm, T0); stemSeatMax = Math.max(stemSeatMax, gap); stemSeatMin = Math.min(stemSeatMin, gap); if (gap > 0.05 || gap < -1e-6) { vn5.push(`${name}: stem ${orn.curves[x].run} row ${v} stands ${gap.toFixed(3)} mm off the molding`); break; } } }
+        if (surf) for (const x of stemIdx) { const pt = parts[x]; for (let v = 0; v < pt.V; v++) { let hm = -Infinity; for (let c = 0; c < pt.C; c++) { const ix = 3 * pt.T(v, c); hm = Math.max(hm, surf(P[ix], P[ix + 1]), surf(-P[ix], P[ix + 1])); } if (hm === -Infinity) continue; const e0 = P[3 * pt.T(v, 0) + 2], gap = e0 - Math.max(hm, T0); stemSeatMax = Math.max(stemSeatMax, gap); stemSeatMin = Math.min(stemSeatMin, gap); if (gap > 1e-6 || gap < -1e-6) { vn5.push(`${name}: stem ${orn.curves[x].run} row ${v} stands ${gap.toFixed(3)} mm off the molding`); break; } } }
       }
       // OR6 filigree off is the frame itself
       const off = FL.withOrnament(G.buildFrame({ ...q, filigree: 'none' }));
@@ -765,7 +765,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     rec('VN2 the classes follow the weight: every item the kind its restated weight makes, every junction motif the kind its anchor\'s weight makes, and a heavy element (shell, palmette, rose — read off the emitted part) only at a junction', vn2.length === 0, vn2.slice(0, 3).join('; '));
     rec('VN3 the stems are continuous: a feature short of their mirror on the axis, overlapping where two runs meet, and reaching into every junction motif by the embed', stemsSeen > 0 && vn3.length === 0, `${stemsSeen} stems, least motif joint ${(-leastMotifJoint).toFixed(3)} mm${vn3.length ? ' — ' + vn3.slice(0, 3).join('; ') : ''}`);
     rec('VN4 every item springs from its stem: a joint of at least the embed (read off the emitted walls and footprints)', itemsSeen > 0 && vn4.length === 0, `${itemsSeen} items, least joint ${leastJoint.toFixed(3)} mm${vn4.length ? ' — ' + vn4.slice(0, 3).join('; ') : ''}`);
-    rec('VN5 the stem is SEATED: every emitted row stands on the highest molding under its own vertices, 0–0.05 mm over it', vn5.length === 0 && stemSeatMax > -Infinity, `stem seat depth ${stemSeatMin.toFixed(4)}–${stemSeatMax.toFixed(4)} mm${vn5.length ? ' — ' + vn5.slice(0, 3).join('; ') : ''}`);
+    rec('VN5 the stem is SEATED: every emitted row\'s edge stands ON the highest molding under its own vertices (within 1e-6 mm: a lifted stem floats, a sunk one is buried)', vn5.length === 0 && stemSeatMax > -Infinity, `stem seat depth ${stemSeatMin.toFixed(4)}–${stemSeatMax.toFixed(4)} mm${vn5.length ? ' — ' + vn5.slice(0, 3).join('; ') : ''}`);
     rec('TB1 every ornament row\'s relief is within the 1,500,000-triangle budget and within the ornament\'s own predicted bound', tb1.length === 0, `most ${mostTris.toLocaleString('en-US')} triangles${tb1.length ? ' — ' + tb1.slice(0, 3).join('; ') : ''}`);
     console.log(`     per wire style (off the emitted mesh): ${['carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
   }
@@ -908,12 +908,14 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     // relief within it — and the real budget restated as 1,500,000.
     // both layouts: the chains (phase 3d, the default) and the groups
     const tb = [];
-    for (const layout of ['chains', 'groups']) {
-      const stress = G.buildFrame({ skeleton: 'rect', printHeight: 400, filigree: 'scrolls', ornLayout: layout, ornDensity: 5, ornCrest: 'on', ornCorners: 'on', ornSides: 'on', ornBottom: 'on', ornScale: 6, ornLeafSize: 0.6, ornTightness: 1 });
+    for (const layout of ['vine', 'chains', 'groups']) {
+      const stress = G.buildFrame({ skeleton: 'rect', printHeight: 400, filigree: 'scrolls', ornLayout: layout === 'groups' ? 'groups' : 'chains', ornHierarchy: layout === 'vine' ? 1 : 0, ornDensity: 5, ornCrest: 'on', ornCorners: 'on', ornSides: 'on', ornBottom: 'on', ornScale: 6, ornLeafSize: 0.6, ornTightness: 1 });
       const full = FL.withOrnament(stress), fullTris = RL.buildRelief(full).indices.length / 3;
       const cut = Math.round((fullTris + full.ornament.tris.frame) / 2);
       const tight = FL.withOrnament(stress, { triBudget: cut }), tightTris = RL.buildRelief(tight).indices.length / 3, gave = tight.ornament.told.filter((m) => /budget/.test(m));
-      tb.push({ layout, ok: gave.length > 0 && tightTris <= cut && tight.ornament.groups.length > 0 && tight.ornament.groups.length < full.ornament.groups.length, msg: `${layout}: ceiling rectangle ${fullTris.toLocaleString('en-US')} tris in ${full.ornament.groups.length} groups; at a ${cut.toLocaleString('en-US')} budget ${tight.ornament.groups.length}, ${tightTris.toLocaleString('en-US')} tris, ${gave.length} told${gave.length ? ' — "' + gave[0] + '"' : ''}` });
+      // the vine gives way item by item (lightest first), then whole runs
+      const fewer = layout === 'vine' ? tight.ornament.items.length < full.ornament.items.length || tight.ornament.curves.length < full.ornament.curves.length : tight.ornament.groups.length < full.ornament.groups.length;
+      tb.push({ layout, ok: gave.length > 0 && tightTris <= cut && tight.ornament.groups.length > 0 && fewer, msg: `${layout}: ceiling rectangle ${fullTris.toLocaleString('en-US')} tris in ${full.ornament.groups.length} groups; at a ${cut.toLocaleString('en-US')} budget ${tight.ornament.groups.length}, ${tightTris.toLocaleString('en-US')} tris, ${gave.length} told${gave.length ? ' — "' + gave[0] + '"' : ''}` });
     }
     rec('TB2 past the budget a chain (or a group) gives way whole, told, and the relief stays within it — both layouts, exercised at half the ceiling rectangle\'s own count; the shipped budget is 1,500,000', tb.every((t) => t.ok) && RL.FRAME_TRI_BUDGET === 1500000, tb.map((t) => t.msg).join(' · '));
   }
@@ -1154,7 +1156,7 @@ const MUTANTS = [
   { id: 'a-heavy-element-mid-run', file: 'vine', from: "let el = placeElement('bud', {", to: "let el = placeElement('rose', {", breaks: [] },
   { id: 'the-element-mirror-is-broken', file: 'elements', from: '  for (let k = 0; k < P.length; k += 3) P[k] = -P[k];', to: '  for (let k = 0; k < P.length; k += 3) P[k] = 0.02 - P[k];', breaks: [] },
   { id: 'the-axis-motif-is-not-its-own-mirror', file: 'filigree', from: '  if (onAxis) { el = symmetrizeElement(el); if (el.asymmetric) return null; }', to: '', breaks: [] },
-  { id: 'the-stem-lifts-off-the-molding', file: 'vine', from: 'const finishStem = (c) => { c.lift = c.pts.map((_, i) => Math.max(0, seatOn(H, c, i)));', to: 'const finishStem = (c) => { c.lift = c.pts.map((_, i) => 0.5 + Math.max(0, seatOn(H, c, i)));', breaks: [] },
+  { id: 'the-stem-lifts-off-the-molding', file: 'vine', from: 'const finishStem = (c) => { c.lift = c.pts.map(() => 0);', to: 'const finishStem = (c) => { c.lift = c.pts.map(() => 0.5);', breaks: [] },
   // RETIRED in phase 3e step 3: 'the-axis-leaf-is-off-the-axis' (the chains'
   // axis LEAF is gone — the axis motif is the palmette element, its own
   // mirror by symmetrizeElement; its successor is

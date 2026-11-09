@@ -48,7 +48,7 @@ import { MIN_FEATURE_MM } from './frame-registry.js';
 import { FRAME_TRI_BUDGET, solidTriBound, plateOutline, EMBED_MM } from './frame-relief.js';
 import {
   CHAIN_RUNS, CHAIN_SEAT, runPath, mapToPath, bandRegion, moldingHeightField, seatOn, slitWorst, mirrorCurve,
-  wireClear, wireClearBound, joinsCleanly, buildScroll, buildLeaf, carvedCap, LEAF_ASPECT, wAt, selfGap, profileFor, rigid, pip, placeMotif, wireHeight,
+  wireClear, wireClearBound, joinsCleanly, buildScroll, buildLeaf, carvedCap, LEAF_ASPECT, wAt, selfGap, profileFor, rigid, pip, placeMotif, wireHeight, wireProfile, LEAF_RELIEF,
 } from './frame-filigree.js';
 import { placeElement, relift, mirrorElement, wireElementContact, elementClear, elementDepth } from './frame-elements.js';
 
@@ -67,6 +67,7 @@ export const STEM_A = [0.12, 0.2];      // its meander's amplitude
 export const STEM_P = [1.1, 0.9];       // its half wavelength (an item every half wave)
 export const ITEM = { tendril: [0.7, 0.45], leaf: [0.62, 0.4], sprig: 0.45, bud: [0.6, 0.3], rosette: 0.85 };            // the curvature compression: c = 1 / (1 + CURVE_K · M · |κ|)
 export const VINE_MARGIN = 0.1;
+export const AXIS_GAP = 0.1;          // mm past the half feature: where a stem stops short of its mirror
 export const VINE_LEAF_CURL = 1.2;   // rad: a vine leaf's turn (the chains' 2.2 curls a short leaf back onto its stem)
 export let TFLIP = false; export const setFlip = (v) => { TFLIP = v; };
 export let DEBUG = null; export const setDebug = (d) => { DEBUG = d; };        // mm: the build's clearances stand this far past F
@@ -179,13 +180,19 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const axisA = cFrom === 'crest' || cFrom === 'bottom', axisB = cTo === 'crest' || cTo === 'bottom';
     // the stem's width, amplitude and half wavelength follow w_h
     const wsOf = (x) => Math.max(F, (STEM_W[0] + STEM_W[1] * wOf(x)) * M);
-    const ampOfX = (x) => Math.max(0.5, Math.min((STEM_A[0] + STEM_A[1] * wOf(x)) * M, M / 2 - wsOf(x) / 2 - 0.6 * F));
+    let ak = 1;      // the meander's share: lowered where the run's own turns fold it (below)
+    const ampOfX = (x) => ak * Math.max(0.5, Math.min((STEM_A[0] + STEM_A[1] * wOf(x)) * M, M / 2 - wsOf(x) / 2 - 0.6 * F));
     const P0 = (x) => M * (STEM_P[0] + STEM_P[1] * wOf(x)) * cOf(x) / dens;
     // the stem's x range: a feature short of the axis (its mirror) at an
     // axis end; run on past an interior end
     const ws0 = wsOf(0), wsL = wsOf(L);
-    const x0 = axisA ? (F + ws0) / 2 + 0.15 : -(E + ws0 + Math.abs(yc));
-    const x1 = axisB ? L - ((F + wsL) / 2 + 0.15) : L + E + wsL + Math.abs(yc);
+    // on the axis the stem stops where its MAPPED end stands AXIS_GAP off
+    // x = 0 (the path's arc length is not the distance to the axis where the
+    // band turns — the arch's apex is a mitre), found by bisection
+    const mappedX = (x, end) => Math.abs(mapToPath({ pts: [[x, yc + ampOfX(end ? L : 0)]], nrm: [[0, 1]], tan: [0], info: {} }, path, 0).pts[0][0]);
+    const axisStop = (end) => { const want = (F + (end ? wsL : ws0)) / 2 + AXIS_GAP; let lo = 0, hi = Math.min(L / 2, 6 * want); for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2, xx = end ? L - m : m; if (mappedX(xx, end) < want) lo = m; else hi = m; } return hi; };
+    const x0 = axisA ? axisStop(false) : -(E + ws0 + Math.abs(yc));
+    const x1 = axisB ? L - axisStop(true) : L + E + wsL + Math.abs(yc);
     // the phase: θ' = π / P(x), scaled so the ends land where they must —
     // an EXTREMUM on the axis (the stem symmetric there), a ZERO at an
     // interior end (the stem on the band's centre line where runs meet)
@@ -201,19 +208,32 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const sc = want / span;
     const theta = (x) => th0 + (rawAt(x) - rawAt(0)) * sc;
     const yOf = (x) => yc + ampOfX(Math.min(L, Math.max(0, x))) * Math.sin(theta(x));
-    // the stem curve, local then mapped
-    const lp = xs.map((x) => [x, yOf(x)]);
-    const tanL = lp.map((_, i) => { const a = lp[Math.max(0, i - 1)], b = lp[Math.min(n, i + 1)]; return Math.atan2(b[1] - a[1], b[0] - a[0]); });
-    const local = { kind: 'stem', pts: lp, nrm: tanL.map((f) => [-Math.sin(f), Math.cos(f)]), tan: tanL, w: xs.map((x) => wsOf(Math.min(L, Math.max(0, x)))), root: 0, info: { kind: 'stem', role: 'stem', wire: 0, tip: 0 } };
-    local.info.wire = Math.max(...local.w); local.info.tip = Math.min(...local.w);
-    const stem = mapToPath(local, path, 0);
+    // the stem curve, local then mapped. Where the run's own path turns hard
+    // (a notched corner's jogs) the meander can bring the stem back within a
+    // feature of itself: its share is lowered — 1, 0.6, 0.3, 0 — until the
+    // stem's own gap is a feature (told), else the run is not built
+    let stem = null, lp = null;
+    for (const a of [1, 0.6, 0.3, 0]) {
+      ak = a;
+      lp = xs.map((x) => [x, yOf(x)]);
+      const tanL = lp.map((_, i) => { const q0 = lp[Math.max(0, i - 1)], q1 = lp[Math.min(n, i + 1)]; return Math.atan2(q1[1] - q0[1], q1[0] - q0[0]); });
+      const local = { kind: 'stem', pts: lp, nrm: tanL.map((f) => [-Math.sin(f), Math.cos(f)]), tan: tanL, w: xs.map((x) => wsOf(Math.min(L, Math.max(0, x)))), root: 0, info: { kind: 'stem', role: 'stem', wire: 0, tip: 0 } };
+      local.info.wire = Math.max(...local.w); local.info.tip = Math.min(...local.w);
+      const cand = mapToPath(local, path, 0);
+      if (selfGap(cand).gap >= Fm) { stem = cand; break; }
+    }
+    if (!stem) { told.push(`the ${run.id} stem is not built — the run folds it onto itself at any meander`); continue; }
+    if (ak < 1) told.push(`the ${run.id} stem meanders at ${(100 * ak).toFixed(0)}% — the run's own turns would bring it within a feature of itself`);
     stem.localY = lp.map((q) => q[1]); stem.localX = xs.slice();
-    stem.run = run.id;
+    stem.run = run.id; stem.meander = ak;
     runs.push({ run, path, L, Aa, Ab, cFrom, cTo, axisA, axisB, wOf, cOf, wsOf, ampOfX, theta, yOf, stem, sc, x0, x1, want });
   }
 
   // ---- 2. the seat (the chains' law: the molding's own height field) ----
-  const finishStem = (c) => { c.lift = c.pts.map((_, i) => Math.max(0, seatOn(H, c, i))); return c; };
+  // the stem stands on the highest molding under its own EMITTED vertices
+  // (withOrnament's seatEmitted, read at every vertex and its mirror): the
+  // lift here is 0 so nothing but that reading raises it (VN5 measures it)
+  const finishStem = (c) => { c.lift = c.pts.map(() => 0); return c; };
   for (const r of runs) finishStem(r.stem);
   const stems = runs.map((r) => r.stem);
 
@@ -261,7 +281,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       el = null;
     }
     if (!el) { told.push(`the ${mk} at ${id} is not built — it cannot join its stems without grazing`); continue; }
-    if (f < 1) told.push(`the ${mk} at ${id} made ${(100 * f / 0.9 * 0.9).toFixed(0)}% — at full size it grazes a stem`);
+    if (f < 1) told.push(`the ${mk} at ${id} made ${(100 * f).toFixed(0)}% — at full size it grazes a stem`);
     elements.push({ el, mirror: onAxis ? null : mirrorElement(el), role: 'motif', kind: mk, cls: wcl, anchor: id, w, onAxis });
   }
 
@@ -383,6 +403,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   if (shrunk) told.push(`${shrunk} item${shrunk > 1 ? 's' : ''} along the vine made smaller to fit`);
 
   // ---- 5. seat the items: on the molding, their root riding on the stem ----
+  const leafPeak = Math.max(...wireProfile('leaf').z);
   for (const it of items) {
     const r = runs.find((q) => q.run.id === it.run), stem = r.stem;
     const k0 = stem.localX.reduce((b, q, i) => (Math.abs(q - it.x) < Math.abs(stem.localX[b] - it.x) ? i : b), 0);
@@ -390,21 +411,45 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const ride = stem.lift[k0] + 0.6 * crown, ws = stem.w[k0];
     for (const cv of it.curves) {
       let s = 0; const sAt = cv.pts.map((q, i) => (i ? (s += Math.hypot(q[0] - cv.pts[i - 1][0], q[1] - cv.pts[i - 1][1])) : 0));
-      cv.lift = cv.pts.map((_, i) => Math.max(Math.max(0, seatOn(H, cv, i)), ride * (1 - smooth(sAt[i] / (2 * ws)))));
+      // a LEAF's own section peaks under its crown (its midrib on a blade —
+      // wireProfile('leaf') tops out under 1), so a leaf is lifted by the
+      // shortfall to stand a feature over the molding, as a chain's leaf
+      // stands on its host's crown
+      const extra = cv.kind === 'leaf' ? Math.max(0, F - leafPeak * Math.max(F, LEAF_RELIEF * cv.info.wire * p.ornProjection)) : 0;
+      cv.lift = cv.pts.map((_, i) => Math.max(Math.max(0, seatOn(H, cv, i)) + extra, ride * (1 - smooth(sAt[i] / (2 * ws)))));
     }
   }
 
-  // ---- 6. the record: one group per side of curves (stems + items), the
+  // ---- 6. THE TRIANGLE BUDGET (the frame's 1.5 M): priced off the solids'
+  // own bounds; past it the vine gives way item by item, lightest first, then
+  // whole runs from the last (their stems and the motifs only they reach),
+  // told ----
+  const priceC = (c) => 2 * solidTriBound(c.pts.length, profileFor(c, p).x.length);       // a curve and its mirror
+  const priceE = (e, both = true) => (both ? 2 : 1) * e.indices.length / 3;
+  let keptRuns = runs.slice(), keptItems = items.slice(), keptMotifs = elements.slice();
+  const total = () => tris + keptRuns.reduce((a, r) => a + priceC(r.stem), 0) + keptItems.reduce((a, it) => a + it.curves.reduce((b, c) => b + priceC(c), 0) + (it.el ? priceE(it.el) : 0), 0) + keptMotifs.reduce((a, o) => a + priceE(o.el, !o.onAxis), 0);
+  let gaveItems = 0, gaveRuns = 0;
+  if (total() > triBudget) {
+    const byW = keptItems.slice().sort((a, b) => a.w - b.w);
+    while (byW.length && total() > triBudget) { const it = byW.shift(); keptItems = keptItems.filter((q) => q !== it); gaveItems++; }
+    while (keptRuns.length && total() > triBudget) {
+      const r = keptRuns.pop(); gaveRuns++;
+      keptMotifs = keptMotifs.filter((o) => keptRuns.some((q) => q.run.from === o.anchor || q.run.to === o.anchor));
+    }
+    if (gaveItems) told.push(`${gaveItems} item${gaveItems > 1 ? 's' : ''} along the vine given way to the ${triBudget.toLocaleString('en-US')}-triangle budget (the lightest first)`);
+    if (gaveRuns) told.push(`${gaveRuns} run${gaveRuns > 1 ? 's' : ''} of the vine not built — past the ${triBudget.toLocaleString('en-US')}-triangle budget`);
+  }
+  // ---- 7. the record: one group per side of curves (stems + items), the
   // motifs as element groups ----
-  const curves = [...stems, ...items.flatMap((it) => it.curves)];
-  const groups = [{ group: 'vine', anchor: runs.map((r) => `${r.run.from}→${r.run.to}`).join(', '), onAxis: false, curves, mirrored: curves.map(mirrorCurve), push: depth, told: [], chain: { vine: true, runs: runs.map((r) => ({ id: r.run.id, L: r.L, from: r.run.from, to: r.run.to, cFrom: r.cFrom, cTo: r.cTo, Aa: r.Aa, Ab: r.Ab, path: r.path })) } }];
-  for (const o of elements) groups.push({ group: o.kind, anchor: o.anchor, onAxis: o.onAxis, curves: [], mirrored: [], elements: [o.el, o.mirror].filter(Boolean), motif: o });
+  const curves = [...keptRuns.map((r) => r.stem), ...keptItems.flatMap((it) => it.curves)];
+  const groups = keptRuns.length ? [{ group: 'vine', anchor: keptRuns.map((r) => `${r.run.from}→${r.run.to}`).join(', '), onAxis: false, curves, mirrored: curves.map(mirrorCurve), push: depth, told: [], chain: { vine: true, runs: keptRuns.map((r) => ({ id: r.run.id, L: r.L, from: r.run.from, to: r.run.to, cFrom: r.cFrom, cTo: r.cTo, Aa: r.Aa, Ab: r.Ab, path: r.path })) } }] : [];
+  for (const o of keptMotifs) groups.push({ group: o.kind, anchor: o.anchor, onAxis: o.onAxis, curves: [], mirrored: [], elements: [o.el, o.mirror].filter(Boolean), motif: o });
   const els = groups.flatMap((g) => g.elements || []);
-  for (const it of items) if (it.el) els.push(it.el, mirrorElement(it.el));
+  for (const it of keptItems) if (it.el) els.push(it.el, mirrorElement(it.el));
   const all = groups.flatMap((g) => [...g.curves, ...g.mirrored]);
-  tris += all.reduce((a, c) => a + solidTriBound(c.pts.length, profileFor(c, p).x.length), 0) + els.reduce((a, e) => a + e.indices.length / 3, 0);
-  if (tris > triBudget) told.push(`the vine is ${tris.toLocaleString('en-US')} triangles, past the ${triBudget.toLocaleString('en-US')} budget`);
+  tris = total();
+  items.length = 0; items.push(...keptItems);
   const tip = all.length ? Math.min(...all.map((c) => c.info.tip ?? c.info.wire)) : F;
-  const weight = { h, runs: runs.map((r) => ({ id: r.run.id, from: r.run.from, to: r.run.to, L: r.L, Aa: r.Aa, Ab: r.Ab, cFrom: r.cFrom, cTo: r.cTo })) };
-  return { scale, length: M, wire: F, style: 'carved', layout: 'vine', tip, groups, curves: all, elements: els, items, motifs: elements, weight, region, H, told, tris: { bound: tris, frame: frameTris, budget: triBudget } };
+  const weight = { h, runs: keptRuns.map((r) => ({ id: r.run.id, from: r.run.from, to: r.run.to, L: r.L, Aa: r.Aa, Ab: r.Ab, cFrom: r.cFrom, cTo: r.cTo })) };
+  return { scale, length: M, wire: F, style: 'carved', layout: 'vine', tip, groups, curves: all, elements: els, items, motifs: keptMotifs, weight, region, H, told, tris: { bound: tris, frame: frameTris, budget: triBudget } };
 }

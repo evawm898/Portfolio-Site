@@ -382,16 +382,34 @@ export function symmetrizeElement(el) {
     }
     return -1;
   };
-  const partner = new Int32Array(n);
-  for (let v = 0; v < n; v++) { partner[v] = find(v); if (partner[v] < 0) return { ...el, asymmetric: true }; }
+  // pair every vertex with an UNPAIRED vertex at its mirror image (a vertex on
+  // x = 0, or one whose image is itself, pairs with itself); a COINCIDENT
+  // vertex left over (a collapsed row repeats a point) copies the final
+  // mirror of whichever vertex it found — so every image exists to the bit
+  const findFree = (v) => {
+    const x = -P[3 * v], y = P[3 * v + 1], z = P[3 * v + 2];
+    for (const dx of [0, -1, 1]) for (const dy of [0, -1, 1]) for (const dz of [0, -1, 1]) {
+      const k = `${Math.round(x * q) + dx},${Math.round(y * q) + dy},${Math.round(z * q) + dz}`;
+      for (const u of map.get(k) || []) if (u !== v && partner[u] < 0 && Math.abs(P[3 * u] - x) < 1e-6 && Math.abs(P[3 * u + 1] - y) < 1e-6 && Math.abs(P[3 * u + 2] - z) < 1e-6) return u;
+    }
+    return -1;
+  };
+  const partner = new Int32Array(n).fill(-1);
+  for (let v = 0; v < n; v++) {
+    if (partner[v] >= 0) continue;
+    if (Math.abs(P[3 * v]) < 1e-9) { partner[v] = v; continue; }
+    const u = findFree(v); if (u >= 0) { partner[v] = u; partner[u] = v; }
+  }
   const out = Float64Array.from(P);
   for (let v = 0; v < n; v++) {
     const u = partner[v];
-    if (u === v || Math.abs(P[3 * v]) < 1e-9) { out[3 * v] = 0; out[3 * v + 1] = P[3 * v + 1]; out[3 * v + 2] = P[3 * v + 2]; continue; }
-    const lo = Math.min(u, v), hi = Math.max(u, v);
-    const x = (P[3 * lo] - P[3 * hi]) / 2, y = (P[3 * lo + 1] + P[3 * hi + 1]) / 2, z = (P[3 * lo + 2] + P[3 * hi + 2]) / 2;
-    out[3 * lo] = x; out[3 * lo + 1] = y; out[3 * lo + 2] = z; out[3 * hi] = -x; out[3 * hi + 1] = y; out[3 * hi + 2] = z;
+    if (u === v) { out[3 * v] = 0; continue; }
+    if (u < 0 || u < v) continue;
+    const x = (P[3 * v] - P[3 * u]) / 2, y = (P[3 * v + 1] + P[3 * u + 1]) / 2, z = (P[3 * v + 2] + P[3 * u + 2]) / 2;
+    out[3 * v] = x; out[3 * v + 1] = y; out[3 * v + 2] = z; out[3 * u] = -x; out[3 * u + 1] = y; out[3 * u + 2] = z;
   }
+  // a leftover takes the exact mirror of the (final) vertex at its image
+  for (let v = 0; v < n; v++) if (partner[v] < 0) { const u = find(v); if (u < 0 || partner[u] < 0) return { ...el, asymmetric: true }; out[3 * v] = -out[3 * u]; out[3 * v + 1] = out[3 * u + 1]; out[3 * v + 2] = out[3 * u + 2]; }
   return { ...el, positions: out, loops: partLoops(out, el.parts), selfMirror: true };
 }
 
