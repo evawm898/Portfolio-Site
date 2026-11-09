@@ -206,8 +206,17 @@ director, the perch graph and the cat's silhouette are untouched.
   both ways; roughly one board in three past 70 cm from the bay catching the light; the
   blocks across the street at 2.3–3.4 m and eleven tree crowns; the drawn-line colour.
 - **Measured**: `node tools/verify-scene-studio.mjs` 45/45, the frame-cost check reading
-  p99 2.60 ms, worst 6.90 ms over 40 s (the bar is 8 / 16.7). The gate's mutant trees now
-  copy `beach-brush.js` beside the studio modules (`STUDIO_DEPS`), never mutating it.
+  p99 2.60 ms, worst 6.90 ms over 40 s (the bar is 8 / 16.7); `--negative-control` 25/25.
+  The room's redraw costs 8–11 ms once per resize (61 ms cold), the furniture's marks ~14 ms
+  once on the first frame after it, and a frame's furniture-and-cats draw then 0.70 ms
+  median, 1.80 worst (headless Chromium, 1280×800). The gate's mutant trees now copy
+  `beach-brush.js` beside the studio modules (`STUDIO_DEPS`), never mutating it.
+- **Scene 3 is unchanged**: `node tools/verify-scene.mjs` 145/145, and every canvas call
+  `draw()` makes on `main`'s beach-brush.js and on this one compared, 330,117 calls over
+  18 frames at three sizes, 0 differing — also after a 1,200-point outside stroke has
+  sized the shared pool past the beach's own.
+- Sheets re-rendered on the new room: `docs/img/studio-cat-style.png` (both cats, five
+  poses, every surface) and `docs/img/studio-cat-jumps.png`.
 
 ## Decisions made without a ruling
 
