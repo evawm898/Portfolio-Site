@@ -1,0 +1,2509 @@
+{
+ "crest": [
+  {
+   "law": "A",
+   "mode": "lattice",
+   "state": "default",
+   "H": 0.4,
+   "tris": 158912,
+   "ms": 1673,
+   "chords": 0,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0.093,
+      "p90": 0.16,
+      "max": 0.169
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0.055,
+      "p90": 0.103,
+      "max": 0.151
+     },
+     "angle8": {
+      "n": 60,
+      "min": 109.284,
+      "median": 143.805,
+      "p90": 155.109,
+      "max": 156.969
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 96.708,
+      "median": 126.441,
+      "p90": 141.515,
+      "max": 146.517
+     },
+     "angle40": {
+      "n": 60,
+      "min": 109.274,
+      "median": 148.255,
+      "p90": 164.276,
+      "max": 180
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 90.528,
+      "median": 121.301,
+      "p90": 137.489,
+      "max": 142.937
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.572,
+      "median": 2.77,
+      "p90": 4.01,
+      "max": 4.654
+     },
+     "trisPerMm2": 20.581,
+     "latticeTrisPerMm2": 20.581
+    }
+   }
+  },
+  {
+   "law": "A",
+   "mode": "lattice",
+   "state": "default",
+   "H": 2.5,
+   "tris": 158912,
+   "ms": 1182,
+   "chords": 0,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0.111,
+      "p90": 0.162,
+      "max": 0.166
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0.48,
+      "p90": 0.639,
+      "max": 0.668
+     },
+     "angle8": {
+      "n": 60,
+      "min": 24.873,
+      "median": 72.018,
+      "p90": 108.624,
+      "max": 109.465
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 23.398,
+      "median": 33.335,
+      "p90": 45.721,
+      "max": 51.25
+     },
+     "angle40": {
+      "n": 60,
+      "min": 24.866,
+      "median": 83.662,
+      "p90": 143.701,
+      "max": 180
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 21.054,
+      "median": 30.082,
+      "p90": 41.447,
+      "max": 46.577
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.812,
+      "median": 2.616,
+      "p90": 3.689,
+      "max": 4.197
+     },
+     "trisPerMm2": 20.581,
+     "latticeTrisPerMm2": 20.581
+    }
+   }
+  },
+  {
+   "law": "A",
+   "mode": "lattice",
+   "state": "stem",
+   "H": 0.4,
+   "tris": 179010,
+   "ms": 1453,
+   "chords": 0,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {}
+  },
+  {
+   "law": "A",
+   "mode": "lattice",
+   "state": "stem",
+   "H": 2.5,
+   "tris": 179010,
+   "ms": 1301,
+   "chords": 0,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {}
+  },
+  {
+   "law": "A",
+   "mode": "crest",
+   "state": "default",
+   "H": 0.4,
+   "tris": 189836,
+   "ms": 2152,
+   "chords": 15466,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0.001
+     },
+     "angle8": {
+      "n": 60,
+      "min": 98.386,
+      "median": 127.287,
+      "p90": 140.909,
+      "max": 146.643
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 96.708,
+      "median": 126.441,
+      "p90": 141.515,
+      "max": 146.517
+     },
+     "angle40": {
+      "n": 60,
+      "min": 93.781,
+      "median": 124.182,
+      "p90": 139.038,
+      "max": 143.007
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 90.528,
+      "median": 121.301,
+      "p90": 137.489,
+      "max": 142.937
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.572,
+      "median": 2.77,
+      "p90": 4.01,
+      "max": 4.654
+     },
+     "trisPerMm2": 24.779,
+     "latticeTrisPerMm2": 20.581
+    }
+   }
+  },
+  {
+   "law": "A",
+   "mode": "crest",
+   "state": "default",
+   "H": 2.5,
+   "tris": 189836,
+   "ms": 2107,
+   "chords": 15466,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "angle8": {
+      "n": 60,
+      "min": 24.873,
+      "median": 34.256,
+      "p90": 46.464,
+      "max": 51.417
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 23.398,
+      "median": 33.335,
+      "p90": 45.721,
+      "max": 51.25
+     },
+     "angle40": {
+      "n": 60,
+      "min": 24.866,
+      "median": 31.631,
+      "p90": 44.333,
+      "max": 48.43
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 21.054,
+      "median": 30.082,
+      "p90": 41.447,
+      "max": 46.577
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.812,
+      "median": 2.616,
+      "p90": 3.689,
+      "max": 4.197
+     },
+     "trisPerMm2": 24.779,
+     "latticeTrisPerMm2": 20.581
+    }
+   }
+  },
+  {
+   "law": "A",
+   "mode": "crest",
+   "state": "stem",
+   "H": 0.4,
+   "tris": 209934,
+   "ms": 2232,
+   "chords": 15466,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {}
+  },
+  {
+   "law": "A",
+   "mode": "crest",
+   "state": "stem",
+   "H": 2.5,
+   "tris": 209934,
+   "ms": 2244,
+   "chords": 15466,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {}
+  },
+  {
+   "law": "A",
+   "mode": "crest+flank",
+   "state": "default",
+   "H": 0.4,
+   "tris": 282608,
+   "ms": 2287,
+   "chords": 61864,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0.001
+     },
+     "angle8": {
+      "n": 60,
+      "min": 98.386,
+      "median": 127.286,
+      "p90": 140.909,
+      "max": 146.643
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 96.708,
+      "median": 126.441,
+      "p90": 141.515,
+      "max": 146.517
+     },
+     "angle40": {
+      "n": 60,
+      "min": 93.781,
+      "median": 124.182,
+      "p90": 139.038,
+      "max": 143.007
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 90.528,
+      "median": 121.301,
+      "p90": 137.489,
+      "max": 142.937
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.572,
+      "median": 2.77,
+      "p90": 4.01,
+      "max": 4.654
+     },
+     "trisPerMm2": 37.374,
+     "latticeTrisPerMm2": 20.581
+    }
+   }
+  },
+  {
+   "law": "A",
+   "mode": "crest+flank",
+   "state": "default",
+   "H": 2.5,
+   "tris": 282608,
+   "ms": 2095,
+   "chords": 61864,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "angle8": {
+      "n": 60,
+      "min": 24.873,
+      "median": 34.256,
+      "p90": 46.464,
+      "max": 51.417
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 23.398,
+      "median": 33.335,
+      "p90": 45.721,
+      "max": 51.25
+     },
+     "angle40": {
+      "n": 60,
+      "min": 24.866,
+      "median": 31.631,
+      "p90": 44.333,
+      "max": 48.43
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 21.054,
+      "median": 30.082,
+      "p90": 41.447,
+      "max": 46.577
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.812,
+      "median": 2.616,
+      "p90": 3.689,
+      "max": 4.197
+     },
+     "trisPerMm2": 37.374,
+     "latticeTrisPerMm2": 20.581
+    }
+   }
+  },
+  {
+   "law": "A",
+   "mode": "crest+flank",
+   "state": "stem",
+   "H": 0.4,
+   "tris": 302706,
+   "ms": 2109,
+   "chords": 61864,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {}
+  },
+  {
+   "law": "A",
+   "mode": "crest+flank",
+   "state": "stem",
+   "H": 2.5,
+   "tris": 302706,
+   "ms": 2207,
+   "chords": 61864,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {}
+  },
+  {
+   "law": "B",
+   "mode": "lattice",
+   "state": "default",
+   "H": 0.4,
+   "tris": 158912,
+   "ms": 1182,
+   "chords": 0,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0.074,
+      "p90": 0.163,
+      "max": 0.171
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0.048,
+      "p90": 0.106,
+      "max": 0.123
+     },
+     "angle8": {
+      "n": 60,
+      "min": 116.873,
+      "median": 140.997,
+      "p90": 154.213,
+      "max": 156.822
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 110.147,
+      "median": 124.596,
+      "p90": 134.143,
+      "max": 136.226
+     },
+     "angle40": {
+      "n": 60,
+      "min": 116.861,
+      "median": 142.863,
+      "p90": 158.017,
+      "max": 180
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 104.239,
+      "median": 119.358,
+      "p90": 129.999,
+      "max": 131.779
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.81,
+      "median": 2.533,
+      "p90": 3.307,
+      "max": 3.474
+     },
+     "trisPerMm2": 20.581,
+     "latticeTrisPerMm2": 20.581
+    },
+    "hub": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0.049,
+      "p90": 0.192,
+      "max": 0.195
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0.045,
+      "p90": 0.102,
+      "max": 0.189
+     },
+     "angle8": {
+      "n": 40,
+      "min": 119.458,
+      "median": 151.567,
+      "p90": 164.686,
+      "max": 171.971
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 99.259,
+      "median": 135.894,
+      "p90": 140.002,
+      "max": 140.054
+     },
+     "angle40": {
+      "n": 40,
+      "min": 121.285,
+      "median": 158.091,
+      "p90": 173.934,
+      "max": 180
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 92.506,
+      "median": 131.444,
+      "p90": 137.667,
+      "max": 137.83
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 1.629,
+      "median": 2.718,
+      "p90": 3.391,
+      "max": 3.473
+     },
+     "trisPerMm2": 13.133,
+     "latticeTrisPerMm2": 13.133
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "lattice",
+   "state": "default",
+   "H": 2.5,
+   "tris": 158912,
+   "ms": 1042,
+   "chords": 0,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0.082,
+      "p90": 0.16,
+      "max": 0.166
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0.436,
+      "p90": 0.686,
+      "max": 0.749
+     },
+     "angle8": {
+      "n": 60,
+      "min": 30.63,
+      "median": 53.806,
+      "p90": 108.204,
+      "max": 120.231
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 25.946,
+      "median": 30.208,
+      "p90": 40.481,
+      "max": 43.142
+     },
+     "angle40": {
+      "n": 60,
+      "min": 31.62,
+      "median": 55.219,
+      "p90": 178.085,
+      "max": 180
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 23.363,
+      "median": 27.233,
+      "p90": 36.899,
+      "max": 39.579
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.793,
+      "median": 2.305,
+      "p90": 3.181,
+      "max": 3.459
+     },
+     "trisPerMm2": 20.581,
+     "latticeTrisPerMm2": 20.581
+    },
+    "hub": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0.045,
+      "median": 0.045,
+      "p90": 0.045,
+      "max": 0.045
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0.783,
+      "median": 0.783,
+      "p90": 0.783,
+      "max": 0.783
+     },
+     "angle8": {
+      "n": 40,
+      "min": 49.285,
+      "median": 49.285,
+      "p90": 49.285,
+      "max": 49.285
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 21.503,
+      "median": 21.503,
+      "p90": 21.503,
+      "max": 21.503
+     },
+     "angle40": {
+      "n": 40,
+      "min": 69.176,
+      "median": 69.176,
+      "p90": 69.176,
+      "max": 69.176
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 19.146,
+      "median": 19.146,
+      "p90": 19.146,
+      "max": 19.146
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 1.644,
+      "median": 1.644,
+      "p90": 1.644,
+      "max": 1.644
+     },
+     "trisPerMm2": 13.133,
+     "latticeTrisPerMm2": 13.133
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "lattice",
+   "state": "stem",
+   "H": 0.4,
+   "tris": 179010,
+   "ms": 1212,
+   "chords": 0,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {
+    "stem": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0.074
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0.061
+     },
+     "angle8": {
+      "n": 40,
+      "min": 137.304,
+      "median": 137.304,
+      "p90": 137.304,
+      "max": 162.5
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 135.706,
+      "median": 139.972,
+      "p90": 139.972,
+      "max": 145.503
+     },
+     "angle40": {
+      "n": 40,
+      "min": 137.304,
+      "median": 137.304,
+      "p90": 137.304,
+      "max": 175.834
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 130.761,
+      "median": 137.538,
+      "p90": 137.538,
+      "max": 142.814
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 2.356,
+      "median": 2.356,
+      "p90": 2.356,
+      "max": 3.403
+     },
+     "trisPerMm2": 9.712,
+     "latticeTrisPerMm2": 9.712
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "lattice",
+   "state": "stem",
+   "H": 2.5,
+   "tris": 179010,
+   "ms": 1295,
+   "chords": 0,
+   "flips": 0,
+   "withdrawn": 0,
+   "centroids": 0,
+   "organs": {
+    "stem": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "angle8": {
+      "n": 40,
+      "min": 67.507,
+      "median": 67.507,
+      "p90": 67.507,
+      "max": 67.507
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 47.428,
+      "median": 47.428,
+      "p90": 47.428,
+      "max": 47.428
+     },
+     "angle40": {
+      "n": 40,
+      "min": 67.507,
+      "median": 67.507,
+      "p90": 67.507,
+      "max": 67.507
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 44.768,
+      "median": 44.768,
+      "p90": 44.768,
+      "max": 44.768
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 2.356,
+      "median": 2.356,
+      "p90": 2.356,
+      "max": 2.356
+     },
+     "trisPerMm2": 9.712,
+     "latticeTrisPerMm2": 9.712
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "crest",
+   "state": "default",
+   "H": 0.4,
+   "tris": 190130,
+   "ms": 2710,
+   "chords": 16246,
+   "flips": 0,
+   "withdrawn": 64,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0.001
+     },
+     "angle8": {
+      "n": 60,
+      "min": 112.89,
+      "median": 124.379,
+      "p90": 133.777,
+      "max": 136.556
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 110.147,
+      "median": 124.596,
+      "p90": 134.143,
+      "max": 136.226
+     },
+     "angle40": {
+      "n": 60,
+      "min": 107.648,
+      "median": 121.379,
+      "p90": 131.382,
+      "max": 132.707
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 104.239,
+      "median": 119.358,
+      "p90": 129.999,
+      "max": 131.779
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.81,
+      "median": 2.533,
+      "p90": 3.307,
+      "max": 3.474
+     },
+     "trisPerMm2": 24.71,
+     "latticeTrisPerMm2": 20.581
+    },
+    "hub": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0.006
+     },
+     "angle8": {
+      "n": 40,
+      "min": 94.251,
+      "median": 136.679,
+      "p90": 140.274,
+      "max": 140.76
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 99.259,
+      "median": 135.894,
+      "p90": 140.002,
+      "max": 140.054
+     },
+     "angle40": {
+      "n": 40,
+      "min": 103.035,
+      "median": 134.538,
+      "p90": 138.858,
+      "max": 138.959
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 92.506,
+      "median": 131.444,
+      "p90": 137.667,
+      "max": 137.83
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 1.629,
+      "median": 2.718,
+      "p90": 3.391,
+      "max": 3.473
+     },
+     "trisPerMm2": 14.574,
+     "latticeTrisPerMm2": 13.133
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "crest",
+   "state": "default",
+   "H": 2.5,
+   "tris": 190130,
+   "ms": 2343,
+   "chords": 16246,
+   "flips": 0,
+   "withdrawn": 64,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "angle8": {
+      "n": 60,
+      "min": 27.065,
+      "median": 30.811,
+      "p90": 41.229,
+      "max": 43.564
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 25.946,
+      "median": 30.208,
+      "p90": 40.481,
+      "max": 43.142
+     },
+     "angle40": {
+      "n": 60,
+      "min": 24.707,
+      "median": 28.526,
+      "p90": 39.07,
+      "max": 40.418
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 23.363,
+      "median": 27.233,
+      "p90": 36.899,
+      "max": 39.579
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.793,
+      "median": 2.305,
+      "p90": 3.181,
+      "max": 3.459
+     },
+     "trisPerMm2": 24.71,
+     "latticeTrisPerMm2": 20.581
+    },
+    "hub": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0.022,
+      "median": 0.022,
+      "p90": 0.022,
+      "max": 0.022
+     },
+     "angle8": {
+      "n": 40,
+      "min": 21.534,
+      "median": 21.534,
+      "p90": 21.534,
+      "max": 21.534
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 21.503,
+      "median": 21.503,
+      "p90": 21.503,
+      "max": 21.503
+     },
+     "angle40": {
+      "n": 40,
+      "min": 22.82,
+      "median": 22.82,
+      "p90": 22.82,
+      "max": 22.82
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 19.146,
+      "median": 19.146,
+      "p90": 19.146,
+      "max": 19.146
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 1.644,
+      "median": 1.644,
+      "p90": 1.644,
+      "max": 1.644
+     },
+     "trisPerMm2": 14.574,
+     "latticeTrisPerMm2": 13.133
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "crest",
+   "state": "stem",
+   "H": 0.4,
+   "tris": 210050,
+   "ms": 2741,
+   "chords": 17477,
+   "flips": 0,
+   "withdrawn": 64,
+   "centroids": 0,
+   "organs": {
+    "stem": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "angle8": {
+      "n": 40,
+      "min": 133.357,
+      "median": 137.304,
+      "p90": 137.304,
+      "max": 146.339
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 135.706,
+      "median": 139.972,
+      "p90": 139.972,
+      "max": 145.503
+     },
+     "angle40": {
+      "n": 40,
+      "min": 131.862,
+      "median": 137.304,
+      "p90": 137.304,
+      "max": 144.28
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 130.761,
+      "median": 137.538,
+      "p90": 137.538,
+      "max": 142.814
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 2.356,
+      "median": 2.356,
+      "p90": 2.356,
+      "max": 3.403
+     },
+     "trisPerMm2": 9.855,
+     "latticeTrisPerMm2": 9.712
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "crest",
+   "state": "stem",
+   "H": 2.5,
+   "tris": 210050,
+   "ms": 2654,
+   "chords": 17477,
+   "flips": 0,
+   "withdrawn": 64,
+   "centroids": 0,
+   "organs": {
+    "stem": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "angle8": {
+      "n": 40,
+      "min": 67.507,
+      "median": 67.507,
+      "p90": 67.507,
+      "max": 67.507
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 47.428,
+      "median": 47.428,
+      "p90": 47.428,
+      "max": 47.428
+     },
+     "angle40": {
+      "n": 40,
+      "min": 67.507,
+      "median": 67.507,
+      "p90": 67.507,
+      "max": 67.507
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 44.768,
+      "median": 44.768,
+      "p90": 44.768,
+      "max": 44.768
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 2.356,
+      "median": 2.356,
+      "p90": 2.356,
+      "max": 2.356
+     },
+     "trisPerMm2": 9.855,
+     "latticeTrisPerMm2": 9.712
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "crest+flank",
+   "state": "default",
+   "H": 0.4,
+   "tris": 297464,
+   "ms": 2877,
+   "chords": 68822,
+   "flips": 0,
+   "withdrawn": 64,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0.001
+     },
+     "angle8": {
+      "n": 60,
+      "min": 112.69,
+      "median": 124.379,
+      "p90": 133.777,
+      "max": 136.556
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 110.147,
+      "median": 124.596,
+      "p90": 134.143,
+      "max": 136.226
+     },
+     "angle40": {
+      "n": 60,
+      "min": 107.648,
+      "median": 121.379,
+      "p90": 131.382,
+      "max": 132.707
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 104.239,
+      "median": 119.358,
+      "p90": 129.999,
+      "max": 131.779
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.81,
+      "median": 2.533,
+      "p90": 3.307,
+      "max": 3.474
+     },
+     "trisPerMm2": 38.927,
+     "latticeTrisPerMm2": 20.581
+    },
+    "hub": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0.006
+     },
+     "angle8": {
+      "n": 40,
+      "min": 94.811,
+      "median": 136.651,
+      "p90": 140.274,
+      "max": 140.76
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 99.259,
+      "median": 135.894,
+      "p90": 140.002,
+      "max": 140.054
+     },
+     "angle40": {
+      "n": 40,
+      "min": 103.035,
+      "median": 134.538,
+      "p90": 138.858,
+      "max": 138.959
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 92.506,
+      "median": 131.444,
+      "p90": 137.667,
+      "max": 137.83
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 1.629,
+      "median": 2.718,
+      "p90": 3.391,
+      "max": 3.473
+     },
+     "trisPerMm2": 19.269,
+     "latticeTrisPerMm2": 13.133
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "crest+flank",
+   "state": "default",
+   "H": 2.5,
+   "tris": 297464,
+   "ms": 3592,
+   "chords": 68822,
+   "flips": 0,
+   "withdrawn": 64,
+   "centroids": 0,
+   "organs": {
+    "petal": {
+     "samples": 60,
+     "zigzagMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 60,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "angle8": {
+      "n": 60,
+      "min": 27.06,
+      "median": 30.811,
+      "p90": 41.131,
+      "max": 43.564
+     },
+     "ideal8": {
+      "n": 60,
+      "min": 25.946,
+      "median": 30.208,
+      "p90": 40.481,
+      "max": 43.142
+     },
+     "angle40": {
+      "n": 60,
+      "min": 24.707,
+      "median": 28.526,
+      "p90": 39.07,
+      "max": 40.418
+     },
+     "ideal40": {
+      "n": 60,
+      "min": 23.363,
+      "median": 27.233,
+      "p90": 36.899,
+      "max": 39.579
+     },
+     "pitchMm": {
+      "n": 60,
+      "min": 1.793,
+      "median": 2.305,
+      "p90": 3.181,
+      "max": 3.459
+     },
+     "trisPerMm2": 38.927,
+     "latticeTrisPerMm2": 20.581
+    },
+    "hub": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0.022,
+      "median": 0.022,
+      "p90": 0.022,
+      "max": 0.022
+     },
+     "angle8": {
+      "n": 40,
+      "min": 22.1,
+      "median": 22.1,
+      "p90": 22.1,
+      "max": 22.1
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 21.503,
+      "median": 21.503,
+      "p90": 21.503,
+      "max": 21.503
+     },
+     "angle40": {
+      "n": 40,
+      "min": 22.82,
+      "median": 22.82,
+      "p90": 22.82,
+      "max": 22.82
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 19.146,
+      "median": 19.146,
+      "p90": 19.146,
+      "max": 19.146
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 1.644,
+      "median": 1.644,
+      "p90": 1.644,
+      "max": 1.644
+     },
+     "trisPerMm2": 19.269,
+     "latticeTrisPerMm2": 13.133
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "crest+flank",
+   "state": "stem",
+   "H": 0.4,
+   "tris": 326756,
+   "ms": 3596,
+   "chords": 76133,
+   "flips": 0,
+   "withdrawn": 64,
+   "centroids": 0,
+   "organs": {
+    "stem": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "angle8": {
+      "n": 40,
+      "min": 133.41,
+      "median": 137.304,
+      "p90": 137.304,
+      "max": 146.339
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 135.706,
+      "median": 139.972,
+      "p90": 139.972,
+      "max": 145.503
+     },
+     "angle40": {
+      "n": 40,
+      "min": 131.862,
+      "median": 137.304,
+      "p90": 137.304,
+      "max": 144.28
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 130.761,
+      "median": 137.538,
+      "p90": 137.538,
+      "max": 142.814
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 2.356,
+      "median": 2.356,
+      "p90": 2.356,
+      "max": 3.403
+     },
+     "trisPerMm2": 15.679,
+     "latticeTrisPerMm2": 9.712
+    }
+   }
+  },
+  {
+   "law": "B",
+   "mode": "crest+flank",
+   "state": "stem",
+   "H": 2.5,
+   "tris": 326756,
+   "ms": 3366,
+   "chords": 76133,
+   "flips": 0,
+   "withdrawn": 64,
+   "centroids": 0,
+   "organs": {
+    "stem": {
+     "samples": 40,
+     "zigzagMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "deficitMm": {
+      "n": 40,
+      "min": 0,
+      "median": 0,
+      "p90": 0,
+      "max": 0
+     },
+     "angle8": {
+      "n": 40,
+      "min": 67.507,
+      "median": 67.507,
+      "p90": 67.507,
+      "max": 67.507
+     },
+     "ideal8": {
+      "n": 40,
+      "min": 47.428,
+      "median": 47.428,
+      "p90": 47.428,
+      "max": 47.428
+     },
+     "angle40": {
+      "n": 40,
+      "min": 67.507,
+      "median": 67.507,
+      "p90": 67.507,
+      "max": 67.507
+     },
+     "ideal40": {
+      "n": 40,
+      "min": 44.768,
+      "median": 44.768,
+      "p90": 44.768,
+      "max": 44.768
+     },
+     "pitchMm": {
+      "n": 40,
+      "min": 2.356,
+      "median": 2.356,
+      "p90": 2.356,
+      "max": 2.356
+     },
+     "trisPerMm2": 15.679,
+     "latticeTrisPerMm2": 9.712
+    }
+   }
+  }
+ ],
+ "print": [
+  {
+   "law": "A",
+   "mode": "lattice",
+   "H": 0.4,
+   "tris": 158912,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15963,
+   "flips": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 3,
+    "sampled": 6486,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0.16,
+    "nearestRaisedMm": 0.16
+   }
+  },
+  {
+   "law": "A",
+   "mode": "lattice",
+   "H": 2.5,
+   "tris": 158912,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15963,
+   "flips": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 3,
+    "sampled": 28772,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0.16,
+    "nearestRaisedMm": 0.16
+   }
+  },
+  {
+   "law": "A",
+   "mode": "crest",
+   "H": 0.4,
+   "tris": 189836,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15983,
+   "flips": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 3,
+    "sampled": 9865,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0.095,
+    "nearestRaisedMm": 0.097
+   }
+  },
+  {
+   "law": "A",
+   "mode": "crest",
+   "H": 2.5,
+   "tris": 189836,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15983,
+   "flips": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 3,
+    "sampled": 39983,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0.095,
+    "nearestRaisedMm": 0.098
+   }
+  },
+  {
+   "law": "B",
+   "mode": "lattice",
+   "H": 0.4,
+   "tris": 158912,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15374,
+   "flips": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 3,
+    "sampled": 7606,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0.005,
+    "nearestRaisedMm": 0.052
+   }
+  },
+  {
+   "law": "B",
+   "mode": "lattice",
+   "H": 2.5,
+   "tris": 158912,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15374,
+   "flips": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 3,
+    "sampled": 31062,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0.005,
+    "nearestRaisedMm": 0.005
+   }
+  },
+  {
+   "law": "B",
+   "mode": "crest",
+   "H": 0.4,
+   "tris": 190130,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15480,
+   "flips": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 3,
+    "sampled": 9190,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0,
+    "nearestRaisedMm": 0
+   }
+  },
+  {
+   "law": "B",
+   "mode": "crest",
+   "H": 2.5,
+   "tris": 190130,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 15480,
+   "flips": 0,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "everyNthTriangle": 3,
+    "sampled": 41063,
+    "newlyClosedPrintableGaps": 0,
+    "newlyTouching": 0,
+    "nearestUnraisedMm": 0,
+    "nearestRaisedMm": 0
+   }
+  }
+ ],
+ "budget": [
+  {
+   "key": "default",
+   "law": "A",
+   "latticeTris": 158912,
+   "latticePct": 7.9,
+   "latticeMs": 1271,
+   "crestTris": 189836,
+   "crestPct": 9.5,
+   "crestMs": 1775,
+   "crestPassMs": 918,
+   "flankTris": 282608,
+   "flankPct": 14.1,
+   "flankMs": 2072,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "default",
+   "law": "B",
+   "latticeTris": 158912,
+   "latticePct": 7.9,
+   "latticeMs": 1139,
+   "crestTris": 190130,
+   "crestPct": 9.5,
+   "crestMs": 2438,
+   "crestPassMs": 1430,
+   "flankTris": 297464,
+   "flankPct": 14.9,
+   "flankMs": 3141,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "umbel",
+   "law": "A",
+   "latticeTris": 530634,
+   "latticePct": 26.5,
+   "latticeMs": 5308,
+   "crestTris": 597696,
+   "crestPct": 29.9,
+   "crestMs": 9472,
+   "crestPassMs": 4642,
+   "flankTris": 808832,
+   "flankPct": 40.4,
+   "flankMs": 10514,
+   "shells": 53,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "umbel",
+   "law": "B",
+   "latticeTris": 530634,
+   "latticePct": 26.5,
+   "latticeMs": 5337,
+   "crestTris": 609962,
+   "crestPct": 30.5,
+   "crestMs": 9264,
+   "crestPassMs": 4694,
+   "flankTris": 870238,
+   "flankPct": 43.5,
+   "flankMs": 11950,
+   "shells": 53,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "mophead",
+   "law": "A",
+   "latticeTris": 1762254,
+   "latticePct": 88.1,
+   "latticeMs": 61173,
+   "crestTris": 1894982,
+   "crestPct": 94.7,
+   "crestMs": 73314,
+   "crestPassMs": 16212,
+   "flankTris": 2300482,
+   "flankPct": 115,
+   "flankMs": 79409,
+   "shells": 458,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "key": "mophead",
+   "law": "B",
+   "latticeTris": 1762254,
+   "latticePct": 88.1,
+   "latticeMs": 64761,
+   "crestTris": 1960690,
+   "crestPct": 98,
+   "crestMs": 70999,
+   "crestPassMs": 15396,
+   "flankTris": 2586968,
+   "flankPct": 129.3,
+   "flankMs": 77314,
+   "shells": 458,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  }
+ ],
+ "rods": [
+  {
+   "state": "rods",
+   "curvature": 1,
+   "smoothRods": [
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      179010,
+      179570
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      179570,
+      180130
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666663,
+     "triRange": [
+      180130,
+      180690
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      180690,
+      181250
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      181250,
+      181810
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      181810,
+      182370
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      182370,
+      182930
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      182930,
+      183490
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666665,
+     "triRange": [
+      183490,
+      184050
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      184050,
+      184610
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      184610,
+      185170
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 560,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      185170,
+      185730
+     ]
+    },
+    {
+     "organ": "style",
+     "tris": 960,
+     "kappaMin": 1.0416666666666665,
+     "triRange": [
+      185730,
+      186690
+     ]
+    }
+   ],
+   "parts": {
+    "petal": {
+     "vertices": 75816,
+     "relievable": 75336,
+     "ridges": 11000,
+     "displaced": 64336,
+     "displacedShare": 0.849,
+     "ridgeOff": 11000,
+     "rod": false,
+     "sheet": true
+    },
+    "hub": {
+     "vertices": 6906,
+     "relievable": 5388,
+     "ridges": 853,
+     "displaced": 1541,
+     "displacedShare": 0.223,
+     "ridgeOff": 42,
+     "rod": false,
+     "sheet": false
+    },
+    "stem": {
+     "vertices": 8321,
+     "relievable": 8225,
+     "ridges": 447,
+     "displaced": 7600,
+     "displacedShare": 0.913,
+     "ridgeOff": 381,
+     "rod": false,
+     "sheet": false
+    }
+   }
+  },
+  {
+   "state": "rods",
+   "curvature": 4,
+   "smoothRods": [],
+   "parts": {
+    "petal": {
+     "vertices": 75816,
+     "relievable": 75336,
+     "ridges": 1080,
+     "displaced": 74256,
+     "displacedShare": 0.979,
+     "ridgeOff": 1080,
+     "rod": false,
+     "sheet": true
+    },
+    "hub": {
+     "vertices": 6906,
+     "relievable": 5388,
+     "ridges": 0,
+     "displaced": 1583,
+     "displacedShare": 0.229,
+     "ridgeOff": 0,
+     "rod": false,
+     "sheet": false
+    },
+    "stem": {
+     "vertices": 8321,
+     "relievable": 8225,
+     "ridges": 32,
+     "displaced": 7949,
+     "displacedShare": 0.955,
+     "ridgeOff": 32,
+     "rod": false,
+     "sheet": false
+    },
+    "stamen": {
+     "vertices": 12048,
+     "relievable": 11952,
+     "ridges": 0,
+     "displaced": 8671,
+     "displacedShare": 0.72,
+     "ridgeOff": 0,
+     "rod": true,
+     "sheet": false
+    },
+    "style": {
+     "vertices": 1608,
+     "relievable": 1600,
+     "ridges": 0,
+     "displaced": 1146,
+     "displacedShare": 0.713,
+     "ridgeOff": 0,
+     "rod": true,
+     "sheet": false
+    }
+   }
+  },
+  {
+   "state": "braid",
+   "curvature": 1,
+   "smoothRods": [
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.0416666666666665,
+     "triRange": [
+      179010,
+      180530
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.0416666666666663,
+     "triRange": [
+      180530,
+      182050
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.0416666666666659,
+     "triRange": [
+      182050,
+      183570
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.0416666666666663,
+     "triRange": [
+      183570,
+      185090
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.041666666666666,
+     "triRange": [
+      185090,
+      186610
+     ]
+    },
+    {
+     "organ": "stamen",
+     "tris": 1520,
+     "kappaMin": 1.0416666666666667,
+     "triRange": [
+      186610,
+      188130
+     ]
+    },
+    {
+     "organ": "style",
+     "tris": 960,
+     "kappaMin": 1.0416666666666665,
+     "triRange": [
+      188130,
+      189090
+     ]
+    }
+   ],
+   "parts": {
+    "petal": {
+     "vertices": 75816,
+     "relievable": 75336,
+     "ridges": 11000,
+     "displaced": 64336,
+     "displacedShare": 0.849,
+     "ridgeOff": 11000,
+     "rod": false,
+     "sheet": true
+    },
+    "hub": {
+     "vertices": 6906,
+     "relievable": 5388,
+     "ridges": 853,
+     "displaced": 1597,
+     "displacedShare": 0.231,
+     "ridgeOff": 42,
+     "rod": false,
+     "sheet": false
+    },
+    "stem": {
+     "vertices": 8321,
+     "relievable": 8225,
+     "ridges": 447,
+     "displaced": 7612,
+     "displacedShare": 0.915,
+     "ridgeOff": 363,
+     "rod": false,
+     "sheet": false
+    }
+   }
+  },
+  {
+   "state": "default",
+   "curvature": 1,
+   "smoothRods": [],
+   "parts": {
+    "petal": {
+     "vertices": 75816,
+     "relievable": 75336,
+     "ridges": 11000,
+     "displaced": 64336,
+     "displacedShare": 0.849,
+     "ridgeOff": 11000,
+     "rod": false,
+     "sheet": true
+    },
+    "hub": {
+     "vertices": 6694,
+     "relievable": 3658,
+     "ridges": 842,
+     "displaced": 1204,
+     "displacedShare": 0.18,
+     "ridgeOff": 36,
+     "rod": false,
+     "sheet": false
+    }
+   }
+  },
+  {
+   "state": "default",
+   "curvature": 4,
+   "smoothRods": [],
+   "parts": {
+    "petal": {
+     "vertices": 75816,
+     "relievable": 75336,
+     "ridges": 1080,
+     "displaced": 74256,
+     "displacedShare": 0.979,
+     "ridgeOff": 1080,
+     "rod": false,
+     "sheet": true
+    },
+    "hub": {
+     "vertices": 6694,
+     "relievable": 3658,
+     "ridges": 0,
+     "displaced": 1240,
+     "displacedShare": 0.185,
+     "ridgeOff": 0,
+     "rod": false,
+     "sheet": false
+    }
+   }
+  }
+ ],
+ "browser": [
+  {
+   "key": "default",
+   "law": "A",
+   "mode": "lattice",
+   "node": {
+    "tris": 158912,
+    "hash": "794f799e",
+    "s": 1.25
+   },
+   "chromium": {
+    "tris": 158912,
+    "hash": "794f799e",
+    "s": 0.8,
+    "heapEndGB": 0.11
+   },
+   "agree": true
+  },
+  {
+   "key": "default",
+   "law": "A",
+   "mode": "crest",
+   "node": {
+    "tris": 189836,
+    "hash": "d6649a26",
+    "s": 2.26
+   },
+   "chromium": {
+    "tris": 189836,
+    "hash": "d6649a26",
+    "s": 1.45,
+    "heapEndGB": 0.14
+   },
+   "agree": true
+  },
+  {
+   "key": "default",
+   "law": "B",
+   "mode": "lattice",
+   "node": {
+    "tris": 158912,
+    "hash": "34dc78d2",
+    "s": 1.03
+   },
+   "chromium": {
+    "tris": 158912,
+    "hash": "34dc78d2",
+    "s": 0.89,
+    "heapEndGB": 0.11
+   },
+   "agree": true
+  },
+  {
+   "key": "default",
+   "law": "B",
+   "mode": "crest",
+   "node": {
+    "tris": 190130,
+    "hash": "a7f2914",
+    "s": 2.58
+   },
+   "chromium": {
+    "tris": 190130,
+    "hash": "a7f2914",
+    "s": 1.96,
+    "heapEndGB": 0.08
+   },
+   "agree": true
+  },
+  {
+   "key": "umbel",
+   "law": "A",
+   "mode": "lattice",
+   "node": {
+    "tris": 530634,
+    "hash": "b3685d2f",
+    "s": 4.76
+   },
+   "chromium": {
+    "tris": 530634,
+    "hash": "b3685d2f",
+    "s": 3.84,
+    "heapEndGB": 0.36
+   },
+   "agree": true
+  },
+  {
+   "key": "umbel",
+   "law": "A",
+   "mode": "crest",
+   "node": {
+    "tris": 597696,
+    "hash": "cc21ced8",
+    "s": 7.84
+   },
+   "chromium": {
+    "tris": 597696,
+    "hash": "cc21ced8",
+    "s": 5.54,
+    "heapEndGB": 0.32
+   },
+   "agree": true
+  },
+  {
+   "key": "umbel",
+   "law": "B",
+   "mode": "lattice",
+   "node": {
+    "tris": 530634,
+    "hash": "23feb661",
+    "s": 4.69
+   },
+   "chromium": {
+    "tris": 530634,
+    "hash": "23feb661",
+    "s": 3.62,
+    "heapEndGB": 0.24
+   },
+   "agree": true
+  },
+  {
+   "key": "umbel",
+   "law": "B",
+   "mode": "crest",
+   "node": {
+    "tris": 609962,
+    "hash": "16b5053c",
+    "s": 8.09
+   },
+   "chromium": {
+    "tris": 609962,
+    "hash": "16b5053c",
+    "s": 5.84,
+    "heapEndGB": 0.28
+   },
+   "agree": true
+  },
+  {
+   "key": "mophead",
+   "law": "A",
+   "mode": "lattice",
+   "node": {
+    "tris": 1762254,
+    "hash": "4e4c2cd4",
+    "s": 52.74
+   },
+   "chromium": {
+    "tris": 1762254,
+    "hash": "4e4c2cd4",
+    "s": 41.7,
+    "heapEndGB": 0.85
+   },
+   "agree": true
+  },
+  {
+   "key": "mophead",
+   "law": "A",
+   "mode": "crest",
+   "node": {
+    "tris": 1894982,
+    "hash": "cc332bfe",
+    "s": 62.86
+   },
+   "chromium": {
+    "tris": 1894982,
+    "hash": "cc332bfe",
+    "s": 46.38,
+    "heapEndGB": 1.3
+   },
+   "agree": true
+  },
+  {
+   "key": "mophead",
+   "law": "B",
+   "mode": "lattice",
+   "node": {
+    "tris": 1762254,
+    "hash": "a573795d",
+    "s": 53.29
+   },
+   "chromium": {
+    "tris": 1762254,
+    "hash": "a573795d",
+    "s": 42.56,
+    "heapEndGB": 1.11
+   },
+   "agree": true
+  },
+  {
+   "key": "mophead",
+   "law": "B",
+   "mode": "crest",
+   "node": {
+    "tris": 1960690,
+    "hash": "2e931cd",
+    "s": 62.77
+   },
+   "chromium": {
+    "tris": 1960690,
+    "hash": "2e931cd",
+    "s": 47.4,
+    "heapEndGB": 0.74
+   },
+   "agree": true
+  }
+ ]
+}

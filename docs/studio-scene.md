@@ -25,7 +25,7 @@ graph, two black cats. Judged on how the cats move; nothing architectural is fin
 | `scene/studio-cat.js` | one cat: channels, eased tweens, foot planting and the gait, every program (up-jump, down-jump, step across, actions) |
 | `scene/studio-rig.js` | the drawable skeleton: spine, two-bone IK legs with a sliding scapula, 3-D head, sprung tail |
 | `scene/studio-cats.js` | the director: two cats, the pair clock, the mirror rule, the shared floor, clicks, dozes, the dev scrub/replay |
-| `scene/studio-draw.js` | the room plane (drawn once per resize) and the furniture + cats plane (painter's order) |
+| `scene/studio-draw.js` | the room plane (drawn once per resize, every mark through scene 3's `brush`), the PALETTE table, and the furniture + cats plane (painter's order; the furniture's brush marks computed once per view and replayed) |
 | `scene/studio-dev.js` | the `?dev=1` harness and overlay — the only DOM module, fenced to its container |
 | `tools/verify-scene-studio.mjs` | the gate (Node + browser; `--negative-control`, 25 mutants) |
 | `tools/shot-scene-studio.mjs` | the key-frame contact sheets → `docs/img/studio-cat-jumps.png` |
@@ -166,11 +166,62 @@ identically.
   five poses) and `docs/img/studio-cat-jumps.png` (re-rendered: the up-jumps and the
   down-jump through their extreme frames).
 
+## The room treatment (Nov 9) — brush and palette
+
+Eva's brief: the room is DRAWN, not filled. Only `studio-draw.js`'s room and furniture
+marks changed (and the cat's shadow tint, now a palette entry); the motion, the
+director, the perch graph and the cat's silhouette are untouched.
+
+- **One brush, scene 3's.** Every room mark goes through `brush` in `beach-brush.js`,
+  imported, never forked: a tapered stroke whose width swells along its length, laid in
+  two or three overlapping passes when it is long. The one change there is that the
+  shared `P.runs` buffer GROWS rather than being replaced in `ensureField` — the change
+  its own header asked for once `brush` had an outside caller. For scene 3 alone the two
+  forms are the same buffer (`ensureField` runs first, at its constant), so scene 3 draws
+  identically; `node tools/verify-scene.mjs` holds its pixel controls.
+- **Three kinds of mark**: a LINE (a stroke along a projected edge — frames, sash bars,
+  crown, chair rail, baseboard, corners), a MASS (a solid fill whose every edge is also
+  stroked in its own colour, so the boundary is a brush edge — the floor, the walls'
+  wash, each face of the furniture), a CUT (a stroke in the bare paper colour — a few
+  boards catching the window, the lit near edge of a furniture top). Light areas are the
+  paper left bare: the ceiling, the sky, the sill's top and apron.
+- **Beyond the glass** is one plane 11 m out, projected and clipped to the three panes:
+  a few pale blocks with no detail fading out at their tops, soft green crowns and a
+  hedge line as radial-gradient discs (no blur filter, which not every canvas has).
+- **Every stroke is drawn off its own seeded stream named by what it is**, so a resize
+  redraws the same marks and nothing crawls. The room is still drawn once per resize
+  onto the back canvas. The furniture is on the front plane in painter's order with the
+  cats, so its brush marks are COMPUTED once per view (a recording context over the same
+  `brush`) and REPLAYED every frame as plain filled polygons, the colour resolved by
+  palette KEY at replay.
+- **The palette is one named table, `PALETTE`**: cream paper, the walls' two washes,
+  honey oak and its joints, the drawn-line trim, the green and the distance beyond the
+  glass, the furniture's tones as top / front / side per FURNITURE tone, the shadow, the
+  cat's ink and its eyes. **The cats are the only true blacks**: `draw/the-cats-are-the-
+  only-true-blacks…` holds every other named colour above a luminance floor (0.015, a
+  contrast of 1.3 against black) and every fill the front plane makes over 240 director
+  frames to the table; the darkest furniture colour is `#3a2b21` (0.027).
+- **Chosen without a ruling**: the furniture's three tones per part; a cut only on a top
+  no other part of the same piece sits on, and only where the top is larger than 6 cm
+  both ways; roughly one board in three past 70 cm from the bay catching the light; the
+  blocks across the street at 2.3–3.4 m and eleven tree crowns; the drawn-line colour.
+- **Measured**: `node tools/verify-scene-studio.mjs` 45/45, the frame-cost check reading
+  p99 2.60 ms, worst 6.90 ms over 40 s (the bar is 8 / 16.7); `--negative-control` 25/25.
+  The room's redraw costs 8–11 ms once per resize (61 ms cold), the furniture's marks ~14 ms
+  once on the first frame after it, and a frame's furniture-and-cats draw then 0.70 ms
+  median, 1.80 worst (headless Chromium, 1280×800). The gate's mutant trees now copy
+  `beach-brush.js` beside the studio modules (`STUDIO_DEPS`), never mutating it.
+- **Scene 3 is unchanged**: `node tools/verify-scene.mjs` 145/145, and every canvas call
+  `draw()` makes on `main`'s beach-brush.js and on this one compared, 330,117 calls over
+  18 frames at three sizes, 0 differing — also after a 1,200-point outside stroke has
+  sized the shared pool past the beach's own.
+- Sheets re-rendered on the new room: `docs/img/studio-cat-style.png` (both cats, five
+  poses, every surface) and `docs/img/studio-cat-jumps.png`.
+
 ## Decisions made without a ruling
 
-1. **Greyscale daylight palette.** The section is one ink and one ground; a light
-   grey room with two black cats keeps that and reads. Per-scene palettes are a later
-   phase.
+1. **~~Greyscale daylight palette.~~** Superseded Nov 9 by Eva's room-treatment brief
+   (the section below).
 2. **Chairs face the table**, backs outward, so floor → chair is taken diagonally over
    the seat's open corner (a jump straight into the room's depth reads as a column
    from behind). Most of the bay's furniture is "into the picture", so several jumps

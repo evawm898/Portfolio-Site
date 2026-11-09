@@ -153,17 +153,20 @@ let xsW = -1;
 // cannot grow; `wave` and the private `*Into` helpers write into buffers
 // `draw` has already sized, which is why none of them carries a growth path.
 // IF THAT STOPS BEING TRUE — a varying column count, or an outside caller of
-// the exported `wave` — then `ensureField` belongs at that entry too, and the
-// `P.runs` line below must GROW rather than replace (`ensureStroke`'s form),
-// because the two pools share that one buffer and only `ensureStroke` sizes
-// it conditionally. Nothing outside this module calls `wave` or `brush`, so
-// none of that is reachable today; it is written down so the next session
-// inherits a decision rather than a rediscovery.
+// the exported `wave` — then `ensureField` belongs at that entry too.
+//
+// `brush` HAS AN OUTSIDE CALLER NOW: scene 4's room (studio-draw.js) draws
+// every one of its marks through it, at its own point counts, and may reach
+// this pool before scene 3 ever has. So the `P.runs` line below GROWS rather
+// than replaces (`ensureStroke`'s form): the two pools share that one buffer,
+// and replacing it would hand a stroke pool already sized past NCOL a `runs`
+// shorter than its STROKE_CAP. For scene 3 alone the two forms are the same
+// buffer — `ensureField` runs first, at NCOL, with nothing to keep.
 function ensureField(n) {
   if (n <= FIELD_CAP) return;
   FIELD_CAP = Math.max(n, NCOL);
   for (const k of FIELD) P[k] = new Float64Array(FIELD_CAP);
-  P.runs = new Int32Array(FIELD_CAP + 2);
+  if (!P.runs || P.runs.length < FIELD_CAP + 2) P.runs = new Int32Array(FIELD_CAP + 2);
   xsW = -1;
 }
 
