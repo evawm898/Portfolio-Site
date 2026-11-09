@@ -5,12 +5,12 @@
 // what is on screen is what prints. Coordinates are millimetres with the
 // origin at the BLEED corner (hanabi/deck.js cardGeom()).
 //
-// The centre art comes ONLY through hanabi/firework.js — fireworkSpec() and
-// renderFirework(). Nothing here knows how a burst is drawn.
+// The centre art comes ONLY through hanabi/firework.js — fireworkSpec(),
+// renderFirework() and renderTier(). Nothing here knows how a burst is drawn.
 
 import { cardGeom, suitById } from './deck.js';
 import { SYMBOLS, DIGITS, DIGIT_BOX, TOKEN_GLYPHS } from './symbols.js';
-import { fireworkSpec, renderFirework, defaultSpec } from './firework.js';
+import { fireworkSpec, renderFirework, renderTier, defaultSpec } from './firework.js';
 
 const f = (v) => +v.toFixed(3);
 
@@ -58,14 +58,16 @@ function glyph(def, x, y, size, color, weight = 7) {
 
 // The corner index: the numeral with the suit symbol beneath, drawn with its
 // top-left at (0, 0). Returns { svg, w, h }.
-function cornerIndex(rank, suit, faceBg, digitH) {
+function cornerIndex(rank, suit, faceBg, digitH, plate = false) {
   const halo = contrast(suit.primary, faceBg) < HALO_BELOW ? haloFor(suit.primary) : null;
   const dw = digitH * (DIGIT_BOX.w / DIGIT_BOX.h);
   const sym = digitH * 0.62;
   const w = Math.max(dw, sym);
-  const svg = digit(rank, (w - dw) / 2, 0, digitH, suit.primary, halo)
+  const h = digitH * 1.08 + sym, p = digitH * 0.16;
+  const back = plate ? `<rect x="${f(-p)}" y="${f(-p)}" width="${f(w + 2 * p)}" height="${f(h + 2 * p)}" rx="${f(p)}" fill="${faceBg}" fill-opacity="0.85"/>` : '';
+  const svg = back + digit(rank, (w - dw) / 2, 0, digitH, suit.primary, halo)
     + symbol(suit.symbol, (w - sym) / 2, digitH * 1.08, sym, suit.primary, halo);
-  return { svg, w, h: digitH * 1.08 + sym };
+  return { svg, w, h };
 }
 
 // Place the corner index according to the corner mode. Two corners read in a
@@ -99,38 +101,23 @@ function guideMarks(g) {
     + '</g>';
 }
 
-// ---- the three face layouts ----
+// ---- the face: a CORNER INDEX (one style for the deck) and a CENTRE (per suit) ----
+//
+// The index decides where the centre may draw: 'large' and 'small' sit in the
+// safe rect's corners and leave the centre the whole safe rect to share;
+// 'band' takes a strip at top and bottom and gives the centre what is between.
+// Phase 1's layouts A/B/C are (large, single), (small, count), (band, bleed),
+// and each pair draws exactly the markup phase 1 drew.
 
-function faceA(design, suit, rank, g) {
-  const s = g.safeRect;
-  const idx = cornerIndex(rank, suit, design.face.bg, g.h * 0.13);
-  const spec = fireworkSpec(design, suit, rank);
-  const r = Math.min(s.w * 0.46, (s.h - 2 * idx.h) * 0.5 + idx.h * 0.35, s.h * 0.4);
-  return renderFirework(spec, { cx: g.fullW / 2, cy: g.fullH / 2, r })
-    + placeCorners(idx, s, g, design.corners);
-}
+export const INDEX_DIGIT = { large: 0.13, small: 0.095 };   // numeral height, fraction of card height
 
-function faceB(design, suit, rank, g) {
+// returns { svg, defs, area, corner: { w, h } }
+function indexArt(design, suit, rank, g, idPrefix, plate) {
   const s = g.safeRect;
-  const idx = cornerIndex(rank, suit, design.face.bg, g.h * 0.095);
-  const spec = { ...fireworkSpec(design, suit, rank), size: 1, trail: false };
-  const slot = s.h / 5;                       // always sized for five, so the count reads
-  const r = Math.min(slot * 0.46, (s.w - 2 * idx.w) * 0.42);
-  const top = g.fullH / 2 - (rank * slot) / 2;
-  let art = '';
-  for (let i = 0; i < rank; i++) {
-    art += renderFirework({ ...spec, seed: spec.seed + i * 7919 }, { cx: g.fullW / 2, cy: top + slot * (i + 0.5), r });
+  if (design.index !== 'band') {
+    const idx = cornerIndex(rank, suit, design.face.bg, g.h * (INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate);
+    return { svg: `<g class="hb-index">${placeCorners(idx, s, g, design.corners)}</g>`, defs: '', area: s, corner: { w: idx.w, h: idx.h } };
   }
-  return art + placeCorners(idx, s, g, design.corners);
-}
-
-function faceC(design, suit, rank, g, idPrefix) {
-  const s = g.safeRect;
-  const spec = fireworkSpec(design, suit, rank);
-  // Full bleed: the burst is sized to the card's half-diagonal and runs off
-  // every edge; the svg viewport clips it at the bleed line.
-  const r = Math.hypot(g.fullW, g.fullH) / 2 * 0.98;
-  const art = renderFirework(spec, { cx: g.fullW / 2, cy: g.fullH / 2, r });
   const bandH = g.bleed + g.safe + g.h * 0.13;
   const dH = g.h * 0.105;
   let defs = '', bandFill = suit.primary;
@@ -160,7 +147,53 @@ function faceC(design, suit, rank, g, idPrefix) {
       + `<rect x="0" y="${f(g.fullH - bandH - rule)}" width="${f(g.fullW)}" height="${f(rule)}" fill="${ink}" fill-opacity="0.6"/>`
       + content(g.fullH - yD - dH)
     : `<g transform="rotate(180 ${f(cx)} ${f(cy)})">${band}</g>`;
-  return { inner: art + band + bottom, defs };
+  const top = bandH + rule;
+  return { svg: `<g class="hb-index">${band + bottom}</g>`, defs, area: { x: s.x, y: top, w: s.w, h: g.fullH - 2 * top }, corner: { w: 0, h: 0 } };
+}
+
+// The free centre a field fills: the area less the corner-index columns.
+export function fieldArea(area, corner) {
+  const gap = Math.max(0.8, area.h * 0.015), side = corner.w ? corner.w + gap : gap;
+  return { x: area.x + side, y: area.y + gap, w: area.w - 2 * side, h: area.h - 2 * gap };
+}
+
+// The rect a lower tier fills, under a burst lifted to make room for it.
+export function tierLayout(area, corner) {
+  const r = Math.min(area.w * 0.4, area.h * 0.27);
+  const cy = area.y + area.h * 0.36;
+  const gap = Math.max(0.8, area.h * 0.015);
+  const x0 = area.x + corner.w + gap, x1 = area.x + area.w - corner.w - gap;
+  const y0 = cy + r + gap, y1 = area.y + area.h - gap;
+  return { burst: { cy, r }, rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } };
+}
+
+function centreArt(design, suit, rank, g, ix) {
+  const layout = (suit.centre && suit.centre.layout) || 'single';
+  const spec = fireworkSpec(design, suit, rank);
+  const cx = g.fullW / 2, cy = g.fullH / 2, a = ix.area, k = ix.corner;
+  if (layout === 'bleed') {
+    // Full bleed: the burst is sized to the card's half-diagonal and runs off
+    // every edge; the svg viewport clips it at the bleed line. A field fills
+    // the trim, so no piece is cut in half by the knife.
+    return renderFirework(spec, { cx, cy, r: Math.hypot(g.fullW, g.fullH) / 2 * 0.98, rect: g.trim });
+  }
+  if (layout === 'count') {
+    const one = { ...spec, size: 1, trail: false };
+    const slot = a.h / 5;                       // always sized for five, so the count reads
+    const r = Math.min(slot * 0.46, (a.w - 2 * k.w) * 0.42);
+    const top = cy - (rank * slot) / 2;
+    let art = '';
+    for (let i = 0; i < rank; i++) art += renderFirework({ ...one, seed: one.seed + i * 7919 }, { cx, cy: top + slot * (i + 0.5), r });
+    return art;
+  }
+  if (spec.tier) {
+    const t = tierLayout(a, k);
+    return renderFirework(spec, { cx, cy: t.burst.cy, r: t.burst.r }) + renderTier(spec, t.rect);
+  }
+  const r = design.index === 'band'
+    ? Math.min(a.w * 0.46, a.h * 0.46)
+    : Math.min(a.w * 0.46, (a.h - 2 * k.h) * 0.5 + k.h * 0.35, a.h * 0.4);
+  return renderFirework(spec, { cx, cy: design.index === 'band' ? a.y + a.h / 2 : cy, r, rect: fieldArea(a, k) });
 }
 
 // ---- public renderers ----
@@ -173,9 +206,11 @@ export function renderFace(design, card, opts = {}) {
   const suit = suitById(design, card.suitId);
   const idPrefix = opts.idPrefix || `hb${card.suitId}${card.rank}`;
   const bg = `<rect x="0" y="0" width="${f(g.fullW)}" height="${f(g.fullH)}" fill="${design.face.bg}"/>`;
-  if (design.layout === 'B') return frame(g, bg + faceB(design, suit, card.rank, g), opts);
-  if (design.layout === 'C') { const c = faceC(design, suit, card.rank, g, idPrefix); return frame(g, bg + c.inner, { ...opts, defs: c.defs }); }
-  return frame(g, bg + faceA(design, suit, card.rank, g), opts);
+  // A full-bleed centre runs under a corner index, so the index sits on a
+  // plate of the face colour; a band index carries its own ground.
+  const plate = suit.centre && suit.centre.layout === 'bleed';
+  const ix = indexArt(design, suit, card.rank, g, idPrefix, plate);
+  return frame(g, bg + centreArt(design, suit, card.rank, g, ix) + ix.svg, { ...opts, defs: ix.defs });
 }
 
 function backPattern(design, g) {

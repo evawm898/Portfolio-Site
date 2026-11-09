@@ -12658,8 +12658,10 @@ Reality toggles. Copy stays generic — no internal product, project or band nam
 ## `/hanabi` — the Hanabi deck designer (pointer only)
 
 Hidden page (`hanabi.html`, `hanabi.css`, `hanabi.js`, `hanabi/*.js`; `noindex`, unlinked). Read
-`docs/hanabi.md` before touching it. Phase 1: suits (colour + a SYMBOL each — colour is never the
-only cue), the 3/2/2/2/1 distribution plus the optional rainbow suit, three face layouts (A/B/C,
-Eva's to rule), back, tokens, imposed print PDF and 300 dpi PNGs. **`hanabi/firework.js` is the
-phase-2 slot** — layout code only calls `fireworkSpec()` and `renderFirework()`; the builder writes
-overrides into `design.fireworks`. Gate: `node tools/verify-hanabi.mjs` (`--negative-control`), not in CI.
+`docs/hanabi.md` before touching it. Suits carry colour + a SYMBOL each (colour is never the only cue).
+**A face is two choices (Eva, on #528): ONE corner index for the deck (`design.index`: large / small /
+band), and a centre PER SUIT (`suit.centre`: layout single / count / bleed, a firework motif, an optional
+tier at ranks 4–5).** Phase 1's layouts A/B/C are those pairs, and a v1 file migrates byte-identically.
+Motifs are the five originals plus 14 drawn after the Hirayama catalogue; hanging/falling pieces are ruled
+out. **`hanabi/firework.js` is the phase-2 slot** — layout code only calls `fireworkSpec()`,
+`renderFirework()` and `renderTier()`. Gate: `node tools/verify-hanabi.mjs` (`--negative-control`), not in CI.

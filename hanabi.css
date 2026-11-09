@@ -78,6 +78,15 @@ input[type=range] { accent-color: var(--color-petrol); }
 .hb-sym[aria-pressed="true"] { border-color: var(--color-petrol); outline: 1px solid var(--color-petrol); }
 .hb-sym.is-taken { opacity: .45; }
 .hb-suit[hidden] { display: none; }
+.hb-suit__centre { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 6px; margin-top: 6px; align-items: center; }
+.hb-suit__centre label { color: var(--color-dim); font-size: 10px; letter-spacing: .04em; }
+.hb-suit__centre select { width: 100%; }
+.hb-suit__centre select:disabled { opacity: .45; }
+.hb-suit__all { grid-column: 1 / -1; justify-self: end; background: none; border: 0; padding: 0; color: var(--color-petrol); font: inherit; font-size: 10px; cursor: pointer; }
+.hb-suit__all:hover { text-decoration: underline; }
+.hb-pick { background: none; border: 1px solid var(--color-line-strong); color: var(--color-ink-2); font: inherit; font-size: 10px; padding: 2px 8px; margin-left: 8px; cursor: pointer; }
+.hb-pick:hover { color: var(--color-ink); border-color: var(--color-petrol); }
+.hb-pick[aria-pressed="true"] { background: var(--color-petrol); border-color: var(--color-petrol); color: var(--color-ground); }
 
 .hb-spec { background: var(--color-ground); border: 1px solid var(--color-line); color: var(--color-ink-2); font-size: 10.5px; padding: 8px; margin: 6px 0 0; white-space: pre-wrap; max-height: 260px; overflow: auto; }
 

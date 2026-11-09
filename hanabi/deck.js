@@ -5,8 +5,19 @@
 // how many copies of each rank, the card size in millimetres, and the tokens.
 // The renderers (hanabi/layout.js, hanabi/firework.js) read a card record and
 // the design; they never decide what is in the deck.
+//
+// A face is two independent choices (Eva's ruling on #528's three layouts):
+//   design.index        the CORNER INDEX, one style for the whole deck, so the
+//                       numeral and symbol are always found in the same place
+//   suit.centre         the CENTRE, per suit: how it is laid out (one burst, the
+//                       rank as a count of bursts, or full bleed), which firework
+//                       motif it draws, and an optional lower tier at ranks 4-5
+// Phase 1's layouts A/B/C are exactly (large, single), (small, count) and
+// (band, bleed); a version-1 file is read that way (LEGACY_LAYOUTS).
 
-export const VERSION = 1;
+import { MOTIF_IDS, TIER_IDS } from './firework.js';
+
+export const VERSION = 2;
 
 // The standard per-suit distribution: three 1s, two 2s, two 3s, two 4s, one 5.
 // The optional rainbow suit uses the same distribution (10 more cards).
@@ -24,11 +35,23 @@ export const SIZE_LIMITS = { min: 30, max: 140 };   // custom size bounds, mm
 export const BLEED_LIMITS = { min: 0, max: 5 };
 export const SAFE_LIMITS = { min: 0, max: 8 };
 
-export const LAYOUTS = {
-  A: 'Corner index + centred burst',
-  B: 'Rank as a column of bursts',
-  C: 'Full-bleed burst + corner band',
+export const INDEX_STYLES = {
+  large: 'Large numeral + symbol',
+  small: 'Small numeral + symbol',
+  band:  'Coloured band, top and bottom',
 };
+export const CENTRE_LAYOUTS = {
+  single: 'One burst in the middle',
+  count:  'The rank as a count of bursts',
+  bleed:  'Full-bleed burst',
+};
+// Phase 1's layouts, as the pair of choices each one was.
+export const LEGACY_LAYOUTS = {
+  A: { index: 'large', layout: 'single' },
+  B: { index: 'small', layout: 'count' },
+  C: { index: 'band',  layout: 'bleed' },
+};
+export const defaultCentre = () => ({ layout: 'single', motif: 'classic', tier: 'none' });
 export const CORNER_MODES = {
   inverted: 'Two corners, bottom inverted',
   upright:  'Two corners, both upright',
@@ -47,12 +70,12 @@ export const PAPERS = {
 // and only enters the deck when `rainbow` is on.
 export function defaultSuits() {
   return [
-    { id: 'white',   name: 'White',   primary: '#EDEAE0', secondary: '#9FB4C8', symbol: 'crescent' },
-    { id: 'red',     name: 'Red',     primary: '#E5484D', secondary: '#F5A97A', symbol: 'heart' },
-    { id: 'blue',    name: 'Blue',    primary: '#3E8EF0', secondary: '#9BD3F7', symbol: 'drop' },
-    { id: 'yellow',  name: 'Yellow',  primary: '#F2C230', secondary: '#FFF0A8', symbol: 'star' },
-    { id: 'green',   name: 'Green',   primary: '#3DBA6B', secondary: '#B6E8A0', symbol: 'triangle' },
-    { id: 'rainbow', name: 'Rainbow', primary: '#E8D9FF', secondary: '#FFB1E0', symbol: 'sparkle', multicolor: true },
+    { id: 'white',   name: 'White',   primary: '#EDEAE0', secondary: '#9FB4C8', symbol: 'crescent', centre: defaultCentre() },
+    { id: 'red',     name: 'Red',     primary: '#E5484D', secondary: '#F5A97A', symbol: 'heart', centre: defaultCentre() },
+    { id: 'blue',    name: 'Blue',    primary: '#3E8EF0', secondary: '#9BD3F7', symbol: 'drop', centre: defaultCentre() },
+    { id: 'yellow',  name: 'Yellow',  primary: '#F2C230', secondary: '#FFF0A8', symbol: 'star', centre: defaultCentre() },
+    { id: 'green',   name: 'Green',   primary: '#3DBA6B', secondary: '#B6E8A0', symbol: 'triangle', centre: defaultCentre() },
+    { id: 'rainbow', name: 'Rainbow', primary: '#E8D9FF', secondary: '#FFB1E0', symbol: 'sparkle', multicolor: true, centre: defaultCentre() },
   ];
 }
 
@@ -64,7 +87,7 @@ export function defaultDesign() {
     size: { preset: 'poker', w: 63.5, h: 88.9 },
     bleed: 3,
     safe: 3,
-    layout: 'A',
+    index: 'large',
     corners: 'inverted',
     face: { bg: '#0B1018' },
     back: { bg: '#10202A', fg: '#2FA3A3', pattern: 'stars', mark: 'burst' },
@@ -147,6 +170,11 @@ export function normaliseDesign(raw, symbolIds) {
   if (typeof raw.version === 'number' && raw.version > VERSION) {
     return { design: null, notes: [`version ${raw.version} is newer than this page (${VERSION}) — refused`] };
   }
+  // A version-1 file chose one layout for the whole deck; it becomes that
+  // layout's corner index plus that layout's centre on every suit.
+  const legacy = !(typeof raw.version === 'number' && raw.version >= 2) && LEGACY_LAYOUTS[raw.layout]
+    ? LEGACY_LAYOUTS[raw.layout] : null;
+  if (legacy) notes.push(`version-1 layout ${raw.layout} read as the ${legacy.index} corner index with a ${legacy.layout} centre on every suit`);
   d.rainbow = !!raw.rainbow;
   if (Array.isArray(raw.suits)) {
     for (const s of d.suits) {
@@ -157,6 +185,14 @@ export function normaliseDesign(raw, symbolIds) {
       s.secondary = hex(r.secondary, s.secondary);
       if (symbolIds.includes(r.symbol)) s.symbol = r.symbol;
       else notes.push(`suit ${s.id}: unknown symbol "${r.symbol}" — default kept`);
+      if (legacy) s.centre.layout = legacy.layout;
+      else if (r.centre && typeof r.centre === 'object') {
+        const c = r.centre;
+        s.centre.layout = pick(c.layout, Object.keys(CENTRE_LAYOUTS), s.centre.layout);
+        if (MOTIF_IDS.includes(c.motif)) s.centre.motif = c.motif;
+        else notes.push(`suit ${s.id}: unknown firework "${c.motif}" — classic kept`);
+        s.centre.tier = pick(c.tier, TIER_IDS, s.centre.tier);
+      } else if (raw.version >= 2) notes.push(`suit ${s.id}: no centre — default kept`);
     }
   }
   if (raw.size && typeof raw.size === 'object') {
@@ -168,7 +204,7 @@ export function normaliseDesign(raw, symbolIds) {
   }
   d.bleed = clamp(num(raw.bleed, d.bleed), BLEED_LIMITS.min, BLEED_LIMITS.max);
   d.safe = clamp(num(raw.safe, d.safe), SAFE_LIMITS.min, SAFE_LIMITS.max);
-  d.layout = pick(raw.layout, Object.keys(LAYOUTS), d.layout);
+  d.index = legacy ? legacy.index : pick(raw.index, Object.keys(INDEX_STYLES), d.index);
   d.corners = pick(raw.corners, Object.keys(CORNER_MODES), d.corners);
   if (raw.face) d.face.bg = hex(raw.face.bg, d.face.bg);
   if (raw.back) {
@@ -192,6 +228,12 @@ export function normaliseDesign(raw, symbolIds) {
 
 export function serialiseDesign(design) {
   return JSON.stringify({ format: 'hanabi-deck', ...design, version: VERSION }, null, 2);
+}
+
+// Set one suit's centre on every suit (the panel's "same for every suit").
+export function copyCentreToAll(design, fromId) {
+  const from = suitById(design, fromId);
+  for (const s of design.suits) s.centre = { ...from.centre };
 }
 
 // ---- imposition: where each card sits on a sheet, in mm ----
