@@ -1,146 +1,280 @@
-// scene/studio-draw.js — every mark scene 4 makes. Flat fills, one neutral
-// daylight, no lighting model: a face's tone is chosen by which way it faces
-// (top lightest, front, then side) and nothing else.
+// scene/studio-draw.js — every mark scene 4 makes.
 //
-// TWO PLANES. The ROOM — walls, bay, windows, sill, floor, crown and wainscot —
-// never moves, so it is drawn once per resize onto the back canvas. The front
-// canvas is cleared every frame and carries the furniture and the cats, in one
-// painter's order, because a cat on the sill sits BEHIND the table and a cat on
-// the table sits IN FRONT of it, and that ordering changes as cats move.
+// THE ROOM IS DRAWN, NOT FILLED. Every mark in it goes through scene 3's brush
+// (`brush` in beach-brush.js — one implementation, imported, never forked): a
+// tapered stroke whose width swells along its length and whose ends lift, laid
+// in two or three overlapping passes when it is long. Three kinds of mark, and
+// nothing else:
+//   a LINE      a brush stroke along a projected edge: window frames, sash bars,
+//               the crown molding, the chair rail, the baseboard, the corners
+//   a MASS      a solid fill whose every edge is also stroked in its own colour,
+//               so the boundary is a brush edge and not a polygon's: the floor,
+//               a wall's wash, each face of the furniture
+//   a CUT       a stroke in the bare paper colour across a mass: the light on
+//               the floorboards, the lit top edge of a piece of furniture
+// Light areas are the paper left bare — the ceiling, the sky through the glass,
+// the sill's top — never painted on.
 //
-// THE PALETTE IS GREYSCALE ON PURPOSE. The section is one ink and one ground
-// (scene.css says palettes are a later phase); a daylit room in greys keeps
-// that, and two black cats read against it.
+// TWO PLANES. The ROOM never moves, so it is drawn once per resize onto the
+// back canvas. The front canvas is cleared every frame and carries the
+// furniture and the cats in one painter's order, because a cat on the sill
+// sits BEHIND the table and a cat on the table sits IN FRONT of it. The
+// furniture's brush marks are COMPUTED once per view (per resize) and replayed
+// every frame as plain filled polygons, so a frame pays for fills and not for
+// strokes. Every stroke is drawn off its own seeded stream, named by what it
+// is, so a resize redraws the same marks and a frame never crawls.
+//
+// THE PALETTE IS ONE NAMED TABLE (`PALETTE`), and every mark names its colour
+// by KEY. The furniture's replay resolves the key at draw time. Warm and tight:
+// cream paper, honey oak, a high-key green beyond the glass, dark warm brown
+// furniture. THE CATS ARE THE ONLY TRUE BLACKS: nothing else reaches that
+// value, and the cats are never lightened to make up for it.
 
 import { ROOM, FURNITURE, NODES, bayOffset, onSurface, pointInPoly } from './studio-room.js';
 import { solveRig } from './studio-rig.js';
 import { toeWorld } from './studio-cat.js';
 import { CAMERA } from './studio-room.js';
+import { brush, rng } from './beach-brush.js';
 
 export const PALETTE = {
-  ground: '#cfcbc4',
-  ceiling: '#e6e3dd',
-  wallSide: '#c7c2ba',
-  wallBack: '#d3cec6',
-  bayWall: '#d8d3cb',
-  crown: '#ecebe7',
-  crownShade: '#bdb8b0',
-  wainscot: '#c2bdb4',
-  rail: '#e1ded8',
-  glass: '#eef1f3',
-  glassDeep: '#e3e8eb',
-  mullion: '#b4afa6',
-  sillTop: '#efede8',
-  sillFace: '#aaa59c',
-  floor: '#a59d92',
-  board: '#968e83',
-  shadow: 'rgba(40, 36, 32, 0.18)',
-  wood: '#8a8278', woodDark: '#6f685f',
-  uph: '#9a948c', uphDark: '#7f7970',
+  paper: '#f4ecdb',       // bare paper: the ceiling, the sky, the sill's top, every cut
+  wall: '#ece1c9',        // the side walls' wash — only enough to read as a surface
+  wallFar: '#f0e6d1',     // the back wall and the bay's facets, nearer the paper still
+  oak: '#c8935a',         // the floorboards: honey oak, the largest warm mass
+  oakLine: '#a8743f',     // the board joints
+  trim: '#86705a',        // drawn line: frames, sash bars, crown, rail, baseboard
+  trimSoft: '#b7a68f',    // the quieter lines: corners, the crown's second line
+  distance: '#ddd8c3',    // the buildings across the street, suggested
+  greenPale: '#cfdfb6',   // beyond the glass: high-key, soft-edged
+  green: '#aecb90',
+  greenDeep: '#93b778',
+  woodTop: '#604835', wood: '#4c392b', woodSide: '#413125',
+  woodDarkTop: '#553f30', woodDark: '#433226', woodDarkSide: '#3a2b21',
+  uphTop: '#6d5242', uph: '#584335', uphSide: '#4c392d',
+  uphDarkTop: '#5c4637', uphDark: '#4b392c', uphDarkSide: '#413126',
+  shadow: '74, 50, 30',   // a cat's shadow, as an rgb triple its alpha is set on
   cat: '#000000',    // one pure black ink: never lightened for contrast
   eye: '#ffffff',    // the face's marks: what carries a cat on dark furniture
 };
 
-const shade = (hex, k) => {
-  const n = parseInt(hex.slice(1), 16);
-  const ch = (v) => Math.max(0, Math.min(255, Math.round(v * k)));
-  return `rgb(${ch(n >> 16)},${ch((n >> 8) & 255)},${ch(n & 255)})`;
+/** A furniture part's three faces, by tone: [top, front, side]. */
+const TONE = {
+  wood: ['woodTop', 'wood', 'woodSide'],
+  woodDark: ['woodDarkTop', 'woodDark', 'woodDarkSide'],
+  uph: ['uphTop', 'uph', 'uphSide'],
+  uphDark: ['uphDarkTop', 'uphDark', 'uphDarkSide'],
 };
 
-function poly(ctx, view, pts3, fill) {
+const colourOf = (key) => PALETTE[key] || key;
+
+// A mark's own stream, named by what it is (FNV-1a over the name).
+function streamFor(name) {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) { h ^= name.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return rng(h >>> 0);
+}
+
+// --------------------------------------------------------------- the marks --
+// The projected polyline, resampled evenly on screen: the brush's wobble and
+// taper run over the INDEX, so the points have to be evenly spaced for a
+// stroke to swell the same way at any length. Capped so a wall line running
+// off the screen behind the viewer costs no more than one across it.
+const MAX_STROKE_PTS = 480;
+function resample(pts, step) {
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  const n = Math.max(6, Math.min(MAX_STROKE_PTS, Math.ceil(L / step) + 1));
+  const xs = new Float64Array(n), ys = new Float64Array(n);
+  let seg = 1, acc = 0, segL = pts.length > 1 ? Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) : 0;
+  for (let k = 0; k < n; k++) {
+    const want = L * k / (n - 1);
+    while (seg < pts.length - 1 && acc + segL < want) {
+      acc += segL; seg++;
+      segL = Math.hypot(pts[seg].x - pts[seg - 1].x, pts[seg].y - pts[seg - 1].y);
+    }
+    const t = segL > 1e-9 ? Math.min(1, Math.max(0, (want - acc) / segL)) : 0;
+    const a = pts[seg - 1] || pts[0], b = pts[seg] || pts[0];
+    xs[k] = a.x + (b.x - a.x) * t; ys[k] = a.y + (b.y - a.y) * t;
+  }
+  return { xs, ys, n, L };
+}
+
+/** A LINE: a brush stroke along a world polyline, `width` in px. */
+function strokeLine(ctx, view, pts3, width, colour, name, { passes = true, vary = 0.42, gate = null } = {}) {
+  const pts = pts3.map(q => view.p(q[0], q[1], q[2]));
+  const { xs, ys, n, L } = resample(pts, 3);
+  if (L < 2) return;
+  let g = null;
+  if (gate) { g = new Float64Array(n); for (let i = 0; i < n; i++) g[i] = gate(i / (n - 1)); }
+  brush(ctx, xs, ys, width, streamFor(name), { n, colour, passes, vary, gate: g });
+}
+
+/** A MASS: a solid fill whose every edge is a brush edge in the same colour. */
+function mass(ctx, pts2, colour, name, edge) {
   ctx.beginPath();
-  pts3.forEach((q, i) => { const p = view.p(q[0], q[1], q[2]); if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
+  pts2.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.closePath();
-  ctx.fillStyle = fill;
+  ctx.fillStyle = colour;
   ctx.fill();
+  if (!(edge > 0)) return;
+  for (let i = 0; i < pts2.length; i++) {
+    const a = pts2[i], b = pts2[(i + 1) % pts2.length];
+    const { xs, ys, n, L } = resample([a, b], 3);
+    if (L < 4) continue;
+    brush(ctx, xs, ys, edge, streamFor(`${name}:${i}`), { n, colour, passes: false, vary: 0.6 });
+  }
 }
-function line(ctx, view, pts3, stroke, width) {
-  ctx.beginPath();
-  pts3.forEach((q, i) => { const p = view.p(q[0], q[1], q[2]); if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
-  ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke();
-}
+const proj = (view, pts3) => pts3.map(q => view.p(q[0], q[1], q[2]));
 
 // --------------------------------------------------------------- the room --
 export function drawRoom(ctx, view) {
   const { halfW: X, backZ: B, ceilY: CY, bay } = ROOM;
-  ctx.fillStyle = PALETTE.ground;
+  ctx.fillStyle = PALETTE.paper;
   ctx.fillRect(0, 0, view.w, view.h);
   const Z0 = -40;   // the room runs out behind the viewer
+  const at = (z) => view.scaleAt(z);   // px per cm at a depth
+  const wB = at(B);
 
-  // floor, including the bay's alcove
-  const floorPts = [[-X, Z0], [X, Z0], [X, B], ...bay.slice().reverse(), [-X, B]];
-  poly(ctx, view, floorPts.map(([x, z]) => [x, 0, z]), PALETTE.floor);
-  drawFloorboards(ctx, view);
-
-  // ceiling
-  poly(ctx, view, [[-X, CY, Z0], [X, CY, Z0], [X, CY, B], ...bay.slice().reverse().map(([x, z]) => [x, CY, z]), [-X, CY, B]], PALETTE.ceiling);
-
-  // side walls, back wall stubs
-  poly(ctx, view, [[-X, 0, Z0], [-X, 0, B], [-X, CY, B], [-X, CY, Z0]], PALETTE.wallSide);
-  poly(ctx, view, [[X, 0, Z0], [X, 0, B], [X, CY, B], [X, CY, Z0]], PALETTE.wallSide);
-  poly(ctx, view, [[-X, 0, B], [bay[0][0], 0, B], [bay[0][0], CY, B], [-X, CY, B]], PALETTE.wallBack);
-  poly(ctx, view, [[bay[3][0], 0, B], [X, 0, B], [X, CY, B], [bay[3][0], CY, B]], PALETTE.wallBack);
-
-  // the bay: three facets, each wainscot below and a window above
+  // THE WALLS: a wash, barely off the paper. The ceiling is the paper itself.
+  mass(ctx, proj(view, [[-X, 0, Z0], [-X, 0, B], [-X, CY, B], [-X, CY, Z0]]), PALETTE.wall, 'wallL', 3);
+  mass(ctx, proj(view, [[X, 0, Z0], [X, 0, B], [X, CY, B], [X, CY, Z0]]), PALETTE.wall, 'wallR', 3);
+  mass(ctx, proj(view, [[-X, 0, B], [bay[0][0], 0, B], [bay[0][0], CY, B], [-X, CY, B]]), PALETTE.wallFar, 'backL', 2);
+  mass(ctx, proj(view, [[bay[3][0], 0, B], [X, 0, B], [X, CY, B], [bay[3][0], CY, B]]), PALETTE.wallFar, 'backR', 2);
   for (let i = 0; i < 3; i++) {
     const a = bay[i], b = bay[i + 1];
-    const tone = i === 1 ? PALETTE.bayWall : shade(PALETTE.bayWall, 0.95);
-    poly(ctx, view, [[a[0], 0, a[1]], [b[0], 0, b[1]], [b[0], CY, b[1]], [a[0], CY, a[1]]], tone);
-    poly(ctx, view, [[a[0], 0, a[1]], [b[0], 0, b[1]], [b[0], ROOM.wainscotY, b[1]], [a[0], ROOM.wainscotY, a[1]]], PALETTE.wainscot);
-    // the window: glass with a frame inset
+    mass(ctx, proj(view, [[a[0], 0, a[1]], [b[0], 0, b[1]], [b[0], CY, b[1]], [a[0], CY, a[1]]]), i === 1 ? PALETTE.wallFar : PALETTE.wall, `bay${i}`, 2);
+  }
+
+  // THE FLOOR: the largest warm mass, its joints brushed in and the window's
+  // light cut out of it as bare paper.
+  const floorPts = [[-X, Z0], [X, Z0], [X, B], ...bay.slice().reverse(), [-X, B]];
+  mass(ctx, proj(view, floorPts.map(([x, z]) => [x, 0, z])), PALETTE.oak, 'floor', 3);
+  drawFloorboards(ctx, view);
+
+  // THE GLASS: what is beyond it, then the frames over it as drawn line
+  const glass = [];
+  for (let i = 0; i < 3; i++) {
+    const a = bay[i], b = bay[i + 1];
     const inset = 7;
     const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
     const ux = (b[0] - a[0]) / L, uz = (b[1] - a[1]) / L;
-    const p0 = [a[0] + ux * inset, a[1] + uz * inset], p1 = [b[0] - ux * inset, b[1] - uz * inset];
-    const y0 = ROOM.sillY + 3, y1 = ROOM.windowTop;
-    poly(ctx, view, [[p0[0], y0, p0[1]], [p1[0], y0, p1[1]], [p1[0], y1, p1[1]], [p0[0], y1, p0[1]]], i === 1 ? PALETTE.glass : PALETTE.glassDeep);
-    // mullions: a transom and the sash bars
+    glass.push({ p0: [a[0] + ux * inset, a[1] + uz * inset], p1: [b[0] - ux * inset, b[1] - uz * inset], y0: ROOM.sillY + 3, y1: ROOM.windowTop });
+  }
+  drawBeyond(ctx, view, glass);
+  glass.forEach(({ p0, p1, y0, y1 }, i) => {
+    const w = Math.max(1.4, at(p0[1]) * 2.6);
+    const P = (x, y, z) => [x, y, z];
+    const corners = [P(p0[0], y0, p0[1]), P(p1[0], y0, p1[1]), P(p1[0], y1, p1[1]), P(p0[0], y1, p0[1])];
+    // the frame, one stroke a side (a brush lifts at a corner, as a hand does)
+    for (let k = 0; k < 4; k++) strokeLine(ctx, view, [corners[k], corners[(k + 1) % 4]], w * 1.25, PALETTE.trim, `frame${i}:${k}`, { passes: false });
+    // the transom and the sash bars
     const yT = y0 + (y1 - y0) * 0.68;
-    line(ctx, view, [[p0[0], yT, p0[1]], [p1[0], yT, p1[1]]], PALETTE.mullion, Math.max(1.5, view.scaleAt(a[1]) * 2.2));
+    strokeLine(ctx, view, [P(p0[0], yT, p0[1]), P(p1[0], yT, p1[1])], w * 0.9, PALETTE.trim, `transom${i}`, { passes: false });
     const bars = i === 1 ? 3 : 1;
     for (let k = 1; k <= bars; k++) {
       const f = k / (bars + 1);
       const q = [p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f];
-      line(ctx, view, [[q[0], y0, q[1]], [q[0], y1, q[1]]], PALETTE.mullion, Math.max(1.5, view.scaleAt(q[1]) * 2.4));
+      strokeLine(ctx, view, [P(q[0], y0, q[1]), P(q[0], y1, q[1])], w * 0.9, PALETTE.trim, `bar${i}:${k}`, { passes: false });
     }
-    line(ctx, view, [[p0[0], y0, p0[1]], [p1[0], y0, p1[1]], [p1[0], y1, p1[1]], [p0[0], y1, p0[1]], [p0[0], y0, p0[1]]], PALETTE.mullion, Math.max(2, view.scaleAt(a[1]) * 3.4));
-  }
+  });
 
-  // chair rail along every wall and facet
-  const rail = (pts) => line(ctx, view, pts, PALETTE.rail, Math.max(1.5, view.scaleAt(B) * 2.6));
-  rail([[-X, ROOM.wainscotY, Z0], [-X, ROOM.wainscotY, B], [bay[0][0], ROOM.wainscotY, B]]);
-  rail([[X, ROOM.wainscotY, Z0], [X, ROOM.wainscotY, B], [bay[3][0], ROOM.wainscotY, B]]);
-  rail(bay.map(([x, z]) => [x, ROOM.wainscotY, z]));
+  // THE WAINSCOT, AS LINE: the chair rail (a rail and its lower edge) and the
+  // baseboard's top, along every wall and facet
+  const run = (y) => [
+    [[-X, y, Z0], [-X, y, B], [bay[0][0], y, B]],
+    bay.map(([x, z]) => [x, y, z]),
+    [[X, y, Z0], [X, y, B], [bay[3][0], y, B]],
+  ];
+  run(ROOM.wainscotY).forEach((pts, k) => strokeLine(ctx, view, pts, Math.max(1.4, wB * 2.4), PALETTE.trim, `rail${k}`));
+  run(ROOM.wainscotY - 4).forEach((pts, k) => strokeLine(ctx, view, pts, Math.max(0.9, wB * 1.1), PALETTE.trimSoft, `railLow${k}`));
+  run(9).forEach((pts, k) => strokeLine(ctx, view, pts, Math.max(1.2, wB * 1.8), PALETTE.trim, `base${k}`));
 
-  // the sill: one continuous ledge across all three facets. Its front edge is
-  // the glass line offset into the room by the sill's depth; on the two side
-  // facets that edge is CUT where it meets the back wall's plane (not clamped
-  // onto it, which slid its ends sideways and left the ledge stopping short of
-  // the wall with no face under it)
+  // THE SILL: its top is bare paper; the nosing, the apron's foot and its
+  // ends are drawn. Its front edge is the glass line offset into the room by
+  // the sill's depth; on the two side facets that edge is CUT where it meets
+  // the back wall's plane (not clamped onto it, which slid its ends sideways
+  // and left the ledge stopping short of the wall)
   const inner = bayOffset(ROOM.sillDepth);
   const meetWall = (p, q) => { const t = (B - p[1]) / (q[1] - p[1]); return [p[0] + (q[0] - p[0]) * t, B]; };
   const front = [meetWall(inner[0], inner[1]), inner[1], inner[2], meetWall(inner[3], inner[2])];
   const sy = ROOM.sillY, ay = ROOM.sillY - ROOM.sillApron;
-  poly(ctx, view, [...bay.map(([x, z]) => [x, sy, z]), ...front.slice().reverse().map(([x, z]) => [x, sy, z])], PALETTE.sillTop);
+  // the sill top and its apron are the paper, painted over the wall's wash
+  mass(ctx, proj(view, [...bay.map(([x, z]) => [x, sy, z]), ...front.slice().reverse().map(([x, z]) => [x, sy, z])]), PALETTE.paper, 'sillTop', 0);
   for (let i = 0; i < 3; i++) {
     const a = front[i], b = front[i + 1];
-    poly(ctx, view, [[a[0], sy, a[1]], [b[0], sy, b[1]], [b[0], ay, b[1]], [a[0], ay, a[1]]], i === 1 ? PALETTE.sillFace : shade(PALETTE.sillFace, 0.95));
+    mass(ctx, proj(view, [[a[0], sy, a[1]], [b[0], sy, b[1]], [b[0], ay, b[1]], [a[0], ay, a[1]]]), PALETTE.paper, `apron${i}`, 0);
   }
-  // the nosing: a lit edge where the top turns down into the face
-  line(ctx, view, front.map(([x, z]) => [x, sy, z]), PALETTE.sillTop, Math.max(1, view.scaleAt(B) * 1.2));
+  strokeLine(ctx, view, front.map(([x, z]) => [x, sy, z]), Math.max(1.4, wB * 2.2), PALETTE.trim, 'nosing');
+  strokeLine(ctx, view, front.map(([x, z]) => [x, ay, z]), Math.max(1, wB * 1.4), PALETTE.trim, 'apronFoot');
+  strokeLine(ctx, view, bay.map(([x, z]) => [x, sy + 0.5, z]), Math.max(0.8, wB * 0.9), PALETTE.trimSoft, 'sillBack');
+  for (const k of [0, 3]) strokeLine(ctx, view, [[front[k][0], sy, front[k][1]], [front[k][0], ay, front[k][1]]], Math.max(1, wB * 1.2), PALETTE.trim, `apronEnd${k}`, { passes: false });
 
-  // crown molding: a lit band with a shaded lip
-  const crown = (pts) => {
-    poly(ctx, view, [...pts.map(([x, z]) => [x, ROOM.crownY, z]), ...pts.slice().reverse().map(([x, z]) => [x, CY, z])], PALETTE.crown);
-    line(ctx, view, pts.map(([x, z]) => [x, ROOM.crownY, z]), PALETTE.crownShade, Math.max(1.2, view.scaleAt(B) * 1.6));
+  // THE CROWN MOLDING, AS LINE: its foot and a quieter line above it
+  const crown = [[[-X, Z0], [-X, B], [bay[0][0], B]], bay, [[X, Z0], [X, B], [bay[3][0], B]]];
+  crown.forEach((pts, k) => {
+    strokeLine(ctx, view, pts.map(([x, z]) => [x, ROOM.crownY, z]), Math.max(1.4, wB * 2.2), PALETTE.trim, `crown${k}`);
+    strokeLine(ctx, view, pts.map(([x, z]) => [x, ROOM.crownY + 7, z]), Math.max(0.9, wB * 1.1), PALETTE.trimSoft, `crownUp${k}`);
+    strokeLine(ctx, view, pts.map(([x, z]) => [x, CY, z]), Math.max(0.9, wB * 1.2), PALETTE.trimSoft, `ceil${k}`);
+  });
+
+  // THE CORNERS: the bay's, and where the side walls meet the back
+  for (const [x, z] of bay) strokeLine(ctx, view, [[x, 0, z], [x, CY, z]], Math.max(0.8, wB), PALETTE.trimSoft, `corner${x}`);
+  strokeLine(ctx, view, [[-X, 0, B], [-X, CY, B]], Math.max(0.8, wB), PALETTE.trimSoft, 'cornerL');
+  strokeLine(ctx, view, [[X, 0, B], [X, CY, B]], Math.max(0.8, wB), PALETTE.trimSoft, 'cornerR');
+}
+
+// BEYOND THE GLASS: a street's far side, suggested — a high-key green of trees
+// and hedges in front of a few pale blocks with no detail in them, the sky the
+// paper. Everything is laid on one plane far behind the bay and projected, so
+// the three facets look onto one street and it moves with the viewport's crop
+// as the room does. Soft edges are radial and vertical gradients, which any
+// canvas draws (a blur filter is not one of those).
+const BEYOND_Z = 1100;
+function drawBeyond(ctx, view, glass) {
+  ctx.save();
+  ctx.beginPath();
+  for (const { p0, p1, y0, y1 } of glass) {
+    [[p0[0], y0, p0[1]], [p1[0], y0, p1[1]], [p1[0], y1, p1[1]], [p0[0], y1, p0[1]]].forEach((q, k) => {
+      const p = view.p(q[0], q[1], q[2]);
+      if (k) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y);
+    });
+    ctx.closePath();
+  }
+  ctx.clip();
+  const r = streamFor('beyond');
+  const s = view.scaleAt(BEYOND_Z);
+  const at = (x, y) => view.p(x, y, BEYOND_Z);
+  const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)].join(',');
+  // the blocks across the street: pale, flat-topped, fading out at the top
+  for (let k = 0; k < 7; k++) {
+    const cx = -900 + k * 290 + (r() - 0.5) * 120, hw = 90 + r() * 70, top = 230 + r() * 110;
+    const a = at(cx - hw, top), b = at(cx + hw, 0);
+    const g = ctx.createLinearGradient(0, a.y, 0, a.y + 60 * s);
+    g.addColorStop(0, `rgba(${hex(PALETTE.distance)},0)`);
+    g.addColorStop(1, `rgba(${hex(PALETTE.distance)},1)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+  }
+  // soft green: crowns of trees and a hedge line, each a cloud of soft discs
+  const blob = (x, y, rad, key, alpha) => {
+    const p = at(x, y), R = rad * s;
+    const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, R);
+    g.addColorStop(0, `rgba(${hex(PALETTE[key])},${alpha})`);
+    g.addColorStop(0.55, `rgba(${hex(PALETTE[key])},${alpha * 0.7})`);
+    g.addColorStop(1, `rgba(${hex(PALETTE[key])},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2); ctx.fill();
   };
-  crown([[-X, Z0], [-X, B], [bay[0][0], B]]);
-  crown([[X, Z0], [X, B], [bay[3][0], B]]);
-  crown(bay);
-  // the corners of the bay, as hairlines
-  for (const [x, z] of bay) line(ctx, view, [[x, 0, z], [x, CY, z]], shade(PALETTE.bayWall, 0.86), 1);
-  line(ctx, view, [[-X, 0, B], [-X, CY, B]], shade(PALETTE.wallSide, 0.85), 1);
-  line(ctx, view, [[X, 0, B], [X, CY, B]], shade(PALETTE.wallSide, 0.85), 1);
+  for (let k = 0; k < 11; k++) {
+    const cx = -950 + k * 190 + (r() - 0.5) * 110, cy = 150 + r() * 90, size = 75 + r() * 55;
+    for (let j = 0; j < 9; j++) {
+      const a = r() * Math.PI * 2, d = Math.sqrt(r()) * size * 0.75;
+      blob(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.8, size * (0.45 + r() * 0.35), j % 3 === 0 ? 'greenPale' : 'green', 0.75);
+    }
+    blob(cx + (r() - 0.5) * size * 0.4, cy - size * 0.35, size * 0.45, 'greenDeep', 0.5);
+  }
+  for (let k = 0; k < 26; k++) blob(-1000 + k * 80 + (r() - 0.5) * 30, 40 + r() * 30, 70 + r() * 30, k % 2 ? 'green' : 'greenDeep', 0.7);
+  ctx.restore();
 }
 
 // FLOORBOARDS FOLLOW THE BAY. Each board line is a level set of distance from
@@ -176,20 +310,38 @@ function boardLines() {
       for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (backDist(x, m) > d) lo = m; else hi = m; }
       pts.push([x, 0, (lo + hi) / 2]);
     }
-    lines.push(pts.filter(p => p[2] > -40));
+    lines.push({ d, pts: pts.filter(p => p[2] > -40) });
   }
   boardCache = lines;
   return lines;
 }
+// The joints as brush lines, broken here and there; and the window's light,
+// cut from the oak as bare paper between the joints in front of the bay —
+// strongest nearest the glass, gone well before the middle of the room.
 function drawFloorboards(ctx, view) {
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = PALETTE.board;
-  for (const pts of boardLines()) {
-    if (pts.length < 2) continue;
-    ctx.beginPath();
-    pts.forEach((q, i) => { const p = view.p(q[0], q[1], q[2]); if (i) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); });
-    ctx.stroke();
-  }
+  const lines = boardLines();
+  lines.forEach(({ d, pts }, k) => {
+    if (pts.length < 2) return;
+    const mid = pts[pts.length >> 1];
+    const w = Math.max(0.7, Math.min(1.8, view.scaleAt(mid[2]) * 0.4));
+    const r = streamFor(`joint${k}`);
+    const gaps = [r(), r(), r()].map(v => 0.08 + v * 0.84);
+    strokeLine(ctx, view, pts, w, PALETTE.oakLine, `joint${k}`, {
+      gate: (t) => (gaps.some(g => Math.abs(t - g) < 0.03) ? 0 : 1),
+    });
+    // the sheen: here and there a board catches the window, cut back to the
+    // paper along part of its length — sparse, and none under the table
+    if (k === 0 || d < 70 || d > 300 || r() > 0.3) return;
+    const prev = lines[k - 1].pts;
+    const between = pts.map((p, i) => {
+      const q = prev[Math.min(prev.length - 1, Math.round(i * (prev.length - 1) / (pts.length - 1)))];
+      return [p[0], 0, (p[2] + q[2]) / 2];
+    });
+    const c = 0.15 + r() * 0.7, h = 0.06 + r() * 0.1;
+    strokeLine(ctx, view, between, Math.max(0.7, view.scaleAt(mid[2]) * 0.8), PALETTE.paper, `sheen${k}`, {
+      vary: 0.5, gate: (t) => (Math.abs(t - c) < h ? 1 : 0),
+    });
+  });
 }
 
 // ---------------------------------------------------------- the furniture --
@@ -202,25 +354,86 @@ function hull(points) {
   return lo.slice(0, -1).concat(up.slice(0, -1));
 }
 
-function drawPart(ctx, view, part) {
-  const base = PALETTE[part.tone] || PALETTE.wood;
+// A RECORDING CONTEXT: just what `brush` and `mass` ask a canvas to do, kept as
+// filled polygons. The colour is recorded as the PALETTE key it was asked for.
+function recorder() {
+  const marks = [];
+  let fill = null, cur = null, path = [];
+  return {
+    marks,
+    set fillStyle(v) { fill = v; }, get fillStyle() { return fill; },
+    beginPath() { path = []; cur = null; },
+    moveTo(x, y) { cur = [x, y]; path.push(cur); },
+    lineTo(x, y) { cur.push(x, y); },
+    closePath() {},
+    fill() { for (const sp of path) if (sp.length >= 6) marks.push({ key: fill, pts: Float32Array.from(sp) }); },
+  };
+}
+
+// A top another part sits on is not a top that catches the light: the chaise's
+// frame under its cushion, its base under the frame.
+const COVERED = new Set();
+for (const item of FURNITURE) for (const a of item.parts) for (const b of item.parts) {
+  if (a === b || a.kind !== 'box' || b.kind !== 'box' || b.y0 !== a.y1) continue;
+  const over = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
+  if (over > 0.6 * (a.x1 - a.x0) && b.z0 <= a.z0 + 2 && b.z1 > a.z0) COVERED.add(a);
+}
+
+// ONE PART'S MARKS: its faces as masses (top lightest, front, then the side),
+// each edge a brush edge, and — where its top shows and is big enough to hold
+// one — the top's near edge cut back to the paper, the light catching it.
+function partMarks(view, part) {
+  const rec = recorder();
+  const [top, front, side] = TONE[part.tone] || TONE.wood;
+  const id = `${part.kind}:${part.x0 ?? part.x}:${part.z0 ?? part.z}:${part.y0}:${part.y1}`;
+  const e = (z) => Math.max(1.2, Math.min(3.2, view.scaleAt(z) * 0.5));
   if (part.kind === 'box') {
     const { x0, x1, y0, y1, z0, z1 } = part;
-    if (x0 > CAMERA.x) poly(ctx, view, [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]], shade(base, 0.82));
-    if (x1 < CAMERA.x) poly(ctx, view, [[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], shade(base, 0.82));
-    poly(ctx, view, [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], base);
-    if (y1 < CAMERA.y) poly(ctx, view, [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], shade(base, 1.18));
+    if (x0 > CAMERA.x) mass(rec, proj(view, [[x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0]]), side, `${id}:l`, e(z0));
+    if (x1 < CAMERA.x) mass(rec, proj(view, [[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]]), side, `${id}:r`, e(z0));
+    mass(rec, proj(view, [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]]), front, `${id}:f`, e(z0));
+    if (y1 < CAMERA.y) {
+      mass(rec, proj(view, [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]]), top, `${id}:t`, e(z0));
+      if (x1 - x0 > 6 && z1 - z0 > 6 && !COVERED.has(part)) {
+        strokeLine(rec, view, [[x0 + 1, y1, z0], [x1 - 1, y1, z0]], Math.max(1, view.scaleAt(z0) * 0.7), 'paper', `${id}:cut`,
+          { gate: (t) => (t > 0.12 && t < 0.62 ? 1 : 0) });
+      }
+    }
   } else if (part.kind === 'cyl') {
     const ring = (y) => Array.from({ length: 36 }, (_, i) => {
       const a = i / 36 * Math.PI * 2;
       return view.p(part.x + part.r * Math.cos(a), y, part.z + part.r * Math.sin(a));
     });
-    const side = hull([...ring(part.y0), ...ring(part.y1)]);
-    ctx.beginPath(); side.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
-    ctx.fillStyle = base; ctx.fill();
-    const top = ring(part.y1);
-    ctx.beginPath(); top.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath();
-    ctx.fillStyle = shade(base, 1.18); ctx.fill();
+    mass(rec, hull([...ring(part.y0), ...ring(part.y1)]), front, `${id}:s`, e(part.z));
+    mass(rec, ring(part.y1), top, `${id}:t`, e(part.z));
+    if (part.r > 6 && part.y1 < CAMERA.y) {
+      // the near rim of a top: the front half of its circle, as a cut
+      const arc = Array.from({ length: 13 }, (_, i) => {
+        const a = Math.PI * (1.2 + i / 12 * 0.75);
+        return [part.x + part.r * 0.96 * Math.cos(a), part.y1, part.z + part.r * 0.96 * Math.sin(a)];
+      });
+      strokeLine(rec, view, arc, Math.max(1, view.scaleAt(part.z) * 0.7), 'paper', `${id}:cut`, { passes: false });
+    }
+  }
+  return rec.marks;
+}
+
+// The marks are computed once per view — a resize makes a new one — and kept
+// beside it; a frame replays them.
+const marksByView = new WeakMap();
+function drawPart(ctx, view, part) {
+  let byPart = marksByView.get(view);
+  if (!byPart) { byPart = new Map(); marksByView.set(view, byPart); }
+  let marks = byPart.get(part);
+  if (!marks) { marks = partMarks(view, part); byPart.set(part, marks); }
+  for (const m of marks) {
+    const P = m.pts;
+    ctx.beginPath();
+    ctx.moveTo(P[0], P[1]);
+    for (let i = 2; i < P.length; i += 2) ctx.lineTo(P[i], P[i + 1]);
+    ctx.closePath();
+    ctx.fillStyle = colourOf(m.key);
+    ctx.fill();
   }
 }
 
@@ -228,11 +441,6 @@ const camDist = (x, y, z) => Math.hypot(x - CAMERA.x, y - CAMERA.y, z - CAMERA.z
 function partCentre(p) {
   if (p.kind === 'box') return [(p.x0 + p.x1) / 2, (p.y0 + p.y1) / 2, (p.z0 + p.z1) / 2];
   return [p.x, (p.y0 + p.y1) / 2, p.z];
-}
-
-function drawItem(ctx, view, item) {
-  const parts = item.parts.slice().sort((a, b) => camDist(...partCentre(b)) - camDist(...partCentre(a)));
-  for (const p of parts) drawPart(ctx, view, p);
 }
 
 // ---------------------------------------------------------------- the cat --
@@ -564,7 +772,7 @@ function drawShadow(ctx, view, cat) {
   ctx.rotate(Math.atan2(q.y - p.y, q.x - p.x));
   ctx.scale(1, 0.32);
   ctx.beginPath(); ctx.arc(0, 0, rx * (0.7 + 0.3 * k), 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(40, 36, 32, ${0.16 * k})`;
+  ctx.fillStyle = `rgba(${PALETTE.shadow}, ${0.16 * k})`;
   ctx.fill();
   ctx.restore();
 }

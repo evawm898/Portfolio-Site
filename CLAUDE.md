@@ -11220,6 +11220,14 @@ never the same kind within 4 s, the floor shared at 55 cm, dozes 8–20 s. A cat
 fill on true capsule tangents; painter's order by separating planes per part. The browser
 gate holds frame cost (p99 < 8 ms, worst < 16.7 ms) under the director.
 `tools/record-scene-studio.mjs ambient|jump` makes exact-frame videos (not committed).
+**The room treatment (Nov 9, Eva's brief — the "room treatment" section of the doc):** every room mark
+goes through scene 3's `brush` (beach-brush.js, imported, never forked; its `P.runs` pool now grows rather
+than being replaced, identical for scene 3) as a LINE, a MASS with brush edges, or a paper CUT; light
+areas are bare paper. One named `PALETTE` (cream walls, honey oak, high-key green beyond the glass,
+trim as drawn line, dark warm brown furniture by tone top/front/side); the cats are the only true blacks
+(`draw/the-cats-are-the-only-true-blacks…`, a 0.015 luminance floor). The room still draws once per
+resize; the furniture's marks are computed once per view and replayed per frame. Mutant trees copy
+`beach-brush.js` (`STUDIO_DEPS`). Gallery wall, lamps, rain, day/night, scroll and object cycles are NOT built.
 
 ## Artist Tracker (`artist-tracker.html`)
 
