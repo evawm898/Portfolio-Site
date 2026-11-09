@@ -43,6 +43,14 @@
          unraised twin's to the bit, and every hub corner that moves moves UP
          (the hub's top is ribbed, its underside never). The list is restated
          here, never imported.
+     R8  THE STARBURST REACHES THE EDGE (Nov 9, third round) — on a starburst
+         at its ruled 'edge' reach, every hub-top vertex (normal up) between
+         the petal feet's inner edge + one lattice edge and three lattice
+         edges inside the hub's rim (both radii read off the LATTICE build's
+         petals and hub) carries full weight: the coverage under the feet and
+         the rim's curvature fade both stand down there, and the ribs run to
+         the rim. Asked on the plain starburst rows: a rod rooted through
+         the hub top occludes it, and the shipped fade around the root stands.
    THE CENTRE (Nov 9): under COLLAR and CONCENTRIC, R1 restates the ring at
    R = max(the plain schedule's r0, the petal feet's inner edge read off the
    LATTICE build's petal points), snapped to 2^-20, and requires the build's
@@ -150,6 +158,8 @@ const ROWS = [
   { id: 'B-concentric', extra: { ribLaw: 'B', ribCentre: 'concentric', textureHeight: 2.5 }, mode: 'crest' },
   { id: 'A-concentric', extra: { ribLaw: 'A', ribCentre: 'concentric', textureHeight: 1 }, mode: 'crest' },
   { id: 'B-starburst-rods', extra: { ribLaw: 'B', ribCentre: 'starburst', textureHeight: 2.5, stemLength: 40, stamenCount: 24, gynoecium: 'STYLE' }, mode: 'crest' },
+  { id: 'A-starburst', extra: { ribLaw: 'A', ribCentre: 'starburst', textureHeight: 1 }, mode: 'crest', reach: true },
+  { id: 'B-starburst', extra: { ribLaw: 'B', ribCentre: 'starburst', textureHeight: 2.5 }, mode: 'crest', reach: true },
 ];
 async function runClauses(R, rows, log = true) {
   const GEO = await R.ribsGeometry();
@@ -329,6 +339,25 @@ async function runClauses(R, rows, log = true) {
       if (hubDown) bad.push(`R7 ${row.id}: ${hubDown} moved hub corners do not move UP (the hub's underside is excluded)`);
       say(`  R7 ${row.id}: ${exTris} stem/rod triangles identical to the unraised twin; ${hubUp} hub corners raised, all upward`);
     }
+    /* R8 the starburst reaches the edge */
+    /* asked on the plain starburst rows (`reach: true`): rods rooted THROUGH the hub top (stamens, a style)
+       occlude it, and the shipped fade around their roots is the rule working, not the reach failing */
+    if (row.reach && p.centre === 'starburst' && p.reach === 'edge') {
+      const e = R.RIB_SPACING_FLOOR_MM / 4;   // the lattice edge (the floor spacing is four of them)
+      let rFeet = Infinity, rRim = 0;
+      for (const g of L.stats.repl) { const PP = g.O.P; for (let i = 0; i < PP.length; i += 3) { const rr = Math.hypot(PP[i], PP[i + 1]); if (g.organ === 'petal') rFeet = Math.min(rFeet, rr); if (g.organ === 'hub') rRim = Math.max(rRim, rr); } }
+      const h = r.stats.repl.find((g) => g.organ === 'hub');
+      let n = 0, short = 0, worst = 1;
+      for (let i = 0; i < h.X.nV; i++) {
+        if (!(h.O.N[i * 3 + 2] > 0.9)) continue;
+        const rr = Math.hypot(h.O.P[i * 3], h.O.P[i * 3 + 1]);
+        if (rr < rFeet + e || rr > rRim - 3 * e) continue;
+        n++; const w = h.X.w0[i] * h.X.mc[i]; if (w < 1 - 1e-12) { short++; worst = Math.min(worst, w); }
+      }
+      if (!n) bad.push(`R8 ${row.id}: no hub-top vertex between the feet's edge ${rFeet.toFixed(3)} and the rim ${rRim.toFixed(3)} mm (vacuous)`);
+      if (short) bad.push(`R8 ${row.id}: ${short} of ${n} hub-top vertices between the feet's edge and the rim fall short of full weight (least ${worst.toFixed(3)})`);
+      say(`  R8 ${row.id}: ${n} hub-top vertices from the feet's edge ${rFeet.toFixed(3)} + e to the rim ${rRim.toFixed(3)} - 3e mm, every one at full weight`);
+    }
     /* R3 + R4 */
     const cl = closure(P), clL = closure(L.acc.positions);
     if (cl.open || cl.doubled || cl.degen) bad.push(`R3 ${row.id}: open ${cl.open}, doubled ${cl.doubled}, degenerate ${cl.degen}`);
@@ -422,6 +451,10 @@ const MUTANTS = [
     witness: async (M) => { const b = await M.ribsBuild(DEFAULTS, { ribLaw: 'A', ribCentre: 'collar', textureHeight: 1 }, { mode: 'crest' }); return b.stats.centre.R === 10; } },
   { id: 'the-rings-are-not-cut', clause: 'R2', row: 'B-concentric', from: 'pts.push({ t, jG: -(j + 1) });', to: 'void t;',
     witness: async (M) => { const b = await M.ribsBuild(DEFAULTS, { ribLaw: 'B', ribCentre: 'concentric', textureHeight: 2.5 }, { mode: 'crest' }); return !b.stats.crestEdges.some((e) => e.jG < 0); } },
+  { id: 'the-starburst-stops-at-the-feet', clause: 'R8', row: 'A-starburst', from: 'if (__cov[i] && O.relievable[i]) w0[i] = 1; }', to: 'if (__cov[i] && O.relievable[i]) w0[i] = 0; }',
+    witness: async (M) => { const b = await M.ribsBuild(DEFAULTS, { ribLaw: 'A', ribCentre: 'starburst', textureHeight: 1 }, { mode: 'lattice' }); const h = b.stats.repl.find((g) => g.organ === 'hub'); for (let i = 0; i < h.X.nV; i++) { const rr = Math.hypot(h.O.P[i * 3], h.O.P[i * 3 + 1]); if (h.O.N[i * 3 + 2] > 0.9 && rr > 6.5 && rr < 7.5 && h.X.w0[i] === 0) return true; } return false; } },
+  { id: 'the-rim-fades-over-the-45-degree-length', clause: 'R8', row: 'B-starburst', from: "O.organ === 'hub' ? T.edgeMm : Lam;", to: "O.organ === 'hub' ? Lam : Lam;",
+    witness: async (M) => { const b = await M.ribsBuild(DEFAULTS, { ribLaw: 'B', ribCentre: 'starburst', textureHeight: 2.5 }, { mode: 'lattice' }); const h = b.stats.repl.find((g) => g.organ === 'hub'); for (let i = 0; i < h.X.nV; i++) { const rr = Math.hypot(h.O.P[i * 3], h.O.P[i * 3 + 1]); if (h.O.N[i * 3 + 2] > 0.9 && rr > 7.2 && rr < 7.6 && h.X.mc[i] < 1) return true; } return false; } },
 ];
 /* R1 on the mutated module must restate from the CLEAN schedule: the gate
    imports the clean module for its numbers (R.ribSchedule is never read) */

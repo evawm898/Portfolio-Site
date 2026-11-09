@@ -6,7 +6,9 @@ untouched. The sheet is `docs/img/bloom-texture-ribs.png`; every number below is
 `docs/data/bloom-texture-ribs.json`. Read §1 for what was built, §2 for the meshing
 answer, §7 for the questions. **§10 is the second round (Eva's rulings of Nov 9 on #541): law
 A the default, the stem and rods excluded by name, and the three centre treatments for
-her ruling** — sheet `docs/img/bloom-texture-ribs-centre.png`. §2–§6 and the main sheet are
+her ruling** — sheet `docs/img/bloom-texture-ribs-centre.png`. **§12 is the third round: Eva
+chose STARBURST and asked it to reach further toward the edges** — sheet
+`docs/img/bloom-texture-ribs-starburst.png`. §2–§6 and the main sheet are
 the first round's record and predate the exclusion (their stem rows are fluted).
 
 ## 0. The rulings in force
@@ -440,6 +442,87 @@ main sheet and §2–§6 were not re-measured after the exclusion (the default b
 neither a stem nor rods; the mophead's budget will fall by its pedicels' and stamens'
 cut triangles).
 
+## 12. Third round: the starburst, reaching the edge
+
+**RULED (Eva, Nov 9): the centre is STARBURST** — "starburst but have it go further along
+the center closer to the edges". Collar and concentric stay in the prototype as the record.
+
+### 12.1 Why the second round's starburst stopped at ~4.7 mm
+
+Measured on the default bloom (8 petals), by the weights the shipped relief pass hands out:
+
+- **The flat octagon from 5.32 to 8.84 mm is the petal FEET**, their top skin flush with the
+  hub top (both at z = +0.6). The hub top under them is COVERED (T5's rule: smooth under a
+  foot) — 931 of the 981 hub-top vertices beyond the feet's inner edge read weight 0 — and the feet themselves
+  carry none (a petal's relief ramp is 0 on every foot row and climbs over the first 3 mm of
+  blade; it is the bead's buried-end ramp).
+- **Covered vertices SEED the coverage fade**, so the hub's own ribs fade out over
+  `max(H × 15/8, e)` — 1.88 mm at H 1, 4.69 mm at H 2.5 — inside the feet's edge.
+- **And the hub's RIM is a 90° convex crease, so the shipped curvature mask counts it a
+  ridge** and fades relief in from it over the same length. At H 2.5 that alone leaves no
+  hub-top vertex beyond the feet's edge at full weight (0 of 981).
+
+### 12.2 What was built (four + one anchored edits, all inert unless the hook asks)
+
+`ribStarburstReach` (`'edge'`, the ruled default under starburst; `'hub'`, the second
+round's, kept for the before/after):
+
+1. **The hub top is ribbed over the feet.** A hub vertex the feet cover is marked, is NOT a
+   seed of the coverage fade, and takes full weight (edits `cover-decl`, `cover-mark`,
+   `cover-seed`, `cover-full`). The feet stay as shipped beneath the raised hub top; at a
+   flute floor the two surfaces are one plane, so nothing shows between them.
+2. **The rim crease keeps its smoothing but over one lattice edge** (`rim-ridge`): on the
+   hub, under the edge reach, the curvature fade's length is `e` (0.4 mm) instead of
+   `max(H × 15/8, e)`. **A decision made without a ruling**, and the one thing here that
+   moves a ruled law: the 45° fade is BONE's (and T5's), and under it the burst cannot reach
+   full height anywhere beyond the feet at H 2.5 — so "closer to the edges" is not reachable
+   without it. What it costs: the burst ends at the rim in a steep 0.4 mm drop — at H 2.5 a
+   raised medallion with a crisp toothed edge (the sheet's 45° cells).
+
+**Tried first and withdrawn:** ribbing the FEET's own top skin (weight 1 on every petal
+row, foot rows flagged, flank lines cut into the unlatticed feet). It reached the edge too,
+but **folded at H 2.5 — 161 within-shell pairs (A) / 97 (B), worst 0.69 mm** — at the
+foot-to-blade crease (r 8.5–8.9 mm, ribs on both sides of the 25° crease along converging
+normals) and at the feet's buried inner wall (r 5.3–5.7, z −0.6). Ribbing the hub top over
+the feet needs neither and reads the same from above.
+
+### 12.3 Measured
+
+| law | reach | H | tris | within-shell pairs | open / doubled / degen | shells | flipped |
+|---|---|---|---|---|---|---|---|
+| A | hub (2nd round) | 1.0 | 189,642 | 0 | 0 / 0 / 0 | 9 | 0 |
+| A | **edge** | 1.0 | 190,110 | 0 | 0 / 0 / 0 | 9 | 0 |
+| A | **edge** | 2.5 | 190,110 | 0 | 0 / 0 / 0 | 9 | 0 |
+| B | hub (2nd round) | 1.0 | 189,706 | 0 | 0 / 0 / 0 | 9 | 0 |
+| B | **edge** | 1.0 | 190,154 | 0 | 0 / 0 / 0 | 9 | 0 |
+| B | **edge** | 2.5 | 190,154 | 0 | 0 / 0 / 0 | 9 | 0 |
+
+Hub-top vertices beyond the feet's inner edge at full weight: **0 → 783 of 981 at H 1, 0 →
+733 at H 2.5**; the rest are the rim crease's last 0.4–0.8 mm. +468 / +448 triangles (the
+crest lines now cross the covered hub top).
+
+**With stamens or a style** the rods root THROUGH the hub top and occlude it, and the shipped
+fade runs around each root (134 of 515 hub-top vertices short of full weight on the gate's
+24-stamen row). That is the visibility rule working around an excluded rod, and is left.
+
+### 12.4 The gate, third round
+
+**R8 is new: the starburst reaches the edge** — on the plain starburst rows (A at H 1, B at
+H 2.5), every hub-top vertex between the feet's inner edge + e and the rim − 3e (both radii
+read off the LATTICE build's petals and hub) carries full weight: 515 of 515 on both. Ten
+rows, **PASS on all**. Two new mutants, each with a witness on the mutated module:
+`the-starburst-stops-at-the-feet` (the covered hub top back at 0) and
+`the-rim-fades-over-the-45-degree-length` (the rim edit reverted). **12 of 12 mutants
+behave**: the first fires R8 with 515 of 515 vertices at 0, the second with 515 of 515 short
+(least 0.099).
+
+### 12.5 Open
+
+Whether starburst becomes the shipped default centre is the shipping prompt's (the prototype
+still takes `ribCentre` explicitly; unset is the first round's axis rule, so §2–§7 reproduce).
+Whether the rim's 0.4 mm drop is right, or a softer one (say the fade at H 1's 1.88 mm at any
+height), is Eva's from the sheet. §8's other questions stay open.
+
 ## 9. Not done
 
 No shipped file, no registry row, no control, no matrix row, no CI. Sepals and leaves
@@ -452,12 +535,13 @@ length, the floor spacing and A's reference radius are proposals (questions 4, 7
 
 ```bash
 npm i --no-save three@0.161.0 playwright-core
-node tools/verify-bloom-ribs.mjs                    # R0-R7 on the clean module
-node tools/verify-bloom-ribs.mjs --negative-control # ten mutants
+node tools/verify-bloom-ribs.mjs                    # R0-R8 on the clean module
+node tools/verify-bloom-ribs.mjs --negative-control # twelve mutants
 node tools/verify-bloom-ribs.mjs --browser          # + Node vs Chromium
 node --max-old-space-size=12000 tools/bloom-texture-ribs-measure.mjs --resume
 node --max-old-space-size=12000 tools/bloom-texture-ribs-browser.mjs --resume
 node tools/shot-bloom-texture-ribs.mjs docs/img/bloom-texture-ribs.png
 node --max-old-space-size=12000 tools/bloom-texture-ribs-measure.mjs --section centre --resume
 node --max-old-space-size=12000 tools/shot-bloom-texture-ribs-centre.mjs docs/img/bloom-texture-ribs-centre.png
+node --max-old-space-size=12000 tools/shot-bloom-texture-ribs-starburst.mjs docs/img/bloom-texture-ribs-starburst.png
 ```

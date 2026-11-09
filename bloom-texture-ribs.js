@@ -56,6 +56,7 @@ import { esincos, TEXTURE_EDGE_MM, TEXTURE_HEIGHT_RANGE } from './bloom-geometry
 /* PROPOSED (Eva's to rule, §7 of the doc). */
 export const RIB_LAWS = Object.freeze(['A', 'B']);
 export const RIB_AXIS_RULES = Object.freeze(['fade', 'start', 'thin']);
+export const RIB_STARBURST_REACH = Object.freeze(['edge', 'hub']);
 /* THE CENTRE TREATMENTS (Eva, Nov 9): rendered all three for her ruling */
 export const RIB_CENTRES = Object.freeze(['collar', 'starburst', 'concentric']);
 /* THE ORGANS (Eva's NAMED exclusion, Nov 9 — distinct from the derived
@@ -108,11 +109,19 @@ export function ribParams(state = {}) {
      ring (`ribField`'s setCentre) and take the plain schedule outside it. */
   const centre = state.ribCentre == null ? null : String(state.ribCentre);
   if (centre !== null && !RIB_CENTRES.includes(centre)) throw new Error(`ribCentre ${JSON.stringify(state.ribCentre)} is not one of ${RIB_CENTRES.join(' / ')}`);
+  /* THE STARBURST REACHES THE EDGE (Eva, Nov 9, third round: "starburst but have
+     it go further along the center closer to the edges"): the hub top is
+     ribbed to its own rim, over the petal feet that sit flush with it, with no
+     coverage fade (edits 7), so the burst fills the whole centre disc out to
+     where the blades rise. 'hub' is the second round's starburst (the ribs
+     faded out ~1.9 mm inside the feet's inner edge), kept for the before/after. */
+  const reach = centre === 'starburst' ? String(state.ribStarburstReach ?? 'edge') : 'hub';
+  if (!RIB_STARBURST_REACH.includes(reach)) throw new Error(`ribStarburstReach ${JSON.stringify(state.ribStarburstReach)} is not one of ${RIB_STARBURST_REACH.join(' / ')}`);
   const axisUsed = centre === 'starburst' ? (law === 'A' ? 'thin' : 'fade') : centre ? 'fade' : axis;
   const s = clampTo(Number(state.ribSpacing ?? RIB_SPACING_DEFAULT), RIB_SPACING_RANGE);
   const crest = clampTo(Number(state.ribCrest ?? RIB_CREST_DEFAULT), RIB_CREST_RANGE);
   const H = clampTo(Number(state.textureHeight ?? RIB_HEIGHT_DEFAULT), TEXTURE_HEIGHT_RANGE);
-  return { law, axis: axisUsed, centre, s, crest, H, sMin: RIB_SPACING_FLOOR_MM, refR: RIB_REF_RADIUS_MM, edgeMm: TEXTURE_EDGE_MM };
+  return { law, axis: axisUsed, centre, reach, s, crest, H, sMin: RIB_SPACING_FLOOR_MM, refR: RIB_REF_RADIUS_MM, edgeMm: TEXTURE_EDGE_MM };
 }
 
 /* ------------------------------------------ engine-agreed arithmetic --- */
@@ -496,7 +505,19 @@ function fanConvex(pc, allP) {
      4  the relief pass hands the hook its per-organ records after the shipped
         COARSE write (the masks, the visibility, the coverage and the derived
         owner decided on the shipped lattice), and the hook re-meshes;
-     5  the record says RIBS. */
+     5  the record says RIBS;
+     6  (Nov 9, second round) the relief pass tells the hook where it begins
+        (the centre's radius is derived there) and asks it, per vertex, for
+        EVA'S NAMED EXCLUSION (the stem and the rods);
+     7  (Nov 9, third round: the STARBURST REACHES THE EDGE) four edits in the
+        relief pass's organ branch, every one inert unless the hook asks: a hub
+        vertex the petal feet COVER is marked, is not a seed of the coverage
+        fade, and takes full weight. So the hub top is ribbed to its own rim,
+        over the feet (which sit flush with it and stay as shipped beneath it:
+        at a flute floor the two surfaces are one plane), with no fade inward of
+        the feet's edge. Tried first and withdrawn: ribbing the feet's own top
+        skin, which folded at the foot-to-blade crease (161 within-shell pairs at
+        H 2.5) and at the feet's buried inner wall. */
 export const RIB_EDITS = Object.freeze([
   ['hook-slot', "import { curveSamples,", "let __RIB = null;\nexport function __setRibs(x) { __RIB = x; }\nimport { curveSamples,"],
   ['field', 'f: refused ? null : (p, n) => field.F(p, n), mp: refused ? null : bonePatchField(b.coverage, patchScaleMm) };',
@@ -505,6 +526,13 @@ export const RIB_EDITS = Object.freeze([
   ['bone2-field-skip', "  const field = refused ? null : bone2Field(params);", "  const field = refused || __RIB ? null : bone2Field(params);"],
   ['begin', "function boneReliefPass(acc, T, organs, capability = null) {\n", "function boneReliefPass(acc, T, organs, capability = null) {\n  if (__RIB && __RIB.begin) __RIB.begin(organs);\n"],
   ['excluded', "      if (!(w0[i] > 0) || !(mc[i] > 0)) continue;\n", "      if (!(w0[i] > 0) || !(mc[i] > 0) || (__RIB && __RIB.excluded(O, i))) continue;\n"],
+  ['cover-decl', "    let visible = 0, buried = 0, covered = 0, coveredUnder = 0;\n    let visDist = null;", "    let visible = 0, buried = 0, covered = 0, coveredUnder = 0;\n    let visDist = null;\n    const __cov = __RIB && __RIB.coverFull ? new Uint8Array(nV) : null;"],
+  ['cover-mark', "{ vis[i] = 0; covered++; if (n[2] < 0) coveredUnder++; }", "{ vis[i] = 0; covered++; if (n[2] < 0) coveredUnder++; if (__cov) __cov[i] = 1; }"],
+  ['cover-seed', "        if (O.relievable[i]) buried++;\n        seed[i] = 1;\n      }\n      visDist = boneGeodesic(O.P, adj, seed, nV, Lam);", "        if (O.relievable[i]) buried++;\n        seed[i] = __cov && __cov[i] ? 0 : 1;\n      }\n      visDist = boneGeodesic(O.P, adj, seed, nV, Lam);"],
+  ['cover-full', "      for (let i = 0; i < nV; i++) if (O.relievable[i] && vis[i]) w0[i] = visDist[i] >= Lam ? 1 : rimEase(visDist[i] / Lam);\n    }",
+    "      for (let i = 0; i < nV; i++) if (O.relievable[i] && vis[i]) w0[i] = visDist[i] >= Lam ? 1 : rimEase(visDist[i] / Lam);\n      if (__cov) { const vs = new Uint8Array(nV); for (let i = 0; i < nV; i++) if (w0[i] > 0) vs[i] = 1; const dIn = boneGeodesic(O.P, adj, vs, nV, Lam); for (let i = 0; i < nV; i++) if (__cov[i] && O.relievable[i]) w0[i] = 1; }\n    }"],
+  ['rim-ridge', "    for (let i = 0; i < nV; i++) { const d = ridgeDist ? ridgeDist[i] : Infinity; mc[i] = d >= Lam ? 1 : rimEase(d / Lam); }",
+    "    const __Lr = __RIB && __RIB.coverFull && O.organ === 'hub' ? T.edgeMm : Lam;\n    for (let i = 0; i < nV; i++) { const d = ridgeDist ? ridgeDist[i] : Infinity; mc[i] = d >= __Lr ? 1 : rimEase(d / __Lr); }"],
   ['write-hook', "  if (T.bone2) T.bone2.full = full ? bone2FullWrite(acc, T, per, G2, capability) : null;", "  if (__RIB && __RIB.write) __RIB.write(acc, T, per, capability);\n  if (T.bone2) T.bone2.full = full ? bone2FullWrite(acc, T, per, G2, capability) : null;"],
 ]);
 export function applyEdits(src, edits) {
@@ -571,6 +599,8 @@ export function ribHook({ mode = 'lattice', stats = {}, samples = null } = {}) {
     /* the start of the relief pass: the centre's radius derived from the organs it is handed */
     begin(organs) { if (FIELD) { FIELD.setCentre(organs); stats.centre = FIELD.C.type ? { type: FIELD.C.type, R: FIELD.C.R, from: FIELD.C.from, rFeet: FIELD.C.rFeet, rFloor: FIELD.C.rFloor, wC: FIELD.C.wC, sc: FIELD.C.sc, circles: FIELD.circles() } : null; } },
     excluded: ribExcluded,
+    /* the starburst's reach (edits 7): read inside the relief pass, after field() */
+    get coverFull() { return !!(FIELD && FIELD.params.reach === 'edge'); },
     write(acc, T, per, capability) {
       const t0 = performance.now();
       const noRelief = !!(capability && capability.boneNoRelief);
