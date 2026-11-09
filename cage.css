@@ -1,4 +1,4 @@
-/* cage.css — the /cage page. Same palette and type as /bug and /frame (frame.css's pattern, cg- prefix). */
+/* cage.css — the /cage page, built on tokens.css (DESIGN.md): Fraunces headings, Plex Mono UI, petrol accents (cg- prefix). */
 /* Re-pointed onto tokens.css (DESIGN.md). --dim-2 was a 3:1 grey used for text; faint is not
    text (rule 4), so it reads dim. Any colour left as a hex below is ARTWORK: a mark drawn in the
    editor or the exported file (rule 9/11), never text. */
@@ -52,6 +52,7 @@ button.cg-btn--solid:hover{color:var(--paper);border-color:var(--teal);}
 
 .cg-readout{font-size:10.5px;line-height:1.6;color:var(--dim);border-top:1px solid var(--line);padding-top:10px;margin-top:6px;white-space:pre-wrap;}
 .cg-readout b{color:var(--paper);font-weight:400;}
+.cg-readout .cg-sep{color:var(--color-faint);}
 .cg-readout b.bad{color:var(--paper);} .cg-readout b.bad::before{content:'\2715\00a0';}
 .cg-note{font-size:10px;color:var(--dim-2);line-height:1.5;margin:0 0 8px;}
 .cg-told{font-size:10px;color:var(--color-ink-2);line-height:1.5;margin:0 0 8px;}
@@ -62,9 +63,9 @@ button.cg-btn--solid:hover{color:var(--paper);border-color:var(--teal);}
 .cg-viewtoggle button + button{border-left:0;}
 
 /* the SVG view: the export's own front elevation on paper, fitted left of the panel */
-#svgStage{position:fixed;inset:0;right:330px;z-index:2;background:#EDEDE8;   /* artwork: the export preview is drawn on paper */display:flex;align-items:center;justify-content:center;padding:140px 24px 90px 24px;}
-#svgStage svg{max-width:100%;max-height:100%;width:auto;height:auto;box-shadow:0 0 0 1px rgba(10,10,12,.15), 0 30px 80px rgba(0,0,0,.25);}
-body.is-svg .cg-header h1{color:var(--ink);} body.is-svg .cg-sub,body.is-svg .cg-back{color:#55554f;}
+/* the page around the sheet stays ground; only the SVG's own paper rect is artwork (rule 9) */
+#svgStage{position:fixed;inset:0;right:330px;z-index:2;background:var(--color-ground);display:flex;align-items:center;justify-content:center;padding:140px 24px 90px 404px;}   /* left padding clears the header column, so the light sheet never sits under chrome text */
+#svgStage svg{max-width:100%;max-height:100%;width:auto;height:auto;box-shadow:0 0 0 1px var(--line-strong), 0 30px 80px rgba(0,0,0,.5);}
 
 /* the profile editor: the side profile, drawn mirrored, points draggable */
 .cg-profile{width:100%;aspect-ratio:1.55;background:var(--ink-soft);border:1px solid var(--line);display:block;touch-action:none;margin:0 0 6px;}
@@ -85,5 +86,5 @@ body.is-svg .cg-header h1{color:var(--ink);} body.is-svg .cg-sub,body.is-svg .cg
   .cg-panel{top:auto;height:46vh;left:10px;right:10px;width:auto;bottom:10px;}
   .cg-view{display:none;}
   .cg-header h1{font-size:28px;}
-  #svgStage{right:0;padding:120px 12px 50vh 12px;}
+  #svgStage{right:0;padding:160px 12px 50vh 12px;}   /* clears the header block at phone width */
 }
