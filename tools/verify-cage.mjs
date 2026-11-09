@@ -30,6 +30,8 @@ const args = process.argv.slice(2);
 const NEG = args.includes('--negative-control');
 const SEEDS = args.includes('--seeds') ? +args[args.indexOf('--seeds') + 1] : 24;
 const MOD = args.includes('--module') ? args[args.indexOf('--module') + 1] : null;
+// --mutant=a,b runs only those mutants (every anchor is still checked first); the run says it is a subset
+const ONLY = (args.find((a) => a.startsWith('--mutant=')) || '').slice(9).split(',').filter(Boolean);
 
 const { analyzeStl } = await import(path.join(ROOT, 'frame-relief.js'));
 // the profile's own law (bloom-curve.js, the CONTROL's owner) — B9 restates the surface from the control's points with it
@@ -375,7 +377,9 @@ if (NEG) {
   const base = await run(path.join(ROOT, 'cage-geometry.js'), { quiet: true });
   if (base.fails.length) { console.error('the clean tree fails:', base.fails); process.exit(1); }
   let bad = 0;
-  for (const m of MUTANTS) {
+  const RUN = ONLY.length ? MUTANTS.filter((m) => ONLY.includes(m.id)) : MUTANTS;
+  if (ONLY.length && RUN.length !== ONLY.length) { console.error(`--mutant names ${ONLY.length - RUN.length} mutant(s) not in the table`); process.exit(1); }
+  for (const m of RUN) {
     const file = path.join(ROOT, `cage-geometry.__mutant__.js`);
     fs.writeFileSync(file, src.replace(m.from, m.to));
     let r; try { r = await run(file, { quiet: true }); } catch (e) { r = { fails: ['<threw>'], out: [String(e)] }; }
@@ -385,7 +389,7 @@ if (NEG) {
     if (!ok) bad++;
     console.log(`${ok ? 'CAUGHT' : 'BAD   '} ${m.id}: ${claimed.length} named clauses red${stray.length ? `, ${stray.length} UNCLAIMED (${stray.slice(0, 3).join('; ')})` : ''}${r.fails.includes('<threw>') ? ' — THREW: ' + r.out[0].slice(0, 120) : ''}`);
   }
-  console.log(`\n${MUTANTS.length - bad} of ${MUTANTS.length} mutants behave`);
+  console.log(`\n${RUN.length - bad} of ${RUN.length} mutants behave${ONLY.length ? ` (a SUBSET of ${MUTANTS.length})` : ''}`);
   process.exit(bad ? 1 : 0);
 } else {
   const r = await run(MOD ? path.resolve(MOD) : path.join(ROOT, 'cage-geometry.js'));
