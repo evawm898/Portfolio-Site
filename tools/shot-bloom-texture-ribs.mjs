@@ -40,6 +40,14 @@ const norm = (v) => { const L = Math.hypot(...v); return v.map((x) => x / L); };
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cells = [];
+/* a text pane at scale 2: 32 characters a line, wrapped here */
+function pane(lines) {
+  const out = [];
+  for (const l of lines) { if (!l) { out.push(''); continue; } let cur = ''; for (const w of l.split(' ')) { if (cur && (cur + ' ' + w).length > 32) { out.push(cur); cur = '   ' + w; } else cur = cur ? cur + ' ' + w : w; } out.push(cur); }
+  const img = Buffer.alloc(W * Hc * 3, 30);
+  out.slice(0, 15).forEach((l, i) => text(img, W, Hc, 12, 14 + i * 26, l, [230, 220, 190], 2));
+  return img;
+}
 const push = (img, caption, wide = 1) => cells.push({ img, caption, wide });
 const build = (extra, mode, samples = null) => R.ribsBuild(DEFAULTS, extra, { mode, GEO, samples });
 const sched = (b) => { const S = b.stats.schedule; return `${S.levels.filter((l) => l.rStart < 60).map((l) => `${l.n}@${l.rStart.toFixed(1)}`).join(' ')} mm; axis r0 ${S.r0.toFixed(2)} mm (cut ${S.rCut.toFixed(2)})`; };
@@ -49,7 +57,7 @@ const qtxt = (q) => (q ? `crest ${q.angle8.median} deg (asked ${q.ideal8.median}
 function wire(img, P, cam) {
   const c = cam.center, fwd = norm(cam.dir.map((v) => -v)), right = norm(cross(fwd, cam.up)), up = norm(cross(right, fwd)), sc = (Hc / 2) / cam.halfHeight, n = norm(cam.dir);
   const pr = (p) => { const d = [p[0] - c[0], p[1] - c[1], p[2] - c[2]]; return [W / 2 + dot(d, right) * sc, Hc / 2 - dot(d, up) * sc, dot(d, n)]; };
-  const line = (A, B, col) => { const k = Math.ceil(Math.hypot(B[0] - A[0], B[1] - A[1])) + 1; if (k > 2 * W) return; for (let i = 0; i <= k; i++) { const x = Math.round(A[0] + (B[0] - A[0]) * i / k), y = Math.round(A[1] + (B[1] - A[1]) * i / k); if (x < 0 || y < 0 || x >= W || y >= Hc) continue; const o = (y * W + x) * 3; for (let q = 0; q < 3; q++) img[o + q] = Math.round(img[o + q] * 0.45 + col[q] * 0.55); } };
+  const line = (A, B, col) => { const k = Math.ceil(Math.hypot(B[0] - A[0], B[1] - A[1])) + 1; if (k > 2 * W) return; for (let i = 0; i <= k; i++) { const x = Math.round(A[0] + (B[0] - A[0]) * i / k), y = Math.round(A[1] + (B[1] - A[1]) * i / k); if (x < 0 || y < 0 || x >= W || y >= Hc) continue; const o = (y * W + x) * 3; for (let q = 0; q < 3; q++) img[o + q] = Math.round(img[o + q] * 0.62 + col[q] * 0.38); } };
   let nAll = 0;
   for (let t = 0; t < P.length / 9; t++) {
     const o = t * 9, q = [0, 1, 2].map((k) => pr([P[o + k * 3], P[o + k * 3 + 1], P[o + k * 3 + 2]]));
@@ -74,19 +82,15 @@ for (const law of ['A', 'B']) {
       `${fmt(b.acc.triangleCount)} tris (${(100 * b.acc.triangleCount / GEO.EXPORT_TRI_CAP).toFixed(1)}% of the 2.0 M cap)`, `spokes (count@from mm): ${sched(b)}`]);
 }
 {
-  const pane = Buffer.alloc(W * Hc * 3, 30);
-  ['THE QUESTION (Eva):', '', 'A: a fixed spoke count; the spacing', '   widens with radius.', 'B: constant spacing; new ribs begin', '   partway out (branching).', '', 'Both: one world field about the', 'bloom axis, outward only, sharp', 'crests, everywhere visible.', '', 'Rows 3-4 the axis, 5 the stem,', '6 meshing, 7-8 height, 9 curvature.'].forEach((l, i) => text(pane, W, Hc, 14, 16 + i * 26, l, [230, 220, 190], 2));
-  push(pane, ['The sheet\'s question, and where each part of it is answered']);
+  push(pane(['THE QUESTION (Eva):', '', 'A: a fixed spoke count, so the spacing widens with radius.', 'B: constant spacing, so new ribs begin partway out (branching).', '', 'Both: one world field about the bloom axis, outward only, sharp crests, everywhere visible.', '', 'Rows 3-4 the axis, 5 the stem, 6 meshing, 7-8 height, 8-9 the curvature rule.']), ['The sheet\'s question, and where each part of it is answered']);
 }
 for (const law of ['A', 'B']) {
   const b = AB[law];
-  push(render(new Float32Array(b.acc.positions), W, Hc, { center: [0, 0, 4], dir: norm([0.25, -1, 0.42]), up: [0, 0, 1], halfHeight: 34 }, { ...RAKE_SIDE }),
+  push(render(new Float32Array(b.acc.positions), W, Hc, { center: [0, 0, 10], dir: norm([0.25, -1, 0.55]), up: [0, 0, 1], halfHeight: 40 }, { ...RAKE_SIDE }),
     [`LAW ${law} from the side, the same build: ${law === 'A' ? 'the pitch widens outward (2 pi r / K); inside r0 the fixed count is too dense to print and the axis rule fades it, so the hub top is smooth and the petals\' inner thirds lose their ribs' : 'the pitch stays between s/sqrt2 and s x sqrt2: a new rib rises from a flute\'s floor where the spacing would pass s x sqrt2 (r 2.25, 4.50, 9.00, 18.0, 36.0 mm)'}`]);
 }
 {
-  const pane = Buffer.alloc(W * Hc * 3, 30);
-  ['WHY A NEEDS A RULE FAR OUT:', '', 'A at 2.5 mm spacing counts 50', 'spokes (2 pi x 20 / 2.5). Their', 'spacing reaches the 1.6 mm floor', 'at r0 = 12.7 mm, outside the hub', '(8.8 mm) — so FADE and START smooth', 'the whole hub top AND the stem.', 'THIN keeps ribs on both by halving.', '', 'B is a thinning law by definition:', 'only its last 4 spokes need a', 'rule, inside r0 = 1.02 mm.'].forEach((l, i) => text(pane, W, Hc, 14, 16 + i * 26, l, [230, 220, 190], 2));
-  push(pane, ['Read with row 3: where each law\'s axis rule acts, from the schedule\'s own numbers']);
+  push(pane(['WHY A NEEDS AN AXIS RULE FAR OUT:', '', 'A at 2.5 mm spacing counts 50 spokes (2 pi x 20 / 2.5). Their spacing reaches the 1.6 mm floor at r0 = 12.7 mm, outside the 8.8 mm hub, so FADE and START smooth the whole hub top and the stem. THIN keeps ribs on both by halving inward.', '', 'B thins by definition: only its last 4 spokes need a rule, inside r0 = 1.02 mm.']), ['Read with row 3: where each law\'s axis rule acts, from the schedule\'s own numbers']);
 }
 
 /* ------------------------------------------------ 3: the axis on the hub top */
@@ -94,13 +98,11 @@ for (const [law, axis] of [['A', 'fade'], ['A', 'start'], ['A', 'thin'], ['B', '
   const b = await build({ ribLaw: law, ribAxis: axis, textureHeight: H1 }, 'crest');
   const S = b.stats.schedule;
   const words = { fade: `the height eases to 0 between r0/2 and r0 (${(S.r0 / 2).toFixed(2)}-${S.r0.toFixed(2)} mm)`, start: `full height down to r0 ${S.r0.toFixed(2)} mm, dropped over one lattice edge inside it`, thin: `every other spoke ends inward where the spacing would fall under ${R.RIB_SPACING_FLOOR_MM} mm, down to ${R.RIB_MIN_SPOKES}; those fade inside r0 ${S.r0.toFixed(2)} mm` }[axis];
-  push(render(new Float32Array(b.acc.positions), W, Hc, { center: [0, 0, 0], dir: [0, 0, 1], up: [0, 1, 0], halfHeight: 11 }, { ...RAKE_TOP }),
-    [`THE AXIS, ${law} ${axis.toUpperCase()}: the hub top from above (22 mm across), H ${H1}`, words, `spokes ${S.levels.filter((l) => l.rStart < 12).map((l) => `${l.n} from ${l.rStart.toFixed(2)}`).join(', ')} mm; the floor spacing ${R.RIB_SPACING_FLOOR_MM} mm (four 0.4 mm lattice edges). The hub's outer ring sits under the feet and stays smooth (T5's coverage).`]);
+  push(render(new Float32Array(b.acc.positions), W, Hc, { center: [0, 0, 0], dir: [0, 0, 1], up: [0, 1, 0], halfHeight: law === 'A' ? 11 : 4 }, { ...RAKE_TOP }),
+    [`THE AXIS, ${law} ${axis.toUpperCase()}: the hub top from above (${law === 'A' ? 22 : 8} mm across), H ${H1}`, words, `spokes ${S.levels.filter((l) => l.rStart < 12).map((l) => `${l.n} from ${l.rStart.toFixed(2)}`).join(', ')} mm; the floor spacing ${R.RIB_SPACING_FLOOR_MM} mm (four 0.4 mm lattice edges). The hub's outer ring sits under the feet and stays smooth (T5's coverage).`]);
 }
 {
-  const pane = Buffer.alloc(W * Hc * 3, 30);
-  ['B\'S AXIS:', '', 'B keeps 4 spokes inside 2.25 mm', '(8 to 4.50, 16 to 9.00 ...), so', 'only those 4 converge; the rule', 'acts inside r0 = 1.02 mm. FADE', 'leaves a soft cross; START a', 'crisp one ending in a 1.02 mm', 'flat disc. B has no THIN: it', 'thins by definition.'].forEach((l, i) => text(pane, W, Hc, 14, 16 + i * 26, l, [230, 220, 190], 2));
-  push(pane, ['Read with row 4: B\'s last level and its two axis rules']);
+  push(pane(['B\'S AXIS:', '', 'B keeps 4 spokes inside 2.25 mm (8 to 4.50, 16 to 9.00 ...), so only those 4 converge, and the rule acts inside r0 = 1.02 mm: FADE leaves a soft cross, START a crisp one ending on a 1 mm flat disc. B has no THIN (it thins by definition).']), ['Read with row 4: B\'s last level and its two axis rules']);
 }
 
 /* ------------------------------------------------ 4: the stem's flutes */
@@ -110,7 +112,7 @@ for (const [law, axis] of [['A', 'fade'], ['A', 'thin'], ['B', 'fade']]) {
   const rS = 3, L = S.levels.filter((l) => l.rStart <= rS).pop();
   const flutes = rS <= S.rCut ? 0 : L.n;
   const q = crestQ(law, 'crest', 'stem', 0.4, 'stem');
-  push(render(new Float32Array(b.acc.positions), W, Hc, { center: [0, 0, -30], dir: norm([0.6, -1, 0.15]), up: [0, 0, 1], halfHeight: 16 }, { ...RAKE_SIDE }),
+  push(render(new Float32Array(b.acc.positions), W, Hc, { center: [0, 0, -30], dir: norm([0.6, -1, 0.35]), up: [0, 0, 1], halfHeight: 6.5 }, { ...RAKE_SIDE }),
     [`THE STEM, ${law} ${axis}: a 60 mm stem of radius 3 mm, H ${H1}, from the side`, flutes ? `${flutes} vertical flutes (the ${L.n} spokes standing at r 3 mm, pitch ${(2 * Math.PI * rS / L.n).toFixed(2)} mm)` : `SMOOTH: r 3 mm is inside the axis rule's cut (${S.rCut.toFixed(2)} mm) — A's ${S.n0} spokes would stand ${(2 * Math.PI * rS / S.n0).toFixed(2)} mm apart there`, q ? `at H 0.4: ${qtxt(q)}` : '']);
 }
 
@@ -119,27 +121,41 @@ const sB = AB.B.stats.samples.filter((q) => q.organ === 'petal' && q.r > 18 && q
 const focus = sB[0] || AB.B.stats.samples[0];
 for (const mode of R.RIB_MODES) {
   const b = await build({ ribLaw: 'B', textureHeight: H1 }, mode);
-  const n = focus.n, cam = { center: focus.p, dir: norm([n[0] + 0.25 * focus.tc[0], n[1] + 0.25 * focus.tc[1], n[2] + 0.25 * focus.tc[2]]), up: focus.tc, halfHeight: 2.6 };
+  const n = focus.n, el = norm(cross(n, focus.tc)), cam = { center: focus.p, dir: norm([n[0] + 0.6 * el[0], n[1] + 0.6 * el[1], n[2] + 0.6 * el[2]]), up: focus.tc, halfHeight: 2.0 };
   const img = render(new Float32Array(b.acc.positions), W, Hc, cam, { ...RAKE_TOP, color: [205, 197, 182] });
   const nW = wire(img, b.acc.positions, cam);
   const q = crestQ('B', mode, 'default', 2.5, 'petal'), q4 = crestQ('B', mode, 'default', 0.4, 'petal');
-  push(img, [`MESHING: ${mode === 'lattice' ? 'the shipped 0.4 mm lattice (release)' : mode === 'crest' ? 'crest lines as edges' : 'crest + flank lines (4 a pitch)'}; B, a petal ${focus.r.toFixed(1)} mm out, 5.2 mm wide, H ${H1}; ${fmt(nW)} front triangles (cyan); ${fmt(b.acc.triangleCount)} tris whole bloom`,
+  push(img, [`MESHING: ${mode === 'lattice' ? 'the shipped 0.4 mm lattice (release)' : mode === 'crest' ? 'crest lines as edges' : 'crest + flank lines (4 a pitch)'}; B, a petal ${focus.r.toFixed(1)} mm out, 4 mm across, at a grazing angle, H ${H1}; ${fmt(nW)} front triangles (cyan); ${fmt(b.acc.triangleCount)} tris whole bloom`,
     q4 ? `H 0.4: ${qtxt(q4)}` : '', q ? `H 2.5: ${qtxt(q)}` : '']);
 }
 
-/* ------------------------------------------------ 6: the height sweep */
+/* ------------------------------------------------ 6: the height sweep, as exact sections */
+const M = await import(pathToFileURL(path.join(ROOT, 'tools/bloom-texture-ribs-measure.mjs')).href);
+function sectionOf(b, q, H) {
+  const P = b.acc.positions; let best = null, bd = Infinity;
+  for (const g of b.stats.ranges.filter((x) => x.organ === q.organ)) for (let k = g.from; k < g.to; k += 7) { const o = k * 9, d = (P[o] - q.p[0]) ** 2 + (P[o + 1] - q.p[1]) ** 2 + (P[o + 2] - q.p[2]) ** 2; if (d < bd) { bd = d; best = g; } }
+  return M.crestSection(P, best.from, best.to, q, H, M.restatedField(b.stats.params), true);
+}
 for (const H of [0.4, 1.0, 1.5, 2.5]) {
-  const b = await build({ ribLaw: 'B', textureHeight: H }, 'crest');
-  const n = focus.n, cam = { center: focus.p, dir: norm([n[0] + 0.9 * focus.tc[0] + 0.3, n[1] + 0.9 * focus.tc[1], n[2] + 0.9 * focus.tc[2]]), up: n, halfHeight: 4.5 };
-  const pr = (DATA.print || []).find((x) => x.law === 'B' && x.mode === 'crest' && x.H === H);
-  const flank = 180 - 2 * Math.atan(4 * H / focus.pitch) * 180 / Math.PI;
-  push(render(new Float32Array(b.acc.positions), W, Hc, cam, { ...RAKE_SIDE }),
-    [`HEIGHT ${H} mm (B, crest lines), a petal ${focus.r.toFixed(1)} mm out, pitch ${focus.pitch.toFixed(2)} mm, 9 mm across`, `the crest's tangent angle (flank slope 4H/pitch): ${flank.toFixed(1)} deg`, pr ? `the default bloom at H ${H}: ${pr.withinPairs} within-shell pairs, ${pr.shells} shells, ${pr.open} open edges, ${pr.gaps.newlyClosedPrintableGaps} printable gaps closed` : `${fmt(b.acc.triangleCount)} tris`]);
+  const L = await build({ ribLaw: 'B', textureHeight: H }, 'lattice'), C = await build({ ribLaw: 'B', textureHeight: H }, 'crest');
+  const sl = sectionOf(L, focus, H), sc = sectionOf(C, focus, H);
+  const img = Buffer.alloc(W * Hc * 3, 26);
+  const half = sc.half, k = Math.min((W - 40) / (2 * half), (Hc - 70) / 2.9), ox = W / 2, oy = Hc - 40;
+  const px = (x, h) => [Math.round(ox + x * k), Math.round(oy - h * k)];
+  const plot = (arr, col, dash = false) => { let prev = null; arr.forEach((h, i) => { if (!Number.isFinite(h)) { prev = null; return; } const q = px(-half + i * sc.dx, h); if (prev && !(dash && (i % 6) < 2)) { const n = Math.max(Math.abs(q[0] - prev[0]), Math.abs(q[1] - prev[1])) + 1; for (let t = 0; t <= n; t++) { const x = Math.round(prev[0] + (q[0] - prev[0]) * t / n), y = Math.round(prev[1] + (q[1] - prev[1]) * t / n); for (let dy = 0; dy < 2; dy++) { const yy = y + dy; if (x < 0 || yy < 0 || x >= W || yy >= Hc) continue; const o = (yy * W + x) * 3; img[o] = col[0]; img[o + 1] = col[1]; img[o + 2] = col[2]; } } } prev = q; }); };
+  /* the sheet's own surface (h = 0) and the 1 mm grid */
+  for (let x = -Math.floor(half); x <= half; x++) { const [gx] = px(x, 0); for (let y = 30; y < Hc - 30; y += 3) if (gx >= 0 && gx < W) { const o = (y * W + gx) * 3; img[o] = img[o + 1] = img[o + 2] = 60; } }
+  for (let hh = 0; hh <= 2.5; hh += 0.5) { const [, gy] = px(0, hh); for (let x = 10; x < W - 10; x += 3) { const o = (gy * W + x) * 3; img[o] = img[o + 1] = img[o + 2] = hh === 0 ? 110 : 55; } }
+  plot(sc.ideal, [235, 170, 70], true);
+  plot(sl.env, [150, 150, 150]);
+  plot(sc.env, [70, 210, 230]);
+  text(img, W, Hc, 10, 8, `H ${H} MM   1 MM GRID`, [220, 220, 210], 1);
+  text(img, W, Hc, 10, 22, 'AMBER DASHED: ASKED   GREY: LATTICE   CYAN: CREST LINES', [220, 220, 210], 1);
+  push(img, [`THE CREST AS BUILT, H ${H} mm: the exact section of the emitted triangles square to one crest (B, a petal ${focus.r.toFixed(1)} mm out, pitch ${focus.pitch.toFixed(2)} mm), drawn to scale`,
+    `lattice: ${sl.ang8.toFixed(1)} deg, peak ${sl.xPeak.toFixed(3)} mm off the crest, ${(sl.deficit).toFixed(3)} mm lost; crest lines: ${sc.ang8.toFixed(1)} deg, ${Math.abs(sc.xPeak).toFixed(3)} mm off; asked ${sc.ideal8.toFixed(1)} deg (pitch/8 secants)`]);
 }
 {
-  const pane = Buffer.alloc(W * Hc * 3, 30);
-  ['PRINT (SLS PA12), UNVALIDATED:', '', 'A sharp crest prints ROUNDED:', 'nothing finer than a crest radius', 'of about 0.2 mm is likely to', 'survive (half the ~0.35-0.4 mm', 'resolvable detail, laser spot', 'and powder fusing). Nothing here', 'has been printed.', '', 'At H 2.5 on a 2.5 mm pitch the', 'crest is ~22-30 deg: a knife', 'edge the process will round.'].forEach((l, i) => text(pane, W, Hc, 14, 16 + i * 26, l, [230, 220, 190], 2));
-  push(pane, ['Read with row 6: what the print will do to the sharp crest (a stated assumption, not a measurement)']);
+  push(pane(['PRINT (SLS PA12), UNVALIDATED:', '', 'A sharp crest prints ROUNDED: a crest radius under about 0.2 mm is unlikely to survive (half the 0.35-0.4 mm resolvable detail; laser spot and powder fusing). Nothing here has been printed.', '', 'At H 2.5 on a 2.3-2.5 mm pitch the crest is 26-31 deg: a knife edge the process will round.']), ['Read with row 6: what the print will do to the sharp crest (a stated assumption, not a measurement)']);
 }
 
 /* ------------------------------------------------ 7: the curvature rule at the bead / nib */
@@ -161,10 +177,8 @@ for (const H of [0.4, 1.0, 1.5, 2.5]) {
     ['THE RODS at boneCurvature 4 /mm: 12 stamens and the style take the spokes (B, H 1.0)', rods ? `stamens ${rods.parts.stamen.displaced}/${rods.parts.stamen.vertices} vertices relieved, style ${rods.parts.style.displaced}/${rods.parts.style.vertices}` : '', 'at the default 1 /mm all of them are smooth: the curvature rule decides, as it does for BONE']);
 }
 {
-  const pane = Buffer.alloc(W * Hc * 3, 30);
-  const lines = ['THE CROSSING (reported, not ruled):', '', 'Ribs relieve EVERY visible face,', 'so a petal\'s underside and the', 'hub\'s underside take spokes too.', '', 'Under the feet and on buried faces', 'the shipped T5 rules hold: smooth.', '', 'The fade at a covered edge is', 'max(H x 15/8, e): 0.75-4.7 mm.'];
-  lines.forEach((l, i) => text(pane, W, Hc, 14, 16 + i * 26, l, [230, 220, 190], 2));
-  push(pane, ['Read with row 7: what the shipped visibility and coverage rules do under ribs']);
+  const lines = ['EVERYWHERE VISIBLE (reported, not ruled):', '', 'Ribs relieve every VISIBLE face, so the petals\' and the hub\'s undersides take spokes too.', '', 'Under the feet and on buried faces the shipped T5 rules hold: smooth. The fade at a covered edge is max(H x 15/8, e): 0.75 mm at H 0.4, 4.7 mm at 2.5.'];
+  push(pane(lines), ['Read with row 7: what the shipped visibility and coverage rules do under ribs']);
 }
 
 /* ------------------------------------------------ 8+: the tables */

@@ -84,7 +84,7 @@ export function restatedField(params) {
   };
 }
 /* the section of the EMITTED triangles [from, to) through sample q, square to its crest */
-export function crestSection(P, from, to, q, H, Fr) {
+export function crestSection(P, from, to, q, H, Fr, keep = false) {
   const t = q.tc, n = q.n, e = nrm(crs(n, t)), p = q.p, half = q.pitch * 0.75, Rr = q.pitch + H + 1;
   const segs = [];
   for (let k = from; k < to; k++) {
@@ -115,7 +115,9 @@ export function crestSection(P, from, to, q, H, Fr) {
   const hi = (x) => H * Fr([p[0] + x * e[0], p[1] + x * e[1], p[2] + x * e[2]]);
   const angI = (w) => 180 - (Math.atan((hi(0) - hi(-w)) / w) + Math.atan((hi(0) - hi(w)) / w)) * 180 / Math.PI;
   const w8 = q.pitch / 8, w40 = q.pitch / 40;
-  return { xPeak: xp, hPeak: hp, deficit: hi(0) - hp, ang8: ang(w8), ang40: ang(w40), ideal8: angI(w8), ideal40: angI(w40), segs: segs.length };
+  const out = { xPeak: xp, hPeak: hp, deficit: hi(0) - hp, ang8: ang(w8), ang40: ang(w40), ideal8: angI(w8), ideal40: angI(w40), segs: segs.length };
+  if (keep) { out.half = half; out.dx = dx; out.env = Array.from(env); out.ideal = Array.from(env, (_, i) => hi(-half + i * dx)); }
+  return out;
 }
 function crestRows(r, H, params) {
   const Fr = restatedField(params);
