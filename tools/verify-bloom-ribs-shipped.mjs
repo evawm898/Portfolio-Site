@@ -127,10 +127,10 @@ export function holdClauses(G) {
   return bad;
 }
 
-async function runAll(G, src, { quiet = false } = {}) {
-  const bad = [...staticClauses(src), ...holdClauses(G)];
+async function runAll(G, src, { quiet = false, rows = null } = {}) {
+  const bad = [...staticClauses(src), ...(rows ? [] : holdClauses(G))];
   const report = [];
-  for (const [label, extra] of ROWS) for (const em of [false, true]) {
+  for (const [label, extra] of (rows ? rows.map((i) => ROWS[i]) : ROWS)) for (const em of [false, true]) {
     const r = rowClauses(G, label, extra, em);
     bad.push(...r.bad);
     report.push(`${label} ${em ? 'EXPORT' : 'LIVE'}: ${r.tris} tris, ${r.census.shells} shells, ${r.census.unmatched}/${r.census.doubled}/${r.census.degen} open/doubled/degenerate`);
@@ -141,26 +141,29 @@ async function runAll(G, src, { quiet = false } = {}) {
 
 /* ------------------------------------------------- the mutants --- */
 export const MUTANTS = [
-  { id: 'relief-points-inward', names: 'TXR1', from: 'const p1 = di > 0 ? [q[0] + n[0] * di, q[1] + n[1] * di, q[2] + n[2] * di] : q;', to: 'const p1 = di > 0 ? [q[0] - n[0] * di, q[1] - n[1] * di, q[2] - n[2] * di] : q;',
+  { id: 'relief-points-inward', rows: [0], names: 'TXR1', from: 'const p1 = di > 0 ? [q[0] + n[0] * di, q[1] + n[1] * di, q[2] + n[2] * di] : q;', to: 'const p1 = di > 0 ? [q[0] - n[0] * di, q[1] - n[1] * di, q[2] - n[2] * di] : q;',
     witness: (G) => { const a = new G.MeshBuilder({ exportMode: true }); const r = G.buildBloomInto(a, stateOf({}), OPTS); const q = r.texture.organs.petal.bone.samples.find((x) => x.s > 0); return !!q && ((q.p1[0] - q.p0[0]) * q.n[0] + (q.p1[1] - q.p0[1]) * q.n[1] + (q.p1[2] - q.p0[2]) * q.n[2]) < 0; } },
-  { id: 'the-profile-is-sharp', names: 'TXR2', from: '  return (1 + ecos(Math.PI * u)) / 2;\n', to: '  return (1 - u) * (1 - u);\n',
+  { id: 'the-profile-is-sharp', rows: [0], names: 'TXR2', from: '  return (1 + ecos(Math.PI * u)) / 2;\n', to: '  return (1 - u) * (1 - u);\n',
     witness: (G) => G.ribField('A', 2).F([10 * Math.cos(Math.PI / 63 / 2), 10 * Math.sin(Math.PI / 63 / 2), 0]) < 0.3 },
-  { id: 'law-A-counts-one-spoke-more', names: 'TXR8', from: 'const K = Math.max(RIB_MIN_SPOKES, Math.round((RIB_TAU * RIB_REF_RADIUS_MM) / s));', to: 'const K = Math.max(RIB_MIN_SPOKES, Math.round((RIB_TAU * RIB_REF_RADIUS_MM) / s) + 1);',
+  { id: 'law-A-counts-one-spoke-more', rows: [0], names: 'TXR8', from: 'const K = Math.max(RIB_MIN_SPOKES, Math.round((RIB_TAU * RIB_REF_RADIUS_MM) / s));', to: 'const K = Math.max(RIB_MIN_SPOKES, Math.round((RIB_TAU * RIB_REF_RADIUS_MM) / s) + 1);',
     witness: (G) => G.ribSchedule('A', 2).n0 === 64 },
-  { id: 'law-B-is-ignored', names: 'TXR8', from: "  if (law === 'A') {\n    const K = Math.max(RIB_MIN_SPOKES,", to: "  if (true) {\n    const K = Math.max(RIB_MIN_SPOKES,",
+  { id: 'law-B-is-ignored', rows: [1], names: 'TXR8', from: "  if (law === 'A') {\n    const K = Math.max(RIB_MIN_SPOKES,", to: "  if (true) {\n    const K = Math.max(RIB_MIN_SPOKES,",
     witness: (G) => G.ribSchedule('B', 2).levels.length === 1 },
-  { id: 'the-centre-fades', names: 'TXR6', from: '    return f;\n  };\n  return { F, S };', to: '    return r < 6 ? f * (r / 6) : f;\n  };\n  return { F, S };',
+  { id: 'the-centre-fades', rows: [0], names: 'TXR6', from: '    return Math.round(f * RIB_FIELD_QUANT) / RIB_FIELD_QUANT;\n  };\n  return { F, S };', to: '    return Math.round((r < 6 ? f * (r / 6) : f) * RIB_FIELD_QUANT) / RIB_FIELD_QUANT;\n  };\n  return { F, S };',
     witness: (G) => G.ribField('A', 2).F([1, 0, 0]) < 0.5 },
-  { id: 'the-stem-is-latticed', names: 'TXR7', from: '  if (T5 && !T5.ribs && (!pedicel || boneT) && stemPlanned.present) {', to: '  if (T5 && (!pedicel || boneT) && stemPlanned.present) {',
+  { id: 'the-stem-is-latticed', rows: [3], names: 'TXR7', from: '  if (T5 && !T5.ribs && (!pedicel || boneT) && stemPlanned.present) {', to: '  if (T5 && (!pedicel || boneT) && stemPlanned.present) {',
     witness: (G) => { const a = new G.MeshBuilder({ exportMode: true }); const r = G.buildBloomInto(a, stateOf({ stemLength: 60 }), OPTS); return r.t5.organs.includes('stem'); } },
-  { id: 'the-rods-are-captured', names: 'TXR7', from: '  if (boneT && !boneT.ribs) acc.boneRods = { index: 0,', to: '  if (boneT) acc.boneRods = { index: 0,',
-    witness: (G) => { const a = new G.MeshBuilder({ exportMode: true }); const r = G.buildBloomInto(a, stateOf({ stamenCount: 12, gynoecium: 'STYLE', stemLength: 60 }), OPTS); return r.t5.organs.some((o) => o === 'stamen' || o === 'style'); } },
-  { id: 'the-hub-underside-is-ribbed', names: 'TXR7', from: "  if (O.organ === 'hub') return !(O.N[i * 3 + 2] > 0);", to: "  if (O.organ === 'hub') return false;",
+  { id: 'the-rods-are-captured', rows: [4], names: 'TXR7', from: '  if (boneT && !boneT.ribs) acc.boneRods = { index: 0,', to: '  if (boneT) acc.boneRods = { index: 0,',
+    /* (the stamens and the style are ridge at every vertex under BONE's 1/mm
+       mask, so capturing them is inert — the compound leaf's petiole is the
+       rod the capture would lattice and relieve) */
+    witness: (G) => { const a = new G.MeshBuilder({ exportMode: true }); const r = G.buildBloomInto(a, stateOf({ stemLength: 60, leafLength: 30, leafType: 'COMPOUND' }), OPTS); return r.t5.organs.some((o) => o === 'petiole' || o === 'stalk'); } },
+  { id: 'the-hub-underside-is-ribbed', rows: [0], names: 'TXR7', from: "  if (O.organ === 'hub') return !(O.N[i * 3 + 2] > 0);", to: "  if (O.organ === 'hub') return false;",
     witness: (G) => G.ribExcluded({ organ: 'hub', N: [0, 0, -1] }, 0) === false },
-  { id: 'math-atan2-restored', names: 'TXR5', from: '  if (ax === 0 && ay === 0) return 0;\n  let a = ay <= ax', to: '  if (ax === 0 && ay === 0) return 0;\n  if (x !== 0) { const m = Math.atan2(y, x); return m < 0 ? m + RIB_TAU : m; }\n  let a = ay <= ax',
+  { id: 'math-atan2-restored', rows: [0], names: 'TXR5', from: '  if (ax === 0 && ay === 0) return 0;\n  let a = ay <= ax', to: '  if (ax === 0 && ay === 0) return 0;\n  if (x !== 0) { const m = Math.atan2(y, x); return m < 0 ? m + RIB_TAU : m; }\n  let a = ay <= ax',
     witness: (G) => G.eatan2(1, 1) === Math.atan2(1, 1) },
-  { id: 'the-hub-centre-on-rings', names: 'TXR9', from: "t5Organs.push(organLatticeInto(acc, from, cap, { organ, edgeMm: T5.edgeMm, decide: d, fanRings: !T5.ribs }));", to: "t5Organs.push(organLatticeInto(acc, from, cap, { organ, edgeMm: T5.edgeMm, decide: d, fanRings: true }));",
-    witness: (G) => { const a = new G.MeshBuilder({ exportMode: true }); const b = new G.MeshBuilder({ exportMode: true }); G.buildBloomInto(a, stateOf({}), OPTS); G.buildBloomInto(b, stateOf({ petalTexture: 'BONE' }), OPTS); return a.triangleCount === b.triangleCount; } },
+  { id: 'the-hub-centre-on-rings', rows: [0], names: 'TXR9', from: "t5Organs.push(organLatticeInto(acc, from, cap, { organ, edgeMm: T5.edgeMm, decide: d, fanRings: !T5.ribs }));", to: "t5Organs.push(organLatticeInto(acc, from, cap, { organ, edgeMm: T5.edgeMm, decide: d, fanRings: true }));",
+    witness: (G) => { const a = new G.MeshBuilder({ exportMode: true, boneDetail: 'coarse' }); const b = new G.MeshBuilder({ exportMode: true, boneDetail: 'coarse' }); G.buildBloomInto(a, stateOf({}), OPTS); G.buildBloomInto(b, stateOf({ petalTexture: 'BONE' }), OPTS); return a.triangleCount === b.triangleCount; } },
 ];
 
 async function loadMutant(src, M) {
@@ -177,23 +180,29 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const src = fs.readFileSync(GEO_FILE, 'utf8');
   if (argv.includes('--negative-control')) {
     for (const M of MUTANTS) { const n = src.split(M.from).length - 1; if (n !== 1) { console.error(`REFUSED: mutant ${M.id}'s anchor matches ${n} times`); process.exit(2); } }
-    let ok = 0;
+    const onlyArg = argv.find((a) => a.startsWith('--mutant='));
+    const only = onlyArg ? onlyArg.slice(9).split(',') : null;
+    let ok = 0, ran = 0;
     for (const M of MUTANTS) {
+      if (only && !only.includes(M.id)) continue;
+      ran++;
       const { G, src: msrc } = await loadMutant(src, M);
       const moved = M.witness(G);
       if (!moved) { console.log(`  MUTANT ${M.id}: the WITNESS did not move — the mutation is not the defect it names`); continue; }
-      const bad = await runAll(G, msrc, { quiet: true });
+      /* scoped to the rows that exercise the mutation (named per mutant); the
+         clean run is what covers every row */
+      const bad = await runAll(G, msrc, { quiet: true, rows: M.rows });
       const fired = bad.some((m) => new RegExp(`\\b${M.names}:`).test(m));
       console.log(`  MUTANT ${M.id}: witness moved; ${fired ? 'FIRED' : 'MISSED'} ${M.names}${fired ? ` (${bad.filter((m) => new RegExp(`\\b${M.names}:`).test(m)).length} line(s): ${bad.find((m) => new RegExp(`\\b${M.names}:`).test(m)).slice(0, 220)})` : ` — ${bad.length} other line(s)${bad.length ? `: ${bad[0].slice(0, 200)}` : ''}`}`);
       if (fired) ok++;
     }
-    console.log(`verify-bloom-ribs-shipped --negative-control: ${ok} of ${MUTANTS.length} mutants behave`);
-    process.exit(ok === MUTANTS.length ? 0 : 1);
+    console.log(`verify-bloom-ribs-shipped --negative-control: ${ok} of ${ran} mutants behave${only ? ` (a SUBSET: ${MUTANTS.length - ran} not run)` : ''}`);
+    process.exit(ok === ran && ran > 0 ? 0 : 1);
   }
   const bad = await runAll(G0, src);
   if (argv.includes('--browser')) {
     const { chromium } = await import('playwright-core');
-    const { startServer, findChromium } = H;
+    const { findChromium } = await import('./chromium-harness.mjs'); const startServer = H.serveRepo;
     const { server, port } = await startServer();
     const browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox'] });
     const page = await browser.newPage();

@@ -1853,6 +1853,33 @@ session). No shipped bloom file moved.
   are fluted), `node tools/shot-bloom-texture-ribs-centre.mjs docs/img/bloom-texture-ribs-centre.png` and
   `node tools/shot-bloom-texture-ribs-starburst.mjs docs/img/bloom-texture-ribs-starburst.png`.
 
+**RIBS SHIPS: THE THIRD TEXTURE CHOICE, THE OCTOBER LAB'S SOFT WAVE ON ONE FIELD ABOUT THE AXIS, THROUGH BONE'S ONE
+DEFERRED PASS — LAW A DEFAULT, LAW B A CHOICE, THE STEM AND RODS EXCLUDED BY NAME, COARSE = FULL** (Nov 9 — read
+`docs/bloom-surface-texture-ribs-shipped.md` before touching `ribsTextureFor`, `ribField`, `ribSchedule`, `eatan2`,
+`ribExcluded`, `RIB_*`, `organLatticeInto`'s `fanRings`, `textureUsesBonePass`, TXR0-TXR10 or block 87; it supersedes
+the prototype block above for what ships).
+- `petalTexture` RIBS with `ribLaw` (A / B, "Rib spacing"), `ribSpacing` (1.6–8 mm, default 2.0) and `ribHeight`
+  (0.30–2.50, default 0.30, UNVALIDATED for SLS in the help text). `textureHeight` hides under RIBS (BONE keeps its 0.4).
+- **Law A's count is `round(2 pi x 20 mm / spacing)`** (63 at 2.0, the lab's own K); law B is `4 x 2^L`, a level beginning
+  where its spacing is `s / sqrt 2`, each new rib growing over one spacing.
+- **The profile is the lab's soft wave** (`(1 + cos(pi u))/2`); no sharp crests, no crest-line cutter — the 0.4 mm lattice
+  carries it, so **no full-detail build exists** (`fullIsCoarse`, the Full detail button hidden, said on the read-out).
+- **BONE's pass runs it** (`mp = 1`, no BONE v2 record, BONE's curvature mask and fade, T5 visibility/coverage/owner).
+  `ribExcluded` skips the stem and every rod BY NAME (Eva's exclusion) and the hub's underside by its normal; under RIBS
+  the stem is not latticed and no rod is captured. **The hub top under the feet stays SMOOTH** (the coverage rule, kept
+  by the brief) — the one visible difference from the lab, Eva's question.
+- **The hub centre splits ROWS, not rings** (`fanRings: false`): rings put the vertices off the 63 spokes and drew moiré;
+  rows put them on the fan's own spokes, the lab's radial hatch. +2,288 tris on a stemless flat hub, 1.3547x its
+  conforming floor past Q14's bar, declared per row in `TEXTURE_ORGAN_BAR_XFAIL`.
+- **Engine agreement:** arithmetic `eatan2` + `ecos` (TXR5 refuses a transcendental), the field on the 2^-20 grid (a valley
+  vertex was raised or not by a last bit: TX7 caught one of 13,235 on the closed tube).
+- Gates: TXR0-3, 6-9 in both STL gates; `node tools/verify-bloom-ribs-shipped.mjs` (TXR3/4/5/10, `--negative-control` ten
+  witnessed mutants, `--browser`), spawned by the defaults bar both arms; panel route (ao) covers the controls; block 87
+  (23 rows, 1,708), smoke block 87 (9, `--conn`); TX11's most-moved and TX14's identical-florets clauses exempt RIBS (the
+  field is f(x, y)). `frozen/phase96` = the 1,685 rows at `0458880`. Bytes: `--movers-predicate ribs`.
+- Sheet: `node tools/shot-bloom-texture-ribs-shipped.mjs docs/img/bloom-texture-ribs-shipped.png` (lab | shipped);
+  figures `node tools/bloom-texture-ribs-shipped-measure.mjs`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).

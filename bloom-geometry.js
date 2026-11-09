@@ -1854,7 +1854,9 @@ export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness',
      builder reading `ps` for the two (it reads `textureFor(ps)` already). */
   'textureHeight', 'textureSize',
   /* BONE's five (Oct 28), for the same reason: one world field */
-  'bonePoreSize', 'bonePoreDensity', 'boneBandRatio', 'bonePatchCoverage', 'boneCurvature'])
+  'bonePoreSize', 'bonePoreDensity', 'boneBandRatio', 'bonePatchCoverage', 'boneCurvature',
+  /* RIBS's two sliders (Nov 9): one world field about the bloom's axis */
+  'ribSpacing', 'ribHeight'])
 /* ===================================================================
    SCOPED VALUES — what a scope OWNS OUTRIGHT rather than offsets (F6-scope,
    Oct 18; read docs/bloom-outline-curve-scope-outcome.md). A curve is not a
@@ -14175,6 +14177,7 @@ export const RIB_EMERGE_K = 1;
 export const RIB_EXCLUDED_ORGANS = Object.freeze(['stem', 'stamen', 'style', 'petiole', 'stalk']);
 export const RIB_CONTROL_IDS = Object.freeze(['ribLaw', 'ribSpacing', 'ribHeight']);
 export const RIB_TAU = 2 * Math.PI;
+export const RIB_FIELD_QUANT = 1048576;   // 2^-20, the field's grid (engine agreement at a valley)
 /* Eva's named exclusion, per vertex of an organ the pass is handed */
 export function ribExcluded(O, i) {
   if (O.rod || RIB_EXCLUDED_ORGANS.includes(O.organ)) return true;
@@ -14240,7 +14243,13 @@ export function ribField(law, s) {
       const a = ribSmoother((r - S.levels[L].rStart) / S.emergeMm);
       if (a < 1) f = (1 - a) * ribWave(S.levels[L - 1].n, th) + a * f;
     }
-    return f;
+    /* ON THE 2^-20 GRID (BONE v2's own BONE2_QUANT): a VALLEY is f exactly 0, and
+       a lattice vertex a valley passes through (the -x axis is one under an odd
+       spoke count: y exactly 0) reads 0 in one engine and ~1e-32 in the other,
+       whose y is an ulp off — a vertex RAISED or not by a last bit (TX7 caught
+       it as one displaced vertex of 13,235 on the closed tube). The grid moves
+       the relief by at most H x 2^-21 mm (1.2e-6 at 2.5 mm), far under X0's bar. */
+    return Math.round(f * RIB_FIELD_QUANT) / RIB_FIELD_QUANT;
   };
   return { F, S };
 }
@@ -16013,10 +16022,19 @@ function boneReliefPass(acc, T, organs, capability = null) {
   /* keyed on the STL's own float32s: copies the file would weld are one position
      here even where their doubles differ in the last bits (the closed tube's ring
      meets the hub at two such points) */
-  const f32 = Math.fround;
+  /* (RIBS) ON THE 2^-20 mm GRID instead: a seam vertex on an axis (x = 0) is
+     r cos(pi/2), which the engines' cos returns ~1e-15 apart — the closed tube's
+     hub and ring copies read -1.1e-15 / -1.1e-15 in Node (one float32, one
+     position) and -1.1e-15 / -6.6e-15 in Chromium (two), so the owner rule took
+     the copies together in one engine and apart in the other (TX7: 13,234
+     against 13,235 tube vertices raised). RIBS raises every visible vertex, so
+     the split always shows; BONE's patch mask leaves most such seams at s = 0
+     and its bytes are held by keeping its key (the hazard is latent there,
+     recorded in docs/bloom-surface-texture-ribs-shipped.md) */
+  const f32 = T.ribs ? (x) => Math.round(x * RIB_FIELD_QUANT) : Math.fround;
   per.forEach((X, oi) => { for (let i = 0; i < X.nV; i++) { const k = `${f32(X.O.P[i * 3])}|${f32(X.O.P[i * 3 + 1])}|${f32(X.O.P[i * 3 + 2])}`; const l = where.get(k); if (l) l.push(oi, i); else where.set(k, [oi, i]); } });
   let sharedPositions = 0, sharedRelieved = 0, sharedAcross = 0, sharedCleared = 0;
-  for (const X of per) X.clr = new Float64Array(X.nV);
+  for (const X of per) { X.clr = new Float64Array(X.nV); X.sh = new Uint8Array(X.nV); }
   const sharedOf = per.map(() => 0);
   for (const l of where.values()) {
     if (l.length <= 2) continue;
@@ -16027,7 +16045,7 @@ function boneReliefPass(acc, T, organs, capability = null) {
     for (let c = 2; c < l.length; c += 2) if (l[c] !== l[0]) { sharedAcross++; break; }
     let ok = true, sMin = Infinity;
     const X0 = per[l[0]], i0 = l[1];
-    for (let c = 0; c < l.length; c += 2) sharedOf[l[c]]++;
+    for (let c = 0; c < l.length; c += 2) { sharedOf[l[c]]++; per[l[c]].sh[l[c + 1]] = 1; }
     for (let c = 0; c < l.length; c += 2) {
       const X = per[l[c]], i = l[c + 1];
       if (!(X.s[i] > 0)) { ok = false; break; }
@@ -16093,7 +16111,7 @@ function boneReliefPass(acc, T, organs, capability = null) {
       }
       if (ci > 0) bs.cleared++;
       if (si > 0) { bs.displaced++; rec.displaced++; if (si > rec.reliefMaxMm) rec.reliefMaxMm = si; if (si < rec.reliefMinMm) rec.reliefMinMm = si; }
-      const smp = () => ({ organ: O.organ, p0: q, p1, n, s: si, f: X.fv[i], mp: X.mpv[i], mc: X.mc[i], w0: X.w0[i], g: X.w0[i], kappa: X.kap[i], ridge: !!X.ridge[i], ridgeDistMm: X.ridgeDist ? X.ridgeDist[i] : Infinity, fadeDistMm: X.visDist ? X.visDist[i] : undefined, sheet: !!O.sheet, clearMm: ci });
+      const smp = () => ({ organ: O.organ, p0: q, p1, n, s: si, f: X.fv[i], mp: X.mpv[i], mc: X.mc[i], w0: X.w0[i], g: X.w0[i], kappa: X.kap[i], ridge: !!X.ridge[i], ridgeDistMm: X.ridgeDist ? X.ridgeDist[i] : Infinity, fadeDistMm: X.visDist ? X.visDist[i] : undefined, sheet: !!O.sheet, clearMm: ci, shared: !!X.sh[i] });
       if (ci > 0 && bs.clearSamples.length < 16) bs.clearSamples.push(smp());
       if (X.ridge[i] && bs.ridgeSamples.length < 32 && (bs.ridgeSamples.length === 0 || (tick % 7) === 0)) bs.ridgeSamples.push(smp());
       else if (X.fv[i] === 0 && X.w0[i] > 0 && X.mc[i] > 0 && bs.floorSamples.length < 16) bs.floorSamples.push(smp());
