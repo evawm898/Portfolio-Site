@@ -133,7 +133,7 @@ async function partOne(dir) {
       const n = [1, 2, 3, 4, 5].map((r) => marks(F.renderFirework(F.defaultSpec(red, r, d.suits, m), { cx: 30, cy: 40, r: 26 })));
       for (let i = 1; i < 5; i++) if (!(n[i] > n[i - 1])) return `${m}: rank ${i + 1} draws ${n[i]} marks, rank ${i} ${n[i - 1]}`;
     }
-    for (const s of d.suits) s.centre = { layout: 'single', motif: 'rosettes', tier: 'streamers' };
+    for (const s of d.suits) s.centre = { layout: 'single', motif: 'starfield', tier: 'rosettes' };
     const cards = D.deckCards(d).filter((c) => c.kind === 'card' && c.suitId === 'red' && c.rank === 4);
     const svgs = new Set(cards.map((c) => L.renderFace(d, c, { idPrefix: 'x' })));
     return svgs.size === 1 || `${svgs.size} distinct pictures for red 4`;
@@ -165,7 +165,7 @@ async function partOne(dir) {
       const bad = well(L.renderFace(d, { kind: 'card', suitId: 'green', rank: 4 }, { guides: true }), w, h, `${preset}/${index}/${centre}/${corners}`);
       if (bad) return bad;
     }
-    for (const [preset, w, h] of [sizes[0], sizes[2]]) for (const motif of F.MOTIF_IDS) for (const centre of ['single', 'count', 'bleed']) for (const tier of ['none', 'streamers']) {
+    for (const [preset, w, h] of [sizes[0], sizes[2]]) for (const motif of F.MOTIF_IDS) for (const centre of ['single', 'count', 'bleed']) for (const tier of ['none', 'rosettes']) {
       d.size = { preset, w, h }; d.index = 'large'; d.corners = 'four';
       for (const s of d.suits) s.centre = { layout: centre, motif, tier };
       for (const r of [1, 5]) { const bad = well(L.renderFace(d, { kind: 'card', suitId: 'yellow', rank: r }), w, h, `${preset}/${motif}/${centre}/${tier}/${r}`); if (bad) return bad; }
@@ -229,7 +229,7 @@ async function partOne(dir) {
 
   check('H9', 'the design file round-trips; newer refused', () => {
     const d = D.defaultDesign(); d.rainbow = true; d.index = 'band'; d.suits[0].name = 'Moon'; d.fireworks = { red: { 2: { rings: 2 } } };
-    d.suits[1].centre = { layout: 'count', motif: 'weeping', tier: 'none' }; d.suits[2].centre = { layout: 'single', motif: 'dome', tier: 'streamers' };
+    d.suits[1].centre = { layout: 'count', motif: 'weeping', tier: 'none' }; d.suits[2].centre = { layout: 'single', motif: 'dome', tier: 'rosettes' };
     const { design, notes } = D.normaliseDesign(JSON.parse(D.serialiseDesign(d)), S.SYMBOL_IDS);
     if (notes.length) return notes.join('; ');
     if (JSON.stringify(design) !== JSON.stringify({ ...d })) return 'did not come back identical';
@@ -243,6 +243,13 @@ async function partOne(dir) {
       if (r.design.index !== index || r.design.suits.some((s) => s.centre.layout !== layout || s.centre.motif !== 'classic')) return `v1 layout ${L1} read as ${r.design.index}/${r.design.suits[0].centre.layout}`;
       if (!r.notes.some((n) => n.includes(`layout ${L1}`))) return `v1 layout ${L1} read without saying so`;
     }
+    // a file saved before Spark drift and Streamers were removed (Nov 9): the
+    // suit falls back to Classic with no second tier, and SAYS so
+    const old = JSON.parse(D.serialiseDesign(D.defaultDesign()));
+    old.suits[0].centre = { layout: 'single', motif: 'sparks', tier: 'streamers' };
+    const o = D.normaliseDesign(old, S.SYMBOL_IDS), oc = o.design.suits[0].centre;
+    if (oc.motif !== 'classic' || oc.tier !== 'none') return `a removed firework read as ${oc.motif}/${oc.tier}`;
+    if (!o.notes.some((n) => n.includes('"sparks"')) || !o.notes.some((n) => n.includes('"streamers"'))) return `a removed firework or tier loaded without a note: ${o.notes.join('; ')}`;
     return true;
   });
   // ---- geometry read off the SVG: every point a mark puts down. Paths are
@@ -279,7 +286,7 @@ async function partOne(dir) {
 
   check('H10', 'one corner index for the deck', () => {
     const d = D.defaultDesign(); d.rainbow = true;
-    const centres = [['single', 'teardrop', 'rosettes'], ['count', 'spoke', 'none'], ['bleed', 'weeping', 'none'], ['single', 'streamers', 'streamers'], ['count', 'dome', 'none'], ['bleed', 'rosettes', 'none']];
+    const centres = [['single', 'teardrop', 'rosettes'], ['count', 'spoke', 'none'], ['bleed', 'weeping', 'none'], ['single', 'starfield', 'rosettes'], ['count', 'dome', 'none'], ['bleed', 'rosettes', 'none']];
     for (const index of ['large', 'small', 'band']) for (const corners of ['inverted', 'upright', 'four']) {
       d.index = index; d.corners = corners;
       d.suits.forEach((s, i) => { s.centre = { layout: centres[i][0], motif: centres[i][1], tier: centres[i][2] }; });
@@ -298,7 +305,7 @@ async function partOne(dir) {
       // one suit, every centre: its index never moves (a plate under a full-bleed centre aside)
       const s = D.suitById(d, 'green'), seen = new Set();
       for (const layout of ['single', 'count', 'bleed']) {
-        s.centre = { layout, motif: 'sparks', tier: 'rosettes' };
+        s.centre = { layout, motif: 'starfield', tier: 'rosettes' };
         const svg = L.renderFace(d, { kind: 'card', suitId: 'green', rank: 5 }, { idPrefix: 'x' });
         seen.add(svg.slice(svg.indexOf('<g class="hb-index">')).replace(/<rect x="[-\d.]+" y="[-\d.]+" width="[\d.]+" height="[\d.]+" rx="[\d.]+" fill="#[0-9A-F]{6}" fill-opacity="0.85"\/>/gi, ''));
       }
@@ -326,7 +333,7 @@ async function partOne(dir) {
     // restated: a corner index is 0.62 of its numeral wide and 1.7 of it tall
     // (numeral, gap, symbol), its numeral 0.13 / 0.095 of the card height
     const DIGIT = { large: 0.13, small: 0.095 };
-    for (const [preset, w, h] of [['poker', 63.5, 88.9], ['mini', 44, 63], ['custom', 90, 70]]) for (const index of ['large', 'small', 'band']) for (const tier of ['rosettes', 'streamers']) {
+    for (const [preset, w, h] of [['poker', 63.5, 88.9], ['mini', 44, 63], ['custom', 90, 70]]) for (const index of ['large', 'small', 'band']) for (const tier of ['rosettes']) {
       const d = D.defaultDesign(); d.size = { preset, w, h }; d.index = index; d.corners = 'four';
       const g = D.cardGeom(d), s = g.safeRect;
       const boxes = [];
@@ -356,7 +363,7 @@ async function partOne(dir) {
 
   check('H13', 'every catalogue motif stays in its box', () => {
     const d = D.defaultDesign(), suit = D.suitById(d, 'red');
-    const fields = ['rosettes', 'starfield', 'sparks', 'streamers'];
+    const fields = ['rosettes', 'starfield'];
     for (const m of F.MOTIF_IDS.filter((m) => m !== 'classic' && !F.BURST_TYPES.includes(m))) for (const r of [1, 2, 3, 4, 5]) for (const R of [7, 26]) {
       const spec = F.defaultSpec(suit, r, d.suits, m);
       const box = { cx: 40, cy: 50, r: R };

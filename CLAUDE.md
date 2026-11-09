@@ -12662,6 +12662,6 @@ Hidden page (`hanabi.html`, `hanabi.css`, `hanabi.js`, `hanabi/*.js`; `noindex`,
 **A face is two choices (Eva, on #528): ONE corner index for the deck (`design.index`: large / small /
 band), and a centre PER SUIT (`suit.centre`: layout single / count / bleed, a firework motif, an optional
 tier at ranks 4–5).** Phase 1's layouts A/B/C are those pairs, and a v1 file migrates byte-identically.
-Motifs are the five originals plus 14 drawn after the Hirayama catalogue; hanging/falling pieces are ruled
-out. **`hanabi/firework.js` is the phase-2 slot** — layout code only calls `fireworkSpec()`,
+Motifs are the five originals plus 12 drawn after the Hirayama catalogue; hanging/falling pieces are ruled
+out, and Spark drift / Streamers were removed (Nov 9; one tier left, rosettes). **`hanabi/firework.js` is the phase-2 slot** — layout code only calls `fireworkSpec()`,
 `renderFirework()` and `renderTier()`. Gate: `node tools/verify-hanabi.mjs` (`--negative-control`), not in CI.

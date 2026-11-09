@@ -191,7 +191,8 @@ export function normaliseDesign(raw, symbolIds) {
         s.centre.layout = pick(c.layout, Object.keys(CENTRE_LAYOUTS), s.centre.layout);
         if (MOTIF_IDS.includes(c.motif)) s.centre.motif = c.motif;
         else notes.push(`suit ${s.id}: unknown firework "${c.motif}" — classic kept`);
-        s.centre.tier = pick(c.tier, TIER_IDS, s.centre.tier);
+        if (c.tier === undefined || TIER_IDS.includes(c.tier)) s.centre.tier = pick(c.tier, TIER_IDS, s.centre.tier);
+        else notes.push(`suit ${s.id}: unknown second tier "${c.tier}" — none kept`);
       } else if (raw.version >= 2) notes.push(`suit ${s.id}: no centre — default kept`);
     }
   }

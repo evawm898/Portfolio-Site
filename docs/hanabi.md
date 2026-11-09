@@ -17,8 +17,8 @@ them: **the corner index is constant across the deck, and the centre varies per 
     (full bleed, C's). A full-bleed centre under a large or small index puts the index on a
     plate of the face colour.
   - `motif`: which firework (below).
-  - `tier`: `none` / `rosettes` / `streamers` — a second tier under a `single` burst at ranks
-    4 and 5 (the catalogue's two-part cards, items 21 and 24).
+  - `tier`: `none` / `rosettes` — a second tier under a `single` burst at ranks 4 and 5 (the
+    catalogue's two-part cards, item 21).
 
 A version-1 file's `layout` A/B/C is read as (large, single), (small, count), (band, bleed)
 on every suit, and is told. **Every phase-1 face renders byte-identically under that reading**
@@ -47,14 +47,13 @@ deck's own line style and never traced. Eva ruled on a 28-item list; the numbers
 | 10 | Dot ring | 89, 105 |
 | 11 | Rosette field | 13, 15, 23, 30, 41 |
 | 12 | Starfield | 34, 67, 86, 90 |
-| 13 | Spark drift | 16, 98 |
-| 14 | Streamers | 38, 60, 73 |
 | 21 | Tier: burst over a rosette field | 52, 57, 58, 61, 62 |
-| 24 | Tier: burst over streamers | 60, 73 |
 
 **Ruled out (Eva):** every hanging or falling piece — parachute flares, parachute chains,
 many parachutes, glow balls, lanterns, dragons (items 15–20) — and every two-tier
-composition built on one (22, 23, 25–28).
+composition built on one (22, 23, 25–28). **Removed after shipping (Eva, Nov 9):** Spark drift
+(13), Streamers (14) and the burst over streamers (24). A saved design naming one loads with
+Classic and no second tier, and says so (H9).
 
 Rank escalates per motif: a burst grows in size and count, a field mostly in count (it
 starts larger, and fills the card's free centre — the area less the corner-index columns —
