@@ -2543,7 +2543,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "A",
@@ -2581,7 +2582,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "A",
@@ -2626,7 +2628,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "A",
@@ -2671,7 +2674,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "A",
@@ -2718,7 +2722,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "A",
@@ -2765,7 +2770,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "B",
@@ -2835,7 +2841,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "B",
@@ -2905,7 +2912,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "B",
@@ -2966,7 +2974,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "B",
@@ -3027,7 +3036,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "B",
@@ -3101,7 +3111,8 @@
    "shells": 9,
    "open": 0,
    "doubled": 0,
-   "degen": 0
+   "degen": 0,
+   "reach": "hub"
   },
   {
    "law": "B",
@@ -3170,6 +3181,223 @@
    "withinPairs": 0,
    "worstSpanMm": 0,
    "crossPairs": 15818,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0,
+   "reach": "hub"
+  },
+  {
+   "law": "A",
+   "centre": "starburst",
+   "reach": "edge",
+   "H": 1,
+   "tris": 190110,
+   "ms": 2632,
+   "centreRec": null,
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.0372
+     },
+     {
+      "n": 16,
+      "rStart": 4.0744
+     },
+     {
+      "n": 32,
+      "rStart": 8.1487
+     },
+     {
+      "n": 64,
+      "rStart": 16.2975
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 10956,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "A",
+   "centre": "starburst",
+   "reach": "edge",
+   "H": 2.5,
+   "tris": 190110,
+   "ms": 2112,
+   "centreRec": null,
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.0372
+     },
+     {
+      "n": 16,
+      "rStart": 4.0744
+     },
+     {
+      "n": 32,
+      "rStart": 8.1487
+     },
+     {
+      "n": 64,
+      "rStart": 16.2975
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 10956,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "B",
+   "centre": "starburst",
+   "reach": "edge",
+   "H": 1,
+   "tris": 190154,
+   "ms": 2133,
+   "centreRec": null,
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.2508
+     },
+     {
+      "n": 16,
+      "rStart": 4.5016
+     },
+     {
+      "n": 32,
+      "rStart": 9.0032
+     },
+     {
+      "n": 64,
+      "rStart": 18.0063
+     },
+     {
+      "n": 128,
+      "rStart": 36.0127
+     },
+     {
+      "n": 256,
+      "rStart": 72.0253
+     },
+     {
+      "n": 512,
+      "rStart": 144.0506
+     },
+     {
+      "n": 1024,
+      "rStart": 288.1012
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 10946,
+   "flips": 0,
+   "withdrawn": 64,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degen": 0
+  },
+  {
+   "law": "B",
+   "centre": "starburst",
+   "reach": "edge",
+   "H": 2.5,
+   "tris": 190154,
+   "ms": 2146,
+   "centreRec": null,
+   "schedule": {
+    "n0": 4,
+    "levels": [
+     {
+      "n": 4,
+      "rStart": 0
+     },
+     {
+      "n": 8,
+      "rStart": 2.2508
+     },
+     {
+      "n": 16,
+      "rStart": 4.5016
+     },
+     {
+      "n": 32,
+      "rStart": 9.0032
+     },
+     {
+      "n": 64,
+      "rStart": 18.0063
+     },
+     {
+      "n": 128,
+      "rStart": 36.0127
+     },
+     {
+      "n": 256,
+      "rStart": 72.0253
+     },
+     {
+      "n": 512,
+      "rStart": 144.0506
+     },
+     {
+      "n": 1024,
+      "rStart": 288.1012
+     }
+    ],
+    "r0": 1.0185916357881302,
+    "rCut": 0.5092958178940651,
+    "emerge": 2.5
+   },
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 10946,
    "flips": 0,
    "withdrawn": 64,
    "shells": 9,

@@ -235,13 +235,16 @@ if (SECTIONS.includes('budget')) {
 if (SECTIONS.includes('centre')) {
   const { census } = await import(pathToFileURL(path.join(ROOT, 'tools/bloom-self-intersection.mjs')).href);
   const out = data.centre || [];
-  for (const law of ['A', 'B']) for (const c of R.RIB_CENTRES) for (const H of [1.0, 2.5]) {
-    if (args.includes('--resume') && out.find((x) => x.law === law && x.centre === c && x.H === H)) continue;
-    const r = await build({}, { ribLaw: law, ribCentre: c, textureHeight: H }, { mode: 'crest' });
+  /* the starburst at both reaches (Nov 9, third round): 'edge' (the ruled one, the default) and 'hub' (the second round's) */
+  const combos = []; for (const law of ['A', 'B']) for (const c of R.RIB_CENTRES) for (const reach of c === 'starburst' ? ['edge', 'hub'] : ['hub']) for (const H of [1.0, 2.5]) combos.push([law, c, reach, H]);
+  for (const x of out) if (x.reach === undefined) x.reach = 'hub';
+  for (const [law, c, reach, H] of combos) {
+    if (args.includes('--resume') && out.find((x) => x.law === law && x.centre === c && x.reach === reach && x.H === H)) continue;
+    const r = await build({}, { ribLaw: law, ribCentre: c, ...(c === 'starburst' ? { ribStarburstReach: reach } : {}), textureHeight: H }, { mode: 'crest' });
     const cs = census(new Float64Array(r.acc.positions));
-    const row = { law, centre: c, H, tris: r.acc.triangleCount, ms: Math.round(r.ms), centreRec: r.stats.centre, schedule: r.stats.schedule, withinPairs: cs.within, worstSpanMm: r3(cs.worstSpanMm), crossPairs: cs.cross, flips: r.stats.flips, withdrawn: r.stats.withdrawn, ...closure(r.acc.positions) };
-    const at = out.findIndex((x) => x.law === law && x.centre === c && x.H === H); if (at >= 0) out[at] = row; else out.push(row);
-    console.log(`centre ${law} ${c} H ${H}: ${row.tris} tris, ${row.withinPairs} within-shell pairs, ${row.shells} shells, open ${row.open}, doubled ${row.doubled}, degen ${row.degen}, flips ${row.flips}; R ${row.centreRec ? row.centreRec.R.toFixed(3) + ' (' + row.centreRec.from + ')' : '-'}`);
+    const row = { law, centre: c, reach, H, tris: r.acc.triangleCount, ms: Math.round(r.ms), centreRec: r.stats.centre, schedule: r.stats.schedule, withinPairs: cs.within, worstSpanMm: r3(cs.worstSpanMm), crossPairs: cs.cross, flips: r.stats.flips, withdrawn: r.stats.withdrawn, ...closure(r.acc.positions) };
+    const at = out.findIndex((x) => x.law === law && x.centre === c && x.reach === reach && x.H === H); if (at >= 0) out[at] = row; else out.push(row);
+    console.log(`centre ${law} ${c}${c === 'starburst' ? ' (' + reach + ')' : ''} H ${H}: ${row.tris} tris, ${row.withinPairs} within-shell pairs, ${row.shells} shells, open ${row.open}, doubled ${row.doubled}, degen ${row.degen}, flips ${row.flips}; R ${row.centreRec ? row.centreRec.R.toFixed(3) + ' (' + row.centreRec.from + ')' : '-'}`);
     data.centre = out; save();
   }
 }
