@@ -361,7 +361,7 @@ const MUTANTS = [
   { id: 'the-bead-fuse-cap-is-dropped', from: "const nMin = Math.ceil(gMax / (hiF * size) - 1e-9)", to: "const nMin = 1", breaks: /^(B3|B5) / },   // a parted run also leaves bars crossing the ring outside every element
   { id: 'the-laurel-run-parts', from: "loF = LEAF_RUN_PITCH_MIN; hiF = LEAF_RUN_PITCH_MAX;", to: "loF = LEAF_RUN_PITCH_MIN; hiF = 1.2;", breaks: /^(B3|B5) / },   // parted leaves leave bars between them
   { id: 'a-bead-floats-off-its-ring', from: "} else sphereSolid(scr, map(s0, 0, 0), size / 2, PATTERN_LAT, PATTERN_LON);", to: "} else sphereSolid(scr, map(s0, 0, size), size / 2, PATTERN_LAT, PATTERN_LON);", breaks: /^(B2|B3|B4|B5|B9|C3) / },   // floated out, the beads also sit on a wider circle, so neighbours part
-  { id: 'the-door-keeps-its-band', from: "const drop = (pts) => door && rg.cut &&", to: "const drop = (pts) => false &&", breaks: /^B7 / },
+  { id: 'the-door-keeps-its-band', from: "const drop = (pts) => door && rg.cut &&", to: "const drop = (pts) => false &&", breaks: /^(B4|B7) / },   // kept in the opening, an element sits where the ring was cut away
   { id: 'the-band-ignores-the-profile-slope', from: "const nr = ez, nz = -er, a0 = ra(zc);", to: "er = 0; ez = 1; const nr = ez, nz = -er, a0 = ra(zc);", breaks: /^B9 / },
   { id: 'the-svg-drops-the-bands', from: "  for (const b of bands) {\n    if (b.kind === 'bead')", to: "  for (const b of []) {\n    if (b.kind === 'bead')", breaks: /^(B8|C10) / },
   { id: 'every-ring-carries-the-band', from: "const want = (rg) => p.bandRings === 'all' ||", to: "const want = (rg) => true ||", breaks: /^B1 / },
