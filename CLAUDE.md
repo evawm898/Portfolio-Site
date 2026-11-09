@@ -1798,6 +1798,36 @@ DETAIL WHERE IT SHOWS, AND ONE PROVISIONAL 2.0 M EXPORT CAP** (Nov 2, Eva's ruli
   `node tools/shot-bloom-texture-bone-v2-shipped.mjs docs/img/bloom-texture-bone-v2-shipped.png`,
   `node tools/bloom-preform-ladder.mjs <dir>` (only the cap varies; the STLs are committed NOWHERE).
 
+**RIBS (RADIAL SPOKE RIBBING) IS A PROTOTYPE AND A SHEET, NOT SHIPPED — A AGAINST B WAITS ON EVA'S SPACING
+RULING** (Nov 9 — read `docs/bloom-surface-texture-ribs.md` before touching `bloom-texture-ribs.js` or starting the
+shipping session). No shipped bloom file moved.
+- **The third choice** (NONE / BONE / RIBS): one world field about the bloom axis, `F(x, y)` only; sharp crests
+  (`g = (1 - u)^2`, a kink at the crest); outward along each vertex's normal through the SHIPPED BONE relief pass (a
+  patched copy, five anchored edits: the field replaces `f`, the patch mask is 1 — everywhere visible — and no BONE v2
+  record). Visibility, coverage, the fade, the curvature mask and the derived owner are the shipped ones.
+- **The laws.** A: a fixed count (50 at 2.5 mm, counted at 20 mm), fanning; B: 4 x 2^L, a level begins where its
+  spacing is s/sqrt2 (pitch 1.8-3.5 mm), a new rib grows from the flute's floor over one spacing. **The axis:** the
+  innermost level's spacing meets the 1.6 mm floor (four lattice edges) at r0; FADE, START, or (A only) THIN. **A's r0
+  is 12.7 mm, outside the hub: A-FADE / START leave the hub top and the stem SMOOTH.** B fluted the stem (8 flutes).
+- **A crest is only crisp on a mesh edge.** The shipped 0.4 mm lattice blunts it (petal, H 2.5: 54 deg built against 30
+  asked for B, 72 against 33 for A; up to 0.17 mm zigzag and 19% of the height lost). The CREST-LINE CUTTER cuts every crest half-plane into each organ's
+  lattice as constraint edges (conforming by construction; a junction edge never cut; a coincident new point withdraws
+  its edge): within ~1 deg, no zigzag, +19.5% on the default. Crest+flank lines buy nothing at the crest. On the stem
+  the lattice's columns already stand on the flutes; its 67.5-vs-47.4 deg gap at H 2.5 is the relief radiating from a 3
+  mm cylinder, not the mesh.
+- **The cutter decides on 2^-20-snapped inputs**: the shipped lattice's doubles differ in the last bit between Node and
+  Chromium (float32 hides it), and an unsnapped cutter chose a different quad diagonal (4,910 floats, 0.53 mm). Snapped,
+  the two engines agree to the float32 bit.
+- Print (default, H 0.4 / 2.5, both laws): 0 within-shell pairs, 9 shells, 0 open edges, 0 gaps closed. A sharp crest
+  prints rounded to ~0.2 mm radius on SLS (UNVALIDATED).
+- Budget with crest lines: the mophead 94.7% (A) / 98.0% (B) of the cap; crest+flank is over it. Chromium: the crest
+  build 1.5-2.0 s on the default, 46-47 s on the mophead; 12 of 12 builds agree with Node to the bit. The shipped
+  curvature rule (1 /mm) smooths every stamen, the style, the braid, the bead and the nib (questions 6 and 8).
+- Gate `node tools/verify-bloom-ribs.mjs` (R0-R6, `--negative-control` seven witnessed mutants, `--browser`); not in CI.
+  The junction rule is unreachable on every default row, so R4 carries a written-down two-part fixture. Measure:
+  `tools/bloom-texture-ribs-measure.mjs`, `tools/bloom-texture-ribs-browser.mjs`. Sheet:
+  `node tools/shot-bloom-texture-ribs.mjs docs/img/bloom-texture-ribs.png`.
+
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
 `endDrag`, `DRAG_LIGHT_OVERRIDE`, `openBloom`'s `asShipped` or the D family).
