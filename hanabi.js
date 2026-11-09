@@ -4,7 +4,7 @@
 
 import {
   defaultDesign, normaliseDesign, serialiseDesign, activeSuits, cardCounts, deckCards,
-  suitById, symbolClashes, imposition, copyCentreToAll, SIZE_PRESETS, INDEX_STYLES, CENTRE_LAYOUTS,
+  suitById, symbolClashes, imposition, copyCentreToAll, SIZE_PRESETS, INDEX_STYLES, CENTRE_LAYOUTS, NUMERAL_FILLS,
   RANKS, COPIES, VERSION,
 } from './hanabi/deck.js';
 import { SYMBOLS, SYMBOL_IDS } from './hanabi/symbols.js';
@@ -70,8 +70,10 @@ function buildSuitRows() {
         <label for="c-${suit.id}-layout">Centre</label><label for="c-${suit.id}-motif">Firework</label>
         <select id="c-${suit.id}-layout" data-c="layout">${Object.keys(CENTRE_LAYOUTS).map((k) => `<option value="${k}" title="${CENTRE_LAYOUTS[k]}">${CENTRE_SHORT[k]}</option>`).join('')}</select>
         <select id="c-${suit.id}-motif" data-c="motif">${motifOptions()}</select>
-        <label for="c-${suit.id}-tier">Second tier, ranks ${TIER_RANKS.join(' and ')}</label><span></span>
-        <select id="c-${suit.id}-tier" data-c="tier">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+        <label for="c-${suit.id}-tier">Second tier, ranks ${TIER_RANKS.join(' and ')}</label>${suit.multicolor
+          ? `<label for="c-${suit.id}-numeral">Corner index</label>` : '<span></span>'}
+        <select id="c-${suit.id}-tier" data-c="tier">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>${suit.multicolor
+          ? `<select id="c-${suit.id}-numeral" data-n>${Object.entries(NUMERAL_FILLS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>` : ''}
         <button type="button" class="hb-suit__all" data-all>same centre for every suit</button>
       </div>`;
     row.addEventListener('input', (e) => {
@@ -81,6 +83,7 @@ function buildSuitRows() {
       changed();
     });
     row.addEventListener('change', (e) => {
+      if (e.target.matches('[data-n]')) { suit.numeral = e.target.value; changed(); return; }
       const c = e.target.dataset.c;
       if (!c) return;
       suit.centre[c] = e.target.value;
@@ -108,6 +111,13 @@ function syncSuitRows() {
     const tier = row.querySelector('[data-c=tier]');
     tier.disabled = suit.centre.layout !== 'single';
     tier.title = tier.disabled ? 'A second tier sits under a single burst; this centre has none.' : '';
+    const num = row.querySelector('[data-n]');
+    if (num) {
+      num.value = suit.numeral;
+      num.disabled = design.index === 'band';
+      num.title = num.disabled ? 'With the band index the band itself is the rainbow; the numeral and symbol are drawn in ink on it.'
+        : 'Solid: the suit colour. Rainbow gradient: the numeral and symbol run through the other suits\' colours, top to bottom.';
+    }
     for (const b of row.querySelectorAll('.hb-sym')) {
       b.setAttribute('aria-pressed', String(b.dataset.sym === suit.symbol));
       b.classList.toggle('is-taken', taken.has(b.dataset.sym) && taken.get(b.dataset.sym) !== suit.id);

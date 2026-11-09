@@ -240,6 +240,12 @@ function rebuild() {
   profileEditor.render();
 }
 const SEP = '<span class="cg-sep"> — </span>';   // DESIGN.md rule 3: em-dash separators are faint
+// phase 2: what the bands built — the style, how many rings, the elements, and how many sit in each bar gap
+function bandLine(b) {
+  if (!b) return 'rings plain';
+  const ns = [...new Set(b.rings.map((r) => r.n))].sort((x, y) => x - y);
+  return `band <b>${b.style === 'beading' ? 'beading' : 'leaf-tip run'}</b> on ${b.rings.length} ring${b.rings.length === 1 ? '' : 's'}${SEP}${b.elements} elements, ${ns.join(' / ')} a bar gap${SEP}cone-segment sag ≤ ${b.sagMax.toFixed(2)} mm`;
+}
 function writeReadout() {
   const i = model.info;
   const t = document.getElementById('told'); t.textContent = model.told.length ? model.told.map((s) => `· ${s}`).join('\n') : ''; t.hidden = !model.told.length;
@@ -251,6 +257,7 @@ function writeReadout() {
     i.collar ? `collar boss r ${i.collar.rc.toFixed(1)} mm (bead ${(i.collar.rc * 1.14).toFixed(1)}), the bars meeting it ${i.collar.pitch.toFixed(2)} mm apart at ${(100 * (1 - i.collar.sC)).toFixed(0)}% of the cap; the hanger stands on it` : 'flat top',
     `${i.shoulderZ.length ? `${i.shoulderZ.length} profile shoulder${i.shoulderZ.length > 1 ? 's' : ''} auto-ringed` : 'no profile shoulder'}${i.scallops ? `${SEP}skirt: ${i.scallops} scallops, cusps on bars` : ''}`,
     `door ${door}`,
+    bandLine(i.bands),
     `print: ${PRINT_NOTE}; shallowest wire ${over}`,
   ].join('\n');
 }

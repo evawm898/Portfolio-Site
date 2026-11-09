@@ -4,13 +4,14 @@
 #   cages: watertight bytes, every part closed, one voxel region, the print
 #   floor on every emitted wire, the door cut read off the emitted bars, the
 #   polygon's corners and mitre, the rings, the SVG census, determinism —
-#   then its negative control (ten mutants of cage-geometry.js, each caught
+#   then its negative control (twenty-three mutants of cage-geometry.js, each caught
 #   by the clause that names it).
 # page: tools/verify-cage-page.mjs, headless Chromium with real pointer drags
-#   and downloads, then its negative control (four broken copies of cage.js).
+#   and downloads, then its negative control (eight broken copies of cage.js / cage.css).
 #
 # PATH SCOPE: the cage's own files, the two modules it imports from other
-# generators (bloom-curve.js, frame-relief.js and what that imports), and the
+# generators (bloom-curve.js, frame-relief.js and what that imports, and since Phase 2
+# frame-pattern.js and frame-filigree.js, whose bead and leaf the ring bands use), and the
 # shared harness helper. No flower or bloom gate reads any cage file.
 name: cage-gate
 
@@ -24,6 +25,8 @@ on:
       - frame-relief.js
       - frame-geometry.js
       - frame-registry.js
+      - frame-pattern.js
+      - frame-filigree.js
       - 'tools/verify-cage*.mjs'
       - tools/cage-page-harness.mjs
       - tools/shot-cage.mjs
@@ -39,6 +42,8 @@ on:
       - frame-relief.js
       - frame-geometry.js
       - frame-registry.js
+      - frame-pattern.js
+      - frame-filigree.js
       - 'tools/verify-cage*.mjs'
       - tools/cage-page-harness.mjs
       - tools/shot-cage.mjs
@@ -53,7 +58,8 @@ concurrency:
 jobs:
   geometry:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Phase 2 (ring bands): 48 cages, about half banded, and 23 mutants — the control alone is ~25 min
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -32,7 +32,14 @@
    looks along +y from −y, so x reads left to right on the drawing). */
 
 import { curveFunction, curveShapeRefusal, cloneCurve } from './bloom-curve.js';
-import { Mesh, exportStl as writeStl } from './frame-relief.js';
+import { Mesh, exportStl as writeStl, bandSolid, sphereSolid, PATTERN_LAT, PATTERN_LON } from './frame-relief.js';
+/* PHASE 2 — the ring bands consume /frame's band pattern UNCHANGED (docs/frame-charter.md §15):
+   the bead is frame-relief's sphereSolid on its own lattice, the leaf is frame-filigree's
+   buildLeaf swept by frame-relief's bandSolid in its own leaf section, and the rules — beads
+   fused at ≤ BEAD_FUSE × r, a laurel run's pitch inside [LEAF_RUN_PITCH_MIN, MAX] × the leaf,
+   one lobe, sixteen stations — are frame-pattern's own constants, imported, never restated. */
+import { BEAD_FUSE, LEAF_RUN_PITCH_MIN, LEAF_RUN_PITCH_MAX, LEAF_RUN_LOBES, PATTERN_LEAF_STATIONS } from './frame-pattern.js';
+import { buildLeaf, leafProfile, LEAF_ASPECT, LEAF_RELIEF } from './frame-filigree.js';
 
 export const MIN_FEATURE_MM = 1.0;
 export const PRINT_NOTE = `${MIN_FEATURE_MM.toFixed(1)} mm minimum wire, assumed for SLS PA12 (a declared guess: nothing printed yet)`;
@@ -45,7 +52,11 @@ export const CAP_STEP_MM = 1.0;          // and over the top cap, where the curv
    neighbouring bars are ONE PRINTABLE GAP apart (pitch = bar diameter + the floor), never until
    they touch — the pack is derived from the floor and the bar, not typed (phase 1's 1.05-diameter
    pack constant is retired). The collar is a turned BOSS with a bead, and the hanger stands on it. */
-export const SHOULDER_DEG = 25;          // ruling 5: a profile knot whose chords turn by at least this (in mm) is a shoulder and auto-places a ring
+export const SHOULDER_DEG = 25;
+/* A band reads as a band only if its element stands proud of the ring it rides: a bead's
+   diameter, and a leaf's width, are held at or over this multiple of the ring's own diameter
+   (a decision made without a ruling — told when it binds). */
+export const BAND_OVER_RING = 1.25;          // ruling 5: a profile knot whose chords turn by at least this (in mm) is a shoulder and auto-places a ring
 
 /* ---- the profile curve (bloom-curve.js's own kind) ---- */
 export const PROFILE_SPEC = Object.freeze({ modes: ['single'], x: [0, 1], y: [0.08, 1], points: [2, 10], lock: { first: 'x', last: 'x' }, monotoneX: true, owner: 'heightMm' });
@@ -57,6 +68,7 @@ export const SECTIONS = [
   { id: 'top', label: 'Top', open: true },
   { id: 'bars', label: 'Bars', open: true },
   { id: 'rings', label: 'Rings', open: true },
+  { id: 'bands', label: 'Ring bands', open: true },
   { id: 'door', label: 'Door', open: true },
   { id: 'base', label: 'Base', open: false },
   { id: 'hanger', label: 'Hanger', open: false },
@@ -71,6 +83,9 @@ export const PRESET_IDS = ['cylinder', 'bell', 'cone', 'onion', 'tiered', 'hexLa
 export const PRESET_LABELS = { custom: 'Custom', cylinder: 'Cylinder', bell: 'Bell', cone: 'Pyramid / cone', onion: 'Onion', tiered: 'Tiered dome on drum', hexLantern: 'Hex lantern' };
 const notFlat = (p) => p.topShape !== 'flat';
 const hasDoor = (p) => p.doorShape !== 'none';
+const banded = (p) => p.bandStyle && p.bandStyle !== 'none';
+/* which rings carry the band (the bands and the door both read it: the door never crosses a banded ring) */
+const bandWants = (p, rg) => p.bandRings === 'all' || (p.bandRings === 'inner' && rg.kind === 'ring') || (p.bandRings === 'ends' && rg.kind === 'frame') || (p.bandRings === 'top' && rg.name === 'top ring');
 
 export const PARAM_SPEC = [
   C('preset', 'body', 'Preset', ['custom', ...PRESET_IDS].map((k) => [k, PRESET_LABELS[k]]), 'bell'),
@@ -85,10 +100,15 @@ export const PARAM_SPEC = [
   R('ringCount', 'rings', 'Rings between base and top', 0, 8, 1, 3),
   C('ringPlace', 'rings', 'Placement', [['even', 'even'], ['clustered', 'clustered toward the ends']], 'even'),
   R('ringMm', 'rings', 'Ring thickness', 0.8, 4, 0.1, 1.8, 'mm'),
+  C('bandStyle', 'bands', 'Band', [['none', 'plain rings'], ['beading', 'beading'], ['leaf', 'leaf-tip run']], 'none'),
+  C('bandRings', 'bands', 'On', [['all', 'every ring'], ['inner', 'the rings between'], ['ends', 'base and top rings'], ['top', 'top ring only']], 'all', banded),
+  R('beadMm', 'bands', 'Bead diameter', 1.5, 6, 0.1, 3.0, 'mm', (p) => p.bandStyle === 'beading'),
+  R('leafMm', 'bands', 'Leaf length', 3, 14, 0.5, 8, 'mm', (p) => p.bandStyle === 'leaf'),
+  R('bandSpacing', 'bands', 'Spacing (× the bead or leaf; snapped so one sits on every bar)', 0.5, 0.9, 0.01, 0.7, '', banded),
   C('doorShape', 'door', 'Door', [['none', 'none'], ['rect', 'rectangle'], ['arch', 'round arch'], ['gothic', 'gothic point'], ['ogee', 'ogee']], 'arch'),
-  R('doorWidth', 'door', 'Door width', 10, 90, 1, 28, 'mm', hasDoor),
+  R('doorWidth', 'door', 'Door width (snapped to whole bar gaps)', 10, 90, 1, 26, 'mm', hasDoor),
   R('doorHeight', 'door', 'Door height', 10, 180, 1, 46, 'mm', hasDoor),
-  R('doorY', 'door', 'Door position (bottom, of the body height)', 0, 1, 0.01, 0.08, '', hasDoor),
+  R('doorY', 'door', 'Door position (the sill sits on the nearest ring)', 0, 1, 0.01, 0, '', hasDoor),
   R('doorFrameMm', 'door', 'Door frame thickness', 1, 4, 0.1, 2.0, 'mm', hasDoor),
   C('baseStyle', 'base', 'Base', [['ring', 'plain ring'], ['tray', 'tray'], ['skirt', 'scalloped skirt'], ['feet', 'feet']], 'tray'),
   R('skirtMm', 'base', 'Skirt depth', 4, 20, 0.5, 9, 'mm', (p) => p.baseStyle === 'skirt'),
@@ -110,12 +130,12 @@ export const PRESET_FIELD_IDS = PARAM_SPEC.filter((s) => s.section !== 'print' &
    default bar. 1.1 sits above MIN_FEATURE_MM (1.0), so no floor binds on it. The onion carries
    three rings, the upper one (0.75 H) in its neck taper. */
 export const PRESETS = {
-  cylinder: { profile: P([[0, 1], [1, 1]]), sides: '0', topShape: 'dome', topHeight: 0.6, barCount: 20, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'arch', doorWidth: 30, doorHeight: 48, doorY: 0.1, baseStyle: 'ring', hanger: 'ring', widthMm: 90, heightMm: 110 },
-  bell: { profile: P([[0, 1], [0.3, 0.96], [0.65, 0.8], [1, 0.64]]), sides: '0', topShape: 'dome', topHeight: 0.6, barCount: 22, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'arch', doorWidth: 28, doorHeight: 46, doorY: 0.08, baseStyle: 'tray', hanger: 'finial', widthMm: 90, heightMm: 140 },
-  cone: { profile: P([[0, 1], [1, 0.48]]), sides: '4', topShape: 'spire', topHeight: 1.1, barCount: 16, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'gothic', doorWidth: 26, doorHeight: 50, doorY: 0.1, baseStyle: 'tray', hanger: 'ring', widthMm: 100, heightMm: 120 },
-  onion: { profile: P([[0, 0.72], [0.3, 0.96], [0.55, 1], [1, 0.74]]), sides: '0', topShape: 'onion', topHeight: 1.15, barCount: 24, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'ogee', doorWidth: 28, doorHeight: 50, doorY: 0.12, baseStyle: 'feet', hanger: 'finial', widthMm: 96, heightMm: 100 },
-  tiered: { profile: P([[0, 1], [0.58, 1], [0.66, 0.7], [1, 0.7]]), sides: '0', topShape: 'dome', topHeight: 0.65, barCount: 24, barMm: 1.1, barsConverge: true, ringCount: 4, ringPlace: 'clustered', ringMm: 1.8, doorShape: 'rect', doorWidth: 30, doorHeight: 40, doorY: 0.1, baseStyle: 'skirt', scallopCount: 8, hanger: 'finial', widthMm: 100, heightMm: 130 },
-  hexLantern: { profile: P([[0, 1], [1, 1]]), sides: '6', topShape: 'spire', topHeight: 0.85, barCount: 18, barMm: 1.1, barsConverge: true, ringCount: 2, ringPlace: 'even', ringMm: 1.8, doorShape: 'rect', doorWidth: 28, doorHeight: 52, doorY: 0.12, baseStyle: 'feet', hanger: 'hook', widthMm: 86, heightMm: 120 },
+  cylinder: { profile: P([[0, 1], [1, 1]]), sides: '0', topShape: 'dome', topHeight: 0.6, barCount: 20, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'arch', doorWidth: 28, doorHeight: 48, doorY: 0, baseStyle: 'ring', hanger: 'ring', widthMm: 90, heightMm: 110 },
+  bell: { profile: P([[0, 1], [0.3, 0.96], [0.65, 0.8], [1, 0.64]]), sides: '0', topShape: 'dome', topHeight: 0.6, barCount: 22, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'arch', doorWidth: 26, doorHeight: 46, doorY: 0, baseStyle: 'tray', hanger: 'finial', widthMm: 90, heightMm: 140 },
+  cone: { profile: P([[0, 1], [1, 0.48]]), sides: '4', topShape: 'spire', topHeight: 1.1, barCount: 16, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'gothic', doorWidth: 29, doorHeight: 50, doorY: 0, baseStyle: 'tray', hanger: 'ring', widthMm: 100, heightMm: 120 },
+  onion: { profile: P([[0, 0.72], [0.3, 0.96], [0.55, 1], [1, 0.74]]), sides: '0', topShape: 'onion', topHeight: 1.15, barCount: 24, barMm: 1.1, barsConverge: true, ringCount: 3, ringPlace: 'even', ringMm: 1.8, doorShape: 'ogee', doorWidth: 27, doorHeight: 47, doorY: 0, baseStyle: 'feet', hanger: 'finial', widthMm: 96, heightMm: 100 },
+  tiered: { profile: P([[0, 1], [0.58, 1], [0.66, 0.7], [1, 0.7]]), sides: '0', topShape: 'dome', topHeight: 0.65, barCount: 24, barMm: 1.1, barsConverge: true, ringCount: 4, ringPlace: 'clustered', ringMm: 1.8, doorShape: 'rect', doorWidth: 26, doorHeight: 40, doorY: 0.15, baseStyle: 'skirt', scallopCount: 8, hanger: 'finial', widthMm: 100, heightMm: 130 },
+  hexLantern: { profile: P([[0, 1], [1, 1]]), sides: '6', topShape: 'spire', topHeight: 0.85, barCount: 24, barMm: 1.1, barsConverge: true, ringCount: 2, ringPlace: 'even', ringMm: 1.8, doorShape: 'rect', doorWidth: 20, doorHeight: 52, doorY: 0, baseStyle: 'feet', hanger: 'hook', widthMm: 86, heightMm: 120 },
 };
 
 export const DEFAULTS = Object.freeze({ ...Object.fromEntries(PARAM_SPEC.map((s) => [s.id, s.default])), ...PRESETS.bell, preset: 'bell' });
@@ -154,6 +174,9 @@ export function randomParams(seed) {
   pts = pts.map(([x, y], i) => [x, Math.min(1, Math.max(0.3, y + (i && i < pts.length - 1 ? j() : 0)))]);
   p.profile = { mode: 'single', points: pts };
   if (curveShapeRefusal(p.profile, PROFILE_SPEC)) p.profile = cloneCurve(PRESETS.cylinder.profile);
+  // phase 2: drawn LAST, so every field above is the sequence it always was
+  p.bandStyle = pick(['none', 'none', 'beading', 'leaf']); p.bandRings = pick(['all', 'inner', 'ends', 'top']);
+  p.beadMm = within(2, 4.5, 0.1); p.leafMm = within(5, 11, 0.5); p.bandSpacing = within(0.55, 0.85, 0.01);
   return p;
 }
 
@@ -209,7 +232,7 @@ export function doorTop(shape, s, a, h) {
   const u = Math.min(1, Math.abs(s) / a);
   if (shape === 'rect') return h;
   if (shape === 'arch') { const r = Math.min(a, 0.5 * h); return h - r + Math.sqrt(Math.max(0, r * r - Math.pow(u * a, 2) * (r / a) * (r / a))); }
-  if (shape === 'gothic') { const rise = Math.min(0.6 * h, 0.866 * 2 * a); const zs = h - rise; const R2 = (2 * a) * (2 * a); return zs + (rise / (0.866 * 2 * a)) * Math.sqrt(Math.max(0, R2 - Math.pow(u * a + a, 2))); }
+  if (shape === 'gothic') { const S3 = Math.sqrt(3); const rise = Math.min(0.6 * h, S3 * a); const zs = h - rise; const R2 = (2 * a) * (2 * a); return zs + (rise / (S3 * a)) * Math.sqrt(Math.max(0, R2 - Math.pow(u * a + a, 2))); }   // √3·a is the equilateral arch's own rise, so the point lands at h
   if (shape === 'ogee') { const rise = Math.min(0.55 * h, 1.1 * a); const zs = h - rise; return zs + rise * (1 - u) * (1 - 0.55 * Math.sin(Math.PI * u)); }
   return h;
 }
@@ -371,85 +394,10 @@ export function buildCage(paramsIn) {
     if (sC < 0.3) told.push(`${barCount} bars at ${(2 * rBar).toFixed(1)} mm, one ${floor.toFixed(1)} mm gap apart, meet the collar at ${(100 * (1 - sC)).toFixed(0)}% of the cap's height — a wide collar; fewer or thinner bars tighten it`);
   }
 
-  /* the door, in (arc s, height z) on the surface, facing -y */
-  const thD = -Math.PI / 2;
-  let door = null;
-  if (p.doorShape !== 'none') {
-    const circ0 = TAU * rho(0) * 0.42;   // no door wider than 42% of the circumference at the sill
-    let W = p.doorWidth; if (W > circ0) { told.push(`door width ${W} mm held to ${circ0.toFixed(0)} mm (42% of the circumference)`); W = circ0; }
-    let Dh = Math.min(p.doorHeight, H * 0.92); if (Dh < p.doorHeight) told.push(`door height ${p.doorHeight} mm held to ${Dh.toFixed(0)} mm inside the body`);
-    const z0 = Math.max(rFrame + rDoor, p.doorY * (H - Dh));
-    const a = W / 2;
-    const top = (s) => z0 + doorTop(p.doorShape, s, a, Dh);
-    const inside = (s, z) => Math.abs(s) < a && z > z0 && z < top(s);
-    // the arc offset of azimuth θ at height z: the surface distance from the door's centre meridian
-    const sOf = (th, z) => wrapPi(th - thD) * polyRadius(rho(z), th, N);
-    door = { W, Dh, z0, a, top, inside, sOf, shape: p.doorShape };
-    // the frame wire: sill, right jamb up, the top edge right→left, the left jamb down
-    const fpts = [];
-    // the inverse of sOf — ONE owner of the surface arc coordinate for the frame, the bars and the rings:
-    // bisect the azimuth whose arc offset is s (s(θ) = (θ − θd)·ρ(θ) is monotone over the door's span)
-    const onSurf = (s, z) => { let lo = thD - Math.PI * 0.9, hi = thD + Math.PI * 0.9; for (let k = 0; k < 50; k++) { const m = (lo + hi) / 2; if (sOf(m, z) < s) lo = m; else hi = m; } return surf((lo + hi) / 2, z); };
-    const nTop = 48, nJ = Math.max(4, Math.ceil(Dh / 2));
-    for (let i = 0; i < nJ; i++) fpts.push(onSurf(a, z0 + (top(a) - z0) * i / nJ));
-    for (let i = 0; i <= nTop; i++) { const s = a - 2 * a * i / nTop; fpts.push(onSurf(s, top(s))); }
-    for (let i = 1; i <= nJ; i++) fpts.push(onSurf(-a, top(-a) - (top(-a) - z0) * i / nJ));
-    for (let i = 1; i < nTop; i++) fpts.push(onSurf(-a + 2 * a * i / nTop, z0));
-    // a pointed top edge repeats its apex: drop coincident consecutive points
-    const fp = fpts.filter((q, i) => i === 0 || len(sub(q, fpts[i - 1])) > 1e-6);
-    tube(mesh, fp, rDoor, { closed: true, kind: 'door', name: 'door frame' });
-    wires.push({ kind: 'door', pts: fp, r: rDoor, closed: true });
-  }
-
-  /* the bars */
-  const dz = (z) => { const e = Math.min(0.5, H * 1e-3); return (rho(z + e) - rho(z - e)) / (2 * e); };
-  const overhang = { deg: 90, where: '' };
-  const noteSlope = (v, where) => { const deg = Math.atan2(Math.abs(v[2]), Math.hypot(v[0], v[1])) * 180 / Math.PI; if (deg < overhang.deg) { overhang.deg = deg; overhang.where = where; } };
-  const cutRuns = (pts, isInside) => {
-    // split a polyline where `isInside` holds, ending each run exactly where it crosses the door outline (bisected)
-    const runs = []; let cur = [];
-    const cross = (A, B) => { let lo = 0, hi = 1; const ia = isInside(A); for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; const Q = [A[0] + (B[0] - A[0]) * m, A[1] + (B[1] - A[1]) * m, A[2] + (B[2] - A[2]) * m]; if (isInside(Q) === ia) lo = m; else hi = m; } const m = (lo + hi) / 2; return [A[0] + (B[0] - A[0]) * m, A[1] + (B[1] - A[1]) * m, A[2] + (B[2] - A[2]) * m]; };
-    for (let i = 0; i < pts.length; i++) {
-      const inA = isInside(pts[i]);
-      if (!inA) { if (i && isInside(pts[i - 1])) cur.push(cross(pts[i - 1], pts[i])); cur.push(pts[i]); }
-      else if (i && !isInside(pts[i - 1])) { cur.push(cross(pts[i - 1], pts[i])); runs.push(cur); cur = []; }
-    }
-    if (cur.length) runs.push(cur);
-    return runs.filter((r) => r.length >= 2);
-  };
-  const barInside = door ? (q) => { const th = Math.atan2(q[1], q[0]); return door.inside(door.sOf(th, q[2]), q[2]); } : () => false;
-  const ribsOverCap = (th, from) => {
-    const out = [];
-    const ns = Math.max(8, Math.ceil(Hc * collar.sC / CAP_STEP_MM));
-    for (let i = from ? 1 : 0; i <= ns; i++) out.push(capPt(th, collar.sC * i / ns));
-    // bury the end in the collar: on past the collar's radius toward the axis
-    const last = out[out.length - 1]; const rr = Math.hypot(last[0], last[1]); const k = rr > 1e-9 ? Math.max(0, rr - collar.rc * 0.55) / rr : 0;
-    out.push([last[0] * k, last[1] * k, last[2]]);
-    return out;
-  };
-  const barsEnd = flat ? 'ring' : p.barsConverge ? 'apex' : 'ring';
-  for (let j = 0; j < barCount; j++) {
-    const th = TAU * j / barCount;
-    const pts = stations.map((z) => surf(th, z));
-    // the bar stands in the base ring and the top ring (the tube is centred on the ring's centreline, so it is buried)
-    if (barsEnd === 'apex') { const cap = ribsOverCap(th, true); pts.push(...cap); }
-    // the slope census stops before the last point: that segment is the bury into the collar, inside it
-    const slopeTo = barsEnd === 'apex' ? pts.length - 1 : pts.length;
-    for (let i = 1; i < slopeTo; i++) noteSlope(sub(pts[i], pts[i - 1]), barsEnd === 'apex' && pts[i][2] > H ? 'the bars over the top cap' : 'the bars');
-    for (const run of cutRuns(pts, barInside)) { tube(mesh, run, rBar, { kind: 'bar', name: `bar ${j}` }); wires.push({ kind: 'bar', pts: run, r: rBar }); }
-  }
-  // bars that end at the top ring: the cap takes half their number as ribs (every other azimuth)
-  let ribCount = 0;
-  if (!flat && barsEnd === 'ring') {
-    ribCount = Math.max(N || 3, Math.round(barCount / 2));
-    if (N && ribCount % N) ribCount = Math.round(ribCount / N) * N || N;
-    for (let j = 0; j < ribCount; j++) { const th = TAU * j / ribCount; const pts = ribsOverCap(th, false); for (let i = 1; i < pts.length - 1; i++) noteSlope(sub(pts[i], pts[i - 1]), 'the dome ribs'); tube(mesh, pts, rBar, { kind: 'rib', name: `rib ${j}` }); wires.push({ kind: 'rib', pts, r: rBar }); }
-    told.push(`bars end at the top ring; ${ribCount} ribs carry the ${p.topShape} to the apex`);
-  }
-
-  /* the rings: base and top (frame weight), the interior count placed even or clustered,
-     and (ruling 5) one at every profile SHOULDER — a knot where the chords either side turn
-     by SHOULDER_DEG or more, measured in mm, so a step or a tier always carries a ring */
+  /* the rings' heights (laid out here, before the door, because the door SITS ON them): base and
+     top (frame weight), the interior count placed even or clustered, and (ruling 5) one at every
+     profile SHOULDER — a knot where the chords either side turn by SHOULDER_DEG or more, measured
+     in mm, so a step or a tier always carries a ring */
   const ringZ = [];
   for (let i = 1; i <= p.ringCount; i++) {
     const t = i / (p.ringCount + 1);
@@ -465,30 +413,212 @@ export function buildCage(paramsIn) {
   }
   ringZ.sort((a, b) => a - b);
   if (shoulderZ.length) told.push(`${shoulderZ.length} profile shoulder${shoulderZ.length > 1 ? 's' : ''} (${shoulderZ.map((z) => z.toFixed(0) + ' mm').join(', ')}) carr${shoulderZ.length > 1 ? 'y' : 'ies'} a ring`);
-  const ringLoop = (z, rr, kind, name) => {
+  // every ring the build lays, bottom to top, marked with what the door must not cross
+  const ringPlan = [{ z: 0, r: rFrame, kind: 'frame', name: 'base ring' }, ...ringZ.map((z, i) => ({ z, r: rRing, kind: 'ring', name: `ring ${i + 1}` })), { z: H, r: rFrame, kind: 'frame', name: 'top ring' }];
+  for (const sz of shoulderZ) { const R = ringPlan.reduce((b, q) => (Math.abs(q.z - sz) < Math.abs(b.z - sz) ? q : b)); if (Math.abs(R.z - sz) < nearRing) R.shoulder = true; }
+  for (const rg of ringPlan) rg.banded = banded(p) && bandWants(p, rg);
+
+  /* THE DOOR (docs/cage-phase-1.md §9). It is cut where the LATTICE is, not wherever a width in mm
+     happens to fall:
+       - its two jambs ARE bars: the door spans k whole bar gaps (k snapped from the asked width,
+         measured at the sill), and the frame's jambs replace the jamb bars — a jamb never cuts a
+         bar part-way up and no sliver of opening stands beside one;
+       - it is centred on the front (−y, ruling 4): on a round cage on a bar (k even) or on a gap
+         (k odd); on a polygon on a FACE centre, never a corner, with k at most the bars of the face
+         (k = the face's own count makes the corner bars its jambs);
+       - the lattice is laid in its own frame and the door placed in it at `thD`; the whole cage
+         (everything but the hanger) turns once at the end by `turn` so that centre is the front;
+       - its sill SITS ON A RING — the one nearest the asked position that keeps the asked height,
+         else the one that holds the tallest door — and its head stays one printable gap
+         (`gapOf`: the two wires and the floor) under the first shoulder ring, banded ring or the
+         top ring above it, and clear of every other ring by the same gap; shortened, and told;
+       - its outline lives in (u, z), u ∈ [−1, 1] the lateral fraction of the door at that height
+         (of the arc on a round cage, of the flat face on a polygon), so the door follows the bars
+         up a tapering profile and every frame point is a point of the cage's own surface. */
+  const dPhi = TAU / barCount;
+  const mod = (a, n) => ((a % n) + n) % n;
+  let door = null, turn = 0;
+  if (p.doorShape !== 'none') {
+    const gapOf = (rg) => rg.r + rDoor + floor;
+    const Dh0 = Math.min(p.doorHeight, H * 0.92);
+    if (Dh0 < p.doorHeight) told.push(`door height ${p.doorHeight} mm held to ${Dh0.toFixed(0)} mm inside the body`);
+    const zAsk = p.doorY * (H - Dh0);
+    const DOOR_MIN = Math.max(10, 4 * rDoor + floor);
+    // every ring a sill can sit on, and the tallest door it holds
+    const sills = [];
+    for (let i = 0; i < ringPlan.length - 1; i++) {
+      const S = ringPlan[i], above = ringPlan.slice(i + 1);
+      if (above.some((R) => R.z - S.z < gapOf(R))) continue;            // a ring grazing it: not a sill
+      const stop = above.find((R) => R.shoulder || R.banded || R === ringPlan[ringPlan.length - 1]);
+      let apex = S.z + Dh0, why = null;
+      if (apex > stop.z - gapOf(stop)) { apex = stop.z - gapOf(stop); why = stop; }
+      for (let it = 0; it <= ringPlan.length; it++) {
+        const R = above.find((q) => Math.abs(q.z - apex) < gapOf(q) - 1e-9);
+        if (!R) break;
+        apex = R.z - gapOf(R); why = R;
+      }
+      sills.push({ S, Dh: apex - S.z, why });
+    }
+    const fits = sills.filter((c) => c.Dh >= DOOR_MIN - 1e-9);
+    if (!fits.length) told.push(`no ring has room above it for a ${DOOR_MIN.toFixed(0)} mm door clear of the rings — no door built`);
+    else {
+      const full = fits.filter((c) => c.Dh >= Dh0 - 1e-9);
+      const tallest = Math.max(...fits.map((c) => c.Dh));
+      const pool = full.length ? full : fits.filter((c) => c.Dh >= tallest - 1e-9);
+      const ch = pool.reduce((b, c) => (Math.abs(c.S.z - zAsk) < Math.abs(b.S.z - zAsk) - 1e-9 ? c : b));
+      const z0 = ch.S.z, Dh = ch.Dh, apex = z0 + Dh;
+      if (Math.abs(z0 - zAsk) > 0.5) told.push(`door sill on the ${ch.S.name} at ${z0.toFixed(0)} mm (asked ${zAsk.toFixed(0)} mm) — a sill sits on a ring`);
+      if (ch.why) told.push(`door height ${Dh0.toFixed(0)} mm shortened to ${Dh.toFixed(0)} mm, one printable gap under the ${ch.why.shoulder ? 'shoulder ' : ch.why.banded ? 'banded ' : ''}${ch.why.name} at ${ch.why.z.toFixed(0)} mm`);
+      // the width: k whole bar gaps, nearest the asked width at the sill
+      const ap = (z) => rho(z) * (N ? Math.cos(Math.PI / N) : 1);
+      const widthOf = (k) => (N ? 2 * ap(z0) * Math.tan(k * dPhi / 2) : k * dPhi * rho(z0));
+      const m = N ? barCount / N : 0, ks = [];
+      if (N) for (let k = m % 2 ? 1 : 2; k <= m; k += 2) ks.push(k);
+      else for (let k = 1; k <= Math.max(1, Math.floor(0.42 * barCount)); k++) ks.push(k);
+      const k = ks.reduce((b, c) => (Math.abs(widthOf(c) - p.doorWidth) < Math.abs(widthOf(b) - p.doorWidth) - 1e-9 ? c : b), ks[0]);
+      const W = widthOf(k), half = k / 2;
+      if (Math.abs(W - p.doorWidth) > 0.5) told.push(`door width ${p.doorWidth} mm snapped to ${W.toFixed(1)} mm — ${k} bar gap${k > 1 ? 's' : ''}, both jambs on bars${N ? `, centred on a face${k === m ? ' (its corner bars are the jambs)' : ''}` : ''}`);
+      // the centre, in bar-index units: a face centre (polygon), else a bar (k even) or a gap (k odd), nearest −y
+      const cIdx = N ? mod((Math.round(0.75 * N - 0.5) + 0.5) * m, barCount) : mod(k % 2 ? Math.round(0.75 * barCount - 0.5) + 0.5 : Math.round(0.75 * barCount), barCount);
+      const thD = TAU * cIdx / barCount;
+      turn = wrapPi(-Math.PI / 2 - thD); if (Math.abs(turn) < 1e-12) turn = 0;
+      if (N && turn) told.push(`the ${N}-gon turns ${(turn * 180 / Math.PI).toFixed(1)}° so the door is centred on a face, at the front`);
+      const tH = Math.tan(half * dPhi);
+      const uOfOff = (o) => (N ? Math.tan(o * dPhi) / tH : o / half);                     // o: an offset from the centre, in bar gaps
+      const dOfU = (u) => (N ? Math.atan(u * tH) : u * half * dPhi);                       // u → the azimuth offset
+      const uOfTheta = (th) => { const d = wrapPi(th - thD); if (Math.abs(d) >= Math.PI / 2) return d > 0 ? Infinity : -Infinity; return uOfOff(d / dPhi); };
+      // the outline's half width in mm at the springing (fixed point: the rise depends on it)
+      const aAt = (z) => (N ? ap(z) * tH : half * dPhi * rho(z));
+      let aRef = aAt(z0); for (let it = 0; it < 4; it++) aRef = aAt(z0 + doorTop(p.doorShape, aRef, aRef, Dh));
+      const top = (u) => z0 + doorTop(p.doorShape, u * aRef, aRef, Dh);
+      const inside = (u, z) => Math.abs(u) < 1 && z > z0 && z < top(u);
+      const jR = mod(cIdx + half, barCount), jL = mod(cIdx - half, barCount);
+      const thR = TAU * jR / barCount, thL = TAU * jL / barCount;
+      // the door's bars: offset from the centre (exact in bar-index units), and u
+      const barU = new Map();
+      for (let j = 0; j < barCount; j++) { let o = mod(j - cIdx, barCount); if (o >= barCount / 2) o -= barCount; if (Math.abs(o) <= half) barU.set(j, Math.abs(o) === half ? Math.sign(o) : uOfOff(o)); }
+      // the rings the door crosses, and where each is cut: at the jambs below the springing, on the head above it
+      const cross = new Map();
+      const zSpring = top(1);
+      for (const rg of ringPlan) {
+        if (!(rg.z > z0 + 1e-9 && rg.z < apex - 1e-9)) continue;
+        if (rg.z <= zSpring) { cross.set(rg, { u: 1, thA: thR, thB: thL, d: half * dPhi }); continue; }
+        let lo = 0, hi = 1; for (let it = 0; it < 60; it++) { const mm = (lo + hi) / 2; if (top(mm) > rg.z) lo = mm; else hi = mm; }
+        const u = (lo + hi) / 2, d = dOfU(u);
+        cross.set(rg, { u, thA: thD + d, thB: thD - d, d });
+      }
+      door = { W, Dh, z0, apex, k, half, m, thD, cIdx, turn, aRef, top, inside, uOfTheta, barU, cross, shape: p.doorShape, centre: N ? 'face' : k % 2 ? 'gap' : 'bar' };
+      // THE FRAME: right jamb up, the head right → left, the left jamb down, the sill left → right. Every
+      // vertex is surf() of an azimuth and a height; at a bar, at a jamb and at a ring's cut the azimuth is
+      // THAT bar's / ring end's own, so a cut end and a frame vertex are the same point to the bit
+      const nJ = Math.max(4, Math.ceil((zSpring - z0) / 2)), nTop = 48;
+      const jambZ = []; for (let i = 0; i < nJ; i++) jambZ.push(z0 + (zSpring - z0) * i / nJ);
+      for (const [rg, c] of cross) if (c.u === 1) jambZ.push(rg.z);
+      jambZ.sort((a, b) => a - b);
+      const jz = jambZ.filter((z, i) => i === 0 || z - jambZ[i - 1] > 1e-6);
+      const head = [];
+      for (let i = 0; i <= nTop; i++) { const u = 1 - 2 * i / nTop; head.push({ u, th: thD + dOfU(u), z: top(u) }); }
+      for (const [j, u] of barU) head.push({ u, th: TAU * j / barCount, z: top(u), bar: true });
+      for (const [rg, c] of cross) if (c.u !== 1) { head.push({ u: c.u, th: c.thA, z: rg.z, bar: true }); head.push({ u: -c.u, th: c.thB, z: rg.z, bar: true }); }
+      head.sort((a, b) => b.u - a.u || (b.bar ? 1 : 0) - (a.bar ? 1 : 0));
+      const headU = head.filter((q, i) => i === 0 || head[i - 1].u - q.u > 1e-9);
+      headU[0] = { u: 1, th: thR, z: zSpring }; headU[headU.length - 1] = { u: -1, th: thL, z: top(-1) };
+      // a pointed or round head rises steeply from its springing: split every head chord longer than a cap step
+      // (in u, by halves) so the frame follows the outline there too, not only the uniform u samples
+      for (let i = 0; i < headU.length - 1; i++) {
+        const A = headU[i], B = headU[i + 1];
+        if (Math.hypot(B.z - A.z, aRef * (B.u - A.u)) <= CAP_STEP_MM || A.u - B.u < 1e-6) continue;
+        const u = (A.u + B.u) / 2; headU.splice(i + 1, 0, { u, th: thD + dOfU(u), z: top(u) }); i--;
+      }
+      const fpts = [], parts = [];
+      const fsurf = (th, z) => surf(th, z);            // the frame's points: the cage's own surface
+      const add = (q, part) => { if (fpts.length && len(sub(q, fpts[fpts.length - 1])) <= 1e-9) return; fpts.push(q); parts.push(part); };
+      jz.forEach((z, i) => add(fsurf(thR, z), i === 0 ? 'corner' : 'jamb'));
+      headU.forEach((q, i) => add(fsurf(q.th, q.z), i === 0 || i === headU.length - 1 ? 'corner' : 'head'));
+      for (let i = jz.length - 1; i >= 0; i--) add(fsurf(thL, jz[i]), i === 0 ? 'corner' : 'jamb');
+      // the sill runs left → right under the same lateral stations as the head, the bars' own azimuths at the bars
+      const sillPts = [];
+      for (let i = 1; i < nTop; i++) { const u = -1 + 2 * i / nTop; sillPts.push({ u, th: thD + dOfU(u) }); }
+      for (const [j, u] of barU) if (Math.abs(u) < 1) sillPts.push({ u, th: TAU * j / barCount, bar: true });
+      sillPts.sort((a, b) => a.u - b.u || (b.bar ? 1 : 0) - (a.bar ? 1 : 0));
+      sillPts.filter((q, i) => i === 0 || q.u - sillPts[i - 1].u > 1e-9).forEach((q) => add(fsurf(q.th, z0), 'sill'));
+      const fp = fpts.filter((q, i) => i === fpts.length - 1 ? len(sub(q, fpts[0])) > 1e-9 : true);
+      tube(mesh, fp, rDoor, { closed: true, kind: 'door', name: 'door frame' });
+      wires.push({ kind: 'door', pts: fp, r: rDoor, closed: true, parts: parts.slice(0, fp.length) });
+    }
+  }
+
+  /* the bars */
+  const dz = (z) => { const e = Math.min(0.5, H * 1e-3); return (rho(z + e) - rho(z - e)) / (2 * e); };
+  const overhang = { deg: 90, where: '' };
+  const noteSlope = (v, where) => { const deg = Math.atan2(Math.abs(v[2]), Math.hypot(v[0], v[1])) * 180 / Math.PI; if (deg < overhang.deg) { overhang.deg = deg; overhang.where = where; } };
+  const ribsOverCap = (th, from) => {
+    const out = [];
+    const ns = Math.max(8, Math.ceil(Hc * collar.sC / CAP_STEP_MM));
+    for (let i = from ? 1 : 0; i <= ns; i++) out.push(capPt(th, collar.sC * i / ns));
+    // bury the end in the collar: on past the collar's radius toward the axis
+    const last = out[out.length - 1]; const rr = Math.hypot(last[0], last[1]); const k = rr > 1e-9 ? Math.max(0, rr - collar.rc * 0.55) / rr : 0;
+    out.push([last[0] * k, last[1] * k, last[2]]);
+    return out;
+  };
+  const barsEnd = flat ? 'ring' : p.barsConverge ? 'apex' : 'ring';
+  for (let j = 0; j < barCount; j++) {
+    const th = TAU * j / barCount;
+    const pts = stations.map((z) => surf(th, z));
+    // the bar stands in the base ring and the top ring (the tube is centred on the ring's centreline, so it is buried)
+    const cap = barsEnd === 'apex' ? ribsOverCap(th, true) : [];
+    pts.push(...cap);
+    // the slope census stops before the last point: that segment is the bury into the collar, inside it
+    const slopeTo = barsEnd === 'apex' ? pts.length - 1 : pts.length;
+    for (let i = 1; i < slopeTo; i++) noteSlope(sub(pts[i], pts[i - 1]), barsEnd === 'apex' && pts[i][2] > H ? 'the bars over the top cap' : 'the bars');
+    // a bar of the door (inside it, or one of its jambs) stops on the sill and starts again on the head,
+    // its two cut ends ON the frame's own vertices at that azimuth; every other bar runs whole
+    let runs = [pts];
+    if (door && door.barU.has(j)) {
+      const zt = door.top(door.barU.get(j));
+      const lower = stations.filter((z) => z < door.z0 - 1e-6).map((z) => surf(th, z));
+      if (door.z0 > 1e-9) lower.push(surf(th, door.z0));
+      const upper = [surf(th, zt), ...stations.filter((z) => z > zt + 1e-6).map((z) => surf(th, z)), ...cap];
+      runs = [lower, upper].filter((r) => r.length >= 2);
+    }
+    for (const run of runs) { tube(mesh, run, rBar, { kind: 'bar', name: `bar ${j}` }); wires.push({ kind: 'bar', pts: run, r: rBar }); }
+  }
+  // bars that end at the top ring: the cap takes half their number as ribs (every other azimuth)
+  let ribCount = 0;
+  if (!flat && barsEnd === 'ring') {
+    ribCount = Math.max(N || 3, Math.round(barCount / 2));
+    if (N && ribCount % N) ribCount = Math.round(ribCount / N) * N || N;
+    for (let j = 0; j < ribCount; j++) { const th = TAU * j / ribCount; const pts = ribsOverCap(th, false); for (let i = 1; i < pts.length - 1; i++) noteSlope(sub(pts[i], pts[i - 1]), 'the dome ribs'); tube(mesh, pts, rBar, { kind: 'rib', name: `rib ${j}` }); wires.push({ kind: 'rib', pts, r: rBar }); }
+    told.push(`bars end at the top ring; ${ribCount} ribs carry the ${p.topShape} to the apex`);
+  }
+
+  /* the rings, laid on the heights above; a ring the door crosses is cut at the door's own outline */
+  const ringRec = [];      // every ring built: { z, r, kind, name, cut, sill } — the bands read it
+  const ringLoop = (rg) => {
+    const { z, r: rr, kind, name } = rg;
+    const cr = door ? door.cross.get(rg) : null;
+    ringRec.push({ z, r: rr, kind, name, cut: !!cr, sill: !!door && Math.abs(z - door.z0) < 1e-9 });
     // a polygon ring samples each face too (16 a face, the corners exact), so a door on a face can cut it
     const M = N ? N * 16 : RING_SECTORS;
-    const pts = [];
-    for (let j = 0; j < M; j++) pts.push(surf(TAU * j / M, z));
-    if (door && z > door.z0 && z < door.top(0)) {
-      // the ring crosses the opening: find the arc |s| < s* inside it and drop it, ending in the jambs / top edge
-      let lo = 0, hi = door.a; for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (door.inside(m, z)) lo = m; else hi = m; }
-      const sStar = hi;
-      const insideRing = (q) => { const th = Math.atan2(q[1], q[0]); return Math.abs(door.sOf(th, z)) < sStar; };
-      // rotate the loop so the cut is not at the seam, then cut
-      const seq = []; const start = (() => { let best = 0, bd = -1; pts.forEach((q, i) => { const d = Math.abs(wrapPi(Math.atan2(q[1], q[0]) - thD)); if (d > bd) { bd = d; best = i; } }); return best; })();
-      for (let i = 0; i <= M; i++) seq.push(pts[(start + i) % M]);
-      const runs = cutRuns(seq, insideRing);
-      // the loop's seam is opposite the door, so the first and last runs meet there: one run, not two ends
-      if (runs.length >= 2 && runs[runs.length - 1][runs[runs.length - 1].length - 1] === runs[0][0]) { const last = runs.pop(); runs[0] = [...last.slice(0, -1), ...runs[0]]; }
-      for (const run of runs) { tube(mesh, run, rr, { kind, name }); wires.push({ kind, pts: run, r: rr }); }
+    if (cr) {
+      // the ring outside the opening: from the right cut end round the back to the left one, both ends ON the frame
+      const run = [surf(cr.thA, z)];
+      const samp = [];
+      for (let j = 0; j < M; j++) { const th = TAU * j / M; if (Math.abs(wrapPi(th - door.thD)) > cr.d + 1e-9) samp.push([mod(th - cr.thA, TAU), th]); }
+      samp.sort((a, b) => a[0] - b[0]);
+      for (const [, th] of samp) run.push(surf(th, z));
+      run.push(surf(cr.thB, z));
+      tube(mesh, run, rr, { kind, name }); wires.push({ kind, pts: run, r: rr });
       return;
     }
+    const pts = [];
+    for (let j = 0; j < M; j++) pts.push(surf(TAU * j / M, z));
     tube(mesh, pts, rr, { closed: true, kind, name }); wires.push({ kind, pts, r: rr, closed: true });
   };
-  ringLoop(0, rFrame, 'frame', 'base ring');
-  ringLoop(H, rFrame, 'frame', 'top ring');
-  ringZ.forEach((z, i) => ringLoop(z, rRing, 'ring', `ring ${i + 1}`));
+  ringLoop(ringPlan[0]);
+  ringLoop(ringPlan[ringPlan.length - 1]);
+  ringPlan.slice(1, -1).forEach((rg) => ringLoop(rg));
+  const bandOut = banded(p) ? buildBands() : null;
 
   /* the collar at the apex, or the flat top's spokes and hub */
   const rH = wireR(Math.max(p.barMm, 1.2), 'hanger wire');
@@ -552,6 +682,18 @@ export function buildCage(paramsIn) {
     }
   }
 
+  /* THE TURN: the lattice was laid in its own frame with the door at `thD`; everything built so far
+     (not the hanger, which is drawn square to the front) turns about the axis once, so the door's
+     centre — a face, a bar or a gap — is the front, −y. turn 0 leaves every float alone. */
+  if (turn) {
+    const c = Math.cos(turn), s = Math.sin(turn);
+    const rot = (q) => [q[0] * c - q[1] * s, q[0] * s + q[1] * c, q[2]];
+    const P = mesh.pos; for (let i = 0; i < P.length; i += 3) { const x = P[i], y = P[i + 1]; P[i] = x * c - y * s; P[i + 1] = x * s + y * c; }
+    for (const w of wires) w.pts = w.pts.map(rot);
+    for (const sd of solids) if (sd.cx || sd.cy) { const q = rot([sd.cx || 0, sd.cy || 0, 0]); sd.cx = q[0]; sd.cy = q[1]; }
+    if (bandOut) for (const el of bandOut.elements) { if (el.c) el.c = rot(el.c); if (el.outline) el.outline = el.outline.map(rot); }
+  }
+
   /* the hanger: it stands on the collar's seat (or the flat top's hub) — ruling 1 */
   const hz = apexZ;
   const hs = p.hangerMm;
@@ -575,15 +717,108 @@ export function buildCage(paramsIn) {
     for (let i = 1; i < pts.length; i++) noteSlope(sub(pts[i], pts[i - 1]), 'the hanger ring');
   }
 
+  /* PHASE 2 — THE RING BANDS. Each banded ring carries a running ornament: beads strung on
+     it, or a laurel run of overlapping leaves lying across it. Every element is built by
+     /frame's own code in a flat development (along the ring s, across it t, out of the
+     surface w — the bead in 3D directly) and mapped onto the CONE SEGMENT through the ring:
+     the frustum through the ring's centreline whose slope is the chord of the profile across
+     the band (docs/cage-phase-1.md §5.10 — a bell's sections are not developable; the cylinder
+     and the polygon's faces are exact). On a round section the map is the exact development of
+     that cone (the arc at slant t is θ·r(t)); on a polygon each face is a plane and the along
+     distance x from the face's centre is kept, so it is exact on every face and folds at the
+     corners. THE COUNT SNAPS TO THE BARS: every bar gap holds the same n elements, the first ON
+     the bar (a bead's centre on the bar crossing; a leaf's base), so the motif never runs at a
+     random phase to the bars; told when the built spacing is not the asked one. A ring the door
+     cuts drops every element that would reach into the opening. */
+  function buildBands() {
+    const style = p.bandStyle, out = { style, rings: [], elements: [], sagMax: 0 };
+    const cN = N ? Math.cos(Math.PI / N) : 1, tN = N ? Math.tan(Math.PI / N) : 0;
+    const ra = (z) => rho(z) * cN;                       // the apothem (the radius on a round cage)
+    const want = (rg) => bandWants(p, rg);
+    const snapped = [], raised = [];
+    const barTh = Array.from({ length: barCount }, (_, j) => TAU * j / barCount);
+    for (const rg of ringRec) {
+      if (!want(rg)) continue;
+      const zc = rg.z, rr = rg.r;
+      // the element, floored and held proud of its ring
+      let size, half, loF, hiF;
+      if (style === 'beading') { size = Math.max(p.beadMm, floor, BAND_OVER_RING * 2 * rr); if (size > p.beadMm + 1e-9) raised.push(`${rg.name} ${p.beadMm.toFixed(1)} → ${size.toFixed(2)} mm`); half = size / 2; loF = 0.5; hiF = BEAD_FUSE / 2; }
+      else { const Lmin = Math.max(floor, BAND_OVER_RING * 2 * rr) / LEAF_ASPECT; size = Math.max(p.leafMm, Lmin); if (size > p.leafMm + 1e-9) raised.push(`${rg.name} ${p.leafMm.toFixed(1)} → ${size.toFixed(2)} mm`); half = LEAF_ASPECT * size / 2; loF = LEAF_RUN_PITCH_MIN; hiF = LEAF_RUN_PITCH_MAX; }
+      // the cone segment: the chord slope of the apothem profile across the band, through the ring
+      let er = 0, ez = 1;
+      for (let k = 0; k < 4; k++) { const dzz = Math.max(1e-6, half * ez); const dr = ra(zc + dzz) - ra(zc - dzz); const l = Math.hypot(dr, 2 * dzz); er = dr / l; ez = 2 * dzz / l; }
+      const nr = ez, nz = -er, a0 = ra(zc);
+      let sag = 0; for (let k = -8; k <= 8; k++) { const t = half * k / 8; sag = Math.max(sag, Math.abs((ra(zc + t * ez) - (a0 + t * er)) * ez)); }
+      out.sagMax = Math.max(out.sagMax, sag);
+      const side0 = 2 * a0 * tN, L0 = N ? N * side0 : TAU * a0;
+      const map = (s, t, w) => {
+        const a = a0 + t * er + w * nr, z = zc + t * ez + w * nz;
+        if (!N) { const th = s / a0; return [a * Math.cos(th), a * Math.sin(th), z]; }
+        const ss = ((s % L0) + L0) % L0; let k = Math.floor(ss / side0), x = ss - (k + 0.5) * side0;
+        const hl = (a0 + t * er) * tN;                     // the face's half length at this slant
+        if (x > hl) { k += 1; x -= 2 * hl; } else if (x < -hl) { k -= 1; x += 2 * hl; }
+        const ph = (2 * k + 1) * Math.PI / N, ux = Math.cos(ph), uy = Math.sin(ph);
+        return [a * ux - x * uy, a * uy + x * ux, z];
+      };
+      const sOfTheta = (th) => { th = ((th % TAU) + TAU) % TAU; if (!N) return th * a0; const k = Math.min(N - 1, Math.floor(th / (TAU / N))); return k * side0 + side0 / 2 + a0 * Math.tan(th - (2 * k + 1) * Math.PI / N); };
+      // the snap: n elements in every bar gap, the first on the bar
+      const sb = barTh.map(sOfTheta), gaps = sb.map((v, j) => (j + 1 < sb.length ? sb[j + 1] : sb[0] + L0) - v);
+      const gMax = Math.max(...gaps), gMin = Math.min(...gaps), asked = p.bandSpacing * size;
+      const nMin = Math.ceil(gMax / (hiF * size) - 1e-9), nMax = Math.floor(gMin / (loF * size) + 1e-9);
+      let n = Math.max(1, Math.round((L0 / barCount) / asked));
+      n = nMin > nMax ? Math.max(1, nMin) : Math.min(nMax, Math.max(nMin, n));
+      const pMin = gMin / n / size, pMax = gMax / n / size;
+      if (Math.abs(pMin - p.bandSpacing) > 0.02 || Math.abs(pMax - p.bandSpacing) > 0.02) snapped.push(`${rg.name} ${n} a bar (${(n * barCount)}), spacing ${pMin.toFixed(2)}${pMax - pMin > 0.005 ? '–' + pMax.toFixed(2) : ''}`);
+      if (nMin > nMax) told.push(`${rg.name}: the bars are too uneven for one ${style === 'beading' ? 'bead' : 'leaf'} count to hold every gap inside ${loF}–${hiF} × the ${style === 'beading' ? 'bead' : 'leaf'}; built ${n} a bar`);
+      const rec = { z: zc, r: rr, kind: rg.kind, name: rg.name, n, count: 0, dropped: 0, size, spacing: [pMin, pMax], sag, er, ez };
+      const drop = (pts) => door && (rg.cut || rg.sill) && pts.some((q) => door.inside(door.uOfTheta(Math.atan2(q[1], q[0])), q[2]));
+      const lf = style === 'leaf' ? buildLeaf({ length: size, width: LEAF_ASPECT * size, side: 1, curl: 0, lobes: LEAF_RUN_LOBES, step: size / PATTERN_LEAF_STATIONS, minStations: PATTERN_LEAF_STATIONS }) : null;
+      const prof2 = lf ? leafProfile() : null, depth = lf ? Math.max(floor, LEAF_RELIEF * LEAF_ASPECT * size) : 0;
+      for (let j = 0; j < sb.length; j++) for (let k = 0; k < n; k++) {
+        const s0 = sb[j] + gaps[j] * k / n, pitch = gaps[j] / n;
+        const scr = new Mesh();
+        if (lf) {
+          // the laurel stack: each base lies a crown over the previous leaf's tip (frame's own law)
+          const over = Math.max(1e-9, size - pitch);
+          const lift = lf.u.map((u) => rr + depth * Math.max(0, 1 - u / over));
+          bandSolid(scr, { id: 'leaf', pts: lf.pts, nrm: lf.nrm, bandWidth: LEAF_ASPECT * size, widthScale: lf.w.map((x) => x / (LEAF_ASPECT * size)), baseLift: lift }, prof2, { scale: 1, plateT: 0, reliefDepth: depth });
+        } else sphereSolid(scr, map(s0, 0, 0), size / 2, PATTERN_LAT, PATTERN_LON);
+        const vs = []; for (let i = 0; i < scr.pos.length; i += 3) vs.push(lf ? map(s0 + scr.pos[i], scr.pos[i + 1], scr.pos[i + 2]) : [scr.pos[i], scr.pos[i + 1], scr.pos[i + 2]]);
+        if (drop(vs)) { rec.dropped++; continue; }
+        beginPart(mesh, style === 'beading' ? 'bead' : 'leaf', `${rg.name} ${style} ${rec.count}`);
+        const base = mesh.pos.length / 3;
+        for (const q of vs) mesh.vertex(q[0], q[1], q[2]);
+        for (const i of scr.idx) mesh.idx.push(base + i);
+        endPart(mesh);
+        const el = { kind: style === 'beading' ? 'bead' : 'leaf', ring: out.rings.length, s: s0, onBar: k === 0 ? j : -1 };
+        if (lf) {
+          // the planform for the drawing: the blade's two margins at their crown
+          const top = (u, i, sgn) => map(s0 + lf.pts[i][0], sgn * lf.w[i] / 2, lift0(i));
+          const lift0 = (i) => rr + depth * (0.5 + Math.max(0, 1 - lf.u[i] / Math.max(1e-9, size - pitch)));
+          el.outline = [...lf.u.map((u, i) => top(u, i, 1)), ...lf.u.map((u, i) => top(u, i, -1)).reverse()];
+          el.len = size; el.width = LEAF_ASPECT * size;
+        } else { el.c = map(s0, 0, 0); el.r = size / 2; }
+        out.elements.push(el); rec.count++;
+      }
+      out.rings.push(rec);
+    }
+    if (snapped.length) told.push(`${style === 'beading' ? 'beading' : 'leaf-tip run'} snapped to the bars — ${snapped.join('; ')}`);
+    if (raised.length) told.push(`${style === 'beading' ? 'beads' : 'leaves'} held ${BAND_OVER_RING}× proud of their ring — ${raised.join('; ')}`);
+    if (out.rings.some((r) => r.dropped)) told.push(`the door takes ${out.rings.reduce((a, r) => a + r.dropped, 0)} band elements where it cuts a ring`);
+    if (!out.rings.length) told.push(`no ring matches "${p.bandRings}" — no band built`);
+    return out;
+  }
+
   const lowZ = p.baseStyle === 'tray' ? -Math.max(floor, 1.6) : p.baseStyle === 'skirt' ? -p.skirtMm : p.baseStyle === 'feet' ? -7 : -rFrame;
   const triangles = mesh.idx.length / 3;
   const info = {
-    barCount, ribCount, barsEnd, ringZ, shoulderZ, scallops, rTop, Hc, collar, door: door ? { W: door.W, Dh: door.Dh, z0: door.z0, shape: door.shape } : null,
+    barCount, ribCount, barsEnd, ringZ, shoulderZ, scallops, rTop, Hc, collar, door: door ? { W: door.W, Dh: door.Dh, z0: door.z0, apex: door.apex, shape: door.shape, k: door.k, centre: door.centre, turnDeg: door.turn * 180 / Math.PI } : null, polyPhase: N ? turn : 0, turn,
     heightMm: topZ - lowZ, widthMm: 2 * Math.max(...stations.map((z) => rho(z))) + (p.baseStyle === 'tray' ? 7 : 0),
     triangles, parts: mesh.parts.length, floor, process: 'SLS PA12 (assumed)',
+    bands: bandOut ? { style: bandOut.style, elements: bandOut.elements.length, sagMax: bandOut.sagMax, rings: bandOut.rings.map(({ er, ez, ...r }) => r) } : null,
     overhang: { deg: +overhang.deg.toFixed(1), where: overhang.where, fdmSupport: overhang.deg < FDM_OVERHANG_DEG },
   };
-  return { mesh: { positions: mesh.pos, indices: mesh.idx, parts: mesh.parts }, wires, solids, told, info, params: p };
+  return { mesh: { positions: mesh.pos, indices: mesh.idx, parts: mesh.parts }, wires, solids, bands: bandOut ? bandOut.elements : [], bandRings: bandOut ? bandOut.rings : [], told, info, params: p };
 }
 
 /* ---- STL: frame-relief's writer over this model's own buffers ---- */
@@ -600,6 +835,8 @@ export function exportSvg(model, { margin = 4 } = {}) {
   const see = (x, z) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); };
   for (const w of model.wires) for (const q of w.pts) { see(q[0] - w.r, q[2] - w.r); see(q[0] + w.r, q[2] + w.r); }
   for (const s of model.solids) for (const [r, z] of s.profile) { const cx = s.cx || 0; see(cx - r, z); see(cx + r, z); }
+  const bands = model.bands || [];
+  for (const b of bands) if (b.kind === 'bead') { see(b.c[0] - b.r, b.c[2] - b.r); see(b.c[0] + b.r, b.c[2] + b.r); } else for (const q of b.outline) see(q[0], q[2]);
   const W = x1 - x0 + 2 * margin, Hh = z1 - z0 + 2 * margin;
   const X = (x) => fx(x - x0 + margin), Z = (z) => fx(z1 - z + margin);
   const paths = [];
@@ -608,6 +845,11 @@ export function exportSvg(model, { margin = 4 } = {}) {
   for (const w of wires) {
     const d = w.pts.map((q, i) => `${i ? 'L' : 'M'}${X(q[0])} ${Z(q[2])}`).join(' ') + (w.closed ? ' Z' : '');
     paths.push(`<path class="${w.kind}" d="${d}" stroke-width="${fx(2 * w.r)}"/>`);
+  }
+  // phase 2: the band elements as outlines — a bead's silhouette circle, a leaf's projected planform
+  for (const b of bands) {
+    if (b.kind === 'bead') { const r = fx(b.r); paths.push(`<path class="bead" d="M${X(b.c[0] - b.r)} ${Z(b.c[2])} A${r} ${r} 0 1 0 ${X(b.c[0] + b.r)} ${Z(b.c[2])} A${r} ${r} 0 1 0 ${X(b.c[0] - b.r)} ${Z(b.c[2])} Z" stroke-width="0.25"/>`); }
+    else paths.push(`<path class="leaf" d="${b.outline.map((q, i) => `${i ? 'L' : 'M'}${X(q[0])} ${Z(q[2])}`).join(' ')} Z" stroke-width="0.25"/>`);
   }
   for (const s of model.solids) {
     const cx = s.cx || 0;

@@ -58,14 +58,15 @@ Z up, the base ring at z = 0, the door facing −y (the front elevation looks al
   added and told. The tiered preset's two shoulders (75 and 86 mm) carry rings now; the bell
   and the onion, whose chords turn by 8–20°, get none. A polygon ring samples each
   face 16 times with the corners exact.
-- **Door**: an outline in (arc s, height z) on the surface — rectangle, round arch (radius
-  `min(a, h/2)`), gothic (two arcs of radius W, rise `min(0.6h, 0.866W)`), ogee (pointed, rise
-  `min(0.55h, 1.1a)`); the **frame** is a closed wire on that outline; every bar and ring run
-  through the opening is **cut where it crosses the outline (bisected)**, so each cut end sits
-  on the frame wire's centreline and is buried in it. Width is held to 42 % of the sill
-  circumference and height to 92 % of the body, told. `onSurf` is the exact inverse of the
-  cut's own arc coordinate, so the jambs and the ring ends meet to the bit (the first cut
-  used an approximate inverse and the gate caught the polygon case 2 ends off).
+- **Door** (§9, Nov 9): an outline in (u, z) on the surface, u the lateral fraction of the door at
+  that height — rectangle, round arch (radius `min(a, h/2)`), gothic (two arcs of radius W, rise
+  `min(0.6h, √3·a)`), ogee (pointed, rise `min(0.55h, 1.1a)`), a the half width at the springing.
+  It spans k whole bar gaps and its **jambs are bars**; it is centred at the front on a bar or a gap
+  (a polygon: on a face centre — the lattice turns so it is the front); its **sill sits on a ring** and
+  its head stays a printable gap under the first shoulder ring, banded ring or the top ring. Every bar
+  inside stops on the sill and starts on the head, every ring it crosses ends on the jambs or the head,
+  each cut end a vertex of the frame wire. Width held to 42 % of the circumference (round) or the face,
+  height to 92 % of the body; every snap told.
 - **Base**: plain ring; tray (a revolved dish with a lip, polygon-aware); scalloped skirt (a
   closed wall whose lower edge sags in `scallopCount` scallops — ruling 9: fewer, wider, the
   count a control (2–24, default 8, about one per two or three bars), BUILT as the divisor of
@@ -82,6 +83,8 @@ hanger ring (5°) or the hook (0°), and under 45° it says an FDM print would w
 The dome ribs read 25–60° at the collar; a flat ring is a bridge for FDM and is not counted.
 
 ## 2. Numbers (EXPORT = LIVE; one model, one mode)
+
+**[Nov 9: superseded by §9.4 — the door placement moved every preset's door and the hex lantern to 24 bars.]**
 
 | Preset | overall mm | triangles | STL | bars | door |
 |---|---|---|---|---|---|
@@ -142,7 +145,8 @@ four mutants of `cage.js`.
    dense-body / light-dome look). *Rejected*: a bare dome (the hanger would float).
 4. **A flat top carries 2N spokes and a hub.** *Rejected*: nothing (no hanger seat).
 5. **The door is always on the front (−y) and is cut cleanly; bars end buried in the frame
-   wire.** No infill in Phase 1 by the brief.
+   wire.** No infill in Phase 1 by the brief. **[Nov 9: the door's PLACEMENT is ruled by §9 — its jambs are bars, it is centred on a
+   face or a bar/gap at the front (the lattice turns), its sill sits on a ring.]**
 6. **The ogee's point and the gothic's rise are fractions of the door height** (0.55 / 0.6)
    so the door keeps its jambs. *Undo*: `doorTop`.
 7. **The SVG draws every wire, back and front** (a cage is its wires), each at its own
@@ -247,3 +251,210 @@ leaf-tip run are merged and follow the frame (`frame-pattern.js`, #477), but the
 rose, rosette and bud (`frame-elements.js`, #479) are standalone primitives placed on no frame,
 their rulings still pending (frame charter §16), and the wiring session that reconciles the
 palmette and rosette with the chain motifs has not happened.
+
+## 8. Phase 2, step 1 — ring bands: beading and the leaf-tip run (Nov 9)
+
+Eva's ruling (Nov 9): go ahead with **beading and the leaf-tip run only**; the rosette and palmette
+bands wait until /frame places those elements (frame charter §16). **RULED Nov 9, from the sheet: the
+default stays PLAIN** — `bandStyle` ships `none`, so the default cage is the Phase 1 cage to the byte (B0),
+and C0f pins it (no preset names a band). Both styles ship as offered; the leaf-tip run reading as a rope
+at full size was put to Eva with the sheet and not asked to be reworked.
+
+### 8.1 What is imported, unchanged
+
+Every element is /frame's own code, called as it ships (frame charter §15):
+
+- a **bead** is frame-relief's `sphereSolid` on its own lattice (`PATTERN_LAT` × `PATTERN_LON`);
+- a **leaf** is frame-filigree's `buildLeaf` (one lobe, no curl, sixteen stations — frame-pattern's
+  `LEAF_RUN_LOBES` / `PATTERN_LEAF_STATIONS`) swept by frame-relief's `bandSolid` in frame-filigree's
+  `leafProfile`, its width `LEAF_ASPECT` × its length and its crown `max(floor, LEAF_RELIEF × width)`;
+- the **rules** are frame-pattern's constants: beads fused at ≤ `BEAD_FUSE` (1.8) × r and no closer than r;
+  a laurel run's pitch inside [`LEAF_RUN_PITCH_MIN`, `LEAF_RUN_PITCH_MAX`] = ½–¾ of a leaf, each base
+  stacked a crown over the previous tip (frame's own lift law).
+
+Nothing in frame-*.js moved. **`cage-gate.yml` now names frame-pattern.js and frame-filigree.js** in its
+path filter (the cage imports both), and the geometry job's limit rose 20 → 45 min: the 48 cages and
+23 mutants made the negative control ~25 min, and the first CI run on this branch was cancelled at the
+old limit. **This is an edit to an existing workflow file**, so a frozen tag dispatched after this merges
+from a base that predates it will be refused (CLAUDE.md's rule of thumb). Every registered phase was
+published before this change (through phase95), so none is owed today. The gate's own per-part
+closedness check was also made ~3× faster (vertices keyed by position once, edges packed as numbers),
+which took the local gate from 86 s to 59 s with the same answer.
+
+### 8.2 The mapping — the cone segment, through the ring
+
+Each element is built flat by /frame's code in a development (along the ring `s`, across it `t`, out of
+the surface `w`; a bead directly in 3D) and every vertex is mapped onto the **cone segment through the
+ring**: the frustum through the ring's own centreline whose slope is the chord of the profile across the
+band's height (§5 item 10). On a **round** section the map is the exact development of that cone — the
+arc at slant `t` is `θ · r(t)`, so a leaf laid along the developed parallel lands with every length
+kept; on a cylinder it is the identity. On a **polygon** each face is a plane: the along-distance from
+the face's centre is kept, so the map is exact on every face and folds at the corners.
+
+**A decision made without a ruling:** §5 item 10 named the frustum through the band's two EDGE rings;
+this uses the frustum through the RING with the same slope, i.e. the edge-ring frustum moved outward by
+the profile's sagitta across the band. It puts every bead's centre exactly on its ring and every leaf's
+underside through it; the cost is that the band's edges stand off the true surface by at most that
+sagitta (reported per build: ≤ 0.11 mm on the bell, ≤ 0.39 mm on the tiered cage's step). B9 bounds it.
+
+### 8.3 The snap — one on every bar
+
+Every bar gap holds the same number `n` of elements, the first ON the bar — a bead's centre on the bar's
+crossing with the ring, a leaf's base on it — so the run never sits at a random phase to the bars.
+`n` comes from the asked spacing (× the bead's diameter or the leaf's length) and is then held inside
+the run's own rule over every gap; the built spacing is told whenever it differs from the asked by more
+than 0.02 ("snapped to the bars — ring 2 5 a bar (110), spacing 0.75"). On a polygon the bars sit at
+equal AZIMUTHS, so the gaps along a face are unequal and the spacing is a range; where no single `n`
+keeps every gap inside the rule, the run is built at the fused end and told.
+
+### 8.4 The other rules
+
+- **Proud of the ring** (a decision made without a ruling, `BAND_OVER_RING` 1.25): a bead's diameter
+  and a leaf's width are held at or over 1.25 × the ring's own diameter, told. Under it a bead
+  disappears into its ring.
+- **Fused**: a bead's centre is on the ring's centreline, so the ring passes through every bead; a
+  leaf's column stands from the ring's centreline outward (its crown lifted by the ring's radius), so
+  the ring runs through every leaf; and every bar crossing the ring passes through an element.
+- **The door** drops every element any of whose vertices would lie in the opening.
+- **The SVG** draws a bead as its silhouette circle and a leaf as its projected planform, thin.
+
+### 8.5 Controls (a new top-level section, "Ring bands")
+
+| control | default | range |
+|---|---|---|
+| Band | plain rings | plain / beading / leaf-tip run |
+| On | every ring | every ring / the rings between / base and top / top ring only |
+| Bead diameter | 3.0 mm | 1.5–6 |
+| Leaf length | 8 mm | 3–14 |
+| Spacing | 0.70 × | 0.50–0.90, snapped |
+
+"Each ring is plain or carries a band" is built as the On selector rather than a control per ring (the
+ring count moves with the profile's shoulders, so a per-ring list would change length under the hand).
+The randomizer draws the band fields LAST, so every earlier field of a seed is the sequence it was.
+
+### 8.6 Gates and cost
+
+- `node tools/verify-cage.mjs`: **997 of 997** over 48 cages (the presets, 24 seeds — about half of
+  them banded now — each preset in each band style, the three ring selections, a bead under its ring
+  and both styles at the widest spacing). The B family: B0 inert when off (byte-identical STL and SVG),
+  B1 the rings named, B2 the snap (a bead's centre within the bar's own wire at every crossing — the
+  emitted bar is a polyline, so its crossing carries the polyline's chord error, tenths of a mm on a
+  profile step), B3 fused along the run (Eva's 1.8 r; ½–¾ of a leaf, round cages), B4 fused to its
+  ring, B5 fused to every bar it crosses (a ray-parity point inside both solids), B6 the floor and
+  1.25 × proud (an element's width read as the extent of its (radius, z) cloud — its z extent alone
+  reads short on a sloped band, which is what the first cut measured), B7 clear of the door, B8 the
+  SVG, B9 on the cage's own shape (the profile restated from the control through bloom-curve.js).
+- `--negative-control`: **23 of 23** (ten band mutants). Five claims were widened on measurement,
+  every one true collateral rather than a loosening: a run whose fuse cap or laurel pitch is dropped
+  parts, so bars cross the ring outside every element (B5); beads floated outward sit on a wider circle,
+  so neighbours part (B3); a band kept in the door opening sits where the ring was cut away (B4). And
+  the plain-rings mutant was rewritten — forcing an unknown style through built elements with neither
+  a centre nor an outline and threw in the SVG writer; it now builds real beads, and an SVG throw is
+  C10's red rather than an abort. `--mutant=a,b` runs a named subset.
+- `node tools/verify-cage-page.mjs`: **18 of 18** (P11 / P11b), `--negative-control` **8 of 8**.
+- Cost, the default bell: 64,132 → **264,652** triangles with beading (12.6 MB STL), **359,044** with
+  leaves (17.1 MB); the tiered cage's eight rings 408,536 / 605,960. A bead is 360 triangles, a leaf
+  about 1,152. Build 70–170 ms. Sheet: `node tools/shot-cage-bands.mjs <dir> --png docs/img/cage-bands.png`.
+
+## 9. Door placement (Nov 9) — the door is cut where the lattice is
+
+Eva's report: *"sometimes it's in the corner and weird."* Reproduced first, then fixed by rule.
+
+### 9.1 Step 1 — what was wrong, measured
+
+`node tools/cage-door-diagnose.mjs [--module <cage-geometry.js>]` builds every preset × round / 4 / 6 / 8 ×
+rect / arch / gothic / ogee (96 cells) plus 14 size extremes and reads the EMITTED model. On `d0e2ed0`
+**all 110 cases were flagged**; by class:
+
+| class | cases | what it is |
+|---|---|---|
+| CORNER | 49 | the door was always centred on −y, and on a 4- or 8-gon −y is a CORNER: the opening folded across two faces. **The shipped Pyramid / cone preset did this** — the "in the corner". A 6-gon's −y happens to be a face centre, which is why the hex lantern looked right. |
+| SILL | 110 | the sill sat at `doorY × (H − h)`, on no ring: a stub of every door bar stood between the base ring and the sill (2–15 mm). |
+| SLIVER | 20 | the door's width was a free number of millimetres, so a jamb fell anywhere between two bars; an uncut bar stood within a third of a pitch of a jamb. |
+| JAMB | 7 | the door was a constant ARC width while bars are constant AZIMUTH, so on a taper (cone, a narrow body, a tall door on the bell) a jamb crossed a bar and cut it part-way up. |
+| RING | 21 | a ring passed 0.8–1.5 mm under the head (the cylinder's 55 mm ring, two wires touching), or the door crossed a shoulder ring (tiered) or a banded ring and cut the band. |
+| SURF | 0 | the frame always lay on the surface; the suspected flat plane was ruled out. |
+
+### 9.2 The rules (Step 2)
+
+- **The jambs ARE bars, on every cross-section** (the brief stated it for round cages; Step 1 showed slivers on
+  polygons too, so it is applied everywhere). The door spans k whole bar gaps, k the count whose width at the
+  sill is nearest the asked width; the frame's jambs replace the jamb bars, every bar inside stops ON the
+  sill and starts again ON the head, its cut ends the frame's own vertices — no stubs, no slivers.
+- **Centred on the front**: a round cage centres the door on a bar (k even) or a gap (k odd); a polygon on a
+  FACE centre, never a corner, k up to the bars of that face — k equal to the face's own count makes the
+  corner bars its jambs (the door is the whole face, its clear width the face less the jamb wires). The
+  lattice is laid in its own frame with the door at its centre and **the whole cage turns once** (everything
+  but the hanger, which is drawn square to the front) so that centre is −y. The 4- and 8-gons therefore turn
+  45° / 22.5° and now show a face to the front; that is told.
+- **Vertically**: the sill SITS ON A RING (the ring nearest the asked position that keeps the asked height,
+  else the one holding the tallest door); the head stays one printable gap (`ring + frame + floor`) under the
+  first shoulder ring, banded ring or the top ring above the sill, and clear of every other ring by the same
+  gap; shortened and told. A ring the door crosses is cut AT the jambs below the springing and on the head
+  above it, its ends the frame's own vertices. A banded ring is never crossed; a banded sill gives up the
+  elements that would stand in the opening (told).
+- **The frame follows the surface**: the outline lives in (u, z), u the lateral fraction of the door at that
+  height (of the arc on a round cage, of the flat face on a polygon), so the door narrows with the bars up a
+  taper and every frame vertex is a point of the cage. The head is sampled so no chord exceeds 1 mm (a gothic
+  head rises steeply from its springing; the uniform samples left a 6 mm chord there, 0.09 mm off the surface).
+- **The width is told when it snaps** (`door width 28 mm snapped to 25.7 mm — 2 bar gaps, both jambs on bars`),
+  the sill when it moves, the height when it is shortened. The 42 % circumference cap and the 92 % height cap stand.
+
+**Found and fixed on the way**: the gothic outline used 0.866 for √3/2, so its point stood ~1 µm above the
+declared height — enough to read as "grazing" a ring sitting exactly one gap above it.
+
+### 9.3 Decisions made without a ruling (for Eva's sheet)
+
+1. **The presets ask for what they build**: every preset's door width, height and position were set to the
+   built values so no preset tells a snap (bell 28 → 26 mm and position 0.08 → 0, the registry defaults
+   with it; cylinder 30 → 28; cone 26 → 29; onion 28 × 50 → 27 × 47, its head one gap under the 50 mm ring;
+   tiered 30 → 26 and position 0.10 → 0.15 so its sill stays on its 13 mm ring; hex lantern 28 → 20).
+2. **The hex lantern goes 18 → 24 bars.** At 18 it carries three bars a face, so a face-centred door with its
+   jambs on bars is either one gap (13 mm) or the whole face (43 mm); at 24 it is 20 mm. *Undo*: one field.
+3. **Most doors now stand on the base ring** (position 0): the asked sill of every preset but the tiered one
+   was nearest it. The position control still moves the sill ring by ring.
+4. **A whole-face door on a polygon** (the corner bars as jambs) is allowed where it is the nearest width — the
+   8-gons at 24 bars do it at the default width.
+
+### 9.4 Numbers (EXPORT = LIVE)
+
+| Preset | overall mm | triangles (was) | STL | bars | door |
+|---|---|---|---|---|---|
+| Bell (default) | 97 × 186 | 63,852 (64,132) | 3.0 MiB | 22 | arch 25.7×46, 2 gaps on a bar, sill on the base ring |
+| Cylinder | 90 × 152 | 53,620 (53,420) | 2.6 MiB | 20 | arch 28.3×48, 2 gaps on a bar, sill on the base ring |
+| Pyramid / cone | 107 × 162 | 41,864 (42,244) | 2.0 MiB | 16 (4-gon) | gothic 29.3×50, 2 gaps on a face, sill on the base ring |
+| Onion | 96 × 175 | 66,460 (66,420) | 3.2 MiB | 24 | ogee 27.1×47, 3 gaps on a gap, sill on the base ring |
+| Tiered dome on drum | 100 × 189 | 73,856 (73,736) | 3.5 MiB | 24 | rect 26.2×40, 2 gaps on a bar, sill on the 13.3 mm ring |
+| Hex lantern | 86 × 179 | 63,180 (51,500) | 3.0 MiB | 24 (6-gon) | rect 20.0×52, 2 gaps on a face, sill on the base ring |
+
+The hex lantern's +11,680 is its six extra bars; the rest move by the door's bar stubs going away and the
+frame's finer head. Every STL is watertight and one piece (C1–C3).
+
+### 9.5 Gates
+
+`node tools/verify-cage.mjs` gains the **D family**, judged on the emitted frame, bars and rings — on every full
+case with a door and, alone, over the whole 96-cell door matrix:
+**D1** the door is at the front and, on a polygon, centred on a face with no corner of the emitted base ring
+inside it (on a round cage, on a bar or the middle of a gap); **D2** its extreme azimuths are bars, every bar
+end on the frame is a frame vertex — the lowest or highest at that bar's azimuth — and no bar of the door has
+a sample between sill and head; **D3** the sill is on an emitted ring, the head is one printable gap under every
+shoulder ring (restated from the control's chords), banded ring (restated from the control's selection) and the
+top ring, and no ring grazes the sill or the apex; **D4** every frame vertex lies on the surface restated from
+the control (the polygon's corners read off the emitted base ring) and every frame chord within 0.05 mm;
+**D5** every snap is told. Eight full door cells (each section, each shape twice) and three extremes join the
+cases. **C6 now reads the corners off the emitted base ring** (the lattice turns), and the bands' door test
+counts the ring the sill sits on. `--negative-control` gains six mutants — the door on a polygon corner, the
+jambs between bars, the door through a shoulder ring, through a banded ring, a sill floating 3 mm above its
+ring, the frame on a flat plane — and three were re-anchored. Their collateral was measured, not assumed: a door through a shoulder
+also chords its jamb across the step, off the surface (D4); a floating sill or a door that keeps its band
+leaves band elements standing in the opening over a banded sill, where the door has taken the bars from under
+them, and one comes loose (C3, seed 18); a flat frame leaves the bars' cut ends behind on the surface (C5, C5c)
+and changes its own measured width (D5). Two older mutants now redden door clauses too, both true: with no bar on a corner the
+face-centred door has no jamb bars (D), and with no ring at a profile step the tall tiered door runs through it
+(D3, D4). **29 of 29 behave** (a full run of 30 min locally, then the three widened claims re-run); the gate
+reads 1,476 of 1,476 over 59 cages. The geometry job's control now costs ~30 min against its 45-min limit —
+reported, the workflow file left alone (editing it costs frozen tags dispatched afterwards).
+
+The diagnostic is `node tools/cage-door-diagnose.mjs`; the ruling sheet is
+`node tools/shot-cage-door.mjs <dir> --base <worktree of d0e2ed0> --png docs/img/cage-door.png` (the
+front half of every flagged case, before beside after, defects marked; and the default cage from both pages).

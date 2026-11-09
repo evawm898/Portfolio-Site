@@ -33,6 +33,34 @@ function haloFor(fg) {
 // Below this contrast against the card, a mark gets its halo.
 export const HALO_BELOW = 3;
 
+// The rainbow numeral's colours: every OTHER suit's primary, in hue order from
+// red, leaving out the near-greys (white has no hue to place). So the rainbow
+// is made of the deck's own colours and follows them when a suit is recoloured.
+// Fewer than two hued suits: a fixed spectrum.
+export const NUMERAL_FALLBACK = ['#E5484D', '#F2C230', '#3DBA6B', '#3E8EF0', '#8E5CF0'];
+function hueSat(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  const sat = mx === 0 ? 0 : d / mx;
+  let h = 0;
+  if (d) h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { hue: h * 60, sat };
+}
+export function numeralColours(design) {
+  const cols = design.suits.filter((x) => !x.multicolor).map((x) => ({ c: x.primary, ...hueSat(x.primary) }))
+    .filter((x) => x.sat >= 0.25)
+    .sort((a, b) => ((a.hue + 30) % 360) - ((b.hue + 30) % 360))
+    .map((x) => x.c);
+  return cols.length >= 2 ? cols : NUMERAL_FALLBACK;
+}
+// A vertical gradient in a mark's own box (userSpaceOnUse, so a "1" with
+// almost no width still gets it), red band at the top: the numeral's 60 x 100
+// box over y0..y1, and the symbol's 100 x 100 box.
+function indexGradient(id, cols, y0, y1) {
+  return `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="0" y1="${f(y0)}" x2="0" y2="${f(y1)}">`
+    + cols.map((c, i) => `<stop offset="${f(i / (cols.length - 1))}" stop-color="${c}"/>`).join('') + '</linearGradient>';
+}
+
 // ---- primitives ----
 function digit(rank, x, y, h, fill, halo, weight = 11) {
   const s = h / DIGIT_BOX.h, d = DIGITS[rank];
@@ -58,15 +86,24 @@ function glyph(def, x, y, size, color, weight = 7) {
 
 // The corner index: the numeral with the suit symbol beneath, drawn with its
 // top-left at (0, 0). Returns { svg, w, h }.
-function cornerIndex(rank, suit, faceBg, digitH, plate = false) {
+// `numeral` = { fill, symFill, cols } paints the numeral and the symbol with a
+// gradient each (url(#…)); their halo is decided by the colour that stands off
+// the card worst.
+function cornerIndex(rank, suit, faceBg, digitH, plate = false, numeral = null) {
   const halo = contrast(suit.primary, faceBg) < HALO_BELOW ? haloFor(suit.primary) : null;
+  let numFill = suit.primary, symFill = suit.primary, numHalo = halo;
+  if (numeral) {
+    const worst = numeral.cols.reduce((a, c) => (contrast(c, faceBg) < contrast(a, faceBg) ? c : a));
+    numFill = numeral.fill; symFill = numeral.symFill;
+    numHalo = contrast(worst, faceBg) < HALO_BELOW ? haloFor(worst) : null;
+  }
   const dw = digitH * (DIGIT_BOX.w / DIGIT_BOX.h);
   const sym = digitH * 0.62;
   const w = Math.max(dw, sym);
   const h = digitH * 1.08 + sym, p = digitH * 0.16;
   const back = plate ? `<rect x="${f(-p)}" y="${f(-p)}" width="${f(w + 2 * p)}" height="${f(h + 2 * p)}" rx="${f(p)}" fill="${faceBg}" fill-opacity="0.85"/>` : '';
-  const svg = back + digit(rank, (w - dw) / 2, 0, digitH, suit.primary, halo)
-    + symbol(suit.symbol, (w - sym) / 2, digitH * 1.08, sym, suit.primary, halo);
+  const svg = back + digit(rank, (w - dw) / 2, 0, digitH, numFill, numHalo)
+    + symbol(suit.symbol, (w - sym) / 2, digitH * 1.08, sym, symFill, numHalo);
   return { svg, w, h };
 }
 
@@ -115,8 +152,16 @@ export const INDEX_DIGIT = { large: 0.13, small: 0.095 };   // numeral height, f
 function indexArt(design, suit, rank, g, idPrefix, plate) {
   const s = g.safeRect;
   if (design.index !== 'band') {
-    const idx = cornerIndex(rank, suit, design.face.bg, g.h * (INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate);
-    return { svg: `<g class="hb-index">${placeCorners(idx, s, g, design.corners)}</g>`, defs: '', area: s, corner: { w: idx.w, h: idx.h } };
+    // A rainbow index (numeral and symbol) is a corner-index option: on a band
+    // the band itself is the rainbow and the index is drawn in ink on it.
+    let numeral = null, defs = '';
+    if (suit.multicolor && suit.numeral === 'rainbow') {
+      const cols = numeralColours(design), id = `${idPrefix}num`, sid = `${idPrefix}sym`;
+      defs = indexGradient(id, cols, DIGIT_BOX.h * 0.08, DIGIT_BOX.h * 0.92) + indexGradient(sid, cols, 2, 98);
+      numeral = { fill: `url(#${id})`, symFill: `url(#${sid})`, cols };
+    }
+    const idx = cornerIndex(rank, suit, design.face.bg, g.h * (INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral);
+    return { svg: `<g class="hb-index">${placeCorners(idx, s, g, design.corners)}</g>`, defs, area: s, corner: { w: idx.w, h: idx.h } };
   }
   const bandH = g.bleed + g.safe + g.h * 0.13;
   const dH = g.h * 0.105;
