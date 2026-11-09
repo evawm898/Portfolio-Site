@@ -41,7 +41,7 @@ const { DEFAULTS } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.
 const args = process.argv.slice(2);
 const arg = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const RUN = !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-const SECTIONS = RUN ? arg('--section', 'crest,print,budget,rods').split(',') : [];
+const SECTIONS = RUN ? arg('--section', 'crest,print,budget,rods,centre').split(',') : [];
 const OUT = arg('--out', path.join(ROOT, 'docs/data/bloom-texture-ribs.json'));
 const data = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, 'utf8')) : {};
 const save = () => { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, JSON.stringify(data, null, 1)); };
@@ -225,6 +225,24 @@ if (SECTIONS.includes('budget')) {
     const at = rows.findIndex((x) => x.key === key && x.law === law); if (at >= 0) rows[at] = row; else rows.push(row);
     console.log(`budget ${key} ${law}: ${JSON.stringify(row)}`);
     data.budget = rows; save();
+  }
+}
+
+/* ----------------------------------------------------------- CENTRE --- */
+/* the three centre treatments x A / B (Eva, Nov 9), the default bloom, crest
+   lines: triangles, the derived radius and what it came from, the census and
+   the closure, at H 1.0 and 2.5 */
+if (SECTIONS.includes('centre')) {
+  const { census } = await import(pathToFileURL(path.join(ROOT, 'tools/bloom-self-intersection.mjs')).href);
+  const out = data.centre || [];
+  for (const law of ['A', 'B']) for (const c of R.RIB_CENTRES) for (const H of [1.0, 2.5]) {
+    if (args.includes('--resume') && out.find((x) => x.law === law && x.centre === c && x.H === H)) continue;
+    const r = await build({}, { ribLaw: law, ribCentre: c, textureHeight: H }, { mode: 'crest' });
+    const cs = census(new Float64Array(r.acc.positions));
+    const row = { law, centre: c, H, tris: r.acc.triangleCount, ms: Math.round(r.ms), centreRec: r.stats.centre, schedule: r.stats.schedule, withinPairs: cs.within, worstSpanMm: r3(cs.worstSpanMm), crossPairs: cs.cross, flips: r.stats.flips, withdrawn: r.stats.withdrawn, ...closure(r.acc.positions) };
+    const at = out.findIndex((x) => x.law === law && x.centre === c && x.H === H); if (at >= 0) out[at] = row; else out.push(row);
+    console.log(`centre ${law} ${c} H ${H}: ${row.tris} tris, ${row.withinPairs} within-shell pairs, ${row.shells} shells, open ${row.open}, doubled ${row.doubled}, degen ${row.degen}, flips ${row.flips}; R ${row.centreRec ? row.centreRec.R.toFixed(3) + ' (' + row.centreRec.from + ')' : '-'}`);
+    data.centre = out; save();
   }
 }
 

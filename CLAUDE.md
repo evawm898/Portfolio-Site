@@ -1798,9 +1798,21 @@ DETAIL WHERE IT SHOWS, AND ONE PROVISIONAL 2.0 M EXPORT CAP** (Nov 2, Eva's ruli
   `node tools/shot-bloom-texture-bone-v2-shipped.mjs docs/img/bloom-texture-bone-v2-shipped.png`,
   `node tools/bloom-preform-ladder.mjs <dir>` (only the cap varies; the STLs are committed NOWHERE).
 
-**RIBS (RADIAL SPOKE RIBBING) IS A PROTOTYPE AND A SHEET, NOT SHIPPED — A AGAINST B WAITS ON EVA'S SPACING
-RULING** (Nov 9 — read `docs/bloom-surface-texture-ribs.md` before touching `bloom-texture-ribs.js` or starting the
-shipping session). No shipped bloom file moved.
+**RIBS (RADIAL SPOKE RIBBING) IS A PROTOTYPE AND TWO SHEETS, NOT SHIPPED — LAW A IS THE DEFAULT, B AN ALTERNATIVE,
+THE STEM AND RODS ARE EXCLUDED BY NAME, AND THE CENTRE WAITS ON EVA** (Nov 9 — read `docs/bloom-surface-texture-ribs.md`,
+§10 first, before touching `bloom-texture-ribs.js` or starting the shipping session). No shipped bloom file moved.
+- **RULED Nov 9 (on #541):** A is the default and B a "spacing" choice under RIBS; ribs on petals, sepals, leaves and
+  the hub TOP; **the stem and every rod (stamens, style, braid, pedicels, petioles, stalks) are EVA'S NAMED EXCLUSION**
+  (`RIB_EXCLUDED_ORGANS` + the rod flag, and the hub's underside by its normal — a list, NOT the derived visibility or
+  curvature rules; R7 holds it against the unraised twin); undersides of petals and sepals both faces. So the stem
+  flutes and A's stem fade below are MOOT. §8's other questions stay open for the shipping prompt.
+- **THE CENTRE (`ribCentre`), three treatments for Eva's ruling** (`docs/img/bloom-texture-ribs-centre.png`): COLLAR
+  (a soft ring, half-width 1.6 mm, smooth disc inside), STARBURST (A-THIN / B's own branching), CONCENTRIC (sharp
+  rings every 1.6 mm inside, cut as constraint circles). The ring radius is DERIVED, never typed:
+  `R = max(r0, the petal feet's inner edge)` — A 12.73 mm (its floor radius, OUTSIDE the 8.8 mm hub: the ring lands on
+  the petal bases and the hub top is all smooth or all concentric), B 5.32 mm (the feet's edge; at H 2.5 the hub top
+  inside it is entirely in T5's coverage fade, so B's collar comes out ~0.15 mm tall). All six: 0 within-shell pairs,
+  0 open edges, 9 shells, 185,564-190,080 tris.
 - **The third choice** (NONE / BONE / RIBS): one world field about the bloom axis, `F(x, y)` only; sharp crests
   (`g = (1 - u)^2`, a kink at the crest); outward along each vertex's normal through the SHIPPED BONE relief pass (a
   patched copy, five anchored edits: the field replaces `f`, the patch mask is 1 — everywhere visible — and no BONE v2
@@ -1823,10 +1835,12 @@ shipping session). No shipped bloom file moved.
 - Budget with crest lines: the mophead 94.7% (A) / 98.0% (B) of the cap; crest+flank is over it. Chromium: the crest
   build 1.5-2.0 s on the default, 46-47 s on the mophead; 12 of 12 builds agree with Node to the bit. The shipped
   curvature rule (1 /mm) smooths every stamen, the style, the braid, the bead and the nib (questions 6 and 8).
-- Gate `node tools/verify-bloom-ribs.mjs` (R0-R6, `--negative-control` seven witnessed mutants, `--browser`); not in CI.
+- Gate `node tools/verify-bloom-ribs.mjs` (R0-R7 over eight rows, `--negative-control` ten witnessed mutants,
+  `--browser`); not in CI. R1 restates the centre radius from the LATTICE build's petal points.
   The junction rule is unreachable on every default row, so R4 carries a written-down two-part fixture. Measure:
   `tools/bloom-texture-ribs-measure.mjs`, `tools/bloom-texture-ribs-browser.mjs`. Sheet:
-  `node tools/shot-bloom-texture-ribs.mjs docs/img/bloom-texture-ribs.png`.
+  `node tools/shot-bloom-texture-ribs.mjs docs/img/bloom-texture-ribs.png` (the record before the rulings: its stem rows
+  are fluted) and `node tools/shot-bloom-texture-ribs-centre.mjs docs/img/bloom-texture-ribs-centre.png`.
 
 **PRINT PREVIEW IS ALWAYS ON, AND A HELD SLIDER DROPS ONLY THE INFILL CELLS** (Eva's
 rulings, F7 — read `docs/bloom-print-preview-always-on.md` before touching `dragLight`,
