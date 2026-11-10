@@ -97,6 +97,18 @@ function run(EL, label) {
   rec('EL3 cost: every element under its declared triangle bound', el3.length === 0, el3.join('; ') || report.join(' | '));
   rec('EL4 smooth: neighbouring top facets turn under the element\'s declared cap (the shell sharper by design)', el4.length === 0, el4.join('; '));
   rec('EL5 the record is the mesh\'s (triangles, height)', el5.length === 0, el5.join('; '));
+  // EL6 THE CREST'S SOFT SHELL (Eva's third round: "rounded lobes, no
+  // points"): read off the built mesh — the rim's radius from the hinge in
+  // 0.5° bins over the fan, its lobes counted as the profile's local maxima
+  // (restated: at most 8 across the fan — 7 ribs, a lobe at either end —
+  // never the module's SHELL_SOFT) and its notches no deeper than a tenth of
+  // the radius (restated); the plain shell's lobes counted beside it, the
+  // control that the reading can tell the two apart
+  {
+    const lobes = (m) => { const P = m.positions, D = Math.PI / 90, bins = new Map(); for (let i = 0; i < P.length; i += 3) { if (P[i + 2] === 0) continue; const th = Math.atan2(P[i], P[i + 1]); if (Math.abs(th) > 1.2) continue; const b = Math.round(th / D); bins.set(b, Math.max(bins.get(b) ?? 0, Math.hypot(P[i], P[i + 1]))); } const ks = [...bins.keys()].sort((x, y) => x - y), r = ks.map((k) => bins.get(k)), R = Math.max(...r); let n = 0; for (let i = 0; i < r.length; i++) { const w = r.slice(Math.max(0, i - 3), i + 4); if (r[i] === Math.max(...w) && r[i] - Math.min(...w) > 0.01 * R) n++; } return { n, depth: 1 - Math.min(...r) / R }; };
+    const soft = lobes(EL.buildElement('shell', { size: 24, soft: true })), plain = lobes(EL.buildElement('shell', { size: 24 }));
+    rec('EL6 the crest\'s soft shell has at most 8 broad lobes, its notches under a tenth of the radius, fewer than the plain shell\'s (counted beside it)', soft.n <= 8 && soft.depth <= 0.1 && plain.n > soft.n, `soft ${soft.n} lobes, notch ${(100 * soft.depth).toFixed(1)}% of R · plain ${plain.n} lobes, notch ${(100 * plain.depth).toFixed(1)}% of R`);
+  }
   const failed = out.filter((o) => !o.ok);
   console.log(`${label}: ${out.length - failed.length} of ${out.length} checks passed${failed.length ? ' — FAILED: ' + failed.map((f) => f.name).join('; ') : ''}`);
   return out;
@@ -108,6 +120,7 @@ const MUTANTS = [
   { id: 'the-crown-is-under-the-floor', from: "const bluntHalf = (W, n = 2.6, b = 0.35) => (u) => Math.max(F / 2,", to: "const bluntHalf = (W, n = 2.6, b = 0.35) => (u) => Math.max(0.1,", breaks: ['EL2'], note: 'blunt petals narrow to a hair at their ends: under the feature across' },
   { id: 'the-rose-lattice-doubles', from: "nu: 22, nv: 16 });\n    patchSolid(mesh, g, `rose-${k}`);", to: "nu: 44, nv: 32 });\n    patchSolid(mesh, g, `rose-${k}`);", breaks: ['EL3'], note: 'four times the rose\'s triangles' },
   { id: 'the-petals-are-faceted', from: "crown: (u, v) => kL * crown * (0.25 + 0.75 * Math.pow(u, 1.3)) * (0.55 + 0.45 * Math.pow(Math.abs(v), 1.8))", to: "crown: (u, v) => kL * crown * (0.25 + 0.75 * Math.pow(u, 1.3)) * (0.55 + 0.45 * Math.pow(Math.abs(v), 1.8)) + (Math.floor(u * 6) % 2) * crown", breaks: ['EL4'], note: 'the rose\'s petals stepped along their length: facets' },
+  { id: 'the-crest-shell-is-sharp-again', from: 'export const SHELL_SOFT = { ribs: 7, scallop: 0.09,', to: 'export const SHELL_SOFT = { ribs: 11, scallop: 0.14,', breaks: ['EL6'], note: 'the soft shell given the plain one\'s 11 ribs and 14 % notches' },
   { id: 'the-record-lies', from: "info: { ...info, triangles: indices.length / 3, heightMm: z1 } };", to: "info: { ...info, triangles: indices.length / 3 - 2, heightMm: z1 } };", breaks: ['EL5'], note: 'the record under-reports the mesh' },
 ];
 

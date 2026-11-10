@@ -255,6 +255,20 @@ export function sphereSolid(mesh, c, r, lat, lon) {
   mesh.parts.push({ id: 'bead', kind: 'bead', base, c: [c[0], c[1], c[2]], r, lat, lon, t0, t1: mesh.idx.length / 3 });
 }
 
+/* A placed element (frame-elements.js) appended part by part: its patch
+   columns and beads, each part re-oriented by its own signed volume (a
+   mirrored element's winding is reversed by that pass, never by hand). */
+export function appendElement(mesh, el, plateT, id) {
+  const base = mesh.pos.length / 3, P = el.positions;
+  for (let k = 0; k < P.length; k += 3) mesh.vertex(P[k], P[k + 1], P[k + 2] === 0 ? 0 : P[k + 2] + plateT);
+  for (const pt of el.parts) {
+    const t0 = mesh.idx.length / 3;
+    for (let t = pt.t0; t < pt.t1; t++) mesh.tri(base + el.indices[3 * t], base + el.indices[3 * t + 1], base + el.indices[3 * t + 2]);
+    orientOutward(mesh, t0);
+    mesh.parts.push({ id: `${id}-${pt.id}`, kind: 'element', element: id, elKind: el.kind, part: pt.kind, base: base + pt.base, nu: pt.nu, nv: pt.nv, c: pt.c, r: pt.r, t0, t1: mesh.idx.length / 3, T: pt.nv ? (i, j) => base + pt.base + i * pt.nv + j : null });
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* The relief                                                          */
 /* ------------------------------------------------------------------ */
@@ -298,6 +312,11 @@ export function buildRelief(model) {
     for (const o of model.ornament.solids) bandSolid(mesh, o.spine, o.prof, { scale: 1, plateT: plateT + (o.lift || 0), reliefDepth: o.depth });
     const crown = Math.min(...model.ornament.solids.map((o) => o.depth * (o.spine.depthScale ? Math.min(...o.spine.depthScale) : 1)));
     if (model.ornament.solids.length && crown < MIN_FEATURE_MM) underFloor.push(`ornament crown ${crown.toFixed(2)} mm high`);
+    // the PLACED ELEMENTS (phase 3e step 3: the junction motifs and the vine's
+    // shells, roses, rosettes and buds), each already placed in print mm by
+    // frame-elements' placeElement: a vertex on the base stays on the back,
+    // every other is raised by the plate (its lift was the molding's)
+    (model.ornament.elements || []).forEach((el, i) => appendElement(mesh, el, plateT, `el${i}`));
   }
   // THE BAND PATTERN (phase 3e): beads and leaf tips laid along the bands'
   // edges in print mm, built in frame-pattern.js, each standing on the

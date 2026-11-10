@@ -1,9 +1,12 @@
 # /frame gate: node tools/verify-frame.mjs — part one (Node) then part two
 # (Chromium) — and the relief gate, in the `verify` job; the two negative
 # controls (every mutant must redden exactly what it names) in jobs of their
-# own, the relief one split into twelve shards by mutant index (four until
+# own — the relief one, on a PR, only for the modules the PR touches (Eva's
+# ruling A; the full sweep on main and nightly) — split into sixteen shards
+# by mutant index (four until
 # phase 3d took the table from 27 to 35 mutants and each one's run ~2.4x —
-# the chains' rows and OR9 — so a shard holds at most three). One job used
+# the chains' rows and OR9; twelve until phase 3e took it to 47 and each run
+# ~1.25x again with the vine rows — so a shard holds at most three). One job used
 # to run all of it and hit its 45-minute limit on runner variance (#459,
 # twice, in the last step). The mutant jobs are Node only: no npm install,
 # no browser. Path-scoped to the frame's own files: the frame gate reads nothing
@@ -25,9 +28,11 @@ on:
       - frame-filigree.js
       - frame-pattern.js
       - frame-elements.js
+      - frame-vine.js
       - tools/verify-frame.mjs
       - tools/verify-frame-elements.mjs
       - tools/shot-frame-elements.mjs
+      - tools/shot-frame-vine.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
@@ -50,9 +55,11 @@ on:
       - frame-filigree.js
       - frame-pattern.js
       - frame-elements.js
+      - frame-vine.js
       - tools/verify-frame.mjs
       - tools/verify-frame-elements.mjs
       - tools/shot-frame-elements.mjs
+      - tools/shot-frame-vine.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
@@ -61,6 +68,10 @@ on:
       - tools/frame-fold-boundary.mjs
       - docs/frame-charter.md
   workflow_dispatch: {}
+  # the FULL relief mutant sweep, nightly (Eva's ruling A, phase 3e step 3);
+  # a PR runs only the mutants of the modules it touches (relief-mutants)
+  schedule:
+    - cron: '17 3 * * *'
 
 # A run on a superseded commit is not evidence about the head. Keyed to the
 # workflow AND the ref, so it can never cancel across PRs.
@@ -107,23 +118,40 @@ jobs:
       - name: Frame gate (part one Node, part two Chromium)
         run: node tools/verify-frame.mjs
 
-  # The relief negative control, sharded by mutant INDEX (k mod 12): every
+  # The relief negative control, sharded by mutant INDEX (k mod 26): every
   # mutant is in exactly one shard by construction. Changing the shard count
-  # is two edits: this matrix list and the n in --shard=k/n.
+  # is two edits: this matrix list and the n in --shard=k/n. 26 since the
+  # chains were capped (fourth round of 3e step 3): a mutant now runs up to
+  # ~21 min and three to a shard overran the 40-minute timeout, so at most
+  # two a shard (52 mutants on main, fewer on a PR) and 60 minutes.
+  # Eva's ruling A (phase 3e step 3): on a PULL REQUEST only the mutants whose
+  # source module the PR's diff touches (--files, from the diff against its
+  # base), so a PR that moves no frame module runs none; on a push to main,
+  # nightly (schedule) and by hand, the FULL sweep. Every anchor is checked
+  # over all mutants either way.
   relief-mutants:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Relief negative control (shard ${{ matrix.shard }} of 12)
-        run: node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/12
+      - name: Relief negative control (shard ${{ matrix.shard }} of 26; a PR runs its touched modules' mutants, main and nightly all)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" | tr '\n' ',')
+            echo "the PR touches: $FILES"
+            node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/26 --files="$FILES"
+          else
+            node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/26
+          fi
 
   frame-mutants:
     runs-on: ubuntu-latest

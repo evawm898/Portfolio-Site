@@ -12542,6 +12542,41 @@ carved), and Bottom centre hides on an arch (no bottom run). OR7/OR8 count the g
 wires rather than asserting them; OR9 excludes the ornament solids, which are bands too, by name. Eight
 mutants; relief negative control in more CI shards. Sheet: `node tools/shot-frame-chains.mjs <dir> --refs <dir>` (refs not in the repo). Still a row
 of separate elements where refs 2/3 are one vine — 2C is Eva's call.
+**Phase 3e step 3 (Nov 9): THE VINE — STOPPED FOR A SHEET, NOT MERGED** (charter §17; read `frame-vine.js`'s header and
+the placement block at the end of `frame-elements.js` before touching `placeElement`, `placeMotif`, `vineFor`,
+`weightAt` or the PL / VN families). The chains' junction motifs are #479's elements now (one primitive each),
+placed by one law: a rigid motion plus a lift, base vertices on z = 0, PROUD (palmette, shell, rose, bud) or SUNK
+(rosette), pushed out of the opening, an axis element its own mirror to the bit. A weight w(s) per run, from
+the anchors' CLASSES (crest 1, junction 0.75, bottom 0.7, terminal 0.3), falling off over 0.55 L, floored at
+0.15; `ornHierarchy` blends it to ½ and **0 runs phase 3d's chains by branch — NOT byte-identical to `main`,
+because step 1 replaced their motifs** (the scrolls are; ruling (a) of §17.7). One stem per run meandering
+across the band, seated by `seatEmitted` alone (lift 0), items at its extrema by weight class (cluster, leaf,
+bud, sprig; a sunk rosette at medium zero crossings), each JOINING its stem by the embed. Sides on by default.
+Measured traps: the axis stop must read the stem's own y (the arch's apex is a mitre); an inward-turning run
+loops the mapped stem (`untangle` cuts and rounds it); `joinsCleanly` passes a wire that never touches;
+`node --check` does NOT catch an illegal `continue` — import the module. Six mutants; relief shards 12 → 16, then 26 at 60 min (fourth round: three capped-chain mutants overran 40).
+Sheet: `node tools/shot-frame-vine.mjs <dir> [--refs <dir>] [--only <regex>]`.
+**SECOND ROUND (Eva's rulings on the first sheet, charter §17.8): THE BAND IS THE CAP.** Nothing stands past the
+band's outer edge (the frame's own `plateOutline`) but the CREST, which is DRAPED on an edge frame (arc length
+along the edge × offset along its averaged normal) — at most `CREST.rise` 0.45 M past the edge, reaching
+`CREST.span` along it, lifted per vertex and falling off at 45° — the SHELL on every top, the arch's
+pointed apex included (Eva, third round: "shell works, spray doesn't" — the spray element and the *Crest
+form* control are gone, §17.9; on the arch it spreads along the apex's two slopes, `CREST.slopes` span/stretch 1.8, to 24 mm against 26 / 24 — ruled (b), Nov 10, CB3). **FOURTH ROUND (§17.10, Eva's B–E):** the
+crest is the SOFT shell (`SHELL_SOFT`, 7 broad round lobes; EL6 counts them off the mesh) and its lift's cone
+crease is rounded (`CREST.round`); corners and springings carry a ROSETTE; every stem's two ends round off to
+the floor (`roundEnds`, VN6 — the flat collar was the swept wire's square end); and THE CHAINS ARE CAPPED TOO —
+elements made smaller (15 % a step, 32–38 % of the lead at the defaults) until each stands between the opening
+and the edge, their top-axis motif the vine's `drapedCrest` (one owner) built first and cleared; CB1 reads chain
+rows. The arch's width: a deeper root reaches the opening and NARROWS the shell (measured), so it spreads along the
+apex's slopes instead (ruled (b)). **The band joints' coplanar seam at the springing is an OPEN STL DEFECT beside the
+page/Node mismatch (§17.6), ruled (c): both are fixed together, in their own session, before anything prints.** The
+leafy runs (chains, the vine's stems and leaves) were not ruled right on the third sheet and are the next session's rework. Every other motif is placed by `placeMotif(…, { beyond, reach })` and made
+smaller until it fits the band and joins its stems; the stems' run-on past a corner is cut back inside the edge.
+Hierarchy 0 is the chains' layout (they still stand past the frame, as 3d built them — capping them is a
+lettered option). Gates CB1 / CB2, four mutants. **Ruling 5 (A): a PR runs only the relief mutants whose module
+its diff touches (`--files`), the full sweep runs on a push to `main` and nightly.** The page/Node relief mismatch
+(§17.6) is an OPEN DEFECT for its own session (ruling 6). A placed element's mirror no longer inherits its
+source's cached box (a stale box read an approach on the left as far).
 **Phase 4 (Oct 23): TEXTURE WAS BUILT, RENDERED AND NOT SHIPPED** (charter §12) — stone grain,
 weathering, cracks and hammered metal as real displacement of the molding along its TRUE normal (smoothed or
 wall-held directions fold, measured). Eva picked **none** from `docs/img/frame-texture-vocabulary.png`, so the

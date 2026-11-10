@@ -989,7 +989,7 @@ by 1.375 mm on the eared rectangle. The standing mutant is `the-mapped-tangent-w
 **Fewer turns cannot undo a fold the PATH makes.** An S laid across an ear's corner, sharper than the
 element itself, folded onto itself: stations 0.13 mm apart after turning 3.46 rad. The coil re-check
 saw it and could only reduce turns, so the element was built anyway. An element whose coils still
-close at its final seat gives way now, told (`a-folded-element-is-built`).
+close at its final seat gives way now, told (`a-folded-element-is-built`). **[Fourth round of 3e step 3: that mutant is RETIRED — with the chains capped to the band an element is a third of its lead and folds nowhere: 0 over the gate's rows and 18 eared / notched states, measured (§17.10). The refusal stays as a guard.]**
 
 **No visible gap, and nothing in the opening** (`slitWorst`, the opening test).
 - Every stretch of an element within 2F of the band must reach an embed. An approach that comes near
@@ -1303,3 +1303,388 @@ and at a grazing light, every caption carrying the gate's own numbers. No pixel 
 40. **The rose is 21 petals on the golden angle**, seed 7. *Undo:* `ROSE_PETALS`, `seed`.
 41. **A base slab is the SHEET's, not the element's** (`{ base: true }` only on the sheet) — an element
     built for placement carries no plate. *Undo:* the option.
+
+## 17. Phase 3e, step 3 — the elements wired in: one primitive each, a weight field, a continuous vine (STOPPED FOR A SHEET — second round; §17.8)
+
+Read `frame-vine.js`'s header and the placement block at the end of `frame-elements.js` before touching
+`placeElement`, `placeMotif`, `symmetrizeElement`, `elementDepth`, `vineFor`, `weightAt`, `HIER` or the
+PL / VN families.
+
+### 17.0 The brief (Eva, Nov 9) and what was checked first
+
+- **Step 0** (§16's heading) was already done on `main` (#532, `03d6ee3`) when the session began — checked,
+  not redone.
+- **Step 1, one primitive each.** The chains' junction motifs (phase 3d: a three-leaf palmette, a five-petal
+  rosette, both leaf curves) are gone; the axis motif is `buildElement('palmette')` and an interior
+  junction's `buildElement('rosette')` (#479's forms, untouched), placed by `placeMotif` — the law the vine
+  places every element by.
+- **Step 2, the weight field**, and **step 3, the vine** — below.
+- **Sides ON by default** (`ornSides`), as asked.
+
+### 17.1 Placing an element (`frame-elements.js`, `frame-filigree.js` `placeMotif`)
+
+- **One rigid motion and one lift.** The element is built about its origin by the #479 builders, unchanged,
+  and placed: rotated so its local +y (the axis every builder grows along) lies along the outward normal,
+  translated, and every vertex NOT on the base (z = 0 exactly — every patch column's foot) raised by `lift`.
+  So a placed element's columns stand from the back up through the molding: it and the molding overlap
+  all the way down, by construction (`appendElement` in `frame-relief.js`).
+- **PROUD** (the palmette, the shell, the rose, the bud): lifted to the highest molding under any of its
+  emitted top vertices (read at each vertex and its mirror image, the chains' seat law), so every top vertex
+  stands its own height over the molding.
+- **SUNK** (the rosette — Eva: "rosettes sink into the molding rather than standing proud"): lifted only so
+  its own crest stands a feature over the molding at its centre; its petals lie down in the profile.
+- **Nothing in the opening:** pushed outward in 0.25 mm steps until no footprint vertex is in the opening.
+- **On the axis, its own mirror to the bit** (`symmetrizeElement`): the builders lay a symmetric element's
+  blades as mirror pairs only to the last bit (cos(π/2 + a) is not −cos(π/2 − a)), so every vertex is paired
+  with the vertex at (−x, y, z) within 1e-6 mm and the pair set exactly symmetric. The rose and the bud are
+  not symmetric and are never placed on the axis. **The footprint** is the union of the parts' loops
+  (each patch's top-grid boundary, each bead's equator); its depth is the distance to the union's boundary
+  — every loop edge outside every OTHER loop (`elementDepth`). The first version took the deepest single
+  petal and read a rosette's centre as 0.9 mm deep where it is 3.4.
+- **The SVG draws each element's footprint outline** (decision 42); its relief is the STL's.
+
+### 17.2 The weight field w(s) (`frame-vine.js`)
+
+- **From the skeleton's named anchors, never placed per frame.** Each anchor a run begins or ends at
+  carries an amplitude by its CLASS: the **crest** (on the axis, upper half) 1.0; a **junction** (an anchor
+  two of the skeleton's runs share — a springing, a corner, an oval's side) 0.75; the **bottom** (on the
+  axis, lower half) 0.7; a **terminal** (an anchor one run reaches — an arch's sill end) 0.3.
+- **Along a run** of length L: the larger of the two ends' amplitudes, each falling off as
+  1 − smoothstep(d / (0.55 L)), floored at 0.15 — highest at the crest, secondary peaks at the corners /
+  springings / sides / bottom, lowest mid-run.
+- **The hierarchy strength** h (`ornHierarchy`, 0–1, default 1) blends it toward a uniform ½:
+  w_h = (1 − h)·½ + h·w. **h = 0 is not the vine at all**: phase 3d's chains run, by branch.
+- **Classes on w_h:** heavy ≥ 0.68, medium ≥ 0.4, light below.
+  - Junction motifs: heavy — the palmette at the crest, the shell at the bottom, the rose at a junction;
+    medium — a sunk rosette; light — none.
+  - Along a run, at the meander's extrema: a scroll-and-leaf CLUSTER (a carved tendril and a leaf from one
+    root) at w_h ≥ 0.56; a LEAF at ≥ 0.36; a BUD at ≥ 0.22; a SPRIG (a small leaf) below. At its zero
+    crossings, a SUNK ROSETTE ON the stem at 0.46 ≤ w_h < 0.66.
+- **Scale, meander and density follow w_h**, × the molding width M: the stem's width (0.15 + 0.08 w) M,
+  its meander amplitude (0.12 + 0.2 w) M (held on the band), its half wavelength — one item per half wave —
+  (1.1 + 0.9 w) M ÷ the density (0.6 + 0.2 × `ornDensity`); every item's size its own law in `ITEM`.
+- **Curvature-aware:** everything along a run is scaled by c = 1 / (1 + 1.2 · M · |κ|), κ the path's own
+  curvature over one molding width — compressed on the oval's ends and the arch's head, full on a straight.
+- **Mirror symmetry is exact:** the left is the right negated (curves by `mirrorCurve`, elements by
+  `mirrorElement`), the axis motif its own mirror.
+
+### 17.3 The vine
+
+- **One stem per run**, in the run's own path frame (`runPath`, the chains' — `offsetCurve` inside the
+  band's outer edge): y = y_c + A(x) sin θ(x), θ' = π / P(x), about the band's centre line. The phase is
+  scaled so an AXIS end is an extremum (the stem symmetric there) and an interior end a zero (on the centre
+  line where runs meet).
+- **Its ends:** on the axis a stem stops a feature (and 0.15 mm) short of its own mirror — the axis motif
+  takes both ends; at an interior junction it runs on past the anchor along its own tangent until it crosses
+  the next run's stem. All of one side's stems and items are ONE group, so stems JOIN where runs meet (an
+  overlap of the embed, VN3), never graze.
+- **Seated** by the chains' law (the molding's own height field, read at the emitted columns); VN5 measures
+  how far over it each row stands.
+- **Items spring from the stem** at its extrema, each into the bay the stem bends around and grown forward
+  (away from the crest). A wire item's root starts back across the stem by ¾ of the stem's width along its
+  own heading, so the joint is a full overlap; its root rides on the stem's crown and falls to the molding
+  over two stem widths. A tendril curls back into its bay (curling forward put its eye 0.9 mm from the stem
+  ahead — measured); a vine leaf turns 1.2 rad (`VINE_LEAF_CURL`; the chains' 2.2 curled a 4 mm leaf back
+  onto its stem). An element item (a bud, a sunk rosette) is placed by the same law as a motif.
+- **Settled heaviest first:** every item JOINS its stem (≥ the embed) and stands a feature (and 0.1 mm)
+  clear of every other wire, element, side and the opening; one that does not is made 15 % smaller up to
+  five times, then not built — told as a count.
+- **The motifs join the stems:** a junction motif must take every stem that ends at it by the embed and
+  graze nothing, or it is remade 10 % smaller up to eight times. The shell's hinge sits a quarter of its
+  size inward of the stems' meeting point (its narrow hinge took them by 0.46 mm; its fan takes them by
+  2.13).
+- **A run that turns INWARD loops the mapped stem, and the loop is cut** (`untangle`). The stem is mapped
+  onto its run by offsetting each station along the path's normal; past an inside corner's radius that is
+  a swallow-tail (the notched rectangle's jogs, measured: every stem of `rect notched dense` folded onto
+  itself at every meander share, so the first build drew NO vine there). The loop is cut where the stem
+  crosses itself and the kink left is rounded by a windowed relaxation until the stem's half width is
+  under its radius of curvature everywhere; told on the read-out.
+- **The axis stop reads the stem's own y.** The bisection that stops a stem AXIS_GAP short of the axis
+  first read the mapped x at the extremum's height; the end station is not the extremum (the phase is
+  anchored at x = 0) and on the arch's mitred apex the mapped x moves with y, so the stem ended 1.562 mm
+  off the axis against a 1.5625 floor — its mirror 0.999 mm away (OR3, VN3). It reads `yOf(x)` now,
+  iterated with the phase until both ends settle.
+- **An item must JOIN its stem, not merely not graze it.** `joinsCleanly` passes a wire that never comes
+  within a feature of the other; near a rounded kink an item was laid 3 mm off its stem and passed it
+  (VN4 caught it). `fits` asks for an overlap of the embed (`wireClear ≤ −E`) first.
+- **A leaf's crest is aimed a hundredth over the feature** (`LEAF_CREST_MARGIN` 0.01 mm): the seat reads
+  the molding's RASTER and OR9 the emitted surface, 1.4e-4 mm apart at worst (measured), and a crest
+  aimed exactly at F landed that much under it on 46 leaf rows.
+
+### 17.4 Hierarchy 0 is NOT byte-identical to `main`, and cannot be with step 1 (a conflict in the brief)
+
+The brief asks for both: step 1 makes the chains' junction motifs the #479 elements, and hierarchy 0 is
+"today's chains (byte-identical to main)". Those cannot both hold — hierarchy 0 IS the chains, and step 1
+changes the chains' motifs. What hierarchy 0 keeps, measured against a worktree of `main` (`03d6ee3`) over
+five skeletons (the scratch `bytes.mjs`; main's own defaults, sides off, for the comparison):
+
+| skeleton | filigree off | groups | chains default (STL tris main → here) | chains dense |
+|---|---|---|---|---|
+| arch | identical (STL + SVG) | identical (STL + SVG) | 225,236 → 212,916; scrolls identical, leaves 25 → 12, 3 elements | 569,332 → 546,148; scrolls identical, leaves 69 → 46, 5 elements |
+| rect | identical (STL + SVG) | identical (STL + SVG) | 142,824 → 131,592; scrolls identical, leaves 23 → 10, 3 elements | 626,464 → 604,000; scrolls identical, leaves 72 → 46, 6 elements |
+| rect eared | identical (STL + SVG) | identical (STL + SVG) | 118,232 → 107,000; scrolls identical, leaves 21 → 8, 3 elements | 903,512 → 881,048; scrolls identical, leaves 124 → 98, 6 elements |
+| oval | identical (STL + SVG) | identical (STL + SVG) | 212,088 → 196,912; scrolls identical, leaves 25 → 12, 3 elements | 563,776 → 553,264; scrolls identical, leaves 52 → 36, 4 elements |
+| circle | identical (STL + SVG) | identical (STL + SVG) | 243,004 → 231,568; scrolls identical, leaves 29 → 16, 3 elements | 762,016 → 751,504; scrolls identical, leaves 90 → 74, 4 elements |
+
+**What moved and why:** the junction motifs' leaf curves (#474's palmette and rosette) are replaced by the
+placed #479 elements, so those solids are gone and the elements are added; the chain leaves that settle
+against a motif now settle against an element of a different footprint, so some land elsewhere. Every
+chain SCROLL is emitted bit-identically. Filigree off and the groups layout are byte-identical, STL and
+SVG. Reading "hierarchy 0 = main" as the chains' scrolls and runs rather than as bytes, it holds; as
+bytes it cannot, and which of the two Eva meant is ruling (a) below.
+
+### 17.5 The gates
+
+- **PL1–PL4** (placed elements, in the relief gate): base on z = 0 and every other vertex on the plate or
+  above, a proud one wholly over the molding and a sunk one's crest a feature over it; no wire grazes an
+  element; nothing in the opening; mirror symmetry to the bit, an axis element its own mirror.
+- **VN1–VN5** (the vine): the weight law restated in the gate (anchor classes, falloff, floor, the
+  hierarchy blend) against every item's weight; the classes follow the weight and a heavy element (read
+  off the emitted part) stands only at a junction; the stems are continuous (a feature short of the axis,
+  joined where runs meet, into every junction motif by the embed); every item joins its stem by the embed
+  off the emitted walls; the stem's every emitted row stands ON the highest molding under it (1e-6 mm).
+- **OR rows** now run a `· vine` (hierarchy 1) and a `· chains` (hierarchy 0) variant of every skeleton,
+  plus three hierarchy-½ rows; TB2's give-way is exercised for the vine, the chains and the groups.
+- **Six new mutants, each caught by the check it names and nothing else:**
+  `an-element-floats-off-its-stem` (PL2, VN4), `the-weight-is-a-constant` (VN1, VN2),
+  `a-heavy-element-mid-run` (VN2), `the-element-mirror-is-broken` (PL2, PL4),
+  `the-axis-motif-is-not-its-own-mirror` (PL4), `the-stem-lifts-off-the-molding` (VN5).
+  `the-axis-leaf-is-off-the-axis` is retired with the chain leaf motif it mutated.
+- The relief negative control is 46 mutants; CI's shards go 12 → 16 (a shard holds at most three). That
+  is an edit to `frame.yml` — see 17.7.
+
+### 17.6 Numbers (relief, Node, this tree)
+
+Relief triangles (export), every row boundary 0 and one voxel region; builds 0.7–3.9 s in Node:
+
+| skeleton | default (h 1) | dense (h 1) | h ½ | h 0 (chains) |
+|---|---|---|---|---|
+| arch | 383,044 | 423,492 | 355,260 | 344,876 |
+| rectangle (mitre) | 398,600 | 554,608 | 361,584 | 344,696 |
+| rectangle notched | 380,192 | 475,000 | 344,536 | 345,856 |
+| rectangle eared | 554,536 | 567,480 | 473,504 | 307,728 |
+| oval | 261,056 | 526,808 | 304,496 | 196,912 |
+| circle | 289,136 | 580,664 | 316,592 | 231,568 |
+
+The heaviest state per skeleton: arch 423,492 (dense), rectangle 567,480 (eared, dense), oval 580,664
+(circle, dense) — 39 % of the 1.5 M budget at most; the vine's give-way never fires at the shipped budget on any measured row.
+Off the emitted mesh, over every vine row of the relief gate: **thinnest wire 1.0000 mm, smallest gap
+1.1099 mm, root embeds 2.093–6.476 mm, stem seat depth 0.0000 mm** (every row ON the molding), items'
+least joint with their stem 1.033 mm, least motif joint 4.828 mm.
+
+**Found, pre-existing, not fixed — AN OPEN DEFECT for its own session (Eva's ruling 6, second round):** the page and Node do not build the same relief. On `main` (`03d6ee3`) the
+default arch is 68,460 triangles in the page and 68,076 in Node with the filigree OFF (+384 — the page's
+setParams path, not the ornament), and the oval's STL hashes differ at an equal count (last-bit
+arithmetic across the two engines). Every relief gate measures Node; nothing compares the page's STL with
+it. On this tree the same +384 shows on the arch at every hierarchy, and the oval differs by hash only.
+That is its own session (an X0-style clause for the frame).
+
+**A SECOND OPEN STL DEFECT, beside it (Eva's ruling on the fourth sheet, Nov 10): the band joints' coplanar
+seam.** At the arch springing (and wherever two bands meet face to face — the phase-2 embed) the head band
+and the jamb overlap with coplanar faces: a dash at the light's edge and a different-shade bar on the band's
+outer wall in a three-quarter render (§17.10, the slabs, item 3). It is every frame's STL, not the
+ornament's. **Both defects are fixed together, in their own session, before anything prints.**
+
+**The relief gate's opening was the ORNAMENTED model's silhouette** (`plateOutline` of the model after
+`withOrnament`, whose box grows to carry what stands past the frame) — so the plate the relief builds
+under a motif past the sill's foot read as opening, and three filigree mutants reddened PL3 for it (a
+sill rosette 0.07 mm past the sill). OR7 and PL3 read the frame's own silhouette now, as both modules
+do. Placement tests a bead's equator at 96 points (`footprintTouches`), a multiple of every coarser
+sampling a reader takes.
+
+**The sweep:** all 46 relief mutants behave. 40 did on the first full run; three widened honestly
+(`the-mirror-is-broken` +OR9, `the-chain-is-not-seated` +VN5, `the-seat-is-read-off-the-centreline`
++VN5 — the vine's stem is seated by the same `seatEmitted`), and the three PL3 extras went with the
+gate's silhouette fix and were re-run clean.
+
+### 17.7 Decisions made without a ruling, and what is Eva's
+
+Decisions:
+42. The engraving (SVG) draws each placed element's footprint outline; its relief is the STL's.
+43. The weight's anchor amplitudes, falloff (0.55 L) and floor (0.15) and the class thresholds are
+    this session's numbers, chosen so the default arch reads crest > springing > mid-jamb on the sheet.
+44. The rose (not the shell) is the heavy motif at a corner / springing / oval side; the shell takes
+    the bottom centre.
+45. A sunk rosette stands ON the stem at a zero crossing (medium weight); buds and leaves at the
+    extrema.
+46. Items grow forward (away from the crest) into the bay the stem bends around.
+47. A stem that a run's inward turn loops is cut and rounded (told), not refused.
+48. `frame.yml`'s relief mutant shards 12 → 16, and its path filters gain `frame-vine.js` and the
+    sheet tool. **This edits an existing workflow file**, which costs
+    a frozen tag dispatched afterwards from a base predating the edit (CLAUDE.md's frozen-tag rule) — no
+    frame phase registers a frozen tag, so nothing is owed here, but the rule is the repo's and is said.
+
+Rulings pending (the sheet):
+- (a) Hierarchy 0: is "today's chains" the chains' law (holds) or main's bytes (cannot, with step 1)?
+- (b) The default look: the weight field's peaks and the item mix at hierarchy 1 and ½.
+- (c) The heavy corner rose stands past the band's outer edge on the rectangle and the oval (its size
+    follows the molding width × weight); keep, or cap it to the band?
+- (d) Mid-run is sparse on a long run (sprigs and buds a half wave apart) — denser, or as is?
+
+### 17.8 Second round — Eva's rulings on the first sheet, and what was built for them
+
+The rulings (Nov 9, on the first vine sheet):
+1. **(c) Cap ornament to the band.** Nothing stands past the band's outer edge, with one exception: the
+   crest may rise above the top, but it spreads ALONG the band and stays low and wide — it never sticks
+   out sideways. (The first sheet's large leaves jutting out of the frame were the crest palmette, 26–28
+   mm above the top, and the corner roses, 6–9 mm past the side.)
+2. **The oval's spiky crest read as a pineapple** (upright fan blades on a soft curve). On a curve use a
+   low, wide, cupped crest that drapes along it — the shell, or a spray of leaves splaying outward and
+   down along the band; keep the palmette for the arch apex only if it reads right once its blades splay.
+3. **(a) Hierarchy 0 = the chains' layout.** Byte identity with `main` is not required (§17.4 stands as
+   the record of what moved).
+4. **(d) Mid-run density as is**, revisited after 1–2.
+5. **The mutant sweep: A.** The full relief sweep on pushes to `main` and nightly; a PR runs only the
+   mutants whose source files it touches. Built in this PR.
+6. **The page/Node build mismatch** (§17.6) is NOT fixed here: an open defect for its own session.
+
+What was built (`frame-vine.js`'s CREST block, `frame-elements.js`, `placeMotif`):
+- **The band is the cap.** `beyond(q)` is "outside the frame's own silhouette" (`plateOutline`, the
+  owner every other opening test reads). Every vine item's wire keeps its half width inside it; every
+  bud and rosette's footprint stays inside it; every junction motif other than the crest is placed by
+  `placeMotif(…, { beyond, reach })` — nudged along its normal either way (never pushed out until it
+  clears) and made 10 % smaller at a time from its weight's size until it fits between the opening and
+  the outer edge AND joins its stems; the read-out says how far (on the default rectangle the top
+  corner rose is 53 % of its weight's size, the arch springing's 48 %). The stems' run-on past an
+  interior end is cut back (30 % at a time) until its edge is inside the outer edge — it ran 2.05 mm
+  out through the rectangle's corner on the first sheet; at a 90° mitre the stem's own end already
+  passes the next run's centre line by 0.2 M, so the cut costs no joint (VN3 holds).
+- **The crest is DRAPED.** It is built about the origin, its plan scaled into the RISE (from its root
+  `CREST.hinge` = 0.7 M under the edge to `CREST.rise` = 0.45 M past it) and widened along the band by
+  at most `CREST.stretch` = 1.5 (the first cut stretched the shell 3× and its scallops became a
+  sunburst's points), then laid on the EDGE FRAME — the silhouette walked from its top crossing of the
+  axis, x the arc length along it, y the offset out along its normal, both the stations and the normals
+  averaged over ±1 M so a mitred apex rounds off instead of creasing (the first cut creased the spray's
+  boss along the axis) and the left half the right's mirror. So it follows the edge round a curve and
+  is never more than the rise past it. Its z is draped too: lifted per vertex to the molding under it
+  and falling off the edge at 45° (`crestLift`), not raised whole to the highest molding under it.
+- **The crest's form** is a new control, *Crest form* (`ornCrestMotif`): by the top (the default) — the
+  SPRAY on a pointed apex (the arch), the SHELL on a curve or a straight top (the oval, the rectangle) —
+  or either by hand. The spray is the palmette's own builder with its blades splayed
+  (`PALMETTE_SPRAY`: two pairs at ±1.0 and ±1.4 rad off the axis flaring further down the band, NO
+  centre blade); a new element kind (`spray`) the elements gate checks like the other five. The shell
+  is #479's approved shell, built at 0.9 M (its height) and draped.
+- `bossGrid`'s angular seam moved onto the element's own axis (−y): a seam off the axis showed as a
+  crack across the draped boss. The palmette's top facets turn 53.1° (was 46.5°) under its 55° cap.
+- A placed element's MIRROR no longer inherits its source's cached box and union edges (`mirrorElement`
+  and `symmetrizeElement` drop `_box`/`_edges`): a clearance read against a mirror before this read the
+  SOURCE's box, so an approach on the left could pass as far.
+- The chains (hierarchy 0) keep their own crest and motifs, standing past the frame as phase 3d built
+  them (ruling 3: hierarchy 0 is the chains' layout); capping the chains too is a lettered option.
+
+Gates: **CB1** nothing past the outer edge but the crest (every emitted wire vertex and every element
+footprint, on every vine row, read against the frame's own silhouette); **CB2** the crest past the edge
+is low (no vertex further out than 0.45 M, restated) and along (everything past it within the crest's
+span + the rise of the axis, as arc length along the edge, restated). VN2 restates the crest's form
+from the skeleton's KIND and the control, never from the module's own reading of the outline. Four
+mutants: a motif pushed past the band, the crest not draped (laid flat across the curve), the crest
+standing up (2.5 M past the edge, the first sheet's), the stem's run-on left uncut through the corner.
+
+**The sweep (ruling 5, A):** `--files=a,b,…` keeps the mutants whose module is in the list, then shards;
+`frame.yml`'s relief-mutants job hands a pull request its own diff against its base (`fetch-depth: 0`)
+and runs the full sweep on a push to `main`, nightly (`schedule`, 03:17 UTC) and by hand. Every anchor is
+still checked over ALL mutants first. A PR that moves no frame module runs none.
+
+The second-round sheet is `docs/img/frame-vine-sheet-2.png` (`node tools/shot-frame-vine.mjs <dir>`): each
+skeleton full-frame at its default, front-on; the crest close up on all three, front-on and from above and
+the side; one corner / springing / shoulder on each; the crest's two forms on each skeleton. The first
+round's sheet stays as it was rendered, the record of what the rulings were made on.
+
+**CB1 found one real case on its first run**: on the dense EARED rectangle the side stem's meander swung
+0.075 mm past the outer edge mid-run, where an ear's notch pinches the band. A meander past the edge along
+the run is now lowered as a self-folding one is (60 % there, told).
+
+### 17.9 Third round — "shell works, spray doesn't"
+
+Eva's ruling on the second sheet (option A, Nov 10): **the shell is the crest on every top, the arch's
+pointed apex included; the spray is gone.** Removed with it: the *Crest form* control (`ornCrestMotif`,
+never on `main`, so no saved design names it), the `spray` element and `PALMETTE_SPRAY`, `crestKind` and
+the edge frame's `apexTurn` that chose between the two, and the gate's per-value probe that existed only
+for that control. The gates restate the crest as the shell everywhere. `buildPalmette` keeps its layout
+argument (the palmette element is unchanged, 10,704 triangles, 53.1° under its cap).
+
+**On the arch the shell is narrower than on the other two**: 18 mm across against the rectangle's 26 and
+the oval's 24, 4.2 mm past the edge. At its full span the draped shell does not fit the mitred apex
+(the crest's search narrows the span until it joins both stems without grazing), and the read-out says
+how wide it came out. Options B–E of the second sheet stand open.
+
+### 17.10 Fourth round — Eva's rulings B–E on the second sheet, and what was built
+
+The rulings (Nov 10): **B** the chains (hierarchy 0) are capped to the band too; **C** the crest's
+4.3 mm rise stands; **D** corners and springings carry a rosette, not a half-size rose; **E** the
+crest's shell is softened — rounded lobes, no points (front-on the arch crest read as a starburst);
+the arch shell is to be widened by reaching further into the band, not by rising, toward the
+rectangle's and oval's 24–26 mm; and the blocky slab-like shapes in the three-quarter close-ups of the
+springing rose are to be identified and fixed.
+
+- **D.** A heavy junction off the axis takes the (sunk) ROSETTE (`motifKind`; VN2 restated). The rose is
+  no longer placed by the vine. Held inside the band: 66 % of its weight's size at the arch springing and
+  the oval shoulder, 73 % / 39 % at the rectangle's top / bottom corners.
+- **E.** The crest is the SOFT shell (`SHELL_SOFT`: 7 ribs, each lobe the rib's (cos² + 0.03)^¼ —
+  round-topped, its notch a short rounded dip, 9 % of the radius against the plain shell's 14 %). Only
+  the crest takes it (`placeElement(…, { soft })`); the bottom shell and the element library's shell are
+  #479's. EL6 counts the lobes off the built mesh (8 across the fan against the plain shell's 11).
+  **And a crease the soft shell exposed**: its lift was a max over CONE-shaped falls off the molding
+  (`crestLift`), whose tip leaves a ridge where the band's crown ends; the shell's fan grid crosses it at a
+  slant and it rendered as a jagged line across every crest. The fall's first 1.5 mm is a parabola now
+  (`CREST.round`), and the rings are dense (`CREST_LIFT_RINGS`: 0.1 mm to 2, 0.25 to 4, 0.5 to 8; 32
+  directions).
+- **The slabs, identified.** (1) BEHIND THE ROSE: the rose's stacked petals are height-field patches
+  with vertical walls, which from three-quarter read as slabs — gone with D. (2) AT THE STEM END: a swept
+  wire closes on a face square to its path, and where one run's stem ends inside the next it showed as a
+  flat collar. Every stem's two ends now narrow on a quarter circle to the 1 mm floor over half its width
+  (`roundEnds`, sampled at 0.1 mm there). The axis stop stays set by the body's width: a stop set for the
+  rounded tip brought the arch's two head stems 0.78 mm apart behind it, at the apex they meet at a slant
+  (OR3 found it); VN3 restates the axis clause against the body width read off the emitted rows. VN6 reads the emitted end
+  rows (no wider than the feature). (3) NOT ORNAMENT: at the arch springing a dash at the light's edge and
+  a different-shade bar on the band's outer wall are the head band and the jamb meeting face to face (the
+  phase-2 embed): coplanar faces of two overlapping shells, drawn flickering by the viewer, fused in print.
+  Not changed here (it is every frame's STL) — a lettered option. (4) THE BUD, found on the re-render: the
+  vine's buds are 5–7 mm across, and a bud's cup leaves were floored at the print floor — 1 mm thick and
+  lifted on 1.3 mm walls, a leaf 1.7 mm wide — so the cup was all wall: flat-topped blocks standing beside
+  the crest. Its rise and cup scaled off that FLOORED crown (a 4.85 mm bud stood 6.67 mm tall). Now the
+  rise and cup scale with the bud's own size, the rosette's petal tips and the cup leaves' tips and
+  margins roll down to the floor (`ROSETTE_LIP`, `BUD_LIP`, `BUD_LIP_V` — 0.85 of the width, because 0.5
+  folds the cupped leaf's facets to 101° and the full width to 64° against EL4's 55°), and a bud whose cup
+  leaf would be narrower than four print floors (`BUD_LEAF_MIN_W`, typed, flagged — read off the
+  renders) is its BERRIES ALONE, sunk into the molding over the root the leaves held. That is every bud
+  the vine places today; the 18 mm library bud keeps its cup. Proud elements are seated per vertex on the
+  molding (`drapeElement`), not lifted as one block to the highest point under them. The rectangle goes
+  322,160 → 284,480 triangles, relief depth 8.6 → 6.9 mm.
+- **B.** A chain is built at its lead and, while any element cannot stand between the opening and the
+  outer edge, again with every element 15 % smaller (more of them), down to `CHAIN_CAP_MIN` of the lead,
+  told: 32–38 % on the three defaults. A chain element is pushed back onto the molding by its overshoot as
+  it is pushed out of the opening by its intrusion; one that cannot clear both is not seated. A chain leaf
+  past the edge is shortened, else not built. The chains' TOP-axis motif is the vine's draped soft crest
+  (`drapedCrest`, one owner for both layouts — the upright palmette was the fan Eva ruled against), built
+  FIRST, every chain reaching the axis laid a feature clear of it; the corner rosettes and the bottom
+  palmette are held inside the band (`placeMotif`'s `beyond`). CB1 now reads every chain row as well as
+  every vine row.
+- **The arch's width — measured, and the ruled method does not reach it.** The band on the arch's axis is
+  1.16 M deep; a root deeper than 0.7 M reaches the opening (0.9 M already does), and deeper is NARROWER,
+  not wider — inside the band the draped shell's points are pulled toward the axis along the apex's
+  sloping normals: 18.1 mm at 0.7 M, 17.2 at 0.9, 16.2 at 1.1. What widens it while keeping it low is
+  reaching further ALONG the band's two slopes: a span of 1.8 M with the stretch cap raised to 1.8 gives
+  24 mm across (2.0 / 2.0 gives 27), still 4.2 mm past the edge, measured. That is a different method from the one ruled, so it is a lettered option.
+  **RULED (b), Nov 10: spread along the slopes.** On the arch (`model.info.kind === 'arch'`, vine and chains
+  alike, through the one `drapedCrest`) the shell takes `CREST.slopes` — span 1.8 M, stretch 1.8 — and is
+  **24 mm across, 4.2 mm past the edge**, root 0.7 M, no fallback; the rectangle and oval keep span 1.35 /
+  stretch 1.5 (26 / 24 mm), unchanged by construction. CB2 reads the arch's span from its own restated
+  1.8; **CB3** holds the default arch's emitted crest at 24 mm across (±0.5) on both layouts, and
+  `the-arch-crest-is-not-spread-along-its-slopes` (the third sheet's 1.35 / 1.5) must redden it.
+- **The springing seam (item 3 of the slabs): ruled (c) — its own session**, recorded as an open STL defect
+  beside the page/Node mismatch (§17.6); the two are fixed together before anything prints.
+- **The leafy runs (the chains and the vine's stems and leaves) are NOT ruled right on the third sheet**;
+  everything else is. They are reworked in the next session and were not changed here.
+
+**CI: the relief mutants run on 26 shards at 60 minutes** (were 16 at 40): with the chains capped a mutant runs up to ~21 min, and three to a shard overran the timeout (six shards cancelled on `202c487`).
+
+Mutants (relief): `the-chains-are-not-capped` (OR1 — at its lead a chain seats nothing, so the row has no chain at all; CB1 cannot see an absent one), `a-rose-at-the-corner` (VN2),
+`the-crest-shell-is-pointed` (CB2 — the crest's record), `a-stem-ends-on-a-flat-face` (VN6);
+(elements) `the-crest-shell-is-sharp-again` (EL6). **Claims the capped chains moved** (CI found each on the
+previous head; each re-measured on this tree before it was changed): `the-chain-opening-check-removed` is
+OR7's alone (the capped elements no longer crowd each other in the opening — least gap 1.0000 mm);
+`the-weight-is-a-constant` no longer reaches CB2 (the chains rows build their crest whatever the weight;
+VN2 still sees the vine's); `the-carved-floor-removed` also reddens OR3; `the-element-mirror-is-broken`
+also reddens PL2 and PL3 (a capped element sits exactly on the opening's edge and its wire's embed); and
+`a-folded-element-is-built` is retired (above).
