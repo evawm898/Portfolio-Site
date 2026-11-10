@@ -728,16 +728,21 @@ export function buildFrame(params, customProfile = null) {
   if (!rb) return build();
   // the band widened for the rinceau, to RIN_BAY_MM at the frame's OWN print
   // scale (printHeight ÷ its box height): the arch's box is half a band
-  // taller than its height, so the width is solved — a fixed point, the box
-  // growing by about half of what the band does (converges in 3–4 builds)
+  // taller than its height (and an eared rectangle's grows with its ears),
+  // so the width is solved: w = RIN_BAY_MM × boxHeight(w) ÷ printHeight, by
+  // the secant method on the box the build measures (4–6 builds)
   p.bandAsked = p.moldingWidth;
-  p.moldingWidth = rb;
-  let m = build();
-  for (let k = 0; k < 8; k++) {
-    const want = Math.max(p.bandAsked, RIN_BAY_MM * (m.box.y1 - m.box.y0) / p.printHeight);
-    if (Math.abs(want - p.moldingWidth) < 1e-9) break;
-    p.moldingWidth = want; m = build();
+  const resid = (w) => { p.moldingWidth = w; const mm = build(); return { mm, r: w - RIN_BAY_MM * (mm.box.y1 - mm.box.y0) / p.printHeight }; };
+  let a = { w: rb, ...resid(rb) }, b = a, m = a.mm;
+  if (Math.abs(a.r) > 1e-12) {
+    b = { w: rb - a.r, ...resid(rb - a.r) }; m = b.mm;
+    for (let k = 0; k < 30 && Math.abs(b.r) > 1e-12 && b.r !== a.r; k++) {
+      const w = b.w - b.r * (b.w - a.w) / (b.r - a.r);
+      a = b; b = { w, ...resid(w) }; m = b.mm;
+    }
   }
+  p.moldingWidth = Math.max(p.bandAsked, m.params.moldingWidth);
+  if (p.moldingWidth !== b.w && p.moldingWidth !== a.w) m = build();
   if (p.moldingWidth <= p.bandAsked) delete p.bandAsked;
   return m;
 }

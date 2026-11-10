@@ -12570,6 +12570,20 @@ carved law's asymptote, not the band); 1¼ is reached at NO width; curved runs l
 `rinBand: 'widen' | 'frieze'` (`rinceauBand` in `buildFrame`, `RIN_BAY_MM` 16) prototypes the two ways; the rect's
 opening falls 73 % → 59 % → 38 % of the outer area. Sheet: `node tools/shot-frame-rinceau.mjs <dir> --band` →
 `docs/img/frame-rinceau-band.png`.
+**Step 2 (Nov 10, §18.6 — STOPPED FOR A SHEET): THE RINCEAU IS THE DEFAULT LAYOUT AND THE CHAINS ARE RETIRED** (Eva's
+(b) and (d); read §18.6 before touching `vineFor`, `frame-rinceau.js`, `rinceauBand` or the RN / BW1 families).
+- `ornLayout` is `rinceau` | `groups` (a stored `chains` reads as the rinceau). `chainsFor`, `buildChain`, `settleChains`,
+  `moldingLift` and the vine's items are gone; `vineFor` is the rinceau's one owner. Hierarchy 0 is an even weight.
+  Tightness hides under it. The hidden step-1 params and the frieze are gone.
+- The band is widened to `RIN_BAY_MM` 16 print mm at the frame's OWN scale (a secant solve on the built box: the arch's
+  box is taller than its height). Under the rinceau the Profile width slider has dead travel below ~30 units — told.
+- Weighted up on the wide band: stem 0.16 + 0.07 w, tendril 1.25 + 0.5 w, two acanthus leaves (sheath 0.42 × 0.75 at
+  −0.45 rad, calyx 0.85 of it). Straight-run turns median 1.06 on the rectangle and the arch; the oval 0.89.
+- `seatEmitted` takes a per-row `extra` (a leaf's crest margin survives the emitted reading); every item wire is
+  self-gap checked; the draped crest's rise is read back off its plan.
+- Gates RN1–RN3, RN5, RN6, BW1 (laws restated, never imported); 56 mutants (five retired, eight new; the negative control
+  copies `frame-rinceau.js`). Sheet: `node tools/shot-frame-rinceau-wired.mjs <dir> --base <worktree of 2a46e1c>` →
+  `docs/img/frame-rinceau-wired.png`.
 **SECOND ROUND (Eva's rulings on the first sheet, charter §17.8): THE BAND IS THE CAP.** Nothing stands past the
 band's outer edge (the frame's own `plateOutline`) but the CREST, which is DRAPED on an edge frame (arc length
 along the edge × offset along its averaged normal) — at most `CREST.rise` 0.45 M past the edge, reaching
