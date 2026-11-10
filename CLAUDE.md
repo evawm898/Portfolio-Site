@@ -12548,9 +12548,9 @@ Sheet: `node tools/shot-frame-vine.mjs <dir> [--refs <dir>] [--only <regex>]`.
 **SECOND ROUND (Eva's rulings on the first sheet, charter §17.8): THE BAND IS THE CAP.** Nothing stands past the
 band's outer edge (the frame's own `plateOutline`) but the CREST, which is DRAPED on an edge frame (arc length
 along the edge × offset along its averaged normal) — at most `CREST.rise` 0.45 M past the edge, reaching
-`CREST.span` along it, lifted per vertex and falling off at 45° — a shell on a curve or straight top, the
-palmette's blades SPLAYED (the `spray` element, no centre blade) on the arch's pointed apex; the *Crest form*
-control (`ornCrestMotif`) overrides. Every other motif is placed by `placeMotif(…, { beyond, reach })` and made
+`CREST.span` along it, lifted per vertex and falling off at 45° — the SHELL on every top, the arch's
+pointed apex included (Eva, third round: "shell works, spray doesn't" — the spray element and the *Crest
+form* control are gone, §17.9; on the arch the shell builds narrower, 18 mm against 26 / 24, told). Every other motif is placed by `placeMotif(…, { beyond, reach })` and made
 smaller until it fits the band and joins its stems; the stems' run-on past a corner is cut back inside the edge.
 Hierarchy 0 is the chains' layout (they still stand past the frame, as 3d built them — capping them is a
 lettered option). Gates CB1 / CB2, four mutants. **Ruling 5 (A): a PR runs only the relief mutants whose module

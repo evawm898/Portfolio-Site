@@ -492,17 +492,14 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     const clsR = (model, id) => { const a = model.info.anchors[id]; if (Math.abs(a.pt[0]) < 1e-9) return a.pt[1] > (model.box.y0 + model.box.y1) / 2 ? 'crest' : 'bottom'; return RUNS_R[model.info.kind].filter((q) => q.includes(id)).length >= 2 ? 'junction' : 'terminal'; };
     const wR = (x, L, a, b, h) => (1 - h) * HV.uniform + h * Math.max(HV.floor, HV[a] * (1 - smoothR(Math.max(0, x) / (HV.reach * L))), HV[b] * (1 - smoothR(Math.max(0, L - x) / (HV.reach * L))));
     const itemKindR = (w, at, leavesOn) => (at === 'zero' ? (w >= 0.46 && w < 0.66 ? 'rosette' : null) : w >= 0.56 ? 'cluster' : w >= 0.36 ? (leavesOn ? 'leaf' : null) : w >= 0.22 ? 'bud' : (leavesOn ? 'sprig' : null));
-    // the crest (phase 3e step 3, second round): the Crest control's form,
-    // or by the skeleton — the arch's pointed apex a spray, every other top a
-    // shell (restated from the skeleton's KIND, not the module's own reading
-    // of the outline)
-    const crestKindR = (model, q) => (['shell', 'spray'].includes(q.ornCrestMotif) ? q.ornCrestMotif : model.info.kind === 'arch' ? 'spray' : 'shell');
-    const motifKindR = (cls, w, ck = 'palmette') => (w >= HV.heavy ? (cls === 'crest' ? ck : cls === 'bottom' ? 'shell' : 'rose') : w >= HV.medium ? 'rosette' : null);
-    const HEAVY = new Set(['shell', 'palmette', 'spray', 'rose']);
+    // the crest (phase 3e step 3, second round): the shell on every top
+    // (Eva on the second sheet: "shell works, spray doesn't")
+    const motifKindR = (cls, w) => (w >= HV.heavy ? (cls === 'crest' || cls === 'bottom' ? 'shell' : 'rose') : w >= HV.medium ? 'rosette' : null);
+    const HEAVY = new Set(['shell', 'palmette', 'rose']);
     // CB, THE BAND IS THE CAP (Eva's rulings 1-2 on the first sheet),
     // restated: the crest may stand CRR.rise of the molding width past the
     // outer edge and reach CRR.span[kind] (+ the rise) along it from the axis
-    const CRR = { rise: 0.45, span: { shell: 1.35, spray: 1.7 } };
+    const CRR = { rise: 0.45, span: { shell: 1.35 } };
     const cb1 = [], cb2 = [];
     let cbVerts = 0, crestPast = 0, crestAlong = 0, crestsSeen = 0;
     // the signed distance to the silhouette (positive inside) and the ARC
@@ -758,7 +755,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         // HEAVY element (read off the emitted part's own kind) only at a
         // junction motif, within its own size of that anchor's stem ends
         for (const it of orn.items) { const r = runsR.get(it.run), k = itemKindR(wR(it.x, r.L, r.a, r.b, h), it.at, leavesOn); if (k !== it.kind) vn2.push(`${name}: an item at ${it.x.toFixed(1)} mm on ${it.run} is a ${it.kind}, its weight makes a ${k}`); }
-        for (const g of orn.groups.filter((gg) => gg.motif)) { const ws = [...runsR.values()].flatMap((r) => [r.from === g.anchor ? wR(0, r.L, r.a, r.b, h) : null, r.to === g.anchor ? wR(r.L, r.L, r.a, r.b, h) : null]).filter((v) => v != null); const k = motifKindR(clsR(model, g.anchor), Math.max(...ws), crestKindR(model, q)); if (k !== g.motif.kind) vn2.push(`${name}: the motif at ${g.anchor} is a ${g.motif.kind}, its weight makes a ${k}`); }
+        for (const g of orn.groups.filter((gg) => gg.motif)) { const ws = [...runsR.values()].flatMap((r) => [r.from === g.anchor ? wR(0, r.L, r.a, r.b, h) : null, r.to === g.anchor ? wR(r.L, r.L, r.a, r.b, h) : null]).filter((v) => v != null); const k = motifKindR(clsR(model, g.anchor), Math.max(...ws)); if (k !== g.motif.kind) vn2.push(`${name}: the motif at ${g.anchor} is a ${g.motif.kind}, its weight makes a ${k}`); }
         for (const e of feet2) if (HEAVY.has(e.kind)) { const r = e.rec, g = orn.groups.find((gg) => gg.motif && (gg.elements || []).some((el) => el === r || el === r.mirrorOf)); if (!g) { vn2.push(`${name}: a heavy ${e.kind} (${e.id}) placed away from every junction`); continue; } const a = model.info.anchors[g.anchor].pt, sc = rel.scale, d = Math.hypot(r.at[0] - (r.mirrorOf ? -1 : 1) * a[0] * sc, r.at[1] - a[1] * sc); if (d > r.size) vn2.push(`${name}: the heavy ${e.kind} at ${g.anchor} stands ${d.toFixed(1)} mm from it (size ${r.size.toFixed(1)})`); }
         // VN3 the stems are continuous: on the axis a stem stops a feature
         // (and the margin) short of its mirror; where two runs meet their

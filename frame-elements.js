@@ -181,18 +181,6 @@ export function buildPalmette({ size = 24, base = false, layout = PALMETTE, kind
   return done(mesh, kind, { size, boss: rB });
 }
 
-/* (b') THE SPRAY (phase 3e step 3, second round — Eva's ruling on the
-   sheet: "a spray of leaves splaying outward and down along the band"):
-   the palmette's own builder with its blades SPLAYED — two pairs leave the
-   boss nearly along the band (±1.0 and ±1.4 rad off the axis) and flare
-   further down it, and there is no centre blade — so laid as a crest and draped
-   along the band's outer edge (frame-vine's crest) it stays low and wide
-   and never stands up as a fan. */
-export const PALMETTE_SPRAY = {
-  leaves: [{ angle: 1.0, len: 0.9, flare: 0.9 }, { angle: -1.0, len: 0.9, flare: -0.9 }, { angle: 1.4, len: 0.78, flare: 1.1 }, { angle: -1.4, len: 0.78, flare: -1.1 }],   // no centre blade: nothing stands up
-  width: 0.3, crown: 0.16, tilt: 0.1, boss: 0.2, bossRise: 0.5,
-};
-export const buildSpray = ({ size = 24, base = false } = {}) => buildPalmette({ size, base, layout: PALMETTE_SPRAY, kind: 'spray' });
 /* a leaf's crown: a raised midrib on a cupped blade (the edges half up). Every
    blade grid scales its crown by the row's half-width over the widest, so a
    tip narrowed to the floor carries no spike — the midrib's width is a share of
@@ -310,7 +298,7 @@ function done(mesh, kind, info) {
   return { kind, positions, indices, parts: mesh.parts, scale: 1, info: { ...info, triangles: indices.length / 3, heightMm: z1 } };
 }
 
-export const ELEMENTS = { shell: buildShell, palmette: buildPalmette, spray: buildSpray, rose: buildRose, rosette: buildRosette, bud: buildBud };
+export const ELEMENTS = { shell: buildShell, palmette: buildPalmette, rose: buildRose, rosette: buildRosette, bud: buildBud };
 export function buildElement(kind, opts = {}) { return ELEMENTS[kind](opts); }
 
 

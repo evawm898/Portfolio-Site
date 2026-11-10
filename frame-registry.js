@@ -123,13 +123,6 @@ export const PARAM_SPEC = [
   // scaled by this strength. Default 1.
   R('ornHierarchy', 'ornament', 'Hierarchy (0 = separate chains)', 0, 1, 0.05, 1, '', (p) => ornOn(p) && chains(p)),
   { id: 'ornCrest', section: 'ornament', label: 'Crest (top centre)', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },
-  // phase 3e step 3, second round (Eva's ruling 2): the vine's crest is
-  // DRAPED low and wide along the band (frame-vine's CREST) — a cupped SHELL,
-  // or the palmette's blades SPLAYED along the band (the spray). By the top
-  // (the default): the spray on a pointed apex, the shell on a curve or a
-  // straight top. The chains (hierarchy 0) keep their own crest.
-  { id: 'ornCrestMotif', section: 'ornament', label: 'Crest form', kind: 'choice', default: 'auto', visibleWhen: (p) => ornOn(p) && chains(p) && +(p.ornHierarchy ?? 1) > 0 && p.ornCrest === 'on',
-    options: [['auto', 'By the top — a spray on a pointed apex, a shell on a curve'], ['shell', 'Shell — low, wide, cupped'], ['spray', 'Spray — leaves splayed along the band']] },
   { id: 'ornCorners', section: 'ornament', label: 'Corners / springings', kind: 'choice', default: 'on', visibleWhen: (p) => ornOn(p) && !isOval(p), options: ON_OFF },
   { id: 'ornSides', section: 'ornament', label: 'Sides', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },   // ON since phase 3e step 3 (Eva: the rectangle default was bare)
   { id: 'ornBottom', section: 'ornament', label: 'Bottom centre', kind: 'choice', default: 'off', visibleWhen: (p) => ornOn(p) && !(isArch(p) && (p.sill === 'none' || chains(p))), options: ON_OFF },   // an arch's chains run head and jamb: there is no bottom run

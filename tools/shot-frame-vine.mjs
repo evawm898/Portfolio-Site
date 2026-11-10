@@ -7,8 +7,6 @@
      - a close-up of the crest on all three (front-on and three-quarter, so
        "low" can be read as well as "wide");
      - a close-up of one corner / springing / shoulder on each;
-     - the crest's two forms side by side on each skeleton (the shell and the
-       spray, through the Crest control) — the lettered option;
      - Eva's references 2, 3 and 4 beside it when --refs names the directory
        holding 2.png / 3.png / 4.png (not in the repository).
    No pixel claim anywhere: for ruling by eye. Writes <dir>/index.html and
@@ -73,7 +71,6 @@ let cells = [
     { row: `close: ${SHOULDER[sk][1]} — ${sk}`, label: `${sk} ${SHOULDER[sk][0]} · front-on`, params: { ...q, ...ON }, cam: at(SHOULDER[sk][0], [0, 0, 1], 75), wide: true },
     { row: `close: ${SHOULDER[sk][1]} — ${sk}`, label: `${sk} ${SHOULDER[sk][0]} · three-quarter`, params: { ...q, ...ON }, cam: at(SHOULDER[sk][0], [0.45, 0.3, 1], 75), wide: true },
   ]),
-  ...SK.flatMap(([sk, q]) => ['shell', 'spray'].map((k) => ({ row: 'the crest\'s two forms (the Crest control) — shell or spray', label: `${sk} · crest ${k}`, params: { ...q, ...ON, ornCrestMotif: k }, cam: at(CREST[sk], [0, 0, 1], 85), wide: true }))),
 ];
 if (ONLY) cells = cells.filter((c) => ONLY.test(c.label));
 

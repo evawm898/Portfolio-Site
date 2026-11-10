@@ -658,7 +658,6 @@ async function partTwo(G, R) {
     ornHierarchy: ORN,
     // the band pattern's rows are hidden and inert at 'none': probed with the beading on
     bandEdge: { bandPattern: 'beading' }, bandSize: { bandPattern: 'beading' }, bandPitch: { bandPattern: 'beading' } };
-  const BY_VALUE = { ornCrestMotif: { shell: ORN, spray: { ...ORN, skeleton: 'rect' } } };
   const baseOf = {};
   for (const s of R.PARAM_SPEC) {
     if (s.section === 'print') continue;        // the print rows reach the STL, never the paper: V2 below
@@ -667,16 +666,11 @@ async function partTwo(G, R) {
     if (!baseOf[key]) { await page.evaluate((q) => window.__frame.setParams(q), ctx); baseOf[key] = await decode(await shot()); }
     const states = s.kind === 'range' ? [[s.default === s.max ? s.min : s.max]] : s.options.map(([v]) => [v]).filter(([v]) => v !== (ctx[s.id] ?? s.default));
     for (const [v] of states) {
-      // a control whose default ('auto') IS one of its options on a given
-      // skeleton is probed per option where auto is the OTHER one (the crest
-      // form: auto is the spray on the arch, the shell on the rectangle)
-      const vctx = (BY_VALUE[s.id] || {})[v];
-      if (vctx) { const k2 = JSON.stringify(vctx); if (!baseOf[k2]) { await page.evaluate((q) => window.__frame.setParams(q), vctx); baseOf[k2] = await decode(await shot()); } }
-      const p = { ...(vctx || ctx), [s.id]: v };
+      const p = { ...ctx, [s.id]: v };
       if (s.id === 'mullionWidth') p.mullions = 3;
       if (s.id === 'profilePreset' && v === 'custom') continue;      // reached by the editor (E1), not by the select
       await page.evaluate((q) => window.__frame.setParams(q), p);
-      const n = diff(baseOf[vctx ? JSON.stringify(vctx) : key], await decode(await shot()));
+      const n = diff(baseOf[key], await decode(await shot()));
       vrows.push({ id: s.id, v, n });
     }
   }

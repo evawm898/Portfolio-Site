@@ -79,36 +79,26 @@ const smooth = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
    the axis along it, y the offset outward along its normal) and DRAPED: it
    follows the edge round a curve, its part past the edge never more than
    CREST.rise of the molding width out, its reach along the edge CREST.span.
-   On a curve the crest is a low, wide, cupped SHELL (Eva: upright fan blades
-   read as a fruit crown on a soft curve); on the arch's pointed apex the
-   palmette's blades SPLAYED outward and down along the band (the spray,
-   frame-elements). Every other motif sits inside the band (placeMotif's
-   `beyond`). Each a measured choice in §17. */
+   The crest is a low, wide, cupped SHELL on every top (Eva: upright fan
+   blades read as a fruit crown on a soft curve; on the second sheet "shell
+   works, spray doesn't", so the arch's pointed apex takes the shell too).
+   Every other motif sits inside the band (placeMotif's `beyond`). Each a
+   measured choice in §17. */
 export const CREST = {
   rise: 0.45,     // × M: how far past the outer edge the crest may stand (low)
-  span: { shell: 1.35, spray: 1.7 },   // × M: its half reach along the edge from the axis (wide) — the shell's own proportion, the spray's blades along the band
+  span: { shell: 1.35 },   // × M: its half reach along the edge from the axis (wide) — the shell's own proportion
   hinge: 0.7,     // × M: its root inside the band, under the edge (the stems' ends there)
   blend: 1.0,     // × M: the frame's normals averaged over this either side (a mitred apex turns smoothly)
-  build: { shell: 0.9, spray: 1.6 },   // × M: the size the element is BUILT at (its HEIGHT is the built one's; its plan is then scaled, evenly, into the rise and the span)
+  build: { shell: 0.9 },   // × M: the size the element is BUILT at (its HEIGHT is the built one's; its plan is then scaled, evenly, into the rise and the span)
   stretch: 1.5,   // its plan widened along the band at most this much over its own proportion
   slope: 1,       // its top falls off the band's edge at this slope (1: 45°) — draped in z as well as in plan
 };
-export const CREST_KINDS = ['shell', 'spray'];
-/* which crest: the control's, or by the top's own shape — a POINTED top (a
-   corner in the outline on the axis: the arch's mitred apex) takes the spray,
-   any other (the oval's curve, the rectangle's straight top) the shell */
-export function crestKind(model, sil) {
-  const want = model.params.ornCrestMotif;
-  if (CREST_KINDS.includes(want)) return want;
-  const f = edgeFrame(sil, 1, 0.05, 0);
-  return f.apexTurn > 0.35 ? 'spray' : 'shell';
-}
 /* THE EDGE FRAME on the silhouette `sil` (print mm): its top crossing of the
    axis, the right half walked from there at `step`, each station's outward
    normal averaged over ±blendMm (a mitred apex turns smoothly, so a point
    offset inward never folds), the left half the right's mirror to the bit.
    at(x, y) → the plan point x along the edge (arc length; negative the left
-   half) and y out from it. apexTurn: the edge's turn at the axis (rad). */
+   half) and y out from it. */
 export function edgeFrame(sil, M, step = 0.1, blendMm = CREST.blend * M) {
   const n = sil.length;
   let area = 0; for (let i = 0; i < n; i++) { const a = sil[i], b = sil[(i + 1) % n]; area += a[0] * b[1] - b[0] * a[1]; }
@@ -150,8 +140,7 @@ export function edgeFrame(sil, M, step = 0.1, blendMm = CREST.blend * M) {
   E.splice(0, E.length, ...Es);
   const interp = (A, s) => { const u = Math.min(A.length - 1.000001, Math.max(0, s / step)), k = Math.floor(u), f = u - k; return [A[k][0] + f * (A[k + 1][0] - A[k][0]), A[k][1] + f * (A[k + 1][1] - A[k][1])]; };
   const at = ([x, y]) => { const s = Math.abs(x), e = interp(E, s), nn = interp(Ns, s), l = Math.hypot(nn[0], nn[1]); const q = [e[0] + y * nn[0] / l, e[1] + y * nn[1] / l]; return x < 0 ? [-q[0], q[1]] : x === 0 ? [0, q[1]] : q; };
-  const apexTurn = Math.acos(Math.max(-1, Math.min(1, N[0][1])));   // the first segment's normal against the axis
-  return { at, E, N: Ns, step, length: (E.length - 1) * step, apexTurn, topY: best.y };
+  return { at, E, N: Ns, step, length: (E.length - 1) * step, topY: best.y };
 }
 /* the signed distance of a plan point to a closed polygon (positive inside) */
 export function silDistance(sil, q) {
@@ -438,10 +427,9 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       ends.get(id).items.push({ r, w: r.wOf(x), P: r.stem.pts[k], N: r.path.out[end ? r.path.out.length - 1 : 0] });
     }
   }
-  // the CREST (the axis at the top): a draped shell or spray, the one thing
+  // the CREST (the axis at the top): a draped shell, the one thing
   // that may stand past the band; every other motif inside the band
-  const cKind = crestKind(model, sil);
-  const motifKind = (cls, wcl) => (wcl === 'heavy' ? (cls === 'crest' ? cKind : cls === 'bottom' ? 'shell' : 'rose') : wcl === 'medium' ? 'rosette' : null);
+  const motifKind = (cls, wcl) => (wcl === 'heavy' ? (cls === 'crest' || cls === 'bottom' ? 'shell' : 'rose') : wcl === 'medium' ? 'rosette' : null);
   const frame = edgeFrame(sil, M);
   // a motif's fit: it JOINS every stem that ends at it (an overlap of the
   // embed, no graze) and grazes nothing (the other stems, its mirror, the

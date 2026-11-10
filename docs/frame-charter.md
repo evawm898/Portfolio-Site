@@ -1587,3 +1587,17 @@ round's sheet stays as it was rendered, the record of what the rulings were made
 **CB1 found one real case on its first run**: on the dense EARED rectangle the side stem's meander swung
 0.075 mm past the outer edge mid-run, where an ear's notch pinches the band. A meander past the edge along
 the run is now lowered as a self-folding one is (60 % there, told).
+
+### 17.9 Third round — "shell works, spray doesn't"
+
+Eva's ruling on the second sheet (option A, Nov 10): **the shell is the crest on every top, the arch's
+pointed apex included; the spray is gone.** Removed with it: the *Crest form* control (`ornCrestMotif`,
+never on `main`, so no saved design names it), the `spray` element and `PALMETTE_SPRAY`, `crestKind` and
+the edge frame's `apexTurn` that chose between the two, and the gate's per-value probe that existed only
+for that control. The gates restate the crest as the shell everywhere. `buildPalmette` keeps its layout
+argument (the palmette element is unchanged, 10,704 triangles, 53.1° under its cap).
+
+**On the arch the shell is narrower than on the other two**: 18 mm across against the rectangle's 26 and
+the oval's 24, 4.2 mm past the edge. At its full span the draped shell does not fit the mitred apex
+(the crest's search narrows the span until it joins both stems without grazing), and the read-out says
+how wide it came out. Options B–E of the second sheet stand open.
