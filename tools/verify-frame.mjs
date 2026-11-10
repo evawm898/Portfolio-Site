@@ -652,7 +652,10 @@ async function partTwo(G, R) {
     // the default carved lead (23 mm) holds only 0.50–0.53 turns — its fat
     // body leaves the eye little room (charter §13.6) — so the slider's
     // travel is probed on a 46 mm lead (scale 5), where it spans 0.50–0.70
-    ornTightness: { ...ORN, ornScale: 5, ornHierarchy: 0 },
+    // (on the scroll GROUPS: the capped chains' elements are a third of their
+    // lead — Eva's ruling B — so tightness moves them under the bar; the
+    // groups' lead is the one this probe was sized for)
+    ornTightness: { ...ORN, ornLayout: 'groups', ornScale: 5 },
     // phase 3e step 3: the hierarchy is probed with the filigree on (its
     // minimum, 0, is phase 3d's chains — the vine gone)
     ornHierarchy: ORN,
