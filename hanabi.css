@@ -165,7 +165,11 @@ input[type=range] { accent-color: var(--color-petrol); }
 .hb-type span { text-align: center; overflow-wrap: anywhere; }
 .hb-type[aria-pressed="true"] { border-color: var(--color-petrol); outline: 1px solid var(--color-petrol); color: var(--color-ink); }
 .hb-params { display: flex; flex-direction: column; gap: 4px; }
-.hb-param { display: grid; grid-template-columns: 96px 1fr 38px 18px; gap: 6px; align-items: center; color: var(--color-ink-2); font-size: 11px; }
+/* a range input carries a ~130px intrinsic width: let it shrink, so the narrowest
+   editor (280px) keeps its read-outs in view */
+.hb-param { display: grid; grid-template-columns: minmax(58px, 96px) minmax(0, 1fr) 38px 18px; gap: 6px; align-items: center; color: var(--color-ink-2); font-size: 11px; }
+.hb-param input[type=range] { width: 100%; min-width: 0; }
+.hb-param > label { overflow-wrap: anywhere; }
 .hb-param.hb-check { display: flex; margin: 2px 0; }
 .hb-param output { color: var(--color-dim); font-size: 10.5px; text-align: right; }
 #edItems button.is-own { box-shadow: inset 0 -3px 0 var(--color-seafoam); }
@@ -178,7 +182,7 @@ input[type=range] { accent-color: var(--color-petrol); }
 .hb-row.hb-stack { display: flex; gap: 6px; align-items: center; font-size: 10.5px; flex-wrap: wrap; }
 #edItems button { padding: 4px 10px; min-width: 28px; }
 #edOrder { margin-top: 6px; flex-wrap: nowrap; gap: 4px; }
-#edOrder .hb-btn { padding: 5px 7px; letter-spacing: .04em; flex: 1 1 0; min-width: 0; }
+#edOrder .hb-btn { padding: 5px 3px; font-size: 10px; letter-spacing: 0; flex: 1 1 auto; min-width: 0; white-space: nowrap; }
 #sceneRows[hidden] { display: none; }
 
 @media (max-width: 1240px) {
