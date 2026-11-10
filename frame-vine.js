@@ -382,9 +382,10 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     // is not the extremum itself — the phase is anchored at x = 0 — and on the
     // arch's mitred apex the mapped x moves with y)
     const mappedX = (x, end) => Math.abs(mapToPath({ pts: [[x, raw ? yOf(x) : yc + (end ? sB : 1) * ampOfX(end ? L : 0)]], nrm: [[0, 1]], tan: [0], info: {} }, path, 0).pts[0][0]);
-    // (its end is ROUNDED to the floor — roundEnds — so it stands a feature
-    // short of its mirror by the floor's width, not its body's)
-    const axisStop = (end) => { const wnt = F + AXIS_GAP; let lo = 0, hi = Math.min(L / 2, 6 * wnt); for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2, xx = end ? L - m : m; if (mappedX(xx, end) < wnt) lo = m; else hi = m; } return hi; };
+    // (set by its BODY's width: its end is rounded to the floor afterwards —
+    // roundEnds — but the two stems meet the apex at a slant, so a stop set
+    // for the rounded tip brought them 0.78 mm apart behind it, OR3)
+    const axisStop = (end) => { const wnt = (F + (end ? wsL : ws0)) / 2 + AXIS_GAP; let lo = 0, hi = Math.min(L / 2, 6 * wnt); for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2, xx = end ? L - m : m; if (mappedX(xx, end) < wnt) lo = m; else hi = m; } return hi; };
     const rawAt = (x) => { const t = (x - x0) / (x1 - x0) * n, k = Math.min(n - 1, Math.max(0, Math.floor(t))); return raw[k] + (raw[k + 1] - raw[k]) * (t - k); };
     const theta = (x) => th0 + (rawAt(x) - rawAt(0)) * sc;
     const yOf = (x) => yc + ampOfX(Math.min(L, Math.max(0, x))) * Math.sin(theta(x));
