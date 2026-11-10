@@ -68,7 +68,7 @@ export const PARAMS = {
   length:     { label: 'Length', min: 0.3, max: 1, step: 0.05 },
   trail:      { label: 'Trail length', min: 0, max: 1, step: 0.05 },
   starSize:   { label: 'Star size', min: 0.4, max: 2.5, step: 0.1 },
-  density:    { label: 'Density', min: 0.4, max: 2, step: 0.1 },
+  density:    { label: 'Detail', min: 0, max: 2, step: 0.1, note: 'how much fine detail the burst carries' },
   rotation:   { label: 'Rotation', min: -180, max: 180, step: 5, unit: '°' },
   tips:       { label: 'Tip dots', kind: 'bool' },
   core:       { label: 'Core', kind: 'bool' },
@@ -84,21 +84,21 @@ export const TYPES = {
   peony:         { label: 'Peony', note: 'rings of stars, no trails', escalate: true,
                    params: ['count', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 20, starSize: 1, density: 1, core: true, rotation: 0 } },
   chrysanthemum: { label: 'Chrysanthemum', note: 'trailed arms', escalate: true,
-                   params: ['count', 'length', 'trail', 'starSize', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 26, length: 1, trail: 0.75, starSize: 1, tips: true, core: true, rotation: 0 } },
+                   params: ['count', 'length', 'trail', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 26, length: 1, trail: 0.75, starSize: 1, density: 1, tips: true, core: true, rotation: 0 } },
   ring:          { label: 'Ring', note: 'a hollow ring of stars', escalate: true,
-                   params: ['count', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 22, starSize: 1, density: 1, core: false, rotation: 0 } },
+                   params: ['count', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 22, starSize: 1, density: 0, core: false, rotation: 0 } },
   willow:        { label: 'Willow', note: 'trails that droop', escalate: true,
-                   params: ['count', 'length', 'trail', 'starSize', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 18, length: 1, trail: 0.7, starSize: 1, tips: true, core: false, rotation: 0 } },
+                   params: ['count', 'length', 'trail', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 18, length: 1, trail: 0.7, starSize: 1, density: 1, tips: true, core: false, rotation: 0 } },
   palm:          { label: 'Palm', note: 'a few thick curving arms', escalate: false,
-                   params: ['count', 'length', 'starSize', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 6, length: 1, starSize: 1, tips: true, core: true, rotation: 0 } },
+                   params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 6, length: 1, starSize: 1, density: 0, tips: true, core: true, rotation: 0 } },
   crossette:     { label: 'Crossette', note: 'arms that split', escalate: true,
-                   params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 8, length: 1, starSize: 1, density: 1, tips: true, core: true, rotation: 0 } },
+                   params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 8, length: 1, starSize: 1, density: 0, tips: true, core: true, rotation: 0 } },
   dahlia:        { label: 'Dahlia', note: 'thick petals', escalate: true,
-                   params: ['count', 'length', 'starSize', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 12, length: 1, starSize: 1, core: true, rotation: 0 } },
+                   params: ['count', 'length', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 12, length: 1, starSize: 1, density: 0, core: true, rotation: 0 } },
   glitter:       { label: 'Glitter', note: 'a cloud of strobing sparks', escalate: true,
                    params: ['count', 'starSize', 'density', 'core', ...COLOR_PARAMS], defaults: { count: 34, starSize: 1, density: 1, core: false } },
   blossom:       { label: 'Blossom', note: 'a five-petal flower', escalate: false,
-                   params: ['count', 'length', 'starSize', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 5, length: 1, starSize: 1, core: true, rotation: 0 } },
+                   params: ['count', 'length', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 5, length: 1, starSize: 1, density: 0, core: true, rotation: 0 } },
 };
 export const TYPE_IDS = Object.keys(TYPES);
 
@@ -152,7 +152,7 @@ const RANK_TABLE = {
 const SIZES = [0.42, 0.58, 0.72, 0.86, 1.0];
 // A field escalates mostly by COUNT, so it starts larger: a rank-1 field of
 // three rosettes at a burst's 0.42 is a smudge.
-const FIELD_MOTIFS = ['rosettes', 'starfield'];
+export const FIELD_MOTIFS = ['rosettes', 'starfield'];
 const FIELD_SIZES = [0.72, 0.8, 0.88, 0.94, 1.0];
 // Per motif, per rank 1..5: the count, and the rings where the motif has them.
 const COUNTS = {
@@ -209,7 +209,7 @@ export function defaultSpec(suit, rank, allSuits, motif = 'classic', tier = 'non
 export function cellOverride(design, suitId, rank) {
   const o = design.fireworks && design.fireworks[suitId] && design.fireworks[suitId][rank];
   if (!o || typeof o !== 'object') return null;
-  const { items, ...rest } = o;
+  const { items, place, ...rest } = o;
   return rest;
 }
 
@@ -563,6 +563,19 @@ function cubicAt(p0, p1, p2, p3, t) {
           u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]];
 }
 
+// DETAIL (the density parameter, 0..2). Every type's drawing at its own default
+// density is the drawing phase 2 shipped, element for element. Below a default
+// of 1 a type strips its secondary marks back (on an even share of its arms);
+// above it, or above a default of 0, it adds finer marks. Added marks are
+// flagged `det`: they never enter the fit, so detail never rescales a burst, and
+// one that would land outside the burst's own reach is left out.
+const detailOf = (s, dflt) => clampN(+(s.density ?? dflt), 0, 2);
+// arm i of n keeps its secondary mark at share d (0..1): an even spread, all at 1
+const keeps = (i, d) => Math.floor((i + 1) * d + 1e-9) > Math.floor(i * d + 1e-9);
+// where the j-th added mark goes along a stroke (0..1): every new mark lands
+// between two already there, so more detail only ever ADDS marks
+const SPLIT = [0.5, 0.25, 0.75, 0.125, 0.625, 0.375, 0.875];
+
 const TYPE_DRAW = {
   // concentric rings of round stars; no lines at all
   peony(s, n, w, rand, o, c) {
@@ -579,11 +592,14 @@ const TYPE_DRAW = {
   chrysanthemum(s, n, w, rand, o, c) {
     const out = [], len = s.length ?? 1, tr = clampN(s.trail ?? 0.75, 0, 1), ph = rand() * Math.PI * 2;
     const r0 = Math.max(0.08, len * (1 - tr)), wd = Math.max(0.16, w * 0.62 * s.starSize);
+    // detail: below 1 the faint inner trails thin out; above 1, beads along each head
+    const dd = detailOf(s, 1), beads = Math.round(Math.max(0, dd - 1) * 3);
     for (let i = 0; i < n; i++) {
       const a = ph + (i / n) * Math.PI * 2 + (rand() - 0.5) * 0.06, l = len * (0.92 + rand() * 0.08);
-      if (r0 > 0.1) out.push({ k: 'line', a: pol(a, 0.06), b: pol(a, r0), w: wd * 0.5, col: o, op: 0.4 });
+      if (r0 > 0.1 && keeps(i, Math.min(1, dd))) out.push({ k: 'line', a: pol(a, 0.06), b: pol(a, r0), w: wd * 0.5, col: o, op: 0.4 });
       out.push({ k: 'line', a: pol(a, r0), b: pol(a, l), w: wd, col: i % 2 ? c : o });
       if (s.tips) out.push({ k: 'dot', p: pol(a, l), r: wd * 1.35, col: o });
+      for (let j = 1; j <= beads; j++) out.push({ k: 'dot', det: true, p: pol(a, r0 + (l - r0) * SPLIT[j - 1]), r: wd * 1.3, col: i % 2 ? o : c });
     }
     if (s.core) out.push({ k: 'dot', p: [0, 0], r: w * 1.6, col: c });
     return out;
@@ -592,9 +608,11 @@ const TYPE_DRAW = {
   ring(s, n, w, rand, o, c) {
     const out = [], dr = w * 1.35 * s.starSize, ph = rand() * Math.PI * 2;
     for (let i = 0; i < n; i++) out.push({ k: 'dot', p: pol(ph + (i / n) * Math.PI * 2, 1), r: dr, col: o });
-    if ((s.density ?? 1) > 1.25) {
-      const m = Math.round(n * 0.84);
-      for (let i = 0; i < m; i++) out.push({ k: 'dot', p: pol(ph + ((i + 0.5) / m) * Math.PI * 2, 0.84), r: dr * 0.7, col: c });
+    // detail: a further inner ring every half step, up to four
+    const inner = Math.min(4, Math.floor(detailOf(s, 0) * 2 + 1e-9));
+    for (let k = 1; k <= inner; k++) {
+      const rr = 1 - 0.16 * k, m = Math.max(5, Math.round(n * rr));
+      for (let i = 0; i < m; i++) out.push({ k: 'dot', det: true, p: pol(ph + ((i + (k % 2 ? 0.5 : 0)) / m) * Math.PI * 2, rr), r: dr * (0.75 - 0.08 * k), col: k % 2 ? c : o });
     }
     if (s.core) out.push({ k: 'dot', p: [0, 0], r: dr * 1.2, col: c });
     return out;
@@ -603,14 +621,17 @@ const TYPE_DRAW = {
   willow(s, n, w, rand, o, c) {
     const out = [], len = s.length ?? 1, tr = clampN(s.trail ?? 0.7, 0.1, 1), ph = rand() * Math.PI * 2;
     const wd = Math.max(0.16, w * 0.55 * s.starSize);
+    // detail: below 1 the faint heads thin out; above 1, droplets down each trail
+    const dd = detailOf(s, 1), drops = Math.round(Math.max(0, dd - 1) * 4);
     for (let i = 0; i < n; i++) {
       const a = ph + (i / n) * Math.PI * 2, cs = Math.cos(a), sn = Math.sin(a), L = len * (0.9 + rand() * 0.1);
       const p0 = [cs * 0.05, sn * 0.05], p1 = [cs * L * 0.6, sn * L * 0.6];
       const p2 = [cs * L * 0.82, sn * L * 0.42 + L * 0.3], p3 = [cs * L * 0.74, sn * L * 0.28 + L * 0.62];
       const t0 = 1 - tr;
-      if (t0 > 0.02) out.push({ k: 'cubic', pts: cubicHead(p0, p1, p2, p3, t0), w: wd * 0.6, col: o, op: 0.35 });
+      if (t0 > 0.02 && keeps(i, Math.min(1, dd))) out.push({ k: 'cubic', pts: cubicHead(p0, p1, p2, p3, t0), w: wd * 0.6, col: o, op: 0.35 });
       out.push({ k: 'cubic', pts: cubicTail(p0, p1, p2, p3, t0), w: wd, col: i % 2 ? c : o });
       if (s.tips) out.push({ k: 'dot', p: p3, r: wd * 1.3, col: o });
+      for (let j = 1; j <= drops; j++) out.push({ k: 'dot', det: true, p: cubicAt(p0, p1, p2, p3, t0 + (1 - t0) * SPLIT[j - 1]), r: wd * 1.45, col: i % 2 ? o : c });
     }
     if (s.core) out.push({ k: 'dot', p: [0, 0], r: w * 1.5, col: c });
     return out;
@@ -630,6 +651,13 @@ const TYPE_DRAW = {
       }
       out.push({ k: 'ribbon', pts, hw, col: i % 2 ? c : o });
       if (s.tips) out.push({ k: 'dot', p: p3, r: W * 0.3, col: o });
+      // detail: pairs of fine leaflets swept back off the frond
+      const pairs = Math.round(detailOf(s, 0) * 3);
+      for (let j = 1; j <= pairs; j++) {
+        const t = 0.2 + 0.62 * SPLIT[j - 1], q = cubicAt(p0, p1, p2, p3, t), q2 = cubicAt(p0, p1, p2, p3, Math.max(0, t - 0.12));
+        const tx = q[0] - q2[0], ty = q[1] - q2[1], tl = Math.hypot(tx, ty) || 1, ux = tx / tl, uy = ty / tl, ll = L * 0.17;
+        for (const sd of [1, -1]) out.push({ k: 'line', det: true, a: q, b: [q[0] + (-uy * sd * 0.8 - ux * 0.6) * ll, q[1] + (ux * sd * 0.8 - uy * 0.6) * ll], w: Math.max(0.14, w * 0.42), col: i % 2 ? c : o });
+      }
     }
     if (s.core) out.push({ k: 'dot', p: [0, 0], r: W * 0.55, col: c });
     return out;
@@ -637,14 +665,22 @@ const TYPE_DRAW = {
   // arms that split near their end into a fork (three tines at high density)
   crossette(s, n, w, rand, o, c) {
     const out = [], len = s.length ?? 1, ph = rand() * Math.PI * 2, wd = Math.max(0.16, w * 0.62 * s.starSize);
-    const tines = (s.density ?? 1) > 1.3 ? [-0.55, 0, 0.55] : [-0.5, 0.5];
+    // detail: a third tine from 0.5, every tine splits again from 1.0 (with the
+    // third tine back from 1.5), and sparks thread the arms at 2.0
+    const lvl = Math.min(4, Math.floor(detailOf(s, 0) * 2 + 1e-9));
+    const tines = lvl === 1 || lvl >= 3 ? [-0.55, 0, 0.55] : [-0.5, 0.5];
     for (let i = 0; i < n; i++) {
       const a = ph + (i / n) * Math.PI * 2, j = pol(a, len * 0.56);
       out.push({ k: 'line', a: pol(a, 0.08), b: j, w: wd, col: o });
+      if (lvl === 4) for (const u of [0.24, 0.4]) out.push({ k: 'dot', det: true, p: pol(a, len * u), r: wd * 0.85, col: c });
       for (const da of tines) {
         const e = [j[0] + Math.cos(a + da) * len * 0.4, j[1] + Math.sin(a + da) * len * 0.4];
         out.push({ k: 'line', a: j, b: e, w: wd * 0.85, col: c });
         if (s.tips) out.push({ k: 'dot', p: e, r: wd * 1.3, col: c });
+        if (lvl >= 2) {
+          const m = [j[0] + Math.cos(a + da) * len * 0.22, j[1] + Math.sin(a + da) * len * 0.22];
+          for (const sd of [-0.5, 0.5]) out.push({ k: 'line', det: true, a: m, b: [m[0] + Math.cos(a + da + sd) * len * 0.15, m[1] + Math.sin(a + da + sd) * len * 0.15], w: wd * 0.6, col: o });
+        }
       }
     }
     if (s.core) out.push({ k: 'dot', p: [0, 0], r: w * 1.6, col: c });
@@ -653,9 +689,17 @@ const TYPE_DRAW = {
   // short, fat petals of light round a core, gaps between them
   dahlia(s, n, w, rand, o, c) {
     const out = [], len = s.length ?? 1, ph = rand() * Math.PI * 2, W = w * 3.4 * s.starSize;
+    // detail: fine spokes in the gaps between petals (to 1.0), then a streak down
+    // each petal in the other colour (1.0 to 2.0)
+    const dd = detailOf(s, 0);
     for (let i = 0; i < n; i++) {
       const a = ph + (i / n) * Math.PI * 2;
       out.push({ k: 'line', a: pol(a, len * 0.36), b: pol(a, len * 0.86), w: W, col: i % 2 ? c : o });
+    }
+    for (let i = 0; i < n; i++) {
+      const a = ph + (i / n) * Math.PI * 2;
+      if (dd > 0 && keeps(i, Math.min(1, dd))) out.push({ k: 'line', det: true, a: pol(a + Math.PI / n, len * 0.3), b: pol(a + Math.PI / n, len * 0.8), w: Math.max(0.14, w * 0.4), col: o });
+      if (dd > 1 && keeps(i, dd - 1)) out.push({ k: 'line', det: true, a: pol(a, len * 0.42), b: pol(a, len * 0.8), w: W * 0.28, col: i % 2 ? o : c });
     }
     if (s.core) {
       const m = Math.max(6, Math.round(n * 0.75));
@@ -666,13 +710,16 @@ const TYPE_DRAW = {
   },
   // a cloud of four-point sparks with no structure at all
   glitter(s, n, w, rand, o, c) {
-    const out = [], m = Math.max(6, Math.round(n * (s.density ?? 1)));
-    for (let i = 0; i < m; i++) {
+    // detail: the spark count. The cloud is FITTED on the sparks detail 1 draws —
+    // below 1 the rest are ghosts (fitted, not drawn), above it the extra are
+    // detail — so the cloud keeps its size whatever the setting
+    const out = [], base = Math.max(6, n), m = Math.max(6, Math.round(n * detailOf(s, 1))), M = Math.max(m, base);
+    for (let i = 0; i < M; i++) {
       const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * 0.94, p = pol(a, d), z = (0.05 + rand() * 0.07) * s.starSize;
-      const col = i % 3 === 2 ? c : o, wd = Math.max(0.16, w * 0.62);
-      if (i % 4 === 3) { out.push({ k: 'dot', p, r: wd * 1.2, col }); continue; }
-      out.push({ k: 'line', a: [p[0] - z, p[1]], b: [p[0] + z, p[1]], w: wd, col });
-      out.push({ k: 'line', a: [p[0], p[1] - z], b: [p[0], p[1] + z], w: wd, col });
+      const col = i % 3 === 2 ? c : o, wd = Math.max(0.16, w * 0.62), fl = { ...(i >= base ? { det: true } : {}), ...(i >= m ? { ghost: true } : {}) };
+      if (i % 4 === 3) { out.push({ k: 'dot', p, r: wd * 1.2, col, ...fl }); continue; }
+      out.push({ k: 'line', a: [p[0] - z, p[1]], b: [p[0] + z, p[1]], w: wd, col, ...fl });
+      out.push({ k: 'line', a: [p[0], p[1] - z], b: [p[0], p[1] + z], w: wd, col, ...fl });
     }
     if (s.core) out.push({ k: 'dot', p: [0, 0], r: w * 1.5, col: c });
     return out;
@@ -686,6 +733,15 @@ const TYPE_DRAW = {
       out.push({ k: 'petal', segs: [at(0.13, 0),
         [at(0.3, 0.3), at(0.7, 0.44), at(0.97, 0.15)], at(0.87, 0), at(0.97, -0.15),
         [at(0.7, -0.44), at(0.3, -0.3), at(0.13, 0)]], col: o });
+    }
+    // detail: veins drawn into every petal (centre, then the two sides, then a
+    // second pair), in the second colour
+    const veins = Math.round(detailOf(s, 0) * 2.5), vw = Math.max(0.14, w * 0.32);
+    for (let i = 0; i < n && veins; i++) {
+      const a = ph + (i / n) * Math.PI * 2, cs = Math.cos(a), sn = Math.sin(a);
+      const at = (u, v) => [(cs * u - sn * v * k) * len, (sn * u + cs * v * k) * len];
+      const vs = [[0, 0.78], [0.12, 0.66], [-0.12, 0.66], [0.24, 0.52], [-0.24, 0.52]].slice(0, veins);
+      for (const [v, u] of vs) out.push({ k: 'line', det: true, a: at(0.2, v * 0.3), b: at(u, v), w: vw, col: c });
     }
     if (s.core) {
       for (let i = 0; i < n; i++) {
@@ -704,11 +760,12 @@ function drawType(spec, cx, cy, R, w, rand, colors) {
   s.starSize = clampN(+s.starSize || 1, PARAMS.starSize.min, PARAMS.starSize.max);
   const n = escalatedCount(spec.motif, s.count, s.rank);
   const o = colors[0], c = pick(colors, 1);
-  const prims = TYPE_DRAW[spec.motif](s, n, w, rand, o, c);
+  const all = TYPE_DRAW[spec.motif](s, n, w, rand, o, c);
   // fit: the unit frame is scaled to R, shrinking until every point plus its
-  // stroke or radius lands inside R
+  // stroke or radius lands inside R — on the BASE marks only, so detail never
+  // rescales the burst
   let k = R;
-  const each = (fn) => { for (const p of prims) {
+  const each = (fn, prims = all.filter((p) => !p.det)) => { for (const p of prims) {
     if (p.k === 'dot') fn(p.p, p.r);
     else if (p.k === 'line') { fn(p.a, p.w / 2); fn(p.b, p.w / 2); }
     else if (p.k === 'cubic') for (const q of p.pts) fn(q, p.w / 2);
@@ -717,6 +774,8 @@ function drawType(spec, cx, cy, R, w, rand, colors) {
   } };
   each((q, pad) => { const d = Math.hypot(q[0], q[1]); if (d > 1e-9) k = Math.min(k, (R - pad) / d); });
   k = Math.max(k, R * 0.05);
+  // a ghost is fitted and not drawn; a detail mark that would reach past R is left out
+  const prims = all.filter((p) => { if (p.ghost) return false; if (!p.det) return true; let ok = true; each((q, pad) => { if (Math.hypot(q[0], q[1]) * k + pad > R + 1e-9) ok = false; }, [p]); return ok; });
   const rot = ((+spec.rotation || 0) * Math.PI) / 180, cs = Math.cos(rot), sn = Math.sin(rot);
   const T = (q) => [cx + (q[0] * cs - q[1] * sn) * k, cy + (q[0] * sn + q[1] * cs) * k];
   const Pq = (q) => { const t = T(q); return P(t[0], t[1]); };

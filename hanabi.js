@@ -5,10 +5,10 @@
 import {
   defaultDesign, normaliseDesign, serialiseDesign, activeSuits, cardCounts, deckCards,
   suitById, symbolClashes, imposition, copyCentreToAll, SIZE_PRESETS, INDEX_STYLES, COMPOSE, COUNT_MODES, NUMERAL_FILLS,
-  RANKS, COPIES, VERSION, SCENES, cellHasOverride, cellOf, clearCell, applyArrangementToRank, ITEM_LIMITS,
+  RANKS, COPIES, VERSION, SCENES, cellHasOverride, cellOf, clearCell, applyArrangementToRank, ITEM_LIMITS, PLACE_LIMITS, restack,
 } from './hanabi/deck.js';
 import { SYMBOLS, SYMBOL_IDS } from './hanabi/symbols.js';
-import { renderFace, renderBack, placementFor, cellItems } from './hanabi/layout.js';
+import { renderFace, renderBack, placementFor, scalePlacement, literalItems } from './hanabi/layout.js';
 import { fireworkSpec, defaultSpec, renderFirework, motifParams, MOTIFS, MOTIF_IDS, TIERS, TIER_RANKS, TYPES, PARAMS } from './hanabi/firework.js';
 import { exportPdf, exportZip, downloadBlob } from './hanabi/export.js';
 
@@ -25,7 +25,7 @@ function loadStored() {
   } catch { return defaultDesign(); }
 }
 let design = loadStored();
-let view = { mode: 'suit', suit: 'red', grayscale: false, guides: false, zoom: 150, cell: { suit: 'red', rank: 1 }, scope: 'row' };
+let view = { mode: 'suit', suit: 'red', grayscale: false, guides: false, zoom: 150, cell: { suit: 'red', rank: 1 }, scope: 'row', item: 0 };
 try { Object.assign(view, JSON.parse(localStorage.getItem(VIEW_KEY) || '{}')); } catch { /* storage unavailable */ }
 
 let saveTimer = 0;
@@ -287,7 +287,39 @@ function selCell() {
   view.cell = { suit, rank };
   return { suit: suitById(design, suit), rank };
 }
-function selectCell(suitId, rank) { view.cell = { suit: suitId, rank }; persistView(); renderBoard(); }
+function selectCell(suitId, rank) { view.cell = { suit: suitId, rank }; view.item = 0; persistView(); renderBoard(); }
+
+// ---- arranging a card by hand ----
+// Count and Count + scale: every firework is an item { x, y, s, rot, n } of the
+// card's own arrangement, in STACKING order (the last is drawn on top). Scale: the
+// one firework is the card's `place`. Column, Full bleed and the field motifs are
+// laid out by their composition and are not arranged.
+function arrangeMode(suit, rank) {
+  if (COUNT_MODES.includes(suit.centre.compose)) return 'items';
+  if (suit.centre.compose === 'scale' && scalePlacement(design, suit, rank)) return 'place';
+  return null;
+}
+function arrangePlacement(suit, rank) {
+  const m = arrangeMode(suit, rank);
+  return m === 'items' ? placementFor(design, suit, rank) : m === 'place' ? scalePlacement(design, suit, rank) : null;
+}
+// The card's arrangement as drawn, written literally (the default pips with the
+// radius they are drawn at), so an edit starting from it moves nothing else.
+function curItems(suit, rank) {
+  const own = cellOf(design, suit.id, rank);
+  return own && own.items ? own.items.map((x) => ({ ...x })) : literalItems(placementFor(design, suit, rank));
+}
+function curPlace(suit, rank) {
+  const own = cellOf(design, suit.id, rank);
+  if (own && own.place) return { ...own.place };
+  const sp = scalePlacement(design, suit, rank), F = sp.field;
+  return { x: (sp.base.cx - F.x) / F.w, y: (sp.base.cy - F.y) / F.h, s: 1, rot: 0 };
+}
+function selItem(suit, rank) {
+  const n = arrangeMode(suit, rank) === 'items' ? rank : 1;
+  view.item = Math.max(0, Math.min(n - 1, view.item | 0));
+  return view.item;
+}
 
 function motifThumb(suit, m) {
   const spec = defaultSpec(suit, 5, design.suits, m, 'none', 'scale');
@@ -358,17 +390,28 @@ function buildEditor(suit, rank) {
   for (const id of MOTIF_IDS) (groups[MOTIFS[id].group] ||= []).push(id);
   const gallery = Object.entries(groups).map(([g, ids]) => `<p class="hb-ed__label">${g}</p><div class="hb-types">${ids.map((m) =>
     `<button type="button" class="hb-type" data-type="${m}" title="${escapeHtml(MOTIFS[m].label)}${MOTIFS[m].note ? ` — ${escapeHtml(MOTIFS[m].note)}` : ''}">${motifThumb(suit, m)}<span>${escapeHtml(MOTIFS[m].label)}</span></button>`).join('')}</div>`).join('');
-  const counting = COUNT_MODES.includes(suit.centre.compose);
+  const mode = arrangeMode(suit, rank);
   $('editor').innerHTML = `
     <div class="hb-ed__head"><p class="hb-ed__title"><b>${escapeHtml(suit.name)} ${rank}</b></p>
       <button type="button" class="hb-btn hb-btn--ghost" id="edReset">Reset to suit</button></div>
     <p class="hb-ed__own" id="edOwn"></p>
     <div class="hb-ed__card" id="edCard"></div>
-    <p class="hb-note" id="edHint">${counting ? 'Drag a firework to move it; drag its square to resize it and its round handle to turn it.' : 'One firework: switch the row to Count to arrange several.'}</p>
-    ${counting ? `<div class="hb-actions">
-      <button type="button" class="hb-btn hb-btn--ghost" id="edApplyRank">Use for every ${rank}</button>
-      <button type="button" class="hb-btn hb-btn--ghost" id="edResetItems">Reset arrangement</button>
-      <button type="button" class="hb-btn hb-btn--ghost" id="edResetRank">Rank ${rank} column to default</button></div>` : ''}
+    <p class="hb-note" id="edHint">${mode ? 'Click a firework to pick it; drag it to move it, its square to resize it, its round handle to turn it. A firework keeps the size you give it wherever you put it, even past the field (the index stays on top).' : `This composition lays its fireworks out itself: switch the row to Count or Scale to place them by hand.`}</p>
+    ${mode ? `<div class="hb-ed__sec" id="edArrange"><p class="hb-ed__label">Arrange <span class="hb-dim">— this card</span></p>
+      ${mode === 'items' ? `<div class="hb-row hb-stack"><span class="hb-dim">Back</span><div class="hb-seg" id="edItems" role="radiogroup" aria-label="Pick a firework, back to front"></div><span class="hb-dim">Front</span></div>` : ''}
+      <div class="hb-params">
+        ${arrangeControl('x', 'Across', 0, 1, 0.01)}${arrangeControl('y', 'Down', 0, 1, 0.01)}
+        ${arrangeControl('s', 'Size', ...(mode === 'items' ? ITEM_LIMITS.s : PLACE_LIMITS.s), 0.01)}${arrangeControl('rot', 'Turn', -180, 180, 5)}</div>
+      ${mode === 'items' ? `<div class="hb-actions" id="edOrder" aria-label="Stacking order">
+        <button type="button" class="hb-btn hb-btn--ghost" data-order="back" title="Draw it under every other firework">To back</button>
+        <button type="button" class="hb-btn hb-btn--ghost" data-order="down" title="One step further back">Backward</button>
+        <button type="button" class="hb-btn hb-btn--ghost" data-order="up" title="One step further forward">Forward</button>
+        <button type="button" class="hb-btn hb-btn--ghost" data-order="front" title="Draw it over every other firework">To front</button></div>
+      <div class="hb-actions">
+        <button type="button" class="hb-btn hb-btn--ghost" id="edApplyRank">Use for every ${rank}</button>
+        <button type="button" class="hb-btn hb-btn--ghost" id="edResetItems">Reset arrangement</button>
+        <button type="button" class="hb-btn hb-btn--ghost" id="edResetRank">Rank ${rank} column to default</button></div>`
+      : `<div class="hb-actions"><button type="button" class="hb-btn hb-btn--ghost" id="edResetPlace">Back to the centre</button></div>`}</div>` : ''}
     <div class="hb-ed__sec"><p class="hb-ed__label">Rank composition <span class="hb-dim">— ${escapeHtml(suit.name)} row</span></p>
       <div class="hb-row"><label for="edCompose">Rank shown by</label><select id="edCompose">${Object.keys(COMPOSE).map((k) => `<option value="${k}" title="${COMPOSE[k]}">${COMPOSE_SHORT[k]}</option>`).join('')}</select></div>
       <div class="hb-row"><label for="edTier">Second tier</label><select id="edTier">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div></div>
@@ -382,12 +425,12 @@ function buildEditor(suit, rank) {
 function paintEditor(suit, rank) {
   const ed = $('editor'); if (!ed.firstElementChild) return;
   const spec = fireworkSpec(design, suit, rank), own = cellOf(design, suit.id, rank) || {}, card = view.scope === 'card';
-  const counting = COUNT_MODES.includes(suit.centre.compose);
+  const mode = arrangeMode(suit, rank), sel = selItem(suit, rank);
   const keys = Object.keys(own);
-  $('edOwn').textContent = keys.length ? `Its own ${keys.map((k) => (k === 'items' ? 'arrangement' : PARAMS[k] ? PARAMS[k].label.toLowerCase() : k)).join(', ')}` : `As the ${suit.name} row`;
+  $('edOwn').textContent = keys.length ? `Its own ${keys.map((k) => (k === 'items' ? 'arrangement' : k === 'place' ? 'placement' : PARAMS[k] ? PARAMS[k].label.toLowerCase() : k)).join(', ')}` : `As the ${suit.name} row`;
   $('edReset').disabled = !keys.length;
   let svg = renderFace(design, { kind: 'card', suitId: suit.id, rank }, { idPrefix: 'ed' });
-  if (counting) svg = svg.replace(/<\/svg>$/, handlesSvg(placementFor(design, suit, rank)) + '</svg>');
+  if (mode) svg = svg.replace(/<\/svg>$/, handlesSvg(arrangePlacement(suit, rank), sel) + '</svg>');
   $('edCard').innerHTML = svg;
   $('edCard').classList.toggle('is-gray', view.grayscale);
   $('edCompose').value = suit.centre.compose;
@@ -406,20 +449,50 @@ function paintEditor(suit, rank) {
     const has = card ? own[k] !== undefined : suit.firework[k] !== undefined && suit.firework[k] !== '';
     el.closest('[data-param]').classList.toggle('is-own', has);
   }
-  for (const [id, on] of [['edApplyRank', true], ['edResetItems', !!own.items], ['edResetRank', !!design.arrangements[rank]]]) if ($(id)) $(id).disabled = !on;
+  for (const [id, on] of [['edApplyRank', true], ['edResetItems', !!own.items], ['edResetRank', !!design.arrangements[rank]], ['edResetPlace', !!own.place]]) if ($(id)) $(id).disabled = !on;
+  if (!mode || !$('edArrange')) return;
+  // the picked firework's own values
+  const it = mode === 'items' ? curItems(suit, rank)[sel] : curPlace(suit, rank);
+  for (const k of ['x', 'y', 's', 'rot']) {
+    const el = $(`ar-${k}`);
+    if (document.activeElement !== el) el.value = it[k];
+    ed.querySelector(`[data-ao="${k}"]`).textContent = k === 'rot' ? `${Math.round(it[k])}°` : k === 's' ? `${mode === 'place' ? '×' : ''}${(+it[k]).toFixed(2)}` : `${Math.round(it[k] * 100)}%`;
+  }
+  if (mode === 'items') {
+    const items = curItems(suit, rank);
+    $('edItems').innerHTML = items.map((x, i) => `<button type="button" role="radio" data-item="${i}" aria-checked="${i === sel}" title="Firework ${x.n + 1}">${x.n + 1}</button>`).join('');
+    for (const b of $('edOrder').children) b.disabled = (b.dataset.order === 'back' || b.dataset.order === 'down') ? sel === 0 : sel === items.length - 1;
+  }
+}
+function arrangeControl(k, label, min, max, step) {
+  return `<div class="hb-param" data-arrange="${k}"><label for="ar-${k}">${label}</label>`
+    + `<input type="range" id="ar-${k}" data-a="${k}" min="${min}" max="${max}" step="${step}"><output data-ao="${k}"></output><span></span></div>`;
+}
+// Write the picked firework's key k: into the card's own arrangement (Count) or
+// its placement (Scale). Arranging is always this card's own.
+function arrangeWrite(k, v) {
+  const { suit, rank } = selCell(), mode = arrangeMode(suit, rank);
+  if (mode === 'items') {
+    const items = curItems(suit, rank), i = selItem(suit, rank);
+    items[i] = { ...items[i], [k]: v };
+    cellOf(design, suit.id, rank, true).items = items;
+  } else if (mode === 'place') cellOf(design, suit.id, rank, true).place = { ...curPlace(suit, rank), [k]: v };
+  changed();
 }
 
 // The drag handles over the editor's card, in card mm.
-function handlesSvg(pl) {
-  const h = Math.max(0.9, pl.unit * 0.07), sw = h * 0.28;
+// Every firework has a move target (in stacking order, so the front one takes a
+// click where two overlap); only the PICKED one carries the resize square and the
+// turn handle, drawn last so nothing covers them.
+function handlesSvg(pl, sel) {
+  const h = Math.max(0.9, Math.min(pl.field.w, pl.field.h) * 0.035), sw = h * 0.28;
+  const it = pl.items[sel] || pl.items[0], i = pl.items.indexOf(it);
+  const a = ((it.rot - 90) * Math.PI) / 180, rx = it.cx + Math.cos(a) * (it.r + h * 2.4), ry = it.cy + Math.sin(a) * (it.r + h * 2.4);
   return '<g class="hb-handles">' + `<rect x="${pl.field.x}" y="${pl.field.y}" width="${pl.field.w}" height="${pl.field.h}" fill="none" stroke="#2FA3A3" stroke-opacity="0.35" stroke-width="${sw}" stroke-dasharray="${sw * 3} ${sw * 3}" pointer-events="none"/>`
-    + pl.items.map((it, i) => {
-      const a = ((it.rot - 90) * Math.PI) / 180, rx = it.cx + Math.cos(a) * (it.r + h * 2.4), ry = it.cy + Math.sin(a) * (it.r + h * 2.4);
-      return `<circle data-h="move" data-i="${i}" cx="${it.cx}" cy="${it.cy}" r="${it.r}" fill="#FFFFFF" fill-opacity="0.001" stroke="#FFFFFF" stroke-opacity="0.45" stroke-width="${sw}" stroke-dasharray="${sw * 2} ${sw * 2}"/>`
-        + `<line x1="${it.cx}" y1="${it.cy}" x2="${rx}" y2="${ry}" stroke="#2FA3A3" stroke-width="${sw}" stroke-opacity="0.6" pointer-events="none"/>`
-        + `<rect data-h="size" data-i="${i}" x="${it.cx + it.r - h}" y="${it.cy - h}" width="${2 * h}" height="${2 * h}" fill="#2FA3A3"/>`
-        + `<circle data-h="rot" data-i="${i}" cx="${rx}" cy="${ry}" r="${h}" fill="#2FA3A3"/>`;
-    }).join('') + '</g>';
+    + pl.items.map((x, k) => `<circle data-h="move" data-i="${k}" cx="${x.cx}" cy="${x.cy}" r="${x.r}" fill="#FFFFFF" fill-opacity="0.001" stroke="${k === i ? '#2FA3A3' : '#FFFFFF'}" stroke-opacity="${k === i ? 0.9 : 0.4}" stroke-width="${k === i ? sw * 1.6 : sw}"${k === i ? '' : ` stroke-dasharray="${sw * 2} ${sw * 2}"`}/>`).join('')
+    + `<line x1="${it.cx}" y1="${it.cy}" x2="${rx}" y2="${ry}" stroke="#2FA3A3" stroke-width="${sw}" stroke-opacity="0.6" pointer-events="none"/>`
+    + `<rect data-h="size" data-i="${i}" x="${it.cx + it.r - h}" y="${it.cy - h}" width="${2 * h}" height="${2 * h}" fill="#2FA3A3"/>`
+    + `<circle data-h="rot" data-i="${i}" cx="${rx}" cy="${ry}" r="${h}" fill="#2FA3A3"/>` + '</g>';
 }
 
 function editorWrite(k, v) {
@@ -431,6 +504,7 @@ function editorWrite(k, v) {
 function onEditor(e) {
   const { suit, rank } = selCell();
   const t = e.target;
+  if (t.dataset.a) { arrangeWrite(t.dataset.a, +t.value); return; }
   if (t.dataset.p) {
     const P = PARAMS[t.dataset.p];
     editorWrite(t.dataset.p, P.kind === 'bool' ? t.checked : P.kind === 'color' ? t.value.toUpperCase() : +t.value);
@@ -450,8 +524,16 @@ function onEditorClick(e) {
     if (view.scope === 'card') clearCell(design, suit.id, rank, b.dataset.clear); else delete suit.firework[b.dataset.clear];
     changed(); return;
   }
+  if (b.dataset.item !== undefined) { view.item = +b.dataset.item; paintEditor(suit, rank); return; }
+  if (b.dataset.order) {
+    const items = curItems(suit, rank), i = selItem(suit, rank);
+    const j = { back: 0, down: i - 1, up: i + 1, front: items.length - 1 }[b.dataset.order];
+    cellOf(design, suit.id, rank, true).items = restack(items, i, j);
+    view.item = Math.max(0, Math.min(items.length - 1, j)); changed(); return;
+  }
   if (b.id === 'edReset') { clearCell(design, suit.id, rank); changed(); }
-  else if (b.id === 'edApplyRank') { applyArrangementToRank(design, rank, cellItems(design, suit.id, rank)); changed(); }
+  else if (b.id === 'edResetPlace') { clearCell(design, suit.id, rank, 'place'); changed(); }
+  else if (b.id === 'edApplyRank') { applyArrangementToRank(design, rank, curItems(suit, rank)); changed(); }
   else if (b.id === 'edResetItems') { clearCell(design, suit.id, rank, 'items'); changed(); }
   else if (b.id === 'edResetRank') { delete design.arrangements[rank]; changed(); }
 }
@@ -465,24 +547,35 @@ function svgPoint(e) {
 }
 function onDragStart(e) {
   const h = e.target.closest('[data-h]'); if (!h) return;
-  const { suit, rank } = selCell();
-  const pl = placementFor(design, suit, rank), i = +h.dataset.i, p = svgPoint(e), it = pl.items[i];
-  board.drag = { kind: h.dataset.h, i, pl, items: cellItems(design, suit.id, rank).map((x) => ({ ...x })), dx: p.x - it.cx, dy: p.y - it.cy };
+  const { suit, rank } = selCell(), mode = arrangeMode(suit, rank); if (!mode) return;
+  const pl = arrangePlacement(suit, rank), i = +h.dataset.i, p = svgPoint(e), it = pl.items[i];
+  view.item = i;
+  board.drag = { kind: h.dataset.h, i, pl, mode, items: mode === 'items' ? curItems(suit, rank) : [curPlace(suit, rank)], dx: p.x - it.cx, dy: p.y - it.cy };
   $('edCard').setPointerCapture(e.pointerId);
   e.preventDefault();
+  // repainted on the first move or on release, never here: the pressed node must
+  // stay in the document while the press is delivered
 }
 function onDragMove(e) {
   const d = board.drag; if (!d) return;
+  d.moved = true;
   const p = svgPoint(e), it = d.items[d.i], c = d.pl.items[d.i], F = d.pl.field;
   const cl = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   if (d.kind === 'move') { it.x = +cl((p.x - d.dx - F.x) / F.w, 0, 1).toFixed(4); it.y = +cl((p.y - d.dy - F.y) / F.h, 0, 1).toFixed(4); }
-  else if (d.kind === 'size') it.s = +cl(Math.hypot(p.x - c.cx, p.y - c.cy) / d.pl.unit, ...ITEM_LIMITS.s).toFixed(3);
+  else if (d.kind === 'size') it.s = +cl(Math.hypot(p.x - c.cx, p.y - c.cy) / d.pl.unit, ...(d.mode === 'items' ? ITEM_LIMITS.s : PLACE_LIMITS.s)).toFixed(3);
   else { let a = (Math.atan2(p.y - c.cy, p.x - c.cx) * 180) / Math.PI + 90; if (a > 180) a -= 360; it.rot = Math.round(a / 5) * 5; }
   const { suit, rank } = selCell();
-  cellOf(design, suit.id, rank, true).items = d.items.map((x) => ({ ...x }));
+  if (d.mode === 'items') cellOf(design, suit.id, rank, true).items = d.items.map((x) => ({ ...x }));
+  else cellOf(design, suit.id, rank, true).place = { ...d.items[0] };
   if (!board.raf) board.raf = requestAnimationFrame(() => { board.raf = 0; paintBoard(); paintEditor(suit, rank); });
 }
-function onDragEnd() { if (!board.drag) return; board.drag = null; changed(); }
+// A press that never moved only picks the firework: it writes nothing.
+function onDragEnd() {
+  const d = board.drag; if (!d) return;
+  board.drag = null;
+  if (d.moved) changed();
+  else { const { suit, rank } = selCell(); paintEditor(suit, rank); }
+}
 
 $('stage').addEventListener('click', (e) => {
   const c = e.target.closest('[data-cell]');
@@ -570,6 +663,7 @@ window.__hanabi = {
   view: () => ({ ...view }),
   select: (suit, rank) => selectCell(suit, rank),
   placement: (suit, rank) => placementFor(design, suitById(design, suit), rank),
+  placeOf: (suit, rank) => { const p = scalePlacement(design, suitById(design, suit), rank); return p && p.items[0]; },
   exportPdf: (o) => exportPdf(design, o),
   exportZip: (o) => exportZip(design, o),
 };

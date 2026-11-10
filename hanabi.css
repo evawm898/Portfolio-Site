@@ -149,6 +149,10 @@ input[type=range] { accent-color: var(--color-petrol); }
 .hb-param.is-own .hb-clear { visibility: visible; color: var(--color-petrol); }
 .hb-param.is-own > label:first-child, .hb-param.is-own.hb-check { color: var(--color-ink); }
 .hb-editor .hb-btn:disabled { opacity: .4; cursor: default; }
+.hb-row.hb-stack { display: flex; gap: 6px; align-items: center; font-size: 10.5px; flex-wrap: wrap; }
+#edItems button { padding: 4px 10px; min-width: 28px; }
+#edOrder { margin-top: 6px; flex-wrap: nowrap; gap: 4px; }
+#edOrder .hb-btn { padding: 5px 7px; letter-spacing: .04em; flex: 1 1 0; min-width: 0; }
 #sceneRows[hidden] { display: none; }
 
 @media (max-width: 1240px) {

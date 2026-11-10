@@ -86,6 +86,9 @@ export const legacyCentre = () => ({ compose: 'scale', motif: 'classic', tier: '
 export const SCENES = { treeline: 'Treeline', rooftops: 'Rooftops' };
 export const SCENE_HEIGHT = { min: 0.08, max: 0.45 };
 export const ITEM_LIMITS = { s: [0.15, 1.25], rot: [-180, 180] };
+// A Scale card's one firework, placed by hand: x, y fractions of the centre
+// field, s a multiple of the radius Scale gives it, rot degrees added.
+export const PLACE_LIMITS = { s: [0.3, 1.6], rot: [-180, 180] };
 export const CORNER_MODES = {
   inverted: 'Two corners, bottom inverted',
   upright:  'Two corners, both upright',
@@ -284,6 +287,11 @@ export function normaliseDesign(raw, symbolIds) {
           if (it) o.items = it;
           else { delete o.items; notes.push(`${sid} ${rk}: an arrangement of ${Array.isArray(o.items) ? o.items.length : 'no'} fireworks for rank ${rk} — dropped`); }
         }
+        if (o.place !== undefined) {
+          const pl = readPlace(o.place);
+          if (pl) o.place = pl;
+          else { delete o.place; notes.push(`${sid} ${rk}: a placement not understood — dropped`); }
+        }
         if (!Object.keys(o).length) delete ranks[rk];
       }
       if (!Object.keys(ranks).length) delete d.fireworks[sid];
@@ -326,13 +334,34 @@ export function readParam(k, v) {
   return typeof v === 'number' && Number.isFinite(v) ? clamp(v, P.min, P.max) : undefined;
 }
 // An arrangement: exactly `rank` fireworks, each clamped onto the field.
+// An item may carry `n`, the firework it is (0..rank-1): a firework keeps its
+// own drawing when its place in the stacking order moves. Kept only when the
+// items' n are exactly 0..rank-1 once each; otherwise every n is dropped and
+// each firework is its slot again.
 export function readItems(items, rank) {
   if (!Array.isArray(items) || items.length !== rank) return null;
   const out = [];
   for (const it of items) {
     if (!it || typeof it !== 'object' || ![it.x, it.y, it.s].every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
-    out.push({ x: clamp(it.x, 0, 1), y: clamp(it.y, 0, 1), s: clamp(it.s, ...ITEM_LIMITS.s), rot: clamp(num(it.rot, 0), ...ITEM_LIMITS.rot) });
+    const o = { x: clamp(it.x, 0, 1), y: clamp(it.y, 0, 1), s: clamp(it.s, ...ITEM_LIMITS.s), rot: clamp(num(it.rot, 0), ...ITEM_LIMITS.rot) };
+    if (it.n !== undefined) o.n = it.n;
+    out.push(o);
   }
+  const ns = out.map((o) => o.n);
+  const perm = ns.every((n) => Number.isInteger(n) && n >= 0 && n < rank) && new Set(ns).size === rank;
+  if (!perm) for (const o of out) delete o.n;
+  return out;
+}
+export function readPlace(p) {
+  if (!p || typeof p !== 'object' || ![p.x, p.y, p.s].every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
+  return { x: clamp(p.x, 0, 1), y: clamp(p.y, 0, 1), s: clamp(p.s, ...PLACE_LIMITS.s), rot: clamp(num(p.rot, 0), ...PLACE_LIMITS.rot) };
+}
+// Move item i of an arrangement to position j of the stacking order (0 is the
+// back). Every item is numbered first, so each firework keeps its drawing.
+export function restack(items, i, j) {
+  const out = items.map((it, k) => ({ ...it, n: Number.isInteger(it.n) ? it.n : k }));
+  const [it] = out.splice(i, 1);
+  out.splice(Math.max(0, Math.min(out.length, j)), 0, it);
   return out;
 }
 
