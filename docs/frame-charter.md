@@ -1627,7 +1627,9 @@ springing rose are to be identified and fixed.
   with vertical walls, which from three-quarter read as slabs — gone with D. (2) AT THE STEM END: a swept
   wire closes on a face square to its path, and where one run's stem ends inside the next it showed as a
   flat collar. Every stem's two ends now narrow on a quarter circle to the 1 mm floor over half its width
-  (`roundEnds`, sampled at 0.1 mm there), the axis stop set for the rounded end. VN6 reads the emitted end
+  (`roundEnds`, sampled at 0.1 mm there). The axis stop stays set by the body's width: a stop set for the
+  rounded tip brought the arch's two head stems 0.78 mm apart behind it, at the apex they meet at a slant
+  (OR3 found it); VN3 restates the axis clause against the body width read off the emitted rows. VN6 reads the emitted end
   rows (no wider than the feature). (3) NOT ORNAMENT: at the arch springing a dash at the light's edge and
   a different-shade bar on the band's outer wall are the head band and the jamb meeting face to face (the
   phase-2 embed): coplanar faces of two overlapping shells, drawn flickering by the viewer, fused in print.
@@ -1649,5 +1651,5 @@ springing rose are to be identified and fixed.
   24 mm across (2.0 / 2.0 gives 27), still 4.2 mm past the edge, measured. That is a different method from the one ruled, so it is a lettered option.
 
 Mutants (relief): `the-chains-are-not-capped` (CB1), `a-rose-at-the-corner` (VN2),
-`the-crest-shell-is-pointed` (CB2 — the crest's record), `a-stem-ends-on-a-flat-face` (VN6, VN3);
+`the-crest-shell-is-pointed` (CB2 — the crest's record), `a-stem-ends-on-a-flat-face` (VN6);
 (elements) `the-crest-shell-is-sharp-again` (EL6).
