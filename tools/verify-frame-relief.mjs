@@ -360,20 +360,27 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     rec('SC8 the wire\'s width is the restated law off the emitted walls: constant at t, or tapered — t through the body, linear over each volute to max(F, ½ t) at the eye; never under F, and a tapered crown never under min(F, its body crown)', sc8.length === 0 && lawErr.false < 1e-9 && lawErr.true < 1e-9, `constant: thinnest ${thinnest.false.toFixed(4)} mm, law error ${lawErr.false.toExponential(1)}, least crown ${leastCrown.false.toFixed(4)} · tapered: thinnest ${thinnest.true.toFixed(4)} mm, law error ${lawErr.true.toExponential(1)}, least crown ${leastCrown.true.toFixed(4)}${sc8.length ? ' — ' + sc8.slice(0, 3).join('; ') : ''}`);
     // SC9 the coil check does not depend on the HEADING a curve is laid at:
     // one carved C mapped onto a straight run at 16 headings reads the same
-    // self-gap at every one, and the unmapped scroll's. Without the mapped
+    // self-gap at every one. Without the mapped
     // tangent's unwrap (atan2 wraps at ±π) the check sees coils that are not
     // there and the chains give way elements they should build — a valid
     // ornament either way, so no clause on the frame's output can see it
     // (measured: the default arch chain 90 -> 84 wires)
     {
-      const c9 = FL.buildScroll({ kind: 'C', length: 30, tightness: 0.9, carved: true, wire: FL.carvedCap(30), balance: 0.6 }), g0 = FL.selfGap(c9).gap, sc9 = [];
+      // compared heading to heading, never to the unmapped scroll: mapping
+      // re-derives a carved wire's width from the MAPPED curvature, so the
+      // mapped gap is the unmapped one only while the floor binds (a mutant
+      // removing the carved floor moved it 1.1254 -> 1.1223 mm at every
+      // heading alike — not this clause's subject)
+      const c9 = FL.buildScroll({ kind: 'C', length: 30, tightness: 0.9, carved: true, wire: FL.carvedCap(30), balance: 0.6 }), sc9 = [];
+      let g0 = null;
       for (let k = 0; k < 16; k++) {
         const th = 2 * Math.PI * k / 16, d = [Math.cos(th), Math.sin(th)], no = [-d[1], d[0]], L = 200, n = 201;
         const pts = Array.from({ length: n }, (_, i) => [d[0] * L * i / (n - 1), d[1] * L * i / (n - 1)]);
         const g = FL.selfGap(FL.mapToPath(c9, { pts, s: pts.map((_, i) => L * i / (n - 1)), tan: pts.map(() => d), out: pts.map(() => no), length: L }, 80)).gap;
+        if (g0 === null) g0 = g;
         if (Math.abs(g - g0) > 1e-6) sc9.push(`heading ${(360 * k / 16).toFixed(1)}°: ${g.toFixed(4)} mm`);
       }
-      rec('SC9 the coil check is independent of the heading: a carved C laid on a straight run at 16 headings reads its own unmapped self-gap at every one', sc9.length === 0, `${g0.toFixed(4)} mm at every heading${sc9.length ? ' — ' + sc9.slice(0, 3).join('; ') : ''}`);
+      rec('SC9 the coil check is independent of the heading: a carved C laid on a straight run at 16 headings reads one self-gap at every one', sc9.length === 0, `${g0.toFixed(4)} mm at every heading${sc9.length ? ' — ' + sc9.slice(0, 3).join('; ') : ''}`);
     }
     const thin = FL.buildScroll({ kind: 'C', length: 60, tightness: 0.5, wire: 0.6 });
     rec('SC4 a wire under the floor is built AT it and told', thin.info.wire === F && thin.info.told.some((x) => /wire 0\.60/.test(x)), thin.info.told.join('; '));
