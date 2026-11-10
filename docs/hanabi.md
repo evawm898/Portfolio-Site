@@ -62,19 +62,33 @@ synced), because its job is making every suit distinguishable without colour.
 |---|---|---|
 | the suit's firework | `suit.centre.motif`, `suit.firework` (params, only the keys the type takes) | the editor in "row" scope; panel 01 |
 | the rank composition | `suit.centre.compose`; under Count the rank column's arrangement `design.arrangements[rank]` | the editor; "Use for every N" |
-| this card | `design.fireworks[suit][rank]` — any spec key, **per key**, plus `items` (its own arrangement) | the editor in "this card" scope, and the drag handles |
+| this card | `design.fireworks[suit][rank]` — any spec key, **per key**, plus `items` (its own arrangement, Count) or `place` (its one firework, Scale) | the editor in "this card" scope, and the Arrange panel |
 
 Per key, not per cell: a card that sets its own star size still follows its suit's count. A
 dot marks a card with anything of its own; "Reset to suit" drops the cell's record, ↺ one key.
 
-**Count arrangements** are one `{ x, y, s, rot }` per firework: x and y fractions of the centre
-FIELD (the area less the corner-index columns), s a radius as a fraction of half the field's
-shorter side, rot degrees. The default pips (`DEFAULT_PIPS`, `layout.js`) vary sizes within a
-card and may overlap. One set of fractions serves every size preset because a firework is held
-inside the field (its radius never reaches past an edge) — so no preset puts one on the corner
-index (H17 restates the field and reads every mark). In the editor a firework is dragged by its
-body, resized by its square and turned by its round handle (real pointer events, captured on the
-card's container). A file whose arrangement is not exactly N long is refused and told.
+**Count arrangements** are one `{ x, y, s, rot, n? }` per firework, in STACKING ORDER (the
+last is drawn on top): x and y fractions of the centre FIELD (the area less the corner-index
+columns), s a radius as a fraction of half the field's shorter side, rot degrees, and `n` the
+firework it is — its drawing's seed, so a firework keeps its own look when it moves up or down
+the stack (`restack()`, `deck.js`). `n` is kept only as a permutation of 0..N−1. The default
+pips (`DEFAULT_PIPS`, `layout.js`) vary sizes within a card and may overlap; they are FITTED to
+the field (a pip near an edge is drawn smaller), so no preset puts one on the corner index (H17).
+**An arrangement made by hand is taken literally** (Eva, Nov 10: "change the size of each
+firework"): a firework keeps the size it was given wherever it is put, and may run past the field
+— under the index, which is drawn over it — and off the card's edge. The first hand edit writes
+the arrangement as DRAWN (`literalItems`), so nothing else on the card moves (H23). A file whose
+arrangement is not exactly N long is refused and told.
+
+**The Arrange panel** (Count and Count + scale; Scale too, for its one firework): click a
+firework on the editor's card to pick it (a click writes nothing), drag it to move it, its square
+to resize it, its round handle to turn it; or set Across / Down / Size / Turn with sliders. Only
+the picked firework carries the square and the handle. **To back · Backward · Forward · To front**
+change what overlaps what; the numbered picker (back to front) reaches a firework buried under
+others. Under **Scale** the one firework's placement is the card's `place: { x, y, s, rot }` —
+x, y fractions of the field, s a multiple of the radius Scale gives it (0.3–1.6), rot added to its
+rotation; absent, the card draws its old markup by branch. Column, Full bleed and the two field
+motifs lay themselves out and have no Arrange panel.
 
 ## The fireworks
 
@@ -82,7 +96,7 @@ card's container). A file whose arrangement is not exactly N long is refused and
 (rings of round stars, no lines), `chrysanthemum` (trailed arms), `ring` (a hollow ring),
 `willow` (drooping trails), `palm` (a few thick tapered fronds), `crossette` (arms that fork),
 `dahlia` (short fat petals), `glitter` (a structureless cloud of four-point sparks), `blossom`
-(solid notched petals). Their parameters — count, length, trail, star size, density,
+(solid notched petals). Their parameters — count, length, trail, star size, detail,
 rotation, tip dots, core, outer and core colours, as each type takes them — are one table
 (`PARAMS`, `TYPES`) the editor builds from and `deck.js` validates against. Every renderer is
 a pure function of the spec (no clock, no `Math.random`; H19). Under Scale a type grows with
@@ -91,6 +105,28 @@ fullness, because the count is the rank.
 
 **The default pairing** (Eva's to rule): White ring · Red peony · Blue willow · Yellow
 chrysanthemum · Green palm · Rainbow glitter.
+
+**Detail** (the `density` key, 0–2, Eva, Nov 10) on all nine: how much fine detail a burst
+carries. Each type's default draws exactly the phase-2 drawing (H22), and detail never rescales a
+burst — added marks are flagged and left out of the fit, and a mark that would reach past r is not
+drawn (H21 holds each drawing's marks a subset of the next one's):
+
+| type | default | what detail does |
+|---|---|---|
+| peony | 1 | rings of stars, 1 to 5 |
+| chrysanthemum | 1 | below 1 the faint inner trails thin out; above, beads along every arm |
+| ring | 0 | a further inner ring every half step, up to four |
+| willow | 1 | below 1 the faint heads thin out; above, droplets down every trail |
+| palm | 0 | pairs of fine leaflets off each frond, up to six |
+| crossette | 0 | a third tine (0.5), every tine splitting again (1.0; three tines from 1.5), sparks along the arms (2.0) |
+| dahlia | 0 | fine spokes in the gaps (to 1), then a streak down each petal |
+| glitter | 1 | the spark count; the cloud is fitted on detail 1's sparks, so it keeps its size |
+| blossom | 0 | veins in every petal, up to five |
+
+**Declared, measured, not migrated:** a phase-2 design that set detail by hand on any type but
+peony (ring and crossette had threshold steps; glitter's cloud rescaled with its count) now draws
+the new law, and a hand arrangement whose firework the old field fit shrank now draws it at the
+size it says. Everything else a phase-2 design holds renders byte-identically (H22).
 
 The catalogue motifs and phase 1's bursts remain, and take rotation and colours.
 
@@ -188,13 +224,15 @@ each face sheet, each back in the slot mirrored for a long- or short-edge flip.
 
 ## Verify
 
-`node tools/verify-hanabi.mjs` — H1–H20 in Node, B1–B8 in Chromium (the PDF is rasterised by
+`node tools/verify-hanabi.mjs` — H1–H24 in Node, B1–B9 in Chromium (the PDF is rasterised by
 `pdftoppm` and its crop marks and edges read against an imposition RESTATED in the gate).
 H10 holds the corner index to one style across suits, H11 a suit's centre to its own cards,
 H12 the tier to ranks 4–5 and clear of the index, H13 every motif to its box, H14 the rainbow index (B6 its control) — read off every
 point it draws (paths are absolute M/L/Q/C/Z by contract, and the gate refuses anything else).
 H15 the migration against `d5cd4ef`, H16 the silhouettes, H17 Count, H18 inheritance, H19
-determinism, H20 the scene; B5 the board, B7 real-pointer arranging, B8 the localStorage
-migration. `--negative-control` runs thirty-nine mutants, four of them of the page script;
+determinism, H20 the scene, H21 detail, H22 phase-2 designs unchanged against `e95f121`, H23
+arranging (literal hand sizes, fitted pips, restacking), H24 Scale placement; B5 the board, B7
+real-pointer arranging, B8 the localStorage migration, B9 the Arrange panel. `--negative-control`
+runs fifty-four mutants, eight of them of the page script;
 `--keep <dir>` saves the PDFs. Not in CI.
 Dev deps: `npm i --no-save jspdf@2.5.1 jszip@3.10.1 playwright-core`; needs `pdfinfo`/`pdftoppm`.

@@ -46,6 +46,19 @@
      H19 every firework is a pure function of its spec (no clock, no Math.random)
      H20 the scene band: off by default; behind the fireworks and under the index, inside
          the bleed box, at its height
+     H21 Detail (density) on all nine types: each takes it, five settings draw five
+         different bursts, every mark stays within r, and added detail never rescales the
+         burst — each drawing's marks are a subset of the next one's along the type's
+         ladder (peony re-spaces its rings by law and is held only to the first two)
+     H22 a phase-2 design renders BYTE-IDENTICALLY to BASE2 (e95f121): the default deck at
+         every size x index, every type x 12 seeds x rank x composition at its default
+         detail, and hand parameter and arrangement edits that stay inside the field
+     H23 arranging by hand: a hand arrangement keeps the size it says past the field edge
+         while the default pips stay fitted; restacking keeps every firework's own drawing
+         and only changes the paint order; n survives the file only as a permutation;
+         the drawn arrangement written out literally draws the same card
+     H24 Scale's one firework placed by hand: moved, scaled and turned as the placement
+         says, saved and read back, clamped; a field motif is never placed
    PART TWO — Chromium, the real page (cdnjs served from node_modules, fonts blocked)
      B1  the page loads with no page error, grayscale and guides toggles act on the stage
      B2  the Centres view renders the viewed suit under each of the five compositions
@@ -56,6 +69,10 @@
      B7  arranging by hand with REAL pointer drags on the editor's card: a move lands where
          the pointer went (in mm), a resize grows, a turn turns, only that card moves; "use
          for every N" carries it to the rank column
+     B9  the Arrange panel: a click on a firework picks it and writes nothing; the size
+         slider sizes the picked firework only; the order buttons restack it (and it stays
+         picked); a Scale card's firework is dragged to where the pointer went; Column has
+         no Arrange panel
      B3  the print PDF: page count, and on page 1 rasterised by pdftoppm the crop marks are
          ink at the positions H6 computed and the card art starts exactly at the bleed box
      B4  the PNG zip: one file per face + back, each 300 dpi of the bleed box
@@ -111,10 +128,10 @@ const MUTANTS = [
   // two types, one shape: blossom draws exactly what peony draws
   { id: 'blossom-draws-a-peony', file: 'firework.js', from: "  blossom(s, n, w, rand, o, c) {", to: "  blossom(s, n, w, rand, o, c) { return TYPE_DRAW.peony({ ...s, ...TYPES.peony.defaults }, escalatedCount('peony', TYPES.peony.defaults.count, s.rank), w, rand, o, c);", breaks: ['H16'] },
   { id: 'default-pairing-collapses', file: 'deck.js', from: "symbol: 'heart', centre: defaultCentre('peony')", to: "symbol: 'heart', centre: defaultCentre('ring')", breaks: ['H16'] },
-  { id: 'count-draws-one-short', file: 'layout.js', from: "return pl.items.map((it, i) => renderFirework(", to: "return pl.items.slice(1).map((it, i) => renderFirework(", breaks: ['H17', 'H18'] },
-  { id: 'firework-escapes-the-field', file: 'layout.js', from: "return { cx, cy, r: Math.min(it.s * unit, room), rot: it.rot || 0 };", to: "return { cx, cy, r: it.s * unit * 1.3, rot: it.rot || 0 };", breaks: ['H17'] },
+  { id: 'count-draws-one-short', file: 'layout.js', from: "return pl.items.map((it) => renderFirework(", to: "return pl.items.slice(1).map((it) => renderFirework(", breaks: ['H17', 'H18'] },
+  { id: 'firework-escapes-the-field', file: 'layout.js', from: "r: fitted ? Math.min(it.s * unit, room) : it.s * unit,", to: "r: it.s * unit * 1.3,", breaks: ['H17'] },
   { id: 'arrangement-length-unchecked', file: 'deck.js', from: "if (!Array.isArray(items) || items.length !== rank) return null;", to: "if (!Array.isArray(items)) return null;", breaks: ['H17'] },
-  { id: 'cell-arrangement-ignored', file: 'layout.js', from: "if (o && Array.isArray(o.items) && o.items.length === rank) return o.items;", to: ";", breaks: ['H17', 'B7'] },
+  { id: 'cell-arrangement-ignored', file: 'layout.js', from: "if (o && Array.isArray(o.items) && o.items.length === rank) return { items: o.items, fitted: false };", to: ";", breaks: ['H17', 'B7'] },
   { id: 'suit-parameters-ignored', file: 'firework.js', from: "for (const k of takes) if (mine[k] !== undefined && mine[k] !== '') spec[k] = mine[k];", to: ";", breaks: ['H18', 'B5'] },
   { id: 'suit-parameters-unfiltered', file: 'firework.js', from: "for (const k of takes) if (mine[k]", to: "for (const k of Object.keys(mine)) if (mine[k]", breaks: ['H18'] },
   { id: 'rank-column-keeps-cell-arrangements', file: 'deck.js', from: "for (const s of design.suits) clearCell(design, s.id, rank, 'items');", to: ";", breaks: ['H18', 'B7'] },
@@ -125,6 +142,22 @@ const MUTANTS = [
   { id: 'card-edit-writes-the-row', file: '../hanabi.js', from: "if (view.scope === 'card') cellOf(design, suit.id, rank, true)[k] = v;", to: "if (false) cellOf(design, suit.id, rank, true)[k] = v;", breaks: ['B5'] },
   { id: 'board-greyscale-not-wired', file: '../hanabi.js', from: "if (e.target.id === 'boardGray') { setGray(e.target.checked); return; }", to: "if (e.target.id === 'boardGray') return;", breaks: ['B5'] },
   { id: 'drag-writes-the-rank-column', file: '../hanabi.js', from: "cellOf(design, suit.id, rank, true).items = d.items.map((x) => ({ ...x }));", to: "design.arrangements[rank] = d.items.map((x) => ({ ...x }));", breaks: ['B7'] },
+  // ---- phase 2b: arranging by hand, and Detail on every type
+  { id: 'detail-rescales-the-burst', file: 'firework.js', from: "const each = (fn, prims = all.filter((p) => !p.det)) =>", to: "const each = (fn, prims = all.filter((p) => !p.ghost)) =>", breaks: ['H21'] },
+  { id: 'glitter-fitted-on-what-it-draws', file: 'firework.js', from: "const each = (fn, prims = all.filter((p) => !p.det)) =>", to: "const each = (fn, prims = all.filter((p) => !p.det && !p.ghost)) =>", breaks: ['H21'] },
+  { id: 'a-type-takes-no-detail', file: 'firework.js', from: "params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 6,", to: "params: ['count', 'length', 'starSize', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 6,", breaks: ['H21'] },
+  { id: 'chrysanthemum-detail-ignored', file: 'firework.js', from: "const dd = detailOf(s, 1), beads = Math.round(Math.max(0, dd - 1) * 3);", to: "const dd = 1, beads = 0;", breaks: ['H21'] },
+  { id: 'pips-not-fitted', file: 'layout.js', from: "return { items: DEFAULT_PIPS[rank], fitted: true };", to: "return { items: DEFAULT_PIPS[rank], fitted: false };", breaks: ['H22', 'H23'] },
+  { id: 'hand-arrangement-fitted', file: 'layout.js', from: "r: fitted ? Math.min(it.s * unit, room) : it.s * unit,", to: "r: Math.min(it.s * unit, room),", breaks: ['H23'] },
+  { id: 'restack-reseeds', file: 'layout.js', from: "seed: spec.seed + it.n * 7919,", to: "seed: spec.seed + pl.items.indexOf(it) * 7919,", breaks: ['H23'] },
+  { id: 'stacking-order-not-saved', file: 'deck.js', from: "if (it.n !== undefined) o.n = it.n;", to: ";", breaks: ['H23'] },
+  { id: 'repeated-n-kept', file: 'deck.js', from: "if (!perm) for (const o of out) delete o.n;", to: ";", breaks: ['H23'] },
+  { id: 'place-ignored', file: 'layout.js', from: "const at = p ? { cx: p.cx, cy: p.cy, r: p.r } : sp.base;", to: "const at = sp.base;", breaks: ['H24'] },
+  { id: 'placement-not-read', file: 'deck.js', from: "if (o.place !== undefined) {", to: "if (o.place !== undefined && false) {", breaks: ['H24'] },
+  { id: 'a-pick-writes-the-card', file: '../hanabi.js', from: "  view.item = i;\n  board.drag =", to: "  view.item = i;\n  if (mode === 'items') cellOf(design, suit.id, rank, true).items = curItems(suit, rank);\n  board.drag =", breaks: ['B9'] },
+  { id: 'the-size-slider-sizes-every-firework', file: '../hanabi.js', from: "items[i] = { ...items[i], [k]: v };", to: "for (let j = 0; j < items.length; j++) items[j] = { ...items[j], [k]: v };", breaks: ['B9'] },
+  { id: 'to-back-goes-to-the-front', file: '../hanabi.js', from: "{ back: 0, down: i - 1, up: i + 1, front: items.length - 1 }", to: "{ back: items.length - 1, down: i - 1, up: i + 1, front: 0 }", breaks: ['B9'] },
+  { id: 'scale-drag-not-written', file: '../hanabi.js', from: "else cellOf(design, suit.id, rank, true).place = { ...d.items[0] };", to: "else;", breaks: ['B9'] },
   { id: 'suit-rows-hold-stale-suits', file: '../hanabi.js', from: "const me = () => suitById(design, suit.id);", to: "const me = () => suit;", breaks: ['B6'] },
 ];
 
@@ -134,12 +167,14 @@ const CATALOGUE = (F) => F.MOTIF_IDS.filter((m) => m !== 'classic' && !m.startsW
 // The page as it shipped before the board: H15's reference. Read from git, so the
 // reference cannot be this tree's own reading of an old file.
 const BASE = 'd5cd4ef';
-let baseDir = null;
-async function baseModules() {
-  if (baseDir) return baseDir;
-  baseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hanabi-base-'));
-  for (const f of MODULES) fs.writeFileSync(path.join(baseDir, f), execFileSync('git', ['-C', REPO, 'show', `${BASE}:hanabi/${f}`]));
-  return baseDir;
+// Phase 2 as it shipped (the Firework board, #542): H22's reference.
+const BASE2 = 'e95f121';
+const baseDirs = {};
+async function baseModules(commit = BASE) {
+  if (baseDirs[commit]) return baseDirs[commit];
+  const dir = baseDirs[commit] = fs.mkdtempSync(path.join(os.tmpdir(), 'hanabi-base-'));
+  for (const f of MODULES) fs.writeFileSync(path.join(dir, f), execFileSync('git', ['-C', REPO, 'show', `${commit}:hanabi/${f}`]));
+  return dir;
 }
 
 // ---- a binary raster of every mark a firework puts down (H16): circles, lines
@@ -693,9 +728,9 @@ async function partOne(dir) {
     if (F.fireworkSpec(d, D.suitById(d, 'yellow'), 3).count !== 12 || F.fireworkSpec(d, D.suitById(d, 'yellow'), 3).starSize !== 2.2) return 'a cell override is not per key';
     if (F.fireworkSpec(d, D.suitById(d, 'yellow'), 4).count !== 9) return 'the cell lost its own count to the suit';
     // a parameter the type does not take never reaches the spec
-    D.suitById(d, 'yellow').firework.density = 2;
-    if (F.fireworkSpec(d, D.suitById(d, 'yellow'), 1).density !== undefined) return 'chrysanthemum took a density it has no use for';
-    delete D.suitById(d, 'yellow').firework.density;
+    D.suitById(d, 'red').firework.trail = 0.2;
+    if (F.fireworkSpec(d, D.suitById(d, 'red'), 1).trail !== undefined) return 'peony took a trail it has no use for';
+    delete D.suitById(d, 'red').firework.trail;
     D.suitById(d, 'yellow').firework = {};
     D.clearCell(d, 'yellow', 3); D.clearCell(d, 'yellow', 4);
     if (diff(start, all()).length) return `reset left ${diff(start, all()).join()} moved`;
@@ -742,6 +777,132 @@ async function partOne(dir) {
       if (pts.some(([x, y]) => x < -1e-6 || x > g.fullW + 1e-6 || y > g.fullH + 1e-6)) return `${kind}: the scene leaves the bleed box`;
       if (top < g.fullH * (1 - height) - 1e-6 || top > g.fullH * (1 - height * 0.4)) return `${kind} at ${height}: its top at ${top.toFixed(2)} of ${g.fullH.toFixed(2)}`;
     }
+    return true;
+  });
+
+  // ---- H21: Detail on all nine types.
+  check('H21', 'Detail: every type takes it, five settings draw five bursts, in its box, never rescaled', () => {
+    const els = (svg) => (svg.match(/<(circle|line|path)[^>]*\/>/g) || []);
+    const sub = (a, b) => { const m = new Map(); for (const x of b) m.set(x, (m.get(x) || 0) + 1); for (const x of a) { const c = m.get(x); if (!c) return x; m.set(x, c - 1); } return null; };
+    // the ladders along which detail only ADDS (restated). Peony re-spaces its rings
+    // past two, and a crossette's tines are two or three (their angles differ), so
+    // those are held along shorter ladders.
+    const ALL = [[0, 0.5, 1, 1.5, 2]];
+    const LADDER = { peony: [[0, 0.5]], chrysanthemum: ALL, ring: ALL, willow: ALL, palm: ALL, crossette: [[0, 1], [0.5, 1.5, 2]], dahlia: ALL, glitter: ALL, blossom: ALL };
+    for (const t of F.TYPE_IDS) {
+      if (!F.motifParams(t).includes('density')) return `${t} takes no detail`;
+      for (const k of [0, 3]) for (const rank of [2, 5]) for (const R of [9, 26]) {
+        const box = { cx: 40, cy: 40, r: R };
+        const at = (d) => F.renderFirework({ ...F.defaultSpec({ id: `q${k}`, primary: '#E5484D', secondary: '#F2C230' }, rank, [], t, 'none', 'count'), density: d }, box);
+        const svgs = [0, 0.5, 1, 1.5, 2].map(at);
+        if (new Set(svgs).size !== 5) return `${t} rank ${rank} r ${R}: only ${new Set(svgs).size} different drawings over detail 0..2`;
+        for (const [i, svg] of svgs.entries()) for (const p of pointsOf(svg)) {
+          const out = Math.hypot(p.x - box.cx, p.y - box.cy) + p.pad - R;
+          if (out > R * 0.02) return `${t} detail ${i / 2}: a mark ${out.toFixed(2)} mm past r=${R}`;
+        }
+        for (const L of LADDER[t]) for (let i = 1; i < L.length; i++) { const miss = sub(els(at(L[i - 1])), els(at(L[i]))); if (miss) return `${t} rank ${rank}: detail ${L[i - 1]} -> ${L[i]} lost or moved ${miss.slice(0, 70)}`; }
+      }
+    }
+    return true;
+  });
+
+  // ---- H22: phase-2 designs are drawn exactly as phase 2 drew them.
+  await checkAsync('H22', `a phase-2 design renders byte-identically to ${BASE2}`, async () => {
+    const B = await baseModules(BASE2);
+    const bd = await import(pathToFileURL(path.join(B, 'deck.js')).href), bl = await import(pathToFileURL(path.join(B, 'layout.js')).href), bf = await import(pathToFileURL(path.join(B, 'firework.js')).href);
+    let n = 0;
+    const same = (tag, a, b) => { n++; if (a === b) return null; let i = 0; while (a[i] === b[i]) i++; return `${tag}: differs at ${i}: …${a.slice(i - 20, i + 40)}… vs …${b.slice(i - 20, i + 40)}…`; };
+    for (const t of F.TYPE_IDS) for (let k = 0; k < 12; k++) for (const rank of [1, 2, 3, 4, 5]) for (const comp of ['count', 'countscale', 'scale']) {
+      const su = { id: `q${k}`, primary: '#E5484D', secondary: '#9FB4C8' }, box = { cx: 40, cy: 40, r: 26 };
+      const e = same(`${t} ${k} ${rank} ${comp}`, F.renderFirework(F.defaultSpec(su, rank, [], t, 'none', comp), box), bf.renderFirework(bf.defaultSpec(su, rank, [], t, 'none', comp), box));
+      if (e) return e;
+    }
+    // edits a phase-2 designer could make that this change does not touch: parameters
+    // (detail only on peony, the one type whose detail law is unchanged) and
+    // arrangements that stay in the field
+    const edit = (d) => {
+      d.rainbow = true;
+      Object.assign(d.suits.find((x) => x.id === 'red').firework, { count: 14, density: 1.6, starSize: 1.4, rotation: 25 });
+      Object.assign(d.suits.find((x) => x.id === 'blue').firework, { length: 0.7, trail: 0.4, tips: false });
+      d.suits.find((x) => x.id === 'green').centre.compose = 'countscale';
+      d.suits.find((x) => x.id === 'yellow').centre.compose = 'scale';
+      d.fireworks = { white: { 3: { count: 9, items: [{ x: 0.5, y: 0.22, s: 0.4, rot: 10 }, { x: 0.45, y: 0.5, s: 0.45, rot: 0 }, { x: 0.55, y: 0.78, s: 0.4, rot: -20 }] } }, rainbow: { 5: { starSize: 1.6 } } };
+      d.arrangements = { 2: [{ x: 0.5, y: 0.3, s: 0.5, rot: 0 }, { x: 0.5, y: 0.7, s: 0.5, rot: 45 }] };
+    };
+    for (const preset of ['poker', 'bridge', 'mini']) for (const index of ['large', 'small', 'band']) for (const edited of [false, true]) {
+      const dn = D.defaultDesign(), db = bd.defaultDesign();
+      for (const [d, M] of [[dn, D], [db, bd]]) { d.size = { preset, ...M.SIZE_PRESETS[preset] }; d.index = index; if (edited) edit(d); }
+      for (const c of D.deckCards(dn)) { const e = same(`${preset}/${index}${edited ? '/edited' : ''} ${c.kind} ${c.suitId || ''}${c.rank || ''}`, L.renderFace(dn, c), bl.renderFace(db, c)); if (e) return e; }
+    }
+    return n > 2500 || `only ${n} compared`;
+  });
+
+  // ---- H23: arranging by hand.
+  check('H23', 'arranging: hand sizes kept past the edge, pips fitted, restacking keeps each firework, n read as a permutation', () => {
+    const d = D.defaultDesign(), red = D.suitById(d, 'red');
+    const fw = (svg) => svg.match(/<g class="hb-firework"[\s\S]*?<\/g>/g) || [];
+    // the default pips stay fitted (a pip near an edge is drawn smaller) ...
+    const pl0 = L.placementFor(d, red, 4);
+    if (!pl0.fitted || !pl0.items.some((it, i) => it.r < L.DEFAULT_PIPS[4][i].s * pl0.unit - 1e-9)) return 'the default rank-4 pips are not fitted to the field';
+    // ... a hand arrangement keeps the size it says, wherever it is
+    D.cellOf(d, 'red', 2, true).items = [{ x: 0.02, y: 0.03, s: 1, rot: 0 }, { x: 0.98, y: 0.97, s: 1.2, rot: 0 }];
+    const pl = L.placementFor(d, red, 2);
+    if (pl.fitted || Math.abs(pl.items[0].r - pl.unit) > 1e-9 || Math.abs(pl.items[1].r - 1.2 * pl.unit) > 1e-9) return `a hand firework was resized at the edge: r ${pl.items.map((x) => (x.r / pl.unit).toFixed(3)).join(', ')} of the unit, asked 1, 1.2`;
+    // the drawn arrangement written literally draws the same card
+    D.clearCell(d, 'red', 2);
+    for (const r of [1, 2, 3, 4, 5]) {
+      const before = L.renderFace(d, { kind: 'card', suitId: 'red', rank: r });
+      D.cellOf(d, 'red', r, true).items = L.literalItems(L.placementFor(d, red, r));
+      if (L.renderFace(d, { kind: 'card', suitId: 'red', rank: r }) !== before) return `rank ${r}: the drawn arrangement, written out, moved the card`;
+      D.clearCell(d, 'red', r);
+    }
+    // restacking keeps every firework's own drawing and changes only the order
+    const items = L.literalItems(L.placementFor(d, red, 5));
+    const before = fw(L.renderFace(d, { kind: 'card', suitId: 'red', rank: 5 }));
+    D.cellOf(d, 'red', 5, true).items = D.restack(items, 0, 4);
+    const after = fw(L.renderFace(d, { kind: 'card', suitId: 'red', rank: 5 }));
+    if ([...before].sort().join() !== [...after].sort().join()) return 'restacking redrew a firework';
+    if (after[4] !== before[0] || after[0] !== before[1]) return 'the restacked firework is not drawn last (on top)';
+    // n survives the file only as a permutation
+    const file = JSON.parse(D.serialiseDesign(d));
+    const r1 = D.normaliseDesign(file, S.SYMBOL_IDS).design;
+    if (JSON.stringify(r1.fireworks.red[5].items.map((x) => x.n)) !== JSON.stringify(D.cellOf(d, 'red', 5).items.map((x) => x.n))) return 'the stacking order did not round-trip';
+    file.fireworks.red[5].items[1].n = file.fireworks.red[5].items[2].n;
+    if (D.normaliseDesign(file, S.SYMBOL_IDS).design.fireworks.red[5].items.some((x) => x.n !== undefined)) return 'a repeated n was kept';
+    return true;
+  });
+
+  // ---- H24: Scale's one firework placed by hand.
+  check('H24', "a Scale card's firework placed by hand; a field motif never placed", () => {
+    const d = D.defaultDesign(), red = D.suitById(d, 'red');
+    red.centre.compose = 'scale';
+    const base = L.scalePlacement(d, red, 3);
+    const plain = L.renderFace(d, { kind: 'card', suitId: 'red', rank: 3 });
+    const F0 = base.field;
+    D.cellOf(d, 'red', 3, true).place = { x: 0.25, y: 0.7, s: 0.6, rot: 30 };
+    const pl = L.scalePlacement(d, red, 3).items[0];
+    if (Math.abs(pl.cx - (F0.x + 0.25 * F0.w)) > 1e-9 || Math.abs(pl.cy - (F0.y + 0.7 * F0.h)) > 1e-9 || Math.abs(pl.r - 0.6 * base.unit) > 1e-9 || pl.rot !== 30) return `placed at ${JSON.stringify(pl)}`;
+    const placed = L.renderFace(d, { kind: 'card', suitId: 'red', rank: 3 });
+    if (placed === plain) return 'the placement drew the card unchanged';
+    const pts = pointsOf(placed.slice(placed.indexOf('<g class="hb-firework"'), placed.indexOf('<g class="hb-index">')));
+    const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
+    if (cx > F0.x + 0.45 * F0.w) return `the placed burst's marks centre at x ${cx.toFixed(2)}, not on the left`;
+    if (L.renderFace(d, { kind: 'card', suitId: 'red', rank: 2 }) !== L.renderFace(D.defaultDesign().suits && (() => { const e = D.defaultDesign(); D.suitById(e, 'red').centre.compose = 'scale'; return e; })(), { kind: 'card', suitId: 'red', rank: 2 })) return 'the placement reached another card';
+    // saved, read back, clamped
+    const file = JSON.parse(D.serialiseDesign(d));
+    if (JSON.stringify(D.normaliseDesign(file, S.SYMBOL_IDS).design.fireworks.red[3].place) !== JSON.stringify(D.cellOf(d, 'red', 3).place)) return 'the placement did not round-trip';
+    file.fireworks.red[3].place = { x: 3, y: -1, s: 9, rot: 999 };
+    const back = D.normaliseDesign(file, S.SYMBOL_IDS).design.fireworks.red[3].place;
+    if (back.x !== 1 || back.y !== 0 || back.s !== D.PLACE_LIMITS.s[1] || back.rot !== 180) return `out-of-range placement read as ${JSON.stringify(back)}`;
+    file.fireworks.red[3].place = 'left';
+    const bad = D.normaliseDesign(file, S.SYMBOL_IDS);
+    if (bad.design.fireworks.red || !bad.notes.some((x) => /placement/.test(x))) return 'a placement not understood was kept or dropped silently';
+    // a field motif fills its rect and is never placed
+    red.centre.motif = 'starfield';
+    if (L.scalePlacement(d, red, 3) !== null) return 'a field motif offered a placement';
+    const withPlace = L.renderFace(d, { kind: 'card', suitId: 'red', rank: 3 });
+    D.clearCell(d, 'red', 3);
+    if (L.renderFace(d, { kind: 'card', suitId: 'red', rank: 3 }) !== withPlace) return 'a placement moved a field motif';
     return true;
   });
   return res;
@@ -879,6 +1040,7 @@ async function partTwo(overrides = {}) {
       await page.click('[data-cell="blue:2"]');
       const P = (s, r) => page.evaluate(([s, r]) => window.__hanabi.placement(s, r).items, [s, r]);
       const drag = async (sel, dx, dy) => {
+        await page.$eval('#edCard', (e) => e.scrollIntoView({ block: 'center' }));
         const bb = await page.$eval(sel, (e) => { const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
         await page.mouse.move(bb.x, bb.y); await page.mouse.down();
         for (let k = 1; k <= 6; k++) await page.mouse.move(bb.x + (dx * k) / 6, bb.y + (dy * k) / 6);
@@ -892,9 +1054,11 @@ async function partTwo(overrides = {}) {
       const dmm = Math.hypot(blue1[0].cx - blue0[0].cx, blue1[0].cy - blue0[0].cy), want = Math.hypot(24, 30) / pxPerMm;
       if (Math.abs(dmm - want) > 1.2) return `the firework moved ${dmm.toFixed(2)} mm under a ${want.toFixed(2)} mm drag`;
       if (moved(a, await snap()) !== 'blue:2') return `a drag repainted ${moved(a, await snap())}`;
+      await page.click('#edItems [data-item="1"]');
       await drag('#edCard [data-h="size"][data-i="1"]', 12, 0);
       const blue2 = await P('blue', 2);
       if (!(blue2[1].r > blue1[1].r + 0.5)) return `resize: r ${blue1[1].r.toFixed(2)} -> ${blue2[1].r.toFixed(2)}`;
+      await page.click('#edItems [data-item="0"]');
       await drag('#edCard [data-h="rot"][data-i="0"]', 40, 25);
       const items = (await page.evaluate(() => window.__hanabi.design())).fireworks.blue[2].items;
       if (!items || items.length !== 2 || items[0].rot === 0) return `the card's arrangement: ${JSON.stringify(items)}`;
@@ -904,6 +1068,51 @@ async function partTwo(overrides = {}) {
       if (d.fireworks.blue || JSON.stringify(d.arrangements[2]) !== JSON.stringify(items)) return `apply to the rank: arrangements ${JSON.stringify(d.arrangements)}, cells ${JSON.stringify(d.fireworks)}`;
       const red1 = await P('red', 2);
       if (Math.abs(red1[0].cx - red0[0].cx) < 1) return 'the rank column did not reach red';
+      await page.evaluate(() => document.getElementById('resetDesign').click());
+      await page.click('[data-view=suit]');
+      return true;
+    });
+
+    await check('B9', 'the Arrange panel: pick, size, restack; a Scale card placed by drag; Column not arranged', async () => {
+      await page.evaluate(() => document.getElementById('resetDesign').click());
+      await page.click('[data-view=fireworks]');
+      await page.click('[data-cell="red:3"]');
+      const D = () => page.evaluate(() => window.__hanabi.design());
+      const P = (s, r) => page.evaluate(([s, r]) => window.__hanabi.placement(s, r).items, [s, r]);
+      const centre = (sel) => page.$eval(sel, (e) => { e.closest('#edCard').scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+      // a click on a firework picks it and writes nothing
+      const c2 = await centre('#edCard [data-h="move"][data-i="2"]');
+      await page.mouse.click(c2.x, c2.y);
+      if (Object.keys((await D()).fireworks).length) return `a pick wrote ${JSON.stringify((await D()).fireworks)}`;
+      if (await page.$eval('#edItems [data-item="2"]', (e) => e.getAttribute('aria-checked')) !== 'true') return 'the clicked firework is not the picked one';
+      // the size slider sizes the picked firework only
+      const before = await P('red', 3);
+      await setRange('#ar-s', 1);
+      const after = await P('red', 3), unit = await page.evaluate(() => window.__hanabi.placement('red', 3).unit);
+      if (Math.abs(after[2].r - unit) > 1e-6) return `the picked firework's radius is ${(after[2].r / unit).toFixed(3)} of the unit, asked 1`;
+      for (const i of [0, 1]) if (Math.abs(after[i].r - before[i].r) > 1e-9 || Math.abs(after[i].cx - before[i].cx) > 1e-9) return `firework ${i} moved under another's size slider`;
+      // to the back: the picked firework is drawn first and stays picked
+      await page.click('#edOrder [data-order="back"]');
+      const items = (await D()).fireworks.red[3].items;
+      if (items[0].n !== 2 || items.map((x) => x.n).sort().join() !== '0,1,2') return `restacked: ${JSON.stringify(items.map((x) => x.n))}`;
+      if (await page.$eval('#edItems [data-item="0"]', (e) => e.getAttribute('aria-checked')) !== 'true') return 'the restacked firework is no longer the picked one';
+      const svg = await page.$eval('[data-cell="red:3"]', (e) => e.innerHTML);
+      if ((svg.match(/<g class="hb-firework"/g) || []).length !== 3) return 'the board card lost a firework';
+      // Column lays itself out: no Arrange panel
+      await page.selectOption('#edCompose', 'column');
+      if (await page.$('#edArrange')) return 'Column offers an Arrange panel';
+      // Scale: the one firework is dragged to where the pointer goes
+      await page.selectOption('#edCompose', 'scale');
+      if (!(await page.$('#edArrange')) || await page.$('#edItems')) return 'Scale: no Arrange panel, or a stacking order for one firework';
+      const S0 = await page.evaluate(() => window.__hanabi.placeOf('red', 3));
+      const m = await centre('#edCard [data-h="move"][data-i="0"]');
+      await page.mouse.move(m.x, m.y); await page.mouse.down();
+      for (let k = 1; k <= 6; k++) await page.mouse.move(m.x - (30 * k) / 6, m.y + (20 * k) / 6);
+      await page.mouse.up();
+      const S1 = await page.evaluate(() => window.__hanabi.placeOf('red', 3));
+      const pxPerMm = await page.$eval('#edCard svg', (e) => e.getBoundingClientRect().width / e.viewBox.baseVal.width);
+      const dmm = Math.hypot(S1.cx - S0.cx, S1.cy - S0.cy), want = Math.hypot(30, 20) / pxPerMm;
+      if (!(await D()).fireworks.red[3].place || Math.abs(dmm - want) > 1.2) return `the Scale firework moved ${dmm.toFixed(2)} mm under a ${want.toFixed(2)} mm drag`;
       await page.evaluate(() => document.getElementById('resetDesign').click());
       await page.click('[data-view=suit]');
       return true;

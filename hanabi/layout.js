@@ -10,7 +10,7 @@
 
 import { cardGeom, suitById } from './deck.js';
 import { SYMBOLS, DIGITS, DIGIT_BOX, TOKEN_GLYPHS } from './symbols.js';
-import { fireworkSpec, renderFirework, renderTier, defaultSpec } from './firework.js';
+import { fireworkSpec, renderFirework, renderTier, defaultSpec, FIELD_MOTIFS } from './firework.js';
 
 const f = (v) => +v.toFixed(3);
 
@@ -229,22 +229,36 @@ export const DEFAULT_PIPS = {
   5: [{ x: 0.27, y: 0.17, s: 0.46, rot: 0 }, { x: 0.73, y: 0.17, s: 0.42, rot: 0 }, { x: 0.5, y: 0.5, s: 0.62, rot: 0 }, { x: 0.27, y: 0.83, s: 0.42, rot: 0 }, { x: 0.73, y: 0.83, s: 0.46, rot: 0 }],
 };
 // The arrangement a cell draws: its own, else its rank column's, else the pips.
-export function cellItems(design, suitId, rank) {
+export function cellItems(design, suitId, rank) { return cellArrangement(design, suitId, rank).items; }
+// ... and whether it is the default pips. The pips are FITTED to the field (a
+// pip near an edge is drawn smaller rather than run past it); an arrangement
+// made by hand is taken literally — the size it says, wherever it is.
+export function cellArrangement(design, suitId, rank) {
   const o = design.fireworks && design.fireworks[suitId] && design.fireworks[suitId][rank];
-  if (o && Array.isArray(o.items) && o.items.length === rank) return o.items;
+  if (o && Array.isArray(o.items) && o.items.length === rank) return { items: o.items, fitted: false };
   const col = design.arrangements && design.arrangements[rank];
-  if (Array.isArray(col) && col.length === rank) return col;
-  return DEFAULT_PIPS[rank];
+  if (Array.isArray(col) && col.length === rank) return { items: col, fitted: false };
+  return { items: DEFAULT_PIPS[rank], fitted: true };
 }
 // Where each firework of a Count cell lands, in card mm: { field, unit,
 // items: [{ cx, cy, r, rot }] }. r is the asked radius held inside the field.
-export function countPlacement(field, items) {
+// fitted (the default pips): a firework's radius is held inside the field.
+// Otherwise (an arrangement made by hand) it keeps the size it was given wherever
+// it is put: toward an edge it may run past the field — under the index, which
+// is drawn over it — and the card's own edge clips it. n is the firework it is
+// (its drawing's seed): its slot when the item does not say.
+export function countPlacement(field, items, fitted = true) {
   const unit = Math.min(field.w, field.h) / 2;
-  return { field, unit, items: items.map((it) => {
+  return { field, unit, fitted, items: items.map((it, i) => {
     const cx = field.x + it.x * field.w, cy = field.y + it.y * field.h;
     const room = Math.max(0.5, Math.min(cx - field.x, field.x + field.w - cx, cy - field.y, field.y + field.h - cy));
-    return { cx, cy, r: Math.min(it.s * unit, room), rot: it.rot || 0 };
+    return { cx, cy, r: fitted ? Math.min(it.s * unit, room) : it.s * unit, rot: it.rot || 0, n: Number.isInteger(it.n) ? it.n : i };
   }) };
+}
+// An arrangement as it is DRAWN, written out literally: the fitted pips with the
+// radius they are drawn at, so a hand edit starting from them moves nothing else.
+export function literalItems(pl) {
+  return pl.items.map((it) => ({ x: (it.cx - pl.field.x) / pl.field.w, y: (it.cy - pl.field.y) / pl.field.h, s: it.r / pl.unit, rot: it.rot, n: it.n }));
 }
 // A phase-1 radial burst reaches past r by its outer stars and sparks (about
 // 13%); the catalogue and the types stay within r.
@@ -253,7 +267,8 @@ const REACH = (spec) => (!spec.motif || spec.motif === 'classic' || spec.motif.s
 export function placementFor(design, suit, rank) {
   const g = cardGeom(design);
   const ix = indexArt(design, suit, rank, g, 'pl', false);
-  return countPlacement(fieldArea(ix.area, ix.corner), cellItems(design, suit.id, rank));
+  const ar = cellArrangement(design, suit.id, rank);
+  return countPlacement(fieldArea(ix.area, ix.corner), ar.items, ar.fitted);
 }
 
 function centreArt(design, suit, rank, g, ix) {
@@ -277,18 +292,48 @@ function centreArt(design, suit, rank, g, ix) {
     return art;
   }
   if (compose === 'count' || compose === 'countscale') {
-    const pl = countPlacement(fieldArea(a, k), cellItems(design, suit.id, rank)), reach = REACH(spec);
-    return pl.items.map((it, i) => renderFirework({ ...spec, seed: spec.seed + i * 7919, rotation: (+spec.rotation || 0) + it.rot },
+    const ar = cellArrangement(design, suit.id, rank);
+    const pl = countPlacement(fieldArea(a, k), ar.items, ar.fitted), reach = REACH(spec);
+    return pl.items.map((it) => renderFirework({ ...spec, seed: spec.seed + it.n * 7919, rotation: (+spec.rotation || 0) + it.rot },
       { cx: it.cx, cy: it.cy, r: it.r / reach })).join('');
   }
-  if (spec.tier) {
-    const t = tierLayout(a, k);
-    return renderFirework(spec, { cx, cy: t.burst.cy, r: t.burst.r }) + renderTier(spec, t.rect);
+  const sp = scaleBurst(design, suit, rank, g, ix, spec);
+  const p = sp.place;
+  // a firework placed by hand: its own centre, radius and turn (a field motif
+  // fills its rect and is never placed)
+  const at = p ? { cx: p.cx, cy: p.cy, r: p.r } : sp.base;
+  const s2 = p && p.rot ? { ...spec, rotation: (+spec.rotation || 0) + p.rot } : spec;
+  if (spec.tier) return renderFirework(s2, at) + renderTier(spec, sp.tierRect);
+  return renderFirework(s2, { ...at, rect: sp.field });
+}
+
+// Scale's one firework: where it sits by default, and where the card's own
+// placement (design.fireworks[suit][rank].place) puts it. The default is the
+// expression Scale has always used, so an unplaced card draws its old markup.
+function scaleBurst(design, suit, rank, g, ix, spec) {
+  const a = ix.area, k = ix.corner, field = fieldArea(a, k);
+  let base, tierRect = null;
+  if (spec.tier) { const t = tierLayout(a, k); base = { cx: g.fullW / 2, cy: t.burst.cy, r: t.burst.r }; tierRect = t.rect; }
+  else {
+    const r = design.index === 'band'
+      ? Math.min(a.w * 0.46, a.h * 0.46)
+      : Math.min(a.w * 0.46, (a.h - 2 * k.h) * 0.5 + k.h * 0.35, a.h * 0.4);
+    base = { cx: g.fullW / 2, cy: design.index === 'band' ? a.y + a.h / 2 : g.fullH / 2, r };
   }
-  const r = design.index === 'band'
-    ? Math.min(a.w * 0.46, a.h * 0.46)
-    : Math.min(a.w * 0.46, (a.h - 2 * k.h) * 0.5 + k.h * 0.35, a.h * 0.4);
-  return renderFirework(spec, { cx, cy: design.index === 'band' ? a.y + a.h / 2 : cy, r, rect: fieldArea(a, k) });
+  const o = design.fireworks && design.fireworks[suit.id] && design.fireworks[suit.id][rank];
+  const pl = o && o.place && !FIELD_MOTIFS.includes(spec.motif) ? o.place : null;
+  const place = pl ? { cx: field.x + pl.x * field.w, cy: field.y + pl.y * field.h, r: base.r * pl.s, rot: pl.rot || 0 } : null;
+  return { field, base, place, tierRect, placeable: !FIELD_MOTIFS.includes(spec.motif) };
+}
+// The editor's view of a Scale card: the field, the default burst and the one
+// item (where it is now), with `unit` the default radius, so s = r / unit.
+// null where the firework cannot be placed (a field motif).
+export function scalePlacement(design, suit, rank) {
+  const g = cardGeom(design), ix = indexArt(design, suit, rank, g, 'pl', false);
+  const sp = scaleBurst(design, suit, rank, g, ix, fireworkSpec(design, suit, rank));
+  if (!sp.placeable) return null;
+  const at = sp.place || { ...sp.base, rot: 0 };
+  return { field: sp.field, unit: sp.base.r, base: sp.base, items: [{ cx: at.cx, cy: at.cy, r: at.r, rot: at.rot || 0, n: 0 }] };
 }
 
 // ---- the scene band: a silhouette along the bottom, behind the fireworks ----

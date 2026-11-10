@@ -12751,5 +12751,10 @@ TYPES (peony, chrysanthemum, ring, willow, palm, crossette, dahlia, glitter, blo
 their spec; the default deck gives every suit a different type. **Old designs open unchanged**: v1 A/B/C →
 (scale / column / bleed), v2 single/count/bleed → scale/column/bleed, phase-1 `peony` etc. → `radial-…`;
 H15 renders 9,000+ faces byte-identical to `d5cd4ef` read from git. Hanging/falling pieces stay ruled out.
-Optional scene band (`design.scene`, off). Gate: `node tools/verify-hanabi.mjs` (H1–H20, B1–B8;
-`--negative-control` 39 mutants, `--mutant=a,b` a subset), not in CI.
+Optional scene band (`design.scene`, off). **Phase 2b (Nov 10): the Arrange panel and Detail** — a
+card's fireworks are picked, moved, sized, turned and RESTACKED (items carry `n`, their drawing's seed,
+so a restack only changes paint order); a hand arrangement is taken literally (no shrink at the field
+edge) while the default pips stay fitted; a Scale card's one firework takes `place`. Detail (`density`,
+0–2) on all nine types, each default byte-identical to `e95f121` (H22), detail never rescaling a burst
+(H21). Gate: `node tools/verify-hanabi.mjs` (H1–H24, B1–B9;
+`--negative-control` 54 mutants, `--mutant=a,b` a subset), not in CI.
