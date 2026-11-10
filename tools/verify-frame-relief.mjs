@@ -1327,7 +1327,7 @@ const MUTANTS = [
   { id: 'the-size-ignores-the-weight', file: 'vine', from: 'const len = (RIN.len[0] + RIN.len[1] * w) * M * cc * f;', to: 'const len = (RIN.len[0] + RIN.len[1] * 0.5) * M * cc * f;', breaks: ['RN5'] },
   { id: 'the-volutes-are-given-few-turns', file: 'rinceau', from: 'export const RIN_TURNS = 0.95;', to: 'export const RIN_TURNS = 0.6;', breaks: ['RN6'] },
   { id: 'the-band-is-not-widened', file: 'geometry', orn: true, from: '  const rb = rinceauBand(p);\n  if (!rb) return build();', to: '  const rb = null;\n  if (!rb) return build();', breaks: ['BW1', 'RN6'] },
-  { id: 'the-rinceau-band-check-removed', file: 'vine', from: 'const bandOK = (c) => !c.pts.some((q) => opening(q)) &&', to: 'const bandOK = (c) => true || ', breaks: ['OR7'] },   // the opening test alone is redundant at the defaults (the slit and edge tests keep a volute out of it too: measured, nothing fired), so the whole band test goes
+  { id: 'the-rinceau-band-check-removed', file: 'vine', from: 'const bandOK = (c) => !c.pts.some((q) => opening(q)) &&', to: 'const bandOK = (c) => true || ', breaks: ['CB1'] },   // the opening test alone is redundant at the defaults (measured, nothing fired), and with the whole band test gone the volutes stand past the OUTER edge, not in the opening (CB1, measured) — OR7's rinceau witness is a-volute-detached
   { id: 'the-rinceau-budget-give-way-removed', file: 'vine', from: '  if (total() > triBudget) {', to: '  if (false) {', breaks: ['TB2'] },
 ];
 

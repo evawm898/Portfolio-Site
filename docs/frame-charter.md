@@ -1944,7 +1944,7 @@ Every law is restated in the gate, never imported from `frame-rinceau.js`.
 `an-element-floats-off-its-stem`. New (Eva's list, and the two the chains carried): `the-stem-has-a-gap` (RN1),
 `a-volute-detached` (RN2), `an-acanthus-leaf-floats` (RN3), `the-size-ignores-the-weight` (RN5),
 `the-volutes-are-given-few-turns` (RN6, the first mutant on `frame-rinceau.js`, which the negative control now copies),
-`the-band-is-not-widened` (BW1, RN6 — it declares `orn: true`, so the ornament rows run for a geometry mutant), `the-rinceau-band-check-removed` (OR7 — the opening test alone fired nothing: the slit and edge tests keep a volute out of the opening too), `the-rinceau-budget-give-way-removed`
+`the-band-is-not-widened` (BW1, RN6 — it declares `orn: true`, so the ornament rows run for a geometry mutant), `the-rinceau-band-check-removed` (CB1 — the opening test alone fired nothing, and with the whole band test gone the volutes stand past the outer edge, not in the opening; OR7's rinceau witness is `a-volute-detached`), `the-rinceau-budget-give-way-removed`
 (TB2); the mirror is `the-mirror-is-broken` (OR5). Re-anchored: `the-seat-is-read-off-the-centreline`,
 `the-crest-stands-up`.
 
