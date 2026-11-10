@@ -100,7 +100,7 @@
    --negative-control re-runs against deliberately broken copies (of the modules, or of the
    page script for what only the board shows); each must fail the check that names it.
    A mutant may name `mayAlso`: collateral it is allowed but not required to redden (the clock mutant
-   seeds with a fraction, which some draws push out of the box).
+   seeds at random: some draws push a mark out of the box, and some move a type's silhouette, H16/H28).
    --mutant=a,b runs only those (reported as a subset); every anchor is still checked first.  --no-browser runs part one alone.  --keep <dir> copies the exported PDFs there.
    --design <file> prints the greyscale likeness report for a saved design and exits 0.
 */
@@ -161,7 +161,7 @@ const MUTANTS = [
   { id: 'suit-parameters-ignored', file: 'firework.js', from: "for (const k of takes) if (mine[k] !== undefined && mine[k] !== '') spec[k] = mine[k];", to: ";", breaks: ['H18', 'B5', 'H22', 'H25', 'H26'] },
   { id: 'suit-parameters-unfiltered', file: 'firework.js', from: "for (const k of takes) if (mine[k]", to: "for (const k of Object.keys(mine)) if (mine[k]", breaks: ['H18', 'H25'] },
   { id: 'rank-column-keeps-cell-arrangements', file: 'deck.js', from: "for (const s of design.suits) clearCell(design, s.id, rank, 'items');", to: ";", breaks: ['H18', 'B7'] },
-  { id: 'renderer-reads-the-clock', file: 'firework.js', from: "  const rand = rng(spec.seed);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", to: "  const rand = rng(Date.now() + Math.random() * 4e9);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", breaks: ['H19', 'H3', 'H4', 'H11', 'H14', 'H15', 'H18', 'H21', 'H22', 'H23', 'H24', 'H25', 'H26', 'H27'], mayAlso: ['H13'] },
+  { id: 'renderer-reads-the-clock', file: 'firework.js', from: "  const rand = rng(spec.seed);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", to: "  const rand = rng(Date.now() + Math.random() * 4e9);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", breaks: ['H19', 'H3', 'H4', 'H11', 'H14', 'H15', 'H18', 'H21', 'H22', 'H23', 'H24', 'H25', 'H26', 'H27'], mayAlso: ['H13', 'H16', 'H28'] },
   { id: 'scene-over-the-index', file: 'layout.js', from: "const art = bg + sceneArt(design, g) + centreArt(design, suit, card.rank, g, ix);", to: "const art = bg + centreArt(design, suit, card.rank, g, ix) + sceneArt(design, g);", breaks: ['H20'] },
   { id: 'scene-drawn-when-off', file: 'layout.js', from: "if (!sc || !sc.on) return '';", to: "if (!sc) return '';", breaks: ['H20', 'H15', 'H22', 'H26'] },
   // the page: what only the board can show
