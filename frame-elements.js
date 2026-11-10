@@ -319,6 +319,11 @@ export function buildBud({ size = 18, base = false } = {}) {
   const mesh = new Mesh(), R = size / 2, rb = 0.4 * R;
   if (base) slab(mesh, size);
   if (0.62 * 1.1 * R < BUD_LEAF_MIN_W) {
+    // a hidden post from the back up into the largest berry: the element
+    // stands on the back like every other (PL1). Its corners (0.71 r out)
+    // lie inside the berry at the post's top, where the berry is 0.8 r wide.
+    { const [x, y, s] = BUD_BERRIES[0], r = Math.max(F / 2, 1.25 * rb * s), c = [x * R, (y - 0.5) * R], h = 0.5 * r;
+      patchSolid(mesh, [-1, 0, 1].map((a) => [-1, 0, 1].map((b) => [c[0] + a * h, c[1] + b * h, 0.8 * r])), 'bud-post'); }
     BUD_BERRIES.forEach(([x, y, s]) => { const r = Math.max(F / 2, 1.25 * rb * s); sphereSolid(mesh, [x * R, (y - 0.5) * R, 0.2 * r], r, PATTERN_LAT, PATTERN_LON); });   // down onto the root the cup leaves held (−0.7 R): the largest berry is the joint
     return done(mesh, 'bud', { size, berries: BUD_BERRIES.length, cup: false });
   }
