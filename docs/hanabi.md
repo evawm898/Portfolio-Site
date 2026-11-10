@@ -47,7 +47,7 @@ the page as it shipped at `d5cd4ef` (read from git) and through this tree, byte 
 without the rainbow suit, with a phase-2 override in place) against `main` at `c7d8768`,
 setting aside the `<g class="hb-index">` wrapper the index now carries.
 
-## The Firework board (phase 2, schema version 3; per-firework styles version 4)
+## The Firework board (phase 2, schema version 3; per-firework styles version 4; the count version 5)
 
 The **Fireworks** tab is the board: rows are the suits in play (the rainbow row appears when
 that suit is on), columns ranks 1–5, each cell a live thumbnail of that card's centre art
@@ -182,24 +182,65 @@ fullness, because the count is the rank.
 **The default pairing** (Eva's to rule): White ring · Red peony · Blue willow · Yellow
 chrysanthemum · Green palm · Rainbow glitter.
 
-**Detail** (the `density` key, 0–2, Eva, Nov 10) on all nine: how much fine detail a burst
-carries. Each type's default draws exactly the phase-2 drawing (H22), and detail never rescales a
-burst — added marks are flagged and left out of the fit, and a mark that would reach past r is not
-drawn (H21 holds each drawing's marks a subset of the next one's):
+## The count (schema version 5, Nov 10)
+
+**Every type's count is the number of its main elements drawn**, and the control is labelled by
+what that type is made of (`TYPES[t].count`, read through `paramFor()`; the integer is shown beside
+the slider). It works at both levels as every parameter does: the suit's firework (the row) and one
+firework's own style (Arrange → Style, marked when set).
+
+| type | the count is | min | default | max | a second countable part (not on this slider) |
+|---|---|---|---|---|---|
+| peony | Stars (every star, all rings) | 5 | 43 | 200 | the core (one dot) |
+| ring | Stars (every star, all rings) | 3 | 22 | 210 | the core (one dot) |
+| glitter | Stars (sparks and round stars) | 6 | 34 | 120 | the core (one dot) |
+| chrysanthemum | Spokes (the bright heads) | 3 | 26 | 60 | a tip dot per spoke; the faint inner trails |
+| dahlia | Spokes (the fat petals) | 3 | 12 | 60 | the core ring of dots (¾ of the spokes, at least 6) |
+| willow | Trails | 3 | 18 | 60 | a faint head and a tip dot per trail |
+| palm | Arms (the fronds) | 3 | 6 | 60 | a tip dot per frond; leaflets (Detail) |
+| crossette | Arms | 3 | 8 | 60 | two or three tines per arm (Detail) |
+| blossom | Petals | 3 | 5 | 60 | the stamens (one per petal) |
+
+- **Under Count a firework is drawn at rank 5, so it draws exactly its count**; under Scale an
+  escalating type (all but palm and blossom) draws fewer at ranks 1–4, as before (the slider's
+  title says so). H29 counts the elements off the SVG by each type's own geometry.
+- **Peony's default moved 20 → 43** because 43 is what it always drew (20 + 14 + 9 over three
+  rings): the count was the OUTER ring and Detail added the rest. The six arm types kept their
+  3–60 range, so no saved value is clamped. Spoke disc is a catalogue motif,
+  not one of the nine types, and its count is still the rank's (no slider).
+- **Stars in rings (peony, ring).** The count is spread over the rings Detail asks for by phase
+  2's own ring law inverted (`starPlan`): the largest outer ring whose rings hold no more than the
+  count, the few left over on the outer ring, and fewer rings when the count cannot fill them
+  (each inner ring at least 5 stars — so a ring's default 22 stars fill four rings at most, and its
+  Detail 1.5 and 2 draw alike there). Under Scale the outer ring escalates, as it did.
+
+**Detail** (the `density` key, 0–2, Eva, Nov 10) on all nine: the look of the secondary marks. **It
+never changes the count** (version 5). Each type's default draws exactly the phase-2 drawing (H22),
+and detail never rescales a burst — added marks are flagged and left out of the fit, and a mark that
+would reach past r is not drawn (H21 holds each drawing's marks a subset of the next one's, for
+the six types whose Detail adds marks):
 
 | type | default | what detail does |
 |---|---|---|
-| peony | 1 | rings of stars, 1 to 5 |
+| peony | 1 | how many rings the stars are spread over, 1 to 5 (was: rings ADDED, more stars) |
 | chrysanthemum | 1 | below 1 the faint inner trails thin out; above, beads along every arm |
-| ring | 0 | a further inner ring every half step, up to four |
+| ring | 0 | how many rings the stars are spread over: one more every half step, up to four inner (was: rings added) |
 | willow | 1 | below 1 the faint heads thin out; above, droplets down every trail |
 | palm | 0 | pairs of fine leaflets off each frond, up to six |
 | crossette | 0 | a third tine (0.5), every tine splitting again (1.0; three tines from 1.5), sparks along the arms (2.0) |
 | dahlia | 0 | fine spokes in the gaps (to 1), then a streak down each petal |
-| glitter | 1 | the spark count; the cloud is fitted on detail 1's sparks, so it keeps its size |
+| glitter | 1 | the share of four-point sparks against round stars: 0 half and half, 1 three in four, 2 all sparks (was: the spark count) |
 | blossom | 0 | veins in every petal, up to five |
 
-**Declared, measured, not migrated:** a phase-2 design that set detail by hand on any type but
+**Saved designs draw exactly as before (version 4 → 5, `migrateCounts`, `deck.js`).** On load,
+every level a count or Detail can be set at — the suit's firework, a card, one firework's style —
+is merged as version 4 merged it (its defaults restated there) and given the count its old Detail
+drew: a peony at 14 stars and Detail 1.6 is stored as 38. A glitter whose Detail was not 1 is stored
+at the sparks it drew, Detail 1, and its old fit as `legacy` (no control): it draws its old cloud
+until its count or Detail is moved, then the count law. The file says how many counts were
+rewritten. H30 renders such designs (Count and Scale, every level) against `d8286f1` byte for byte.
+
+**Declared, measured, not migrated (Nov 10, the Detail session):** a phase-2 design that set detail by hand on any type but
 peony (ring and crossette had threshold steps; glitter's cloud rescaled with its count) now draws
 the new law, and a hand arrangement whose firework the old field fit shrank now draws it at the
 size it says. Everything else a phase-2 design holds renders byte-identically (H22).
@@ -309,9 +350,10 @@ H15 the migration against `d5cd4ef`, H16 the silhouettes, H17 Count, H18 inherit
 determinism, H20 the scene, H21 detail, H22 phase-2 designs unchanged against `e95f121`, H23
 arranging (literal hand sizes, fitted pips, restacking), H24 Scale placement, H25 per-firework
 styles, H26 version-3 designs unchanged against `68ff42a`, H27 optical centring, H28 the greyscale
-likeness report; B5 the board (one greyscale), B7 real-pointer arranging, B8 the localStorage
+likeness report, H29 the count (every type at its min, default and max, at every Detail, both levels),
+H30 version-4 designs migrated and unchanged against `d8286f1`; B5 the board (one greyscale), B7 real-pointer arranging, B8 the localStorage
 migration, B9 the Arrange panel, B10 the layout (rail, resize, zoom, kept per browser), B11 styles
-and Centre through the editor. `--design <file>` prints the likeness report for a saved design
-(non-blocking). `--negative-control` runs seventy-two mutants, thirteen of them of the page script;
+and Centre through the editor, B12 the count control (label, range, readout, both levels). `--design <file>` prints the likeness report for a saved design
+(non-blocking). `--negative-control` runs eighty-five mutants, fifteen of them of the page script;
 `--keep <dir>` saves the PDFs. Not in CI.
 Dev deps: `npm i --no-save jspdf@2.5.1 jszip@3.10.1 playwright-core`; needs `pdfinfo`/`pdftoppm`.

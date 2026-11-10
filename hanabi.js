@@ -10,7 +10,7 @@ import {
 } from './hanabi/deck.js';
 import { SYMBOLS, SYMBOL_IDS } from './hanabi/symbols.js';
 import { renderFace, renderBack, placementFor, scalePlacement, literalItems, centring } from './hanabi/layout.js';
-import { fireworkSpec, fireworkSpecAt, fireworkStyle, defaultSpec, renderFirework, motifParams, MOTIFS, MOTIF_IDS, STYLE_MOTIFS, TIERS, TIER_RANKS, TYPES, PARAMS } from './hanabi/firework.js';
+import { fireworkSpec, fireworkSpecAt, fireworkStyle, defaultSpec, renderFirework, motifParams, MOTIFS, MOTIF_IDS, STYLE_MOTIFS, TIERS, TIER_RANKS, TYPES, PARAMS, paramFor } from './hanabi/firework.js';
 import { exportPdf, exportZip, downloadBlob } from './hanabi/export.js';
 
 const STORE_KEY = 'hanabi.design.v1';   // the key predates version 2; normaliseDesign migrates what it holds
@@ -395,12 +395,15 @@ function renderBoard() {
   paintEditor(suit, rank);
 }
 
-function paramControl(k) {
-  const P = PARAMS[k];
+// The count control is the type's own (paramFor: Stars, Spokes, Trails, Arms or
+// Petals, with its range); every other parameter is the shared table's.
+const paramNote = (P) => (P.note ? ` title="${escapeHtml(P.note)}"` : '');
+function paramControl(k, motif) {
+  const P = paramFor(k, motif);
   const clear = `<button type="button" class="hb-clear" data-clear="${k}" title="Back to the suit's value">↺</button>`;
   if (P.kind === 'bool') return `<label class="hb-param hb-check" data-param="${k}"><input type="checkbox" data-p="${k}"> ${P.label}${clear}</label>`;
   if (P.kind === 'color') return `<div class="hb-param" data-param="${k}"><label for="p-${k}">${P.label}</label><input type="color" id="p-${k}" data-p="${k}">${clear}</div>`;
-  return `<div class="hb-param" data-param="${k}"><label for="p-${k}">${P.label}</label>`
+  return `<div class="hb-param" data-param="${k}"${paramNote(P)}><label for="p-${k}">${P.label}</label>`
     + `<input type="range" id="p-${k}" data-p="${k}" min="${P.min}" max="${P.max}" step="${P.step}"><output data-o="${k}"></output>${clear}</div>`;
 }
 
@@ -445,18 +448,18 @@ function buildEditor(suit, rank) {
         <button type="button" role="radio" data-scope="row">${escapeHtml(suit.name)} row</button><button type="button" role="radio" data-scope="card">This card only</button></div>
       <p class="hb-note">${card ? `Changes here belong to ${escapeHtml(suit.name)} ${rank} alone; ↺ hands a setting back to the suit.` : `Changes here reach every ${escapeHtml(suit.name)} card that has not set its own.`}</p>
       <p class="hb-ed__label">Firework type <span class="hb-dim" id="edTypeName"></span></p>${gallery}
-      <p class="hb-ed__label">Parameters</p><div class="hb-params">${motifParams(spec.motif).map(paramControl).join('') || '<p class="hb-note">This firework has no parameters.</p>'}</div></div>`;
+      <p class="hb-ed__label">Parameters</p><div class="hb-params">${motifParams(spec.motif).map((k) => paramControl(k, spec.motif)).join('') || '<p class="hb-note">This firework has no parameters.</p>'}</div></div>`;
 }
 
 // ---- one firework's own style (Count): its type, colours, detail and the
 // type's parameters, over the card's. Rebuilt only when the picked firework or
 // its type changes, so a slider being dragged is never replaced.
-function styleControl(k) {
-  const P = PARAMS[k];
+function styleControl(k, motif) {
+  const P = paramFor(k, motif);
   const clear = `<button type="button" class="hb-clear" data-sclear="${k}" title="Back to the card's value">↺</button>`;
   if (P.kind === 'bool') return `<label class="hb-param hb-check" data-sparam="${k}"><input type="checkbox" data-s="${k}"> ${P.label}${clear}</label>`;
   if (P.kind === 'color') return `<div class="hb-param" data-sparam="${k}"><label for="st-${k}">${P.label}</label><input type="color" id="st-${k}" data-s="${k}">${clear}</div>`;
-  return `<div class="hb-param" data-sparam="${k}"><label for="st-${k}">${P.label}</label>`
+  return `<div class="hb-param" data-sparam="${k}"${paramNote(P)}><label for="st-${k}">${P.label}</label>`
     + `<input type="range" id="st-${k}" data-s="${k}" min="${P.min}" max="${P.max}" step="${P.step}"><output data-so="${k}"></output>${clear}</div>`;
 }
 function styleOptions(cardMotif) {
@@ -468,7 +471,7 @@ function styleOptions(cardMotif) {
 function buildStyle(suit, rank, n, spec) {
   $('edStyle').innerHTML = `<p class="hb-ed__label">Style <span class="hb-dim">— firework ${n + 1}, this card</span></p>
     <div class="hb-row"><label for="st-motif">Type</label><select id="st-motif" data-s="motif">${styleOptions(fireworkSpec(design, suit, rank).motif)}</select></div>
-    <div class="hb-params">${motifParams(spec.motif).map(styleControl).join('') || '<p class="hb-note">This firework has no parameters.</p>'}</div>
+    <div class="hb-params">${motifParams(spec.motif).map((k) => styleControl(k, spec.motif)).join('') || '<p class="hb-note">This firework has no parameters.</p>'}</div>
     <div class="hb-actions"><button type="button" class="hb-btn hb-btn--ghost" id="stReset">Reset firework to suit</button>
       <button type="button" class="hb-btn hb-btn--ghost" id="stApplyRank" title="Give every other suit's ${rank} (drawn as a Count) this card's fireworks' styles">Style mix to every ${rank}</button></div>
     <p class="hb-note" id="stNote"></p>`;
@@ -512,7 +515,7 @@ function paintEditor(suit, rank) {
   const spec = fireworkSpec(design, suit, rank), own = cellOf(design, suit.id, rank) || {}, card = view.scope === 'card';
   const mode = arrangeMode(suit, rank), sel = selItem(suit, rank);
   const keys = Object.keys(own);
-  $('edOwn').textContent = keys.length ? `Its own ${keys.map((k) => (k === 'items' ? 'arrangement' : k === 'place' ? 'placement' : k === 'styles' ? 'firework styles' : PARAMS[k] ? PARAMS[k].label.toLowerCase() : k)).join(', ')}` : `As the ${suit.name} row`;
+  $('edOwn').textContent = keys.filter((k) => k !== 'legacy').length ? `Its own ${keys.filter((k) => k !== 'legacy').map((k) => (k === 'items' ? 'arrangement' : k === 'place' ? 'placement' : k === 'styles' ? 'firework styles' : PARAMS[k] ? paramFor(k, spec.motif).label.toLowerCase() : k)).join(', ')}` : `As the ${suit.name} row`;
   $('edReset').disabled = !keys.length;
   let svg = renderFace(design, { kind: 'card', suitId: suit.id, rank }, { idPrefix: 'ed' });
   if (mode) svg = svg.replace(/<\/svg>$/, handlesSvg(arrangePlacement(suit, rank), sel) + '</svg>');

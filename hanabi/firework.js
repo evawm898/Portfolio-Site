@@ -64,11 +64,13 @@ const RADIAL_IDS = Object.values(LEGACY_RADIAL);
 // the editor builds its controls from it, and deck.js validates a saved
 // suit's parameters against it.
 export const PARAMS = {
-  count:      { label: 'Arms / stars', min: 3, max: 60, step: 1, note: 'fewer at lower ranks under Scale' },
+  // the ENVELOPE of every type's count (a saved value is read onto it); each type
+  // has its own label and range, TYPES[t].count, and paramFor() is what a control reads
+  count:      { label: 'Count', min: 3, max: 210, step: 1 },
   length:     { label: 'Length', min: 0.3, max: 1, step: 0.05 },
   trail:      { label: 'Trail length', min: 0, max: 1, step: 0.05 },
   starSize:   { label: 'Star size', min: 0.4, max: 2.5, step: 0.1 },
-  density:    { label: 'Detail', min: 0, max: 2, step: 0.1, note: 'how much fine detail the burst carries' },
+  density:    { label: 'Detail', min: 0, max: 2, step: 0.1, note: 'the look of the secondary marks; it never changes the count' },
   rotation:   { label: 'Rotation', min: -180, max: 180, step: 5, unit: '°' },
   tips:       { label: 'Tip dots', kind: 'bool' },
   core:       { label: 'Core', kind: 'bool' },
@@ -82,25 +84,53 @@ const COLOR_PARAMS = ['outerColor', 'coreColor'];
 // grows with rank under Scale.
 export const TYPES = {
   peony:         { label: 'Peony', note: 'rings of stars, no trails', escalate: true,
-                   params: ['count', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 20, starSize: 1, density: 1, core: true, rotation: 0 } },
+                   params: ['count', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Stars', min: 5, max: 200 },
+                   defaults: { count: 43, starSize: 1, density: 1, core: true, rotation: 0 } },
   chrysanthemum: { label: 'Chrysanthemum', note: 'trailed arms', escalate: true,
-                   params: ['count', 'length', 'trail', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 26, length: 1, trail: 0.75, starSize: 1, density: 1, tips: true, core: true, rotation: 0 } },
+                   params: ['count', 'length', 'trail', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Spokes', min: 3, max: 60 },
+                   defaults: { count: 26, length: 1, trail: 0.75, starSize: 1, density: 1, tips: true, core: true, rotation: 0 } },
   ring:          { label: 'Ring', note: 'a hollow ring of stars', escalate: true,
-                   params: ['count', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 22, starSize: 1, density: 0, core: false, rotation: 0 } },
+                   params: ['count', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Stars', min: 3, max: 210 },
+                   defaults: { count: 22, starSize: 1, density: 0, core: false, rotation: 0 } },
   willow:        { label: 'Willow', note: 'trails that droop', escalate: true,
-                   params: ['count', 'length', 'trail', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 18, length: 1, trail: 0.7, starSize: 1, density: 1, tips: true, core: false, rotation: 0 } },
+                   params: ['count', 'length', 'trail', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Trails', min: 3, max: 60 },
+                   defaults: { count: 18, length: 1, trail: 0.7, starSize: 1, density: 1, tips: true, core: false, rotation: 0 } },
   palm:          { label: 'Palm', note: 'a few thick curving arms', escalate: false,
-                   params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 6, length: 1, starSize: 1, density: 0, tips: true, core: true, rotation: 0 } },
+                   params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Arms', min: 3, max: 60 },
+                   defaults: { count: 6, length: 1, starSize: 1, density: 0, tips: true, core: true, rotation: 0 } },
   crossette:     { label: 'Crossette', note: 'arms that split', escalate: true,
-                   params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 8, length: 1, starSize: 1, density: 0, tips: true, core: true, rotation: 0 } },
+                   params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Arms', min: 3, max: 60 },
+                   defaults: { count: 8, length: 1, starSize: 1, density: 0, tips: true, core: true, rotation: 0 } },
   dahlia:        { label: 'Dahlia', note: 'thick petals', escalate: true,
-                   params: ['count', 'length', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 12, length: 1, starSize: 1, density: 0, core: true, rotation: 0 } },
+                   params: ['count', 'length', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Spokes', min: 3, max: 60 },
+                   defaults: { count: 12, length: 1, starSize: 1, density: 0, core: true, rotation: 0 } },
   glitter:       { label: 'Glitter', note: 'a cloud of strobing sparks', escalate: true,
-                   params: ['count', 'starSize', 'density', 'core', ...COLOR_PARAMS], defaults: { count: 34, starSize: 1, density: 1, core: false } },
+                   params: ['count', 'starSize', 'density', 'core', ...COLOR_PARAMS], count: { label: 'Stars', min: 6, max: 120 },
+                   defaults: { count: 34, starSize: 1, density: 1, core: false } },
   blossom:       { label: 'Blossom', note: 'a five-petal flower', escalate: false,
-                   params: ['count', 'length', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 5, length: 1, starSize: 1, density: 0, core: true, rotation: 0 } },
+                   params: ['count', 'length', 'starSize', 'density', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Petals', min: 3, max: 60 },
+                   defaults: { count: 5, length: 1, starSize: 1, density: 0, core: true, rotation: 0 } },
 };
 export const TYPE_IDS = Object.keys(TYPES);
+// COUNT (Nov 10): every type's count is the number of its main elements drawn —
+// TYPES[t].count names them (Stars, Spokes, Trails, Arms, Petals) and sets the
+// range. Under Count a firework is drawn at rank 5, so it draws exactly that
+// many; under Scale an escalating type draws fewer at the lower ranks. Detail
+// never changes it.
+export function countRange(motif) {
+  return TYPES[motif] ? TYPES[motif].count : { label: PARAMS.count.label, min: PARAMS.count.min, max: PARAMS.count.max };
+}
+// The control a parameter is given on a motif: its own label and range for count.
+export function paramFor(k, motif) {
+  if (k !== 'count' || !TYPES[motif]) return PARAMS[k];
+  const c = TYPES[motif].count;
+  return { ...PARAMS.count, label: c.label, min: c.min, max: c.max, note: TYPES[motif].escalate ? 'fewer at lower ranks under Scale' : undefined };
+}
+// The keys a spec inherits, beyond its controls: a migrated glitter's legacy fit
+// (version 5, deck.js migrateCounts), which is no control and rides with its count.
+export function inheritKeys(motif) {
+  return motif === 'glitter' ? [...motifParams(motif), 'legacy'] : motifParams(motif);
+}
 
 
 // group: the panel's optgroup. item: the number in the ruled list.
@@ -228,7 +258,7 @@ export function fireworkSpec(design, suit, rank, motifAt) {
   const other = !!(motifAt && MOTIFS[motifAt] && motifAt !== cardMotif);
   const motif = other ? motifAt : cardMotif;
   const spec = defaultSpec(suit, rank, design.suits, motif, tier, compose);
-  const takes = motifParams(spec.motif).filter((k) => !other || COLOR_PARAMS.includes(k));
+  const takes = inheritKeys(spec.motif).filter((k) => !other || COLOR_PARAMS.includes(k));
   const mine = suit.firework && typeof suit.firework === 'object' ? suit.firework : {};
   for (const k of takes) if (mine[k] !== undefined && mine[k] !== '') spec[k] = mine[k];
   if (!over) return spec;
@@ -254,7 +284,7 @@ export function fireworkSpecAt(design, suit, rank, n) {
   const st = fireworkStyle(design, suit.id, rank, n);
   if (!st) return fireworkSpec(design, suit, rank);
   const spec = fireworkSpec(design, suit, rank, STYLE_MOTIFS.includes(st.motif) ? st.motif : undefined);
-  for (const k of motifParams(spec.motif)) if (st[k] !== undefined && st[k] !== '') spec[k] = st[k];
+  for (const k of inheritKeys(spec.motif)) if (st[k] !== undefined && st[k] !== '') spec[k] = st[k];
   return spec;
 }
 const f = (v) => +v.toFixed(3);
@@ -576,6 +606,32 @@ export function escalatedCount(type, base, rank) {
   return Math.max(3, n - (5 - clampN(rank | 0 || 5, 1, 5)) * step);
 }
 
+// STARS IN RINGS (peony, ring). The count is the TOTAL of stars; Detail sets how
+// many rings they are spread over. ringCounts() is phase 2's own law for an outer
+// ring of n (a peony's rings each at least 5; a ring's inner rings, which Detail
+// adds, likewise), and the plan inverts it: the largest outer ring whose rings
+// hold no more than the count, the few stars left over on the outer ring. So a
+// count phase 2 drew (every count a version-4 design is migrated to) is drawn
+// star for star as it was; and under Scale the OUTER ring escalates, as it did.
+export const peonyRingsFor = (density) => clampN(Math.round(1 + 2 * (density ?? 1)), 1, 5);
+export const ringRingsFor = (density) => 1 + Math.min(4, Math.floor(clampN(+(density ?? 0), 0, 2) * 2 + 1e-9));
+export function ringCounts(type, n, rings) {
+  if (type === 'peony') return Array.from({ length: rings }, (_, k) => Math.max(5, Math.round(n * (1 - k / (rings + 0.6)))));
+  return [n, ...Array.from({ length: rings - 1 }, (_, i) => Math.max(5, Math.round(n * (1 - 0.16 * (i + 1)))))];
+}
+const sumOf = (a) => a.reduce((x, y) => x + y, 0);
+export function starPlan(type, total, density, rank = 5) {
+  const T = Math.round(total);
+  let rings = type === 'peony' ? peonyRingsFor(density) : ringRingsFor(density);
+  while (rings > 1 && sumOf(ringCounts(type, 3, rings)) > T) rings--;
+  let n = 3;
+  while (sumOf(ringCounts(type, n + 1, rings)) <= T) n++;
+  const left = Math.max(0, T - sumOf(ringCounts(type, n, rings)));
+  const plan = ringCounts(type, escalatedCount(type, n, rank), rings);
+  plan[0] += left;
+  return plan;
+}
+
 const pol = (a, d) => [Math.cos(a) * d, Math.sin(a) * d];
 // a cubic split at t: the second piece's control points
 function cubicTail(p0, p1, p2, p3, t) {
@@ -610,10 +666,11 @@ const SPLIT = [0.5, 0.25, 0.75, 0.125, 0.625, 0.375, 0.875];
 const TYPE_DRAW = {
   // concentric rings of round stars; no lines at all
   peony(s, n, w, rand, o, c) {
-    const out = [], ss = s.starSize, rings = clampN(Math.round(1 + 2 * (s.density ?? 1)), 1, 5);
+    const plan = s.plan || starPlan('peony', n, s.density, 5);
+    const out = [], ss = s.starSize, rings = plan.length;
     const dr = w * 1.55 * ss;
     for (let k = 0; k < rings; k++) {
-      const rr = 1 - k / (rings + 0.6), nk = Math.max(5, Math.round(n * rr)), ph = rand() * Math.PI * 2;
+      const rr = 1 - k / (rings + 0.6), nk = plan[k], ph = rand() * Math.PI * 2;
       for (let i = 0; i < nk; i++) out.push({ k: 'dot', p: pol(ph + (i / nk) * Math.PI * 2, rr), r: dr * (1 - k * 0.12), col: k % 2 ? c : o });
     }
     if (s.core) out.push({ k: 'dot', p: [0, 0], r: dr * 1.5, col: c });
@@ -635,14 +692,15 @@ const TYPE_DRAW = {
     if (s.core) out.push({ k: 'dot', p: [0, 0], r: w * 1.6, col: c });
     return out;
   },
-  // one hollow ring of stars (two at high density); nothing inside but a core
+  // one hollow ring of stars; nothing inside but a core
   ring(s, n, w, rand, o, c) {
-    const out = [], dr = w * 1.35 * s.starSize, ph = rand() * Math.PI * 2;
-    for (let i = 0; i < n; i++) out.push({ k: 'dot', p: pol(ph + (i / n) * Math.PI * 2, 1), r: dr, col: o });
-    // detail: a further inner ring every half step, up to four
-    const inner = Math.min(4, Math.floor(detailOf(s, 0) * 2 + 1e-9));
+    const plan = s.plan || starPlan('ring', n, s.density, 5);
+    const out = [], dr = w * 1.35 * s.starSize, ph = rand() * Math.PI * 2, n0 = plan[0];
+    for (let i = 0; i < n0; i++) out.push({ k: 'dot', p: pol(ph + (i / n0) * Math.PI * 2, 1), r: dr, col: o });
+    // detail: the stars spread over a further inner ring every half step, up to four
+    const inner = plan.length - 1;
     for (let k = 1; k <= inner; k++) {
-      const rr = 1 - 0.16 * k, m = Math.max(5, Math.round(n * rr));
+      const rr = 1 - 0.16 * k, m = plan[k];
       for (let i = 0; i < m; i++) out.push({ k: 'dot', det: true, p: pol(ph + ((i + (k % 2 ? 0.5 : 0)) / m) * Math.PI * 2, rr), r: dr * (0.75 - 0.08 * k), col: k % 2 ? c : o });
     }
     if (s.core) out.push({ k: 'dot', p: [0, 0], r: dr * 1.2, col: c });
@@ -739,8 +797,24 @@ const TYPE_DRAW = {
     }
     return out;
   },
-  // a cloud of four-point sparks with no structure at all
+  // a cloud of four-point sparks with no structure at all: exactly n of them,
+  // every one fitted. Detail: the share drawn as four-point sparks (the rest round
+  // stars) — 0 half and half, 1 three in four (phase 2's), 2 every one.
   glitter(s, n, w, rand, o, c) {
+    const out = [], m = Math.max(6, n), roundShare = clampN(0.5 - 0.25 * detailOf(s, 1), 0, 0.5);
+    for (let i = 0; i < m; i++) {
+      const a = rand() * Math.PI * 2, d = Math.sqrt(rand()) * 0.94, p = pol(a, d), z = (0.05 + rand() * 0.07) * s.starSize;
+      const col = i % 3 === 2 ? c : o, wd = Math.max(0.16, w * 0.62);
+      if (keeps(i, roundShare)) { out.push({ k: 'dot', p, r: wd * 1.2, col }); continue; }
+      out.push({ k: 'line', a: [p[0] - z, p[1]], b: [p[0] + z, p[1]], w: wd, col });
+      out.push({ k: 'line', a: [p[0], p[1] - z], b: [p[0], p[1] + z], w: wd, col });
+    }
+    if (s.core) out.push({ k: 'dot', p: [0, 0], r: w * 1.5, col: c });
+    return out;
+  },
+  // GLITTER AS PHASE 2b DREW IT (Detail was the spark count): kept for a design
+  // migrated from version 4 with its glitter's Detail set by hand (its `legacy`).
+  glitterLegacy(s, n, w, rand, o, c) {
     // detail: the spark count. The cloud is FITTED on the sparks detail 1 draws —
     // below 1 the rest are ghosts (fitted, not drawn), above it the extra are
     // detail — so the cloud keeps its size whatever the setting
@@ -786,12 +860,27 @@ const TYPE_DRAW = {
   },
 };
 
+// A glitter migrated from version 4 with its Detail set by hand keeps the drawing
+// it had: `legacy` is the old { count, density }, and it holds only while the
+// count is still the one it drew and Detail is back at 1 (what the migration
+// wrote). Touch either and the firework is drawn by the count law.
+export const legacyGlitterCount = (L) => Math.max(6, Math.round(Math.max(3, Math.round(+L.count || 3)) * clampN(+(L.density ?? 1), 0, 2)));
+function glitterLegacyOf(s) {
+  const L = s.legacy;
+  if (!L || typeof L !== 'object' || !Number.isFinite(+L.count) || !Number.isFinite(+L.density)) return null;
+  return +s.count === legacyGlitterCount(L) && +(s.density ?? 1) === 1 ? L : null;
+}
+
 function drawType(spec, cx, cy, R, w, rand, colors) {
   const s = { ...TYPES[spec.motif].defaults, ...spec };
   s.starSize = clampN(+s.starSize || 1, PARAMS.starSize.min, PARAMS.starSize.max);
-  const n = escalatedCount(spec.motif, s.count, s.rank);
+  const cr = TYPES[spec.motif].count, count = clampN(Math.round(+s.count || cr.min), cr.min, cr.max);
   const o = colors[0], c = pick(colors, 1);
-  const all = TYPE_DRAW[spec.motif](s, n, w, rand, o, c);
+  let all;
+  const leg = spec.motif === 'glitter' ? glitterLegacyOf(s) : null;
+  if (leg) all = TYPE_DRAW.glitterLegacy({ ...s, density: leg.density }, escalatedCount('glitter', leg.count, s.rank), w, rand, o, c);
+  else if (spec.motif === 'peony' || spec.motif === 'ring') all = TYPE_DRAW[spec.motif]({ ...s, plan: starPlan(spec.motif, count, s.density, s.rank) }, count, w, rand, o, c);
+  else all = TYPE_DRAW[spec.motif](s, escalatedCount(spec.motif, count, s.rank), w, rand, o, c);
   // fit: the unit frame is scaled to R, shrinking until every point plus its
   // stroke or radius lands inside R — on the BASE marks only, so detail never
   // rescales the burst
