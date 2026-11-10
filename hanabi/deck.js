@@ -31,11 +31,16 @@
 // version-2 file's single/count/bleed as scale/column/bleed (V2_LAYOUTS), so
 // every saved design opens looking as it did.
 
-import { MOTIF_IDS, TIER_IDS, LEGACY_RADIAL, PARAMS, STYLE_MOTIFS } from './firework.js';
+import { MOTIF_IDS, MOTIFS, TYPES, TIER_IDS, LEGACY_RADIAL, PARAMS, STYLE_MOTIFS, inheritKeys,
+  ringCounts, peonyRingsFor, ringRingsFor, legacyGlitterCount } from './firework.js';
 
 // 4: a Count card's fireworks may each carry a style of their own (`styles` in
 // the cell). A version-3 file has none and reads unchanged.
-export const VERSION = 4;
+// 5: a type's count is the number of its main elements DRAWN (Stars, Spokes,
+// Trails, Arms, Petals) and Detail no longer changes it: a peony's and a ring's
+// count is the total of their stars, a glitter's the sparks. A version-4 file is
+// migrated (migrateCounts) so every firework draws as it did.
+export const VERSION = 5;
 
 // The standard per-suit distribution: three 1s, two 2s, two 3s, two 4s, one 5.
 // The optional rainbow suit uses the same distribution (10 more cards).
@@ -305,6 +310,10 @@ export function normaliseDesign(raw, symbolIds) {
       if (!Object.keys(ranks).length) delete d.fireworks[sid];
     }
   }
+  if (ver < 5) {
+    const moved = migrateCounts(d);
+    if (moved) notes.push(`${moved} firework count${moved === 1 ? '' : 's'} rewritten as the stars ${moved === 1 ? 'its' : 'their'} Detail drew (version 5: the count is the number drawn, and Detail no longer adds any) — ${moved === 1 ? 'it draws' : 'they draw'} exactly as before`);
+  }
   if (raw.arrangements && typeof raw.arrangements === 'object') {
     for (const [rk, items] of Object.entries(raw.arrangements)) {
       const it = RANKS.includes(+rk) ? readItems(items, +rk) : null;
@@ -333,8 +342,82 @@ export function serialiseDesign(design) {
   return JSON.stringify({ format: 'hanabi-deck', ...design, version: VERSION }, null, 2);
 }
 
+// ---- version 4 -> 5: the count of a peony, a ring and a glitter ----
+// In version 4 those three counted their OUTER ring (or their spark base) and
+// Detail added stars on top; in version 5 the count is what is drawn. Every
+// level a count or a Detail can be set at — the suit's firework, a card, one
+// firework's style — is visited top down, its version-4 parameters merged as
+// version 4 merged them (V4 defaults restated here, because firework.js now
+// carries version 5's), and wherever the version-5 merge of the levels already
+// rewritten would not draw the same, that level is given the count (and, for a
+// glitter whose Detail was not 1, Detail 1 and its old fit as `legacy`).
+const V4_DEFAULTS = { peony: { count: 20, density: 1 }, ring: { count: 22, density: 0 }, glitter: { count: 34, density: 1 } };
+const STAR_KEYS = ['count', 'density', 'legacy'];
+function mergeKeys(base, layers, keys) {
+  const e = { ...base };
+  for (const L of layers) if (L) for (const k of keys) if (L[k] !== undefined && L[k] !== '') e[k] = L[k];
+  return e;
+}
+// What a version-4 count and Detail drew, as version-5 parameters.
+export function v5Count(type, count, density) {
+  const n5 = Math.max(3, Math.round(+count || 3));
+  if (type === 'glitter') {
+    const dd = Math.min(2, Math.max(0, +(density ?? 1)));
+    return dd === 1 ? { count, density } : { count: legacyGlitterCount({ count, density }), density: 1, legacy: { count: +count, density: +density } };
+  }
+  const rings = type === 'peony' ? peonyRingsFor(density) : ringRingsFor(density);
+  return { count: ringCounts(type, n5, rings).reduce((a, b) => a + b, 0), density };
+}
+export function migrateCounts(d) {
+  let moved = 0;
+  const v5Def = (t) => ({ count: TYPES[t].defaults.count, density: TYPES[t].defaults.density });
+  const keysOf = (t) => inheritKeys(t).filter((k) => STAR_KEYS.includes(k));
+  // give `node` what it needs so the version-5 merge `now` draws as `req` asks
+  const settle = (node, req, now) => {
+    let w = false;
+    for (const k of ['count', 'density']) if (req[k] !== undefined && +now[k] !== +req[k]) { node[k] = req[k]; w = true; }
+    if (req.legacy) { if (JSON.stringify(now.legacy) !== JSON.stringify(req.legacy)) { node.legacy = req.legacy; w = true; } }
+    else if (now.legacy) { node.legacy = false; w = true; }
+    if (w) moved++;
+  };
+  const clone = (o) => (o ? JSON.parse(JSON.stringify(o)) : o);
+  for (const s of d.suits) {
+    const ms = s.centre.motif, suit4 = clone(s.firework);
+    if (V4_DEFAULTS[ms]) {
+      const old = mergeKeys(V4_DEFAULTS[ms], [suit4], keysOf(ms));
+      settle(s.firework, v5Count(ms, old.count, old.density), mergeKeys(v5Def(ms), [s.firework], keysOf(ms)));
+    }
+    const ranks = d.fireworks && d.fireworks[s.id];
+    if (!ranks) continue;
+    for (const o of Object.values(ranks)) {
+      if (!o || typeof o !== 'object') continue;
+      const { styles, items, place, ...cell4 } = clone(o);
+      const mc = MOTIFS[o.motif] ? o.motif : ms;
+      const cardOld = V4_DEFAULTS[mc] ? mergeKeys(V4_DEFAULTS[mc], [suit4, cell4], keysOf(mc)) : null;
+      if (cardOld) settle(o, v5Count(mc, cardOld.count, cardOld.density), mergeKeys(v5Def(mc), [s.firework, o], keysOf(mc)));
+      if (!o.styles || typeof o.styles !== 'object') continue;
+      for (const st of Object.values(o.styles)) {
+        if (!st || typeof st !== 'object') continue;
+        const other = STYLE_MOTIFS.includes(st.motif) && st.motif !== mc;
+        const t = other ? st.motif : mc;
+        if (!V4_DEFAULTS[t]) continue;
+        const st4 = clone(st);
+        const old = other ? mergeKeys(V4_DEFAULTS[t], [st4], keysOf(t)) : mergeKeys(V4_DEFAULTS[t], [suit4, cell4, st4], keysOf(t));
+        const now = other ? mergeKeys(v5Def(t), [st], keysOf(t)) : mergeKeys(v5Def(t), [s.firework, o, st], keysOf(t));
+        settle(st, v5Count(t, old.count, old.density), now);
+      }
+    }
+  }
+  return moved;
+}
+
 // One firework parameter, read back onto its range; undefined if not one.
+// `legacy` is no control: a migrated glitter's old { count, density } (or false).
 export function readParam(k, v) {
+  if (k === 'legacy') {
+    if (v === false) return false;
+    return v && typeof v === 'object' && Number.isFinite(v.count) && Number.isFinite(v.density) ? { count: v.count, density: v.density } : undefined;
+  }
   const P = PARAMS[k];
   if (!P) return undefined;
   if (P.kind === 'bool') return typeof v === 'boolean' ? v : undefined;

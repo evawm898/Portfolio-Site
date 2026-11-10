@@ -12793,7 +12793,13 @@ duplicates are one card); **Centre** writes the card's own items/place so the DR
 rotated burst) sits on the art field's centre (`centring`, `drawnExtent`, `layout.js`); the deck panel collapses
 to a rail, the editor resizes by its handle, the editor card zooms (`hanabi.layout.v1`, per browser, never in the
 design); ONE greyscale (the toolbar's). v3 designs read with no note and draw byte-identically (H26 vs `68ff42a`).
-The greyscale likeness of styled suits is a non-blocking report (`--design <file>`). **Phase 2b (Nov 10): the Arrange panel and Detail** — a
+The greyscale likeness of styled suits is a non-blocking report (`--design <file>`). **Nov 10, the count (schema v5):** every type's
+count is the number of main elements DRAWN, labelled per type (`TYPES[t].count`, `paramFor`: Stars — peony
+5–200 default 43, ring 3–210/22, glitter 6–120/34; Spokes — chrysanthemum, dahlia; Trails — willow; Arms — palm,
+crossette; Petals — blossom; 3–60), exact under Count and at rank 5 of Scale. Detail no longer changes it (peony/ring:
+how many rings a fixed count is spread over, `starPlan`; glitter: the share of four-point sparks). A v4 file is
+migrated on load (`migrateCounts`: the count its old Detail drew; a glitter off Detail 1 keeps its old fit as
+`legacy`, no control) and draws byte-identically (H30 vs `d8286f1`); H29 counts the drawn elements, B12 the control. **Phase 2b (Nov 10): the Arrange panel and Detail** — a
 card's fireworks are picked, moved, sized, turned and RESTACKED (items carry `n`, their drawing's seed,
 so a restack only changes paint order); a hand arrangement is taken literally (no shrink at the field
 edge) while the default pips stay fitted; a Scale card's one firework takes `place`. Detail (`density`,
