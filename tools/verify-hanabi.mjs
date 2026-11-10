@@ -137,7 +137,7 @@ const MUTANTS = [
   { id: 'distribution-wrong', file: 'deck.js', from: "COPIES = { 1: 3, 2: 2, 3: 2, 4: 2, 5: 1 }", to: "COPIES = { 1: 3, 2: 2, 3: 2, 4: 2, 5: 2 }", breaks: ['H1'] },
   { id: 'corner-drops-symbol', file: 'layout.js', from: "+ symbol(suit.symbol, (w - sym) / 2, digitH * 1.08, sym, symFill, numHalo);", to: ";", breaks: ['H2', 'H14', 'H15', 'H22', 'H26', 'H30'] },
   { id: 'rank-does-not-escalate', file: 'firework.js', from: "4: { burstType: 'chrysanthemum', starCount: 18, rings: 3, size: 0.86", to: "4: { burstType: 'chrysanthemum', starCount: 12, rings: 1, size: 0.58", breaks: ['H3', 'H15', 'H26'] },
-  { id: 'override-ignored', file: 'firework.js', from: "if (!other) return { ...spec, ...over };", to: "if (!other) return spec;", breaks: ['H4', 'H15', 'H18', 'H22', 'H26', 'H30'] },
+  { id: 'override-ignored', file: 'firework.js', from: "if (!other) return withStem(design, { ...spec, ...over });", to: "if (!other) return withStem(design, spec);", breaks: ['H4', 'H15', 'H18', 'H22', 'H26', 'H30'] },
   { id: 'crop-mark-off-trim', file: 'deck.js', from: "xs.add(+s.trimX.toFixed(6));", to: "xs.add(+(s.trimX - g.bleed).toFixed(6));", breaks: ['H6', 'B3'] },
   { id: 'duplex-not-mirrored', file: 'deck.js', from: "return r * imp.cols + c;", to: "return i;", breaks: ['H7'] },
   { id: 'shared-cut-keeps-inner-bleed', file: 'deck.js', from: "const l = c === 0 ? b : 0,", to: "const l = b,", breaks: ['H6'] },
@@ -186,7 +186,7 @@ const MUTANTS = [
   { id: 'glitter-fitted-on-what-it-draws', file: 'firework.js', from: "const each = (fn, prims = all.filter((p) => !p.det)) =>", to: "const each = (fn, prims = all.filter((p) => !p.det && !p.ghost)) =>", breaks: ['H30'] },
   { id: 'a-type-takes-no-detail', file: 'firework.js', from: "params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Arms', min: 3, max: 60 },\n                   defaults: { count: 6,", to: "params: ['count', 'length', 'starSize', 'tips', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Arms', min: 3, max: 60 },\n                   defaults: { count: 6,", breaks: ['H21'] },
   { id: 'chrysanthemum-detail-ignored', file: 'firework.js', from: "const dd = detailOf(s, 1), beads = Math.round(Math.max(0, dd - 1) * 3);", to: "const dd = 1, beads = 0;", breaks: ['H21'] },
-  { id: 'pips-not-fitted', file: 'layout.js', from: "return { items: DEFAULT_PIPS[rank], fitted: true };", to: "return { items: DEFAULT_PIPS[rank], fitted: false };", breaks: ['H22', 'H23', 'H17', 'H26', 'H30'] },
+  { id: 'pips-not-fitted', file: 'layout.js', from: "return { items: (design.pips === 'grid' ? GRID_PIPS : DEFAULT_PIPS)[rank], fitted: true };", to: "return { items: (design.pips === 'grid' ? GRID_PIPS : DEFAULT_PIPS)[rank], fitted: false };", breaks: ['H22', 'H23', 'H17', 'H26', 'H30'] },
   { id: 'hand-arrangement-fitted', file: 'layout.js', from: "r: fitted ? Math.min(it.s * unit, room) : it.s * unit,", to: "r: Math.min(it.s * unit, room),", breaks: ['H23', 'H26', 'H27'] },
   { id: 'restack-reseeds', file: 'layout.js', from: "seed: spec.seed + it.n * 7919,", to: "seed: spec.seed + pl.items.indexOf(it) * 7919,", breaks: ['H23', 'H26'] },
   { id: 'stacking-order-not-saved', file: 'deck.js', from: "if (it.n !== undefined) o.n = it.n;", to: ";", breaks: ['H23', 'H26'] },
@@ -222,7 +222,7 @@ const MUTANTS = [
   { id: 'ring-count-is-the-outer-ring', file: 'firework.js', from: "ph = rand() * Math.PI * 2, n0 = plan[0];", to: "ph = rand() * Math.PI * 2, n0 = n;", breaks: ['H22', 'H29', 'H30'] },
   { id: 'glitter-detail-is-the-count', file: 'firework.js', from: "const out = [], m = Math.max(6, n), roundShare", to: "const out = [], m = Math.max(6, Math.round(n * detailOf(s, 1))), roundShare", breaks: ['H29'] },
   { id: 'scale-escalates-nothing', file: 'firework.js', from: "const plan = ringCounts(type, escalatedCount(type, n, rank), rings);", to: "const plan = ringCounts(type, n, rings);", breaks: ['H22', 'H30'] },
-  { id: 'the-count-control-is-shared', file: 'firework.js', from: "if (k !== 'count' || !TYPES[motif]) return PARAMS[k];", to: "return PARAMS[k];", breaks: ['H29', 'B12'] },
+  { id: 'the-count-control-is-shared', file: 'firework.js', from: "  if (k !== 'count') return PARAMS[k];", to: "  return PARAMS[k];", breaks: ['H29', 'B12', 'H31', 'B13'] },
   { id: 'the-editor-count-is-shared', file: '../hanabi.js', from: "function paramControl(k, motif) {\n  const P = paramFor(k, motif);", to: "function paramControl(k, motif) {\n  const P = PARAMS[k];", breaks: ['B12'] },
   { id: 'the-style-count-is-shared', file: '../hanabi.js', from: "function styleControl(k, motif) {\n  const P = paramFor(k, motif);", to: "function styleControl(k, motif) {\n  const P = PARAMS[k];", breaks: ['B12'] },
   { id: 'no-count-migration', file: 'deck.js', from: "  if (ver < 5) {", to: "  if (false) {", breaks: ['H22', 'H26', 'H30'] },
@@ -231,6 +231,28 @@ const MUTANTS = [
   { id: 'migration-reads-version-5-defaults', file: 'deck.js', from: "const V4_DEFAULTS = { peony: { count: 20,", to: "const V4_DEFAULTS = { peony: { count: 43,", breaks: ['H30'] },
   { id: 'a-stale-legacy-fit-is-inherited', file: 'deck.js', from: "else if (now.legacy) { node.legacy = false; w = true; }", to: ";", breaks: ['H30'] },
   { id: 'migration-skips-the-styles', file: 'deck.js', from: "        settle(st, v5Count(t, old.count, old.density), now);", to: "        ;", breaks: ['H30'] },
+
+  // ---- the polish pass (version 6): the catalogue counts, the new defaults, the four corners, the grid, the frame, the rounded preview, the Centre skip
+  { id: 'catalogue-count-ignored', file: 'firework.js', from: "  if (CATALOGUE_COUNT[m] && spec.rank) s.count = catalogueCountAt(m, spec.count, spec.rank);", to: "", breaks: ['H31'] },
+  { id: 'catalogue-escalation-flat', file: 'firework.js', from: "return Math.max(CATALOGUE_COUNT[motif].min, Math.round((+v || 0) * c[r - 1] / c[4]));", to: "return Math.max(CATALOGUE_COUNT[motif].min, Math.round(+v || 0));", breaks: ['H31'] },
+  { id: 'catalogue-count-not-a-parameter', file: 'firework.js', from: "  if (CATALOGUE_COUNT[motif]) return ['count', 'rotation', ...COLOR_PARAMS];", to: "", breaks: ['H31'] },
+  { id: 'no-catalogue-migration', file: 'deck.js', from: "  if (ver < 6) {\n    const moved = migrateCatalogueCounts(d);", to: "  if (false) {\n    const moved = migrateCatalogueCounts(d);", breaks: ['H32'] },
+  { id: 'migration-keeps-the-stale-suit-count', file: 'deck.js', from: "delete s.firework.count; moved++;", to: "moved++;", breaks: ['H32'] },
+  { id: 'migration-forgets-the-type-cards', file: 'deck.js', from: "if (mc !== sm && takesCount(mc) && !hasN(o.count)) o.count = suitN;", to: ";", breaks: ['H32'] },
+  { id: 'old-designs-take-four-corners', file: 'deck.js', from: "d.corners = pick(raw.corners, Object.keys(CORNER_MODES), old6 ? old6.corners : d.corners);", to: "d.corners = pick(raw.corners, Object.keys(CORNER_MODES), d.corners);", breaks: ['H32'] },
+  { id: 'new-designs-keep-two-corners', file: 'deck.js', from: "    corners: 'four',", to: "    corners: 'inverted',", breaks: ['H32'] },
+  { id: 'stems-on-in-new-designs', file: 'deck.js', from: "    stems: false,", to: "    stems: true,", breaks: ['H32', 'H35', 'B13'] },
+  { id: 'stem-parameter-ignored', file: 'firework.js', from: "&& !(spec.stem ?? stemDefault(design))) spec.trail = false;", to: "&& !stemDefault(design)) spec.trail = false;", breaks: ['H35'] },
+  { id: 'grid-ignores-the-index-boxes', file: 'layout.js', from: "  for (const b of grid.boxes) room = Math.min(room,", to: "  for (const b of []) room = Math.min(room,", breaks: ['H34'] },
+  { id: 'grid-not-the-default', file: 'deck.js', from: "    pips: 'grid',", to: "    pips: 'field',", breaks: ['H32', 'H34'] },
+  { id: 'grid-reserves-only-the-drawn-corners', file: 'layout.js', from: "[[a.x, a.y], [a.x + a.w - k.w, a.y], [a.x, a.y + a.h - k.h], [a.x + a.w - k.w, a.y + a.h - k.h]]", to: "[[a.x, a.y], [a.x + a.w - k.w, a.y + a.h - k.h]]", breaks: ['H34'] },
+  { id: 'four-corners-not-turned', file: 'layout.js', from: "  if (mode === 'four') return tl + tr + inv(tl) + inv(tr);", to: "  if (mode === 'four') return tl + tr + `<g transform=\"translate(0 ${f(h - idx.h)})\">${tl + tr}</g>`;", breaks: ['H33'] },
+  { id: 'frame-in-the-safe-zone', file: 'layout.js', from: "inset = Math.max(0.8, g.safe * 0.5), sw", to: "inset = g.safe, sw", breaks: ['H35'] },
+  { id: 'frame-under-the-index', file: 'layout.js', from: "frame(g, art + ix.svg + frameArt(design, suit, g), {", to: "frame(g, art + frameArt(design, suit, g) + ix.svg, {", breaks: ['H35'] },
+  { id: 'rounded-in-every-render', file: 'layout.js', from: "  if (round && !guides) {", to: "  if (!guides) {", breaks: ['H35'] },
+  { id: 'centre-all-rewrites-centred-cards', file: '../hanabi.js', from: "    else if (Math.hypot(c.dx, c.dy) < CENTRE_TOL_MM) already.push(name);", to: "    else if (false) already.push(name);", breaks: ['B11', 'B13'] },
+  { id: 'colour-hex-not-shown', file: '../hanabi.js', from: "for (const out of document.querySelectorAll('.hb-panel .hb-hex')) out.textContent = $(out.dataset.for).value.toUpperCase();", to: ";", breaks: ['B13'] },
+  { id: 'rounded-preview-not-passed', file: '../hanabi.js', from: "{ guides: view.guides, round: view.round, idPrefix: `p${uid++}` }), `${suit.name}", to: "{ guides: view.guides, idPrefix: `p${uid++}` }), `${suit.name}", breaks: ['B13'] },
 ];
 
 // The catalogue motifs: every motif that is neither a firework type nor phase 1's.
@@ -245,6 +267,8 @@ const BASE2 = 'e95f121';
 const BASE3 = '68ff42a';
 // Per-firework styles as they shipped (#549; schema version 4, Detail still adding stars): H30's reference.
 const BASE4 = 'd8286f1';
+// The count as it shipped (#551; schema version 5): H31's and H32's reference.
+const BASE5 = '5771675';
 const baseDirs = {};
 async function baseModules(commit = BASE) {
   if (baseDirs[commit]) return baseDirs[commit];
@@ -357,6 +381,28 @@ const COUNT_TABLE = {
   peony: ['Stars', 5, 43, 200], ring: ['Stars', 3, 22, 210], glitter: ['Stars', 6, 34, 120],
   chrysanthemum: ['Spokes', 3, 26, 60], dahlia: ['Spokes', 3, 12, 60], willow: ['Trails', 3, 18, 60],
   palm: ['Arms', 3, 6, 60], crossette: ['Arms', 3, 8, 60], blossom: ['Petals', 3, 5, 60],
+};
+// the catalogue counts (H31, B13): label, min, default, max RESTATED, and the catalogue's own
+// escalation by rank (what an unset count draws at ranks 1..5)
+const CAT_TABLE = { spoke: ['Spokes', 6, 80, 160], spokecore: ['Spokes', 6, 80, 160], rosettes: ['Count', 1, 15, 30], starfield: ['Count', 1, 26, 60] };
+const CAT_ESC = { spoke: [24, 36, 50, 64, 80], spokecore: [24, 36, 50, 64, 80], rosettes: [3, 5, 8, 11, 15], starfield: [6, 10, 14, 19, 26] };
+// counted off the SVG: a disc's spokes are its lines that start out from the centre past a
+// fifth of its reach (the core ring's stems start near it); a rosette is eight petal lines,
+// eight dots and a centre dot; a star of the field one dot and eight lines
+const catElements = (m, svg, ctr) => {
+  const circles = [...svg.matchAll(/<circle /g)].length;
+  const lines = [...svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/g)];
+  if (m === 'rosettes') return circles % 9 ? NaN : circles / 9;
+  if (m === 'starfield') return lines.length === circles * 8 ? circles : NaN;
+  const d = (x, y) => Math.hypot(x - ctr.cx, y - ctr.cy);
+  const reach = Math.max(...lines.map((l) => d(+l[3], +l[4])));
+  return lines.filter((l) => d(+l[1], +l[2]) > reach * 0.2 || (m === 'spoke' && d(+l[3], +l[4]) > reach * 0.5)).length;
+};
+// a rendered burst's centre, from its own circles' box (a Scale card's one firework)
+const centreOf = (svg) => {
+  const xs = [], ys = [];
+  for (const m of svg.matchAll(/<(?:circle cx|line x1)="([-\d.]+)" (?:cy|y1)="([-\d.]+)"/g)) { xs.push(+m[1]); ys.push(+m[2]); }
+  return { cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2 };
 };
 const elementsOf = (type, svg, box) => {
   const off = (x, y) => Math.abs(x - box.cx) > 1e-3 || Math.abs(y - box.cy) > 1e-3;
@@ -723,10 +769,11 @@ async function partOne(dir) {
       // restated: the hued suits in hue order from red; white has no hue.
       const want = ['#E5484D', '#F2C230', '#3DBA6B', '#3E8EF0'];
       if (stops.join() !== want.join()) return `stops ${stops.join(' ')} — expected ${want.join(' ')}`;
-      if ((svg.match(/stroke="url\(#xnum\)"/g) || []).length !== 2) return `${index}: the gradient numeral is not in both corners`;
+      const corners = d.corners === 'four' ? 4 : 2;
+      if ((svg.match(/stroke="url\(#xnum\)"/g) || []).length !== corners) return `${index}: the gradient numeral is not in all ${corners} corners`;
       const sgrad = (svg.match(/<linearGradient id="xsym"[\s\S]*?<\/linearGradient>/) || [])[0];
       if (!sgrad || [...sgrad.matchAll(/stop-color="([^"]+)"/g)].map((m) => m[1]).join() !== want.join()) return `${index}: the symbol has no gradient through the same colours`;
-      if ((svg.match(new RegExp(`<path d="${S.SYMBOLS[rb.symbol].d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" fill="url\\(#xsym\\)"`, 'g')) || []).length !== 2) return `${index}: the gradient symbol is not in both corners`;
+      if ((svg.match(new RegExp(`<path d="${S.SYMBOLS[rb.symbol].d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" fill="url\\(#xsym\\)"`, 'g')) || []).length !== (d.corners === 'four' ? 4 : 2)) return `${index}: the gradient symbol is not in every corner`;
     }
     d.index = 'large';
     if (L.renderFace(d, { kind: 'card', suitId: 'red', rank: 3 }, { idPrefix: 'x' }) !== redBefore) return 'the rainbow numeral reached the red suit';
@@ -815,7 +862,7 @@ async function partOne(dir) {
     const DIGIT = { large: 0.13, small: 0.095 };
     const count = (svg) => (svg.match(/<g class="hb-firework"/g) || []).length;
     for (const [preset, w, h] of [['poker', 63.5, 88.9], ['bridge', 57.2, 88.9], ['mini', 44, 63]]) for (const index of ['large', 'small', 'band']) {
-      const d = D.defaultDesign(); d.rainbow = true; d.size = { preset, w, h }; d.index = index; d.corners = 'four';
+      const d = D.defaultDesign(); d.rainbow = true; d.size = { preset, w, h }; d.index = index; d.corners = 'four'; d.pips = 'field';   // the corner grid: H34
       const g = D.cardGeom(d), sr = g.safeRect;
       // the field: the area less the index columns, less a gap (restated)
       let area, cw;
@@ -994,7 +1041,7 @@ async function partOne(dir) {
     for (const preset of ['poker', 'bridge', 'mini']) for (const index of ['large', 'small', 'band']) for (const edited of [false, 'rainbow', true]) {
       const db = bd.defaultDesign();
       db.size = { preset, ...bd.SIZE_PRESETS[preset] }; db.index = index; if (edited === true) edit(db); else if (edited) db.rainbow = true;
-      let dn = D.defaultDesign(); dn.size = { preset, ...D.SIZE_PRESETS[preset] }; dn.index = index; if (edited === 'rainbow') dn.rainbow = true;
+      let dn = Object.assign(D.defaultDesign(), D.V6_OLD_DEFAULTS); dn.size = { preset, ...D.SIZE_PRESETS[preset] }; dn.index = index; if (edited === 'rainbow') dn.rainbow = true;   // version 6's new defaults: H32
       if (edited === true) dn = D.normaliseDesign(JSON.parse(bd.serialiseDesign(db)), S.SYMBOL_IDS).design;
       for (const c of D.deckCards(dn)) { const e = same(`${preset}/${index}${edited ? `/${edited === true ? 'edited' : edited}` : ''} ${c.kind} ${c.suitId || ''}${c.rank || ''}`, L.renderFace(dn, c), bl.renderFace(db, c)); if (e) return e; }
     }
@@ -1003,7 +1050,7 @@ async function partOne(dir) {
 
   // ---- H23: arranging by hand.
   check('H23', 'arranging: hand sizes kept past the edge, pips fitted, restacking keeps each firework, n read as a permutation', () => {
-    const d = D.defaultDesign(), red = D.suitById(d, 'red');
+    const d = Object.assign(D.defaultDesign(), { pips: 'field' }), red = D.suitById(d, 'red');   // the corner grid's fit: H34
     const fw = (svg) => svg.match(/<g class="hb-firework"[\s\S]*?<\/g>/g) || [];
     // the default pips stay fitted (a pip near an edge is drawn smaller) ...
     const pl0 = L.placementFor(d, red, 4);
@@ -1153,7 +1200,8 @@ async function partOne(dir) {
       if (other.length) return `a version-3 file read with notes: ${other.join('; ')}`;
       if (!notes.length) return 'the hand-set peony count and Detail were not migrated (no note)';
       // and it reads as the base read it, but for the count keys version 5 rewrites
-      const strip = (x) => JSON.stringify(x, (k, v) => (['count', 'density', 'legacy', 'version'].includes(k) ? undefined : v));
+      // (and version 6's new fields, which the old schema had none of: H32 holds their reading)
+      const strip = (x) => JSON.stringify(x, (k, v) => (['count', 'density', 'legacy', 'version', 'stems', 'pips', 'frame'].includes(k) ? undefined : v));
       if (strip(design) !== strip(bd.normaliseDesign(file, S.SYMBOL_IDS).design)) return 'the version-3 file reads differently here';
       for (const c of D.deckCards(design)) {
         n++;
@@ -1327,6 +1375,237 @@ async function partOne(dir) {
     const got = elementsOf('peony', svg.split('<g class="hb-firework"')[1], { cx: it.cx, cy: it.cy, r: it.r });
     if (got !== want) return `the migrated peony draws ${got} stars, its count says ${want}`;
     return (n > 600 && migrated >= 16) || `only ${n} faces, ${migrated} migrated files`;
+  });
+
+  // ---- H31: the catalogue counts (version 6). The spoke discs' spokes and the fields'
+  // rosettes and stars, counted off the SVG by each motif's own geometry; the table and the
+  // catalogue's escalation are RESTATED here. Unset, every motif draws exactly what it drew
+  // at BASE5 (byte for byte, every composition and rank).
+  await checkAsync('H31', 'the catalogue counts: spoke disc, spoke disc with a core, rosette field, starfield — exact at min, default and max, escalated under Scale, unset byte-identical', async () => {
+    const B = await baseModules(BASE5), bf = await import(pathToFileURL(path.join(B, 'firework.js')).href);
+    let n = 0;
+    for (const [m, [label, lo, dflt, hi]] of Object.entries(CAT_TABLE)) {
+      const P = F.paramFor('count', m);
+      if (P.label !== label || P.min !== lo || P.max !== hi || P.step !== 1) return `${m}: the count control is ${P.label} ${P.min}..${P.max} step ${P.step}; the table says ${label} ${lo}..${hi}`;
+      if (!F.motifParams(m).includes('count')) return `${m} takes no count`;
+      if (F.catalogueCountDefault(m) !== dflt) return `${m}: default ${F.catalogueCountDefault(m)}, the table ${dflt}`;
+      const su = { id: 'q1', primary: '#E5484D', secondary: '#9FB4C8' };
+      // unset: byte-identical to BASE5 at every composition and rank
+      for (const comp of COMPOSES) for (const rank of [1, 2, 3, 4, 5]) {
+        const box = { cx: 40, cy: 40, r: 26, rect: { x: 20, y: 12, w: 40, h: 56 } };
+        const a = F.renderFirework(F.defaultSpec(su, rank, [], m, 'none', comp), box), b = bf.renderFirework(bf.defaultSpec(su, rank, [], m, 'none', comp), box);
+        n++;
+        if (a !== b) return `${m} ${comp} ${rank}: unset, it no longer draws what ${BASE5} drew`;
+        const want = CAT_ESC[m][(comp === 'count' ? 5 : rank) - 1];
+        if (catElements(m, a, box) !== want) return `${m} ${comp} ${rank}: unset, draws ${catElements(m, a, box)}, the catalogue ${want}`;
+      }
+      // set: exactly the count at rank 5 (Count, and Scale's 5); under Scale fewer, by the catalogue's ratio
+      for (const v of [lo, dflt, hi, Math.round((lo + hi) / 2)]) for (const [comp, rank] of [['count', 1], ['count', 3], ['scale', 5], ['scale', 1], ['scale', 3], ['countscale', 2], ['column', 4], ['bleed', 2]]) {
+        const box = { cx: 40, cy: 40, r: 26, rect: { x: 20, y: 12, w: 40, h: 56 } };
+        const spec = { ...F.defaultSpec(su, rank, [], m, 'none', comp), count: v };
+        const er = comp === 'count' ? 5 : rank, want = Math.max(lo, Math.round(v * CAT_ESC[m][er - 1] / CAT_ESC[m][4]));
+        const got = catElements(m, F.renderFirework(spec, box), box); n++;
+        if (got !== want) return `${m} count ${v}, ${comp} rank ${rank}: drew ${got}, want ${want}`;
+      }
+      // the levels, through a design on every size: the suit's count reaches every card of its
+      // row; a card's own reaches it alone; a firework's own style (the bursts) reaches it alone
+      for (const preset of ['poker', 'mini']) for (const compose of ['count', 'scale']) {
+        const d = D.defaultDesign(); d.size = { preset, ...D.SIZE_PRESETS[preset] };
+        const red = D.suitById(d, 'red'); red.centre = { compose, motif: m, tier: 'none' };
+        const row = Math.round(lo + (hi - lo) * 0.3), own = Math.round(lo + (hi - lo) * 0.9), sty = Math.round(lo + (hi - lo) * 0.6);
+        red.firework.count = row;
+        D.cellOf(d, 'red', 4, true).count = own;
+        const field = F.FIELD_MOTIFS.includes(m);
+        if (!field && compose === 'count') D.setFireworkStyle(d, 'red', 3, 2, 'count', sty);
+        for (const rank of D.RANKS) {
+          const svg = L.renderFace(d, { kind: 'card', suitId: 'red', rank });
+          const groups = svg.split('<g class="hb-firework"').slice(1).map((g) => g.slice(0, g.indexOf('</g>')));
+          const er = compose === 'count' ? 5 : rank;
+          const items = compose === 'count' ? L.placementFor(d, red, rank).items : [null];
+          if (groups.length !== items.length) return `${m} ${preset} ${compose} red ${rank}: ${groups.length} fireworks`;
+          for (const [i, it] of items.entries()) {
+            const base = rank === 4 ? own : rank === 3 && it && it.n === 2 && !field && compose === 'count' ? sty : row;
+            const want = Math.max(lo, Math.round(base * CAT_ESC[m][er - 1] / CAT_ESC[m][4]));
+            const ctr = it ? { cx: it.cx, cy: it.cy } : centreOf(groups[i]);
+            const got = catElements(m, groups[i], ctr); n++;
+            if (got !== want) return `${m} ${preset} ${compose} red ${rank} firework ${i + 1}: drew ${got}, its count says ${want}`;
+          }
+        }
+      }
+    }
+    return n > 350 || `only ${n} counted`;
+  });
+
+  // ---- H32: version 6's new defaults, and every design saved before keeps what it had.
+  // A version-5 file (BASE5, read from git) with catalogue counts set at every level opens
+  // migrated and draws byte-identically; one with nothing set reads with no note at all.
+  await checkAsync('H32', `version 6: new designs open with four corners, no rising trail, the corner grid, no frame; a version-5 design (${BASE5}) keeps its own and renders byte-identically`, async () => {
+    const d0 = D.defaultDesign();
+    if (d0.version !== 6 || d0.corners !== 'four' || d0.stems !== false || d0.pips !== 'grid' || d0.face.frame !== 'none') return `the defaults are version ${d0.version}, ${d0.corners}, stems ${d0.stems}, ${d0.pips}, frame ${d0.face.frame}`;
+    const B = await baseModules(BASE5);
+    const bd = await import(pathToFileURL(path.join(B, 'deck.js')).href), bl = await import(pathToFileURL(path.join(B, 'layout.js')).href);
+    // a file that does not say: before version 6, the old meaning; from version 6, the new
+    for (const [ver, want] of [[5, ['inverted', true, 'field']], [6, ['four', false, 'grid']]]) {
+      const raw = JSON.parse(D.serialiseDesign(D.defaultDesign())); raw.version = ver;
+      delete raw.corners; delete raw.stems; delete raw.pips; delete raw.face.frame;
+      const r = D.normaliseDesign(raw, S.SYMBOL_IDS).design;
+      if (r.corners !== want[0] || r.stems !== want[1] || r.pips !== want[2] || r.face.frame !== 'none') return `a version-${ver} file that does not say reads ${r.corners}, stems ${r.stems}, ${r.pips}, frame ${r.face.frame}`;
+    }
+    let n = 0, migrated = 0;
+    const cases = [
+      ['nothing set by hand', () => {}],
+      ['a spoke disc with a core under a stale peony count', (d) => { const r = d.suits.find((x) => x.id === 'red'); r.centre.motif = 'spokecore'; Object.assign(r.firework, { count: 43, density: 1.4 }); }],
+      ['the same, with a card made a peony that took the count', (d) => { const r = d.suits.find((x) => x.id === 'red'); r.centre.motif = 'spokecore'; Object.assign(r.firework, { count: 61 }); d.fireworks = { red: { 3: { motif: 'peony' }, 5: { motif: 'chrysanthemum', count: 20 } } }; }],
+      ['a spoke disc under Scale with card counts', (d) => { const b = d.suits.find((x) => x.id === 'blue'); b.centre = { compose: 'scale', motif: 'spoke', tier: 'none' }; d.fireworks = { blue: { 1: { count: 30 }, 2: { count: 17, rotation: 20 }, 5: { count: 100 } } }; }],
+      ['a peony row with a count, cards made fields and a disc', (d) => { const r = d.suits.find((x) => x.id === 'red'); r.centre.compose = 'scale'; Object.assign(r.firework, { count: 30 }); d.fireworks = { red: { 2: { motif: 'rosettes' }, 3: { motif: 'starfield', count: 9 }, 4: { motif: 'spoke' } } }; }],
+      ['a field row under Scale with a card count', (d) => { const g = d.suits.find((x) => x.id === 'green'); g.centre = { compose: 'scale', motif: 'starfield', tier: 'none' }; d.fireworks = { green: { 4: { count: 7 } } }; }],
+      ['spoke styles that drew nothing', (d) => { const y = d.suits.find((x) => x.id === 'yellow'); y.centre.motif = 'spokecore'; d.fireworks = { yellow: { 3: { styles: { 0: { motif: 'spoke', count: 12 }, 2: { count: 5 } } } } }; }],
+      ['classic under Scale (the rising trail)', (d) => { d.suits.find((x) => x.id === 'white').centre = { compose: 'scale', motif: 'classic', tier: 'none' }; d.suits.find((x) => x.id === 'green').centre = { compose: 'bleed', motif: 'radial-willow', tier: 'none' }; }],
+    ];
+    for (const [label, edit] of cases) for (const preset of ['poker', 'mini']) for (const corners of ['inverted', 'four']) {
+      const db = bd.defaultDesign(); db.rainbow = true; db.corners = corners; db.size = { preset, ...bd.SIZE_PRESETS[preset] }; edit(db);
+      const file = JSON.parse(bd.serialiseDesign(db));
+      if (file.version !== 5) return `the base wrote version ${file.version}`;
+      const { design, notes } = D.normaliseDesign(file, S.SYMBOL_IDS);
+      if (notes.some((x) => !/catalogue firework counts? rewritten/.test(x))) return `${label}: read with notes ${notes.join('; ')}`;
+      if (notes.length) migrated++;
+      if (label === 'nothing set by hand' && notes.length) return 'a version-5 file with nothing set by hand was rewritten';
+      if (label !== 'nothing set by hand' && label !== 'classic under Scale (the rising trail)' && !notes.length) return `${label}: no migration note`;
+      if (design.corners !== corners || design.stems !== true || design.pips !== 'field') return `${label}: read as ${design.corners}, stems ${design.stems}, ${design.pips}`;
+      for (const c of D.deckCards(design)) {
+        n++;
+        const a = L.renderFace(design, c), b = bl.renderFace(db, c);
+        if (a !== b) { let i = 0; while (a[i] === b[i]) i++; return `${label} ${preset} ${corners} ${c.suitId || c.kind}${c.rank || ''}: differs at ${i}: …${a.slice(i - 30, i + 30)}… vs …${b.slice(i - 30, i + 30)}…`; }
+      }
+      const again = D.normaliseDesign(JSON.parse(D.serialiseDesign(design)), S.SYMBOL_IDS);
+      if (again.notes.length) return `${label}: the version-6 file read with notes ${again.notes.join('; ')}`;
+      if (JSON.stringify(again.design) !== JSON.stringify(design)) return `${label}: the version-6 file does not round-trip`;
+    }
+    return (n > 1000 && migrated >= 20) || `only ${n} faces, ${migrated} migrated files`;
+  });
+
+  // ---- H33: the corner index in four corners. The bottom pair is a TRUE 180-degree turn
+  // about the card's centre (restated from the size and the bleed) of the top pair, the four
+  // boxes stay inside the safe zone and apart, and a numeral is tall enough at mini size.
+  check('H33', 'four corners: the bottom pair is the top pair turned 180 degrees about the card centre; inside the safe zone, apart, legible at mini', () => {
+    const DIGIT = { large: 0.13, small: 0.095 };   // restated, of the card height
+    let n = 0;
+    for (const [preset, w, h] of [['poker', 63.5, 88.9], ['bridge', 57.2, 88.9], ['mini', 44, 63]]) for (const index of ['large', 'small']) for (const corners of ['four', 'inverted']) {
+      const d = D.defaultDesign(); d.rainbow = true; d.size = { preset, w, h }; d.index = index; d.corners = corners;
+      const b = d.bleed, sf = d.safe, cx = (w + 2 * b) / 2, cy = (h + 2 * b) / 2;
+      for (const s of D.activeSuits(d)) for (const rank of [1, 5]) {
+        const svg = L.renderFace(d, { kind: 'card', suitId: s.id, rank }, { idPrefix: 'x' }); n++;
+        const ix = svg.slice(svg.indexOf('<g class="hb-index">'));
+        const tops = [...ix.matchAll(/<g transform="translate\(([-\d.]+) ([-\d.]+)\)">/g)].filter((m) => !ix.slice(Math.max(0, m.index - 40), m.index).includes('rotate(180'));
+        const rots = [...ix.matchAll(/<g transform="rotate\(([-\d.]+) ([-\d.]+) ([-\d.]+)\)"><g transform="translate\(([-\d.]+) ([-\d.]+)\)">/g)];
+        const wantTop = corners === 'four' ? 2 : 1;
+        if (rots.length !== wantTop) return `${preset}/${index}/${corners} ${s.id} ${rank}: ${rots.length} turned indices, want ${wantTop}`;
+        for (const r of rots) {
+          if (+r[1] !== 180 || Math.abs(+r[2] - cx) > 1e-3 || Math.abs(+r[3] - cy) > 1e-3) return `${preset}/${index}/${corners}: the bottom index is turned ${r[1]} about ${r[2]},${r[3]}, not 180 about the centre ${cx},${cy}`;
+          if (!tops.some((t) => t[1] === r[4] && t[2] === r[5])) return `${preset}/${index}/${corners}: a turned index is not the turn of an upright one`;
+        }
+        // the digit's height, and the index boxes inside the safe zone and apart
+        const sc = +(/<g transform="translate\([-\d.]+ [-\d.]+\) scale\(([\d.]+)\)">/.exec(ix) || [])[1];
+        const dh = sc * S.DIGIT_BOX.h, want = h * DIGIT[index];
+        if (Math.abs(dh - want) > S.DIGIT_BOX.h * 0.0006) return `${preset}/${index}: the numeral is ${dh.toFixed(2)} mm tall, want ${want.toFixed(2)}`;
+        if (preset === 'mini' && dh < 5.5) return `mini/${index}: a ${dh.toFixed(2)} mm numeral`;
+        const bw = 0.62 * want, bh = 1.7 * want;   // restated: the symbol (0.62 of the numeral) is the box's width; numeral + gap + symbol its height
+        const boxes = [];
+        for (const t of tops) { const x = +t[1], y = +t[2]; boxes.push([x, y], [2 * cx - x - bw, 2 * cy - y - bh]); }
+        for (const [x, y] of boxes) if (x < b + sf - 1e-3 || y < b + sf - 1e-3 || x + bw > b + w - sf + 1e-3 || y + bh > b + h - sf + 1e-3) return `${preset}/${index}/${corners}: an index box at ${x.toFixed(2)},${y.toFixed(2)} leaves the safe zone`;
+        for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+          const [ax, ay] = boxes[i], [bx, by] = boxes[j];
+          if (ax < bx + bw && bx < ax + bw && ay < by + bh && by < ay + bh) return `${preset}/${index}/${corners}: two index boxes overlap`;
+        }
+      }
+    }
+    return n > 100 || `only ${n} faces`;
+  });
+
+  // ---- H34: the corner grid (design.pips 'grid'). One grid for every face: the safe zone
+  // less a gap, with all four corner-index boxes reserved (RESTATED) whatever the corner mode.
+  // Every mark of a default Count card is on it; the art does not move with the corners; and
+  // rank 1 uses the room between the indices (the balance it is for).
+  check('H34', 'the corner grid: every default pip inside the safe zone and clear of the four index boxes, the same art under every corner mode, rank 1 using the room between the indices', () => {
+    const DIGIT = { large: 0.13, small: 0.095 };
+    const report = [];
+    for (const [preset, w, h] of [['poker', 63.5, 88.9], ['bridge', 57.2, 88.9], ['mini', 44, 63]]) for (const index of ['large', 'small', 'band']) {
+      const d = D.defaultDesign(); d.rainbow = true; d.size = { preset, w, h }; d.index = index;
+      const g = D.cardGeom(d), sr = g.safeRect;
+      let area = sr, bw = 0, bh = 0;
+      if (index === 'band') { const top = g.bleed + g.safe + h * 0.13 + h * 0.006; area = { x: sr.x, y: top, w: sr.w, h: g.fullH - 2 * top }; }
+      else { bw = 0.62 * h * DIGIT[index]; bh = 1.7 * h * DIGIT[index]; }
+      const gap = Math.max(0.8, area.h * 0.015);
+      const boxes = bw ? [[area.x, area.y], [area.x + area.w - bw, area.y], [area.x, area.y + area.h - bh], [area.x + area.w - bw, area.y + area.h - bh]] : [];
+      for (const compose of ['count', 'countscale']) for (const s of D.activeSuits(d)) {
+        s.centre = { ...s.centre, compose };
+        for (const r of [1, 2, 3, 4, 5]) {
+          const arts = ['four', 'inverted', 'upright'].map((c) => { d.corners = c; return L.renderFace(d, { kind: 'card', suitId: s.id, rank: r }, { centreOnly: true, idPrefix: 'x' }); });
+          if (arts[1] !== arts[0] || arts[2] !== arts[0]) return `${preset}/${index}/${compose} ${s.id} ${r}: the art moves with the corner mode`;
+          for (const p of pointsOf(arts[0].slice(arts[0].indexOf('<g class="hb-firework"')))) {
+            if (p.x - p.pad < area.x + gap - 0.05 || p.x + p.pad > area.x + area.w - gap + 0.05 || p.y - p.pad < area.y + gap - 0.05 || p.y + p.pad > area.y + area.h - gap + 0.05)
+              return `${preset}/${index}/${compose} ${s.id} ${r}: a mark at ${p.x.toFixed(2)},${p.y.toFixed(2)} off the grid's safe zone`;
+            for (const [x, y] of boxes) {
+              const dx = Math.max(x - p.x, 0, p.x - x - bw), dy = Math.max(y - p.y, 0, p.y - y - bh);
+              if (Math.hypot(dx, dy) < p.pad + gap - 0.05) return `${preset}/${index}/${compose} ${s.id} ${r}: a mark at ${p.x.toFixed(2)},${p.y.toFixed(2)} within the gap of an index box`;
+            }
+          }
+        }
+      }
+      if (index === 'large') {
+        const one = D.defaultDesign(); one.size = { preset, w, h };
+        const red = D.suitById(one, 'red'), rg = L.placementFor(one, red, 1).items[0].r;
+        one.pips = 'field'; const rf = L.placementFor(one, red, 1).items[0].r;
+        report.push(`${preset} ${rf.toFixed(1)} -> ${rg.toFixed(1)} mm`);
+        if (preset !== 'mini' && rg < rf * 1.3) return `${preset}: rank 1 on the grid is ${rg.toFixed(2)} mm against the field's ${rf.toFixed(2)} — not the room between the indices`;
+      }
+    }
+    return true;
+  });
+
+  // ---- H35: the card's frame (it prints), the rounded preview (it never does), and phase
+  // 1's rising trail (a design's own default, and a parameter of the burst).
+  check('H35', 'the frame prints where it says; the rounded preview clips only the preview; the rising trail follows the design and the suit', () => {
+    for (const [preset, w, h] of [['poker', 63.5, 88.9], ['mini', 44, 63]]) for (const safe of [3, 1, 6]) {
+      const d = D.defaultDesign(); d.size = { preset, w, h }; d.safe = safe;
+      const card = { kind: 'card', suitId: 'red', rank: 3 };
+      const none = L.renderFace(d, card), raw = (() => { const x = JSON.parse(JSON.stringify(d)); delete x.face.frame; return L.renderFace(x, card); })();
+      if (none !== raw || none.includes('hb-frame')) return 'frame none draws something';
+      for (const [fr, k] of [['line', 1], ['inner', 2]]) {
+        d.face.frame = fr;
+        const svg = L.renderFace(d, card), grp = (svg.match(/<g class="hb-frame">([\s\S]*?)<\/g>/) || [])[1] || '';
+        const rects = [...grp.matchAll(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"[^>]*stroke="([^"]+)"[^>]*stroke-width="([\d.]+)"/g)];
+        if (rects.length !== k) return `frame ${fr}: ${rects.length} lines`;
+        const inset = Math.max(0.8, safe * 0.5);   // restated
+        const r0 = rects[0];
+        if (Math.abs(+r0[1] - (d.bleed + inset)) > 1e-3 || Math.abs(+r0[3] - (w - 2 * inset)) > 1e-3) return `frame ${fr} at ${preset}, safe ${safe}: the line is at ${(+r0[1] - d.bleed).toFixed(2)} mm, want ${inset}`;
+        if (r0[5] !== D.suitById(d, 'red').primary) return `frame ${fr}: drawn in ${r0[5]}`;
+        for (const r of rects) if (+r[1] < d.bleed || +r[1] + +r[3] > d.bleed + w) return `frame ${fr}: a line outside the trim`;
+        if (safe >= 3 && rects.some((r) => +r[1] + +r[6] / 2 > d.bleed + safe - 0.1)) return `frame ${fr} at safe ${safe}: a line reaches the safe zone (the index)`;
+        if (svg.indexOf('class="hb-frame"') < svg.indexOf('class="hb-index"')) return 'the frame is drawn under the index';
+        if (L.renderFace(d, card, { centreOnly: true }).includes('hb-frame')) return 'the board\'s thumbnail draws the frame';
+      }
+      d.face.frame = 'none';
+      // the rounded preview: a clip on the trim at 0.05 of the shorter side, only when asked and without guides
+      const round = L.renderFace(d, card, { round: true, idPrefix: 'q' });
+      const cp = (round.match(/<clipPath id="qclip"><rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)" rx="([-\d.]+)"/) || []);
+      if (!cp.length || Math.abs(+cp[3] - w) > 1e-3 || Math.abs(+cp[5] - Math.min(w, h) * 0.05) > 1e-3 || !round.includes('clip-path="url(#qclip)"')) return `${preset}: the rounded preview is not the trim at ${(Math.min(w, h) * 0.05).toFixed(2)} mm corners`;
+      if (L.renderFace(d, card, { round: true, guides: true }).includes('clipPath') || none.includes('clipPath')) return 'a clip without the rounded preview, or under the guides';
+      for (const k of ['clue', 'fuse']) if (!L.renderFace(d, { kind: k }, { round: true }).includes('clipPath')) return `the ${k} token is not rounded in the preview`;
+      if (!L.renderBack(d, { round: true }).includes('clipPath')) return 'the back is not rounded in the preview';
+    }
+    if (/round\s*:/.test(fs.readFileSync(path.join(REPO, 'hanabi', 'export.js'), 'utf8'))) return 'export.js asks for the rounded preview';
+    // the rising trail: off in a new design, on in one that does not say (saved before), and the suit's own either way
+    const trail = (dd) => /stroke-dasharray/.test(L.renderFace(dd, { kind: 'card', suitId: 'white', rank: 1 }).split('<g class="hb-index">')[0]);
+    const d = D.defaultDesign(); D.suitById(d, 'white').centre = { compose: 'scale', motif: 'classic', tier: 'none' };
+    if (!F.motifParams('classic').includes('stem') || !F.motifParams('radial-willow').includes('stem') || F.motifParams('peony').includes('stem')) return 'the rising trail is not a parameter of exactly the phase-1 bursts';
+    if (trail(d)) return 'a new design draws the rising trail';
+    const old = JSON.parse(JSON.stringify(d)); delete old.stems;
+    if (!trail(old)) return 'a design that does not say lost its rising trail';
+    D.suitById(d, 'white').firework.stem = true; if (!trail(d)) return 'the suit\'s rising trail on does not draw it';
+    D.suitById(old, 'white').firework.stem = false; if (trail(old)) return 'the suit\'s rising trail off still draws it';
+    D.cellOf(d, 'white', 1, true).stem = false; if (trail(d)) return 'a card\'s rising trail off still draws it';
+    return true;
   });
   return res;
 }
@@ -1641,16 +1920,20 @@ async function partTwo(overrides = {}) {
       if (!/moved/.test(await page.$eval('#edStatus', (e) => e.textContent))) return 'Centre said nothing';
       await page.click('#edResetItems');
       if ((await D()).fireworks.blue) return 'Reset arrangement did not undo the centring';
-      // Centre all rank 1s, then a row
+      // Centre all rank 1s, then a row (a card already centred within 0.05 mm is left alone: B13)
+      const SUITS5 = ['white', 'red', 'blue', 'yellow', 'green'], TOL = 0.05;
+      const offBefore = [];
+      for (const s of SUITS5) { const c = await page.evaluate((s) => window.__hanabi.centring(s, 1), s); if (Math.hypot(c.dx, c.dy) >= TOL) offBefore.push(s); }
       await page.click('#centreRank1');
       const d2 = await D();
-      for (const s of ['white', 'red', 'blue', 'yellow', 'green']) {
+      for (const s of SUITS5) {
         const c = await page.evaluate((s) => window.__hanabi.centring(s, 1), s);
-        if (Math.hypot(c.dx, c.dy) > 0.01) return `after Centre all rank 1s, ${s} 1 is ${Math.hypot(c.dx, c.dy).toFixed(3)} mm off`;
+        if (Math.hypot(c.dx, c.dy) > (offBefore.includes(s) ? 0.01 : TOL)) return `after Centre all rank 1s, ${s} 1 is ${Math.hypot(c.dx, c.dy).toFixed(3)} mm off`;
       }
-      if (Object.keys(d2.fireworks).sort().join() !== 'blue,green,red,white,yellow' || Object.values(d2.fireworks).some((x) => Object.keys(x).join() !== '1')) return `Centre all rank 1s wrote ${JSON.stringify(Object.fromEntries(Object.entries(d2.fireworks).map(([k, v]) => [k, Object.keys(v)])))}`;
+      if (!offBefore.length || Object.keys(d2.fireworks).sort().join() !== offBefore.sort().join() || Object.values(d2.fireworks).some((x) => Object.keys(x).join() !== '1')) return `Centre all rank 1s wrote ${JSON.stringify(Object.fromEntries(Object.entries(d2.fireworks).map(([k, v]) => [k, Object.keys(v)])))}; off centre were ${offBefore.join(', ')}`;
       await page.click('[data-centre-row="green"]');
-      if (Object.keys((await D()).fireworks.green).join() !== '1,2,3,4,5') return 'centre row did not reach every green card';
+      for (const r of [1, 2, 3, 4, 5]) { const c = await page.evaluate((r) => window.__hanabi.centring('green', r), r); if (Math.hypot(c.dx, c.dy) > TOL) return `centre row left green ${r} ${Math.hypot(c.dx, c.dy).toFixed(3)} mm off`; }
+      if (!Object.keys((await D()).fireworks.green || {}).length) return 'centre row did not reach a green card';
       await page.evaluate(() => document.getElementById('resetDesign').click());
       await page.click('[data-view=suit]');
       return true;
@@ -1700,6 +1983,79 @@ async function partTwo(overrides = {}) {
       return true;
     });
 
+    await check('B13', 'the polish pass: no panel dropdown cut off, one-line labels, every colour shows its hex, the rounded preview, Centre all rank 1s skips a centred card, the catalogue counts and the rising trail in the editor', async () => {
+      const Lm = await import(pathToFileURL(path.join(REPO, 'hanabi/layout.js')).href), Dm = await import(pathToFileURL(path.join(REPO, 'hanabi/deck.js')).href);
+      await page.evaluate(() => { localStorage.removeItem('hanabi.layout.v1'); document.getElementById('resetDesign').click(); });
+      await page.reload(); await page.waitForFunction(() => window.__hanabi);
+      await page.click('[data-view=suit]');
+      await page.evaluate(() => { const r = document.getElementById('rainbow'); if (!r.checked) r.click(); for (const s of document.querySelectorAll('.hb-panel details')) s.open = true; });
+      // every option of every panel select fits the select it is in (the arrow's room kept)
+      const cut = await page.evaluate(() => {
+        const ctx = document.createElement('canvas').getContext('2d'), out = [];
+        for (const sel of document.querySelectorAll('.hb-panel select')) {
+          if (!sel.offsetParent) continue;
+          const cs = getComputedStyle(sel); ctx.font = cs.font;
+          const room = sel.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 22;
+          for (const o of sel.options) { const w = ctx.measureText(o.textContent).width; if (w > room) out.push(`${sel.id || sel.dataset.c || 'select'} "${o.textContent}" ${w.toFixed(0)} > ${room.toFixed(0)} px`); }
+        }
+        return out;
+      });
+      if (cut.length) return `dropdown labels cut off at the default panel width: ${cut.slice(0, 4).join('; ')}`;
+      const wrapped = await page.evaluate(() => [...document.querySelectorAll('.hb-suit__centre label, .hb-panel .hb-row > label')].filter((l) => l.offsetParent)
+        .filter((l) => l.getBoundingClientRect().height > parseFloat(getComputedStyle(l).lineHeight) * 1.5 || l.scrollWidth > l.clientWidth + 1).map((l) => l.textContent.trim()));
+      if (wrapped.length) return `labels wrap or overflow: ${wrapped.slice(0, 5).join(' | ')}`;
+      // every panel colour: a swatch and its hex, the hex following the value
+      const hexes = await page.evaluate(() => [...document.querySelectorAll('.hb-panel .hb-row input[type=color]')].map((i) => ({ id: i.id, v: i.value.toUpperCase(), hex: i.parentElement.matches('.hb-colorbox') ? i.parentElement.querySelector('.hb-hex').textContent : null })));
+      if (hexes.length < 8 || hexes.some((h) => h.hex !== h.v)) return `a colour without its hex: ${JSON.stringify(hexes.filter((h) => h.hex !== h.v))}`;
+      await page.$eval('#faceBg', (e) => { e.value = '#223344'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+      if (await page.$eval('#faceBg', (e) => e.parentElement.querySelector('.hb-hex').textContent) !== '#223344' || (await page.evaluate(() => window.__hanabi.design().face.bg)) !== '#223344') return 'the card face hex does not follow the colour';
+      // the rounded preview: on by default, a clip on every stage card, none under the guides or when off
+      const clips = () => page.$$eval('#stage .hb-card svg', (s) => s.filter((x) => x.querySelector('clipPath')).length + '/' + s.length);
+      if (!(await page.isChecked('#roundCorners')) || !/^(\d+)\/\1$/.test(await clips())) return `the rounded preview is not on by default: ${await clips()} cards clipped`;
+      await page.check('#guides'); const g = await clips(); await page.uncheck('#guides');
+      await page.uncheck('#roundCorners'); const off = await clips(); await page.check('#roundCorners');
+      if (!g.startsWith('0/') || !off.startsWith('0/')) return `clipped under the guides (${g}) or with the rounded preview off (${off})`;
+      // Centre all rank 1s: a card already centred is left alone (no override, no dot); the rest are centred; twice changes nothing
+      await page.evaluate(() => document.getElementById('resetDesign').click());
+      await page.click('[data-view=fireworks]');
+      const d0 = await page.evaluate(() => window.__hanabi.design());
+      const already = Dm.activeSuits(d0).filter((s) => { const c = Lm.centring(d0, s, 1); return c && Math.hypot(c.dx, c.dy) < 0.05; }).map((s) => s.id);
+      const off1 = Dm.activeSuits(d0).filter((s) => { const c = Lm.centring(d0, s, 1); return c && Math.hypot(c.dx, c.dy) >= 0.05; }).map((s) => s.id);
+      if (!already.length || !off1.length) return `the default deck gives no case of each: already centred ${already}, not ${off1}`;
+      await page.click('#centreRank1');
+      const d1 = await page.evaluate(() => window.__hanabi.design());
+      const marked = Object.keys(d1.fireworks).filter((id) => d1.fireworks[id][1]);
+      if (marked.sort().join() !== [...off1].sort().join()) return `Centre all rank 1s wrote ${marked.join(', ') || 'nothing'}; ${off1.join(', ')} were off centre and ${already.join(', ')} already centred`;
+      for (const id of already) if (await page.$(`[data-cell="${id}:1"] .hb-cell__mark`)) return `${id} 1 was already centred and is marked as overridden`;
+      const status = await page.$eval('#boardStatus', (e) => e.textContent);
+      if (!/already centred/.test(status)) return `the status does not say what was left: "${status}"`;
+      await page.click('#centreRank1');
+      if (JSON.stringify(await page.evaluate(() => window.__hanabi.design().fireworks)) !== JSON.stringify(d1.fireworks)) return 'a second Centre all rank 1s changed the deck';
+      // the catalogue counts in the editor: the disc's spokes and a field's count, drawn exactly
+      await page.evaluate(() => document.getElementById('resetDesign').click());
+      await page.click('[data-view=fireworks]');
+      await page.click('[data-cell="red:3"]');
+      await page.click('#edScope [data-scope="row"]');
+      for (const m of ['spoke', 'spokecore', 'rosettes', 'starfield']) {
+        const [label, lo, dflt, hi] = CAT_TABLE[m];
+        await page.click(`#editor [data-type="${m}"]`);
+        const ctl = await page.$eval('#p-count', (e) => ({ min: +e.min, max: +e.max, step: +e.step, value: +e.value, label: document.querySelector('label[for="p-count"]').textContent, out: document.querySelector('[data-o="count"]').textContent }));
+        if (ctl.label !== label || ctl.min !== lo || ctl.max !== hi || ctl.step !== 1 || ctl.value !== dflt || ctl.out !== String(dflt)) return `${m}: the count control reads "${ctl.label}" ${ctl.min}..${ctl.max} step ${ctl.step} at ${ctl.value} ("${ctl.out}")`;
+        await setRange('#p-count', hi);
+        const d = await page.evaluate(() => window.__hanabi.design()), red = d.suits.find((x) => x.id === 'red'), pl = Lm.placementFor(d, red, 3);
+        const gs = await page.$$eval('#edCard .hb-firework', (g) => g.map((x) => x.outerHTML));
+        const got = gs.map((x, i) => catElements(m, x.replace(/><\/(circle|line|path)>/g, '/>'), pl.items[i]));
+        if (red.firework.count !== hi || got.length !== 3 || got.some((c) => c !== hi)) return `${m} at ${hi}: wrote ${red.firework.count}, the card draws ${got.join(', ')}`;
+        await page.click('#editor [data-clear="count"]');
+      }
+      // the rising trail: a parameter of the phase-1 burst, off in a new design
+      await page.click('#editor [data-type="classic"]');
+      if (await page.$('[data-param="stem"] input') === null || await page.isChecked('[data-param="stem"] input')) return 'Classic has no rising-trail control, or it is on in a new design';
+      await page.evaluate(() => document.getElementById('resetDesign').click());
+      await page.click('[data-view=suit]');
+      return true;
+    });
+
     await check('B2', 'the Centres view renders the five compositions, five cards each', async () => {
       await page.click('[data-view=layouts]');
       const rows = await page.$$eval('#stage .hb-group', (gs) => gs.map((g) => g.querySelectorAll('svg').length));
@@ -1725,7 +2081,9 @@ async function partTwo(overrides = {}) {
       const bandStrokes = await page.$$eval('#stage .hb-index path[stroke$="num)"]', (p) => p.length);
       await page.click('[data-index=large]');
       await page.uncheck('#rainbow');
-      return (strokes === 10 && fills === 10 && solid === 0 && stops === 5 && disabled && bandStrokes === 0) || `gradient numerals ${strokes} and symbols ${fills} (want 10 each), after solid ${solid}, gradients ${stops} (want 5), band: disabled ${disabled}, strokes ${bandStrokes}`;
+      // five cards, an index in each corner the deck's corner mode asks for (four, by default)
+      const want = 5 * ((await page.evaluate(() => window.__hanabi.design().corners)) === 'four' ? 4 : 2);
+      return (strokes === want && fills === want && solid === 0 && stops === 5 && disabled && bandStrokes === 0) || `gradient numerals ${strokes} and symbols ${fills} (want ${want} each), after solid ${solid}, gradients ${stops} (want 5), band: disabled ${disabled}, strokes ${bandStrokes}`;
     });
 
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hanabi-'));

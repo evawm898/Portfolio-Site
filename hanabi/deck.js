@@ -32,7 +32,7 @@
 // every saved design opens looking as it did.
 
 import { MOTIF_IDS, MOTIFS, TYPES, TIER_IDS, LEGACY_RADIAL, PARAMS, STYLE_MOTIFS, inheritKeys,
-  ringCounts, peonyRingsFor, ringRingsFor, legacyGlitterCount } from './firework.js';
+  ringCounts, peonyRingsFor, ringRingsFor, legacyGlitterCount, CATALOGUE_COUNT, catalogueCountAt, catalogueCountDefault } from './firework.js';
 
 // 4: a Count card's fireworks may each carry a style of their own (`styles` in
 // the cell). A version-3 file has none and reads unchanged.
@@ -40,7 +40,13 @@ import { MOTIF_IDS, MOTIFS, TYPES, TIER_IDS, LEGACY_RADIAL, PARAMS, STYLE_MOTIFS
 // Trails, Arms, Petals) and Detail no longer changes it: a peony's and a ring's
 // count is the total of their stars, a glitter's the sparks. A version-4 file is
 // migrated (migrateCounts) so every firework draws as it did.
-export const VERSION = 5;
+// 6 (the polish pass, Nov 10): the spoke discs and the two fields take a count
+// (CATALOGUE_COUNT), stored as what they draw at rank 5; a version-5 file's
+// stored counts are rewritten so it draws as it did (migrateCatalogueCounts).
+// New designs open with four corner indices, phase 1's rising trail off, the
+// corner-grid pips and no frame; a file saved before version 6 keeps what it
+// had — two corners, the trail, the field pips (V6_OLD_DEFAULTS).
+export const VERSION = 6;
 
 // The standard per-suit distribution: three 1s, two 2s, two 3s, two 4s, one 5.
 // The optional rainbow suit uses the same distribution (10 more cards).
@@ -94,15 +100,32 @@ export const defaultCentre = (motif = 'classic') => ({ compose: 'count', motif, 
 export const legacyCentre = () => ({ compose: 'scale', motif: 'classic', tier: 'none' });
 export const SCENES = { treeline: 'Treeline', rooftops: 'Rooftops' };
 export const SCENE_HEIGHT = { min: 0.08, max: 0.45 };
-export const ITEM_LIMITS = { s: [0.15, 1.25], rot: [-180, 180] };
+export const ITEM_LIMITS = { s: [0.15, 1.6], rot: [-180, 180] };
 // A Scale card's one firework, placed by hand: x, y fractions of the centre
 // field, s a multiple of the radius Scale gives it, rot degrees added.
 export const PLACE_LIMITS = { s: [0.3, 1.6], rot: [-180, 180] };
 export const CORNER_MODES = {
   inverted: 'Two corners, bottom inverted',
   upright:  'Two corners, both upright',
-  four:     'All four corners',
+  four:     'All four corners, bottom pair inverted',
 };
+// A card's edge in the art (it prints): nothing, a thin rounded line half the
+// safe margin in from the trim, or that line with a second inside it.
+export const FRAMES = {
+  none:  'None',
+  line:  'Thin border',
+  inner: 'Inner frame (double line)',
+};
+// How the default Count pips are fitted: 'grid' (version 6) holds each one
+// clear of the four corner-index boxes and inside the safe zone, so ranks 1 and
+// 2 use the room between the indices; 'field' (before) holds them inside the
+// field between the index columns.
+export const PIP_FITS = {
+  grid:  'Corner grid — ranks 1–2 use the room between the indices',
+  field: 'Field — between the index columns (before Nov 10)',
+};
+// What a file saved before version 6 meant where it does not say.
+export const V6_OLD_DEFAULTS = { corners: 'inverted', stems: true, pips: 'field' };
 
 export const BACK_PATTERNS = ['none', 'stars', 'dots', 'stripes', 'rays'];
 export const BACK_MARKS = ['none', 'burst', 'ring'];
@@ -134,8 +157,11 @@ export function defaultDesign() {
     bleed: 3,
     safe: 3,
     index: 'large',
-    corners: 'inverted',
-    face: { bg: '#0B1018' },
+    corners: 'four',
+    face: { bg: '#0B1018', frame: 'none' },
+    // phase 1's rising trail under classic / radial bursts (firework.js stemDefault)
+    stems: false,
+    pips: 'grid',
     back: { bg: '#10202A', fg: '#2FA3A3', pattern: 'stars', mark: 'burst' },
     tokens: { clueBg: '#1A3E66', clueFg: '#CFE6FF', fuseBg: '#3A1414', fuseFg: '#FF8A5C' },
     // The CELL overrides the Firework board writes: { [suitId]: { [rank]:
@@ -274,8 +300,18 @@ export function normaliseDesign(raw, symbolIds) {
   d.bleed = clamp(num(raw.bleed, d.bleed), BLEED_LIMITS.min, BLEED_LIMITS.max);
   d.safe = clamp(num(raw.safe, d.safe), SAFE_LIMITS.min, SAFE_LIMITS.max);
   d.index = legacy ? legacy.index : pick(raw.index, Object.keys(INDEX_STYLES), d.index);
-  d.corners = pick(raw.corners, Object.keys(CORNER_MODES), d.corners);
-  if (raw.face) d.face.bg = hex(raw.face.bg, d.face.bg);
+  // before version 6 a file that does not say meant two corners, the trail and the field pips
+  const old6 = ver < 6 ? V6_OLD_DEFAULTS : null;
+  d.corners = pick(raw.corners, Object.keys(CORNER_MODES), old6 ? old6.corners : d.corners);
+  d.stems = typeof raw.stems === 'boolean' ? raw.stems : old6 ? old6.stems : d.stems;
+  d.pips = pick(raw.pips, Object.keys(PIP_FITS), old6 ? old6.pips : d.pips);
+  if (raw.face) {
+    d.face.bg = hex(raw.face.bg, d.face.bg);
+    if (raw.face.frame !== undefined) {
+      if (FRAMES[raw.face.frame]) d.face.frame = raw.face.frame;
+      else notes.push(`unknown card frame "${raw.face.frame}" — none kept`);
+    }
+  }
   if (raw.back) {
     d.back.bg = hex(raw.back.bg, d.back.bg);
     d.back.fg = hex(raw.back.fg, d.back.fg);
@@ -313,6 +349,10 @@ export function normaliseDesign(raw, symbolIds) {
   if (ver < 5) {
     const moved = migrateCounts(d);
     if (moved) notes.push(`${moved} firework count${moved === 1 ? '' : 's'} rewritten as the stars ${moved === 1 ? 'its' : 'their'} Detail drew (version 5: the count is the number drawn, and Detail no longer adds any) — ${moved === 1 ? 'it draws' : 'they draw'} exactly as before`);
+  }
+  if (ver < 6) {
+    const moved = migrateCatalogueCounts(d);
+    if (moved) notes.push(`${moved} catalogue firework count${moved === 1 ? '' : 's'} rewritten (version 6: a spoke disc's spokes and a field's rosettes or stars are a count of their own) — ${moved === 1 ? 'it draws' : 'they draw'} exactly as before`);
   }
   if (raw.arrangements && typeof raw.arrangements === 'object') {
     for (const [rk, items] of Object.entries(raw.arrangements)) {
@@ -407,6 +447,70 @@ export function migrateCounts(d) {
         settle(st, v5Count(t, old.count, old.density), now);
       }
     }
+  }
+  return moved;
+}
+
+// ---- version 5 -> 6: the counted catalogue motifs ----
+// Before version 6 a spoke disc's or a field's count was no parameter: a count
+// at the SUIT or in a firework's STYLE was ignored by it (it may be left from
+// another type), and a count on a CARD was drawn as given, at that rank. Now
+// the count reaches a catalogue firework at every level and is what it draws
+// at rank 5 (fewer at the lower ranks under Scale). So:
+//   a suit count under a counted catalogue motif is taken off the suit, and
+//     handed to each card of the row drawn as another type that inherited it;
+//   a suit count of another type is kept, and each card made a counted
+//     catalogue motif is given that motif's own count, which it drew;
+//   a card count on a counted catalogue card becomes the count whose rank-r
+//     escalation is the number it drew (the escalation reaches every integer);
+//   a style count on a counted catalogue firework is dropped (it drew nothing).
+const hasN = (v) => v !== undefined && v !== '';
+export function v6CatalogueCount(motif, drawn, rank) {
+  const C = CATALOGUE_COUNT[motif], want = Math.round(+drawn);
+  if (rank === 5) return Math.min(C.max, Math.max(C.min, want));
+  let best = C.min, bestD = Infinity;
+  for (let v = C.min; v <= C.max; v++) {
+    const d = Math.abs(catalogueCountAt(motif, v, rank) - want);
+    if (d < bestD) { best = v; bestD = d; if (!d) break; }
+  }
+  return best;
+}
+export function migrateCatalogueCounts(d) {
+  let moved = 0;
+  const counted = (m) => !!CATALOGUE_COUNT[m];
+  const takesCount = (m) => inheritKeys(m).includes('count');
+  for (const s of d.suits) {
+    const sm = s.centre.motif, er = (r) => (s.centre.compose === 'count' ? 5 : r);
+    const ranks = (d.fireworks && d.fireworks[s.id]) || {};
+    const suitN = s.firework && hasN(s.firework.count) ? s.firework.count : undefined;
+    if (counted(sm) && suitN !== undefined) {
+      delete s.firework.count; moved++;
+      for (const o of Object.values(ranks)) {
+        if (!o || typeof o !== 'object') continue;
+        const mc = MOTIFS[o.motif] ? o.motif : sm;
+        if (mc !== sm && takesCount(mc) && !hasN(o.count)) o.count = suitN;
+      }
+    }
+    for (const [rk, o] of Object.entries(ranks)) {
+      if (!o || typeof o !== 'object') continue;
+      const mc = MOTIFS[o.motif] ? o.motif : sm;
+      if (counted(mc)) {
+        if (hasN(o.count)) {
+          const v = v6CatalogueCount(mc, o.count, er(+rk));
+          if (v !== o.count) { o.count = v; moved++; }
+        } else if (!counted(sm) && suitN !== undefined) { o.count = catalogueCountDefault(mc); moved++; }
+      }
+      if (o.styles && typeof o.styles === 'object') {
+        for (const [n, st] of Object.entries(o.styles)) {
+          if (!st || typeof st !== 'object' || !hasN(st.count)) continue;
+          const t = STYLE_MOTIFS.includes(st.motif) ? st.motif : mc;
+          if (counted(t)) { delete st.count; moved++; if (!Object.keys(st).length) delete o.styles[n]; }
+        }
+        if (!Object.keys(o.styles).length) delete o.styles;
+      }
+      if (!Object.keys(o).length) delete ranks[rk];
+    }
+    if (d.fireworks && d.fireworks[s.id] && !Object.keys(d.fireworks[s.id]).length) delete d.fireworks[s.id];
   }
   return moved;
 }

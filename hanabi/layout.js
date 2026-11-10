@@ -121,10 +121,35 @@ function placeCorners(idx, rect, g, mode) {
   return tl + inv(tl);
 }
 
-function frame(g, inner, { guides, px, defs = '' }) {
+// opts.round (the PREVIEW only; never an export): the card as an object — its
+// art clipped to the trim with rounded corners (ROUND_CORNER of the shorter
+// side, 3.2 mm on a poker card) and a hairline round it. Under the guides the
+// bleed is the point, so they win.
+export const ROUND_CORNER = 0.05;
+let roundSeq = 0;
+function frame(g, inner, { guides, px, defs = '', round, idPrefix }) {
   const size = px ? ` width="${px.w}" height="${px.h}"` : '';
+  if (round && !guides) {
+    const t = g.trim, rx = f(Math.min(g.w, g.h) * ROUND_CORNER), id = `${idPrefix || `rc${++roundSeq}`}clip`;
+    const rr = (extra) => `<rect x="${f(t.x)}" y="${f(t.y)}" width="${f(t.w)}" height="${f(t.h)}" rx="${rx}" ry="${rx}"${extra}/>`;
+    defs += `<clipPath id="${id}">${rr('')}</clipPath>`;
+    inner = `<g class="hb-round" clip-path="url(#${id})">${inner}</g>`
+      + rr(` class="hb-edge" fill="none" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="${f(Math.max(0.2, g.w * 0.004))}"`);
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f(g.fullW)} ${f(g.fullH)}"${size} preserveAspectRatio="xMidYMid meet">`
     + (defs ? `<defs>${defs}</defs>` : '') + inner + (guides ? guideMarks(g) : '') + '</svg>';
+}
+
+// The card's edge in the ART (design.face.frame; it prints): a thin rounded line
+// half the safe margin in from the trim (never nearer than 0.8 mm, clear of the
+// knife's wander), or that line with a second inside it. In the suit's colour,
+// over the art and the index.
+export function frameArt(design, suit, g) {
+  const fr = design.face && design.face.frame;
+  if (!fr || fr === 'none') return '';
+  const t = g.trim, inset = Math.max(0.8, g.safe * 0.5), sw = Math.max(0.25, g.w * 0.005);
+  const rect = (d, w, op) => `<rect x="${f(t.x + d)}" y="${f(t.y + d)}" width="${f(t.w - 2 * d)}" height="${f(t.h - 2 * d)}" rx="${f(Math.max(0.5, Math.min(g.w, g.h) * ROUND_CORNER - d))}" fill="none" stroke="${suit.primary}" stroke-opacity="${op}" stroke-width="${f(w)}"/>`;
+  return `<g class="hb-frame">${rect(inset, sw, 0.75)}${fr === 'inner' ? rect(inset + sw * 3.2, sw * 0.6, 0.5) : ''}</g>`;
 }
 
 // Preview-only guides: the bleed shaded, the trim line dashed, the safe zone dotted.
@@ -238,7 +263,34 @@ export function cellArrangement(design, suitId, rank) {
   if (o && Array.isArray(o.items) && o.items.length === rank) return { items: o.items, fitted: false };
   const col = design.arrangements && design.arrangements[rank];
   if (Array.isArray(col) && col.length === rank) return { items: col, fitted: false };
-  return { items: DEFAULT_PIPS[rank], fitted: true };
+  return { items: (design.pips === 'grid' ? GRID_PIPS : DEFAULT_PIPS)[rank], fitted: true };
+}
+// THE CORNER GRID (design.pips 'grid', version 6). Every face shares one grid:
+// the safe zone, with the four corner-index boxes reserved whatever the corner
+// mode (so the art never moves when the corners change), and one gap. A default
+// pip is fitted to it — held inside the safe zone less the gap and clear of
+// every index box by the gap — instead of to the field between the index
+// columns, so ranks 1 and 2 use the room between the indices (rank 1 on a poker
+// card: a 57 mm burst where the field fit drew 40 mm). Ranks 3-5 are the field's
+// pips; their sizes keep them as they were. null: the field fit (before v6).
+export const GRID_PIPS = {
+  ...DEFAULT_PIPS,
+  1: [{ x: 0.5, y: 0.5, s: 1.5, rot: 0 }],
+  2: [{ x: 0.44, y: 0.27, s: 1.1, rot: 0 }, { x: 0.56, y: 0.73, s: 0.95, rot: 0 }],
+};
+export function pipGrid(design, ix) {
+  if (design.pips !== 'grid') return null;
+  const a = ix.area, k = ix.corner, gap = Math.max(0.8, a.h * 0.015);
+  const boxes = k.w ? [[a.x, a.y], [a.x + a.w - k.w, a.y], [a.x, a.y + a.h - k.h], [a.x + a.w - k.w, a.y + a.h - k.h]]
+    .map(([x, y]) => ({ x, y, w: k.w, h: k.h })) : [];
+  return { area: a, boxes, gap };
+}
+// The room a fitted pip at (cx, cy) has on the grid.
+export function gridRoom(grid, cx, cy) {
+  const a = grid.area;
+  let room = Math.min(cx - a.x, a.x + a.w - cx, cy - a.y, a.y + a.h - cy);
+  for (const b of grid.boxes) room = Math.min(room, Math.hypot(Math.max(b.x - cx, 0, cx - b.x - b.w), Math.max(b.y - cy, 0, cy - b.y - b.h)));
+  return room - grid.gap;
 }
 // Where each firework of a Count cell lands, in card mm: { field, unit,
 // items: [{ cx, cy, r, rot }] }. r is the asked radius held inside the field.
@@ -247,11 +299,11 @@ export function cellArrangement(design, suitId, rank) {
 // it is put: toward an edge it may run past the field — under the index, which
 // is drawn over it — and the card's own edge clips it. n is the firework it is
 // (its drawing's seed): its slot when the item does not say.
-export function countPlacement(field, items, fitted = true) {
+export function countPlacement(field, items, fitted = true, grid = null) {
   const unit = Math.min(field.w, field.h) / 2;
   return { field, unit, fitted, items: items.map((it, i) => {
     const cx = field.x + it.x * field.w, cy = field.y + it.y * field.h;
-    const room = Math.max(0.5, Math.min(cx - field.x, field.x + field.w - cx, cy - field.y, field.y + field.h - cy));
+    const room = Math.max(0.5, grid ? gridRoom(grid, cx, cy) : Math.min(cx - field.x, field.x + field.w - cx, cy - field.y, field.y + field.h - cy));
     return { cx, cy, r: fitted ? Math.min(it.s * unit, room) : it.s * unit, rot: it.rot || 0, n: Number.isInteger(it.n) ? it.n : i };
   }) };
 }
@@ -268,7 +320,7 @@ export function placementFor(design, suit, rank) {
   const g = cardGeom(design);
   const ix = indexArt(design, suit, rank, g, 'pl', false);
   const ar = cellArrangement(design, suit.id, rank);
-  return countPlacement(fieldArea(ix.area, ix.corner), ar.items, ar.fitted);
+  return countPlacement(fieldArea(ix.area, ix.corner), ar.items, ar.fitted, pipGrid(design, ix));
 }
 
 // A Count card's fireworks as drawn, one string each in stacking order. Each is
@@ -304,7 +356,7 @@ function centreArt(design, suit, rank, g, ix) {
   }
   if (compose === 'count' || compose === 'countscale') {
     const ar = cellArrangement(design, suit.id, rank);
-    return countArt(design, suit, rank, countPlacement(fieldArea(a, k), ar.items, ar.fitted)).join('');
+    return countArt(design, suit, rank, countPlacement(fieldArea(a, k), ar.items, ar.fitted, pipGrid(design, ix))).join('');
   }
   const sp = scaleBurst(design, suit, rank, g, ix, spec);
   const p = sp.place;
@@ -407,7 +459,7 @@ export function centring(design, suit, rank) {
   const fx = field.x + field.w / 2, fy = field.y + field.h / 2;
   const cl = (v) => Math.min(1, Math.max(0, v));
   if (compose === 'count' || compose === 'countscale') {
-    const ar = cellArrangement(design, suit.id, rank), pl = countPlacement(field, ar.items, ar.fitted);
+    const ar = cellArrangement(design, suit.id, rank), pl = countPlacement(field, ar.items, ar.fitted, pipGrid(design, ix));
     const e = drawnExtent(countArt(design, suit, rank, pl).join(''));
     if (!e) return null;
     const dx = fx - e.cx, dy = fy - e.cy;
@@ -486,7 +538,7 @@ export function renderFace(design, card, opts = {}) {
   // centre art, without the corner index.
   const art = bg + sceneArt(design, g) + centreArt(design, suit, card.rank, g, ix);
   if (opts.centreOnly) return frame(g, art, opts);
-  return frame(g, art + ix.svg, { ...opts, defs: ix.defs });
+  return frame(g, art + ix.svg + frameArt(design, suit, g), { ...opts, idPrefix, defs: ix.defs });
 }
 
 function backPattern(design, g) {

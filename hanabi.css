@@ -50,7 +50,7 @@ body {
 .hb-num { color: var(--color-seafoam); }
 .hb-val { color: var(--color-dim); text-transform: none; letter-spacing: 0; font-size: 11px; }
 
-.hb-row { display: grid; grid-template-columns: 110px 1fr; gap: 6px 8px; align-items: center; margin: 8px 0; }
+.hb-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px 8px; align-items: center; margin: 8px 0; }
 .hb-row--pair { grid-template-columns: 82px 1fr 82px 1fr; }
 .hb-row label, .hb-check { color: var(--color-ink-2); font-size: 11px; }
 .hb-check { display: flex; align-items: center; gap: 6px; margin: 8px 0; cursor: pointer; }
@@ -64,6 +64,14 @@ select, input[type=number], input[type=text] {
 select:focus, input:focus { outline: 1px solid var(--color-petrol); outline-offset: 0; }
 input[type=number]:disabled { color: var(--color-faint); }
 input[type=color] { width: 100%; height: 26px; padding: 0 2px; border: 1px solid var(--color-line-strong); background: var(--color-ground); cursor: pointer; }
+/* the swatch inside its own edge, so a colour near the panel's ground (a dark card
+   face) still reads as a colour and not as an empty box */
+input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; }
+input[type=color]::-webkit-color-swatch { border: 1px solid var(--color-line-strong); border-radius: 0; }
+input[type=color]::-moz-color-swatch { border: 1px solid var(--color-line-strong); border-radius: 0; }
+.hb-colorbox { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.hb-colorbox input[type=color] { flex: 0 0 46px; width: 46px; }
+.hb-hex { color: var(--color-ink-2); font-size: 10.5px; letter-spacing: .04em; white-space: nowrap; }
 input[type=checkbox] { accent-color: var(--color-petrol); }
 input[type=range] { accent-color: var(--color-petrol); }
 
@@ -80,17 +88,19 @@ input[type=range] { accent-color: var(--color-petrol); }
 .hb-btn--ghost { background: transparent; border-color: var(--color-line-strong); }
 
 /* ---------- a suit row ---------- */
-.hb-suit { border: 1px solid var(--color-line); padding: 8px; margin: 8px 0; }
+#suitRows { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.hb-suit { border: 1px solid var(--color-line); padding: 8px; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .hb-suit__head { display: grid; grid-template-columns: 1fr 40px 40px; gap: 6px; align-items: center; }
 .hb-suit__head input[type=color] { height: 24px; }
-.hb-suit__syms { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 6px; }
+.hb-suit__syms { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
 .hb-sym { background: var(--color-ground); border: 1px solid var(--color-line); padding: 3px; cursor: pointer; aspect-ratio: 1; display: flex; }
 .hb-sym svg { width: 100%; height: 100%; }
 .hb-sym[aria-pressed="true"] { border-color: var(--color-petrol); outline: 1px solid var(--color-petrol); }
 .hb-sym.is-taken { opacity: .45; }
 .hb-suit[hidden] { display: none; }
-.hb-suit__centre { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 6px; margin-top: 6px; align-items: center; }
-.hb-suit__centre label { color: var(--color-dim); font-size: 10px; letter-spacing: .04em; }
+/* one label | select a line: a select as wide as the row, so no option is cut off */
+.hb-suit__centre { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 4px 6px; align-items: center; }
+.hb-suit__centre label { color: var(--color-dim); font-size: 10px; letter-spacing: .04em; white-space: nowrap; }
 .hb-suit__centre select { width: 100%; }
 .hb-suit__centre select:disabled { opacity: .45; }
 .hb-suit__all { grid-column: 1 / -1; justify-self: end; background: none; border: 0; padding: 0; color: var(--color-petrol); font: inherit; font-size: 10px; cursor: pointer; }
@@ -115,6 +125,8 @@ input[type=range] { accent-color: var(--color-petrol); }
 .hb-cards { display: flex; flex-wrap: wrap; gap: 12px; }
 .hb-card { width: var(--hb-card-w); margin: 0; }
 .hb-card svg { display: block; width: 100%; height: auto; box-shadow: 0 0 0 1px var(--color-line); }
+/* rounded corners: the svg draws the card's own edge, and the square outline goes */
+.hb-stage.is-round .hb-card svg, .hb-stage.is-round .hb-ed__card svg { box-shadow: none; }
 .hb-card figcaption { color: var(--color-dim); font-size: 10.5px; margin-top: 4px; }
 
 /* ---------- the Firework board ---------- */
@@ -132,7 +144,7 @@ input[type=range] { accent-color: var(--color-petrol); }
 .hb-board__bar .hb-group__title { margin: 0; }
 .hb-board { display: grid; grid-template-columns: 96px repeat(5, minmax(0, 180px)); gap: 6px; }
 .hb-board__rank { text-align: center; color: var(--color-ink); font-size: 12px; }
-.hb-board__suit { display: flex; gap: 6px; align-items: center; color: var(--color-ink-2); font-size: 10.5px; line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
+.hb-board__suit { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; justify-content: center; color: var(--color-ink-2); font-size: 10.5px; line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
 .hb-board__suit b { color: var(--color-ink); font-weight: 500; }
 .hb-board__sym { flex: 0 0 16px; width: 16px; height: 16px; display: flex; }
 .hb-board__sym svg { width: 100%; height: 100%; }

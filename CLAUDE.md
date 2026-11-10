@@ -12826,10 +12826,20 @@ count is the number of main elements DRAWN, labelled per type (`TYPES[t].count`,
 crossette; Petals — blossom; 3–60), exact under Count and at rank 5 of Scale. Detail no longer changes it (peony/ring:
 how many rings a fixed count is spread over, `starPlan`; glitter: the share of four-point sparks). A v4 file is
 migrated on load (`migrateCounts`: the count its old Detail drew; a glitter off Detail 1 keeps its old fit as
-`legacy`, no control) and draws byte-identically (H30 vs `d8286f1`); H29 counts the drawn elements, B12 the control. **Phase 2b (Nov 10): the Arrange panel and Detail** — a
+`legacy`, no control) and draws byte-identically (H30 vs `d8286f1`); H29 counts the drawn elements, B12 the control.
+**Nov 10, the polish pass (schema v6; read "The polish pass" in `docs/hanabi.md`):** the spoke discs and the two fields
+take a count (`CATALOGUE_COUNT`: Spokes 6–160/80, Count 1–30/15 and 1–60/26; stored as what they draw at rank 5,
+escalated under Scale by the catalogue's `COUNTS`; unset is byte-identical, H31), and a v5 file's stale counts are
+rewritten so it draws as before (`migrateCatalogueCounts`, H32 vs `5771675`). NEW designs open with four corner
+indices (the bottom pair a true 180° turn, H33), phase 1's rising trail off (`stem`, a burst parameter;
+`design.stems`), the CORNER GRID pip fit (`pips: 'grid'` — default pips held clear of all four index boxes, so
+ranks 1–2 fill the room between the indices; H34) and no frame (`face.frame` none / line / inner, it prints, H35);
+a file before v6 that does not say keeps two corners, the trail and the field fit (`V6_OLD_DEFAULTS`). Rounded
+corners are the PREVIEW only (`view.round`, never an export). Centre all rank 1s / centre row skip a card already
+centred within 0.05 mm. B13 measures every panel dropdown option against its box. **Phase 2b (Nov 10): the Arrange panel and Detail** — a
 card's fireworks are picked, moved, sized, turned and RESTACKED (items carry `n`, their drawing's seed,
 so a restack only changes paint order); a hand arrangement is taken literally (no shrink at the field
 edge) while the default pips stay fitted; a Scale card's one firework takes `place`. Detail (`density`,
 0–2) on all nine types, each default byte-identical to `e95f121` (H22), detail never rescaling a burst
-(H21). Gate: `node tools/verify-hanabi.mjs` (H1–H28, B1–B11;
-`--negative-control` 72 mutants, `--mutant=a,b` a subset), not in CI.
+(H21). Gate: `node tools/verify-hanabi.mjs` (H1–H35, B1–B13;
+`--negative-control` 105 mutants, `--mutant=a,b` a subset), not in CI.
