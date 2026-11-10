@@ -243,12 +243,17 @@ It is spawned by `verify-bloom-defaults-bar.mjs` in both arms, so it rides in CI
 `0458880`, both modes):
 
 - **Predeclared from the guard predicate:** a row moves iff it builds RIBS with the infill off. That is
-  exactly block 87's 23 rows, all ADDED, and none has a base counterpart. Every other row is a holder:
-  every BONE, PEBBLE and CELLULAR row, and the shipping default. No row definition moved.
-- **Rows 0–599: PASS.** 0 floats moved on the 600 holders, positionally under `Object.is`, over
-  858,053,196 export floats and 65,498,834 captured-grid values in both modes.
-- **Rows 600–1,707 were still running when this commit was pushed.** They are reported in the PR
-  conversation.
+  20 of block 87's 23 rows, all ADDED, none with a base counterpart. The other three are holders: the
+  infill row, which refuses RIBS, and the two GATED rows. Every other row is a holder too: every BONE,
+  PEBBLE and CELLULAR row, and the shipping default. No row definition moved.
+- **PASS over the whole 1,708-row matrix in both modes** (eight chunks, `--merge`d): 0 floats moved on
+  the 1,688 holders, positionally under `Object.is`, and 20 of 20 predeclared movers moved. That is over
+  2,835,623,718 export floats (315,069,302 triangles) and 84,435,812 captured-grid values.
+- **The byte tool had a defect that this run found, and it is fixed.** `baseScopes` stripped a LAYER
+  entry's values against `SCOPE_VALUE_IDS` alone, so it took `layerRing` and `layerPetalCount` (listed in
+  `SCOPE_LAYER_VALUE_IDS`) away from the base build. Block 85's LAYER RING rows then read as 32 false
+  movers. A layer entry now strips against both lists, and rows 1,616–1,707 were re-run on the fixed
+  tool. The geometry was never wrong; the comparison was.
 - Every change made to `bloom-geometry.js` after that run started sits inside a `T.ribs` branch (the
   owner key, the shared flag), so no holder's bytes can depend on it.
 
