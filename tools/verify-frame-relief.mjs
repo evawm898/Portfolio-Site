@@ -523,8 +523,12 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     // CB, THE BAND IS THE CAP (Eva's rulings 1-2 on the first sheet),
     // restated: the crest may stand CRR.rise of the molding width past the
     // outer edge and reach CRR.span[kind] (+ the rise) along it from the axis
-    const CRR = { rise: 0.45, span: { shell: 1.35 } };
-    const cb1 = [], cb2 = [];
+    // — on the ARCH its slopes' span, CRR.slopes (Eva's ruling (b), fourth
+    // sheet: the pointed apex spreads the shell along its two slopes). CB3
+    // the arch's default crest REACHES 24 mm across (the emitted plan)
+    const CRR = { rise: 0.45, span: { shell: 1.35 }, slopes: 1.8, archAcross: 24 };
+    const cb1 = [], cb2 = [], cb3 = [];
+    let archCrestRows = 0, archAcrossMin = Infinity;
     let stemEndMax = 0;
     let cbVerts = 0, cbRows = 0, crestPast = 0, crestAlong = 0, crestsSeen = 0;
     // the signed distance to the silhouette (positive inside) and the ARC
@@ -823,7 +827,8 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
           const crest = !!(e.rec.crest || e.rec.mirrorOf?.crest);
           if (!crest) { for (const l of e.foot.loops) { const bad = l.find((qq) => geo(qq).sd < -1e-6); if (bad) { cb1.push(`${name}: the ${e.kind} ${e.id} stands ${(-geo(bad).sd).toFixed(3)} mm past the outer edge`); break; } } continue; }
           crestsSeen++;
-          const span = CRR.span[e.kind];
+          const span = model.info.kind === 'arch' && CRR.span[e.kind] ? CRR.slopes : CRR.span[e.kind];
+          if (/^arch default/.test(name) && !e.rec.mirrorOf) { let xw = 0; for (const pt of e.parts) { const n = 2 * pt.nu * pt.nv; for (let vv = pt.base; vv < pt.base + n; vv++) xw = Math.max(xw, Math.abs(P[3 * vv])); } archCrestRows++; archAcrossMin = Math.min(archAcrossMin, 2 * xw); if (Math.abs(2 * xw - CRR.archAcross) > 0.5) cb3.push(`${name}: the arch's crest is ${(2 * xw).toFixed(1)} mm across`); }
           if (!span) { cb2.push(`${name}: a crest of kind ${e.kind}`); continue; }
           if (!(e.rec.soft || e.rec.mirrorOf?.soft)) cb2.push(`${name}: the ${e.kind} crest is not the SOFT shell (rounded lobes, Eva's third round)`);
           for (const pt of e.parts) { const n = 2 * pt.nu * pt.nv; for (let vv = pt.base; vv < pt.base + n; vv++) { const g2 = geo([P[3 * vv], P[3 * vv + 1]]); if (g2.sd >= 0) continue; crestPast = Math.max(crestPast, -g2.sd / Mg); crestAlong = Math.max(crestAlong, g2.arc / Mg); if (-g2.sd > CRR.rise * Mg + 1e-6) { cb2.push(`${name}: the ${e.kind} crest stands ${(-g2.sd).toFixed(3)} mm past the edge (the rise ${(CRR.rise * Mg).toFixed(3)})`); vv = Infinity; break; } if (g2.arc > (span + CRR.rise) * Mg + 1e-6) { cb2.push(`${name}: the ${e.kind} crest reaches ${g2.arc.toFixed(2)} mm along the edge from the axis past the edge (the span ${((span + CRR.rise) * Mg).toFixed(2)})`); vv = Infinity; break; } } if (cb2.length && cb2.at(-1).startsWith(name)) break; }
@@ -855,6 +860,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     rec('VN6 every stem\'s two ends are ROUNDED off: its emitted first and last rows no wider than the feature (Eva\'s third round: nothing reads as a cut slab)', stemsSeen > 0 && vn6.length === 0, `widest stem end ${stemEndMax.toFixed(3)} mm${vn6.length ? ' — ' + vn6.slice(0, 3).join('; ') : ''}`);
     rec('CB1 nothing stands past the band\'s outer edge (the frame\'s own silhouette) but the crest: every emitted wire vertex and every placed element\'s footprint inside it, on the vine (Eva\'s ruling 1 on the first vine sheet) and on the chains (ruling B on the second)', cbRows > 0 && cbVerts > 0 && cb1.length === 0, `${cbVerts} wire vertices on ${cbRows} vine and chain rows${cb1.length ? ' — ' + cb1.slice(0, 3).join('; ') : ''}`);
     rec('CB2 the crest past the edge is LOW and ALONG the band: no vertex further out than 0.45 of the molding width, and everything past the edge within the crest\'s span (+ the rise) of the axis along the edge', crestsSeen > 0 && cb2.length === 0, `${crestsSeen} crests, past the edge ${crestPast.toFixed(3)} M at most, along it ${crestAlong.toFixed(3)} M${cb2.length ? ' — ' + cb2.slice(0, 3).join('; ') : ''}`);
+    rec('CB3 the arch\'s crest spreads ALONG its slopes (Eva\'s ruling (b), fourth sheet): on the default arch, vine and chains, the emitted crest is 24 mm across (within half a millimetre)', archCrestRows > 0 && cb3.length === 0, `${archCrestRows} arch crests, narrowest ${archAcrossMin.toFixed(1)} mm across${cb3.length ? ' — ' + cb3.slice(0, 3).join('; ') : ''}`);
     rec('TB1 every ornament row\'s relief is within the 1,500,000-triangle budget and within the ornament\'s own predicted bound', tb1.length === 0, `most ${mostTris.toLocaleString('en-US')} triangles${tb1.length ? ' — ' + tb1.slice(0, 3).join('; ') : ''}`);
     console.log(`     per wire style (off the emitted mesh): ${['vine', 'carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
   }
@@ -1255,6 +1261,7 @@ const MUTANTS = [
   // rosette at the corners, E the crest's soft shell, and no cut slab)
   { id: 'the-chains-are-not-capped', file: 'filigree', from: 'if (!ch.pastBand || lf < CHAIN_CAP_MIN) break;', to: 'break;', breaks: ['OR1'] },   // the chain at its lead: every element on the default arch and oval stands past the band, so none is seated and the row is left with NO chain (OR1: 0 wire solids) — CB1 cannot see a chain that is not there
   { id: 'a-rose-at-the-corner', file: 'vine', from: "(cls === 'crest' || cls === 'bottom' ? 'shell' : 'rosette')", to: "(cls === 'crest' || cls === 'bottom' ? 'shell' : 'rose')", breaks: ['VN2'] },   // the second sheet's half-size rose
+  { id: 'the-arch-crest-is-not-spread-along-its-slopes', file: 'vine', from: "slopes: { span: 1.8, stretch: 1.8 },", to: "slopes: { span: 1.35, stretch: 1.5 },", breaks: ['CB3'] },   // the 18 mm arch shell of the third sheet
   { id: 'the-crest-shell-is-pointed', file: 'vine', from: "soft: kind === 'shell' });", to: "soft: false });", breaks: ['CB2'] },   // #479's pointed scallops: the starburst
   { id: 'a-stem-ends-on-a-flat-face', file: 'vine', from: 'const finishStem = (c) => { roundEnds(c);', to: 'const finishStem = (c) => {', breaks: ['VN6'] },   // the collar at the springing
   // RETIRED in phase 3e step 3: 'the-axis-leaf-is-off-the-axis' (the chains'

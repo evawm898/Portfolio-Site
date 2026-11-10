@@ -92,6 +92,12 @@ export const CREST = {
   build: { shell: 0.9 },   // × M: the size the element is BUILT at (its HEIGHT is the built one's; its plan is then scaled, evenly, into the rise and the span)
   stretch: 1.5,   // its plan widened along the band at most this much over its own proportion
   slope: 1,       // its top falls off the band's edge at this slope (1: 45°) — draped in z as well as in plan
+  // the ARCH (Eva's ruling (b), fourth sheet): its pointed apex leaves the band
+  // only 1.16 M deep on the axis, so a deeper root reaches the opening, and
+  // deeper is NARROWER (the apex's sloping normals pull the points in). Its
+  // shell reaches further ALONG the two slopes instead: span and stretch both
+  // 1.8 — 24 mm across on the default arch, the rise unchanged (measured, §17.10)
+  slopes: { span: 1.8, stretch: 1.8 },
   round: 1.5,     // mm: the fall's first stretch is a parabola, not a cone (a cone's tip leaves a CREASE in the lift where the band's crown ends, which the shell's fan grid crosses at a slant — a jagged line across the soft crest, third round)
 };
 /* THE EDGE FRAME on the silhouette `sil` (print mm): its top crossing of the
@@ -151,7 +157,7 @@ export function silDistance(sil, q) {
 /* THE CREST, built about the origin, its plan stretched to the span and the
    rise (x to ±span·M, y from −hinge·M to +rise·M), then draped on the edge
    frame: low and wide past the edge, never sideways */
-export function crestElement(kind, { M, frame, hinge = CREST.hinge, span = CREST.span[kind] }) {
+export function crestElement(kind, { M, frame, hinge = CREST.hinge, span = CREST.span[kind], stretch = CREST.stretch }) {
   const el = placeElement(kind, { size: CREST.build[kind] * M, at: [0, 0], angle: 0, lift: 0, soft: kind === 'shell' });   // the crest's shell is the SOFT one (rounded lobes)
   let xm = 0, ym = -Infinity, y0 = Infinity; for (const l of el.loops) for (const [x, y] of l) { xm = Math.max(xm, Math.abs(x)); ym = Math.max(ym, y); y0 = Math.min(y0, y); }
   // its plan scaled into the rise (from its root under the edge to the most
@@ -159,7 +165,7 @@ export function crestElement(kind, { M, frame, hinge = CREST.hinge, span = CREST
   // and widened along the band by at most CREST.stretch (a stretch past it
   // turns the shell's scallops into a sunburst's points — measured on the
   // first sheet at 3×)
-  const k = (CREST.rise + hinge) * M / (ym - y0), kx = Math.min(CREST.stretch * k, span * M / xm);
+  const k = (CREST.rise + hinge) * M / (ym - y0), kx = Math.min(stretch * k, span * M / xm);
   const flat = remapElement(el, ([x, y]) => [kx * x, -hinge * M + k * (y - y0)]);
   return { ...remapElement(flat, frame.at), at: frame.at([0, 0]) };   // its place: the edge on the axis
 }
@@ -189,14 +195,14 @@ export function crestLift(Hz) {
    lifted per vertex (crestLift; the plan's mirror symmetry kept, the lift
    reading a point and its mirror alike) and made its own mirror again. One
    owner for the vine's crest and the chains'. Returns { el, note }. */
-export function drapedCrest(kind, { M, frame, opening, Hz, fits, why }) {
-  const span0 = CREST.span[kind];
+export function drapedCrest(kind, { M, frame, opening, Hz, fits, why, slopes = false }) {
+  const span0 = slopes ? CREST.slopes.span : CREST.span[kind], stretch = slopes ? CREST.slopes.stretch : CREST.stretch;
   let el = null, note = '';
   search: for (const span of [span0, 0.85 * span0, 0.7 * span0]) for (const hg of [CREST.hinge, 0.6, 0.5, 0.4]) {
-    let c = crestElement(kind, { M, frame, hinge: hg, span });
+    let c = crestElement(kind, { M, frame, hinge: hg, span, stretch });
     if (footprintTouches(c, opening)) continue;
     c = symmetrizeElement(c); if (c.asymmetric) continue;
-    c.sunk = false; c.out = [0, 1]; c.pushed = 0; c.crest = { hinge: hg, span, rise: CREST.rise };
+    c.sunk = false; c.out = [0, 1]; c.pushed = 0; c.crest = { hinge: hg, span, stretch, rise: CREST.rise };
     if (fits(c)) { el = c; if (span < span0 || hg < CREST.hinge) note = ` (span ${(span / span0 * 100).toFixed(0)}%, root ${hg.toFixed(2)} M under the edge)`; break search; }
   }
   if (!el) return { el: null, note: `the ${kind} crest is not built — draped low on the band it cannot ${why} without grazing` };
@@ -519,7 +525,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     if (!mk) continue;
     let el = null, note = '';
     if (e.cls === 'crest' && wcl === 'heavy') {
-      const r = drapedCrest(mk, { M, frame, opening, Hz, fits: (c) => joins(e, c, true), why: 'join both stems' });
+      const r = drapedCrest(mk, { M, frame, opening, Hz, fits: (c) => joins(e, c, true), why: 'join both stems', slopes: kind === 'arch' });
       told.push(r.note);
       if (!r.el) continue;
       el = r.el;

@@ -12550,14 +12550,16 @@ band's outer edge (the frame's own `plateOutline`) but the CREST, which is DRAPE
 along the edge × offset along its averaged normal) — at most `CREST.rise` 0.45 M past the edge, reaching
 `CREST.span` along it, lifted per vertex and falling off at 45° — the SHELL on every top, the arch's
 pointed apex included (Eva, third round: "shell works, spray doesn't" — the spray element and the *Crest
-form* control are gone, §17.9; on the arch the shell builds narrower, 18 mm against 26 / 24, told). **FOURTH ROUND (§17.10, Eva's B–E):** the
+form* control are gone, §17.9; on the arch it spreads along the apex's two slopes, `CREST.slopes` span/stretch 1.8, to 24 mm against 26 / 24 — ruled (b), Nov 10, CB3). **FOURTH ROUND (§17.10, Eva's B–E):** the
 crest is the SOFT shell (`SHELL_SOFT`, 7 broad round lobes; EL6 counts them off the mesh) and its lift's cone
 crease is rounded (`CREST.round`); corners and springings carry a ROSETTE; every stem's two ends round off to
 the floor (`roundEnds`, VN6 — the flat collar was the swept wire's square end); and THE CHAINS ARE CAPPED TOO —
 elements made smaller (15 % a step, 32–38 % of the lead at the defaults) until each stands between the opening
 and the edge, their top-axis motif the vine's `drapedCrest` (one owner) built first and cleared; CB1 reads chain
-rows. The arch's width: a deeper root reaches the opening and NARROWS the shell (measured), so widening it means
-spreading along the apex's slopes — a lettered option, as is the band joints' coplanar seam at the springing. Every other motif is placed by `placeMotif(…, { beyond, reach })` and made
+rows. The arch's width: a deeper root reaches the opening and NARROWS the shell (measured), so it spreads along the
+apex's slopes instead (ruled (b)). **The band joints' coplanar seam at the springing is an OPEN STL DEFECT beside the
+page/Node mismatch (§17.6), ruled (c): both are fixed together, in their own session, before anything prints.** The
+leafy runs (chains, the vine's stems and leaves) were not ruled right on the third sheet and are the next session's rework. Every other motif is placed by `placeMotif(…, { beyond, reach })` and made
 smaller until it fits the band and joins its stems; the stems' run-on past a corner is cut back inside the edge.
 Hierarchy 0 is the chains' layout (they still stand past the frame, as 3d built them — capping them is a
 lettered option). Gates CB1 / CB2, four mutants. **Ruling 5 (A): a PR runs only the relief mutants whose module

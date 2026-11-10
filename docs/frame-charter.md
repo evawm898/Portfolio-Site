@@ -1479,6 +1479,12 @@ arithmetic across the two engines). Every relief gate measures Node; nothing com
 it. On this tree the same +384 shows on the arch at every hierarchy, and the oval differs by hash only.
 That is its own session (an X0-style clause for the frame).
 
+**A SECOND OPEN STL DEFECT, beside it (Eva's ruling on the fourth sheet, Nov 10): the band joints' coplanar
+seam.** At the arch springing (and wherever two bands meet face to face — the phase-2 embed) the head band
+and the jamb overlap with coplanar faces: a dash at the light's edge and a different-shade bar on the band's
+outer wall in a three-quarter render (§17.10, the slabs, item 3). It is every frame's STL, not the
+ornament's. **Both defects are fixed together, in their own session, before anything prints.**
+
 **The relief gate's opening was the ORNAMENTED model's silhouette** (`plateOutline` of the model after
 `withOrnament`, whose box grows to carry what stands past the frame) — so the plate the relief builds
 under a motif past the sill's foot read as opening, and three filigree mutants reddened PL3 for it (a
@@ -1660,6 +1666,16 @@ springing rose are to be identified and fixed.
   sloping normals: 18.1 mm at 0.7 M, 17.2 at 0.9, 16.2 at 1.1. What widens it while keeping it low is
   reaching further ALONG the band's two slopes: a span of 1.8 M with the stretch cap raised to 1.8 gives
   24 mm across (2.0 / 2.0 gives 27), still 4.2 mm past the edge, measured. That is a different method from the one ruled, so it is a lettered option.
+  **RULED (b), Nov 10: spread along the slopes.** On the arch (`model.info.kind === 'arch'`, vine and chains
+  alike, through the one `drapedCrest`) the shell takes `CREST.slopes` — span 1.8 M, stretch 1.8 — and is
+  **24 mm across, 4.2 mm past the edge**, root 0.7 M, no fallback; the rectangle and oval keep span 1.35 /
+  stretch 1.5 (26 / 24 mm), unchanged by construction. CB2 reads the arch's span from its own restated
+  1.8; **CB3** holds the default arch's emitted crest at 24 mm across (±0.5) on both layouts, and
+  `the-arch-crest-is-not-spread-along-its-slopes` (the third sheet's 1.35 / 1.5) must redden it.
+- **The springing seam (item 3 of the slabs): ruled (c) — its own session**, recorded as an open STL defect
+  beside the page/Node mismatch (§17.6); the two are fixed together before anything prints.
+- **The leafy runs (the chains and the vine's stems and leaves) are NOT ruled right on the third sheet**;
+  everything else is. They are reworked in the next session and were not changed here.
 
 **CI: the relief mutants run on 26 shards at 60 minutes** (were 16 at 40): with the chains capped a mutant runs up to ~21 min, and three to a shard overran the timeout (six shards cancelled on `202c487`).
 

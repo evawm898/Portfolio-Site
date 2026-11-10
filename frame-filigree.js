@@ -1254,7 +1254,7 @@ export function chainsFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
   // and every chain that reaches the axis is laid clear of it
   const topAxis = Object.entries(model.info.anchors).find(([, a]) => Math.abs(a.pt[0]) < 1e-9 && a.pt[1] > (model.box.y0 + model.box.y1) / 2);
   const crestWanted = topAxis && (CHAIN_RUNS[kind] || []).some((r) => p[r.control] === 'on' && (r.from === topAxis[0] || r.to === topAxis[0]));
-  const crest = crestWanted ? drapedCrest('shell', { M: moldW, frame: edgeFrame(sil, moldW), opening, Hz: (q) => Math.max(0, H(q)), fits: () => true, why: 'stand clear of the opening' }) : null;
+  const crest = crestWanted ? drapedCrest('shell', { M: moldW, frame: edgeFrame(sil, moldW), opening, Hz: (q) => Math.max(0, H(q)), fits: () => true, why: 'stand clear of the opening', slopes: kind === 'arch' }) : null;
   if (crest) told.push(crest.note);
   const avoid = crest && crest.el ? [crest.el] : null;
   for (const run of CHAIN_RUNS[kind] || []) {
