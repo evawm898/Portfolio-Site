@@ -1255,7 +1255,7 @@ const MUTANTS = [
   // phase 3e step 3, second round (Eva's rulings 1-2: the band is the cap)
   { id: 'a-motif-pushed-past-the-band', file: 'filigree', from: '  if (beyond) {\n    // CAPPED TO THE BAND', to: '  if (false) {\n    // CAPPED TO THE BAND', breaks: ['CB1'] },   // the corner roses pushed out of the opening and past the edge, as the first sheet had them
   { id: 'the-crest-is-not-draped', file: 'vine', from: 'return { ...remapElement(flat, frame.at), at: frame.at([0, 0]) };', to: 'return { ...remapElement(flat, ([x, y]) => [x, frame.topY + y]), at: frame.at([0, 0]) };', breaks: ['CB2', 'CB3'] },   // laid flat across a curve, its ends stand past the rise; and on the arch it is no longer spread along the two slopes, so CB3 reads its width off 24 mm
-  { id: 'the-crest-stands-up', file: 'vine', from: 'const k = (CREST.rise + hinge) * M / (ym - y0)', to: 'const k = (2.5 + hinge) * M / (ym - y0)', breaks: ['CB2'] },   // the upright crest of the first sheet: 2.5 molding widths past the edge
+  { id: 'the-crest-stands-up', file: 'vine', from: 'const k = (CREST.rise + hinge) * M / (ym - y0)', to: 'const k = (2.5 + hinge) * M / (ym - y0)', breaks: ['CB2', 'CB3'] },   // the upright crest of the first sheet: 2.5 molding widths past the edge; scaled up, the arch's crest is no longer 24 mm across its slopes (CB3)
   { id: 'the-stem-runs-on-past-the-corner', file: 'vine', from: 'if (out.A || out.B) {', to: 'if (false) {', breaks: ['CB1'] },   // the run-on past an interior end left uncut: out through the rectangle's corner
   // third round (Eva's rulings on the second sheet: B the chains capped, D a
   // rosette at the corners, E the crest's soft shell, and no cut slab)
