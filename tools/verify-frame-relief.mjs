@@ -481,7 +481,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     // a wire's walls), the module's records used only to know which part is
     // which and what was ASKED (the weight a record claims is checked against
     // the restated field, never trusted)
-    const pl1 = [], pl2 = [], pl3 = [], pl4 = [], pl5 = [], vn1 = [], vn2 = [], vn3 = [], vn4 = [], vn5 = [];
+    const pl1 = [], pl2 = [], pl3 = [], pl4 = [], pl5 = [], vn1 = [], vn2 = [], vn3 = [], vn4 = [], vn5 = [], vn6 = [];
     let elSeen = 0, vineRows = 0, itemsSeen = 0, leastJoint = Infinity, worstVnW = 0, stemSeatMax = -Infinity, stemSeatMin = Infinity, leastElClear = Infinity, leastMotifJoint = Infinity, stemsSeen = 0;
     // the field, restated (charter §17): anchor amplitudes by class, the
     // falloff, the floor, the blend, the class and item thresholds, and the
@@ -494,14 +494,15 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     const itemKindR = (w, at, leavesOn) => (at === 'zero' ? (w >= 0.46 && w < 0.66 ? 'rosette' : null) : w >= 0.56 ? 'cluster' : w >= 0.36 ? (leavesOn ? 'leaf' : null) : w >= 0.22 ? 'bud' : (leavesOn ? 'sprig' : null));
     // the crest (phase 3e step 3, second round): the shell on every top
     // (Eva on the second sheet: "shell works, spray doesn't")
-    const motifKindR = (cls, w) => (w >= HV.heavy ? (cls === 'crest' || cls === 'bottom' ? 'shell' : 'rose') : w >= HV.medium ? 'rosette' : null);
+    const motifKindR = (cls, w) => (w >= HV.heavy ? (cls === 'crest' || cls === 'bottom' ? 'shell' : 'rosette') : w >= HV.medium ? 'rosette' : null);
     const HEAVY = new Set(['shell', 'palmette', 'rose']);
     // CB, THE BAND IS THE CAP (Eva's rulings 1-2 on the first sheet),
     // restated: the crest may stand CRR.rise of the molding width past the
     // outer edge and reach CRR.span[kind] (+ the rise) along it from the axis
     const CRR = { rise: 0.45, span: { shell: 1.35 } };
     const cb1 = [], cb2 = [];
-    let cbVerts = 0, crestPast = 0, crestAlong = 0, crestsSeen = 0;
+    let stemEndMax = 0;
+    let cbVerts = 0, cbRows = 0, crestPast = 0, crestAlong = 0, crestsSeen = 0;
     // the signed distance to the silhouette (positive inside) and the ARC
     // LENGTH, from the top crossing of the axis, of the nearest point on it
     const silGeom = (sil) => {
@@ -762,6 +763,10 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         // emitted stems OVERLAP (≥ the embed)
         const stemIdx = []; orn.curves.forEach((c, x) => { if (c.kind === 'stem') stemIdx.push(x); });
         const stemOf = new Map(); for (const x of stemIdx) stemOf.set(`${orn.curves[x].run}|${owner[x].side}`, x);
+        // VN6 every stem's two ENDS are rounded off to the floor (Eva's third
+        // round: "nothing reads as a cut slab from any angle") — the emitted
+        // first and last rows no wider than the feature, read off the mesh
+        for (const x of stemIdx) { const pt = parts[x]; for (const v of [0, pt.V - 1]) { const a = 3 * pt.T(v, 0), b = 3 * pt.T(v, pt.C - 1), wd = Math.hypot(P[a] - P[b], P[a + 1] - P[b + 1]); stemEndMax = Math.max(stemEndMax, wd); if (wd > F + 1e-6) vn6.push(`${name}: stem ${orn.curves[x].run} ends on a face ${wd.toFixed(3)} mm wide`); } }
         for (const x of stemIdx) { stemsSeen++; const c = orn.curves[x], r = runsR.get(c.run), w = W[x]; for (const [cls, k] of [[r.a, 0], [r.b, w.c.length - 1]]) if (cls === 'crest' || cls === 'bottom') { const ax = Math.abs(w.c[k][0]); if (ax < (F + w.t[k]) / 2 - 1e-6 || ax > (F + w.t[k]) / 2 + 0.15 + 1e-3) vn3.push(`${name}: stem ${c.run} ends ${ax.toFixed(3)} mm off the axis (want ${((F + w.t[k]) / 2).toFixed(3)}–${((F + w.t[k]) / 2 + 0.15).toFixed(3)})`); } }
         for (const [a, b] of RUNS_R[model.info.kind].map((q, i, arr) => (i ? [arr[i - 1], q] : null)).filter(Boolean)) {
           for (const side of ['R', 'L']) { const ra = [...runsR.values()].find((r) => r.from === a[0] && r.to === a[1]), rb = [...runsR.values()].find((r) => r.from === b[0] && r.to === b[1]); if (!ra || !rb) continue; const xa = stemOf.get(`${ra.id}|${side}`), xb = stemOf.get(`${rb.id}|${side}`); const d = minDL(W[xa].c, W[xa].t, W[xb].c, W[xb].t); if (d > -E + 1e-6) vn3.push(`${name}: the ${ra.id} and ${rb.id} stems (${side}) meet at ${d.toFixed(3)} mm — no overlap of the embed`); }
@@ -777,6 +782,11 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         // highest molding under that row's own vertices — never under it,
         // never more than 0.05 mm over it (a lifted stem floats)
         if (surf) for (const x of stemIdx) { const pt = parts[x]; for (let v = 0; v < pt.V; v++) { let hm = -Infinity; for (let c = 0; c < pt.C; c++) { const ix = 3 * pt.T(v, c); hm = Math.max(hm, surf(P[ix], P[ix + 1]), surf(-P[ix], P[ix + 1])); } if (hm === -Infinity) continue; const e0 = P[3 * pt.T(v, 0) + 2], gap = e0 - Math.max(hm, T0); stemSeatMax = Math.max(stemSeatMax, gap); stemSeatMin = Math.min(stemSeatMin, gap); if (gap > 1e-6 || gap < -1e-6) { vn5.push(`${name}: stem ${orn.curves[x].run} row ${v} stands ${gap.toFixed(3)} mm off the molding`); break; } } }
+      }
+      // ---- CB: the band is the cap, on every vine row and (Eva's ruling B on
+      // the second sheet) every chain row ----
+      if (orn.layout === 'vine' || orn.layout === 'chains') {
+        cbRows++;
         // CB1 nothing stands past the band's outer edge (the frame's own
         // silhouette) but the crest: every emitted wire vertex and every
         // element footprint inside it. CB2 the crest past it is LOW — no
@@ -791,6 +801,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
           crestsSeen++;
           const span = CRR.span[e.kind];
           if (!span) { cb2.push(`${name}: a crest of kind ${e.kind}`); continue; }
+          if (!(e.rec.soft || e.rec.mirrorOf?.soft)) cb2.push(`${name}: the ${e.kind} crest is not the SOFT shell (rounded lobes, Eva's third round)`);
           for (const pt of e.parts) { const n = 2 * pt.nu * pt.nv; for (let vv = pt.base; vv < pt.base + n; vv++) { const g2 = geo([P[3 * vv], P[3 * vv + 1]]); if (g2.sd >= 0) continue; crestPast = Math.max(crestPast, -g2.sd / Mg); crestAlong = Math.max(crestAlong, g2.arc / Mg); if (-g2.sd > CRR.rise * Mg + 1e-6) { cb2.push(`${name}: the ${e.kind} crest stands ${(-g2.sd).toFixed(3)} mm past the edge (the rise ${(CRR.rise * Mg).toFixed(3)})`); vv = Infinity; break; } if (g2.arc > (span + CRR.rise) * Mg + 1e-6) { cb2.push(`${name}: the ${e.kind} crest reaches ${g2.arc.toFixed(2)} mm along the edge from the axis past the edge (the span ${((span + CRR.rise) * Mg).toFixed(2)})`); vv = Infinity; break; } } if (cb2.length && cb2.at(-1).startsWith(name)) break; }
         }
       }
@@ -817,7 +828,8 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     rec('VN3 the stems are continuous: a feature short of their mirror on the axis, overlapping where two runs meet, and reaching into every junction motif by the embed', stemsSeen > 0 && vn3.length === 0, `${stemsSeen} stems, least motif joint ${(-leastMotifJoint).toFixed(3)} mm${vn3.length ? ' — ' + vn3.slice(0, 3).join('; ') : ''}`);
     rec('VN4 every item springs from its stem: a joint of at least the embed (read off the emitted walls and footprints)', itemsSeen > 0 && vn4.length === 0, `${itemsSeen} items, least joint ${leastJoint.toFixed(3)} mm${vn4.length ? ' — ' + vn4.slice(0, 3).join('; ') : ''}`);
     rec('VN5 the stem is SEATED: every emitted row\'s edge stands ON the highest molding under its own vertices (within 1e-6 mm: a lifted stem floats, a sunk one is buried)', vn5.length === 0 && stemSeatMax > -Infinity, `stem seat depth ${stemSeatMin.toFixed(4)}–${stemSeatMax.toFixed(4)} mm${vn5.length ? ' — ' + vn5.slice(0, 3).join('; ') : ''}`);
-    rec('CB1 nothing stands past the band\'s outer edge (the frame\'s own silhouette) but the crest: every emitted wire vertex and every placed element\'s footprint inside it (Eva\'s ruling 1 on the first vine sheet)', vineRows > 0 && cbVerts > 0 && cb1.length === 0, `${cbVerts} wire vertices on ${vineRows} vine rows${cb1.length ? ' — ' + cb1.slice(0, 3).join('; ') : ''}`);
+    rec('VN6 every stem\'s two ends are ROUNDED off: its emitted first and last rows no wider than the feature (Eva\'s third round: nothing reads as a cut slab)', stemsSeen > 0 && vn6.length === 0, `widest stem end ${stemEndMax.toFixed(3)} mm${vn6.length ? ' — ' + vn6.slice(0, 3).join('; ') : ''}`);
+    rec('CB1 nothing stands past the band\'s outer edge (the frame\'s own silhouette) but the crest: every emitted wire vertex and every placed element\'s footprint inside it, on the vine (Eva\'s ruling 1 on the first vine sheet) and on the chains (ruling B on the second)', cbRows > 0 && cbVerts > 0 && cb1.length === 0, `${cbVerts} wire vertices on ${cbRows} vine and chain rows${cb1.length ? ' — ' + cb1.slice(0, 3).join('; ') : ''}`);
     rec('CB2 the crest past the edge is LOW and ALONG the band: no vertex further out than 0.45 of the molding width, and everything past the edge within the crest\'s span (+ the rise) of the axis along the edge', crestsSeen > 0 && cb2.length === 0, `${crestsSeen} crests, past the edge ${crestPast.toFixed(3)} M at most, along it ${crestAlong.toFixed(3)} M${cb2.length ? ' — ' + cb2.slice(0, 3).join('; ') : ''}`);
     rec('TB1 every ornament row\'s relief is within the 1,500,000-triangle budget and within the ornament\'s own predicted bound', tb1.length === 0, `most ${mostTris.toLocaleString('en-US')} triangles${tb1.length ? ' — ' + tb1.slice(0, 3).join('; ') : ''}`);
     console.log(`     per wire style (off the emitted mesh): ${['vine', 'carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
@@ -1215,6 +1227,12 @@ const MUTANTS = [
   { id: 'the-crest-is-not-draped', file: 'vine', from: 'return { ...remapElement(flat, frame.at), at: frame.at([0, 0]) };', to: 'return { ...remapElement(flat, ([x, y]) => [x, frame.topY + y]), at: frame.at([0, 0]) };', breaks: ['CB2'] },   // laid flat across a curve, its ends stand past the rise
   { id: 'the-crest-stands-up', file: 'vine', from: 'const k = (CREST.rise + hinge) * M / (ym - y0)', to: 'const k = (2.5 + hinge) * M / (ym - y0)', breaks: ['CB2'] },   // the upright crest of the first sheet: 2.5 molding widths past the edge
   { id: 'the-stem-runs-on-past-the-corner', file: 'vine', from: 'if (out.A || out.B) {', to: 'if (false) {', breaks: ['CB1'] },   // the run-on past an interior end left uncut: out through the rectangle's corner
+  // third round (Eva's rulings on the second sheet: B the chains capped, D a
+  // rosette at the corners, E the crest's soft shell, and no cut slab)
+  { id: 'the-chains-are-not-capped', file: 'filigree', from: 'if (!ch.pastBand || lf < CHAIN_CAP_MIN) break;', to: 'break;', breaks: ['CB1'] },   // the chain at its lead: its scrolls 13-17 mm past the edge
+  { id: 'a-rose-at-the-corner', file: 'vine', from: "(cls === 'crest' || cls === 'bottom' ? 'shell' : 'rosette')", to: "(cls === 'crest' || cls === 'bottom' ? 'shell' : 'rose')", breaks: ['VN2'] },   // the second sheet's half-size rose
+  { id: 'the-crest-shell-is-pointed', file: 'vine', from: "soft: kind === 'shell' });", to: "soft: false });", breaks: ['CB2'] },   // #479's pointed scallops: the starburst
+  { id: 'a-stem-ends-on-a-flat-face', file: 'vine', from: 'const finishStem = (c) => { roundEnds(c);', to: 'const finishStem = (c) => {', breaks: ['VN6', 'VN3'] },   // the collar at the springing; VN3: the axis stop is set for a rounded end
   // RETIRED in phase 3e step 3: 'the-axis-leaf-is-off-the-axis' (the chains'
   // axis LEAF is gone — the axis motif is the palmette element, its own
   // mirror by symmetrizeElement; its successor is

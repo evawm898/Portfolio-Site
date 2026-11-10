@@ -49,7 +49,7 @@ import { offsetCurve, outerEdge, innerEdge, sweepSpine } from './frame-geometry.
 import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound, plateOutline } from './frame-relief.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
 import { placeElement, relift, mirrorElement, symmetrizeElement, wireElementContact, elementClear, footprintTouches } from './frame-elements.js';
-import { vineFor } from './frame-vine.js';
+import { vineFor, silDistance, drapedCrest, edgeFrame } from './frame-vine.js';
 
 export const SCROLL_STEP_DEG = 3;
 export const SCROLL_MAX_STEP_MM = 1.0;
@@ -750,6 +750,7 @@ export const CHAIN_RUNS = {
 };
 export const CHAIN_STEP_MM = 0.5;
 export const CHAIN_LEAD = 2.5;       // × molding width: the lead the element count is read against (the scale slider's own default, so every default measurement holds)
+export const CHAIN_CAP_MIN = 0.2;   // the chains capped to the band: elements made smaller (15 % a step) down to this share of their lead
 export const CHAIN_SEAT = 0.3;       // the elements' backs lie this share of the molding width inside its outer edge
 export const CHAIN_PATH_SMOOTH = 24;
 
@@ -866,7 +867,7 @@ export const CHAIN_S_TILT = 0.0;                            // rad
 export const CHAIN_JUNCTION = 0.35;     // × a footprint: a run stops this short of an INTERIOR junction (its leaf stands there)
 export const CHAIN_MARGIN = 0.1;        // mm: the build's clearances stand this far past F (the gate reads the emitted walls, ~0.07 mm off a centreline estimate)
 export const CHAIN_GAP = 2;             // × MIN_FEATURE_MM: an element's approach to the band is an embed or at least this far off (no visible slit)
-export function buildChain(path, { moldW, lead, density = 3, tightness = 0.5, leaves = true, leafSize = 0.42, startAxis = false, endAxis = false, region = null, opening = null }) {
+export function buildChain(path, { moldW, lead, density = 3, tightness = 0.5, leaves = true, leafSize = 0.42, startAxis = false, endAxis = false, region = null, opening = null, past = null, avoid = null }) {
   const F = MIN_FEATURE_MM, told = [];
   // the junction allowances: at the AXIS the two mirrored start C's stand a
   // feature apart (F/2 each side); at an interior junction the run stops
@@ -909,13 +910,20 @@ export function buildChain(path, { moldW, lead, density = 3, tightness = 0.5, le
     // its inner edge — pushed back out by its deepest intrusion; an element
     // that cannot hold both is given way (told by the caller)
     const intrusion = (o) => { if (!opening) return 0; let m = 0; o.pts.forEach((q, i) => { if (opening(q)) m = Math.max(m, -region.depth(q) + wAt(o, i) / 2); }); return m; };
+    // and NOTHING PAST THE BAND'S OUTER EDGE (Eva's ruling B on the second
+    // sheet: the chains are capped to the band too) — pushed back onto the
+    // molding by its furthest overshoot; an element that cannot clear both
+    // the opening and the edge does not fit the band at this size
+    const overshoot = (o) => { if (!past) return 0; let m = 0; o.pts.forEach((q, i) => { m = Math.max(m, past(q, wAt(o, i))); }); return m; };
     let held = false;
     for (let it = 0; it < 16; it++) {
       const o = intrusion(on); if (o > 0) { dy += o + 0.05; on = place(c, dy); continue; }
+      const v = overshoot(on); if (v > 0) { dy -= v + 0.05; on = place(c, dy); continue; }
       const w = slit(on); if (!(w > -Infinity)) { held = true; break; }
       dy -= w + EMBED_MM + 1e-3; on = place(c, dy);
     }
-    if (held) { holdCoils(); held = !(intrusion(on) > 0) && !(slit(on) > -Infinity); }
+    if (held) { holdCoils(); held = !(intrusion(on) > 0) && !(slit(on) > -Infinity) && !(overshoot(on) > 0); }
+    on.pastBand = held ? false : overshoot(on) > 0 || intrusion(on) > 0;
     // fewer turns cannot undo a fold the PATH makes (an element laid across a
     // corner sharper than itself): if its coils still close, it gives way
     on.unseated = !held ? 'it cannot lie on the molding without reaching into the opening or leaving a gap' : selfGap(on).gap < F + CHAIN_MARGIN ? 'laid across the band\'s corner it would fold onto itself' : null;
@@ -924,7 +932,10 @@ export function buildChain(path, { moldW, lead, density = 3, tightness = 0.5, le
     return on;
   };
   const extentX = (on) => { let lo = Infinity, hi = -Infinity; on.local.pts.forEach(([x], i) => { const h = wAt(on, i) / 2; lo = Math.min(lo, x - h); hi = Math.max(hi, x + h); }); return [lo, hi]; };
-  const clearOf = (on, prev) => (prev ? wireClear(on, prev) : startAxis ? wireClear(on, mirrorCurve(on)) : Infinity);
+  // an element placed before the chain (the draped crest on the axis) is
+  // cleared as the one before it is: every element laid a feature off it
+  const avoidClear = (on) => (avoid ? Math.min(...avoid.map((el) => wireElementContact(on, el, EMBED_MM).clear)) : Infinity);
+  const clearOf = (on, prev) => Math.min(prev ? wireClear(on, prev) : startAxis ? wireClear(on, mirrorCurve(on)) : Infinity, avoidClear(on));
   const lay = (lens) => {
     const out = []; let x = j0;
     for (let k = 0; k < N; k++) {
@@ -960,11 +971,18 @@ export function buildChain(path, { moldW, lead, density = 3, tightness = 0.5, le
           lon.remake = (f) => make2(ll * f);
           return lon;
         };
-        curves.push(make2(frac * len));
+        // capped to the band: a leaf past the outer edge is shortened (to
+        // a fifth of its length at most), else not built
+        let lf = make2(frac * len), f = 1;
+        const over = (o) => (past ? Math.max(0, ...o.pts.map((q, i) => past(q, wAt(o, i)))) : 0);
+        while (over(lf) > 0 && f > 0.2) { f *= 0.8; lf = make2(frac * len * f); }
+        if (over(lf) > 0) { told.push(`element ${k + 1}: a leaf not built — it stands past the band's outer edge at any length`); continue; }
+        if (f < 1) told.push(`element ${k + 1}: a leaf shortened to ${(100 * f).toFixed(0)}% — at full length it stands past the band's outer edge`);
+        curves.push(lf);
       }
     }
   }
-  return { curves, told, n: N, foot };
+  return { curves, told, n: N, foot, pastBand: laid.out.filter((o) => o.pastBand).length };
 }
 
 /* SEATED ON THE MOLDING (Eva's ruling 2B): a chain curve's crown stands on
@@ -1221,16 +1239,37 @@ export function chainsFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
   // in no band's footprint
   const sil = plateOutline(model).map(([x, y]) => [x * scale, y * scale]);
   const opening = (q) => pip(q, sil) && !region.inside(q);
+  // past the band's outer edge (the frame's own silhouette): by how much a
+  // wire of width w centred at q stands out of it (≤ 0 inside)
+  const beyondBy = (q, w) => w / 2 - silDistance(sil, q);
   const H = moldingHeightField(model, scale);
   const depth = CHAIN_SEAT * moldW;
   let tris = model.spines.reduce((a, sp) => a + solidTriBound(sp.pts.length + 2, model.prof.x.length + 1), 0);
   const frameTris = tris;
+  // THE CREST FIRST (capped chains, Eva's ruling B): the top of the axis
+  // carries the vine's draped crest — the soft shell, low and wide along the
+  // band, the one thing past its edge (frame-vine's drapedCrest, one owner) —
+  // and every chain that reaches the axis is laid clear of it
+  const topAxis = Object.entries(model.info.anchors).find(([, a]) => Math.abs(a.pt[0]) < 1e-9 && a.pt[1] > (model.box.y0 + model.box.y1) / 2);
+  const crestWanted = topAxis && (CHAIN_RUNS[kind] || []).some((r) => p[r.control] === 'on' && (r.from === topAxis[0] || r.to === topAxis[0]));
+  const crest = crestWanted ? drapedCrest('shell', { M: moldW, frame: edgeFrame(sil, moldW), opening, Hz: (q) => Math.max(0, H(q)), fits: () => true, why: 'stand clear of the opening' }) : null;
+  if (crest) told.push(crest.note);
+  const avoid = crest && crest.el ? [crest.el] : null;
   for (const run of CHAIN_RUNS[kind] || []) {
     if (p[run.control] !== 'on') continue;
     if (!model.info.anchors[run.from] || !model.info.anchors[run.to]) { told.push(`no ${!model.info.anchors[run.from] ? run.from : run.to} on this frame — its ${run.id} chain is not built`); continue; }
     const path = runPath(model, run, scale, depth);
     const axis = (id) => Math.abs(model.info.anchors[id].pt[0]) < 1e-9;
-    const ch = buildChain(path, { moldW, lead: length, density: p.ornDensity, tightness: p.ornTightness, leaves: p.ornLeaves === 'on', leafSize: p.ornLeafSize, startAxis: axis(run.from), endAxis: axis(run.to), region: region.near(path.pts[Math.floor(path.pts.length / 2)], path.length + 6 * length), opening });
+    // CAPPED TO THE BAND (Eva's ruling B on the second sheet): the chain is
+    // built at its lead, and while any element cannot stand between the
+    // opening and the band's outer edge, again with every element smaller
+    // (the lead 15 % shorter, so more of them) — told
+    let ch = null, lf = 1;
+    for (; ; lf *= 0.85) {
+      ch = buildChain(path, { moldW, lead: length * lf, density: p.ornDensity, tightness: p.ornTightness, leaves: p.ornLeaves === 'on', leafSize: p.ornLeafSize, startAxis: axis(run.from), endAxis: axis(run.to), region: region.near(path.pts[Math.floor(path.pts.length / 2)], path.length + 6 * length), opening, past: beyondBy, avoid: axis(run.from) || axis(run.to) ? avoid : null });
+      if (!ch.pastBand || lf < CHAIN_CAP_MIN) break;
+    }
+    if (lf < 1) told.push(`chain ${run.id}: its elements made ${(100 * lf).toFixed(0)}% of their lead (${ch.n} of them) to stay inside the band${ch.pastBand ? ` — ${ch.pastBand} still do not fit and are not built` : ''}`);
     ends.push({ id: run.from, P: path.pts[0], N: path.out[0], axis: axis(run.from), foot: ch.foot, path, at: 0 }, { id: run.to, P: path.pts.at(-1), N: path.out.at(-1), axis: axis(run.to), foot: ch.foot, path, at: path.length });
     const reliefDepth = p.moldingDepth * scale * p.reliefScale;
     const lp = { depth, moldW, prof: model.prof, reliefDepth, ramp: 0.35 * moldW };
@@ -1270,11 +1309,24 @@ export function chainsFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     // law the vine places them by. Sized to the run's footprint as the leaf
     // motifs they replace were (a centre leaf one footprint long; five petals
     // under half a footprint each)
+    // CAPPED TO THE BAND (Eva's ruling B): the TOP of the axis carries the
+    // vine's draped crest — the soft shell, low and wide along the band, the
+    // one thing past its edge (frame-vine's drapedCrest, one owner) — and
+    // every other motif is held inside the band (placeMotif's `beyond`),
+    // made 10 % smaller at a time until it fits
+    if (topAxis && id === topAxis[0]) {
+      if (avoid) groups.push({ group: 'shell', anchor: id, onAxis: true, curves: [], mirrored: [], elements: avoid, push: depth, told: [], motif: { kind: 'shell', crest: true }, remake: null });
+      continue;
+    }
     const kind = isAxis ? 'palmette' : 'rosette';
-    const spec = { size: isAxis ? foot : 0.98 * foot, at: P, out: [nx, ny], H, opening, onAxis: isAxis, sunk: kind === 'rosette' };
-    const el = placeMotif(kind, spec);
-    if (!el) { told.push(`the ${kind} at ${id} is not built — it cannot stand on the frame clear of the opening`); continue; }
-    groups.push({ group: kind, anchor: id, onAxis: isAxis, curves: [], mirrored: [], elements: isAxis ? [el] : [el, mirrorElement(el)], push: depth, told: [], motif: { kind, ...spec, H: undefined, opening: undefined }, remake: (f) => placeMotif(kind, { ...spec, size: spec.size * f }) });
+    const spec = { size: isAxis ? foot : 0.98 * foot, at: P, out: [nx, ny], H, opening, onAxis: isAxis, sunk: kind === 'rosette', beyond: (q) => !pip(q, sil), reach: 0.5 * moldW };
+    let el = null, f0 = 1;
+    for (let q = 0; q < 16 && !el; q++, f0 *= 0.9) el = placeMotif(kind, { ...spec, size: spec.size * f0 });
+    f0 /= 0.9;
+    if (!el) { told.push(`the ${kind} at ${id} is not built — it cannot stand inside the band clear of the opening`); continue; }
+    if (f0 < 1) told.push(`the ${kind} at ${id} held inside the band at ${(100 * f0).toFixed(0)}% of its size`);
+    const spec0 = { ...spec, size: spec.size * f0 };
+    groups.push({ group: kind, anchor: id, onAxis: isAxis, curves: [], mirrored: [], elements: isAxis ? [el] : [el, mirrorElement(el)], push: depth, told: [], motif: { kind, ...spec0, H: undefined, opening: undefined, beyond: undefined }, remake: (f) => placeMotif(kind, { ...spec0, size: spec0.size * f }) });
   }
   settleChains(groups, told, region, opening);
   // the budget, once everything is settled (a junction leaf counted too)

@@ -63,6 +63,7 @@ const CREST = { arch: 'apex', rectangle: 'topCentre', oval: 'topCentre' };
 const SHOULDER = { arch: ['springR', 'the right springing'], rectangle: ['cornerTR', 'the top-right corner'], oval: ['sideR', 'the right side (the shoulder)'] };
 let cells = [
   ...SK.map(([sk, q]) => ({ row: `${sk} — the default, full frame, front-on`, label: `${sk} · default`, params: { ...q, ...ON }, cam: FRONT, big: true })),
+  ...SK.map(([sk, q]) => ({ row: `${sk} — hierarchy 0 (the chains), capped to the band`, label: `${sk} · chains`, params: { ...q, ...ON, ornHierarchy: 0 }, cam: FRONT, big: true })),
   ...SK.flatMap(([sk, q]) => [
     { row: `close: the crest — ${sk}`, label: `${sk} crest · front-on`, params: { ...q, ...ON }, cam: at(CREST[sk], [0, 0, 1], 85), wide: true },
     { row: `close: the crest — ${sk}`, label: `${sk} crest · from above and the side`, params: { ...q, ...ON }, cam: at(CREST[sk], [0.35, 0.75, 1], 85), wide: true },
@@ -105,7 +106,7 @@ const rows = [...new Set(out.map((c) => c.row))];
 const refs = REFS ? `<h2>Eva's references 2, 3, 4</h2><div class="row">${['2', '3', '4'].map((n) => { const f = path.join(REFS, n + '.png'); return fs.existsSync(f) ? `<div class="cell"><img src="data:image/png;base64,${fs.readFileSync(f).toString('base64')}"><div class="cap"><b>ref ${n}</b></div></div>` : ''; }).join('')}</div>` : '<h2>references 2, 3, 4 — not in the repository: hold the sheet beside them</h2>';
 const html = `<!doctype html><meta charset="utf-8"><title>/frame — phase 3e step 3: the vine</title>
 <style>body{background:#0A0A0C;color:#EDEDE8;font:11px/1.5 "Space Mono",monospace;margin:20px}h1{font:600 22px "Playfair Display",serif;margin:0 0 4px}h2{font:400 11px monospace;letter-spacing:.18em;text-transform:uppercase;color:#5FA0A0;margin:22px 0 8px}.row{display:flex;gap:14px;flex-wrap:wrap}.cell{width:640px}.cell.big{width:900px}.cell img{width:100%;display:block;background:#0A0A0C;border:1px solid rgba(237,237,232,.22)}.cap{color:#8A8A85;margin-top:4px;font-size:9.5px}.cap b{color:#EDEDE8;font-weight:400}</style>
-<h1>/frame — phase 3e step 3, second round: the ornament capped to the band, the crest draped low and wide</h1><div>the STL's own positions under the one fixed light; the engraving is the SVG the button saves. Nothing here has been printed; the 1.0 mm floor is an assumption. ${errors.length ? 'PAGE ERRORS: ' + errors.join(' | ') : 'no page errors'}</div>
+<h1>/frame — phase 3e step 3, third round: the soft shell crest, rosettes at the corners, rounded stem ends, the chains capped too</h1><div>the STL's own positions under the one fixed light; the engraving is the SVG the button saves. Nothing here has been printed; the 1.0 mm floor is an assumption. ${errors.length ? 'PAGE ERRORS: ' + errors.join(' | ') : 'no page errors'}</div>
 ${refs}
 ${rows.map((r) => `<h2>${r}</h2><div class="row">${out.filter((c) => c.row === r).map((c) => `<div class="cell${c.big ? ' big' : ''}"><img src="data:image/png;base64,${c.png}"><div class="cap"><b>${c.label}</b><br>${c.readout}</div></div>`).join('')}</div>`).join('')}`;
 fs.writeFileSync(path.join(OUT, 'index.html'), html);

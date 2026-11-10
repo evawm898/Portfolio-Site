@@ -120,9 +120,16 @@ export const domeCrown = (crown, k = 0.6) => (u, v) => Math.max(F, crown) * Math
    rib's own cos². Everything converges on the hinge, where the ribs are
    zero and the ears meet. */
 export const SHELL_FAN = 1.25, SHELL_RIBS = 11, SHELL_SCALLOP = 0.14, SHELL_DISH = 0.34, SHELL_RIB = 0.09, SHELL_EAR = 0.22;
-export function shellGrid({ R, size, nu = 30, nv = 88, at = [0, 0] }) {
+/* THE SOFT SHELL (the crest's — Eva on the second sheet: "soften the shell's
+   scallops for the crest — rounded lobes, no points"; front-on the crest read
+   as a starburst): fewer, broader ribs, and each lobe a ROUND bump — the rim
+   follows (cos² + ε)^¼ of the rib phase, flat-topped and full where the rib
+   runs out, its notch a short rounded dip (ε keeps the dip from being a cusp)
+   — and shallower. */
+export const SHELL_SOFT = { ribs: 7, scallop: 0.09, eps: 0.03, rib: 0.07 };
+export function shellGrid({ R, size, nu = 30, nv = 88, at = [0, 0], soft = false }) {
   const grid = [];
-  const ribs = SHELL_RIBS, fan = SHELL_FAN;
+  const ribs = soft ? SHELL_SOFT.ribs : SHELL_RIBS, fan = SHELL_FAN;
   for (let i = 0; i <= nu; i++) {
     const u = i / nu, row = [];
     for (let j = 0; j <= nv; j++) {
@@ -130,7 +137,8 @@ export function shellGrid({ R, size, nu = 30, nv = 88, at = [0, 0] }) {
       const phase = (th + fan) / (2 * fan) * ribs * Math.PI;
       const rib = Math.cos(phase) ** 2;               // 1 on a rib's crest, 0 in a groove
       // the rim: lobes on the crests, notches in the grooves
-      const rimR = R * (1 - SHELL_SCALLOP * (1 - rib));
+      const lobe = soft ? Math.pow((rib + SHELL_SOFT.eps) / (1 + SHELL_SOFT.eps), 0.25) : rib;
+      const rimR = R * (1 - (soft ? SHELL_SOFT.scallop : SHELL_SCALLOP) * (1 - lobe));
       const rho = u * rimR;
       // the ears: below SHELL_EAR of the radius the outline is a straight
       // hinge line, |x| growing linearly, so the fan's root is a flat hinge
@@ -139,18 +147,18 @@ export function shellGrid({ R, size, nu = 30, nv = 88, at = [0, 0] }) {
       const ear = smooth((rho - 0.0) / earW);
       const x = x0 * (0.55 + 0.45 * ear), y = y0 - (1 - ear) * 0.25 * earW * Math.abs(Math.sin(th));
       const dish = size * SHELL_DISH * Math.pow(u, 2.2);
-      const ridge = size * SHELL_RIB * rib * smooth((u - 0.1) / 0.45) * (0.55 + 0.45 * u);
+      const ridge = size * (soft ? SHELL_SOFT.rib : SHELL_RIB) * rib * smooth((u - 0.1) / 0.45) * (0.55 + 0.45 * u);
       row.push([at[0] + x, at[1] + y, F + 0.4 + dish + ridge]);
     }
     grid.push(row);
   }
   return grid;
 }
-export function buildShell({ size = 24, base = false } = {}) {
+export function buildShell({ size = 24, base = false, soft = false } = {}) {
   const mesh = new Mesh(), R = size / 2;
   if (base) slab(mesh, size);
-  patchSolid(mesh, shellGrid({ R, size }), 'shell');
-  return done(mesh, 'shell', { size, ribs: SHELL_RIBS });
+  patchSolid(mesh, shellGrid({ R, size, soft }), 'shell');
+  return done(mesh, 'shell', { size, ribs: soft ? SHELL_SOFT.ribs : SHELL_RIBS, soft });
 }
 
 /* ------------------------------------------------------------------ */
@@ -316,9 +324,9 @@ export function buildElement(kind, opts = {}) { return ELEMENTS[kind](opts); }
 
 const elementMemo = new Map();
 /* the built element at a size, memoised on (kind, size): pure */
-export function elementAt(kind, size) {
-  const key = `${kind}|${size}`;
-  if (!elementMemo.has(key)) elementMemo.set(key, buildElement(kind, { size }));
+export function elementAt(kind, size, soft = false) {
+  const key = `${kind}|${size}|${soft}`;
+  if (!elementMemo.has(key)) elementMemo.set(key, buildElement(kind, soft ? { size, soft } : { size }));
   return elementMemo.get(key);
 }
 
@@ -357,15 +365,15 @@ export function footprintTouches(el, test) {
    builder grows along — to the direction angle + π/2), its origin to `at`,
    every non-base vertex raised by `lift`. Positions in print mm with z
    relative to the plate's top (the relief adds plateT to every z > 0). */
-export function placeElement(kind, { size, at = [0, 0], angle = 0, lift = 0 } = {}) {
-  const e = elementAt(kind, size);
+export function placeElement(kind, { size, at = [0, 0], angle = 0, lift = 0, soft = false } = {}) {
+  const e = elementAt(kind, size, soft);
   const ca = Math.cos(angle), sa = Math.sin(angle), src = e.positions, P = new Float64Array(src.length);
   for (let k = 0; k < src.length; k += 3) {
     const x = src[k], y = src[k + 1], z = src[k + 2];
     P[k] = at[0] + ca * x - sa * y; P[k + 1] = at[1] + sa * x + ca * y; P[k + 2] = z === 0 ? 0 : z + lift;
   }
   const parts = e.parts.map((pt) => (pt.kind === 'bead' ? { ...pt, c: [at[0] + ca * pt.c[0] - sa * pt.c[1], at[1] + sa * pt.c[0] + ca * pt.c[1], pt.c[2] + lift] } : { ...pt }));
-  return { kind, size, at, angle, lift, positions: P, indices: e.indices, parts, loops: partLoops(P, parts), flip: false };
+  return { kind, size, at, angle, lift, positions: P, indices: e.indices, parts, loops: partLoops(P, parts), flip: false, ...(soft ? { soft: true } : {}) };
 }
 /* the same element raised to a new lift (the plan untouched) */
 export function relift(el, lift) {

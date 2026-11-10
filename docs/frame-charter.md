@@ -1601,3 +1601,53 @@ argument (the palmette element is unchanged, 10,704 triangles, 53.1° under its 
 the oval's 24, 4.2 mm past the edge. At its full span the draped shell does not fit the mitred apex
 (the crest's search narrows the span until it joins both stems without grazing), and the read-out says
 how wide it came out. Options B–E of the second sheet stand open.
+
+### 17.10 Fourth round — Eva's rulings B–E on the second sheet, and what was built
+
+The rulings (Nov 10): **B** the chains (hierarchy 0) are capped to the band too; **C** the crest's
+4.3 mm rise stands; **D** corners and springings carry a rosette, not a half-size rose; **E** the
+crest's shell is softened — rounded lobes, no points (front-on the arch crest read as a starburst);
+the arch shell is to be widened by reaching further into the band, not by rising, toward the
+rectangle's and oval's 24–26 mm; and the blocky slab-like shapes in the three-quarter close-ups of the
+springing rose are to be identified and fixed.
+
+- **D.** A heavy junction off the axis takes the (sunk) ROSETTE (`motifKind`; VN2 restated). The rose is
+  no longer placed by the vine. Held inside the band: 66 % of its weight's size at the arch springing and
+  the oval shoulder, 73 % / 39 % at the rectangle's top / bottom corners.
+- **E.** The crest is the SOFT shell (`SHELL_SOFT`: 7 ribs, each lobe the rib's (cos² + 0.03)^¼ —
+  round-topped, its notch a short rounded dip, 9 % of the radius against the plain shell's 14 %). Only
+  the crest takes it (`placeElement(…, { soft })`); the bottom shell and the element library's shell are
+  #479's. EL6 counts the lobes off the built mesh (8 across the fan against the plain shell's 11).
+  **And a crease the soft shell exposed**: its lift was a max over CONE-shaped falls off the molding
+  (`crestLift`), whose tip leaves a ridge where the band's crown ends; the shell's fan grid crosses it at a
+  slant and it rendered as a jagged line across every crest. The fall's first 1.5 mm is a parabola now
+  (`CREST.round`), and the rings are dense (`CREST_LIFT_RINGS`: 0.1 mm to 2, 0.25 to 4, 0.5 to 8; 32
+  directions).
+- **The slabs, identified.** (1) BEHIND THE ROSE: the rose's stacked petals are height-field patches
+  with vertical walls, which from three-quarter read as slabs — gone with D. (2) AT THE STEM END: a swept
+  wire closes on a face square to its path, and where one run's stem ends inside the next it showed as a
+  flat collar. Every stem's two ends now narrow on a quarter circle to the 1 mm floor over half its width
+  (`roundEnds`, sampled at 0.1 mm there), the axis stop set for the rounded end. VN6 reads the emitted end
+  rows (no wider than the feature). (3) NOT ORNAMENT: at the arch springing a dash at the light's edge and
+  a different-shade bar on the band's outer wall are the head band and the jamb meeting face to face (the
+  phase-2 embed): coplanar faces of two overlapping shells, drawn flickering by the viewer, fused in print.
+  Not changed here (it is every frame's STL) — a lettered option.
+- **B.** A chain is built at its lead and, while any element cannot stand between the opening and the
+  outer edge, again with every element 15 % smaller (more of them), down to `CHAIN_CAP_MIN` of the lead,
+  told: 32–38 % on the three defaults. A chain element is pushed back onto the molding by its overshoot as
+  it is pushed out of the opening by its intrusion; one that cannot clear both is not seated. A chain leaf
+  past the edge is shortened, else not built. The chains' TOP-axis motif is the vine's draped soft crest
+  (`drapedCrest`, one owner for both layouts — the upright palmette was the fan Eva ruled against), built
+  FIRST, every chain reaching the axis laid a feature clear of it; the corner rosettes and the bottom
+  palmette are held inside the band (`placeMotif`'s `beyond`). CB1 now reads every chain row as well as
+  every vine row.
+- **The arch's width — measured, and the ruled method does not reach it.** The band on the arch's axis is
+  1.16 M deep; a root deeper than 0.7 M reaches the opening (0.9 M already does), and deeper is NARROWER,
+  not wider — inside the band the draped shell's points are pulled toward the axis along the apex's
+  sloping normals: 18.1 mm at 0.7 M, 17.2 at 0.9, 16.2 at 1.1. What widens it while keeping it low is
+  reaching further ALONG the band's two slopes: a span of 1.8 M with the stretch cap raised to 1.8 gives
+  24 mm across (2.0 / 2.0 gives 27), still 4.2 mm past the edge, measured. That is a different method from the one ruled, so it is a lettered option.
+
+Mutants (relief): `the-chains-are-not-capped` (CB1), `a-rose-at-the-corner` (VN2),
+`the-crest-shell-is-pointed` (CB2 — the crest's record), `a-stem-ends-on-a-flat-face` (VN6, VN3);
+(elements) `the-crest-shell-is-sharp-again` (EL6).

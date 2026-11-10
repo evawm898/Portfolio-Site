@@ -92,6 +92,7 @@ export const CREST = {
   build: { shell: 0.9 },   // × M: the size the element is BUILT at (its HEIGHT is the built one's; its plan is then scaled, evenly, into the rise and the span)
   stretch: 1.5,   // its plan widened along the band at most this much over its own proportion
   slope: 1,       // its top falls off the band's edge at this slope (1: 45°) — draped in z as well as in plan
+  round: 1.5,     // mm: the fall's first stretch is a parabola, not a cone (a cone's tip leaves a CREASE in the lift where the band's crown ends, which the shell's fan grid crosses at a slant — a jagged line across the soft crest, third round)
 };
 /* THE EDGE FRAME on the silhouette `sil` (print mm): its top crossing of the
    axis, the right half walked from there at `step`, each station's outward
@@ -151,7 +152,7 @@ export function silDistance(sil, q) {
    rise (x to ±span·M, y from −hinge·M to +rise·M), then draped on the edge
    frame: low and wide past the edge, never sideways */
 export function crestElement(kind, { M, frame, hinge = CREST.hinge, span = CREST.span[kind] }) {
-  const el = placeElement(kind, { size: CREST.build[kind] * M, at: [0, 0], angle: 0, lift: 0 });
+  const el = placeElement(kind, { size: CREST.build[kind] * M, at: [0, 0], angle: 0, lift: 0, soft: kind === 'shell' });   // the crest's shell is the SOFT one (rounded lobes)
   let xm = 0, ym = -Infinity, y0 = Infinity; for (const l of el.loops) for (const [x, y] of l) { xm = Math.max(xm, Math.abs(x)); ym = Math.max(ym, y); y0 = Math.min(y0, y); }
   // its plan scaled into the rise (from its root under the edge to the most
   // it may stand past it)
@@ -164,16 +165,47 @@ export function crestElement(kind, { M, frame, hinge = CREST.hinge, span = CREST
 }
 /* the crest's lift at a plan point: the molding under it and its mirror,
    and off the band's edge the molding's height falling at CREST.slope — the
-   highest of Hz(q + d) − slope·|d| over d (rings out to 8 mm, 16 directions),
+   highest of Hz(q + d) − slope·|d| over d (CREST_LIFT_RINGS out to 8 mm, 32 directions),
    a hundredth over (the raster against the emitted surface, as the leaves'
    crest margin) */
+// the rings are DENSE where the fall is read (0.1 mm to 2, 0.25 to 4, 0.5 to
+// 8; 32 directions): a max over coarse rings terraces the lift in steps of
+// the ring spacing times the slope, and the third round's soft crest showed
+// that terrace as a jagged line across the shell where it crosses the
+// band's crown
+const CREST_LIFT_RINGS = [0, ...Array.from({ length: 20 }, (_, k) => 0.1 * (k + 1)), ...Array.from({ length: 8 }, (_, k) => 2 + 0.25 * (k + 1)), ...Array.from({ length: 8 }, (_, k) => 4 + 0.5 * (k + 1))];
 export function crestLift(Hz) {
-  const R = [0, 0.4, 0.8, 1.2, 1.6, 2.2, 2.8, 3.6, 4.4, 5.4, 6.6, 8];
+  const R = CREST_LIFT_RINGS, D = 32;
   return ([x, y]) => {
     let m = 0;
-    for (const r of R) for (let a = 0; a < (r ? 16 : 1); a++) { const t = 2 * Math.PI * a / 16, dx = r * Math.cos(t), dy = r * Math.sin(t); m = Math.max(m, Hz([x + dx, y + dy]) - CREST.slope * r, Hz([-x - dx, y + dy]) - CREST.slope * r); }
+    for (const r of R) for (let a = 0; a < (r ? D : 1); a++) { const t = 2 * Math.PI * a / D, dx = r * Math.cos(t), dy = r * Math.sin(t); const f = CREST.slope * (r < CREST.round ? r * r / (2 * CREST.round) : r - CREST.round / 2); m = Math.max(m, Hz([x + dx, y + dy]) - f, Hz([-x - dx, y + dy]) - f); }
     return m > 0 ? m + 0.01 : 0;
   };
+}
+
+/* THE DRAPED CREST, searched: the root's depth under the edge first moved up
+   (a crest reaching into the opening), then the span narrowed, until `fits`
+   (the vine: it joins both stems; the chains: it grazes no chain) — then
+   lifted per vertex (crestLift; the plan's mirror symmetry kept, the lift
+   reading a point and its mirror alike) and made its own mirror again. One
+   owner for the vine's crest and the chains'. Returns { el, note }. */
+export function drapedCrest(kind, { M, frame, opening, Hz, fits, why }) {
+  const span0 = CREST.span[kind];
+  let el = null, note = '';
+  search: for (const span of [span0, 0.85 * span0, 0.7 * span0]) for (const hg of [CREST.hinge, 0.6, 0.5, 0.4]) {
+    let c = crestElement(kind, { M, frame, hinge: hg, span });
+    if (footprintTouches(c, opening)) continue;
+    c = symmetrizeElement(c); if (c.asymmetric) continue;
+    c.sunk = false; c.out = [0, 1]; c.pushed = 0; c.crest = { hinge: hg, span, rise: CREST.rise };
+    if (fits(c)) { el = c; if (span < span0 || hg < CREST.hinge) note = ` (span ${(span / span0 * 100).toFixed(0)}%, root ${hg.toFixed(2)} M under the edge)`; break search; }
+  }
+  if (!el) return { el: null, note: `the ${kind} crest is not built — draped low on the band it cannot ${why} without grazing` };
+  const cr = el.crest;
+  el = symmetrizeElement(liftEach(el, crestLift(Hz)));
+  if (el.asymmetric) return { el: null, note: `the ${kind} crest is not built — its draped lift is not symmetric` };
+  el.sunk = false; el.out = [0, 1]; el.pushed = 0; el.crest = cr;
+  let xw = 0; for (const l of el.loops) for (const [x] of l) xw = Math.max(xw, Math.abs(x));
+  return { el, note: `the crest is a ${kind}, draped along the band: ${(CREST.rise * M).toFixed(1)} mm past the edge at most, ${(2 * xw).toFixed(0)} mm across${note}` };
 }
 
 /* the CLASS of an anchor, from the skeleton alone: on the axis (the upper
@@ -350,7 +382,9 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     // is not the extremum itself — the phase is anchored at x = 0 — and on the
     // arch's mitred apex the mapped x moves with y)
     const mappedX = (x, end) => Math.abs(mapToPath({ pts: [[x, raw ? yOf(x) : yc + (end ? sB : 1) * ampOfX(end ? L : 0)]], nrm: [[0, 1]], tan: [0], info: {} }, path, 0).pts[0][0]);
-    const axisStop = (end) => { const wnt = (F + (end ? wsL : ws0)) / 2 + AXIS_GAP; let lo = 0, hi = Math.min(L / 2, 6 * wnt); for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2, xx = end ? L - m : m; if (mappedX(xx, end) < wnt) lo = m; else hi = m; } return hi; };
+    // (its end is ROUNDED to the floor — roundEnds — so it stands a feature
+    // short of its mirror by the floor's width, not its body's)
+    const axisStop = (end) => { const wnt = F + AXIS_GAP; let lo = 0, hi = Math.min(L / 2, 6 * wnt); for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2, xx = end ? L - m : m; if (mappedX(xx, end) < wnt) lo = m; else hi = m; } return hi; };
     const rawAt = (x) => { const t = (x - x0) / (x1 - x0) * n, k = Math.min(n - 1, Math.max(0, Math.floor(t))); return raw[k] + (raw[k + 1] - raw[k]) * (t - k); };
     const theta = (x) => th0 + (rawAt(x) - rawAt(0)) * sc;
     const yOf = (x) => yc + ampOfX(Math.min(L, Math.max(0, x))) * Math.sin(theta(x));
@@ -411,7 +445,42 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   // the stem stands on the highest molding under its own EMITTED vertices
   // (withOrnament's seatEmitted, read at every vertex and its mirror): the
   // lift here is 0 so nothing but that reading raises it (VN5 measures it)
-  const finishStem = (c) => { c.lift = c.pts.map(() => 0); return c; };
+  // ROUNDED ENDS (third round, Eva: "nothing reads as a cut slab from any
+  // angle"): a swept wire closes on a face square to its path, and a stem's
+  // end showed as a flat collar where it lies inside the next run's stem — so
+  // over its last half width each end narrows on a quarter circle to the
+  // floor (its crown follows the width, crownScale, floored at the feature)
+  const roundEnds = (c) => {
+    // the ends are sampled finer first (0.1 mm over the rounding), every
+    // per-vertex field interpolated, so the quarter circle is drawn and not
+    // two or three chords of it
+    { const L0 = c.pts.reduce((a, q, i) => a + (i ? Math.hypot(q[0] - c.pts[i - 1][0], q[1] - c.pts[i - 1][1]) : 0), 0);
+      const keys = ['pts', 'nrm', 'tan', 'w', 'localX', 'localY'].filter((k) => Array.isArray(c[k]) && c[k].length === c.pts.length);
+      const out = Object.fromEntries(keys.map((k) => [k, []]));
+      let acc = 0;
+      for (let i = 0; i < c.pts.length; i++) {
+        if (i) {
+          const l = Math.hypot(c.pts[i][0] - c.pts[i - 1][0], c.pts[i][1] - c.pts[i - 1][1]), r = Math.max(c.w[0], c.w[c.pts.length - 1]);
+          if (acc < 1.5 * r || acc + l > L0 - 1.5 * r) {
+            const m = Math.ceil(l / 0.1);
+            for (let t = 1; t < m; t++) for (const k of keys) { const A = c[k][i - 1], B = c[k][i], f = t / m; out[k].push(Array.isArray(A) ? A.map((v, j) => v + f * (B[j] - v)) : A + f * (B - A)); }
+          }
+          acc += l;
+        }
+        for (const k of keys) out[k].push(c[k][i]);
+      }
+      if (out.nrm) out.nrm = out.nrm.map(([x, y]) => { const l = Math.hypot(x, y) || 1; return [x / l, y / l]; });
+      Object.assign(c, out); }
+    const n = c.pts.length, s = [0];
+    for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(c.pts[i][0] - c.pts[i - 1][0], c.pts[i][1] - c.pts[i - 1][1]));
+    const w = c.w.slice(), L = s[n - 1];
+    for (const [end, w0] of [[0, c.w[0]], [1, c.w[n - 1]]]) {
+      const r = w0 / 2;
+      for (let i = 0; i < n; i++) { const d = end ? L - s[i] : s[i]; if (d >= r) continue; const q = 1 - d / r; w[i] = Math.min(w[i], F + (w0 - F) * Math.sqrt(Math.max(0, 1 - q * q))); }
+    }
+    c.w = w; return c;
+  };
+  const finishStem = (c) => { roundEnds(c); c.lift = c.pts.map(() => 0); return c; };
   for (const r of runs) finishStem(r.stem);
   const stems = runs.map((r) => r.stem);
 
@@ -429,7 +498,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   }
   // the CREST (the axis at the top): a draped shell, the one thing
   // that may stand past the band; every other motif inside the band
-  const motifKind = (cls, wcl) => (wcl === 'heavy' ? (cls === 'crest' || cls === 'bottom' ? 'shell' : 'rose') : wcl === 'medium' ? 'rosette' : null);
+  const motifKind = (cls, wcl) => (wcl === 'heavy' ? (cls === 'crest' || cls === 'bottom' ? 'shell' : 'rosette') : wcl === 'medium' ? 'rosette' : null);
   const frame = edgeFrame(sil, M);
   // a motif's fit: it JOINS every stem that ends at it (an overlap of the
   // embed, no graze) and grazes nothing (the other stems, its mirror, the
@@ -449,22 +518,10 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     if (!mk) continue;
     let el = null, note = '';
     if (e.cls === 'crest' && wcl === 'heavy') {
-      // the crest, draped: its root's depth under the edge first moved up
-      // (a crest reaching into the opening), then its span narrowed
-      const span0 = CREST.span[mk];
-      search: for (const span of [span0, 0.85 * span0, 0.7 * span0]) for (const hg of [CREST.hinge, 0.6, 0.5, 0.4]) {
-        let c = crestElement(mk, { M, frame, hinge: hg, span });
-        if (footprintTouches(c, opening)) continue;
-        c = symmetrizeElement(c); if (c.asymmetric) continue;
-        c.sunk = false; c.out = [0, 1]; c.pushed = 0; c.crest = { hinge: hg, span, rise: CREST.rise };
-        if (joins(e, c, true)) { el = c; if (span < span0 || hg < CREST.hinge) note = ` (span ${(span / span0 * 100).toFixed(0)}%, root ${hg.toFixed(2)} M under the edge)`; break search; }
-      }
-      if (!el) { told.push(`the ${mk} crest is not built — draped low on the band it cannot join both stems without grazing`); continue; }
-      // draped in z: the lift per vertex (the plan's mirror symmetry kept — the
-      // lift reads a point and its mirror alike), then made its own mirror again
-      { const cr = el.crest; el = symmetrizeElement(liftEach(el, crestLift(Hz))); if (el.asymmetric) { told.push(`the ${mk} crest is not built — its draped lift is not symmetric`); continue; } el.sunk = false; el.out = [0, 1]; el.pushed = 0; el.crest = cr; }
-      let xw = 0; for (const l of el.loops) for (const [x] of l) xw = Math.max(xw, Math.abs(x));
-      told.push(`the crest is a ${mk}, draped along the band: ${(CREST.rise * M).toFixed(1)} mm past the edge at most, ${(2 * xw).toFixed(0)} mm across${note}`);
+      const r = drapedCrest(mk, { M, frame, opening, Hz, fits: (c) => joins(e, c, true), why: 'join both stems' });
+      told.push(r.note);
+      if (!r.el) continue;
+      el = r.el;
     } else {
       let nx = 0, ny = 0; for (const q of e.items) { nx += q.N[0]; ny += q.N[1]; } const nl = Math.hypot(nx, ny);
       const P = onAxis ? [0, e.items[0].P[1]] : e.items.reduce((a, q) => [a[0] + q.P[0] / e.items.length, a[1] + q.P[1] / e.items.length], [0, 0]);
