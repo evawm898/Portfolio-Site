@@ -82,14 +82,26 @@ const F = MIN_FEATURE_MM;
    along, 0..1), its crown z(u, v) (v across, −1..1) above `lift(u)`; `tilt`
    raises the tip (z += tilt · u) and `cup` lifts the margins (z += cup ·
    v²) — the two bends a placed petal has. nu × nv stations. */
-export function bladeGrid({ at = [0, 0], ang = 0, L, hw, crown, lift = () => 0, tilt = 0, cup = 0, nu = 24, nv = 12 }) {
+/* THE ROLLED LIP of the CREST's soft shell (Eva's fourth round: "nothing
+   reads as a cut slab from any angle"). A patch's top closes straight down to
+   the back plane at its boundary, and the crest stands past the band's edge
+   with nothing beside it, so its rim read from three-quarter as a tall
+   scalloped curtain. So its top rolls down to just over the floor at the rim
+   and the fan's sides (a library element keeps #479's edge: a lip steep
+   enough to keep its shape folded its facets past EL4's caps, measured): z' = zl + (z − zl) · w, w a quarter sine
+   of the distance in from the edge over LIP of the span, zl the floor
+   (F + LIP.over, never above the top it rolls). */
+export const LIP = { u: 0.2, over: 0.05 };
+const lipW = (d, span) => Math.sin(Math.PI / 2 * Math.min(1, Math.max(0, d) / span));
+const lipZ = (z, w) => { const zl = Math.min(z, F + LIP.over); return zl + (z - zl) * w; };
+export function bladeGrid({ at = [0, 0], ang = 0, L, hw, crown, lift = () => 0, tilt = 0, cup = 0, nu = 24, nv = 12, lipU = 0 }) {
   const ca = Math.cos(ang), sa = Math.sin(ang), grid = [], hMax = Math.max(...Array.from({ length: nu + 1 }, (_, k) => hw(k / nu)));
   for (let i = 0; i <= nu; i++) {
     const u = i / nu, h = hw(u), row = [];
     for (let j = 0; j <= nv; j++) {
       const v = 2 * j / nv - 1, x = u * L, y = v * h;
       const z = lift(u) + crown(u, v) * Math.min(1, hw(u) / hMax) + tilt * u + cup * v * v;
-      row.push([at[0] + ca * x - sa * y, at[1] + sa * x + ca * y, Math.max(0, z)]);
+      row.push([at[0] + ca * x - sa * y, at[1] + sa * x + ca * y, lipU ? lipZ(Math.max(0, z), lipW(1 - u, lipU)) : Math.max(0, z)]);
     }
     grid.push(row);
   }
@@ -126,7 +138,7 @@ export const SHELL_FAN = 1.25, SHELL_RIBS = 11, SHELL_SCALLOP = 0.14, SHELL_DISH
    follows (cos² + ε)^¼ of the rib phase, flat-topped and full where the rib
    runs out, its notch a short rounded dip (ε keeps the dip from being a cusp)
    — and shallower. */
-export const SHELL_SOFT = { ribs: 7, scallop: 0.09, eps: 0.03, rib: 0.07 };
+export const SHELL_SOFT = { ribs: 7, scallop: 0.09, eps: 0.03, rib: 0.07, dish: 0.2 };
 export function shellGrid({ R, size, nu = 30, nv = 88, at = [0, 0], soft = false }) {
   const grid = [];
   const ribs = soft ? SHELL_SOFT.ribs : SHELL_RIBS, fan = SHELL_FAN;
@@ -146,9 +158,10 @@ export function shellGrid({ R, size, nu = 30, nv = 88, at = [0, 0], soft = false
       const x0 = rho * Math.sin(th), y0 = rho * Math.cos(th);
       const ear = smooth((rho - 0.0) / earW);
       const x = x0 * (0.55 + 0.45 * ear), y = y0 - (1 - ear) * 0.25 * earW * Math.abs(Math.sin(th));
-      const dish = size * SHELL_DISH * Math.pow(u, 2.2);
+      const dish = size * (soft ? SHELL_SOFT.dish : SHELL_DISH) * Math.pow(u, 2.2);
       const ridge = size * (soft ? SHELL_SOFT.rib : SHELL_RIB) * rib * smooth((u - 0.1) / 0.45) * (0.55 + 0.45 * u);
-      row.push([at[0] + x, at[1] + y, F + 0.4 + dish + ridge]);
+      const zt = F + 0.4 + dish + ridge;
+      row.push([at[0] + x, at[1] + y, soft ? lipZ(zt, lipW(1 - u, LIP.u) * lipW(fan - Math.abs(th), LIP.u * fan)) : zt]);
     }
     grid.push(row);
   }
@@ -209,13 +222,13 @@ function slab(mesh, size) { const h = 0.75 * size, g = [[[-h, -h, F], [h, -h, F]
 /* A blade whose centreline bends in plan: curvature κ(u) = flare · u (the
    tip turns the most), so the plan is a flaring arc; everything else as
    bladeGrid. */
-export function curvedBladeGrid({ at, ang, L, hw, crown, lift = () => 0, tilt = 0, cup = 0, flare = 0, nu = 24, nv = 12 }) {
+export function curvedBladeGrid({ at, ang, L, hw, crown, lift = () => 0, tilt = 0, cup = 0, flare = 0, nu = 24, nv = 12, lipU = 0, lipV = 0 }) {
   const grid = [], hMax = Math.max(...Array.from({ length: nu + 1 }, (_, k) => hw(k / nu)));
   let x = 0, y = 0, f = ang; const centre = [[0, 0, f]];
   for (let i = 1; i <= nu; i++) { const u = (i - 0.5) / nu, ds = L / nu, dphi = flare * u * ds / L; x += ds * Math.cos(f + dphi / 2); y += ds * Math.sin(f + dphi / 2); f += dphi; centre.push([x, y, f]); }
   for (let i = 0; i <= nu; i++) {
     const u = i / nu, h = hw(u), [cx, cy, ph] = centre[i], nx = -Math.sin(ph), ny = Math.cos(ph), row = [];
-    for (let j = 0; j <= nv; j++) { const v = 2 * j / nv - 1; row.push([at[0] + cx + v * h * nx, at[1] + cy + v * h * ny, Math.max(0, lift(u) + crown(u, v) * Math.min(1, hw(u) / hMax) + tilt * u * u + cup * v * v)]); }
+    for (let j = 0; j <= nv; j++) { const v = 2 * j / nv - 1; row.push([at[0] + cx + v * h * nx, at[1] + cy + v * h * ny, lipU || lipV ? lipZ(Math.max(0, lift(u) + crown(u, v) * Math.min(1, hw(u) / hMax) + tilt * u * u + cup * v * v), (lipU ? lipW(1 - u, lipU) : 1) * (lipV ? lipW(1 - Math.abs(v), lipV) : 1)) : Math.max(0, lift(u) + crown(u, v) * Math.min(1, hw(u) / hMax) + tilt * u * u + cup * v * v)]); }
     grid.push(row);
   }
   return grid;
@@ -263,6 +276,10 @@ export function buildRose({ size = 26, seed = 7, base = false } = {}) {
    its share of the circle wide so neighbours OVERLAP, alternate petals
    lifted a third of a crown so the overlap stacks (never a graze), the
    crown a low flat cushion with a soft midline dip — flat and wide. */
+/* the rosette's petal TIPS roll down to the floor over this share of their
+   length (Eva's fourth round: from a low three-quarter angle a blunt petal
+   tip standing at full height read as a rectangular bar) */
+export const ROSETTE_LIP = 0.3;
 export function buildRosette({ size = 20, base = false } = {}) {
   const mesh = new Mesh(), R = size / 2, n = ROSETTE.petals;
   if (base) slab(mesh, size);
@@ -270,7 +287,7 @@ export function buildRosette({ size = 20, base = false } = {}) {
   for (let i = 0; i < n; i++) {
     const ang = 2 * Math.PI * i / n, L = ROSETTE.len * R, W = ROSETTE.width * 2 * Math.PI * (0.55 * R) / n;
     const lift = F + 0.3 + (i % 2 ? 0.4 * crown : 0);
-    const g = bladeGrid({ at: [0.1 * R * Math.cos(ang), 0.1 * R * Math.sin(ang)], ang, L, hw: bluntHalf(W, 3.0, 0.25), crown: (u, v) => crown * Math.pow(Math.max(0, 1 - v * v), 0.3) * (0.8 - 0.15 * Math.exp(-((v / 0.3) ** 2))) * (0.75 + 0.25 * Math.sin(Math.PI * u)), lift: () => lift, nu: 18, nv: 16 });
+    const g = bladeGrid({ at: [0.1 * R * Math.cos(ang), 0.1 * R * Math.sin(ang)], ang, L, hw: bluntHalf(W, 3.0, 0.25), crown: (u, v) => crown * Math.pow(Math.max(0, 1 - v * v), 0.3) * (0.8 - 0.15 * Math.exp(-((v / 0.3) ** 2))) * (0.75 + 0.25 * Math.sin(Math.PI * u)), lift: () => lift, nu: 18, nv: 16 , lipU: ROSETTE_LIP });
     patchSolid(mesh, g, `rosette-${i}`);
   }
   const rb = ROSETTE.boss * R;
@@ -287,13 +304,31 @@ export function buildRosette({ size = 20, base = false } = {}) {
    berries sunk a third into the cup (their centres low, under the leaves'
    crowns) — stacked shells, no stalk. */
 export const BUD_BERRIES = [[0, 0.05, 1.0], [0.46, 0.22, 0.74], [-0.42, 0.28, 0.62]];   // [x, y] × R, radius share
+/* the bud's cup leaves roll down at their TIP and their MARGINS over this
+   share of their length and width (Eva's fourth round: tilted up and
+   cupped, a leaf's tip and margins stood at full height and read from
+   three-quarter as upright bars) */
+export const BUD_LIP = 0.3, BUD_LIP_V = 0.85;   // the margin's roll is wide: narrower (0.5) folded the cupped leaf's facets to 101°, the full width 64° (EL4's cap 55°, measured)
+/* a cup leaf narrower than this reads as a BLOCK, not a leaf: its margins
+   cannot roll below the print floor F, so a leaf a couple of floors wide is
+   all wall (Eva's fourth round: the vine's 5–7 mm buds read as cut slabs
+   from three-quarter). Below it the bud is its berries alone, sunk into the
+   molding. Typed (four floors), flagged — read off the renders, not derived */
+export const BUD_LEAF_MIN_W = 4 * F;
 export function buildBud({ size = 18, base = false } = {}) {
   const mesh = new Mesh(), R = size / 2, rb = 0.4 * R;
   if (base) slab(mesh, size);
-  const crown = Math.max(F, 0.07 * size);
+  if (0.62 * 1.1 * R < BUD_LEAF_MIN_W) {
+    BUD_BERRIES.forEach(([x, y, s]) => { const r = Math.max(F / 2, 1.25 * rb * s); sphereSolid(mesh, [x * R, (y - 0.5) * R, 0.2 * r], r, PATTERN_LAT, PATTERN_LON); });   // down onto the root the cup leaves held (−0.7 R): the largest berry is the joint
+    return done(mesh, 'bud', { size, berries: BUD_BERRIES.length, cup: false });
+  }
+  // the crown is floored at the print floor (it is the leaf's THICKNESS); the
+  // leaves' rise and cup scale with the bud's own SIZE — read off the floored
+  // crown, a 4.85 mm bud stood 6.67 mm tall and its leaves read as upright fins
+  const crown = Math.max(F, 0.07 * size), rise = 0.07 * size;
   for (let i = 0; i < 5; i++) {
     const ang = Math.PI / 2 + (i - 2) * 0.62, L = 1.1 * R, W = 0.62 * L;
-    const g = curvedBladeGrid({ at: [0, -0.7 * R], ang, L, hw: roundedHalf(W, 0.65, 0.9), crown: midribCrown(crown), lift: () => F + 0.3, tilt: 3.2 * crown, cup: 1.4 * crown, flare: 0.25 * (i - 2), nu: 20, nv: 14 });
+    const g = curvedBladeGrid({ at: [0, -0.7 * R], ang, L, hw: roundedHalf(W, 0.65, 0.9), crown: midribCrown(crown), lift: () => F + 0.3, tilt: 3.2 * rise, cup: 1.4 * rise, flare: 0.25 * (i - 2), nu: 20, nv: 14, lipU: BUD_LIP, lipV: BUD_LIP_V });
     patchSolid(mesh, g, `cup-leaf-${i}`);
   }
   BUD_BERRIES.forEach(([x, y, s]) => { const r = Math.max(F / 2, rb * s); sphereSolid(mesh, [x * R, y * R, F + 0.3 + 1.2 * crown + 0.35 * r], r, PATTERN_LAT, PATTERN_LON); });
@@ -400,6 +435,27 @@ export function liftEach(el, lift) {
   const P = Float64Array.from(el.positions); let top = 0;
   for (let k = 0; k < P.length; k += 3) if (P[k + 2] !== 0) { const d = lift([P[k], P[k + 1]]); P[k + 2] += d; top = Math.max(top, d); }
   return { ...el, positions: P, lift: top, liftEach: true };
+}
+/* DRAPED on what is under it (Eva's fourth round: "nothing reads as a cut
+   slab from any angle"): a PROUD element lifted as one block to the highest
+   molding anywhere under it stood with its straight-down edges exposed
+   wherever the band's profile falls away across its footprint — read from
+   three-quarter as wedge-shaped slabs. Draped, every top vertex is raised by
+   the lift under it (`lift`, a plan point → mm; the crest's own rounded
+   envelope of the molding) and a bead moves whole by the lift at its centre,
+   so the element keeps its own height over the molding everywhere. Base
+   vertices (z = 0) stay on the back. */
+export function drapeElement(el, lift) {
+  const P = Float64Array.from(el.positions), inBead = new Uint8Array(P.length / 3);
+  let top = 0;
+  const parts = el.parts.map((pt) => {
+    if (pt.kind !== 'bead') return pt;
+    const n = 2 + (pt.lat - 1) * pt.lon, d = lift([pt.c[0], pt.c[1]]); top = Math.max(top, d);
+    for (let v = pt.base; v < pt.base + n; v++) { inBead[v] = 1; P[3 * v + 2] += d; }
+    return { ...pt, c: [pt.c[0], pt.c[1], pt.c[2] + d] };
+  });
+  for (let v = 0; v < inBead.length; v++) if (!inBead[v] && P[3 * v + 2] !== 0) { const d = lift([P[3 * v], P[3 * v + 1]]); P[3 * v + 2] += d; top = Math.max(top, d); }
+  return { ...el, positions: P, parts, lift: top, draped: true };
 }
 /* THE mirror of a placed element: x negated (the doubles never recomputed),
    the winding reversed by the relief's own orientation pass. */

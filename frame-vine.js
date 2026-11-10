@@ -50,7 +50,7 @@ import {
   CHAIN_RUNS, CHAIN_SEAT, runPath, mapToPath, bandRegion, moldingHeightField, seatOn, slitWorst, mirrorCurve,
   wireClear, wireClearBound, joinsCleanly, buildScroll, buildLeaf, carvedCap, LEAF_ASPECT, wAt, selfGap, profileFor, rigid, pip, placeMotif, wireHeight, wireProfile, LEAF_RELIEF,
 } from './frame-filigree.js';
-import { placeElement, relift, liftEach, mirrorElement, symmetrizeElement, remapElement, wireElementContact, elementClear, elementDepth, footprintTouches } from './frame-elements.js';
+import { placeElement, relift, liftEach, drapeElement, mirrorElement, symmetrizeElement, remapElement, wireElementContact, elementClear, elementDepth, footprintTouches } from './frame-elements.js';
 
 /* the field's constants (one each, every one a measured choice in §17) */
 export const HIER = {
@@ -619,8 +619,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       const at = [P[0] + dir[0] * 0.7 * R, P[1] + dir[1] * 0.7 * R];
       let el = placeElement('bud', { size, at, angle: Math.atan2(dir[1], dir[0]) - Math.PI / 2, lift: 0 });
       if (footprintTouches(el, opening) || footprintTouches(el, beyond)) return null;
-      let lift = 0; const Pp = el.positions; for (let k = 0; k < Pp.length; k += 3) if (Pp[k + 2] !== 0) lift = Math.max(lift, Hz([Pp[k], Pp[k + 1]]), Hz([-Pp[k], Pp[k + 1]]));
-      el = relift(el, lift);
+      el = drapeElement(el, crestLift(Hz));   // draped on the molding, not lifted as one block (placeMotif's proud rule)
       return { el };
     };
     const fits = (it) => {

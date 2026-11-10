@@ -48,8 +48,8 @@
 import { offsetCurve, outerEdge, innerEdge, sweepSpine } from './frame-geometry.js';
 import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound, plateOutline } from './frame-relief.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
-import { placeElement, relift, mirrorElement, symmetrizeElement, wireElementContact, elementClear, footprintTouches } from './frame-elements.js';
-import { vineFor, silDistance, drapedCrest, edgeFrame } from './frame-vine.js';
+import { placeElement, relift, drapeElement, mirrorElement, symmetrizeElement, wireElementContact, elementClear, footprintTouches } from './frame-elements.js';
+import { vineFor, silDistance, drapedCrest, edgeFrame, crestLift } from './frame-vine.js';
 
 export const SCROLL_STEP_DEG = 3;
 export const SCROLL_MAX_STEP_MM = 1.0;
@@ -1204,11 +1204,13 @@ export function placeMotif(kind, { size, at, out, H, opening, onAxis = false, su
   if (sunk) {
     let zmax = 0; for (let k = 2; k < el.positions.length; k += 3) zmax = Math.max(zmax, el.positions[k]);
     lift = Math.max(0, Hz(c) + MIN_FEATURE_MM - zmax);
-  } else {
-    lift = 0; const P = el.positions;
-    for (let k = 0; k < P.length; k += 3) if (P[k + 2] !== 0) lift = Math.max(lift, Hz([P[k], P[k + 1]]), Hz([-P[k], P[k + 1]]));
   }
-  el = relift(el, lift);
+  // a PROUD element is DRAPED on the molding (drapeElement: each vertex over
+  // the molding under it and its mirror, never sunk), not lifted as one block
+  // to the highest molding under it — that left its edges standing as slabs
+  // wherever the profile falls away (Eva's fourth round); a SUNK one keeps
+  // its one lift (its petals lie down in the profile by design)
+  el = sunk ? relift(el, lift) : drapeElement(el, crestLift(Hz));
   el.sunk = sunk; el.out = out; el.pushed = Math.hypot(c[0] - at[0], c[1] - at[1]);
   if (onAxis) { el = symmetrizeElement(el); if (el.asymmetric) return null; }
   return el;
