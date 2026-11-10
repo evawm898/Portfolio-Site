@@ -1661,6 +1661,8 @@ springing rose are to be identified and fixed.
   reaching further ALONG the band's two slopes: a span of 1.8 M with the stretch cap raised to 1.8 gives
   24 mm across (2.0 / 2.0 gives 27), still 4.2 mm past the edge, measured. That is a different method from the one ruled, so it is a lettered option.
 
+**CI: the relief mutants run on 26 shards at 60 minutes** (were 16 at 40): with the chains capped a mutant runs up to ~21 min, and three to a shard overran the timeout (six shards cancelled on `202c487`).
+
 Mutants (relief): `the-chains-are-not-capped` (OR1 — at its lead a chain seats nothing, so the row has no chain at all; CB1 cannot see an absent one), `a-rose-at-the-corner` (VN2),
 `the-crest-shell-is-pointed` (CB2 — the crest's record), `a-stem-ends-on-a-flat-face` (VN6);
 (elements) `the-crest-shell-is-sharp-again` (EL6). **Claims the capped chains moved** (CI found each on the

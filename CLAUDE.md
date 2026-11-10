@@ -12543,7 +12543,7 @@ across the band, seated by `seatEmitted` alone (lift 0), items at its extrema by
 bud, sprig; a sunk rosette at medium zero crossings), each JOINING its stem by the embed. Sides on by default.
 Measured traps: the axis stop must read the stem's own y (the arch's apex is a mitre); an inward-turning run
 loops the mapped stem (`untangle` cuts and rounds it); `joinsCleanly` passes a wire that never touches;
-`node --check` does NOT catch an illegal `continue` — import the module. Six mutants; relief shards 12 → 16.
+`node --check` does NOT catch an illegal `continue` — import the module. Six mutants; relief shards 12 → 16, then 26 at 60 min (fourth round: three capped-chain mutants overran 40).
 Sheet: `node tools/shot-frame-vine.mjs <dir> [--refs <dir>] [--only <regex>]`.
 **SECOND ROUND (Eva's rulings on the first sheet, charter §17.8): THE BAND IS THE CAP.** Nothing stands past the
 band's outer edge (the frame's own `plateOutline`) but the CREST, which is DRAPED on an edge frame (arc length
