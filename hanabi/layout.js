@@ -10,7 +10,7 @@
 
 import { cardGeom, suitById } from './deck.js';
 import { SYMBOLS, DIGITS, DIGIT_BOX, TOKEN_GLYPHS } from './symbols.js';
-import { fireworkSpec, renderFirework, renderTier, defaultSpec, FIELD_MOTIFS } from './firework.js';
+import { fireworkSpec, fireworkSpecAt, renderFirework, renderTier, defaultSpec, FIELD_MOTIFS } from './firework.js';
 
 const f = (v) => +v.toFixed(3);
 
@@ -271,6 +271,17 @@ export function placementFor(design, suit, rank) {
   return countPlacement(fieldArea(ix.area, ix.corner), ar.items, ar.fitted);
 }
 
+// A Count card's fireworks as drawn, one string each in stacking order. Each is
+// its own spec (fireworkSpecAt: the card's, unless that firework carries a
+// style of its own), seeded by n, the firework it is.
+function countArt(design, suit, rank, pl) {
+  return pl.items.map((it) => {
+    const spec = fireworkSpecAt(design, suit, rank, it.n), reach = REACH(spec);
+    return renderFirework({ ...spec, seed: spec.seed + it.n * 7919, rotation: (+spec.rotation || 0) + it.rot },
+      { cx: it.cx, cy: it.cy, r: it.r / reach });
+  });
+}
+
 function centreArt(design, suit, rank, g, ix) {
   const compose = (suit.centre && suit.centre.compose) || 'scale';
   const spec = fireworkSpec(design, suit, rank);
@@ -293,9 +304,7 @@ function centreArt(design, suit, rank, g, ix) {
   }
   if (compose === 'count' || compose === 'countscale') {
     const ar = cellArrangement(design, suit.id, rank);
-    const pl = countPlacement(fieldArea(a, k), ar.items, ar.fitted), reach = REACH(spec);
-    return pl.items.map((it) => renderFirework({ ...spec, seed: spec.seed + it.n * 7919, rotation: (+spec.rotation || 0) + it.rot },
-      { cx: it.cx, cy: it.cy, r: it.r / reach })).join('');
+    return countArt(design, suit, rank, countPlacement(fieldArea(a, k), ar.items, ar.fitted)).join('');
   }
   const sp = scaleBurst(design, suit, rank, g, ix, spec);
   const p = sp.place;
@@ -334,6 +343,92 @@ export function scalePlacement(design, suit, rank) {
   if (!sp.placeable) return null;
   const at = sp.place || { ...sp.base, rot: 0 };
   return { field: sp.field, unit: sp.base.r, base: sp.base, items: [{ cx: at.cx, cy: at.cy, r: at.r, rot: at.rot || 0, n: 0 }] };
+}
+
+// ---- optical centring ----
+//
+// What a firework DRAWS is not centred on its anchor: a willow's trails hang
+// below it, a palm's fronds curve to one side, a rotated burst leans. So the
+// card is centred on its drawn EXTENT — the box round every mark as rendered
+// (circles with their radius, lines and curves with half their stroke, a
+// rotate() on a firework's group applied) — and the extent is centred in the
+// card's art field (fieldArea: the area less the corner-index columns). Paths
+// are absolute M/L/Q/C/Z by the renderers' contract; anything else throws.
+const CURVE_SAMPLES = 24;
+export function drawnExtent(svg) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const grp of svg.split('<g class="hb-firework"').slice(1)) {
+    const tm = /^[^>]*transform="rotate\(([-\d.]+) ([-\d.]+) ([-\d.]+)\)"/.exec(grp);
+    const a = tm ? (+tm[1] * Math.PI) / 180 : 0, ox = tm ? +tm[2] : 0, oy = tm ? +tm[3] : 0, cs = Math.cos(a), sn = Math.sin(a);
+    const add = (x, y, pad) => {
+      if (a) { const dx = x - ox, dy = y - oy; x = ox + dx * cs - dy * sn; y = oy + dx * sn + dy * cs; }
+      x0 = Math.min(x0, x - pad); y0 = Math.min(y0, y - pad); x1 = Math.max(x1, x + pad); y1 = Math.max(y1, y + pad);
+    };
+    const body = grp.slice(0, grp.indexOf('</g>') < 0 ? grp.length : grp.indexOf('</g>'));
+    for (const m of body.matchAll(/<circle cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)"/g)) add(+m[1], +m[2], +m[3]);
+    for (const m of body.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"[^>]*stroke-width="([\d.]+)"/g)) { add(+m[1], +m[2], +m[5] / 2); add(+m[3], +m[4], +m[5] / 2); }
+    for (const m of body.matchAll(/<path d="([^"]+)"([^>]*)>/g)) {
+      const sw = /stroke-width="([\d.]+)"/.exec(m[2]), pad = sw ? +sw[1] / 2 : 0;
+      let cur = null, start = null;
+      for (const seg of m[1].match(/[A-Za-z][^A-Za-z]*/g)) {
+        const c = seg[0], n = (seg.slice(1).match(/-?[\d.]+/g) || []).map(Number);
+        if (!'MLQCZ'.includes(c)) throw new Error(`drawnExtent: a path command it cannot read (${c})`);
+        if (c === 'M' || c === 'L') { for (let i = 0; i < n.length; i += 2) { cur = [n[i], n[i + 1]]; if (c === 'M' && i === 0) start = cur; add(cur[0], cur[1], pad); } }
+        else if (c === 'Z') cur = start;
+        else {
+          const ctrl = [cur]; for (let i = 0; i < n.length; i += 2) ctrl.push([n[i], n[i + 1]]);
+          for (let k = 1; k <= CURVE_SAMPLES; k++) {
+            const t = k / CURVE_SAMPLES; let q = ctrl.map((p) => p.slice());
+            while (q.length > 1) q = q.slice(1).map((p, i) => [q[i][0] + (p[0] - q[i][0]) * t, q[i][1] + (p[1] - q[i][1]) * t]);
+            add(q[0][0], q[0][1], pad);
+          }
+          cur = ctrl[ctrl.length - 1];
+        }
+      }
+    }
+  }
+  return x0 <= x1 ? { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 } : null;
+}
+
+// The arrangement that centres a card's drawn fireworks in its art field, as a
+// normal per-card value the page writes into the cell (so Reset undoes it and
+// the Across / Down sliders show it):
+//   Count, Count + scale  { kind: 'items', items } — the whole group moved as
+//                         one, so the fireworks keep their places to each other
+//   Scale                 { kind: 'place', place } — its one firework moved
+// with { dx, dy } the shift in mm and `clamped` when a firework's anchor had to
+// stop at the field's edge (the result is then as near centred as it can go).
+// null where the composition lays itself out (Column, Full bleed, a field
+// motif) or a second tier sits under the burst.
+export function centring(design, suit, rank) {
+  const compose = (suit.centre && suit.centre.compose) || 'scale';
+  const g = cardGeom(design), ix = indexArt(design, suit, rank, g, 'pl', false);
+  const field = fieldArea(ix.area, ix.corner);
+  const fx = field.x + field.w / 2, fy = field.y + field.h / 2;
+  const cl = (v) => Math.min(1, Math.max(0, v));
+  if (compose === 'count' || compose === 'countscale') {
+    const ar = cellArrangement(design, suit.id, rank), pl = countPlacement(field, ar.items, ar.fitted);
+    const e = drawnExtent(countArt(design, suit, rank, pl).join(''));
+    if (!e) return null;
+    const dx = fx - e.cx, dy = fy - e.cy;
+    const raw = literalItems(pl).map((it) => ({ ...it, x: it.x + dx / field.w, y: it.y + dy / field.h }));
+    const items = raw.map((it) => ({ ...it, x: cl(it.x), y: cl(it.y) }));
+    return { kind: 'items', items, dx, dy, field, clamped: raw.some((it, i) => it.x !== items[i].x || it.y !== items[i].y) };
+  }
+  if (compose !== 'scale') return null;
+  const spec = fireworkSpec(design, suit, rank);
+  if (spec.tier) return null;
+  const sp = scaleBurst(design, suit, rank, g, ix, spec);
+  if (!sp.placeable) return null;
+  const at = sp.place || { ...sp.base, rot: 0 };
+  const s2 = at.rot ? { ...spec, rotation: (+spec.rotation || 0) + at.rot } : spec;
+  const e = drawnExtent(renderFirework(s2, { cx: at.cx, cy: at.cy, r: at.r, rect: sp.field }));
+  if (!e) return null;
+  const dx = fx - e.cx, dy = fy - e.cy, F = sp.field;
+  const raw = { x: (at.cx + dx - F.x) / F.w, y: (at.cy + dy - F.y) / F.h };
+  const own = design.fireworks && design.fireworks[suit.id] && design.fireworks[suit.id][rank];
+  const place = { x: cl(raw.x), y: cl(raw.y), s: own && own.place ? own.place.s : 1, rot: at.rot || 0 };
+  return { kind: 'place', place, dx, dy, field, clamped: place.x !== raw.x || place.y !== raw.y };
 }
 
 // ---- the scene band: a silhouette along the bottom, behind the fireworks ----

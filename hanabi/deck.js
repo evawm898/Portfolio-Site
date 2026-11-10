@@ -21,7 +21,9 @@
 //                              { x, y, s, rot } per firework, x/y fractions of
 //                              the centre field, s of half its shorter side
 //   design.fireworks[suit][rank]  the CELL override: any spec key, per key,
-//                              and `items`, that cell's own arrangement
+//                              `items`, that cell's own arrangement, and
+//                              `styles` { [n]: { motif?, ...params } }, one
+//                              firework's own type and parameters (version 4)
 //   design.scene               an optional silhouette band behind the fireworks
 //
 // Phase 1's layouts A/B/C are exactly (large, scale), (small, column) and
@@ -29,9 +31,11 @@
 // version-2 file's single/count/bleed as scale/column/bleed (V2_LAYOUTS), so
 // every saved design opens looking as it did.
 
-import { MOTIF_IDS, TIER_IDS, LEGACY_RADIAL, PARAMS } from './firework.js';
+import { MOTIF_IDS, TIER_IDS, LEGACY_RADIAL, PARAMS, STYLE_MOTIFS } from './firework.js';
 
-export const VERSION = 3;
+// 4: a Count card's fireworks may each carry a style of their own (`styles` in
+// the cell). A version-3 file has none and reads unchanged.
+export const VERSION = 4;
 
 // The standard per-suit distribution: three 1s, two 2s, two 3s, two 4s, one 5.
 // The optional rainbow suit uses the same distribution (10 more cards).
@@ -292,6 +296,10 @@ export function normaliseDesign(raw, symbolIds) {
           if (pl) o.place = pl;
           else { delete o.place; notes.push(`${sid} ${rk}: a placement not understood — dropped`); }
         }
+        if (o.styles !== undefined) {
+          const st = readStyles(o.styles, +rk, (m) => notes.push(`${sid} ${rk}: ${m}`), motifOf);
+          if (st) o.styles = st; else delete o.styles;
+        }
         if (!Object.keys(o).length) delete ranks[rk];
       }
       if (!Object.keys(ranks).length) delete d.fireworks[sid];
@@ -352,6 +360,25 @@ export function readItems(items, rank) {
   if (!perm) for (const o of out) delete o.n;
   return out;
 }
+// One card's per-firework styles: { [n]: style }, n a firework of the card
+// (0..rank-1). A style keeps a known motif (not a field: it fills a rect) and
+// the parameters readParam takes; the rest is dropped and told. null if empty.
+export function readStyles(styles, rank, note, motifOf = (m) => m) {
+  if (!styles || typeof styles !== 'object' || Array.isArray(styles)) { note('firework styles not understood — dropped'); return null; }
+  const out = {};
+  for (const [n, st] of Object.entries(styles)) {
+    if (!/^\d+$/.test(n) || +n >= rank) { note(`a style for firework ${n}, which a rank-${rank} card does not have — dropped`); continue; }
+    if (!st || typeof st !== 'object') { note(`firework ${+n + 1}: a style not understood — dropped`); continue; }
+    const o = {};
+    for (const [k, v] of Object.entries(st)) {
+      if (k === 'motif') { const m = motifOf(v); if (STYLE_MOTIFS.includes(m)) o.motif = m; else note(`firework ${+n + 1}: type "${v}" not offered for one firework — dropped`); continue; }
+      const ok = readParam(k, v);
+      if (ok === undefined) note(`firework ${+n + 1}: ${k}=${JSON.stringify(v)} not understood — dropped`); else o[k] = ok;
+    }
+    if (Object.keys(o).length) out[+n] = o;
+  }
+  return Object.keys(out).length ? out : null;
+}
 export function readPlace(p) {
   if (!p || typeof p !== 'object' || ![p.x, p.y, p.s].every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
   return { x: clamp(p.x, 0, 1), y: clamp(p.y, 0, 1), s: clamp(p.s, ...PLACE_LIMITS.s), rot: clamp(num(p.rot, 0), ...PLACE_LIMITS.rot) };
@@ -369,6 +396,36 @@ export function restack(items, i, j) {
 export function copyCentreToAll(design, fromId) {
   const from = suitById(design, fromId);
   for (const s of design.suits) { s.centre = { ...from.centre }; s.firework = { ...(from.firework || {}) }; }
+}
+
+// ---- per-firework styles: one firework of a Count card, keyed by n ----
+export function setFireworkStyle(design, suitId, rank, n, key, value) {
+  const o = cellOf(design, suitId, rank, true);
+  ((o.styles ||= {})[n] ||= {})[key] = value;
+}
+// Drop one key of firework n's style, or the whole style (back to the card).
+export function clearFireworkStyle(design, suitId, rank, n, key) {
+  const o = cellOf(design, suitId, rank);
+  if (!o || !o.styles || !o.styles[n]) return;
+  if (key) delete o.styles[n][key]; else delete o.styles[n];
+  if (o.styles[n] && !Object.keys(o.styles[n]).length) delete o.styles[n];
+  if (!Object.keys(o.styles).length) clearCell(design, suitId, rank, 'styles');
+}
+// Carry one card's style mix to every other suit's card of that rank that draws
+// a Count (the only compositions with several fireworks to style). A colour
+// set by hand travels with its firework; one inherited stays each suit's own.
+// Returns the suits it reached and the ones it left alone.
+export function applyStylesToRank(design, fromSuitId, rank) {
+  const src = cellOf(design, fromSuitId, rank), styles = src && src.styles;
+  const reached = [], skipped = [];
+  for (const s of activeSuits(design)) {
+    if (s.id === fromSuitId) continue;
+    if (!COUNT_MODES.includes(s.centre.compose)) { skipped.push(s.id); continue; }
+    if (styles) cellOf(design, s.id, rank, true).styles = JSON.parse(JSON.stringify(styles));
+    else clearCell(design, s.id, rank, 'styles');
+    reached.push(s.id);
+  }
+  return { reached, skipped };
 }
 
 // ---- the board's cell edits
