@@ -217,6 +217,9 @@ const ROW_DEF_MOVED_BY_PRED = {
     },
   },
   bone: { added: 20, rows: {} },
+  /* RIBS (Nov 9): block 87's twenty-three rows; no base row is redefined — the
+     choice guard keeps every slider sweep where it was. */
+  ribs: { added: 23, rows: {} },
   /* BONE v2 (Nov 2): no row added; block 79's three TEXTURE CAP rows are
      redefined (their states no longer reach the 2.0 M cap) and block 82's
      ruled-defaults, maxima, minima, 40 x 3 and two GATED rows take v2's ranges. */
@@ -362,6 +365,13 @@ const PREDICATE_MOVERS = {
      PEBBLE / CELLULAR take their shipped expressions by branch. Written from
      the CONTROLS, never from either tree's guard. */
   bone: (st) => String(st.petalTexture) === 'BONE' && String(st.petalInfill ?? 'NONE') === 'NONE',
+  /* RIBS (Nov 9): a row moves iff its texture is RIBS and the infill is NONE —
+     and every such row is one of block 87's ADDED rows, which the base tree
+     cannot build, so on the base's own rows the predicate names NO mover: every
+     shipped row (BONE, PEBBLE, CELLULAR, the default) holds to the bit. The
+     three branches RIBS adds (the hub's centre fan, the stem's lattice, the
+     rods' capture) are each `ribs`-guarded, and this is their witness. */
+  ribs: (st) => String(st.petalTexture) === 'RIBS' && String(st.petalInfill ?? 'NONE') === 'NONE',
   /* BONE v2 (Nov 2) — the v2 field, the hybrid mesher, coarse/full, and the
      ONE export cap (EXPORT_TRI_CAP, 2,000,000, provisional, Eva's PreForm
      ruling) replacing the 1,500,000 budget. A row moves iff (a) its texture is
@@ -1290,7 +1300,14 @@ const PREDICATE_MOVERS = {
     return st.stamenCoil === 'INDEPENDENT' && Number(st.stamenCoilRadius) > 0;
   },
 };
+/* A LAYER entry also owns `values.layerRing` / `values.layerPetalCount`
+   (#495, S7), which the geometry lists in `SCOPE_LAYER_VALUE_IDS` and NOT in
+   `SCOPE_VALUE_IDS` — so reading the petal-value list alone stripped every
+   owned ring and count from the BASE build and reported block 85's and 86's
+   holders as moved (RIBS session, Nov 10: 32 findings on LAYER RING rows, the
+   base building the derived ring 7.94 where the row owns 0.80). */
 const BASE_VALUE_IDS = new Set(base.SCOPE_VALUE_IDS || []);
+const BASE_LAYER_VALUE_IDS = new Set([...(base.SCOPE_VALUE_IDS || []), ...(base.SCOPE_LAYER_VALUE_IDS || [])]);
 /* A TIER's values are the SEPAL ids (#425), which the petal list does not hold:
    reading the petal list for a tier stripped every sepal tier's own curve from
    the BASE build and reported a holder as moved (curves-leaves, measured on
@@ -1425,7 +1442,7 @@ function baseScopes(sc) {
     if (Object.keys(v).length === Object.keys(e.values).length) return e;
     const out = { ...e }; if (Object.keys(v).length) out.values = v; else delete out.values; return out;
   };
-  const layers = (sc.layers || []).map((e) => strip(e)), petals = (sc.petals || []).map((e) => strip(e)), tiers = (sc.tiers || []).map((e) => strip(e, BASE_TIER_VALUE_IDS));
+  const layers = (sc.layers || []).map((e) => strip(e, BASE_LAYER_VALUE_IDS)), petals = (sc.petals || []).map((e) => strip(e)), tiers = (sc.tiers || []).map((e) => strip(e, BASE_TIER_VALUE_IDS));
   if (layers.every((e, i) => e === sc.layers[i]) && petals.every((e, i) => e === sc.petals[i]) && tiers.every((e, i) => e === sc.tiers[i])) return sc;
   return { ...sc, layers, petals, tiers };
 }

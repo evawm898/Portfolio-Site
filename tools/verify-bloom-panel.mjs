@@ -4848,6 +4848,8 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
       /* (BONE, Oct 28) its five sliders, and the dropdown's OFFERED values (a
          retired value is kept as a hidden option, never offered) */
       bone: ['bonePoreSize', 'bonePoreDensity', 'boneBandRatio', 'bonePatchCoverage', 'boneCurvature'].map((id) => ({ id, hidden: wrap(id).hidden, said: wrap(id).querySelector('.bl-val').textContent })),
+      /* (RIBS, Nov 9) its three: the spacing law, the spacing and its own height */
+      ribs: ['ribLaw', 'ribSpacing', 'ribHeight'].map((id) => ({ id, hidden: wrap(id).hidden, said: wrap(id).querySelector('.bl-val').textContent })),
       offered: [...document.getElementById('petalTexture').options].filter((o) => !o.hidden).map((o) => o.value),
       kept: [...document.getElementById('petalTexture').options].filter((o) => o.hidden).map((o) => o.value) };
   });
@@ -4859,10 +4861,11 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     const present = evalPredicate({ ref: 'texturePresent' }, r.ui), infOn = evalPredicate({ ref: 'infillPresent' }, r.ui);
     if (!!r.T !== present) p.push(`the builder reports ${r.T ? 'a record' : 'no record'} while the registry reads the texture ${present ? 'present' : 'absent'}`);
     if (!!r.line !== !!r.T) p.push(`the TEXTURE line is ${r.line ? 'shown' : 'absent'} while the builder reports ${r.T ? 'a record' : 'no record'}`);
-    const isBone = String(r.ui.petalTexture) === 'BONE', legacy = present && !isBone;
-    if (r.h.hidden !== !present || r.z.hidden !== !legacy) p.push(`the height / size sliders are ${r.h.hidden ? 'hidden' : 'shown'} / ${r.z.hidden ? 'hidden' : 'shown'} at ${r.ui.petalTexture} (the size is the retired patterns' own)`);
+    const isBone = String(r.ui.petalTexture) === 'BONE', isRibs = String(r.ui.petalTexture) === 'RIBS', legacy = present && !isBone && !isRibs;
+    if (r.h.hidden !== !(present && !isRibs) || r.z.hidden !== !legacy) p.push(`the height / size sliders are ${r.h.hidden ? 'hidden' : 'shown'} / ${r.z.hidden ? 'hidden' : 'shown'} at ${r.ui.petalTexture} (the size is the retired patterns' own; RIBS reads its own height)`);
     for (const b of r.bone) if (b.hidden !== !isBone) p.push(`BONE's ${b.id} is ${b.hidden ? 'hidden' : 'shown'} at ${r.ui.petalTexture}`);
-    if (JSON.stringify(r.offered) !== '["NONE","BONE"]' || JSON.stringify(r.kept) !== '["PEBBLE","CELLULAR"]') p.push(`the dropdown offers ${r.offered.join(' / ')} and keeps ${r.kept.join(' / ')} hidden — it must offer NONE / BONE and keep PEBBLE / CELLULAR for saved designs (Eva, Oct 23)`);
+    for (const b of r.ribs) if (b.hidden !== !isRibs) p.push(`RIBS's ${b.id} is ${b.hidden ? 'hidden' : 'shown'} at ${r.ui.petalTexture}`);
+    if (JSON.stringify(r.offered) !== '["NONE","BONE","RIBS"]' || JSON.stringify(r.kept) !== '["PEBBLE","CELLULAR"]') p.push(`the dropdown offers ${r.offered.join(' / ')} and keeps ${r.kept.join(' / ')} hidden — it must offer NONE / BONE / RIBS (Eva, Nov 9) and keep PEBBLE / CELLULAR for saved designs (Eva, Oct 23)`);
     if (r.tex.hidden || r.inf.hidden) p.push('a choice is HIDDEN — Q9 greys, never hides');
     /* THE GREYING, both ways, restated from the registry's own predicates on
        the page's state: a control is greyed iff its `enabledWhen` is false,
@@ -4881,7 +4884,13 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
         else {
           if (r.notBuilt) p.push('the read-out says NOT BUILT while the builder relieved the sheet');
           const o = r.T.organs && r.T.organs.petal;
-          if (isBone) {
+          if (isRibs) {
+            if (!/^RIBS:/.test(r.line[1])) p.push(`the TEXTURE line does not name RIBS: "${r.line[1].slice(0, 80)}"`);
+            if (!o || !o.bone || !new RegExp(`petal: ${o.bone.displaced} of ${o.bone.vertices} vertices raised`).test(r.line[1])) p.push(`the RIBS line does not carry the petal's own raised count ${o && o.bone && o.bone.displaced} of ${o && o.bone && o.bone.vertices}`);
+            if (!/NEVER on the stem or a rod/.test(r.line[1]) || !/no "Full detail" build/.test(r.line[1])) p.push('the RIBS line does not say the stem and rods are excluded and that the view IS the export');
+            const rh = r.ribs.find((x) => x.id === 'ribHeight');
+            if (!rh || !/\bmm\b/.test(rh.said)) p.push(`the rib height's read-out is not in millimetres: "${rh && rh.said}"`);
+          } else if (isBone) {
             if (!/^BONE v2:/.test(r.line[1])) p.push(`the TEXTURE line does not name BONE v2: "${r.line[1].slice(0, 80)}"`);
             if (!o || !o.bone || !new RegExp(`petal: ${o.bone.displaced} of ${o.bone.vertices} vertices raised`).test(r.line[1])) p.push(`the BONE line does not carry the petal's own raised count ${o && o.bone && o.bone.displaced} of ${o && o.bone && o.bone.vertices}`);
             if (!/pore floors on the sheet/.test(r.line[1]) || !/COARSE PREVIEW|FULL DETAIL/.test(r.line[1])) p.push('the BONE line does not say the pore floors sit on the sheet and which view (coarse preview / full detail) is showing');
@@ -4892,7 +4901,7 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
           if (!new RegExp(`${r.T.heightMm}`).test(r.line[1])) p.push(`the TEXTURE line does not carry the height ${r.T.heightMm}`);
         }
       }
-      if (!want.refused && !/\bmm\b/.test(r.h.said)) p.push(`the height control's read-out is not in millimetres: "${r.h.said}"`);
+      if (!want.refused && !isRibs && !/\bmm\b/.test(r.h.said)) p.push(`the height control's read-out is not in millimetres: "${r.h.said}"`);
     }
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
     else ok.push(`${tag} ${label}: ${r.T ? (r.T.refused ? `refused ${r.T.refused}` : `${r.T.type} H ${r.T.heightMm}`) : 'no record'}`);
@@ -4906,6 +4915,8 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   await run(p1, 'PEBBLE on — the line with the lattice count and the bar, the sliders shown, the INFILL greyed and told', [{ id: 'petalTexture', value: 'PEBBLE' }], { infGreyed: true, texGreyed: false });
   await run(p1, 'CELLULAR at the height ceiling', [{ id: 'petalTexture', value: 'CELLULAR' }, { id: 'textureHeight', value: '1.5' }], { infGreyed: true, texGreyed: false });
   await run(p1, 'BONE on — its line, its five sliders shown and the feature size hidden, the INFILL greyed', [{ id: 'petalTexture', value: 'BONE' }, { id: 'textureHeight', value: '0.4' }], { infGreyed: true, texGreyed: false });
+  await run(p1, 'RIBS on — its line, its three controls shown, the shared height and BONE\'s five hidden, the INFILL greyed', [{ id: 'petalTexture', value: 'RIBS' }], { infGreyed: true, texGreyed: false });
+  await run(p1, 'RIBS law B at its height ceiling', [{ id: 'petalTexture', value: 'RIBS' }, { id: 'ribLaw', value: 'B' }, { id: 'ribHeight', value: '2.5' }], { infGreyed: true, texGreyed: false });
   await run(p1, 'BONE at the height ceiling and full coverage', [{ id: 'petalTexture', value: 'BONE' }, { id: 'textureHeight', value: '1.5' }, { id: 'bonePatchCoverage', value: '1' }], { infGreyed: true, texGreyed: false });
   await run(p1, 'BOTH ON — refused with the word infill, NOT BUILT told, NEITHER control greyed (each stays reachable)', [{ id: 'petalInfill', value: 'VORONOI' }], { refused: 'infill', infGreyed: false, texGreyed: false });
   await run(p1, 'the infill alone — the TEXTURE choice greyed and told, no line', [{ id: 'petalTexture', value: 'NONE' }], { infGreyed: false, texGreyed: true });

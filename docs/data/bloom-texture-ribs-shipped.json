@@ -1,0 +1,250 @@
+{
+ "budget": [
+  {
+   "key": "default",
+   "law": "A",
+   "tris": 161200,
+   "pct": 8.1,
+   "nodeMs": 1165,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degenerate": 0
+  },
+  {
+   "key": "default",
+   "law": "B",
+   "tris": 161200,
+   "pct": 8.1,
+   "nodeMs": 943,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degenerate": 0
+  },
+  {
+   "key": "umbel",
+   "law": "A",
+   "tris": 478294,
+   "pct": 23.9,
+   "nodeMs": 3531,
+   "shells": 53,
+   "open": 0,
+   "doubled": 0,
+   "degenerate": 0
+  },
+  {
+   "key": "umbel",
+   "law": "B",
+   "tris": 478294,
+   "pct": 23.9,
+   "nodeMs": 3630,
+   "shells": 53,
+   "open": 0,
+   "doubled": 0,
+   "degenerate": 0
+  },
+  {
+   "key": "mophead",
+   "law": "A",
+   "tris": 1970874,
+   "pct": 98.5,
+   "nodeMs": 31992,
+   "shells": 674,
+   "open": 0,
+   "doubled": 0,
+   "degenerate": 0
+  },
+  {
+   "key": "mophead",
+   "law": "B",
+   "tris": 1970874,
+   "pct": 98.5,
+   "nodeMs": 30849,
+   "shells": 674,
+   "open": 0,
+   "doubled": 0,
+   "degenerate": 0
+  }
+ ],
+ "print": [
+  {
+   "law": "A",
+   "H": 0.3,
+   "tris": 161200,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 17570,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degenerate": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "sampled": 6618,
+    "newlyClosedPrintableGaps": 0,
+    "nearestUnraisedMm": 0.038,
+    "nearestRaisedMm": 0.038
+   }
+  },
+  {
+   "law": "A",
+   "H": 2.5,
+   "tris": 161200,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 17570,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degenerate": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "sampled": 30291,
+    "newlyClosedPrintableGaps": 0,
+    "nearestUnraisedMm": 0.038,
+    "nearestRaisedMm": 0.038
+   }
+  },
+  {
+   "law": "B",
+   "H": 0.3,
+   "tris": 161200,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 17608,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degenerate": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "sampled": 6656,
+    "newlyClosedPrintableGaps": 0,
+    "nearestUnraisedMm": 0.038,
+    "nearestRaisedMm": 0.038
+   }
+  },
+  {
+   "law": "B",
+   "H": 2.5,
+   "tris": 161200,
+   "withinPairs": 0,
+   "worstSpanMm": 0,
+   "crossPairs": 17608,
+   "shells": 9,
+   "open": 0,
+   "doubled": 0,
+   "degenerate": 0,
+   "gaps": {
+    "sameMesh": true,
+    "parts": 9,
+    "sampled": 30416,
+    "newlyClosedPrintableGaps": 0,
+    "nearestUnraisedMm": 0.038,
+    "nearestRaisedMm": 0.038
+   }
+  }
+ ],
+ "hub": [
+  {
+   "law": "A",
+   "H": 0.3,
+   "hubTris": 9600,
+   "degenerate": 0,
+   "nearAxisTris": 768,
+   "nearAxisMinAngleDeg": 8.34,
+   "nearAxisFolds": 0,
+   "degenerateBarMm2": 1e-9
+  },
+  {
+   "law": "A",
+   "H": 2.5,
+   "hubTris": 9600,
+   "degenerate": 0,
+   "nearAxisTris": 768,
+   "nearAxisMinAngleDeg": 2.754,
+   "nearAxisFolds": 0,
+   "degenerateBarMm2": 1e-9
+  },
+  {
+   "law": "B",
+   "H": 0.3,
+   "hubTris": 9600,
+   "degenerate": 0,
+   "nearAxisTris": 768,
+   "nearAxisMinAngleDeg": 6.284,
+   "nearAxisFolds": 0,
+   "degenerateBarMm2": 1e-9
+  },
+  {
+   "law": "B",
+   "H": 2.5,
+   "hubTris": 9600,
+   "degenerate": 0,
+   "nearAxisTris": 768,
+   "nearAxisMinAngleDeg": 1.33,
+   "nearAxisFolds": 0,
+   "degenerateBarMm2": 1e-9
+  }
+ ],
+ "browser": [
+  {
+   "key": "default",
+   "law": "A",
+   "chromiumMs": 654,
+   "nodeMs": 916,
+   "tris": 161200,
+   "agree": true,
+   "heapGB": 0.1
+  },
+  {
+   "key": "default",
+   "law": "B",
+   "chromiumMs": 623,
+   "nodeMs": 820,
+   "tris": 161200,
+   "agree": true,
+   "heapGB": 0.09
+  },
+  {
+   "key": "umbel",
+   "law": "A",
+   "chromiumMs": 2277,
+   "nodeMs": 2975,
+   "tris": 478294,
+   "agree": true,
+   "heapGB": 0.23
+  },
+  {
+   "key": "umbel",
+   "law": "B",
+   "chromiumMs": 2156,
+   "nodeMs": 2677,
+   "tris": 478294,
+   "agree": true,
+   "heapGB": 0.23
+  },
+  {
+   "key": "mophead",
+   "law": "A",
+   "chromiumMs": 24618,
+   "nodeMs": 30578,
+   "tris": 1970874,
+   "agree": true,
+   "heapGB": 0.89
+  },
+  {
+   "key": "mophead",
+   "law": "B",
+   "chromiumMs": 24297,
+   "nodeMs": 29848,
+   "tris": 1970874,
+   "agree": true,
+   "heapGB": 0.95
+  }
+ ]
+}

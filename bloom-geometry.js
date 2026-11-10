@@ -1854,7 +1854,9 @@ export const SCOPE_UNSCOPED = Object.freeze(['sheetThickness',
      builder reading `ps` for the two (it reads `textureFor(ps)` already). */
   'textureHeight', 'textureSize',
   /* BONE's five (Oct 28), for the same reason: one world field */
-  'bonePoreSize', 'bonePoreDensity', 'boneBandRatio', 'bonePatchCoverage', 'boneCurvature'])
+  'bonePoreSize', 'bonePoreDensity', 'boneBandRatio', 'bonePatchCoverage', 'boneCurvature',
+  /* RIBS's two sliders (Nov 9): one world field about the bloom's axis */
+  'ribSpacing', 'ribHeight'])
 /* ===================================================================
    SCOPED VALUES — what a scope OWNS OUTRIGHT rather than offsets (F6-scope,
    Oct 18; read docs/bloom-outline-curve-scope-outcome.md). A curve is not a
@@ -13000,10 +13002,17 @@ export function infillIsAbsent(state) { return String(state.petalInfill ?? 'NONE
    and T5's, untouched). `TEXTURE_TYPES` is every value a state may carry;
    `TEXTURE_TYPES_SHOWN` is what the dropdown offers. Read the BONE block
    after `organT5For` and docs/bloom-surface-texture-bone-outcome.md. */
-export const TEXTURE_TYPES = Object.freeze(['NONE', 'BONE', 'PEBBLE', 'CELLULAR']);
-export const TEXTURE_TYPES_SHOWN = Object.freeze(['NONE', 'BONE']);
+/* RIBS (Nov 9, Eva's rulings — read docs/bloom-surface-texture-ribs-shipped.md)
+   is the THIRD shown choice: NONE / BONE / RIBS, one at a time. */
+export const TEXTURE_TYPES = Object.freeze(['NONE', 'BONE', 'RIBS', 'PEBBLE', 'CELLULAR']);
+export const TEXTURE_TYPES_SHOWN = Object.freeze(['NONE', 'BONE', 'RIBS']);
 export const TEXTURE_TYPES_HIDDEN = Object.freeze(['PEBBLE', 'CELLULAR']);
 export function textureIsBone(state) { return String(state.petalTexture ?? 'NONE') === 'BONE'; }
+export function textureIsRibs(state) { return String(state.petalTexture ?? 'NONE') === 'RIBS'; }
+/* BONE and RIBS share ONE deferred relief pass (`boneReliefPass`): the sheets
+   are captured, latticed and relieved after the build; RIBS reads its own
+   field and no patch mask, and never captures a rod (Eva's named exclusion) */
+export function textureUsesBonePass(state) { return textureIsBone(state) || textureIsRibs(state); }
 /* THE HEIGHT'S FLOOR IS EVA'S 0.4 mm (Q13) — UNVALIDATED: nothing in this
    project has been printed, and 0.4 is the edge-profile ruling's own guess at
    SLS Nylon 12 White's resolvable detail. It is the slider's MINIMUM, so 0 is
@@ -13090,6 +13099,7 @@ export function textureFor(state, cap = null) {
      patch mask beside it (`mp`). Every other type is T3's expression below,
      term for term. */
   if (type === 'BONE') return boneTextureFor(state, cap, heightMm, hAsked, refused);
+  if (type === 'RIBS') return ribsTextureFor(state, cap, refused);
   return { type, heightMm, sizeMm, edgeMm: textureEdgeInForce(cap), heightClamped: heightMm !== hAsked, sizeClamped: sizeMm !== sAsked, refused, f: refused ? null : textureField(type, sizeMm) };
 }
 /* ===================================================================
@@ -13147,7 +13157,7 @@ function textureContext(T, organ, rowAt, firstSub, noSubRows, rep = null) {
   /* BONE relieves nothing here: the sheet is latticed exactly as T3 lattices
      it and emitted UNDISPLACED, handing its normals and ramp to the deferred
      pass (`bone` set, `relief` null — see the BONE block) */
-  if (T.type === 'BONE') return { organ, rep, bone: true, relief: null, lattice: { edgeMm: T.edgeMm, rowAt, firstSub, noSubRows }, panels: [], latticeSamples: [] };
+  if (T.bone) return { organ, rep, bone: true, relief: null, lattice: { edgeMm: T.edgeMm, rowAt, firstSub, noSubRows }, panels: [], latticeSamples: [] };
   return { organ, rep, relief: { heightMm: T.heightMm, f: T.f }, lattice: { edgeMm: T.edgeMm, rowAt, firstSub, noSubRows }, panels: [] };
 }
 /* the record a blade carries — the controls, the refusal, and its panels */
@@ -13188,7 +13198,10 @@ function textureSummary(state, petalsAll, sepalsBuilt, leavesBuilt, cap = null) 
     if (lb.leaflets) for (const lf of lb.leaflets) add('leaf', lf.texture);
   }
   for (const o of Object.values(organs)) if (!Number.isFinite(o.reliefMinMm)) o.reliefMinMm = 0;
-  return { type: T.type, heightMm: T.heightMm, sizeMm: T.sizeMm, edgeMm: T.edgeMm, bar: TEXTURE_LATTICE_BAR, refused: T.refused || null, heightClamped: T.heightClamped, sizeClamped: T.sizeClamped, organs };
+  const out = { type: T.type, heightMm: T.heightMm, sizeMm: T.sizeMm, edgeMm: T.edgeMm, bar: TEXTURE_LATTICE_BAR, refused: T.refused || null, heightClamped: T.heightClamped, sizeClamped: T.sizeClamped, organs };
+  /* (RIBS) the schedule the field was built from, for the read-out and TXR */
+  if (T.ribs) out.ribs = T.ribs;
+  return out;
 }
 
 /* ===================================================================
@@ -13335,7 +13348,12 @@ function t5Weld(pos, from, to) {
    export floor does not bind) is the organ's shipped mesh in export mode,
    triangle for triangle the same topology: every count, pair, fan and zip
    decision is taken on it, the geometry on this mesh. */
-function organLatticeInto(acc, from, cap, { organ, edgeMm, decide = null, sink = null }) {
+/* `fanRings` false (RIBS's hub, Nov 9): a closed centre fan is NOT re-meshed
+   as rings — each fan triangle takes the rows split like every other face, so
+   its vertices stand on the fan's own radial spokes and the ribs converge on
+   the axis as the lab's radial hatch. On the ring lattice the 63 spokes alias
+   into a circular moire within ~5 mm of the axis (measured, the outcome doc). */
+function organLatticeInto(acc, from, cap, { organ, edgeMm, decide = null, sink = null, fanRings = true }) {
   const to = acc.triangleCount;
   const tags = cap.tags || [];
   const W = t5Weld(acc.positions, from, to);
@@ -13424,7 +13442,7 @@ function organLatticeInto(acc, from, cap, { organ, edgeMm, decide = null, sink =
     const inc = new Map();
     for (let t = 0; t < nT; t++) if (!kept[t]) for (let k = 0; k < 3; k++) { const v = tri[t * 3 + k]; const l = inc.get(v); if (l) l.push(t); else inc.set(v, [t]); }
     for (const [v, ts] of inc) {
-      if (ts.length < T5_FAN_MIN_SPOKES) continue;
+      if (!fanRings || ts.length < T5_FAN_MIN_SPOKES) continue;
       const tag = tags[ts[0]];
       if (!ts.every((t) => tags[t] === tag && fanOf[t] < 0)) continue;
       /* every spoke shared by exactly two of these triangles, and the opposite
@@ -14098,6 +14116,159 @@ function boneTextureFor(state, cap, heightMm, hAsked, refused) {
   return { type: 'BONE', heightMm, sizeMm: b.pore, edgeMm, heightClamped: heightMm !== hAsked, sizeClamped: a.pore !== b.pore, refused, bone,
     bone2: refused ? null : { field, params, full: null },
     f: refused ? null : (p, n) => field.F(p, n), mp: refused ? null : bonePatchField(b.coverage, patchScaleMm) };
+}
+
+/* ===================================================================
+   RIBS — RADIAL SPOKE RIBBING, THE THIRD TEXTURE CHOICE (Nov 9, Eva's
+   rulings; read docs/bloom-surface-texture-ribs-shipped.md, and the
+   prototype's record docs/bloom-surface-texture-ribs.md, before touching it).
+
+   THE LOOK IS THE OCTOBER LAB'S (bloom-texture-lab.html, "ribbing — radial
+   spokes"): a SOFT wave across a pitch, `f = (1 + cos(pi u)) / 2` with u the
+   distance to the nearest crest in half-pitches — exactly the lab's
+   `0.5 + 0.5 cos(K atan2(y, x))` under law A — supersedes the prototype's
+   sharp crests, so no crest-line cutter is built: the field is sampled on
+   the shipped 0.4 mm lattice like BONE's coarse build (measured in the
+   outcome doc: the lattice carries the soft wave). ONE world field about the
+   bloom's axis, a function of (x, y) alone, OUTWARD ONLY, peak-to-valley H.
+     A (the default)  a FIXED spoke count, fanning: K = round(2 pi R / s), the
+                      lab's own law, s the spacing asked AT R = 20 mm (the lab's
+                      RIB_REF_RADIUS_MM) — 63 spokes at the default 2.0 mm;
+     B (a choice)     CONSTANT spacing, branching: 4 x 2^L spokes, level L
+                      begins where its spacing is s / sqrt2 (so the pitch runs
+                      s/sqrt2 .. s sqrt2), and a new rib grows from the flute's
+                      floor to full height over one spacing outward.
+   THE CENTRE CONVERGES FREELY (Eva): no collar, no thinning, no fade to
+   smooth and no floor at the axis — under-resolved spokes near the axis blur
+   into a radial hatch on the lattice, as they do in the lab.
+
+   WHERE (Eva's NAMED exclusion — a list she ruled, recorded as such, never
+   the derived visibility or curvature rule): ribs on the petals, sepals,
+   leaves and the hub's TOP, both faces of every sheet. NEVER on the stem or
+   any rod — stamens, the style, braid strands, pedicels (a floret's stem),
+   petioles, leaflet stalks: under RIBS no rod is captured and the stem is not
+   latticed, so each is the untextured build's to the bit; and the hub's
+   vertices whose own normal does not face up (its underside and side wall)
+   carry nothing. Everything else is BONE's shipped pass, unchanged: the
+   sheets' ramps, T5's visibility and coverage, the geodesic fade, the
+   curvature mask at BONE's default 1 /mm, the derived owner.
+
+   ENGINE AGREEMENT: + - * /, Math.sqrt, Math.floor and Math.round, an
+   arithmetic `eatan2` (two exact half-angle reductions and a series, the
+   prototype's, agreeing with Math.atan2 to ~1e-15) and the shipped `ecos`.
+   =================================================================== */
+export const RIB_LAWS = Object.freeze(['A', 'B']);
+export const RIB_LAW_DEFAULT = 'A';
+/* THE HEIGHT: RIBS's own minimum is 0.3 mm (Eva, Nov 9; BONE keeps 0.4) —
+   UNVALIDATED for SLS, said on the control. The maximum is the texture's. */
+export const RIB_HEIGHT_RANGE = Object.freeze([0.3, TEXTURE_HEIGHT_RANGE[1]]);
+export const RIB_HEIGHT_STEP = 0.05;
+export const RIB_HEIGHT_DEFAULT = 0.3;
+export const RIB_HEIGHT_HELP = 'Rib height, 0.3 to 2.5 mm peak to valley. UNVALIDATED for SLS: 0.3 mm is under the ~0.35-0.4 mm detail the process is assumed to resolve, and nothing ribbed has been printed.';
+/* THE SPACING: the arc between two crests AT the reference radius (law A) or
+   everywhere (law B), in mm. Its floor is four lattice edges at that radius
+   (T3's floor for a feature); the default is the lab's 2.0 mm. */
+export const RIB_REF_RADIUS_MM = 20;
+export const RIB_SPACING_RANGE = Object.freeze([4 * TEXTURE_EDGE_MM, 8]);
+export const RIB_SPACING_STEP = 0.05;
+export const RIB_SPACING_DEFAULT = 2;
+export const RIB_MIN_SPOKES = 4;
+export const RIB_EMERGE_K = 1;
+export const RIB_EXCLUDED_ORGANS = Object.freeze(['stem', 'stamen', 'style', 'petiole', 'stalk']);
+export const RIB_CONTROL_IDS = Object.freeze(['ribLaw', 'ribSpacing', 'ribHeight']);
+export const RIB_TAU = 2 * Math.PI;
+export const RIB_FIELD_QUANT = 1048576;   // 2^-20, the field's grid (engine agreement at a valley)
+/* Eva's named exclusion, per vertex of an organ the pass is handed */
+export function ribExcluded(O, i) {
+  if (O.rod || RIB_EXCLUDED_ORGANS.includes(O.organ)) return true;
+  if (O.organ === 'hub') return !(O.N[i * 3 + 2] > 0);
+  return false;
+}
+/* atan on [0, 1]: two exact half-angle reductions to |t| <= tan(pi/16), then
+   the series to t^25 by Horner (the truncation is under 1e-19) */
+function eatanUnit(t) {
+  t = t / (1 + Math.sqrt(1 + t * t));
+  t = t / (1 + Math.sqrt(1 + t * t));
+  const y = t * t;
+  let a = 1 / 25;
+  for (let k = 23; k >= 1; k -= 2) a = 1 / k - y * a;
+  return 4 * t * a;
+}
+/* the angle of (x, y) about the axis in [0, 2 pi), arithmetic only */
+export function eatan2(y, x) {
+  const ax = x < 0 ? -x : x, ay = y < 0 ? -y : y;
+  if (ax === 0 && ay === 0) return 0;
+  let a = ay <= ax ? eatanUnit(ay / ax) : Math.PI / 2 - eatanUnit(ax / ay);
+  if (x < 0) a = Math.PI - a;
+  if (y < 0) a = -a;
+  return a < 0 ? a + RIB_TAU : a;
+}
+/* the controls as read, clamped; one owner of what a RIBS build asks */
+export function ribParams(state) {
+  const clampTo = (x, r) => (x < r[0] ? r[0] : x > r[1] ? r[1] : x);
+  const lawAsked = String(state.ribLaw ?? RIB_LAW_DEFAULT);
+  if (!RIB_LAWS.includes(lawAsked)) throw new Error(`ribLaw ${JSON.stringify(state.ribLaw)} is not one of ${RIB_LAWS.join(' / ')}`);
+  const sAsked = Number(state.ribSpacing ?? RIB_SPACING_DEFAULT), hAsked = Number(state.ribHeight ?? RIB_HEIGHT_DEFAULT);
+  const s = clampTo(sAsked, RIB_SPACING_RANGE), H = clampTo(hAsked, RIB_HEIGHT_RANGE);
+  return { law: lawAsked, s, H, sClamped: s !== sAsked, hClamped: H !== hAsked };
+}
+/* THE SCHEDULE: a count is n0 x 2^L, level L beginning at rStart[L] */
+export function ribSchedule(law, s) {
+  if (law === 'A') {
+    const K = Math.max(RIB_MIN_SPOKES, Math.round((RIB_TAU * RIB_REF_RADIUS_MM) / s));
+    return { law, n0: K, levels: [{ n: K, rStart: 0 }], emergeMm: s };
+  }
+  const levels = [{ n: RIB_MIN_SPOKES, rStart: 0 }];
+  for (let L = 1; L <= 24; L++) { const n = RIB_MIN_SPOKES * (1 << L); levels.push({ n, rStart: (n * s) / (RIB_TAU * Math.SQRT2) }); }
+  return { law, n0: RIB_MIN_SPOKES, levels, emergeMm: RIB_EMERGE_K * s };
+}
+const ribSmoother = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * x * (x * (6 * x - 15) + 10));
+/* the soft profile at level n for the angle th: u is the distance to the
+   nearest crest in half-pitches, f = (1 + cos(pi u)) / 2 */
+function ribWave(n, th) {
+  const ph = (n * th) / RIB_TAU;
+  const d = ph - Math.floor(ph + 0.5);
+  const u = 2 * (d < 0 ? -d : d);
+  return (1 + ecos(Math.PI * u)) / 2;
+}
+export function ribField(law, s) {
+  const S = ribSchedule(law, s);
+  const F = (p) => {
+    const x = p[0], y = p[1];
+    const r = Math.sqrt(x * x + y * y), th = eatan2(y, x);
+    let L = 0;
+    while (L + 1 < S.levels.length && S.levels[L + 1].rStart <= r) L++;
+    let f = ribWave(S.levels[L].n, th);
+    if (L > 0) {
+      const a = ribSmoother((r - S.levels[L].rStart) / S.emergeMm);
+      if (a < 1) f = (1 - a) * ribWave(S.levels[L - 1].n, th) + a * f;
+    }
+    /* ON THE 2^-20 GRID (BONE v2's own BONE2_QUANT): a VALLEY is f exactly 0, and
+       a lattice vertex a valley passes through (the -x axis is one under an odd
+       spoke count: y exactly 0) reads 0 in one engine and ~1e-32 in the other,
+       whose y is an ulp off — a vertex RAISED or not by a last bit (TX7 caught
+       it as one displaced vertex of 13,235 on the closed tube). The grid moves
+       the relief by at most H x 2^-21 mm (1.2e-6 at 2.5 mm), far under X0's bar. */
+    return Math.round(f * RIB_FIELD_QUANT) / RIB_FIELD_QUANT;
+  };
+  return { F, S };
+}
+/* THE CONTROLS AS READ (RIBS's arm of `textureFor`): BONE's record shape, so
+   the one deferred pass runs it — the curvature mask at BONE's DEFAULT (the
+   shipped rule, not special-cased), no patch mask (`mp` 1: everywhere
+   visible), and no BONE v2 record, so there is no full-detail build: the
+   coarse and the full are the same build, said on the read-out */
+function ribsTextureFor(state, cap, refused) {
+  const P = ribParams(state);
+  const edgeMm = textureEdgeInForce(cap);
+  const field = refused ? null : ribField(P.law, P.s);
+  const S = field ? field.S : ribSchedule(P.law, P.s);
+  const ribs = { law: P.law, spacingMm: P.s, refRadiusMm: RIB_REF_RADIUS_MM, spokes: S.law === 'A' ? S.n0 : null,
+    levels: S.levels.filter((l) => l.rStart < 400).map((l) => ({ n: l.n, rStart: l.rStart })), emergeMm: S.emergeMm,
+    excluded: RIB_EXCLUDED_ORGANS.slice(), sClamped: P.sClamped, profile: 'soft' };
+  const bone = { curvature: BONE_CURVATURE_DEFAULT, fadeMm: textureFadeWidthMm(P.H, edgeMm), coverage: 1, ribs: true, fullIsCoarse: true };
+  return { type: 'RIBS', heightMm: P.H, sizeMm: P.s, edgeMm, heightClamped: P.hClamped, sizeClamped: P.sClamped, refused, bone, ribs,
+    bone2: null, f: refused ? null : (p) => field.F(p), mp: refused ? null : () => 1 };
 }
 
 /* THE SHEET'S CAPTURE (a petal, a sepal, a leaf or a leaflet under BONE): its
@@ -15436,7 +15607,7 @@ function bone2Grid(pos0) {
    contiguous run, so a stream index maps by the runs before it; every record
    of the build that names a triangle range is mapped onto the stream the file
    holds (the keys below are every range field the builder writes) */
-const BONE2_RANGE_KEYS = new Set(['triRange', 'triRanges', 'triFrom', 'triTo', 'triStart', 'petalTriEnd', 'hubTriEnd', 'stemTriEnd', 'emittedTriRange', 'cover']);
+const BONE2_RANGE_KEYS = new Set(['triRange', 'triRanges', 'triFrom', 'triTo', 'triStart', 'petalTriEnd', 'hubTriEnd', 'stemTriEnd', 'emittedTriRange', 'cover', 'centreTriRange']);
 export function bone2RangeMap(runs) {
   /* runs: [{ from, to, newFrom, newTo }] sorted by from */
   return (x) => {
@@ -15834,6 +16005,8 @@ function boneReliefPass(acc, T, organs, capability = null) {
     const s = new Float64Array(nV), fv = new Float64Array(nV).fill(-1), mpv = new Float64Array(nV).fill(-1);
     for (let i = 0; i < nV; i++) {
       if (!(w0[i] > 0) || !(mc[i] > 0)) continue;
+      /* (RIBS) Eva's named exclusion: the stem, every rod, the hub below its top */
+      if (T.ribs && ribExcluded(O, i)) continue;
       const q = [O.P[i * 3], O.P[i * 3 + 1], O.P[i * 3 + 2]];
       const mp = T.mp(q);
       mpv[i] = mp;
@@ -15849,10 +16022,19 @@ function boneReliefPass(acc, T, organs, capability = null) {
   /* keyed on the STL's own float32s: copies the file would weld are one position
      here even where their doubles differ in the last bits (the closed tube's ring
      meets the hub at two such points) */
-  const f32 = Math.fround;
+  /* (RIBS) ON THE 2^-20 mm GRID instead: a seam vertex on an axis (x = 0) is
+     r cos(pi/2), which the engines' cos returns ~1e-15 apart — the closed tube's
+     hub and ring copies read -1.1e-15 / -1.1e-15 in Node (one float32, one
+     position) and -1.1e-15 / -6.6e-15 in Chromium (two), so the owner rule took
+     the copies together in one engine and apart in the other (TX7: 13,234
+     against 13,235 tube vertices raised). RIBS raises every visible vertex, so
+     the split always shows; BONE's patch mask leaves most such seams at s = 0
+     and its bytes are held by keeping its key (the hazard is latent there,
+     recorded in docs/bloom-surface-texture-ribs-shipped.md) */
+  const f32 = T.ribs ? (x) => Math.round(x * RIB_FIELD_QUANT) : Math.fround;
   per.forEach((X, oi) => { for (let i = 0; i < X.nV; i++) { const k = `${f32(X.O.P[i * 3])}|${f32(X.O.P[i * 3 + 1])}|${f32(X.O.P[i * 3 + 2])}`; const l = where.get(k); if (l) l.push(oi, i); else where.set(k, [oi, i]); } });
   let sharedPositions = 0, sharedRelieved = 0, sharedAcross = 0, sharedCleared = 0;
-  for (const X of per) X.clr = new Float64Array(X.nV);
+  for (const X of per) { X.clr = new Float64Array(X.nV); X.sh = new Uint8Array(X.nV); }
   const sharedOf = per.map(() => 0);
   for (const l of where.values()) {
     if (l.length <= 2) continue;
@@ -15863,7 +16045,7 @@ function boneReliefPass(acc, T, organs, capability = null) {
     for (let c = 2; c < l.length; c += 2) if (l[c] !== l[0]) { sharedAcross++; break; }
     let ok = true, sMin = Infinity;
     const X0 = per[l[0]], i0 = l[1];
-    for (let c = 0; c < l.length; c += 2) sharedOf[l[c]]++;
+    for (let c = 0; c < l.length; c += 2) { sharedOf[l[c]]++; per[l[c]].sh[l[c + 1]] = 1; }
     for (let c = 0; c < l.length; c += 2) {
       const X = per[l[c]], i = l[c + 1];
       if (!(X.s[i] > 0)) { ok = false; break; }
@@ -15929,7 +16111,7 @@ function boneReliefPass(acc, T, organs, capability = null) {
       }
       if (ci > 0) bs.cleared++;
       if (si > 0) { bs.displaced++; rec.displaced++; if (si > rec.reliefMaxMm) rec.reliefMaxMm = si; if (si < rec.reliefMinMm) rec.reliefMinMm = si; }
-      const smp = () => ({ organ: O.organ, p0: q, p1, n, s: si, f: X.fv[i], mp: X.mpv[i], mc: X.mc[i], w0: X.w0[i], g: X.w0[i], kappa: X.kap[i], ridge: !!X.ridge[i], ridgeDistMm: X.ridgeDist ? X.ridgeDist[i] : Infinity, fadeDistMm: X.visDist ? X.visDist[i] : undefined, sheet: !!O.sheet, clearMm: ci });
+      const smp = () => ({ organ: O.organ, p0: q, p1, n, s: si, f: X.fv[i], mp: X.mpv[i], mc: X.mc[i], w0: X.w0[i], g: X.w0[i], kappa: X.kap[i], ridge: !!X.ridge[i], ridgeDistMm: X.ridgeDist ? X.ridgeDist[i] : Infinity, fadeDistMm: X.visDist ? X.visDist[i] : undefined, sheet: !!O.sheet, clearMm: ci, shared: !!X.sh[i] });
       if (ci > 0 && bs.clearSamples.length < 16) bs.clearSamples.push(smp());
       if (X.ridge[i] && bs.ridgeSamples.length < 32 && (bs.ridgeSamples.length === 0 || (tick % 7) === 0)) bs.ridgeSamples.push(smp());
       else if (X.fv[i] === 0 && X.w0[i] > 0 && X.mc[i] > 0 && bs.floorSamples.length < 16) bs.floorSamples.push(smp());
@@ -29054,7 +29236,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
   /* (BONE) the build's own capture lists: every sheet and every rod group
      hands its mesh to the ONE deferred relief pass (`boneReliefPass`); null
      on every other build, by branch */
-  const boneT = tube && tube.collect ? null : (textureIsBone(state) ? organT5For(state, capability) : null);
+  const boneT = tube && tube.collect ? null : (textureUsesBonePass(state) ? organT5For(state, capability) : null);
   acc.boneSheets = boneT ? [] : null;
   acc.boneRods = null;
 
@@ -29325,7 +29507,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      untextured build take the shipped expressions, by branch */
   const T5 = tube && tube.collect ? null : organT5For(state, capability);
   const t5Organs = T5 ? [] : null;
-  const t5Cut = (organ, from, cap) => { const d = t5Decide && t5Decide !== 'twin' && t5Decide[organ] ? { positions: t5Decide.positions, from: t5Decide[organ][0], to: t5Decide[organ][1] } : null; t5Organs.push(organLatticeInto(acc, from, cap, { organ, edgeMm: T5.edgeMm, decide: d })); };
+  const t5Cut = (organ, from, cap) => { const d = t5Decide && t5Decide !== 'twin' && t5Decide[organ] ? { positions: t5Decide.positions, from: t5Decide[organ][0], to: t5Decide[organ][1] } : null; t5Organs.push(organLatticeInto(acc, from, cap, { organ, edgeMm: T5.edgeMm, decide: d, fanRings: !T5.ribs })); };
   let hubBuilt;
   if (headOff) hubBuilt = HUB_ABSENT;
   else if (T5) { const c = organCapture(acc, () => buildHubInto(acc, state, fr.hub)); hubBuilt = c.out; t5Cut('hub', petalTriEnd, c); t5Organs[t5Organs.length - 1].cover = [0, petalTriEnd]; }
@@ -29339,7 +29521,8 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      underside is; it is emitted HERE, after the hub, where it always was. */
   /* a floret's stem is its PEDICEL, a rod: deferred to BONE (Q12) */
   let stemBuilt;
-  if (T5 && (!pedicel || boneT) && stemPlanned.present) { const c = organCapture(acc, () => buildStemInto(acc, stemPlanned)); stemBuilt = c.out; t5Cut('stem', hubTriEnd, c); stemBuilt = { ...stemBuilt, latticeTris: acc.positions.length / 9 - hubTriEnd }; }
+  /* (RIBS) the stem and a floret's pedicel are Eva's named exclusion: not latticed */
+  if (T5 && !T5.ribs && (!pedicel || boneT) && stemPlanned.present) { const c = organCapture(acc, () => buildStemInto(acc, stemPlanned)); stemBuilt = c.out; t5Cut('stem', hubTriEnd, c); stemBuilt = { ...stemBuilt, latticeTris: acc.positions.length / 9 - hubTriEnd }; }
   else stemBuilt = buildStemInto(acc, stemPlanned);
   const stemTriEnd = acc.positions.length / 9;
   /* LEAVES ON THE STEM. Built AFTER the stem because they read its plan for
@@ -29359,7 +29542,9 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
      a noded stem a leafless rebuild turns the nodes BARE, which moves the stem
      too, and a prefix read off it lands in the wrong place). */
   const leafTris0 = acc.triangleCount;
-  if (boneT) acc.boneRods = { index: 0, decide: t5Decide && t5Decide !== 'twin' && t5Decide.rods ? t5Decide.rods : null, decidePositions: t5Decide && t5Decide !== 'twin' ? t5Decide.positions : null, curvature: boneT.bone.curvature, edgeMm: boneT.edgeMm, smooth: [], organs: [] };
+  /* (RIBS) no rod is captured: Eva's named exclusion, so every rod is the
+     untextured build's own, byte for byte */
+  if (boneT && !boneT.ribs) acc.boneRods = { index: 0, decide: t5Decide && t5Decide !== 'twin' && t5Decide.rods ? t5Decide.rods : null, decidePositions: t5Decide && t5Decide !== 'twin' ? t5Decide.positions : null, curvature: boneT.bone.curvature, edgeMm: boneT.edgeMm, smooth: [], organs: [] };
   if (leafPlanned.present) {
     for (let i = 0; i < leafPlanned.azimuths.length; i++) {
       /* A NODE WHOSE CAP LEAVES NO BLADE BUILDS NO LEAF (told by the plan). */
@@ -29564,7 +29749,7 @@ function buildBloomBody(acc, state, { below = null, capability = null, scopes = 
     spacingVariance: spacingField ? { amount: spacingField.amount, frequency: spacingField.frequency, phaseDeg: spacingField.phaseDeg, phaseInert: spacingField.phaseInert,
       fan: spacingField.fan, n: spacingField.n, nyquist: spacingField.nyquist, aliased: spacingField.aliased, halfSpanDeg: spacingField.halfSpanDeg,
       floor: spacingField.floor } : null,
-    neighbour, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, leafTriRange, sepals: sepalsBuilt, inflorescence: infloPlanned, inflorescenceBuilt,
+    neighbour, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, leafTriRange, centreTriRange: [leafTriRange[1], sepalTris0], sepals: sepalsBuilt, inflorescence: infloPlanned, inflorescenceBuilt,
     /* THE PETAL SITES the sepal limit was drawn against ({ p, ring, slot, cap },
        with `p.grid` captured whenever a whorl of sepals exists) — telemetry,
        so `tools/bloom-sepal-contact.mjs` can draw the same petals densely

@@ -245,6 +245,22 @@ async function boneArm() {
   return r.status !== 0 ? [`TXB: tools/verify-bloom-bone.mjs${CONTROL ? ' --control' : ''} exited ${r.status}: ${(r.stderr || '').trim().split('\n').slice(-3).join(' | ')}`] : [];
 }
 
+/* RIBS'S GATE AND MUST-FAIL (Nov 9), spawned the same way and for the same
+   reason: tools/verify-bloom-ribs-shipped.mjs is Node-only and imports the
+   harness, and spawning it here puts it in CI with no workflow edit. Its clean
+   arm (TXR0-TXR10 over its eight rows, both modes) runs beside the gate, its
+   ten mutants beside --control. RIBS adds NO table row, BONE's precedent: every
+   measure here reads the mid-surface the relief is applied over (`self` on the
+   captured grid, the approach measures on the unrelieved parts), so a RIBS row
+   would measure the untextured bloom and say nothing about the ribs. */
+async function ribsArm() {
+  const { spawnSync } = await import('node:child_process');
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/verify-bloom-ribs-shipped.mjs'), ...(CONTROL ? ['--negative-control'] : [])], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const tail = (r.stdout || '').trim().split('\n').slice(-1)[0];
+  console.log(`  ribs ${CONTROL ? 'must-fail' : 'clean'} arm: ${tail}`);
+  return r.status !== 0 ? [`TXR: tools/verify-bloom-ribs-shipped.mjs${CONTROL ? ' --negative-control' : ''} exited ${r.status}: ${(r.stdout || '').trim().split('\n').filter((l) => /FAIL|MISSED|did not move/.test(l)).slice(0, 3).join(' | ')} ${(r.stderr || '').trim().split('\n').slice(-2).join(' | ')}`] : [];
+}
+
 /* A LAYER'S OWN PETAL COUNT'S MUST-FAIL (Nov 8), spawned the same way and for
    the same reason: tools/verify-bloom-layer-count.mjs is Node-only and imports
    the harness (the PC family is pure; the apex table never runs the Z family),
@@ -262,7 +278,7 @@ async function layerCountArm() {
 async function main() {
   const tree = await loadTree(ROOT);
   const matrix = buildMatrix();
-  const rootBad = [...await rootTaperArm(tree), ...await boneArm(), ...await layerCountArm()];
+  const rootBad = [...await rootTaperArm(tree), ...await boneArm(), ...await layerCountArm(), ...await ribsArm()];
   if (rootBad.length) { console.log(`defaults bar: FAILED — ${rootBad.length} root-taper, bone or layer-count finding(s)`); for (const b of rootBad) console.log('  - ' + b); process.exitCode = 1; return; }
   if (!CONTROL) {
     const bad = verify(tree, SHIPPED_STATES, matrix);
