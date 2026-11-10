@@ -1221,7 +1221,7 @@ const MUTANTS = [
   { id: 'a-heavy-element-mid-run', file: 'vine', from: "let el = placeElement('bud', {", to: "let el = placeElement('rose', {", breaks: ['VN2'] },
   { id: 'the-element-mirror-is-broken', file: 'elements', from: '  for (let k = 0; k < P.length; k += 3) P[k] = -P[k];', to: '  for (let k = 0; k < P.length; k += 3) P[k] = 0.02 - P[k];', breaks: ['PL4'] },   // PL4 is its witness; PL2 fired only while a mirror inherited its source's stale cached box (fixed in the second round) — a 0.02 mm offset makes no graze
   { id: 'the-axis-motif-is-not-its-own-mirror', file: 'filigree', from: '  if (onAxis) { el = symmetrizeElement(el); if (el.asymmetric) return null; }', to: '', breaks: ['PL4'] },
-  { id: 'the-stem-lifts-off-the-molding', file: 'vine', from: 'const finishStem = (c) => { c.lift = c.pts.map(() => 0);', to: 'const finishStem = (c) => { c.lift = c.pts.map(() => 0.5);', breaks: ['VN5'] },
+  { id: 'the-stem-lifts-off-the-molding', file: 'vine', from: 'roundEnds(c); c.lift = c.pts.map(() => 0);', to: 'roundEnds(c); c.lift = c.pts.map(() => 0.5);', breaks: ['VN5'] },
   // phase 3e step 3, second round (Eva's rulings 1-2: the band is the cap)
   { id: 'a-motif-pushed-past-the-band', file: 'filigree', from: '  if (beyond) {\n    // CAPPED TO THE BAND', to: '  if (false) {\n    // CAPPED TO THE BAND', breaks: ['CB1'] },   // the corner roses pushed out of the opening and past the edge, as the first sheet had them
   { id: 'the-crest-is-not-draped', file: 'vine', from: 'return { ...remapElement(flat, frame.at), at: frame.at([0, 0]) };', to: 'return { ...remapElement(flat, ([x, y]) => [x, frame.topY + y]), at: frame.at([0, 0]) };', breaks: ['CB2'] },   // laid flat across a curve, its ends stand past the rise
