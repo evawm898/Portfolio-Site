@@ -48,8 +48,9 @@ import { MIN_FEATURE_MM } from './frame-registry.js';
 import { FRAME_TRI_BUDGET, solidTriBound, plateOutline, EMBED_MM } from './frame-relief.js';
 import {
   CHAIN_RUNS, CHAIN_SEAT, runPath, mapToPath, bandRegion, moldingHeightField, seatOn, slitWorst, mirrorCurve,
-  wireClear, wireClearBound, joinsCleanly, buildScroll, buildLeaf, carvedCap, LEAF_ASPECT, wAt, selfGap, profileFor, rigid, pip, placeMotif, wireHeight, wireProfile, LEAF_RELIEF,
+  wireClear, wireClearBound, joinsCleanly, LEAF_CROSS, buildScroll, buildLeaf, carvedCap, LEAF_ASPECT, wAt, selfGap, profileFor, rigid, pip, placeMotif, wireHeight, wireProfile, LEAF_RELIEF,
 } from './frame-filigree.js';
+import { rinceauSpec, rinceauTendril, acanthusLeaf, RIN, RIN_TRY } from './frame-rinceau.js';
 import { placeElement, relift, liftEach, drapeElement, mirrorElement, symmetrizeElement, remapElement, wireElementContact, elementClear, elementDepth, footprintTouches } from './frame-elements.js';
 
 /* the field's constants (one each, every one a measured choice in §17) */
@@ -343,6 +344,8 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   const dens = 0.6 + 0.2 * p.ornDensity;
   const leafK = p.ornLeafSize / 0.42;
   const leaves = p.ornLeaves === 'on';
+  // the RINCEAU (phase 3f step 1, frame-rinceau.js): a hidden switch, null on every shipped frame
+  const rin = rinceauSpec(p);
   // the band in a run's local frame: the path lies `depth` inside the outer
   // edge, so the band spans y ∈ [depth − M, depth]; its centre line y_c
   const yc = depth - M / 2;
@@ -364,10 +367,10 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const cOf = (x) => at1(comp, path, x);
     const axisA = cFrom === 'crest' || cFrom === 'bottom', axisB = cTo === 'crest' || cTo === 'bottom';
     // the stem's width, amplitude and half wavelength follow w_h
-    const wsOf = (x) => Math.max(F, (STEM_W[0] + STEM_W[1] * wOf(x)) * M);
+    const wsOf = (x) => Math.max(F, ((rin ? RIN.stemW : STEM_W)[0] + (rin ? RIN.stemW : STEM_W)[1] * wOf(x)) * M);
     let ak = 1;      // the meander's share: lowered where the run's own turns fold it (below)
-    const ampOfX = (x) => ak * Math.max(0.5, Math.min((STEM_A[0] + STEM_A[1] * wOf(x)) * M, M / 2 - wsOf(x) / 2 - 0.6 * F));
-    const P0 = (x) => M * (STEM_P[0] + STEM_P[1] * wOf(x)) * cOf(x) / dens;
+    const ampOfX = (x) => ak * Math.max(0.5, Math.min(((rin ? RIN.A : STEM_A)[0] + (rin ? RIN.A : STEM_A)[1] * wOf(x)) * M, M / 2 - wsOf(x) / 2 - 0.6 * F));
+    const P0 = rin ? (x) => M * (RIN.P[0] + RIN.P[1] * wOf(x)) * rin.wave * cOf(x) / dens : (x) => M * (STEM_P[0] + STEM_P[1] * wOf(x)) * cOf(x) / dens;
     // the stem's x range: a feature short of the axis (its mirror) at an
     // axis end; run on past an interior end
     const ws0 = wsOf(0), wsL = wsOf(L);
@@ -445,7 +448,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     if (!stem) { told.push(`the ${run.id} stem is not built — the run folds it onto itself at any meander`); continue; }
     if (ak < 1) told.push(`the ${run.id} stem meanders at ${(100 * ak).toFixed(0)}% — at full swing it would come within a feature of itself or past the band's edge`);
     stem.run = run.id; stem.meander = ak;
-    runs.push({ run, path, L, Aa, Ab, cFrom, cTo, axisA, axisB, wOf, cOf, wsOf, ampOfX, theta, yOf, stem, sc, x0, x1, want });
+    runs.push({ run, path, L, Aa, Ab, cFrom, cTo, axisA, axisB, wOf, cOf, wsOf, ampOfX, theta, yOf, stem, sc, x0, x1, want, P0 });
   }
 
   // ---- 2. the seat (the chains' law: the molding's own height field) ----
@@ -566,13 +569,14 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       const side = Math.sign(Math.sin(r.theta(x))) || 1, w = r.wOf(x);
       cand.push({ r, x, w, side, at: 'extremum', n: nExt++ });
     }
-    for (let k = Math.ceil(thA / Math.PI - 1e-9); k <= Math.floor(thB / Math.PI + 1e-9); k++) {
+    if (!rin) for (let k = Math.ceil(thA / Math.PI - 1e-9); k <= Math.floor(thB / Math.PI + 1e-9); k++) {
       const x = solveX(k * Math.PI); if (!guard(x) || x < 0.8 * M || x > r.L - 0.8 * M) continue;
       cand.push({ r, x, w: r.wOf(x), side: 0, at: 'zero' });
     }
   }
   cand.sort((a, b) => b.w - a.w || a.x - b.x);
   const itemKind = (c) => {
+    if (rin) return c.at === 'extremum' ? 'volute' : null;
     if (c.at === 'zero') return c.w >= 0.46 && c.w < 0.66 ? 'rosette' : null;
     if (c.w >= 0.56) return 'cluster';
     if (c.w >= 0.36) return leaves ? 'leaf' : null;
@@ -598,7 +602,41 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const cc = r.cOf(c.x), w = c.w;
     // the item's heading: forward (away from the crest), into the bay the
     // stem bends around (inward at an outward bulge, outward at an inward one)
-    const make = (f) => {
+    const make = (f, tk = 1) => {
+      if (kd === 'volute') {
+        // THE RINCEAU's wave: a tendril branching off just past the extremum
+        // on the stem's descent, leaving its tangent into the hollow the stem
+        // bends around and curling back into it (toward the crest of this
+        // wave) — so the volutes alternate sides as the extrema do; acanthus
+        // leaves sheathe the branch point
+        const P = r.P0(c.x) * r.sc;   // the local half wavelength as laid (the phase's own scale)
+        const xb = Math.min(r.L, c.x + RIN.branch * P), yb = r.yOf(xb), dydx = (r.yOf(xb + 0.05) - r.yOf(xb - 0.05)) / 0.1;
+        const tanb = Math.atan2(dydx, 1), phi = tanb - c.side * RIN.diverge;
+        const len = (RIN.len[0] + RIN.len[1] * w) * M * cc * f;
+        const rootB = [xb - Math.cos(phi) * 0.75 * r.wsOf(xb), yb - Math.sin(phi) * 0.75 * r.wsOf(xb)];
+        // fewer turns are taken off what the coil gap HOLDS at this size (asked past it, the bisection already lowered them)
+        const cap = RIN.wireK * r.wsOf(xb), held = tk < 1 ? rinceauTendril(len, rin.turns, cap).info.turnsHeld : rin.turns;
+        const tt = rinceauTendril(len, held * tk, cap); tt.info.turnsAsked = rin.turns;
+        const t = lay(tt, rootB, phi, c.side > 0, r.path);
+        t.info = { ...t.info, role: 'volute' };
+        const out = [t];
+        if (leaves) {
+          const fl = rin.leaf, ll = fl.len * len * leafK;
+          // the sheath leaf: rooted on the stem just behind the branch, lying
+          // along the tendril's outer side, curling with it
+          const ph1 = tanb - c.side * (RIN.diverge + RIN.sheath), xr = xb - 0.3 * r.wsOf(xb);
+          const r1 = [xr - Math.cos(ph1) * 0.75 * r.wsOf(xr), r.yOf(xr) - Math.sin(ph1) * 0.75 * r.wsOf(xr)];
+          const lf = lay(acanthusLeaf(ll, fl, -c.side), r1, ph1, false, r.path); lf.info = { ...lf.info, role: 'acanthus' }; out.push(lf);
+          if (fl.leaves > 1) {
+            // the calyx's second leaf: on the stem's continuation, turning
+            // the other way, over the stem going on
+            const ph2 = tanb + c.side * RIN.calyx;
+            const r2 = [xb - Math.cos(ph2) * 0.75 * r.wsOf(xb), yb - Math.sin(ph2) * 0.75 * r.wsOf(xb)];
+            const l2 = lay(acanthusLeaf(0.7 * ll, fl, c.side), r2, ph2, false, r.path); l2.info = { ...l2.info, role: 'acanthus' }; out.push(l2);
+          }
+        }
+        return { curves: out };
+      }
       if (kd === 'cluster') {
         const len = (ITEM.tendril[0] + ITEM.tendril[1] * w) * M * cc * f;
         const t = lay(tendril(len, p.ornTightness), rootFor(-c.side * 0.95), -c.side * 0.95, c.side < 0, r.path);
@@ -629,7 +667,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       return { el };
     };
     const fits = (it) => {
-      const why = () => false;   // (the reason is the argument: kept for reading the code, not reported)
+      const why = (m) => { if (globalThis.__vineWhy) globalThis.__vineWhy.push(m); return false; };   // (the reason is the argument: not reported; a probe may collect it)
       if (!it) return why('make null');
       if (it.el) {
         const e = it.el, m = mirrorElement(e);
@@ -652,11 +690,15 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
         }
       }
       // the cluster's leaf and tendril share a root: a joint there
-      if (it.curves.length === 2 && !joinsCleanly(it.curves[0], it.curves[1])) return why('cluster pair');
+      if (!rin && it.curves.length === 2 && !joinsCleanly(it.curves[0], it.curves[1])) return why('cluster pair');
+      // the rinceau's sheath leaf laps its volute's root: a joint there
+      // (a crossing — the leaf lies OVER the tendril, its lobes in and out of the tendril's edge — by the leaves' own crossing rule, phase 3c's LEAF_CROSS)
+      if (rin && it.curves.length >= 2 && !joinsCleanly(it.curves[0], it.curves[1], LEAF_CROSS)) return why('sheath');
       return true;
     };
     let it = null, q = 0;
-    for (; q < 6; q++) { const t = make(0.85 ** q); if (fits(t)) { it = t; break; } }
+    if (kd === 'volute') { for (; q < RIN_TRY.length; q++) { const t = make(...RIN_TRY[q]); if (fits(t)) { it = t; break; } } if (q === RIN_TRY.length) q = 6; }
+    else for (; q < 6; q++) { const t = make(0.85 ** q); if (fits(t)) { it = t; break; } }
     if (!it) { dropped++; continue; }
     if (q) shrunk++;
     const rec = { run: r.run.id, x: c.x, w, kind: kd, side: c.side, at: c.at, curves: it.curves || [], el: it.el || null };
@@ -686,7 +728,11 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       // shortfall to stand a feature over the molding, as a chain's leaf
       // stands on its host's crown
       const extra = cv.kind === 'leaf' ? Math.max(0, F + LEAF_CREST_MARGIN - leafPeak * Math.max(F, LEAF_RELIEF * cv.info.wire * p.ornProjection)) : 0;
-      cv.lift = cv.pts.map((_, i) => Math.max(Math.max(0, seatOn(H, cv, i)) + extra, ride * (1 - smooth(sAt[i] / (2 * ws)))));
+      // a rinceau's acanthus laps OVER its volute's root (a stacked shell):
+      // it rides a crown higher than the tendril and falls over longer
+      const lap = rin && cv.info.role === 'acanthus' ? rin.leaf.lap : 0;
+      const rideC = ride + lap * crown, fall = lap ? 3.5 : 2;
+      cv.lift = cv.pts.map((_, i) => Math.max(Math.max(0, seatOn(H, cv, i)) + extra, rideC * (1 - smooth(sAt[i] / (fall * ws)))));
     }
   }
 

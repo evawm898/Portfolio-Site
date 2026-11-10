@@ -12556,6 +12556,13 @@ Measured traps: the axis stop must read the stem's own y (the arch's apex is a m
 loops the mapped stem (`untangle` cuts and rounds it); `joinsCleanly` passes a wire that never touches;
 `node --check` does NOT catch an illegal `continue` — import the module. Six mutants; relief shards 12 → 16, then 26 at 60 min (fourth round: three capped-chain mutants overran 40).
 Sheet: `node tools/shot-frame-vine.mjs <dir> [--refs <dir>] [--only <regex>]`.
+**Phase 3f step 1 (Nov 10): THE RINCEAU VOCABULARY — STOPPED FOR A SHEET, NOTHING WIRED** (charter §18; read
+`frame-rinceau.js`'s header before touching it). Eva ruled the leafy runs (chains, vine) wrong; a rinceau replaces
+both in step 2. Built: a stem law and an item law (a sweep-then-volute tendril at every wave, alternating sides;
+acanthus sheathing the branch, lapping the volute) read by `vineFor` behind hidden params (`ornRinceau`, `rinWave`,
+`rinTurns`, `rinLeaf`) no control writes — absent, the relief STL is byte-identical to `main` on 18 states. At the
+default 180 mm print a volute holds at most ~0.9 turn (the band's 1 mm floors and 2 mm no-slit rule), so "many"
+builds as "medium" there. Sheet: `node tools/shot-frame-rinceau.mjs <dir>` → `docs/img/frame-rinceau-vocabulary.png`.
 **SECOND ROUND (Eva's rulings on the first sheet, charter §17.8): THE BAND IS THE CAP.** Nothing stands past the
 band's outer edge (the frame's own `plateOutline`) but the CREST, which is DRAPED on an edge frame (arc length
 along the edge × offset along its averaged normal) — at most `CREST.rise` 0.45 M past the edge, reaching

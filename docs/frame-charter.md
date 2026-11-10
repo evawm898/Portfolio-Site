@@ -1688,3 +1688,105 @@ OR7's alone (the capped elements no longer crowd each other in the opening — l
 VN2 still sees the vine's); `the-carved-floor-removed` also reddens OR3; `the-element-mirror-is-broken`
 also reddens PL2 and PL3 (a capped element sits exactly on the opening's edge and its wire's embed); and
 `a-folded-element-is-built` is retired (above).
+
+## 18. Phase 3f, step 1 — the rinceau: the vocabulary (STOPPED FOR A SHEET; nothing wired)
+
+Read `frame-rinceau.js`'s header before touching the rinceau. **Step 1 ships no control and moves no
+shipped byte**: the rinceau is reached only through hidden params (`ornRinceau: 'on'`, `rinWave`,
+`rinTurns`, `rinLeaf`) that no control writes — the sheet sets them — and with them absent every frame
+builds as on `main`, by branch (measured below).
+
+### 18.0 The ruling (Eva, Nov 10) and what was checked first
+
+- Crests, rosettes, the band cap and the weight field are right; **the leafy runs are not**: the chains read
+  as a row of leaf clumps, the vine as a gentle stem with leaves stuck on. Wanted: a RINCEAU — one stem per
+  run in an S, a tendril at every wave curling into a volute (the approved carved scroll, arris), volutes
+  alternating sides, acanthus sheathing each branch point and lapping over the volute; size following w(s);
+  curvature-aware; inside the band; mirror exact; floors held. It replaces the vine's stem AND the chains
+  (step 2, after the pick).
+- **Checked: the vine's machinery is the rinceau's.** `vineFor` already owns everything the ruling keeps — the
+  run paths (`runPath`, `offsetCurve`), the seat law (the molding's own height field at the emitted columns),
+  w(s), the curvature compression, the band cap, the junction motifs, the settling, the mirror, the budget. What
+  the vine gets wrong is the two things the rinceau changes: the stem's meander (low, long) and what springs at
+  each wave (a bud / leaf / sprig picked by weight, a tendril only near a peak, ~½ turn). So the rinceau is a
+  new item law and stem law read by `vineFor` (`rin`), not a second vine — one owner of runs, seat and settling.
+
+### 18.1 The construction (`frame-rinceau.js`, read by `vineFor`)
+
+- **The stem** is the vine's (one per run, y = y_c + A sin θ, θ' = π / P), with the rinceau's own laws: amplitude
+  `RIN.A` [0.30, 0.10] × M (capped by the band, so it swings near both edges), half wavelength `RIN.P`
+  [1.15, 0.55] × M × the WAVE factor (`RIN_WAVE`: loose 1.4 / medium 1.0 / tight 0.72), width `RIN.stemW`
+  [0.12, 0.05] × M (thinner than the vine's: the volutes carry the weight). Every extremum gets a volute (the
+  zero crossings nothing), so they alternate sides by construction.
+- **The tendril** (`rinceauTendril`) branches `RIN.branch` 0.18 of the half wave past the extremum, on the stem's
+  descent, leaving the stem's tangent by only `RIN.diverge` 0.25 rad (a branch, not a spur), and is the second
+  half of a carved C: a SWEEP (radius `RIN.sweep` 1.1 × its length) across the hollow, then a VOLUTE
+  (`RIN.share` 0.62 of its length) winding toward the crest of its own wave. Its length `RIN.len` [1.05, 0.45]
+  × M follows w(s) and the compression; its width the carved law under `RIN.wireK` 0.85 of the stem's (a
+  branch is thinner than its stem). The asked VOLUTE turns (`RIN_TURNS` few 0.6 / medium 0.95 / many 1.35) are
+  lowered by bisection until every coil gap is F + 0.1 (the vine's clearance); the turn DRAWN (root to eye,
+  the tendril's own tangent) is what the captions report.
+- **Two shapes were tried and refused first (measured on plan dumps):** (1) the vine's own tendril law, a C half
+  with a 0.42 L body — tiny ½-turn hooks pinched against the stem; (2) a single spiral whose radius falls
+  linearly from the stem — its eye drags back toward its own root on the stem, so every turn past ~0.7 met
+  the stem a second time (a graze) and the three turn variants built identically (0.62–0.68 everywhere, even
+  on a 16 mm band). The sweep-then-volute is the classical form and the one that lets the volute sit in the
+  middle of the hollow.
+- **The fit's schedule** (`RIN_TRY`): a volute that does not fit is first given FEWER TURNS (a curved run
+  compresses its coils — the oval's refusals are all coil gaps after mapping), then made smaller; past the
+  last it is not built (told, as a count).
+- **The acanthus** (`acanthusLeaf`: phase 3c's leaf, broader, 4–5 lobes, a 1.0 rad curl so it hugs the curl):
+  LIGHT one sheath leaf rooted on the stem just behind the branch, its heading 0.3 rad off the tendril's toward
+  the stem, so it covers the crotch and lies over the tendril's sweep; FULL a longer, broader sheath plus a
+  second leaf on the stem's continuation turning the other way (the calyx about the node). Each acanthus is a
+  stacked shell riding a crown higher than its tendril (`lap`) and falling over 3.5 stem widths, so it laps OVER
+  the volute's root. With the tendril it is a CROSSING by phase 3c's leaf rule (`LEAF_CROSS`, F/2 of overlap
+  at every approach), never a graze; with everything else the vine's clearances.
+
+### 18.2 Measured (Node, the hidden params; relief = export)
+
+Every row: boundary edges 0, one voxel region.
+
+| run | variant | volutes | turns drawn | relief tris |
+|---|---|---|---|---|
+| straight (rect side) | medium / medium / light | 13 | 0.84–0.91 | 340,944 |
+| straight | wave loose / tight | 10 / 18 | 0.84–0.91 | 277,752 / 447,760 |
+| straight | turns few / many | 13 / 13 | 0.70 / 0.84–0.91 | 305,176 / 340,944 |
+| straight | leaf full | 13 (26 leaves) | 0.61–0.67 | 443,656 |
+| straight | many, 300 mm print | 13 | 1.03–1.12 | 427,848 |
+| curved (oval crest → side) | medium | 10 | 0.60–0.75 | 288,560 |
+| curved | wave loose / tight | 7 / 13 | 0.68–0.75 | 235,432 / 345,632 |
+| curved | leaf full | 10 (20 leaves) | 0.60–0.75 | 387,760 |
+
+- **At the default 180 mm print a volute holds at most ~0.9 of a turn, so "many" builds as "medium" there.**
+  The bay under a wave is ~0.75 M deep (7 mm of the 9.5 mm band), and the 1 mm floors, the F + 0.1 coil gap and
+  the 2 mm no-slit rule against the band's edges leave a ~4 mm volute. At 300 mm (M 15.9) "medium" reaches
+  ~1.05 and "many" 1.12. More turns need a wider band or a larger print — the ruling's choice is of the LAW;
+  what the default can hold is a measurement.
+- **The full calyx costs turns**: its sheath leaf's crossing with the tendril binds, so the schedule lowers the
+  turns (0.61–0.67 on the straight run).
+- Whole frames (the rinceau on every run the vine builds, its crest and motifs unchanged): arch 447,948, rect
+  433,912, oval 290,864 (the vine: 329,788 / 284,672 / 200,184); tight + full 690,092 / 694,256 / 466,840; at
+  density 5, bottom on, 600 mm, tight + full: 1,286,300 / 1,476,136 / 1,497,016 — the last two give items way
+  to the 1.5 M budget (the vine's own give-way, told). Builds 4–8 s at the defaults (Node).
+- **Shipped bytes: identical.** With the hidden params absent, `vineFor` takes every old branch; the relief STL
+  of 18 states (three skeletons × filigree off, the vine, the chains, the groups, dense, h ½ leaves off) is
+  byte-identical to a worktree of `main` (`2a46e1c`).
+
+### 18.3 The sheet
+
+`node tools/shot-frame-rinceau.mjs <dir> [--only <regex>] [--refs <dir>]` → `docs/img/frame-rinceau-vocabulary.png`:
+the vine as on main (the before), then each variant on the straight band and the curved run, front-on and
+three-quarter (Relief view, a mid-run camera), and a preview of the three default frames with the rinceau on
+every run (NOT the ruling). Captions are the Node build's counts. References 1 and 2 are not in the repository.
+
+### 18.4 Not done (step 2, after the pick)
+
+The registry controls, retiring the chains (and their mutants), hierarchy 0 = a uniform rinceau, the
+junctions (the stems' ends at the crest and corners as the vine has them), the gates (stem continuity, a
+volute detached, a leaf floating, the mirror broken, w(s) ignored) and the CI shard count. The volute's tip
+ends square (a swept wire's end face) — `roundEnds` is the stem's and is owed to the tendril and the leaves.
+
+`frame-rinceau.js` is NOT yet in `frame.yml`'s path filter (an edit to an existing workflow file costs later frozen
+tags — CLAUDE.md); step 2 adds it, since then the module is load-bearing. This PR's gate runs regardless, through
+`frame-vine.js`. Every relief-mutant anchor still matches exactly once after the edits to `frame-vine.js`.
