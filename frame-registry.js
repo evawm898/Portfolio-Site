@@ -21,9 +21,11 @@ const isOval = (p) => p.skeleton === 'oval';
 const hasMullions = (p) => isArch(p) && p.mullions > 0;
 const sizedCorner = (p) => isRect(p) && p.cornerTreatment !== 'mitre';
 const ornOn = (p) => p.filigree === 'scrolls';
-// the chains layout (phase 3d, the default): the groups' wire, style and
-// scale do not reach a chain, so they hide there
-const chains = (p) => (p.ornLayout ?? 'chains') === 'chains';
+// the RINCEAU layout (phase 3f step 2, the default; it replaced phase 3d's
+// running chains and phase 3e's vine): the groups' wire, style and scale do
+// not reach it, so they hide there. A stored 'chains' reads as the rinceau
+// (frame-geometry's buildFrame maps it)
+const rinceau = (p) => (p.ornLayout ?? 'rinceau') !== 'groups';
 const patternOn = (p) => (p.bandPattern ?? 'none') !== 'none';
 const ON_OFF = [['on', 'On'], ['off', 'Off']];
 
@@ -93,12 +95,12 @@ export const PARAM_SPEC = [
   R('ornDensity', 'ornament', 'Density (scrolls per group, or along a run)', 1, 5, 1, 2, '', ornOn),
   // the lead scroll's length, as a multiple of the molding width (the
   // ornament keeps its proportion to the frame at any print size)
-  R('ornScale', 'ornament', 'Scale (× molding width)', 1, 6, 0.05, 2.5, '', (p) => ornOn(p) && !chains(p)),
-  R('ornTightness', 'ornament', 'Tightness', 0, 1, 0.01, 0.5, '', ornOn),
+  R('ornScale', 'ornament', 'Scale (× molding width)', 1, 6, 0.05, 2.5, '', (p) => ornOn(p) && !rinceau(p)),
+  R('ornTightness', 'ornament', 'Tightness', 0, 1, 0.01, 0.5, '', (p) => ornOn(p) && !rinceau(p)),   // the groups' (the rinceau's volutes take the coil gap's own turns)
   // the wire, in PRINT mm (a print feature: floored at MIN_FEATURE_MM)
   // (a CARVED stroke's width is its own length's, so the wire control is
   // hidden and inert there)
-  R('ornWire', 'ornament', 'Wire (print)', 1, 3.2, 0.05, 1.6, 'mm', (p) => ornOn(p) && !chains(p) && p.ornWireStyle !== 'carved'),
+  R('ornWire', 'ornament', 'Wire (print)', 1, 3.2, 0.05, 1.6, 'mm', (p) => ornOn(p) && !rinceau(p) && p.ornWireStyle !== 'carved'),
   // the wire's style (phase 3b, Eva's ruling 1): CONSTANT along the scroll,
   // or TAPERED — full width through the body, thinning over each volute to
   // half of it at the eye, floored at MIN_FEATURE_MM (the thinnest point)
@@ -106,26 +108,27 @@ export const PARAM_SPEC = [
   // the self-similar stroke, width = 0.7 × the local radius of curvature,
   // capped at a tenth of the scroll's length, floored at MIN_FEATURE_MM —
   // and makes it the default (Eva's ruling 1B on the critique)
-  { id: 'ornWireStyle', section: 'ornament', label: 'Wire style', kind: 'choice', default: 'carved', visibleWhen: (p) => ornOn(p) && !chains(p),   // the chains are carved (Eva's 1B)
+  { id: 'ornWireStyle', section: 'ornament', label: 'Wire style', kind: 'choice', default: 'carved', visibleWhen: (p) => ornOn(p) && !rinceau(p),   // the rinceau is carved (Eva's 1B)
     options: [['carved', 'Carved — fat body, thinning as it curls'], ['tapered', 'Tapered — thins toward the volute'], ['constant', 'Constant']] },
   // the CLUSTER (phase 3c, Eva's pick P5): two leaves lapping each group's
   // lead scroll at its root, as stacked shells; their size × the lead's length
   { id: 'ornLeaves', section: 'ornament', label: 'Leaves', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },
   R('ornLeafSize', 'ornament', 'Leaf size (× scroll)', 0.2, 0.6, 0.01, 0.42, '', (p) => ornOn(p) && p.ornLeaves === 'on'),
-  // the LAYOUT (phase 3d, Eva's ruling 4B): CHAINS — scroll-and-leaf chains
-  // running along the band between anchors, seated on the molding — or the
-  // phase-3a GROUPS at the anchors
-  { id: 'ornLayout', section: 'ornament', label: 'Layout', kind: 'choice', default: 'chains', visibleWhen: ornOn,
-    options: [['chains', 'Running chains — along the band'], ['groups', 'Groups — at the anchors']] },
-  // phase 3e step 3: the SCALE HIERARCHY (frame-vine.js). 0 is phase 3d's
-  // chains, by branch; above it the continuous vine, its weight field's
+  // the LAYOUT: the RINCEAU (phase 3f step 2, Eva's picks B / E / I) — one
+  // stem per run in an S, a tendril curling into a carved volute at every
+  // wave, acanthus at each branch; the band WIDENED to RIN_BAY_MM for it
+  // (Eva's (b)) — or the phase-3a GROUPS at the anchors
+  { id: 'ornLayout', section: 'ornament', label: 'Layout', kind: 'choice', default: 'rinceau', visibleWhen: ornOn,
+    options: [['rinceau', 'Rinceau — a running scroll along the band'], ['groups', 'Groups — at the anchors']] },
+  // phase 3e step 3: the SCALE HIERARCHY (frame-vine.js): the weight field's
   // contrast (heavy at the crest, the corners and the bottom; light mid-run)
-  // scaled by this strength. Default 1.
-  R('ornHierarchy', 'ornament', 'Hierarchy (0 = separate chains)', 0, 1, 0.05, 1, '', (p) => ornOn(p) && chains(p)),
+  // scaled by this strength — 0 an even weight along every run (the chains
+  // that 0 used to select are retired). Default 1.
+  R('ornHierarchy', 'ornament', 'Hierarchy (0 = even)', 0, 1, 0.05, 1, '', (p) => ornOn(p) && rinceau(p)),
   { id: 'ornCrest', section: 'ornament', label: 'Crest (top centre)', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },
   { id: 'ornCorners', section: 'ornament', label: 'Corners / springings', kind: 'choice', default: 'on', visibleWhen: (p) => ornOn(p) && !isOval(p), options: ON_OFF },
   { id: 'ornSides', section: 'ornament', label: 'Sides', kind: 'choice', default: 'on', visibleWhen: ornOn, options: ON_OFF },   // ON since phase 3e step 3 (Eva: the rectangle default was bare)
-  { id: 'ornBottom', section: 'ornament', label: 'Bottom centre', kind: 'choice', default: 'off', visibleWhen: (p) => ornOn(p) && !(isArch(p) && (p.sill === 'none' || chains(p))), options: ON_OFF },   // an arch's chains run head and jamb: there is no bottom run
+  { id: 'ornBottom', section: 'ornament', label: 'Bottom centre', kind: 'choice', default: 'off', visibleWhen: (p) => ornOn(p) && !(isArch(p) && (p.sill === 'none' || rinceau(p))), options: ON_OFF },   // an arch's rinceau runs head and jamb: there is no bottom run
 
   // --- 4. print — the relief STL, the PRIMARY output (phase 2, ruling 1).
   //     These reach the STL and the 3D view and never the SVG; the 2-D gate's

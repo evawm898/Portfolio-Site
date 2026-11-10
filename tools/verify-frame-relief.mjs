@@ -463,7 +463,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
   // wire part's first and last column = its two walls), against the gate's
   // OWN band footprints (outerEdge / innerEdge, the boundaries' owner — never
   // frame-filigree's bandRegion), MIN_FEATURE_MM and EMBED_MM.
-  if (FL && (label === 'shipped' || ['filigree', 'vine', 'elements'].includes(MUTANTS.find((m) => m.id === label)?.file))) {
+  if (FL && (label === 'shipped' || ['filigree', 'vine', 'elements', 'rinceau'].includes(MUTANTS.find((m) => m.id === label)?.file))) {
     const F = R.MIN_FEATURE_MM, E = RL.EMBED_MM;
     const ON = { filigree: 'scrolls' };
     const DENSE = { filigree: 'scrolls', ornDensity: 5, ornCrest: 'on', ornCorners: 'on', ornSides: 'on', ornBottom: 'on' };
@@ -475,15 +475,14 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       ['rect crowded (groups must give way)', { skeleton: 'rect', width: 70, height: 120, ...DENSE, ornScale: 6 }],
       ['dense, round wire, tight, thick', { ...DENSE, ornShape: 'round', ornTightness: 1, ornWire: 3.2 }],
     ];
-    // the default (phase 3d): carved RUNNING CHAINS; beside it the phase-3c
-    // carved GROUPS with their clusters, and the tapered and constant groups
-    // phase 3e step 3: the default is the VINE (hierarchy 1); the chains of
-    // phase 3d are hierarchy 0, kept beside it; a hierarchy-½ vine row on
-    // each skeleton
-    for (const r of OROWS.splice(0)) { OROWS.push(...(/crowded|round wire/.test(r[0]) ? [] : [[`${r[0]} · vine`, { ...r[1], ornLayout: 'chains', ornHierarchy: 1 }]]), [`${r[0]} · chains`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'chains', ornHierarchy: 0 }], [`${r[0]} · carved`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'groups' }], [`${r[0]} · tapered`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'tapered', ornLeaves: 'off', ornLayout: 'groups' }], [`${r[0]} · constant`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'constant', ornLeaves: 'off', ornLayout: 'groups' }]); }
-    OROWS.push(['arch default, hierarchy ½ · vine', { ...ON, ornHierarchy: 0.5 }], ['rect dense, hierarchy ½ · vine', { skeleton: 'rect', ...DENSE, ornHierarchy: 0.5 }], ['oval default, bottom on, hierarchy ½ · vine', { skeleton: 'oval', ...ON, ornBottom: 'on', ornHierarchy: 0.5 }]);
-    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : /vine$/.test(name) ? 'vine' : /(carved|chains)$/.test(name) ? 'carved' : 'constant');
-    const ST = { vine: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, carved: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, constant: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, tapered: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 } };
+    // the default (phase 3f step 2): the RINCEAU (hierarchy 1), its band
+    // widened to 16 print mm; beside it the phase-3a GROUPS, carved, tapered
+    // and constant (the chains of phase 3d and the vine of phase 3e are
+    // retired); a hierarchy-½ rinceau row on each skeleton, and one at 0
+    for (const r of OROWS.splice(0)) { OROWS.push(...(/crowded|round wire/.test(r[0]) ? [] : [[`${r[0]} · rinceau`, { ...r[1], ornLayout: 'rinceau', ornHierarchy: 1 }]]), [`${r[0]} · carved`, { ...r[1], ornWireStyle: 'carved', ornLayout: 'groups' }], [`${r[0]} · tapered`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'tapered', ornLeaves: 'off', ornLayout: 'groups' }], [`${r[0]} · constant`, { ornShape: 'half-round', ...r[1], ornWireStyle: 'constant', ornLeaves: 'off', ornLayout: 'groups' }]); }
+    OROWS.push(['arch default, hierarchy ½ · rinceau', { ...ON, ornHierarchy: 0.5 }], ['rect dense, hierarchy ½ · rinceau', { skeleton: 'rect', ...DENSE, ornHierarchy: 0.5 }], ['oval default, bottom on, hierarchy ½ · rinceau', { skeleton: 'oval', ...ON, ornBottom: 'on', ornHierarchy: 0.5 }], ['rect default, hierarchy 0 · rinceau', { skeleton: 'rect', ...ON, ornHierarchy: 0 }], ['arch default, leaves off · rinceau', { ...ON, ornLeaves: 'off' }], ['rect default, 300 mm, a band already wider · rinceau', { skeleton: 'rect', ...ON, printHeight: 300 }]);
+    const styleOf = (name) => (/tapered$/.test(name) ? 'tapered' : /rinceau$/.test(name) ? 'rinceau' : /carved$/.test(name) ? 'carved' : 'constant');
+    const ST = { rinceau: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, carved: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, constant: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 }, tapered: { wire: Infinity, gap: Infinity, e0: Infinity, e1: 0 } };
     // CL / TB (phase 3c): a leaf lies OVER its host; the relief never passes the budget
     const cl1 = [], tb1 = []; let leavesSeen = 0, leastLap = Infinity, mostTris = 0;
     const BUDGET = 1500000;   // the ruled budget, restated (the bloom's precedent)
@@ -505,7 +504,17 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     // a wire's walls), the module's records used only to know which part is
     // which and what was ASKED (the weight a record claims is checked against
     // the restated field, never trusted)
-    const pl1 = [], pl2 = [], pl3 = [], pl4 = [], pl5 = [], vn1 = [], vn2 = [], vn3 = [], vn4 = [], vn5 = [], vn6 = [];
+    const pl1 = [], pl2 = [], pl3 = [], pl4 = [], pl5 = [], vn1 = [], vn2 = [], vn3 = [], vn5 = [], vn6 = [];
+    // RN (phase 3f step 2): the RINCEAU's own laws, restated from the charter
+    // (§18.6) — never imported from frame-rinceau.js: the tendril's length
+    // (1.25 + 0.5 w) × the band, at one of the size shares 1 / 0.85 / 0.72 /
+    // 0.6; the turns Eva accepted on a straight run (ruling (d): ~1.05 — the
+    // median held in [0.95, 1.15]); the band widened to 16 print mm (ruling
+    // (b)) and no further
+    const RNR = { len: [1.25, 0.5], sizes: [1, 0.85, 0.72, 0.6], sizeTol: 0.03, turns: [0.95, 1.15], bay: 16 };
+    const rn1 = [], rn2 = [], rn3 = [], rn5 = [], rn6 = [], bw1 = [];
+    let volutesSeen = 0, leavesRn = 0, leastVolJoint = Infinity, leastLeafJoint = Infinity, worstStep = 0, sizeRows = 0, worstSize = 0, bandRows = 0;
+    const straightTurns = [];
     let elSeen = 0, vineRows = 0, itemsSeen = 0, leastJoint = Infinity, worstVnW = 0, stemSeatMax = -Infinity, stemSeatMin = Infinity, leastElClear = Infinity, leastMotifJoint = Infinity, stemsSeen = 0;
     // the field, restated (charter §17): anchor amplitudes by class, the
     // falloff, the floor, the blend, the class and item thresholds, and the
@@ -515,7 +524,6 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     const smoothR = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
     const clsR = (model, id) => { const a = model.info.anchors[id]; if (Math.abs(a.pt[0]) < 1e-9) return a.pt[1] > (model.box.y0 + model.box.y1) / 2 ? 'crest' : 'bottom'; return RUNS_R[model.info.kind].filter((q) => q.includes(id)).length >= 2 ? 'junction' : 'terminal'; };
     const wR = (x, L, a, b, h) => (1 - h) * HV.uniform + h * Math.max(HV.floor, HV[a] * (1 - smoothR(Math.max(0, x) / (HV.reach * L))), HV[b] * (1 - smoothR(Math.max(0, L - x) / (HV.reach * L))));
-    const itemKindR = (w, at, leavesOn) => (at === 'zero' ? (w >= 0.46 && w < 0.66 ? 'rosette' : null) : w >= 0.56 ? 'cluster' : w >= 0.36 ? (leavesOn ? 'leaf' : null) : w >= 0.22 ? 'bud' : (leavesOn ? 'sprig' : null));
     // the crest (phase 3e step 3, second round): the shell on every top
     // (Eva on the second sheet: "shell works, spray doesn't")
     const motifKindR = (cls, w) => (w >= HV.heavy ? (cls === 'crest' || cls === 'bottom' ? 'shell' : 'rosette') : w >= HV.medium ? 'rosette' : null);
@@ -526,7 +534,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     // — on the ARCH its slopes' span, CRR.slopes (Eva's ruling (b), fourth
     // sheet: the pointed apex spreads the shell along its two slopes). CB3
     // the arch's default crest REACHES 24 mm across (the emitted plan)
-    const CRR = { rise: 0.45, span: { shell: 1.35 }, slopes: 1.8, archAcross: 24 };
+    const CRR = { rise: 0.45, span: { shell: 1.35 }, slopes: 1.8, archAcross: 2.3 };
     const cb1 = [], cb2 = [], cb3 = [];
     let archCrestRows = 0, archAcrossMin = Infinity;
     let stemEndMax = 0;
@@ -573,6 +581,10 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       const a = RL.analyzeStl(RL.exportStl(rel)), cc = RL.connected(rel);
       if (a.boundary !== 0 || cc.comps !== 1) or1.push(`${name}: boundary ${a.boundary}, ${cc.comps} regions`);
       const orn = model.ornament, P = rel.positions;
+      // BW1 THE BAND (Eva's ruling (b)): on a rinceau row the band is drawn
+      // max(the asked width, 16 print mm) at the frame's own print scale
+      // (rel.scale, the relief's); on a groups row exactly the asked width
+      { bandRows++; const asked = (q.moldingWidth ?? 18) * rel.scale, want = /rinceau$/.test(name) ? Math.max(asked, RNR.bay) : asked; if (Math.abs(rel.info.bandW - want) > 1e-9) bw1.push(`${name}: band ${rel.info.bandW.toFixed(3)} mm, want ${want.toFixed(3)}`); }
       // the emitted wires: per part, the two wall columns of the top grid
       const parts = rel.parts.filter((x) => /^orn/.test(x.id));
       if (parts.length !== orn.curves.length || !parts.length) { or1.push(`${name}: ${parts.length} wire solids for ${orn.curves.length} wires`); continue; }
@@ -592,7 +604,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       // motif's leaf has none (the crossing rule throughout)
       const hostOf = (x) => {
         const c = orn.curves[x];
-        if (!leafAt[x] || /^(axis|palmette|rosette|vine-leaf)$/.test(c.info.role || '')) return -1;
+        if (!leafAt[x] || /^(axis|palmette|rosette|vine-leaf|acanthus)$/.test(c.info.role || '')) return -1;
         if (c.chainIndex != null) return owner.findIndex((o, y) => o.gi === owner[x].gi && o.side === owner[x].side && !leafAt[y] && orn.curves[y].chainIndex === c.chainIndex);
         return owner.findIndex((o) => o.gi === owner[x].gi && o.side === owner[x].side && o.i === 0);
       };
@@ -674,13 +686,13 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       const sil = RL.plateOutline(G.buildFrame(q)).map(([x, y]) => [x * rel.scale, y * rel.scale]);
       W.forEach((w, x) => {
         // the chains' rule; the phase-3a groups are counted and reported
-        for (const q of w.c) if (pip(q, sil) && depthIn(fs_, q) < 0) { if (!/(chains|vine)$/.test(name)) { groupOpen++; break; } or7.push(`${name}: wire ${x} reaches into the opening at (${q[0].toFixed(1)}, ${q[1].toFixed(1)})`); opened++; break; }
+        for (const q of w.c) if (pip(q, sil) && depthIn(fs_, q) < 0) { if (!/rinceau$/.test(name)) { groupOpen++; break; } or7.push(`${name}: wire ${x} reaches into the opening at (${q[0].toFixed(1)}, ${q[1].toFixed(1)})`); opened++; break; }
         let run = null; const runs = [];
         w.c.forEach((qq, i) => { const cl = -depthIn(fs_, qq) - w.t[i] / 2; if (cl < 2 * F) { if (!run) run = { min: cl }; run.min = Math.min(run.min, cl); } else if (run) { runs.push(run); run = null; } });
         if (run) runs.push(run);
         // the CHAINS' rule (phase 3d); the phase-3a groups float by design — their
         // slits are what the ruling replaced, counted and reported, not asserted
-        for (const r of runs) { slitRuns++; if (r.min > -E + 1e-6) { if (/(chains|vine)$/.test(name)) { worstSlit = Math.max(worstSlit, r.min); or8.push(`${name}: wire ${x} comes ${r.min.toFixed(3)} mm from the band without joining it`); } else groupSlits++; break; } }
+        for (const r of runs) { slitRuns++; if (r.min > -E + 1e-6) { if (/rinceau$/.test(name)) { worstSlit = Math.max(worstSlit, r.min); or8.push(`${name}: wire ${x} comes ${r.min.toFixed(3)} mm from the band without joining it`); } else groupSlits++; break; } }
       });
       // OR9 SEATED ON THE MOLDING (phase 3d, Eva's 2B), the chains only: the
       // molding surface is read off the EMITTED band solids (their top grids,
@@ -690,7 +702,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       // and every ornament row's crest clears the highest molding under that row
       // by the feature (the top clears the molding top)
       let surf = null;
-      if (/(chains|vine)$/.test(name)) {
+      if (/rinceau$/.test(name)) {
         const cell = 2, grid = new Map(), key = (i, j) => i * 100003 + j, tris = [];
         for (const bp of rel.parts.filter((x) => x.kind === 'band' && !/^orn/.test(x.id))) {   // the MOLDING: the ornament solids are bands too
           const last = bp.closed ? bp.V : bp.V - 1;
@@ -769,11 +781,11 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         else if (r.mirrorOf) { const j = recs.indexOf(r.mirrorOf); if (j < 0) { pl4.push(`${name}: a mirrored ${e.kind} with no source`); continue; } const A = vs(feet2[j].parts), B = vs(e.parts); if (A.length !== B.length || A.some((q, k) => B[k][0] !== -q[0] || B[k][1] !== q[1] || B[k][2] !== q[2])) pl4.push(`${name}: the left ${e.kind} is not the right with x negated`); }
         else if (!recs.some((o) => o.mirrorOf === r)) pl4.push(`${name}: the ${e.kind} at (${r.at[0].toFixed(1)}, ${r.at[1].toFixed(1)}) has no mirror and is not on the axis`);
       }
-      // ---- VN: the vine ----
-      if (orn.layout === 'vine') {
+      // ---- VN / RN: the rinceau (its stems, its field, its volutes) ----
+      if (orn.layout === 'rinceau') {
         vineRows++;
         const h = q.ornHierarchy ?? 1, leavesOn = (q.ornLeaves ?? 'on') === 'on';
-        const vg = orn.groups.find((g) => g.group === 'vine');
+        const vg = orn.groups.find((g) => g.group === 'rinceau');
         const runsR = new Map(vg.chain.runs.map((r) => [r.id, { ...r, a: clsR(model, r.from), b: clsR(model, r.to) }]));
         // VN1 the field: the anchors' classes restated, and every placed
         // item's claimed weight the restated w_h at its station
@@ -783,7 +795,9 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         // it; every motif the kind its anchor's restated weight makes it; a
         // HEAVY element (read off the emitted part's own kind) only at a
         // junction motif, within its own size of that anchor's stem ends
-        for (const it of orn.items) { const r = runsR.get(it.run), k = itemKindR(wR(it.x, r.L, r.a, r.b, h), it.at, leavesOn); if (k !== it.kind) vn2.push(`${name}: an item at ${it.x.toFixed(1)} mm on ${it.run} is a ${it.kind}, its weight makes a ${k}`); }
+        // (the rinceau's one item: a VOLUTE at every extremum of the stem — a
+        // tendril and, with the leaves on, its two acanthus leaves)
+        for (const it of orn.items) { const want = leavesOn ? 3 : 1, got = it.curves.length; if (it.kind !== 'volute' || it.at !== 'extremum' || got !== want || it.curves[0].kind !== 'tendril' || it.curves.slice(1).some((c) => c.kind !== 'leaf')) vn2.push(`${name}: an item at ${it.x.toFixed(1)} mm on ${it.run} is a ${it.kind} at a${it.at === 'extremum' ? 'n' : ''} ${it.at} with ${got} wires (want a volute at an extremum: a tendril${leavesOn ? ' and two acanthus leaves' : ''})`); }
         for (const g of orn.groups.filter((gg) => gg.motif)) { const ws = [...runsR.values()].flatMap((r) => [r.from === g.anchor ? wR(0, r.L, r.a, r.b, h) : null, r.to === g.anchor ? wR(r.L, r.L, r.a, r.b, h) : null]).filter((v) => v != null); const k = motifKindR(clsR(model, g.anchor), Math.max(...ws)); if (k !== g.motif.kind) vn2.push(`${name}: the motif at ${g.anchor} is a ${g.motif.kind}, its weight makes a ${k}`); }
         for (const e of feet2) if (HEAVY.has(e.kind)) { const r = e.rec, g = orn.groups.find((gg) => gg.motif && (gg.elements || []).some((el) => el === r || el === r.mirrorOf)); if (!g) { vn2.push(`${name}: a heavy ${e.kind} (${e.id}) placed away from every junction`); continue; } const a = model.info.anchors[g.anchor].pt, sc = rel.scale, d = Math.hypot(r.at[0] - (r.mirrorOf ? -1 : 1) * a[0] * sc, r.at[1] - a[1] * sc); if (d > r.size) vn2.push(`${name}: the heavy ${e.kind} at ${g.anchor} stands ${d.toFixed(1)} mm from it (size ${r.size.toFixed(1)})`); }
         // VN3 the stems are continuous: on the axis a stem stops a feature
@@ -801,11 +815,44 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         }
         // the stems JOIN the motifs at their junctions (an overlap ≥ the embed)
         for (const g of orn.groups.filter((gg) => gg.motif)) for (const el of g.elements) { const e = feet2.find((f2) => f2.rec === el); for (const r of [...runsR.values()].filter((rr) => rr.from === g.anchor || rr.to === g.anchor)) { const x = stemOf.get(`${r.id}|${el.mirrorOf ? 'L' : 'R'}`); const cq = contact(W[x], e.foot, E); leastMotifJoint = Math.min(leastMotifJoint, cq.clear); if (!(cq.clear <= -E + 1e-6)) vn3.push(`${name}: the ${r.id} stem does not reach into the ${g.motif.kind} at ${g.anchor} (${cq.clear.toFixed(3)} mm)`); } }
-        // VN4 every item springs from its stem: a wire's emitted walls overlap
-        // the stem's by the embed; an element's footprint takes the stem's
-        // walls by the embed
-        orn.curves.forEach((c, x) => { if (!c.vineItem) return; itemsSeen++; const sx = stemOf.get(`${c.vineItem.run}|${owner[x].side}`); const d = minDL(W[x].c, W[x].t, W[sx].c, W[sx].t); leastJoint = Math.min(leastJoint, -d); if (d > -E + 1e-6) vn4.push(`${name}: a ${c.kind} off its stem — overlap ${(-d).toFixed(3)} mm`); });
-        for (const e of feet2) { const it = e.rec.vineItem || e.rec.mirrorOf?.vineItem; if (!it) continue; itemsSeen++; const sx = stemOf.get(`${it.run}|${e.rec.mirrorOf ? 'L' : 'R'}`); const cq = contact(W[sx], e.foot, E); leastJoint = Math.min(leastJoint, -cq.clear); if (!(cq.clear <= -E + 1e-6)) vn4.push(`${name}: a ${e.kind} off its stem — overlap ${(-cq.clear).toFixed(3)} mm`); }
+        // RN1 THE STEM IS CONTINUOUS: one stem solid per run per side, its
+        // emitted rows never further apart than 2 mm (the stem is laid at
+        // 0.4 mm and mapped — 1.02 mm round a rounded corner's outside: a
+        // jump is a gap stood in for by a straight chord)
+        const perRun = new Map(); for (const x of stemIdx) { const key = `${orn.curves[x].run}|${owner[x].side}`; perRun.set(key, (perRun.get(key) || 0) + 1); }
+        for (const r of runsR.values()) for (const side of ['R', 'L']) { const n = perRun.get(`${r.id}|${side}`) || 0; if (n !== 1) rn1.push(`${name}: run ${r.id} (${side}) has ${n} stems`); }
+        for (const x of stemIdx) { const c = W[x].c; let mx = 0; for (let i = 1; i < c.length; i++) mx = Math.max(mx, Math.hypot(c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1])); worstStep = Math.max(worstStep, mx); if (mx > 2) rn1.push(`${name}: the ${orn.curves[x].run} stem jumps ${mx.toFixed(2)} mm between two rows`); }
+        // RN2 every VOLUTE springs from its stem, RN3 every ACANTHUS leaf: its
+        // emitted walls overlap the stem's by the embed (a joint, never a graze)
+        orn.curves.forEach((c, x) => {
+          if (!c.vineItem) return;
+          const sx = stemOf.get(`${c.vineItem.run}|${owner[x].side}`), d = minDL(W[x].c, W[x].t, W[sx].c, W[sx].t);
+          if (c.info.role === 'volute') { volutesSeen++; leastVolJoint = Math.min(leastVolJoint, -d); if (d > -E + 1e-6) rn2.push(`${name}: a volute on ${c.vineItem.run} (${owner[x].side}) off its stem — overlap ${(-d).toFixed(3)} mm`); }
+          else if (c.info.role === 'acanthus') { leavesRn++; leastLeafJoint = Math.min(leastLeafJoint, -d); if (d > -E + 1e-6) rn3.push(`${name}: an acanthus leaf on ${c.vineItem.run} (${owner[x].side}) floats off its stem — overlap ${(-d).toFixed(3)} mm`); }
+          else rn2.push(`${name}: an item wire of role ${c.info.role}`);
+        });
+        // RN5 THE SIZE FOLLOWS w(s): on a STRAIGHT run (the rectangle's side,
+        // the arch's jamb), a band and a half from either end (no curvature
+        // to compress it), every volute's emitted length — the arc of its
+        // tendril's emitted centreline — is (1.25 + 0.5 w) × the band at the
+        // RESTATED weight, at one of the restated size shares (within 3 %)
+        // RN6 THE TURNS: the median turn drawn on those straight runs (the
+        // emitted centreline's own turning, root to eye) in [0.95, 1.15]
+        const Mg = model.params.moldingWidth * rel.scale;
+        orn.curves.forEach((c, x) => {
+          if (c.info.role !== 'volute' || owner[x].side !== 'R') return;
+          const it = c.vineItem, r = runsR.get(it.run);
+          // (a mitred rectangle's side and an arch's jamb: a rounded, notched or eared corner's jogs bend the side run)
+          if (!/^(side|jamb)$/.test(it.run) || !['mitre', undefined].includes(q.cornerTreatment) || it.x < 1.5 * Mg || it.x > r.L - 1.5 * Mg) return;
+          const C = W[x].c; let arc = 0, turn = 0;
+          for (let i = 1; i < C.length; i++) arc += Math.hypot(C[i][0] - C[i - 1][0], C[i][1] - C[i - 1][1]);
+          for (let i = 1; i < C.length - 1; i++) { const ax = C[i][0] - C[i - 1][0], ay = C[i][1] - C[i - 1][1], bx = C[i + 1][0] - C[i][0], by = C[i + 1][1] - C[i][1]; turn += Math.atan2(ax * by - ay * bx, ax * bx + ay * by); }
+          const want = (RNR.len[0] + RNR.len[1] * wR(it.x, r.L, r.a, r.b, h)) * Mg, ratio = arc / want;
+          const off = Math.min(...RNR.sizes.map((f) => Math.abs(ratio / f - 1)));
+          sizeRows++; worstSize = Math.max(worstSize, off);
+          if (off > RNR.sizeTol) rn5.push(`${name}: a volute at ${it.x.toFixed(1)} mm on ${it.run} is ${arc.toFixed(2)} mm long — ${ratio.toFixed(3)} of the (1.25 + 0.5 w) × band its restated weight ${wR(it.x, r.L, r.a, r.b, h).toFixed(3)} asks, no size share within 3 %`);
+          straightTurns.push({ name, t: Math.abs(turn) / (2 * Math.PI) });
+        });
         // VN5 the stem is SEATED: every emitted row's edge stands on the
         // highest molding under that row's own vertices — never under it,
         // never more than 0.05 mm over it (a lifted stem floats)
@@ -813,7 +860,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       }
       // ---- CB: the band is the cap, on every vine row and (Eva's ruling B on
       // the second sheet) every chain row ----
-      if (orn.layout === 'vine' || orn.layout === 'chains') {
+      if (orn.layout === 'rinceau') {
         cbRows++;
         // CB1 nothing stands past the band's outer edge (the frame's own
         // silhouette) but the crest: every emitted wire vertex and every
@@ -828,7 +875,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
           if (!crest) { for (const l of e.foot.loops) { const bad = l.find((qq) => geo(qq).sd < -1e-6); if (bad) { cb1.push(`${name}: the ${e.kind} ${e.id} stands ${(-geo(bad).sd).toFixed(3)} mm past the outer edge`); break; } } continue; }
           crestsSeen++;
           const span = model.info.kind === 'arch' && CRR.span[e.kind] ? CRR.slopes : CRR.span[e.kind];
-          if (/^arch default/.test(name) && !e.rec.mirrorOf) { let xw = 0; for (const pt of e.parts) { const n = 2 * pt.nu * pt.nv; for (let vv = pt.base; vv < pt.base + n; vv++) xw = Math.max(xw, Math.abs(P[3 * vv])); } archCrestRows++; archAcrossMin = Math.min(archAcrossMin, 2 * xw); if (Math.abs(2 * xw - CRR.archAcross) > 0.5) cb3.push(`${name}: the arch's crest is ${(2 * xw).toFixed(1)} mm across`); }
+          if (/^arch default/.test(name) && !e.rec.mirrorOf) { let xw = 0; for (const pt of e.parts) { const n = 2 * pt.nu * pt.nv; for (let vv = pt.base; vv < pt.base + n; vv++) xw = Math.max(xw, Math.abs(P[3 * vv])); } archCrestRows++; archAcrossMin = Math.min(archAcrossMin, 2 * xw); const Mb = model.params.moldingWidth * rel.scale; if (2 * xw < CRR.archAcross * Mb) cb3.push(`${name}: the arch's crest is ${(2 * xw).toFixed(1)} mm across (${(2 * xw / Mb).toFixed(2)} band widths)`); }
           if (!span) { cb2.push(`${name}: a crest of kind ${e.kind}`); continue; }
           if (!(e.rec.soft || e.rec.mirrorOf?.soft)) cb2.push(`${name}: the ${e.kind} crest is not the SOFT shell (rounded lobes, Eva's third round)`);
           for (const pt of e.parts) { const n = 2 * pt.nu * pt.nv; for (let vv = pt.base; vv < pt.base + n; vv++) { const g2 = geo([P[3 * vv], P[3 * vv + 1]]); if (g2.sd >= 0) continue; crestPast = Math.max(crestPast, -g2.sd / Mg); crestAlong = Math.max(crestAlong, g2.arc / Mg); if (-g2.sd > CRR.rise * Mg + 1e-6) { cb2.push(`${name}: the ${e.kind} crest stands ${(-g2.sd).toFixed(3)} mm past the edge (the rise ${(CRR.rise * Mg).toFixed(3)})`); vv = Infinity; break; } if (g2.arc > (span + CRR.rise) * Mg + 1e-6) { cb2.push(`${name}: the ${e.kind} crest reaches ${g2.arc.toFixed(2)} mm along the edge from the axis past the edge (the span ${((span + CRR.rise) * Mg).toFixed(2)})`); vv = Infinity; break; } } if (cb2.length && cb2.at(-1).startsWith(name)) break; }
@@ -838,31 +885,38 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       const off = FL.withOrnament(G.buildFrame({ ...q, filigree: 'none' }));
       if (off.ornament || G.exportSvg(off).svg !== G.exportSvg(G.buildFrame({ ...q, filigree: 'none' })).svg) or6.push(`${name}: off is not the frame`);
     }
-    rec('OR9 the chains are SEATED on the molding: no ornament top vertex below the emitted band surface under it, and every row\'s crest a feature above the highest molding under that row', or9.length === 0, `${seatRows} rows over the band, least crown above the molding ${leastCrown.toFixed(3)} mm, deepest sink ${worstSink.toFixed(4)} mm${or9.length ? ' — ' + or9.slice(0, 3).join('; ') : ''}`);
+    rec('OR9 the rinceau is SEATED on the molding: no ornament top vertex below the emitted band surface under it, and every row\'s crest a feature above the highest molding under that row', or9.length === 0, `${seatRows} rows over the band, least crown above the molding ${leastCrown.toFixed(3)} mm, deepest sink ${worstSink.toFixed(4)} mm${or9.length ? ' — ' + or9.slice(0, 3).join('; ') : ''}`);
     rec('OR1 with the filigree on, every ornament row is watertight (boundary 0) and ONE voxel region, at the default and at density 5 with every group on, on all three skeletons', or1.length === 0, `${OROWS.length} rows${or1.length ? ' — ' + or1.slice(0, 3).join('; ') : ''}`);
     rec('OR2 no wire is narrower than the feature (read off the emitted walls)', or2.length === 0, `least wire ${leastWire.toFixed(4)} mm${or2.length ? ' — ' + or2.slice(0, 2).join('; ') : ''}`);
     rec('OR3 every gap is a feature or a junction: a wire\'s own coils, wires of one half-group (a contact must be a true overlap of the embed, never a graze), and wires of different groups or sides at least a feature apart', or3.length === 0, `least gap ${leastGap.toFixed(4)} mm${or3.length ? ' — ' + or3.slice(0, 3).join('; ') : ''}`);
     rec('OR4 every scroll group is rooted: each half has a contact with the band (the gate\'s own footprints) at least EMBED_MM deep, and no contact is a graze', or4.length === 0, `${built} groups built, ${notBuilt} given way (told); embeds ${leastEmbed.toFixed(3)}–${deepest.toFixed(3)} mm${or4.length ? ' — ' + or4.slice(0, 3).join('; ') : ''}`);
     rec('OR5 the ornament is mirror-symmetric to the bit: every left wire\'s emitted vertices are the right\'s with x negated', or5.length === 0, or5.slice(0, 2).join('; '));
     rec('OR6 the filigree off is the frame itself (no ornament field, the same SVG string)', or6.length === 0, or6.slice(0, 2).join('; '));
-    rec('OR7 the CHAINS reach nothing into the OPENING: no chain vertex inside the frame\'s silhouette and in no band\'s footprint', or7.length === 0, `${opened} chain wires in the opening; the phase-3a groups put ${groupOpen} there (reported)${or7.length ? ' — ' + or7.slice(0, 3).join('; ') : ''}`);
-    rec('OR8 no visible gap between the CHAINS and the band: every stretch of every chain wire within 2F of the band reaches an embed', or8.length === 0, `${slitRuns} approaches${worstSlit > -Infinity ? `, worst ${worstSlit.toFixed(3)} mm` : ', every chain one an embed'}; the phase-3a groups leave ${groupSlits} slits (reported)${or8.length ? ' — ' + or8.slice(0, 3).join('; ') : ''}`);
+    rec('OR7 the RINCEAU reaches nothing into the OPENING: no rinceau vertex inside the frame\'s silhouette and in no band\'s footprint', or7.length === 0, `${opened} rinceau wires in the opening; the phase-3a groups put ${groupOpen} there (reported)${or7.length ? ' — ' + or7.slice(0, 3).join('; ') : ''}`);
+    rec('OR8 no visible gap between the RINCEAU and the band: every stretch of every rinceau wire within 2F of the band reaches an embed', or8.length === 0, `${slitRuns} approaches${worstSlit > -Infinity ? `, worst ${worstSlit.toFixed(3)} mm` : ', every rinceau one an embed'}; the phase-3a groups leave ${groupSlits} slits (reported)${or8.length ? ' — ' + or8.slice(0, 3).join('; ') : ''}`);
     rec('CL1 every leaf lies OVER its host scroll: its emitted top at its root stands above the host\'s crown at the host\'s root', leavesSeen > 0 && cl1.length === 0, `${leavesSeen} leaves, least lap ${leastLap.toFixed(4)} mm${cl1.length ? ' — ' + cl1.slice(0, 3).join('; ') : ''}`);
-    rec('PL1 every placed element (the junction motifs, the vine\'s buds and rosettes) stands on the back through the molding: base on z = 0, every other vertex on the plate or above; a proud one wholly over the molding, a sunk one\'s crest a feature over it at its centre', elSeen > 0 && pl1.length === 0, `${elSeen} elements${pl1.length ? ' — ' + pl1.slice(0, 3).join('; ') : ''}`);
+    rec('PL1 every placed element (the junction motifs) stands on the back through the molding: base on z = 0, every other vertex on the plate or above; a proud one wholly over the molding, a sunk one\'s crest a feature over it at its centre', elSeen > 0 && pl1.length === 0, `${elSeen} elements${pl1.length ? ' — ' + pl1.slice(0, 3).join('; ') : ''}`);
     rec('PL2 no wire grazes a placed element: every approach within a feature is an overlap of the embed (a leaf\'s of F/2)', pl2.length === 0, `least clearance ${leastElClear.toFixed(3)} mm${pl2.length ? ' — ' + pl2.slice(0, 3).join('; ') : ''}`);
     rec('PL3 no placed element reaches into the opening (the frame\'s silhouette less the bands, the gate\'s own footprints)', pl3.length === 0, pl3.slice(0, 3).join('; '));
     rec('PL4 the placed elements are mirror-symmetric to the bit: a left copy is its right with x negated; an element on the axis is its own mirror', pl4.length === 0, pl4.slice(0, 3).join('; '));
-    rec('VN1 the vine\'s weight field is the restated law: anchor classes (crest 1, junction 0.75, bottom 0.7, terminal 0.3), falloff over 0.55 of the run, floor 0.15, blended to ½ by the hierarchy; every item\'s weight the restated one', vineRows > 0 && vn1.length === 0, `${vineRows} vine rows, worst |w| ${worstVnW.toExponential(1)}${vn1.length ? ' — ' + vn1.slice(0, 3).join('; ') : ''}`);
-    rec('VN2 the classes follow the weight: every item the kind its restated weight makes, every junction motif the kind its anchor\'s weight makes, and a heavy element (shell, palmette, rose — read off the emitted part) only at a junction', vn2.length === 0, vn2.slice(0, 3).join('; '));
+    rec('VN1 the rinceau\'s weight field is the restated law: anchor classes (crest 1, junction 0.75, bottom 0.7, terminal 0.3), falloff over 0.55 of the run, floor 0.15, blended to ½ by the hierarchy; every item\'s weight the restated one', vineRows > 0 && vn1.length === 0, `${vineRows} rinceau rows, worst |w| ${worstVnW.toExponential(1)}${vn1.length ? ' — ' + vn1.slice(0, 3).join('; ') : ''}`);
+    rec('VN2 the classes: every item a volute at an extremum of its stem (a tendril and, leaves on, two acanthus leaves), every junction motif the kind its anchor\'s weight makes, and a heavy element (shell, palmette, rose — read off the emitted part) only at a junction', vn2.length === 0, vn2.slice(0, 3).join('; '));
     rec('VN3 the stems are continuous: a feature short of their mirror on the axis, overlapping where two runs meet, and reaching into every junction motif by the embed', stemsSeen > 0 && vn3.length === 0, `${stemsSeen} stems, least motif joint ${(-leastMotifJoint).toFixed(3)} mm${vn3.length ? ' — ' + vn3.slice(0, 3).join('; ') : ''}`);
-    rec('VN4 every item springs from its stem: a joint of at least the embed (read off the emitted walls and footprints)', itemsSeen > 0 && vn4.length === 0, `${itemsSeen} items, least joint ${leastJoint.toFixed(3)} mm${vn4.length ? ' — ' + vn4.slice(0, 3).join('; ') : ''}`);
+    const stMed = (() => { const t = straightTurns.map((u) => u.t).sort((a, b) => a - b); return t.length ? t[t.length >> 1] : NaN; })();
+    for (const nm of new Set(straightTurns.map((u) => u.name))) { const t = straightTurns.filter((u) => u.name === nm).map((u) => u.t).sort((a, b) => a - b), m = t[t.length >> 1]; if (/default · rinceau$/.test(nm) && !(m >= RNR.turns[0] && m <= RNR.turns[1])) rn6.push(`${nm}: median turn on its straight run ${m.toFixed(3)}`); }
+    rec('RN1 the rinceau\'s stem is CONTINUOUS: one stem solid per run per side, no two emitted rows more than 2 mm apart', stemsSeen > 0 && rn1.length === 0, `${stemsSeen} stems, widest row step ${worstStep.toFixed(3)} mm${rn1.length ? ' — ' + rn1.slice(0, 3).join('; ') : ''}`);
+    rec('RN2 every volute springs from its stem: its tendril\'s emitted walls overlap the stem\'s by at least the embed', volutesSeen > 0 && rn2.length === 0, `${volutesSeen} volutes, least joint ${leastVolJoint.toFixed(3)} mm${rn2.length ? ' — ' + rn2.slice(0, 3).join('; ') : ''}`);
+    rec('RN3 no acanthus leaf floats: every one\'s emitted walls overlap its stem\'s by at least the embed', leavesRn > 0 && rn3.length === 0, `${leavesRn} acanthus leaves, least joint ${leastLeafJoint.toFixed(3)} mm${rn3.length ? ' — ' + rn3.slice(0, 3).join('; ') : ''}`);
+    rec('RN5 the size follows w(s): on a straight run every volute\'s emitted length is (1.25 + 0.5 w) × the band at the RESTATED weight, at a size share 1 / 0.85 / 0.72 / 0.6 (within 3 %)', sizeRows > 0 && rn5.length === 0, `${sizeRows} straight-run volutes, worst ${(100 * worstSize).toFixed(2)} % off a share${rn5.length ? ' — ' + rn5.slice(0, 3).join('; ') : ''}`);
+    rec('RN6 the turns (Eva\'s ruling (d), ~1.05): on every default frame\'s straight run the median volute turn drawn, read off the emitted centreline, is in [0.95, 1.15]', straightTurns.length > 0 && rn6.length === 0, `${straightTurns.length} straight-run volutes, median ${stMed.toFixed(3)} turns${rn6.length ? ' — ' + rn6.slice(0, 3).join('; ') : ''}`);
+    rec('BW1 the band is widened for the rinceau (Eva\'s ruling (b)): max(the asked width, 16 print mm) on every rinceau row, exactly the asked width on every groups row', bandRows > 0 && bw1.length === 0, `${bandRows} rows${bw1.length ? ' — ' + bw1.slice(0, 3).join('; ') : ''}`);
     rec('VN5 the stem is SEATED: every emitted row\'s edge stands ON the highest molding under its own vertices (within 1e-6 mm: a lifted stem floats, a sunk one is buried)', vn5.length === 0 && stemSeatMax > -Infinity, `stem seat depth ${stemSeatMin.toFixed(4)}–${stemSeatMax.toFixed(4)} mm${vn5.length ? ' — ' + vn5.slice(0, 3).join('; ') : ''}`);
     rec('VN6 every stem\'s two ends are ROUNDED off: its emitted first and last rows no wider than the feature (Eva\'s third round: nothing reads as a cut slab)', stemsSeen > 0 && vn6.length === 0, `widest stem end ${stemEndMax.toFixed(3)} mm${vn6.length ? ' — ' + vn6.slice(0, 3).join('; ') : ''}`);
-    rec('CB1 nothing stands past the band\'s outer edge (the frame\'s own silhouette) but the crest: every emitted wire vertex and every placed element\'s footprint inside it, on the vine (Eva\'s ruling 1 on the first vine sheet) and on the chains (ruling B on the second)', cbRows > 0 && cbVerts > 0 && cb1.length === 0, `${cbVerts} wire vertices on ${cbRows} vine and chain rows${cb1.length ? ' — ' + cb1.slice(0, 3).join('; ') : ''}`);
+    rec('CB1 nothing stands past the band\'s outer edge (the frame\'s own silhouette) but the crest: every emitted wire vertex and every placed element\'s footprint inside it, on every rinceau row (Eva\'s ruling 1 on the first vine sheet)', cbRows > 0 && cbVerts > 0 && cb1.length === 0, `${cbVerts} wire vertices on ${cbRows} rinceau rows${cb1.length ? ' — ' + cb1.slice(0, 3).join('; ') : ''}`);
     rec('CB2 the crest past the edge is LOW and ALONG the band: no vertex further out than 0.45 of the molding width, and everything past the edge within the crest\'s span (+ the rise) of the axis along the edge', crestsSeen > 0 && cb2.length === 0, `${crestsSeen} crests, past the edge ${crestPast.toFixed(3)} M at most, along it ${crestAlong.toFixed(3)} M${cb2.length ? ' — ' + cb2.slice(0, 3).join('; ') : ''}`);
-    rec('CB3 the arch\'s crest spreads ALONG its slopes (Eva\'s ruling (b), fourth sheet): on the default arch, vine and chains, the emitted crest is 24 mm across (within half a millimetre)', archCrestRows > 0 && cb3.length === 0, `${archCrestRows} arch crests, narrowest ${archAcrossMin.toFixed(1)} mm across${cb3.length ? ' — ' + cb3.slice(0, 3).join('; ') : ''}`);
+    rec('CB3 the arch\'s crest spreads ALONG its slopes (Eva\'s ruling (b), fourth sheet): on every default arch the emitted crest is at least 2.3 band widths across (24 mm on the 9.5 mm band, 2.53 M; it grows with the widened band; not spread along the slopes it is 1.9 M)', archCrestRows > 0 && cb3.length === 0, `${archCrestRows} arch crests, narrowest ${archAcrossMin.toFixed(1)} mm across${cb3.length ? ' — ' + cb3.slice(0, 3).join('; ') : ''}`);
     rec('TB1 every ornament row\'s relief is within the 1,500,000-triangle budget and within the ornament\'s own predicted bound', tb1.length === 0, `most ${mostTris.toLocaleString('en-US')} triangles${tb1.length ? ' — ' + tb1.slice(0, 3).join('; ') : ''}`);
-    console.log(`     per wire style (off the emitted mesh): ${['vine', 'carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
+    console.log(`     per wire style (off the emitted mesh): ${['rinceau', 'carved', 'constant', 'tapered'].map((k) => `${k}: thinnest wire ${ST[k].wire.toFixed(4)} mm, smallest gap ${ST[k].gap.toFixed(4)} mm, root embeds ${ST[k].e0.toFixed(3)}–${ST[k].e1.toFixed(3)} mm`).join(' · ')}`);
   }
 
   // CV / AR / LF / TB2 — the CARVED primitives (phase 3c, Eva's rulings on
@@ -1001,18 +1055,18 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     // is exercised by handing the SHIPPED ornamentFor a budget the default
     // rectangle at its ceiling passes: groups give way whole, told, the
     // relief within it — and the real budget restated as 1,500,000.
-    // both layouts: the chains (phase 3d, the default) and the groups
+    // both layouts: the rinceau (the default) and the groups
     const tb = [];
-    for (const layout of ['vine', 'chains', 'groups']) {
-      const stress = G.buildFrame({ skeleton: 'rect', printHeight: 400, filigree: 'scrolls', ornLayout: layout === 'groups' ? 'groups' : 'chains', ornHierarchy: layout === 'vine' ? 1 : 0, ornDensity: 5, ornCrest: 'on', ornCorners: 'on', ornSides: 'on', ornBottom: 'on', ornScale: 6, ornLeafSize: 0.6, ornTightness: 1 });
+    for (const layout of ['rinceau', 'groups']) {
+      const stress = G.buildFrame({ skeleton: 'rect', printHeight: 400, filigree: 'scrolls', ornLayout: layout, ornHierarchy: 1, ornDensity: 5, ornCrest: 'on', ornCorners: 'on', ornSides: 'on', ornBottom: 'on', ornScale: 6, ornLeafSize: 0.6, ornTightness: 1 });
       const full = FL.withOrnament(stress), fullTris = RL.buildRelief(full).indices.length / 3;
       const cut = Math.round((fullTris + full.ornament.tris.frame) / 2);
       const tight = FL.withOrnament(stress, { triBudget: cut }), tightTris = RL.buildRelief(tight).indices.length / 3, gave = tight.ornament.told.filter((m) => /budget/.test(m));
-      // the vine gives way item by item (lightest first), then whole runs
-      const fewer = layout === 'vine' ? tight.ornament.items.length < full.ornament.items.length || tight.ornament.curves.length < full.ornament.curves.length : tight.ornament.groups.length < full.ornament.groups.length;
+      // the rinceau gives way volute by volute (lightest first), then whole runs
+      const fewer = layout === 'rinceau' ? tight.ornament.items.length < full.ornament.items.length || tight.ornament.curves.length < full.ornament.curves.length : tight.ornament.groups.length < full.ornament.groups.length;
       tb.push({ layout, ok: gave.length > 0 && tightTris <= cut && tight.ornament.groups.length > 0 && fewer, msg: `${layout}: ceiling rectangle ${fullTris.toLocaleString('en-US')} tris in ${full.ornament.groups.length} groups; at a ${cut.toLocaleString('en-US')} budget ${tight.ornament.groups.length}, ${tightTris.toLocaleString('en-US')} tris, ${gave.length} told${gave.length ? ' — "' + gave[0] + '"' : ''}` });
     }
-    rec('TB2 past the budget a chain (or a group) gives way whole, told, and the relief stays within it — both layouts, exercised at half the ceiling rectangle\'s own count; the shipped budget is 1,500,000', tb.every((t) => t.ok) && RL.FRAME_TRI_BUDGET === 1500000, tb.map((t) => t.msg).join(' · '));
+    rec('TB2 past the budget the rinceau gives way volute by volute (a group whole), told, and the relief stays within it — both layouts, exercised at half the ceiling rectangle\'s own count; the shipped budget is 1,500,000', tb.every((t) => t.ok) && RL.FRAME_TRI_BUDGET === 1500000, tb.map((t) => t.msg).join(' · '));
   }
 
   // base-tree byte identity, when a worktree is given
@@ -1229,13 +1283,11 @@ const MUTANTS = [
   { id: 'the-leaf-is-not-lifted', file: 'filigree', from: '  return D * Math.max(Math.min(MIN_FEATURE_MM, D) / D, c.info.hostW / c.info.hostWire);', to: '  return 0;', breaks: ['CL1'] },
   { id: 'the-leaf-crossing-rule-removed', file: 'filigree', from: '|| joinsCleanly(lf, o, LEAF_CROSS));', to: '|| true);', breaks: ['OR3'] },
   { id: 'the-budget-give-way-removed', file: 'filigree', from: 'if (tris + gTris > triBudget) { told.push(`the ${g} group', to: 'if (false) { told.push(`the ${g} group', breaks: ['TB2'] },
-  { id: 'the-chain-budget-give-way-removed', file: 'filigree', from: 'if (tris + gTris > triBudget) { told.push(`the ${run.id} chain', to: 'if (false) { told.push(`the ${run.id} chain', breaks: ['TB2'] },
   // phase 3d — the chains
   { id: 'the-chain-is-not-seated', file: 'filigree', from: '    if (c.lift) spine.baseLift = orn.H ?', to: '    if (false) spine.baseLift = orn.H ?', breaks: ['OR9', 'CL1', 'VN5'] },   // unseated, a chain's leaves no longer stand on their host's crown (CL1)
   // RETIRED (fourth round): the-chain-slit-rule-removed — capped (ruling B), a chain element is pushed back inside the band's edge before the slit rule is consulted, so it no longer binds: with slitWorst returning nothing, 0 of 21 states (three skeletons and the circle at default and dense, eared / notched / rounded corners at 6 / 16 / 40 mm, the crowded, sill-less and large-scale rows) build a single different chain point, measured. The rule stays as a guard.
-  { id: 'the-chain-opening-check-removed', file: 'filigree', from: 'const intrusion = (o) => { if (!opening) return 0;', to: 'const intrusion = (o) => { return 0;', breaks: ['OR7'] },   // left in the opening (OR7). Before the chains were capped (ruling B) the elements also crowded each other there (OR3); at a third of their lead they no longer do — least gap 1.0000 mm, measured
   { id: 'the-mapped-tangent-wraps', file: 'filigree', from: '  for (let i = 1; i < m; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', to: '  for (let i = 1; i < 0; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', breaks: ['SC9'] },   // the coil check blind where a mapped coil closes (found in the 3d build, OR3). Since the chains are capped no real coil closes on the gate's rows and the wrap's damage runs the other way — false coils, elements given way (the default arch chain 90 -> 84 wires), a valid ornament no output clause can see — so SC9 tests the property itself
-  { id: 'the-seat-is-read-off-the-centreline', file: 'filigree', from: 'spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth) : c.lift;', to: 'spine.baseLift = c.lift;', breaks: ['OR9', 'VN5'] },   // the seat read on the centreline's span, not at the emitted columns: crowns 0.989 mm where the floor is 1
+  { id: 'the-seat-is-read-off-the-centreline', file: 'filigree', from: 'spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth, c.seatExtra || null) : c.lift;', to: 'spine.baseLift = c.lift;', breaks: ['OR9', 'VN5'] },   // the seat read on the centreline's span, not at the emitted columns: crowns 0.989 mm where the floor is 1
   // RETIRED (fourth round): a-folded-element-is-built — once the chains are capped to the band (ruling B) an element is a third of its lead and no longer folds across a corner: 0 folds over the gate's rows and over 18 eared / notched states (corners 6–60 mm, dense, ornScale up to 8), measured. The refusal stays in the code as a guard; a mutant that can never apply is not kept.
   // PHASE 3e — the band pattern (frame-pattern.js)
   { id: 'the-bead-pitch-cap-removed', file: 'pattern', from: 'if (pt > BEAD_FUSE * r) {', to: 'if (false) {', breaks: ['PT2'] },   // 2 mm beads asked 3 mm apart are built 3 mm apart: no neck
@@ -1246,20 +1298,17 @@ const MUTANTS = [
   { id: 'the-seam-is-not-closed', file: 'pattern', from: 'const usable = path.closedPair ? path.L : path.L - endClear;', to: 'const usable = path.closedPair ? path.L - 0.7 * pitch : path.L - endClear;', breaks: ['PT2', 'PT4', 'PT5'] },   // a closed run stops short of the seam: the gap there is 1.4 pitches
   // phase 3e step 3 — the placed elements and the vine (PL / VN). Each one a
   // failure the brief named; each claims what it must redden
-  { id: 'an-element-floats-off-its-stem', file: 'vine', from: 'curves: it.curves || [], el: it.el || null };', to: 'curves: it.curves || [], el: it.el ? { ...it.el, positions: it.el.positions.map((v, k) => (k % 3 === 1 && v !== 0 ? v + 0 : k % 3 === 0 ? v + 4 : v)), loops: it.el.loops.map((l) => l.map(([x, y]) => [x + 4, y])) } : null };', breaks: ['PL2', 'VN4', 'CB1'] },   // CB1: an item on the edge, shifted 4 mm, stands past the band
   { id: 'the-weight-is-a-constant', file: 'vine', from: 'export function weightAt(x, L, Aa, Ab) {', to: 'export function weightAt(x, L, Aa, Ab) {\n  return 0.5;', breaks: ['VN1', 'VN2'] },   // at 0.5 the vine's crest anchor is medium and takes a rosette (VN2); CB2 no longer sees it, because the chains rows (ruling B) build their crest whatever the weight
-  { id: 'a-heavy-element-mid-run', file: 'vine', from: "let el = placeElement('bud', {", to: "let el = placeElement('rose', {", breaks: ['VN2'] },
   { id: 'the-element-mirror-is-broken', file: 'elements', from: '  for (let k = 0; k < P.length; k += 3) P[k] = -P[k];', to: '  for (let k = 0; k < P.length; k += 3) P[k] = 0.02 - P[k];', breaks: ['PL4', 'PL2', 'PL3'] },   // PL4 is its witness. PL2 once fired only through a mirror's stale cached box (fixed in the second round); since the chains are capped (ruling B) a capped element sits exactly on the opening's edge and its wire's embed, so a left copy 0.02 mm off truly reaches into the one (PL3) and grazes the other (PL2)
   { id: 'the-axis-motif-is-not-its-own-mirror', file: 'filigree', from: '  if (onAxis) { el = symmetrizeElement(el); if (el.asymmetric) return null; }', to: '', breaks: ['PL4'] },
   { id: 'the-stem-lifts-off-the-molding', file: 'vine', from: 'roundEnds(c); c.lift = c.pts.map(() => 0);', to: 'roundEnds(c); c.lift = c.pts.map(() => 0.5);', breaks: ['VN5'] },
   // phase 3e step 3, second round (Eva's rulings 1-2: the band is the cap)
   { id: 'a-motif-pushed-past-the-band', file: 'filigree', from: '  if (beyond) {\n    // CAPPED TO THE BAND', to: '  if (false) {\n    // CAPPED TO THE BAND', breaks: ['CB1'] },   // the corner roses pushed out of the opening and past the edge, as the first sheet had them
   { id: 'the-crest-is-not-draped', file: 'vine', from: 'return { ...remapElement(flat, frame.at), at: frame.at([0, 0]) };', to: 'return { ...remapElement(flat, ([x, y]) => [x, frame.topY + y]), at: frame.at([0, 0]) };', breaks: ['CB2', 'CB3'] },   // laid flat across a curve, its ends stand past the rise; and on the arch it is no longer spread along the two slopes, so CB3 reads its width off 24 mm
-  { id: 'the-crest-stands-up', file: 'vine', from: 'const k = (CREST.rise + hinge) * M / (ym - y0)', to: 'const k = (2.5 + hinge) * M / (ym - y0)', breaks: ['CB2', 'CB3'] },   // the upright crest of the first sheet: 2.5 molding widths past the edge; scaled up, the arch's crest is no longer 24 mm across its slopes (CB3)
+  { id: 'the-crest-stands-up', file: 'vine', from: 'const k = (riseK * CREST.rise + hinge) * M / (ym - y0)', to: 'const k = (riseK * 2.5 + hinge) * M / (ym - y0)', breaks: ['CB2', 'CB3'] },   // the upright crest of the first sheet: 2.5 molding widths past the edge; scaled up, the arch's crest is no longer 24 mm across its slopes (CB3)
   { id: 'the-stem-runs-on-past-the-corner', file: 'vine', from: 'if (out.A || out.B) {', to: 'if (false) {', breaks: ['CB1'] },   // the run-on past an interior end left uncut: out through the rectangle's corner
   // third round (Eva's rulings on the second sheet: B the chains capped, D a
   // rosette at the corners, E the crest's soft shell, and no cut slab)
-  { id: 'the-chains-are-not-capped', file: 'filigree', from: 'if (!ch.pastBand || lf < CHAIN_CAP_MIN) break;', to: 'break;', breaks: ['OR1'] },   // the chain at its lead: every element on the default arch and oval stands past the band, so none is seated and the row is left with NO chain (OR1: 0 wire solids) — CB1 cannot see a chain that is not there
   { id: 'a-rose-at-the-corner', file: 'vine', from: "(cls === 'crest' || cls === 'bottom' ? 'shell' : 'rosette')", to: "(cls === 'crest' || cls === 'bottom' ? 'shell' : 'rose')", breaks: ['VN2'] },   // the second sheet's half-size rose
   { id: 'the-arch-crest-is-not-spread-along-its-slopes', file: 'vine', from: "slopes: { span: 1.8, stretch: 1.8 },", to: "slopes: { span: 1.35, stretch: 1.5 },", breaks: ['CB3'] },   // the 18 mm arch shell of the third sheet
   { id: 'the-crest-shell-is-pointed', file: 'vine', from: "soft: kind === 'shell' });", to: "soft: false });", breaks: ['CB2'] },   // #479's pointed scallops: the starburst
@@ -1268,6 +1317,18 @@ const MUTANTS = [
   // axis LEAF is gone — the axis motif is the palmette element, its own
   // mirror by symmetrizeElement; its successor is
   // 'the-axis-motif-is-not-its-own-mirror' above)
+  // phase 3f step 2: THE RINCEAU (Eva's list: stem continuity, a volute
+  // detached, a leaf floating, the mirror broken — 'the-mirror-is-broken'
+  // above — and w(s) ignored), and the two the retired chains' mutants
+  // carried (the opening, the budget), and the band
+  { id: 'the-stem-has-a-gap', file: 'vine', from: '  for (const r of runs) finishStem(r.stem);', to: "  for (const r of runs) { finishStem(r.stem); const n = r.stem.pts.length, a = Math.floor(0.4 * n), b = Math.floor(0.6 * n); for (const k of ['pts', 'nrm', 'tan', 'w', 'localX', 'localY', 'lift']) if (Array.isArray(r.stem[k]) && r.stem[k].length === n) r.stem[k].splice(a, b - a); }", breaks: ['RN1'] },
+  { id: 'a-volute-detached', file: 'vine', from: 'curves: it.curves || [], el: it.el || null };', to: 'curves: (it.curves || []).map((cv, k) => (k === 0 ? { ...cv, pts: cv.pts.map(([x, y]) => [x + 6 * Math.cos(cv.tan[0]), y + 6 * Math.sin(cv.tan[0])]) } : cv)), el: it.el || null };', breaks: ['RN2'] },
+  { id: 'an-acanthus-leaf-floats', file: 'vine', from: 'curves: it.curves || [], el: it.el || null };', to: 'curves: (it.curves || []).map((cv, k) => (k === 1 ? { ...cv, pts: cv.pts.map(([x, y]) => [x + 6 * Math.cos(cv.tan[0]), y + 6 * Math.sin(cv.tan[0])]) } : cv)), el: it.el || null };', breaks: ['RN3'] },
+  { id: 'the-size-ignores-the-weight', file: 'vine', from: 'const len = (RIN.len[0] + RIN.len[1] * w) * M * cc * f;', to: 'const len = (RIN.len[0] + RIN.len[1] * 0.5) * M * cc * f;', breaks: ['RN5'] },
+  { id: 'the-volutes-are-given-few-turns', file: 'rinceau', from: 'export const RIN_TURNS = 0.95;', to: 'export const RIN_TURNS = 0.6;', breaks: ['RN6'] },
+  { id: 'the-band-is-not-widened', file: 'geometry', from: '  const rb = rinceauBand(p);\n  if (!rb) return build();', to: '  const rb = null;\n  if (!rb) return build();', breaks: ['BW1', 'RN6'] },
+  { id: 'the-rinceau-opening-check-removed', file: 'vine', from: 'const bandOK = (c) => !c.pts.some((q) => opening(q)) &&', to: 'const bandOK = (c) => true &&', breaks: ['OR7'] },
+  { id: 'the-rinceau-budget-give-way-removed', file: 'vine', from: '  if (total() > triBudget) {', to: '  if (false) {', breaks: ['TB2'] },
 ];
 
 
@@ -1278,9 +1339,10 @@ async function negativeControl() {
   const srcP = fs.readFileSync(path.join(ROOT, 'frame-pattern.js'), 'utf8');
   const srcE = fs.readFileSync(path.join(ROOT, 'frame-elements.js'), 'utf8');
   const srcV = fs.readFileSync(path.join(ROOT, 'frame-vine.js'), 'utf8');
+  const srcN = fs.readFileSync(path.join(ROOT, 'frame-rinceau.js'), 'utf8');
   const R = await import(pathToFileURL(path.join(ROOT, 'frame-registry.js')).href);
   for (const m of MUTANTS) {
-    const n = (m.file === 'relief' ? srcR : m.file === 'filigree' ? srcF : m.file === 'pattern' ? srcP : m.file === 'elements' ? srcE : m.file === 'vine' ? srcV : srcG).split(m.from).length - 1;
+    const n = (m.file === 'relief' ? srcR : m.file === 'filigree' ? srcF : m.file === 'pattern' ? srcP : m.file === 'elements' ? srcE : m.file === 'vine' ? srcV : m.file === 'rinceau' ? srcN : srcG).split(m.from).length - 1;
     if (n !== 1) { console.log(`FAIL anchor ${m.id}: matches ${n} times`); process.exit(1); }
   }
   let bad = 0;
@@ -1302,7 +1364,7 @@ async function negativeControl() {
   // ruling A on the sweep: a PR runs the mutants of the modules it touches;
   // the full sweep runs on a push to main and nightly), then sharded
   const filesArg = (process.argv.find((a) => a.startsWith('--files=')) || '').slice(8);
-  const MOD = { geometry: 'frame-geometry.js', relief: 'frame-relief.js', filigree: 'frame-filigree.js', pattern: 'frame-pattern.js', elements: 'frame-elements.js', vine: 'frame-vine.js' };
+  const MOD = { geometry: 'frame-geometry.js', relief: 'frame-relief.js', filigree: 'frame-filigree.js', pattern: 'frame-pattern.js', elements: 'frame-elements.js', vine: 'frame-vine.js', rinceau: 'frame-rinceau.js' };
   const touched = filesArg ? new Set(filesArg.split(',').map((f) => path.basename(f.trim())).filter(Boolean)) : null;
   const POOL = touched ? MUTANTS.filter((m) => touched.has(MOD[m.file])) : MUTANTS;
   if (touched) console.log(`--files: ${POOL.length} of ${MUTANTS.length} mutants are on a touched module (${[...new Set(POOL.map((m) => MOD[m.file]))].join(', ') || 'none'}); the rest run on main and nightly`);
@@ -1313,7 +1375,7 @@ async function negativeControl() {
     // every module copied, each one's imports of the others rewired to the
     // copies (the vine and the filigree import each other; the elements
     // import the relief), the one named mutated
-    const SRC = { geometry: srcG, relief: srcR, filigree: srcF, pattern: srcP, elements: srcE, vine: srcV };
+    const SRC = { geometry: srcG, relief: srcR, filigree: srcF, pattern: srcP, elements: srcE, vine: srcV, rinceau: srcN };
     const pathOf = (k) => path.join(ROOT, `_frame-${k}-mutant-${m.id}.js`);
     for (const [k, src] of Object.entries(SRC)) {
       let t = m.file === k ? src.replace(m.from, m.to) : src;

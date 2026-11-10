@@ -13,33 +13,31 @@
    only for (a) the stem's meander law and (b) what springs at each extremum.
    Pure functions, no DOM.
 
-   STEP 1 STATE: reached only through the hidden param `ornRinceau: 'on'`
-   (with `rinWave` / `rinTurns` / `rinLeaf`), which no control writes — the
-   vocabulary sheet (tools/shot-frame-rinceau.mjs) sets it. With it absent
-   every frame builds as on main, by branch. Read docs/frame-charter.md §18.
-   STEP 1b (§18.5): the picks are B / E / I (`sheath`), and a hidden
-   `rinBand` ('widen' | 'frieze', frame-geometry's rinceauBand) prototypes
-   the band a whole turn needs. */
+   STEP 2 (§18.6): the layout's default — the rinceau replaced the vine's
+   stem and items AND phase 3d's chains — on a band WIDENED to RIN_BAY_MM
+   (frame-geometry's rinceauBand, Eva's ruling (b)) at Eva's picks B / E
+   (medium wave, medium turns: ~1.05 drawn on a straight run, ruling (d)),
+   and the acanthus FULLER than pick I: on the wide band the stem and the
+   leaves are weighted up to fill it (Eva, Nov 10) — the stem 0.16 + 0.07 w
+   of the band, the tendril 1.25 + 0.5 w, the leaf H's two (sheath and
+   calyx), the sheath 1.33× pick I's length (0.42 of a longer tendril) and
+   broader (0.75), the calyx 0.85 of it. Read docs/frame-charter.md §18. */
 
 import { MIN_FEATURE_MM } from './frame-registry.js';
 import { scrollCurve, buildLeaf, carvedCap, selfGap, LEAF_ASPECT } from './frame-filigree.js';
 
 const F = MIN_FEATURE_MM;
 
-/* the variants the sheet rules between (Eva picks one; each a measured
-   choice in §18) */
-export const RIN_WAVE = { loose: 1.4, medium: 1.0, tight: 0.72 };   // × the half wavelength
-export const RIN_TURNS = { few: 0.6, medium: 0.95, many: 1.35 };   // the VOLUTE's asked turns (held to the coil gap, told)
-export const RIN_LEAF = {
-  // light: one sheath leaf along the tendril's outer side
-  light: { leaves: 1, len: 0.3, aspect: 0.5, lobes: 4, lap: 0.8 },
-  // full: the sheath leaf longer and broader, plus a second leaf on the
-  // stem's own continuation (the acanthus calyx about the node)
-  full: { leaves: 2, len: 0.38, aspect: 0.62, lobes: 5, lap: 1.0 },
-  // sheath (Eva's pick I, on the vocabulary sheet): LIGHT's one leaf, at
-  // FULL's longer, broader sheath — no calyx leaf
-  sheath: { leaves: 1, len: 0.38, aspect: 0.62, lobes: 5, lap: 1.0 },
-};
+/* the picks (§18.5) and the weight Eva asked for on the wide band (§18.6):
+   the half wavelength factor (pick B), the asked volute turns (pick E; held
+   to the coil gap, told) and the acanthus. The step-1 variants (loose /
+   tight waves, few / many turns, the light leaf) are in the charter's
+   tables; no control reaches them. */
+export const RIN_WAVE = 1.0;
+export const RIN_TURNS = 0.95;
+// two leaves (H's sheath and calyx), the sheath longer and broader than
+// pick I's — × the tendril's length, its breadth × its own length
+export const RIN_LEAF = { leaves: 2, len: 0.42, aspect: 0.75, lobes: 5, lap: 1.0 };
 
 /* the stem and the tendril, × the molding width M, each [base, slope in w_h] */
 /* the fit: at each SIZE share (tried in order) the volute takes the most
@@ -51,25 +49,22 @@ export const RIN_TK_MIN = 0.45;
 export const RIN = {
   A: [0.3, 0.1],       // the meander's amplitude (capped by the band, in vineFor)
   P: [1.15, 0.55],     // its half wavelength (one volute per half wave)
-  len: [1.05, 0.45],   // the tendril's length, × M (its bay is ~0.75 M deep: the stem near one edge, the sweep across and the volute in it)
+  len: [1.25, 0.5],    // the tendril's length, × M (its bay is ~0.75 M deep: the stem near one edge, the sweep across and the volute in it; 1.05 + 0.45 w on step 1's sheets, weighted up on the wide band)
   share: 0.62,         // the volute's share of the tendril's length (the rest the sweep)
   sweep: 1.1,          // the sweep's radius, × the tendril's length (gentle: it leaves the stem near its tangent)
   branch: 0.18,        // the branch point stands this share of the half wave past the extremum (on the stem's descent)
   diverge: 0.25,       // rad: the tendril leaves the stem's tangent this far into the hollow (near-tangent: a branch, not a spur)
-  stemW: [0.12, 0.05], // the rinceau's stem width (thinner than the vine's: the volutes carry the weight)
+  stemW: [0.16, 0.07], // the stem's width (0.12 + 0.05 w on step 1's sheets: on the 16 mm band it read as a fine line, Eva — weighted up)
   wireK: 0.85,         // the tendril's cap: at most this share of the stem's own width (a branch is thinner than its stem)
-  sheath: -0.3,       // rad: the sheath leaf's heading off the tendril's (negative: toward the stem — it covers the crotch and laps the sweep)
-  calyx: 0.45,         // rad: the full calyx's second leaf turns this far off the stem's tangent the other way
+  sheath: -0.45,      // rad (−0.3 on step 1's sheets: the fuller leaf, lying further over the stem, keeps off the tendril's sweep): the sheath leaf's heading off the tendril's (negative: toward the stem — it covers the crotch and laps the sweep)
+  calyx: 0.45,         // rad: the calyx's second leaf turns this far off the stem's tangent the other way
+  calyxLen: 0.85,      // the calyx leaf's length, × the sheath leaf's
   leafCurl: 1.0,       // rad: an acanthus leaf's turn (it hugs the curl, it does not roll back)
 };
 
-/* the spec the vine reads, from the hidden params */
-export function rinceauSpec(p) {
-  if (p.ornRinceau !== 'on') return null;
-  const wave = RIN_WAVE[p.rinWave] ?? RIN_WAVE.medium;
-  const turns = RIN_TURNS[p.rinTurns] ?? RIN_TURNS.medium;
-  const leaf = RIN_LEAF[p.rinLeaf] ?? RIN_LEAF.light;
-  return { wave, turns, leaf, names: { wave: p.rinWave || 'medium', turns: p.rinTurns || 'medium', leaf: p.rinLeaf || 'light' } };
+/* the spec the vine reads */
+export function rinceauSpec() {
+  return { wave: RIN_WAVE, turns: RIN_TURNS, leaf: RIN_LEAF };
 }
 
 /* THE TENDRIL: the second half of a carved C — a SWEEP off the stem (a

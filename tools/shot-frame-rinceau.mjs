@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 /* shot-frame-rinceau.mjs <dir> [--only <regex>] [--refs <dir>] — phase 3f
+   THE RECORD OF STEPS 1 AND 1b (phase 3f step 2 fixed the picks and removed
+   the hidden params it sets): run it against a worktree of babf787 to
+   reproduce frame-rinceau-vocabulary.png and frame-rinceau-band.png.
    step 1, THE RINCEAU VOCABULARY (docs/frame-charter.md §18): the running
    scroll on ONE STRAIGHT BAND (the rectangle's right side, its side run
    alone) and ONE CURVED RUN (the oval's upper run, crest to side), in the

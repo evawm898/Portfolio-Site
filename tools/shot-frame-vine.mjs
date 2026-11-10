@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 /* shot-frame-vine.mjs <dir> [--refs <dir>] [--only <regex>] — phase 3e
+   RETIRED LAYOUT (phase 3f step 2): the vine is gone — run this against a
+   worktree of 2a46e1c to reproduce its sheet; on this tree it draws the
+   rinceau.
    step 3's contact sheet, SECOND ROUND (Eva's rulings on the first: the
    ornament capped to the band, the crest draped low and wide along it), in
    LARGER cells:

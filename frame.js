@@ -178,15 +178,13 @@ function writeReadout() {
     + `floor: ${r.floorNote}${floorWarn ? '\n' + floorWarn : ''}`;
   const o = model.ornament;
   const ornLine = o
-    ? (o.layout === 'vine'
-      ? `ornament <b>a vine</b> — one stem per run (${o.weight.runs.map((r) => `${r.from}→${r.to}`).join(', ')}, mirrored), seated on the molding · hierarchy <b>${o.weight.h.toFixed(2)}</b>: `
-        + `junction motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · along the stems <b>${['cluster', 'rosette', 'leaf', 'bud', 'sprig'].map((k) => [k, o.items.filter((it) => it.kind === k).length]).filter(([, n]) => n).map(([k, n]) => `${n} ${n > 1 ? (k === 'leaf' ? 'leaves' : k + 's') : k}`).join(', ') || 'the bare stem'}</b> (per side) · `
-      : o.layout === 'chains'
-      ? `ornament <b>${o.groups.filter((g) => g.chain).length}</b> running chains (${o.groups.filter((g) => g.chain).map((g) => g.anchor).join(', ')}, mirrored) seated on the molding, <b>${o.groups.filter((g) => !g.chain).length}</b> junction motifs, `
+    ? (o.layout === 'rinceau'
+      ? `ornament <b>a rinceau</b> — one stem per run (${o.weight.runs.map((r) => `${r.from}→${r.to}`).join(', ')}, mirrored), seated on the molding · hierarchy <b>${o.weight.h.toFixed(2)}</b>: `
+        + `junction motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · <b>${o.items.length}</b> volutes per side, turns drawn <b>${o.items.length ? `${Math.min(...o.items.map((it) => it.curves[0].info.turnsDrawn)).toFixed(2)}–${Math.max(...o.items.map((it) => it.curves[0].info.turnsDrawn)).toFixed(2)}` : '—'}</b>, <b>${o.items.reduce((n, it) => n + it.curves.length - 1, 0)}</b> acanthus leaves · `
       : `ornament <b>${o.groups.length}</b> groups (${o.groups.map((g) => g.anchor).join(', ')}, mirrored), `)
       + `<b>${o.curves.filter((c) => c.kind !== 'leaf').length}</b> scrolls, <b>${o.curves.filter((c) => c.kind === 'leaf').length}</b> leaves · lead <b>${o.length.toFixed(1)} mm</b>, `
       + (o.style === 'carved' ? `stroke <b>carved</b> (${o.shape}): <b>${o.groups.length ? o.groups[0].curves[0].info.wire.toFixed(2) : '—'} mm</b> body, width 0.7 × the local radius, thinning to <b>${o.tip.toFixed(2)} mm</b> at the eye` : `wire <b>${o.wire.toFixed(2)} mm</b> (${o.shape}, <b>${o.style}</b>${o.style === 'tapered' ? `, thinning to <b>${o.tip.toFixed(2)} mm</b> at the eye` : ''})`)
-      + ` — print mm; ${o.layout === 'vine' || o.layout === 'chains' ? 'held inside the band, the crest alone past its edge' : 'it may stand past the frame (overall height is the frame\'s)'} · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> of ${o.tris.budget.toLocaleString('en-US')} triangles`
+      + ` — print mm; ${o.layout === 'rinceau' ? 'held inside the band, the crest alone past its edge' : 'it may stand past the frame (overall height is the frame\'s)'} · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> of ${o.tris.budget.toLocaleString('en-US')} triangles`
       + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
     : 'ornament: none';
   const pt = model.pattern;

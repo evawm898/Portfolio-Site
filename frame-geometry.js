@@ -688,49 +688,58 @@ export function profileFor(p, custom) {
   return PROFILE_PRESETS[p.profilePreset] || PROFILE_PRESETS.flat;
 }
 
-/* THE RINCEAU's BAND (phase 3f step 1b — a HIDDEN PROTOTYPE for Eva's
-   ruling, docs/frame-charter.md §18.5; no control writes `rinBand`, and
-   with it absent nothing here runs). At the default 180 mm print the
-   9.5 mm band holds a volute to ~0.8 of a turn; a medium volute reaches a
-   whole turn on a straight run once the band it runs in is RIN_BAY_MM wide
-   (measured: 13.8 mm → 1.00, 15.9 mm → 1.03–1.07). Two ways to get it:
-     widen  — the molding itself drawn RIN_BAY_MM wide (the profile
-              stretched across it, its depth unchanged);
-     frieze — the molding as it was, a short step down, a FLAT FRIEZE
-              RIN_BAY_MM wide inside it, a small sight-edge bead at the
-              opening: one composite band (the sweep, relief and SVG read
-              it as any profile), the rinceau held on the flat (vineFor
-              reads `rinFriezeAt`, the flat's span in profile x).
-   The print scale is read as printHeight ÷ height (the rect's and the
-   oval's frameBox; the arch's box is half a band taller, so its bay
-   lands a little under — told by the measurement, not corrected). */
+/* THE RINCEAU's BAND (phase 3f step 2, Eva's ruling (b) on step 1b's sheet,
+   docs/frame-charter.md §18.5–18.6): with the rinceau on (filigree scrolls,
+   the rinceau layout) the molding is drawn at least RIN_BAY_MM print mm wide
+   — the profile stretched across it, its depth unchanged — because a medium
+   volute reaches a whole turn on a straight run only once its band is that
+   wide (measured: 9.5 mm → ~0.75, 13.8 → 1.00, 16 → 1.03–1.07, and no wider
+   band buys more: the carved law's own asymptote). A band already wider is
+   left alone. The print scale is read as printHeight ÷ height (the rect's
+   and the oval's frameBox; the arch's box is half a band taller, so its bay
+   lands a little under: 15.2 mm at the default — told, not corrected).
+   `p.bandAsked` keeps the control's own width, so the page can say the band
+   was widened. */
 export const RIN_BAY_MM = 16;
-export const RIN_FRIEZE = { step: 0.8, bead: 1.6, z: 0.4, beadRise: 0.15 };   // print mm, and the frieze's level in profile z
-function rinceauBand(p, points) {
-  if (p.ornRinceau !== 'on' || p.filigree !== 'scrolls' || !(p.rinBand === 'widen' || p.rinBand === 'frieze')) return null;
-  const s0 = p.printHeight / p.height, bay = RIN_BAY_MM / s0;
-  if (p.rinBand === 'widen') return { width: Math.max(p.moldingWidth, bay), points, frieze: null };
-  const w = p.moldingWidth, step = RIN_FRIEZE.step / s0, bead = RIN_FRIEZE.bead / s0, T = w + step + bay + bead, z = RIN_FRIEZE.z;
-  const a = (w + step) / T, b = (w + step + bay) / T;
-  const pts = [...points.map(([x, y]) => [x * w / T, y]), [a, z], [b, z], [(w + step + bay + bead / 2) / T, z + RIN_FRIEZE.beadRise], [1, z]];
-  return { width: T, points: pts, frieze: [a, b] };
+function rinceauBand(p) {
+  if (p.filigree !== 'scrolls' || p.ornLayout === 'groups') return null;
+  const bay = RIN_BAY_MM / (p.printHeight / p.height);
+  return bay > p.moldingWidth ? bay : null;
 }
 
 export function buildFrame(params, customProfile = null) {
   const p = { ...DEFAULTS, ...params };
   for (const s of PARAM_SPEC) if (s.kind === 'range') p[s.id] = Math.min(s.max, Math.max(s.min, +p[s.id]));
-  let points = profileFor(p, customProfile);
-  const rb = rinceauBand(p, points);
-  if (rb) { p.rinMolding = p.moldingWidth; p.moldingWidth = rb.width; points = rb.points; if (rb.frieze) p.rinFriezeAt = rb.frieze; }
+  // the phase-3d chains are retired: a stored 'chains' layout is the rinceau
+  if (p.ornLayout === 'chains') p.ornLayout = 'rinceau';
+  const points = profileFor(p, customProfile);
   const prof = profileSamples(points);
-  const { spines, info } = skeletonFor(p);
-  const bands = spines.map((s) => sweepSpine(s, prof, p));
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, strokes = 0;
-  for (const b of bands) for (const poly of [...b.edges, ...b.creases, ...b.hatch.map((h) => h.pts), ...b.cross.map((h) => h.pts)]) {
-    strokes++;
-    for (const [x, y] of poly) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  const build = () => {
+    const { spines, info } = skeletonFor(p);
+    const bands = spines.map((s) => sweepSpine(s, prof, p));
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, strokes = 0;
+    for (const b of bands) for (const poly of [...b.edges, ...b.creases, ...b.hatch.map((h) => h.pts), ...b.cross.map((h) => h.pts)]) {
+      strokes++;
+      for (const [x, y] of poly) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+    return { params: p, profile: points, prof, spines, bands, info, box: { x0, y0, x1, y1 }, strokes };
+  };
+  const rb = rinceauBand(p);
+  if (!rb) return build();
+  // the band widened for the rinceau, to RIN_BAY_MM at the frame's OWN print
+  // scale (printHeight ÷ its box height): the arch's box is half a band
+  // taller than its height, so the width is solved — a fixed point, the box
+  // growing by about half of what the band does (converges in 3–4 builds)
+  p.bandAsked = p.moldingWidth;
+  p.moldingWidth = rb;
+  let m = build();
+  for (let k = 0; k < 8; k++) {
+    const want = Math.max(p.bandAsked, RIN_BAY_MM * (m.box.y1 - m.box.y0) / p.printHeight);
+    if (Math.abs(want - p.moldingWidth) < 1e-9) break;
+    p.moldingWidth = want; m = build();
   }
-  return { params: p, profile: points, prof, spines, bands, info, box: { x0, y0, x1, y1 }, strokes };
+  if (p.moldingWidth <= p.bandAsked) delete p.bandAsked;
+  return m;
 }
 
 /* ------------------------------------------------------------------ */

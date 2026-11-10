@@ -646,18 +646,19 @@ async function partTwo(G, R) {
     // the wire's thickness is the tapered and constant styles' — a carved
     // stroke derives its width from the curve (phase 3c), so it is probed there
     ornWire: { ...ORN, ornLayout: 'groups', ornWireStyle: 'tapered' },
-    // the groups' controls (hidden under the chains) are probed on the groups;
+    // the groups' controls (hidden under the rinceau) are probed on the groups;
     // the layout itself and the bottom (no arch bottom run) on a rectangle
     ornLayout: ORN, ornScale: { ...ORN, ornLayout: 'groups' }, ornWireStyle: { ...ORN, ornLayout: 'groups' }, ornBottom: { ...ORN, skeleton: 'rect' },
     // the default carved lead (23 mm) holds only 0.50–0.53 turns — its fat
     // body leaves the eye little room (charter §13.6) — so the slider's
     // travel is probed on a 46 mm lead (scale 5), where it spans 0.50–0.70
-    // (on the scroll GROUPS: the capped chains' elements are a third of their
-    // lead — Eva's ruling B — so tightness moves them under the bar; the
-    // groups' lead is the one this probe was sized for)
+    // (on the scroll GROUPS: the rinceau's volutes take the coil gap's own
+    // turns and hide the slider; the groups' lead is the one this probe was
+    // sized for)
     ornTightness: { ...ORN, ornLayout: 'groups', ornScale: 5 },
     // phase 3e step 3: the hierarchy is probed with the filigree on (its
-    // minimum, 0, is phase 3d's chains — the vine gone)
+    // minimum, 0, is an even weight along every run: the rinceau's volutes
+    // all one size)
     ornHierarchy: ORN,
     // the band pattern's rows are hidden and inert at 'none': probed with the beading on
     bandEdge: { bandPattern: 'beading' }, bandSize: { bandPattern: 'beading' }, bandPitch: { bandPattern: 'beading' } };

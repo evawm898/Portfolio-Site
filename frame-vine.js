@@ -48,7 +48,7 @@ import { MIN_FEATURE_MM } from './frame-registry.js';
 import { FRAME_TRI_BUDGET, solidTriBound, plateOutline, EMBED_MM } from './frame-relief.js';
 import {
   CHAIN_RUNS, CHAIN_SEAT, runPath, mapToPath, bandRegion, moldingHeightField, seatOn, slitWorst, mirrorCurve,
-  wireClear, wireClearBound, joinsCleanly, LEAF_CROSS, buildScroll, buildLeaf, carvedCap, LEAF_ASPECT, wAt, selfGap, profileFor, rigid, pip, placeMotif, wireHeight, wireProfile, LEAF_RELIEF,
+  wireClear, wireClearBound, joinsCleanly, LEAF_CROSS, buildScroll, buildLeaf, carvedCap, LEAF_ASPECT, wAt, selfGap, profileFor, rigid, pip, placeMotif, wireHeight, wireProfile, LEAF_RELIEF, crownScale,
 } from './frame-filigree.js';
 import { rinceauSpec, rinceauTendril, acanthusLeaf, RIN, RIN_SIZES, RIN_TK_MIN } from './frame-rinceau.js';
 import { placeElement, relift, liftEach, drapeElement, mirrorElement, symmetrizeElement, remapElement, wireElementContact, elementClear, elementDepth, footprintTouches } from './frame-elements.js';
@@ -62,14 +62,8 @@ export const HIER = {
   heavy: 0.68, medium: 0.4,                                  // the class thresholds on w_h
 };
 export const CURVE_K = 1.2;            // the curvature compression: c = 1 / (1 + CURVE_K · M · |κ|)
-/* the stem and the items, × the molding width M, each [base, slope in w_h] */
-export const STEM_W = [0.15, 0.08];     // the stem's width
-export const STEM_A = [0.12, 0.2];      // its meander's amplitude
-export const STEM_P = [1.1, 0.9];       // its half wavelength (an item every half wave)
-export const ITEM = { tendril: [0.7, 0.45], leaf: [0.62, 0.4], sprig: 0.45, bud: [0.6, 0.3], rosette: 0.85 };   // each item's size law
 export const VINE_MARGIN = 0.1;       // mm: the build's clearances stand this far past F
 export const AXIS_GAP = 0.1;          // mm past the half feature: where a stem stops short of its mirror
-export const VINE_LEAF_CURL = 1.2;   // rad: a vine leaf's turn (the chains' 2.2 curls a short leaf back onto its stem)
 const smooth = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
 /* THE BAND IS THE CAP (Eva's rulings on the first sheet, 1 and 2). Nothing
@@ -158,7 +152,7 @@ export function silDistance(sil, q) {
 /* THE CREST, built about the origin, its plan stretched to the span and the
    rise (x to ±span·M, y from −hinge·M to +rise·M), then draped on the edge
    frame: low and wide past the edge, never sideways */
-export function crestElement(kind, { M, frame, hinge = CREST.hinge, span = CREST.span[kind], stretch = CREST.stretch }) {
+export function crestElement(kind, { M, frame, hinge = CREST.hinge, span = CREST.span[kind], stretch = CREST.stretch, riseK = 1 }) {
   const el = placeElement(kind, { size: CREST.build[kind] * M, at: [0, 0], angle: 0, lift: 0, soft: kind === 'shell' });   // the crest's shell is the SOFT one (rounded lobes)
   let xm = 0, ym = -Infinity, y0 = Infinity; for (const l of el.loops) for (const [x, y] of l) { xm = Math.max(xm, Math.abs(x)); ym = Math.max(ym, y); y0 = Math.min(y0, y); }
   // its plan scaled into the rise (from its root under the edge to the most
@@ -166,7 +160,7 @@ export function crestElement(kind, { M, frame, hinge = CREST.hinge, span = CREST
   // and widened along the band by at most CREST.stretch (a stretch past it
   // turns the shell's scallops into a sunburst's points — measured on the
   // first sheet at 3×)
-  const k = (CREST.rise + hinge) * M / (ym - y0), kx = Math.min(stretch * k, span * M / xm);
+  const k = (riseK * CREST.rise + hinge) * M / (ym - y0), kx = Math.min(stretch * k, span * M / xm);
   const flat = remapElement(el, ([x, y]) => [kx * x, -hinge * M + k * (y - y0)]);
   return { ...remapElement(flat, frame.at), at: frame.at([0, 0]) };   // its place: the edge on the axis
 }
@@ -196,12 +190,21 @@ export function crestLift(Hz) {
    lifted per vertex (crestLift; the plan's mirror symmetry kept, the lift
    reading a point and its mirror alike) and made its own mirror again. One
    owner for the vine's crest and the chains'. Returns { el, note }. */
-export function drapedCrest(kind, { M, frame, opening, Hz, fits, why, slopes = false }) {
+export function drapedCrest(kind, { M, frame, opening, Hz, fits, why, slopes = false, sil = null }) {
   const span0 = slopes ? CREST.slopes.span : CREST.span[kind], stretch = slopes ? CREST.slopes.stretch : CREST.stretch;
   let el = null, note = '';
   search: for (const span of [span0, 0.85 * span0, 0.7 * span0]) for (const hg of [CREST.hinge, 0.6, 0.5, 0.4]) {
-    let c = crestElement(kind, { M, frame, hinge: hg, span, stretch });
-    if (footprintTouches(c, opening)) continue;
+    // the rise is a CAP, read back off the draped plan (the frame's normals
+    // are averaged, so where the edge is not straight under the crest a
+    // point y out stands a little further than y from the silhouette —
+    // 0.02 mm on an eared rectangle's 16 mm band): lowered until it holds
+    let c = null;
+    for (const rk of [1, 0.99, 0.97, 0.94, 0.9]) {
+      c = crestElement(kind, { M, frame, hinge: hg, span, stretch, riseK: rk });
+      if (!sil || c.loops.every((l) => l.every((q) => -silDistance(sil, q) <= CREST.rise * M))) break;
+      c = null;
+    }
+    if (!c || footprintTouches(c, opening)) continue;
     c = symmetrizeElement(c); if (c.asymmetric) continue;
     c.sunk = false; c.out = [0, 1]; c.pushed = 0; c.crest = { hinge: hg, span, stretch, rise: CREST.rise };
     if (fits(c)) { el = c; if (span < span0 || hg < CREST.hinge) note = ` (span ${(span / span0 * 100).toFixed(0)}%, root ${hg.toFixed(2)} M under the edge)`; break search; }
@@ -263,16 +266,6 @@ function pathCurvature(path, win) {
 }
 const at1 = (arr, path, x) => { const n = arr.length, q = Math.min(path.length, Math.max(0, x)), k = Math.min(n - 1, Math.round(q / path.length * (n - 1))); return arr[k]; };
 
-/* a TENDRIL: the second half of a carved C (from its root to its eye) — a
-   long flat body curling into one volute; its root at the origin, its
-   tangent +x, curling toward +y */
-export function tendril(len, tightness) {
-  const c = buildScroll({ kind: 'C', length: 2 * len, tightness, wire: carvedCap(2 * len), balance: 1, carved: true });
-  const r = c.root, sl = (a) => (Array.isArray(a) ? a.slice(r) : a);
-  const out = { ...c, kind: 'tendril', pts: sl(c.pts), nrm: sl(c.nrm), tan: sl(c.tan), u: sl(c.u), kap: sl(c.kap), w: sl(c.w), root: 0 };
-  out.info = { ...c.info, role: 'tendril', L: len };
-  return out;
-}
 /* lay a local curve (root at its origin, growing along +x) at `root` in a
    run's local frame, heading `phi`, curling right of its march when
    `flip`; then mapped onto the path */
@@ -333,6 +326,8 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   const region = bandRegion(model, scale);
   const told = [];
   const M = p.moldingWidth * scale, h = p.ornHierarchy;
+  // the band WIDENED for the rinceau (frame-geometry's rinceauBand, Eva's (b))
+  if (p.bandAsked != null) told.push(`the band is drawn ${M.toFixed(1)} mm wide for the rinceau (the profile width asks ${(p.bandAsked * scale).toFixed(1)} mm): a volute takes a whole turn only on a band about 16 mm wide`);
   const sil = plateOutline(model).map(([x, y]) => [x * scale, y * scale]);
   const opening = (q) => pip(q, sil) && !region.inside(q);
   // past the band's outer edge: outside the frame's own silhouette
@@ -344,15 +339,11 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   const dens = 0.6 + 0.2 * p.ornDensity;
   const leafK = p.ornLeafSize / 0.42;
   const leaves = p.ornLeaves === 'on';
-  // the RINCEAU (phase 3f step 1, frame-rinceau.js): a hidden switch, null on every shipped frame
-  const rin = rinceauSpec(p);
-  // on a FRIEZE (step 1b's prototype, frame-geometry's rinceauBand) the
-  // rinceau's laws read the FLAT's width, and it runs on the flat alone
-  const frz = rin && p.rinFriezeAt ? { a: p.rinFriezeAt[0] * M, b: p.rinFriezeAt[1] * M } : null;
-  const Mr = frz ? frz.b - frz.a : M;
+  // the RINCEAU's laws (frame-rinceau.js, Eva's picks)
+  const rin = rinceauSpec();
   // the band in a run's local frame: the path lies `depth` inside the outer
   // edge, so the band spans y ∈ [depth − M, depth]; its centre line y_c
-  const yc = frz ? depth - (frz.a + frz.b) / 2 : depth - M / 2;
+  const yc = depth - M / 2;
   let tris = model.spines.reduce((a, sp) => a + solidTriBound(sp.pts.length + 2, model.prof.x.length + 1), 0);
   const frameTris = tris;
   const W = weightOverride || ((x, L, Aa, Ab) => withStrength(weightAt(x, L, Aa, Ab), h));
@@ -365,16 +356,16 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const path = runPath(model, run, scale, depth), L = path.length;
     const cFrom = anchorClass(model, run.from), cTo = anchorClass(model, run.to);
     const Aa = ampOf(cFrom), Ab = ampOf(cTo);
-    const kap = pathCurvature(path, Mr);
-    const comp = kap.map((k) => 1 / (1 + CURVE_K * Mr * Math.abs(k)));
+    const kap = pathCurvature(path, M);
+    const comp = kap.map((k) => 1 / (1 + CURVE_K * M * Math.abs(k)));
     const wOf = (x) => W(x, L, Aa, Ab);
     const cOf = (x) => at1(comp, path, x);
     const axisA = cFrom === 'crest' || cFrom === 'bottom', axisB = cTo === 'crest' || cTo === 'bottom';
     // the stem's width, amplitude and half wavelength follow w_h
-    const wsOf = (x) => Math.max(F, ((rin ? RIN.stemW : STEM_W)[0] + (rin ? RIN.stemW : STEM_W)[1] * wOf(x)) * Mr);
+    const wsOf = (x) => Math.max(F, (RIN.stemW[0] + RIN.stemW[1] * wOf(x)) * M);
     let ak = 1;      // the meander's share: lowered where the run's own turns fold it (below)
-    const ampOfX = (x) => ak * Math.max(0.5, Math.min(((rin ? RIN.A : STEM_A)[0] + (rin ? RIN.A : STEM_A)[1] * wOf(x)) * Mr, Mr / 2 - wsOf(x) / 2 - 0.6 * F));
-    const P0 = rin ? (x) => Mr * (RIN.P[0] + RIN.P[1] * wOf(x)) * rin.wave * cOf(x) / dens : (x) => M * (STEM_P[0] + STEM_P[1] * wOf(x)) * cOf(x) / dens;
+    const ampOfX = (x) => ak * Math.max(0.5, Math.min((RIN.A[0] + RIN.A[1] * wOf(x)) * M, M / 2 - wsOf(x) / 2 - 0.6 * F));
+    const P0 = (x) => M * (RIN.P[0] + RIN.P[1] * wOf(x)) * rin.wave * cOf(x) / dens;
     // the stem's x range: a feature short of the axis (its mirror) at an
     // axis end; run on past an interior end
     const ws0 = wsOf(0), wsL = wsOf(L);
@@ -513,8 +504,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   // the CREST (the axis at the top): a draped shell, the one thing
   // that may stand past the band; every other motif inside the band
   const motifKind = (cls, wcl) => (wcl === 'heavy' ? (cls === 'crest' || cls === 'bottom' ? 'shell' : 'rosette') : wcl === 'medium' ? 'rosette' : null);
-  // (on a frieze the motifs are the MOLDING's: sized by its own width)
-  const Mm = frz ? p.rinMolding * scale : M;
+  const Mm = M;
   const frame = edgeFrame(sil, Mm);
   // a motif's fit: it JOINS every stem that ends at it (an overlap of the
   // embed, no graze) and grazes nothing (the other stems, its mirror, the
@@ -534,7 +524,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     if (!mk) continue;
     let el = null, note = '';
     if (e.cls === 'crest' && wcl === 'heavy') {
-      const r = drapedCrest(mk, { M: Mm, frame, opening, Hz, fits: (c) => joins(e, c, true), why: 'join both stems', slopes: kind === 'arch' });
+      const r = drapedCrest(mk, { M: Mm, frame, opening, Hz, fits: (c) => joins(e, c, true), why: 'join both stems', slopes: kind === 'arch', sil });
       told.push(r.note);
       if (!r.el) continue;
       el = r.el;
@@ -568,109 +558,65 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const thA = r.theta(0), thB = r.theta(r.L);
     const kMin = Math.ceil((thA - Math.PI / 2) / Math.PI - 1e-9), kMax = Math.floor((thB - Math.PI / 2) / Math.PI + 1e-9);
     const solveX = (target) => { let lo = 0, hi = r.L; for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (r.theta(m) < target) lo = m; else hi = m; } return (lo + hi) / 2; };
-    const guard = (x) => x > 0.35 * Mr && x < r.L - 0.35 * Mr;
+    const guard = (x) => x > 0.35 * M && x < r.L - 0.35 * M;
     let nExt = 0;
     for (let k = kMin; k <= kMax; k++) {
       const x = solveX(Math.PI / 2 + k * Math.PI); if (!guard(x)) continue;
       const side = Math.sign(Math.sin(r.theta(x))) || 1, w = r.wOf(x);
       cand.push({ r, x, w, side, at: 'extremum', n: nExt++ });
     }
-    if (!rin) for (let k = Math.ceil(thA / Math.PI - 1e-9); k <= Math.floor(thB / Math.PI + 1e-9); k++) {
-      const x = solveX(k * Math.PI); if (!guard(x) || x < 0.8 * Mr || x > r.L - 0.8 * Mr) continue;
-      cand.push({ r, x, w: r.wOf(x), side: 0, at: 'zero' });
-    }
   }
   cand.sort((a, b) => b.w - a.w || a.x - b.x);
-  const itemKind = (c) => {
-    if (rin) return c.at === 'extremum' ? 'volute' : null;
-    if (c.at === 'zero') return c.w >= 0.46 && c.w < 0.66 ? 'rosette' : null;
-    if (c.w >= 0.56) return 'cluster';
-    if (c.w >= 0.36) return leaves ? 'leaf' : null;
-    if (c.w >= 0.22) return 'bud';
-    return leaves ? 'sprig' : null;
-  };
+  // the rinceau's one item: a volute at every extremum
+  const itemKind = (c) => (c.at === 'extremum' ? 'volute' : null);
   // what is kept, both sides, for the clearances
   const keptWires = [...stems, ...stems.map((st) => { const m = mirrorCurve(st); m.mirrorOf = st; return m; })];
   const keptEls = elements.flatMap((o) => [o.el, o.mirror].filter(Boolean));
   const near = (c) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of c.pts) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } return region.near([(x0 + x1) / 2, (y0 + y1) / 2], Math.hypot(x1 - x0, y1 - y0) / 2 + 3 * F + 4); };
-  const bandOK = (c) => !c.pts.some((q) => opening(q)) && c.pts.every((q, i) => silDistance(sil, q) >= wAt(c, i) / 2) && !(slitWorst(c, near(c)) > -Infinity) && (!frz || c.pts.every((q, i) => { const d = silDistance(sil, q); return d >= frz.a + wAt(c, i) / 2 && d <= frz.b - wAt(c, i) / 2; }));   // in the band: not in the opening, not past the outer edge (the wire's half width inside it)
+  const bandOK = (c) => !c.pts.some((q) => opening(q)) && c.pts.every((q, i) => silDistance(sil, q) >= wAt(c, i) / 2) && !(slitWorst(c, near(c)) > -Infinity);   // in the band: not in the opening, not past the outer edge (the wire's half width inside it)
   const clearOf = (a, b) => (wireClearBound(a, b) >= Fm ? Infinity : wireClear(a, b));
   let dropped = 0, shrunk = 0;
   for (const c of cand) {
     const kd = itemKind(c); if (!kd) continue;
     const r = c.r, stem = r.stem;
-    const root0 = [c.x, r.yOf(c.x)], ws0 = r.wsOf(c.x);
-    // a wire item's root starts back across the stem, behind its centre line
-    // along the item's own heading, so the joint is a full overlap and
-    // never the two wires' edges kissing
-    const rootFor = (phi) => [root0[0] - Math.cos(phi) * 0.75 * ws0, root0[1] - Math.sin(phi) * 0.75 * ws0];
-    const root = root0;
     const cc = r.cOf(c.x), w = c.w;
-    // the item's heading: forward (away from the crest), into the bay the
-    // stem bends around (inward at an outward bulge, outward at an inward one)
+    // THE RINCEAU's wave: a tendril branching off just past the extremum on
+    // the stem's descent, leaving its tangent into the hollow the stem bends
+    // around and curling back into it (toward the crest of this wave) — so
+    // the volutes alternate sides as the extrema do; acanthus sheathes the
+    // branch point. `f` the size share, `tk` the share of the turns the coil
+    // gap holds at that size
     const make = (f, tk = 1) => {
-      if (kd === 'volute') {
-        // THE RINCEAU's wave: a tendril branching off just past the extremum
-        // on the stem's descent, leaving its tangent into the hollow the stem
-        // bends around and curling back into it (toward the crest of this
-        // wave) — so the volutes alternate sides as the extrema do; acanthus
-        // leaves sheathe the branch point
-        const P = r.P0(c.x) * r.sc;   // the local half wavelength as laid (the phase's own scale)
-        const xb = Math.min(r.L, c.x + RIN.branch * P), yb = r.yOf(xb), dydx = (r.yOf(xb + 0.05) - r.yOf(xb - 0.05)) / 0.1;
-        const tanb = Math.atan2(dydx, 1), phi = tanb - c.side * RIN.diverge;
-        const len = (RIN.len[0] + RIN.len[1] * w) * Mr * cc * f;
-        const rootB = [xb - Math.cos(phi) * 0.75 * r.wsOf(xb), yb - Math.sin(phi) * 0.75 * r.wsOf(xb)];
-        // fewer turns are taken off what the coil gap HOLDS at this size (asked past it, the bisection already lowered them)
-        const cap = RIN.wireK * r.wsOf(xb), held = tk < 1 ? rinceauTendril(len, rin.turns, cap).info.turnsHeld : rin.turns;
-        const tt = rinceauTendril(len, held * tk, cap); tt.info.turnsAsked = rin.turns;
-        const t = lay(tt, rootB, phi, c.side > 0, r.path);
-        t.info = { ...t.info, role: 'volute' };
-        const out = [t];
-        if (leaves) {
-          const fl = rin.leaf, ll = fl.len * len * leafK;
-          // the sheath leaf: rooted on the stem just behind the branch, lying
-          // along the tendril's outer side, curling with it
-          const ph1 = tanb - c.side * (RIN.diverge + RIN.sheath), xr = xb - 0.3 * r.wsOf(xb);
-          const r1 = [xr - Math.cos(ph1) * 0.75 * r.wsOf(xr), r.yOf(xr) - Math.sin(ph1) * 0.75 * r.wsOf(xr)];
-          const lf = lay(acanthusLeaf(ll, fl, -c.side), r1, ph1, false, r.path); lf.info = { ...lf.info, role: 'acanthus' }; out.push(lf);
-          if (fl.leaves > 1) {
-            // the calyx's second leaf: on the stem's continuation, turning
-            // the other way, over the stem going on
-            const ph2 = tanb + c.side * RIN.calyx;
-            const r2 = [xb - Math.cos(ph2) * 0.75 * r.wsOf(xb), yb - Math.sin(ph2) * 0.75 * r.wsOf(xb)];
-            const l2 = lay(acanthusLeaf(0.7 * ll, fl, c.side), r2, ph2, false, r.path); l2.info = { ...l2.info, role: 'acanthus' }; out.push(l2);
-          }
+      const P = r.P0(c.x) * r.sc;   // the local half wavelength as laid (the phase's own scale)
+      const xb = Math.min(r.L, c.x + RIN.branch * P), yb = r.yOf(xb), dydx = (r.yOf(xb + 0.05) - r.yOf(xb - 0.05)) / 0.1;
+      const tanb = Math.atan2(dydx, 1), phi = tanb - c.side * RIN.diverge;
+      const len = (RIN.len[0] + RIN.len[1] * w) * M * cc * f;
+      // its root starts back across the stem, behind the stem's centre line
+      // along its own heading, so the joint is a full overlap and never the
+      // two wires' edges kissing
+      const rootB = [xb - Math.cos(phi) * 0.75 * r.wsOf(xb), yb - Math.sin(phi) * 0.75 * r.wsOf(xb)];
+      // fewer turns are taken off what the coil gap HOLDS at this size (asked past it, the bisection already lowered them)
+      const cap = RIN.wireK * r.wsOf(xb), held = tk < 1 ? rinceauTendril(len, rin.turns, cap).info.turnsHeld : rin.turns;
+      const tt = rinceauTendril(len, held * tk, cap); tt.info.turnsAsked = rin.turns;
+      const t = lay(tt, rootB, phi, c.side > 0, r.path);
+      t.info = { ...t.info, role: 'volute' };
+      const out = [t];
+      if (leaves) {
+        const fl = rin.leaf, ll = fl.len * len * leafK;
+        // the sheath leaf: rooted on the stem just behind the branch, lying
+        // along the tendril's outer side, curling with it
+        const ph1 = tanb - c.side * (RIN.diverge + RIN.sheath), xr = xb - 0.3 * r.wsOf(xb);
+        const r1 = [xr - Math.cos(ph1) * 0.75 * r.wsOf(xr), r.yOf(xr) - Math.sin(ph1) * 0.75 * r.wsOf(xr)];
+        const lf = lay(acanthusLeaf(ll, fl, -c.side), r1, ph1, false, r.path); lf.info = { ...lf.info, role: 'acanthus' }; out.push(lf);
+        if (fl.leaves > 1) {
+          // the calyx's second leaf: on the stem's continuation, turning
+          // the other way, over the stem going on
+          const ph2 = tanb + c.side * RIN.calyx;
+          const r2 = [xb - Math.cos(ph2) * 0.75 * r.wsOf(xb), yb - Math.sin(ph2) * 0.75 * r.wsOf(xb)];
+          const l2 = lay(acanthusLeaf(RIN.calyxLen * ll, fl, c.side), r2, ph2, false, r.path); l2.info = { ...l2.info, role: 'acanthus' }; out.push(l2);
         }
-        return { curves: out };
       }
-      if (kd === 'cluster') {
-        const len = (ITEM.tendril[0] + ITEM.tendril[1] * w) * M * cc * f;
-        const t = lay(tendril(len, p.ornTightness), rootFor(-c.side * 0.95), -c.side * 0.95, c.side < 0, r.path);
-        t.info = { ...t.info, role: 'tendril' };
-        const out = [t];
-        if (leaves) { const ll = 0.7 * len * leafK; const lf = lay(buildLeaf({ length: ll, width: LEAF_ASPECT * ll, side: -c.side, curl: VINE_LEAF_CURL }), rootFor(-c.side * 0.3), -c.side * 0.3, false, r.path); lf.info = { ...lf.info, role: 'vine-leaf' }; out.push(lf); }
-        return { curves: out };
-      }
-      if (kd === 'leaf' || kd === 'sprig') {
-        const ll = (kd === 'leaf' ? ITEM.leaf[0] + ITEM.leaf[1] * w : ITEM.sprig) * M * cc * f * leafK;
-        const lf = lay(buildLeaf({ length: ll, width: LEAF_ASPECT * ll, side: -c.side, curl: VINE_LEAF_CURL }), rootFor(-c.side * 0.75), -c.side * 0.75, false, r.path);
-        lf.info = { ...lf.info, role: 'vine-leaf' };
-        return { curves: [lf] };
-      }
-      // an element: a bud's cup root on the stem, growing into the bay; a
-      // sunk rosette centred ON the stem
-      const N = r.path.out[Math.min(r.path.out.length - 1, Math.round(c.x / r.L * (r.path.out.length - 1)))];
-      const T = [N[1], -N[0]];
-      const P = mapToPath({ pts: [root], nrm: [[0, 1]], tan: [0], info: {} }, r.path, 0).pts[0];
-      if (kd === 'rosette') { const el = placeMotif('rosette', { size: ITEM.rosette * M * cc * f, at: P, out: N, H, opening, sunk: true, beyond, reach: 0.25 * M }); return el ? { el } : null; }
-      const size = (ITEM.bud[0] + ITEM.bud[1] * w) * M * cc * f, R = size / 2;
-      // the bud's local +y along the item's heading (into the bay, forward)
-      const ang = -c.side * 1.15, dir = [Math.cos(ang) * T[0] + Math.sin(ang) * N[0], Math.cos(ang) * T[1] + Math.sin(ang) * N[1]];
-      const at = [P[0] + dir[0] * 0.7 * R, P[1] + dir[1] * 0.7 * R];
-      let el = placeElement('bud', { size, at, angle: Math.atan2(dir[1], dir[0]) - Math.PI / 2, lift: 0 });
-      if (footprintTouches(el, opening) || footprintTouches(el, beyond)) return null;
-      el = drapeElement(el, crestLift(Hz));   // draped on the molding, not lifted as one block (placeMotif's proud rule)
-      return { el };
+      return { curves: out, f, len };
     };
     const fits = (it) => {
       const why = (m) => { if (globalThis.__vineWhy) globalThis.__vineWhy.push(m); return false; };   // (the reason is the argument: not reported; a probe may collect it)
@@ -684,7 +630,8 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
         return elementClear(e, m) >= Fm || why('own mirror');
       }
       for (const cv of it.curves) {
-        if (cv.kind === 'tendril' && selfGap(cv).gap < Fm) return why(`self gap ${selfGap(cv).gap.toFixed(2)}`);
+        // (a leaf too: mapped across a corner's jog it can fold back over itself)
+        if (selfGap(cv).gap < Fm) return why(`${cv.kind} self gap ${selfGap(cv).gap.toFixed(2)}`);
         if (!bandOK(cv)) return why(`band: opening ${cv.pts.some((q) => opening(q))} slit ${slitWorst(cv, near(cv))}`);
         if (wireClear(cv, stem) > -E + 1e-9) return why(`${cv.kind} not on its stem (${(-wireClear(cv, stem)).toFixed(2)} mm of overlap)`);   // a joint, not merely no graze (joinsCleanly passes a wire that never touches)
         if (!joinsCleanly(cv, stem)) return why(`${cv.kind} not joined to stem`);
@@ -695,15 +642,15 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
           for (const e of keptEls) { const q = wireElementContact(m, e, E); if (q.clear < Fm) return why(`${cv.kind} vs element ${q.clear.toFixed(2)}`); }
         }
       }
-      // the cluster's leaf and tendril share a root: a joint there
-      if (!rin && it.curves.length === 2 && !joinsCleanly(it.curves[0], it.curves[1])) return why('cluster pair');
-      // the rinceau's sheath leaf laps its volute's root: a joint there
-      // (a crossing — the leaf lies OVER the tendril, its lobes in and out of the tendril's edge — by the leaves' own crossing rule, phase 3c's LEAF_CROSS)
-      if (rin && it.curves.length >= 2 && !joinsCleanly(it.curves[0], it.curves[1], LEAF_CROSS)) return why('sheath');
+      // within the item every leaf laps the volute's root and the other leaf:
+      // a CROSSING (the leaf lies OVER them, its lobes in and out of their
+      // edges — the leaves' own crossing rule, phase 3c's LEAF_CROSS) or a
+      // feature clear, never a graze
+      for (let a = 0; a < it.curves.length; a++) for (let b = a + 1; b < it.curves.length; b++) if (!joinsCleanly(it.curves[a], it.curves[b], LEAF_CROSS)) return why(`pair ${a}-${b}`);
       return true;
     };
     let it = null, q = 0;
-    if (kd === 'volute') {
+    {
       // at each size share the volute takes the MOST turns that fit on the
       // MAPPED path (bisected — a curved run compresses the coils on its
       // inner side, so the gap the local tendril holds is not the gap it
@@ -717,16 +664,15 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
         if (best) { it = best; break; }
       }
     }
-    else for (; q < 6; q++) { const t = make(0.85 ** q); if (fits(t)) { it = t; break; } }
     if (!it) { dropped++; continue; }
     if (q) shrunk++;
-    const rec = { run: r.run.id, x: c.x, w, kind: kd, side: c.side, at: c.at, curves: it.curves || [], el: it.el || null };
+    const rec = { run: r.run.id, x: c.x, w, c: cc, f: it.f, len: it.len, kind: kd, side: c.side, at: c.at, curves: it.curves || [], el: it.el || null };
     for (const cv of rec.curves) { cv.vineItem = rec; keptWires.push(cv, mirrorCurve(cv)); }
     if (rec.el) { rec.el.vineItem = rec; keptEls.push(rec.el, mirrorElement(rec.el)); }
     items.push(rec);
   }
-  if (dropped) told.push(`${dropped} item${dropped > 1 ? 's' : ''} along the vine not built — no room a feature clear at any size`);
-  if (shrunk) told.push(`${shrunk} item${shrunk > 1 ? 's' : ''} along the vine made smaller to fit`);
+  if (dropped) told.push(`${dropped} volute${dropped > 1 ? "s" : ""} not built — no room a feature clear at any size`);
+  if (shrunk) told.push(`${shrunk} volute${shrunk > 1 ? "s" : ""} made smaller or given fewer turns to fit`);
 
   // ---- 5. seat the items: on the molding, their root riding on the stem ----
   const leafPeak = Math.max(...wireProfile('leaf').z);
@@ -746,12 +692,16 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       // wireProfile('leaf') tops out under 1), so a leaf is lifted by the
       // shortfall to stand a feature over the molding, as a chain's leaf
       // stands on its host's crown
-      const extra = cv.kind === 'leaf' ? Math.max(0, F + LEAF_CREST_MARGIN - leafPeak * Math.max(F, LEAF_RELIEF * cv.info.wire * p.ornProjection)) : 0;
+      // (per row: the crown follows the leaf's width, floored at the feature
+      // — crownScale — so a narrowing leaf's crest is lower where it narrows)
+      const dLeaf = Math.max(F, LEAF_RELIEF * cv.info.wire * p.ornProjection), kLeaf = cv.kind === 'leaf' ? crownScale(cv, dLeaf) : null;
+      const extraAt = (i) => (cv.kind === 'leaf' ? Math.max(0, F + LEAF_CREST_MARGIN - leafPeak * dLeaf * (kLeaf ? kLeaf[i] : 1)) : 0);
       // a rinceau's acanthus laps OVER its volute's root (a stacked shell):
       // it rides a crown higher than the tendril and falls over longer
-      const lap = rin && cv.info.role === 'acanthus' ? rin.leaf.lap : 0;
+      const lap = cv.info.role === 'acanthus' ? rin.leaf.lap : 0;
       const rideC = ride + lap * crown, fall = lap ? 3.5 : 2;
-      cv.lift = cv.pts.map((_, i) => Math.max(Math.max(0, seatOn(H, cv, i)) + extra, rideC * (1 - smooth(sAt[i] / (fall * ws)))));
+      cv.lift = cv.pts.map((_, i) => Math.max(Math.max(0, seatOn(H, cv, i)) + extraAt(i), rideC * (1 - smooth(sAt[i] / (fall * ws)))));
+      if (cv.kind === 'leaf') cv.seatExtra = cv.pts.map((_, i) => extraAt(i));
     }
   }
 
@@ -771,13 +721,13 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       const r = keptRuns.pop(); gaveRuns++;
       keptMotifs = keptMotifs.filter((o) => keptRuns.some((q) => q.run.from === o.anchor || q.run.to === o.anchor));
     }
-    if (gaveItems) told.push(`${gaveItems} item${gaveItems > 1 ? 's' : ''} along the vine given way to the ${triBudget.toLocaleString('en-US')}-triangle budget (the lightest first)`);
-    if (gaveRuns) told.push(`${gaveRuns} run${gaveRuns > 1 ? 's' : ''} of the vine not built — past the ${triBudget.toLocaleString('en-US')}-triangle budget`);
+    if (gaveItems) told.push(`${gaveItems} volute${gaveItems > 1 ? "s" : ""} given way to the ${triBudget.toLocaleString('en-US')}-triangle budget (the lightest first)`);
+    if (gaveRuns) told.push(`${gaveRuns} run${gaveRuns > 1 ? 's' : ''} of the rinceau not built — past the ${triBudget.toLocaleString('en-US')}-triangle budget`);
   }
   // ---- 7. the record: one group per side of curves (stems + items), the
   // motifs as element groups ----
   const curves = [...keptRuns.map((r) => r.stem), ...keptItems.flatMap((it) => it.curves)];
-  const groups = keptRuns.length ? [{ group: 'vine', anchor: keptRuns.map((r) => `${r.run.from}→${r.run.to}`).join(', '), onAxis: false, curves, mirrored: curves.map(mirrorCurve), push: depth, told: [], chain: { vine: true, runs: keptRuns.map((r) => ({ id: r.run.id, L: r.L, from: r.run.from, to: r.run.to, cFrom: r.cFrom, cTo: r.cTo, Aa: r.Aa, Ab: r.Ab, path: r.path })) } }] : [];
+  const groups = keptRuns.length ? [{ group: 'rinceau', anchor: keptRuns.map((r) => `${r.run.from}→${r.run.to}`).join(', '), onAxis: false, curves, mirrored: curves.map(mirrorCurve), push: depth, told: [], chain: { vine: true, runs: keptRuns.map((r) => ({ id: r.run.id, L: r.L, from: r.run.from, to: r.run.to, cFrom: r.cFrom, cTo: r.cTo, Aa: r.Aa, Ab: r.Ab, path: r.path })) } }] : [];
   for (const o of keptMotifs) groups.push({ group: o.kind, anchor: o.anchor, onAxis: o.onAxis, curves: [], mirrored: [], elements: [o.el, o.mirror].filter(Boolean), motif: o });
   const els = groups.flatMap((g) => g.elements || []);
   for (const it of keptItems) if (it.el) els.push(it.el, mirrorElement(it.el));
@@ -786,5 +736,5 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   items.length = 0; items.push(...keptItems);
   const tip = all.length ? Math.min(...all.map((c) => c.info.tip ?? c.info.wire)) : F;
   const weight = { h, runs: keptRuns.map((r) => ({ id: r.run.id, from: r.run.from, to: r.run.to, L: r.L, Aa: r.Aa, Ab: r.Ab, cFrom: r.cFrom, cTo: r.cTo })) };
-  return { scale, length: M, wire: F, style: 'carved', layout: 'vine', tip, groups, curves: all, elements: els, items, motifs: keptMotifs, weight, region, H, told, tris: { bound: tris, frame: frameTris, budget: triBudget } };
+  return { scale, length: M, wire: F, style: 'carved', layout: 'rinceau', tip, groups, curves: all, elements: els, items, motifs: keptMotifs, weight, region, H, told, tris: { bound: tris, frame: frameTris, budget: triBudget } };
 }

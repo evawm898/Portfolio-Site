@@ -724,14 +724,15 @@ function anchorFrame(model, anchor, scale) {
 }
 
 /* ================================================================== */
-/* RUNNING CHAINS (phase 3d, Eva's ruling 4B)                          */
+/* THE RUNS (phase 3d; the chains that first ran on them are RETIRED,  */
+/* phase 3f step 2 — the rinceau, frame-vine.js, runs on them now)     */
 /* ================================================================== */
 
 /* A RUN is a stretch of band between two consecutive right-hand anchors,
    read as a path at depth δ inside the band's OUTER edge — offsetCurve, the
    one producer of every parallel curve, at d = −w/2 + δ — in print mm, cut
    between the two anchors' own points and resampled by arc length. The
-   chain lies in that path's frame: x its arc length from the run's first
+   rinceau lies in that path's frame: x its arc length from the run's first
    anchor, y outward (−nrm: every spine's normal points into the opening). */
 export const CHAIN_RUNS = {
   arch: [
@@ -749,8 +750,6 @@ export const CHAIN_RUNS = {
   ],
 };
 export const CHAIN_STEP_MM = 0.5;
-export const CHAIN_LEAD = 2.5;       // × molding width: the lead the element count is read against (the scale slider's own default, so every default measurement holds)
-export const CHAIN_CAP_MIN = 0.2;   // the chains capped to the band: elements made smaller (15 % a step) down to this share of their lead
 export const CHAIN_SEAT = 0.3;       // the elements' backs lie this share of the molding width inside its outer edge
 export const CHAIN_PATH_SMOOTH = 24;
 
@@ -851,149 +850,8 @@ export function mapToPath(c, path, x0 = 0) {
   return out;
 }
 
-/* THE CHAIN on one run (Eva's ruling 4B: C–S–C, sized to the run). A run of
-   length L takes N = max(3, round(L / lead)) ELEMENTS laid TANGENTIALLY
-   along the band, each over a footprint L / N: a C at each junction and S's
-   between. Every element is a carved scroll whose BACK lies on the molding
-   (its root at the path, which runs `depth` inside the outer edge) and whose
-   volutes curl outward — an S's second volute curls back over the molding.
-   A C faces its junction: its SHORT half (balance 0.6) toward the run's
-   end. Footprints are measured off the built curve (its x extent) and the
-   element scaled so footprint = L / N less a feature between neighbours.
-   Leaves lap each element's root, one either side. Choices made without a
-   ruling, each one constant: the element count law, the leaf layout. */
-export const CHAIN_ELEMENT_ASPECT = { C: 0.46, S: 0.52 };   // a scroll's x extent ÷ its length (measured, carved, tightness ½)
-export const CHAIN_S_TILT = 0.0;                            // rad
-export const CHAIN_JUNCTION = 0.35;     // × a footprint: a run stops this short of an INTERIOR junction (its leaf stands there)
-export const CHAIN_MARGIN = 0.1;        // mm: the build's clearances stand this far past F (the gate reads the emitted walls, ~0.07 mm off a centreline estimate)
 export const CHAIN_GAP = 2;             // × MIN_FEATURE_MM: an element's approach to the band is an embed or at least this far off (no visible slit)
-export function buildChain(path, { moldW, lead, density = 3, tightness = 0.5, leaves = true, leafSize = 0.42, startAxis = false, endAxis = false, region = null, opening = null, past = null, avoid = null }) {
-  const F = MIN_FEATURE_MM, told = [];
-  // the junction allowances: at the AXIS the two mirrored start C's stand a
-  // feature apart (F/2 each side); at an interior junction the run stops
-  // CHAIN_JUNCTION of a footprint short, for the junction's leaf
-  const N = Math.max(3, Math.round(path.length / lead * density / 3));
-  let foot = path.length / N;
-  // (at the AXIS too: the palmette stands between the two start C's)
-  const j0 = CHAIN_JUNCTION * foot, j1 = CHAIN_JUNCTION * foot;
-  const L = path.length - j0 - j1; foot = L / N;
-  // the elements, LAID SEQUENTIALLY in the path's own geometry: each pushed
-  // along until it clears the one before (and, at the axis, its own mirror)
-  // by a feature, read off the MAPPED curves — a curved run compresses
-  // whatever lies over the molding (y < 0) — and, when the chain overruns
-  // the run, every element's length scaled down and the chain laid again
-  const kinds = []; for (let k = 0; k < N; k++) kinds.push(k === 0 || k === N - 1 ? 'C' : 'S');
-  // NO VISIBLE GAP (Eva's 2B): every stretch of an element within
-  // CHAIN_GAP × F of the band's footprint must reach an embed (it is one
-  // contact, rooted) — an approach that comes near and does not touch reads
-  // as a slit. Read on the mapped curve; the element is pushed onto the
-  // molding (−y) until it holds
-  const slit = (on) => (region ? slitWorst(on, region) : -Infinity);
-  const make = (k, len, x) => {
-    const kind = kinds[k];
-    let c = buildScroll({ kind, length: len, tightness, wire: carvedCap(len), balance: 0.6, carved: true });
-    const place = (cc, dy) => { const local = shift(rigid(cc, { at: [0, 0], angle: 0, mirrorX: kind === 'C' && k === N - 1 }), [x, dy]); const on = mapToPath(local, path, 0); on.local = local; return on; };
-    let dy = 0, on = place(c, dy);
-    // the coils, re-read after mapping (a curved run can close them), at
-    // the element's seat — read again once the seat moves: fewer turns until
-    // a feature (and the margin) apart, told
-    const holdCoils = () => {
-      if (selfGap(on).gap >= F + CHAIN_MARGIN) return;
-      let lo = 0, hi = c.info.turnsHeld;
-      for (let it = 0; it < 16; it++) { const m = (lo + hi) / 2; if (selfGap(place(buildScroll({ kind, length: len, turns: m, wire: carvedCap(len), balance: 0.6, carved: true }), dy)).gap >= F + CHAIN_MARGIN) lo = m; else hi = m; }
-      const held = c.info.turnsHeld;
-      c = buildScroll({ kind, length: len, turns: lo, wire: carvedCap(len), balance: 0.6, carved: true }); on = place(c, dy);
-      told.push(`element ${k + 1}: volutes held at ${lo.toFixed(2)} of ${held.toFixed(2)} turns — laid on the run, a closer coil leaves a gap under the feature`);
-    };
-    holdCoils();
-    // and NOTHING IN THE OPENING: an element pushed onto the molding stops at
-    // its inner edge — pushed back out by its deepest intrusion; an element
-    // that cannot hold both is given way (told by the caller)
-    const intrusion = (o) => { if (!opening) return 0; let m = 0; o.pts.forEach((q, i) => { if (opening(q)) m = Math.max(m, -region.depth(q) + wAt(o, i) / 2); }); return m; };
-    // and NOTHING PAST THE BAND'S OUTER EDGE (Eva's ruling B on the second
-    // sheet: the chains are capped to the band too) — pushed back onto the
-    // molding by its furthest overshoot; an element that cannot clear both
-    // the opening and the edge does not fit the band at this size
-    const overshoot = (o) => { if (!past) return 0; let m = 0; o.pts.forEach((q, i) => { m = Math.max(m, past(q, wAt(o, i))); }); return m; };
-    let held = false;
-    for (let it = 0; it < 16; it++) {
-      const o = intrusion(on); if (o > 0) { dy += o + 0.05; on = place(c, dy); continue; }
-      const v = overshoot(on); if (v > 0) { dy -= v + 0.05; on = place(c, dy); continue; }
-      const w = slit(on); if (!(w > -Infinity)) { held = true; break; }
-      dy -= w + EMBED_MM + 1e-3; on = place(c, dy);
-    }
-    if (held) { holdCoils(); held = !(intrusion(on) > 0) && !(slit(on) > -Infinity) && !(overshoot(on) > 0); }
-    on.pastBand = held ? false : overshoot(on) > 0 || intrusion(on) > 0;
-    // fewer turns cannot undo a fold the PATH makes (an element laid across a
-    // corner sharper than itself): if its coils still close, it gives way
-    on.unseated = !held ? 'it cannot lie on the molding without reaching into the opening or leaving a gap' : selfGap(on).gap < F + CHAIN_MARGIN ? 'laid across the band\'s corner it would fold onto itself' : null;
-    on.info = { ...c.info, role: kind === 'C' ? (k === 0 ? 'start' : 'end') : 'link', seatPush: -dy };
-    on.localY = on.local.pts.map((q) => q[1]); on.chainIndex = k; on.len = len;
-    return on;
-  };
-  const extentX = (on) => { let lo = Infinity, hi = -Infinity; on.local.pts.forEach(([x], i) => { const h = wAt(on, i) / 2; lo = Math.min(lo, x - h); hi = Math.max(hi, x + h); }); return [lo, hi]; };
-  // an element placed before the chain (the draped crest on the axis) is
-  // cleared as the one before it is: every element laid a feature off it
-  const avoidClear = (on) => (avoid ? Math.min(...avoid.map((el) => wireElementContact(on, el, EMBED_MM).clear)) : Infinity);
-  const clearOf = (on, prev) => Math.min(prev ? wireClear(on, prev) : startAxis ? wireClear(on, mirrorCurve(on)) : Infinity, avoidClear(on));
-  const lay = (lens) => {
-    const out = []; let x = j0;
-    for (let k = 0; k < N; k++) {
-      // the first guess: the extent's left end at x
-      let c = make(k, lens[k], 0); const [lo] = extentX(c); let at = x - lo; c = make(k, lens[k], at);
-      const prev = out[k - 1] || null;
-      // push on until a feature clear (a step growing from 2 % of a footprint,
-      // then bisected sixteen times — 2^-16 of the last step)
-      let a = at, b = at;
-      if (clearOf(c, prev) < F + CHAIN_MARGIN) { let step = 0.02 * foot; for (let it = 0; it < 40 && clearOf(c, prev) < F + CHAIN_MARGIN; it++) { a = b; b += step; step *= 1.6; c = make(k, lens[k], b); } for (let it = 0; it < 16; it++) { const m = (a + b) / 2, cm = make(k, lens[k], m); if (clearOf(cm, prev) >= F + CHAIN_MARGIN) { b = m; c = cm; } else a = m; } }
-      out.push(c); x = extentX(c)[1];
-    }
-    return { out, end: x };
-  };
-  let lens = kinds.map((kind) => (foot - F) / CHAIN_ELEMENT_ASPECT[kind]);
-  let laid = lay(lens);
-  for (let it = 0; it < 6 && laid.end > path.length - j1 + 1e-6; it++) { const f = (path.length - j1 - j0) / (laid.end - j0); lens = lens.map((l) => l * Math.min(0.995, f)); laid = lay(lens); }
-  if (laid.end > path.length - j1 + 1e-6) told.push(`the chain overruns its run by ${(laid.end - path.length + j1).toFixed(2)} mm`);
-  const curves = [];
-  for (const on of laid.out) {
-    if (on.unseated) { told.push(`element ${on.chainIndex + 1} not built — ${on.unseated}`); continue; }
-    curves.push(on);
-    if (leaves) {
-      const k = on.chainIndex, len = on.len, r = on.local.pts[on.local.root];
-      for (const [side, ang, frac] of [[+1, 0.35, leafSize], [-1, Math.PI - 0.35, leafSize * 0.85]]) {
-        const make2 = (ll) => {
-          const lf0 = buildLeaf({ length: ll, width: LEAF_ASPECT * ll, side });
-          const lfl = rigid(lf0, { at: r, angle: ang });
-          const lon = mapToPath(lfl, path, 0);
-          lon.info = { ...lf0.info, hostWire: on.info.wire, hostW: wAt(on, on.root), role: 'leaf' };
-          lon.localY = lfl.pts.map((q) => q[1]);
-          lon.chainIndex = k;
-          lon.remake = (f) => make2(ll * f);
-          return lon;
-        };
-        // capped to the band: a leaf past the outer edge is shortened (to
-        // a fifth of its length at most), else not built
-        let lf = make2(frac * len), f = 1;
-        const over = (o) => (past ? Math.max(0, ...o.pts.map((q, i) => past(q, wAt(o, i)))) : 0);
-        while (over(lf) > 0 && f > 0.2) { f *= 0.8; lf = make2(frac * len * f); }
-        if (over(lf) > 0) { told.push(`element ${k + 1}: a leaf not built — it stands past the band's outer edge at any length`); continue; }
-        if (f < 1) told.push(`element ${k + 1}: a leaf shortened to ${(100 * f).toFixed(0)}% — at full length it stands past the band's outer edge`);
-        curves.push(lf);
-      }
-    }
-  }
-  return { curves, told, n: N, foot, pastBand: laid.out.filter((o) => o.pastBand).length };
-}
 
-/* SEATED ON THE MOLDING (Eva's ruling 2B): a chain curve's crown stands on
-   the molding's own height under it. A row at local y (its centre's offset
-   outward from the path, which runs `depth` inside the outer edge) spanning
-   its own width w covers the band across-fraction [(depth − y − w/2)/W,
-   (depth − y + w/2)/W] (0 at the outer edge); its lift is the profile's
-   HIGHEST z over that span × the relief depth, so the crown clears the
-   molding under every part of it. Past the outer edge the lift falls
-   linearly to the plate over one stem width (the ornament steps down off
-   the molding rather than dropping off it). */
 /* The worst SLIT of a wire against the band: over every stretch within
    G of the band's footprint that reaches no embed, the nearest approach
    (−Infinity when there is none). Read at BOTH G = CHAIN_GAP × F and G = F:
@@ -1050,7 +908,7 @@ export function moldingHeightField(model, scale) {
    spine's own offset curves (a wire whose seat was read on the centreline's
    span cleared the molding by 0.989 mm where its crown is the 1 mm floor).
    An embed row beyond either end lifts the end row it extends. */
-export function seatEmitted(H, spine, prof, lift, depth) {
+export function seatEmitted(H, spine, prof, lift, depth, extra = null) {
   const mesh = new Mesh();
   bandSolid(mesh, { ...spine, baseLift: lift }, prof, { scale: 1, plateT: 0, reliefDepth: depth });
   const part = mesh.parts[0], P = mesh.pos, n = lift.length, out = lift.slice();
@@ -1058,7 +916,10 @@ export function seatEmitted(H, spine, prof, lift, depth) {
     const i = Math.min(n - 1, Math.max(0, v - part.rowOffset));
     // read at the vertex AND its mirror image: the raster is not symmetric to
     // the bit, and a seat read on one side only would break the mirror (OR5)
-    for (let c = 0; c < part.C; c++) { const ix = 3 * part.T(v, c); out[i] = Math.max(out[i], H([P[ix], P[ix + 1]]), H([-P[ix], P[ix + 1]])); }
+    // (`extra`, per row: what the wire stands over the molding by — a leaf's
+    // crest shortfall, so the crest is a feature over the molding the
+    // EMITTED columns read and not only over the one its centreline read)
+    for (let c = 0; c < part.C; c++) { const ix = 3 * part.T(v, c); out[i] = Math.max(out[i], H([P[ix], P[ix + 1]]) + (extra ? extra[i] : 0), H([-P[ix], P[ix + 1]]) + (extra ? extra[i] : 0)); }
   }
   return out;
 }
@@ -1071,93 +932,6 @@ export function seatOn(H, c, i) {
   let m = -Infinity;
   for (let k = 0; k <= 16; k++) { const t = (k / 16 - 0.5) * w; m = Math.max(m, H([q[0] + t * n[0], q[1] + t * n[1]])); }
   return m;
-}
-
-export function moldingLift(y, w, { depth, moldW, prof, reliefDepth, ramp }) {
-  const zAt = (f) => { const x = prof.x; if (f <= x[0]) return prof.z[0]; for (let k = 1; k < x.length; k++) if (f <= x[k]) return prof.z[k - 1] + (prof.z[k] - prof.z[k - 1]) * (f - x[k - 1]) / (x[k] - x[k - 1]); return prof.z[x.length - 1]; };
-  const a = (depth - y - w / 2) / moldW, b = (depth - y + w / 2) / moldW;
-  if (b <= 0) { const over = -b * moldW; return zAt(0) * reliefDepth * Math.max(0, 1 - over / ramp); }
-  let m = 0; const lo = Math.max(0, a), hi = Math.min(1, b);
-  for (let k = 0; k <= 16; k++) m = Math.max(m, zAt(lo + (hi - lo) * k / 16));
-  for (let k = 0; k < prof.x.length; k++) if (prof.x[k] >= lo && prof.x[k] <= hi) m = Math.max(m, prof.z[k]);
-  return m * reliefDepth;
-}
-
-/* SETTLING the chains: the contact rules the groups obey, applied to every
-   wire of every chain, both sides, and the junctions'. Scroll elements: a
-   feature clear of every other scroll element — a later element that is not
-   gives way (told). Leaves: a JOINT with their host element (the embed), and
-   with every other wire either a feature clear or a CROSSING (every approach
-   under a feature an overlap of LEAF_CROSS); a leaf that is neither is
-   shortened 15 % at a time from its root, up to seven times, then dropped
-   (told). A junction or axis leaf has no host: the crossing rule throughout.
-   The mirror is re-taken from each settled right half, so it stays exact. */
-function settleChains(groups, told, region, opening) {
-  const F = MIN_FEATURE_MM, Fm = F + CHAIN_MARGIN;
-  const clear = (a, b) => (wireClearBound(a, b) >= Fm ? Infinity : wireClear(a, b));
-  const near = (c) => { const B = boxOf(c); return region.near([(B.x0 + B.x1) / 2, (B.y0 + B.y1) / 2], Math.hypot(B.x1 - B.x0, B.y1 - B.y0) / 2 + B.w + 3 * F); };
-  // a leaf's own band rule: no slit (every approach within CHAIN_GAP × F an
-  // embed) and nothing in the opening
-  const bandOK = (c) => !c.pts.some((q) => opening(q)) && !(slitWorst(c, near(c)) > -Infinity);
-  const isLeaf = (c) => c.kind === 'leaf';
-  // the scroll elements first, in build order, against everything kept
-  const keptScroll = [];
-  for (const g of groups) {
-    const keep = [];
-    for (const c of g.curves) {
-      if (isLeaf(c)) { keep.push(c); continue; }
-      const mates = [c, ...(g.mirrored.length ? [mirrorCurve(c)] : [])];
-      let worst = Infinity; for (const m of mates) for (const o of keptScroll) worst = Math.min(worst, clear(m, o));
-      if (g.mirrored.length) worst = Math.min(worst, clear(c, mates[1]));
-      if (worst < Fm) { told.push(`chain ${g.group}: element ${c.chainIndex + 1} not built — it would come ${worst.toFixed(2)} mm from another`); continue; }
-      keep.push(c); keptScroll.push(...mates);
-    }
-    g.curves = keep;
-  }
-  // the junction MOTIFS (placed elements, phase 3e step 3), against every
-  // scroll kept: every approach of a scroll a JOINT (an overlap of the embed —
-  // the motif stands on the chain's end) or a feature clear; a motif that
-  // grazes is remade 10 % smaller up to eight times, then not built (told).
-  // A chain's leaf gives way to a motif, never the reverse
-  const keptEls = [];
-  for (const g of groups.filter((q) => q.elements)) {
-    let els = g.elements, q = 0, ok = false;
-    for (; q < 9; q++) {
-      ok = els.every((e) => keptScroll.every((o) => wireElementContact(o, e, EMBED_MM).graze === -Infinity) && keptEls.every((o) => elementClear(e, o) >= Fm));
-      if (ok || !g.remake) break;
-      const el = g.remake(0.9 ** (q + 1)); if (!el) break;
-      els = g.onAxis ? [el] : [el, mirrorElement(el)];
-    }
-    if (!ok) { told.push(`the ${g.group} at ${g.anchor} is not built — it grazes a chain at every size`); g.elements = []; continue; }
-    if (q) told.push(`the ${g.group} at ${g.anchor} made ${(100 * 0.9 ** q).toFixed(0)}% — at full size it grazes a chain`);
-    g.elements = els; keptEls.push(...els);
-  }
-  // then the leaves, against every scroll, every leaf already kept and every
-  // motif (a feature clear, or a CROSSING of LEAF_CROSS)
-  const keptLeaves = [];
-  const elOK = (c) => keptEls.every((e) => wireElementContact(c, e, LEAF_CROSS).graze === -Infinity);
-  for (const g of groups.filter((q) => !q.elements)) {
-    const keep = [];
-    for (const c of g.curves) {
-      if (!isLeaf(c)) { keep.push(c); continue; }
-      const host = c.chainIndex != null ? g.curves.find((h) => !isLeaf(h) && h.chainIndex === c.chainIndex) : null;
-      if (c.chainIndex != null && !host) continue;               // its element gave way
-      let got = null, q = 0, cur = c;
-      for (; q < 8 && !got; q++) {
-        const mates = [cur, ...(g.mirrored.length ? [mirrorCurve(cur)] : [])];
-        const others = [...keptScroll, ...keptLeaves].filter((o) => o !== host);
-        const ok = bandOK(cur) && (host ? joinsCleanly(cur, host) : true) && mates.every((m) => elOK(m) && others.every((o) => o === host || clear(m, o) >= Fm || joinsCleanly(m, o, LEAF_CROSS)))
-          && (mates.length < 2 || clear(mates[0], mates[1]) >= Fm || joinsCleanly(mates[0], mates[1], LEAF_CROSS));
-        if (ok) { got = cur; break; }
-        if (c.remake) { cur = c.remake(0.85 ** (q + 1)); if (c.finish) c.finish(cur); } else cur = truncateCurve(cur, 0.85);
-      }
-      if (!got) { told.push(`chain ${g.group}: a leaf not built — it grazes another wire at every length`); continue; }
-      if (q) told.push(`chain ${g.group}: a leaf shortened to ${(100 * 0.85 ** q).toFixed(0)}% — at full length it grazes another wire`);
-      keep.push(got); keptLeaves.push(got, ...(g.mirrored.length ? [mirrorCurve(got)] : []));
-    }
-    g.curves = keep;
-    g.mirrored = keep.map(mirrorCurve);
-  }
 }
 
 /* PLACING A MOTIF (phase 3e step 3): one law for the chains' junction
@@ -1215,130 +989,6 @@ export function placeMotif(kind, { size, at, out, H, opening, onAxis = false, su
   if (onAxis) { el = symmetrizeElement(el); if (el.asymmetric) return null; }
   return el;
 }
-/* A curve cut to a fraction of its stations from its root (row 0): every
-   per-station array sliced alike. */
-function truncateCurve(c, frac) {
-  const n = Math.max(3, Math.round(c.pts.length * frac));
-  const cut = (a) => (Array.isArray(a) ? a.slice(0, n) : a);
-  const out = { ...c, pts: c.pts.slice(0, n), nrm: c.nrm.slice(0, n), tan: c.tan.slice(0, n) };
-  for (const k of ['w', 'kap', 'u', 'localY', 'lift']) if (c[k]) out[k] = cut(c[k]);
-  return out;
-}
-
-/* The ornament as RUNNING CHAINS: one chain per run whose control is on,
-   mirrored; the same record ornamentFor returns. */
-export function chainsFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
-  const p = model.params, kind = model.info.kind;
-  const frameH = model.box.y1 - model.box.y0, scale = p.printHeight / frameH;
-  const region = bandRegion(model, scale);
-  const told = [];
-  // a chain is sized by its RUN (its elements share the run's length), so
-  // the scale slider is the groups' and is hidden here; the lead the element
-  // count is read against is CHAIN_LEAD × the molding width
-  const moldW = p.moldingWidth * scale, length = CHAIN_LEAD * p.moldingWidth * scale;
-  const groups = [], ends = [];
-  // the OPENING: inside the frame's silhouette (plateOutline, its owner) and
-  // in no band's footprint
-  const sil = plateOutline(model).map(([x, y]) => [x * scale, y * scale]);
-  const opening = (q) => pip(q, sil) && !region.inside(q);
-  // past the band's outer edge (the frame's own silhouette): by how much a
-  // wire of width w centred at q stands out of it (≤ 0 inside)
-  const beyondBy = (q, w) => w / 2 - silDistance(sil, q);
-  const H = moldingHeightField(model, scale);
-  const depth = CHAIN_SEAT * moldW;
-  let tris = model.spines.reduce((a, sp) => a + solidTriBound(sp.pts.length + 2, model.prof.x.length + 1), 0);
-  const frameTris = tris;
-  // THE CREST FIRST (capped chains, Eva's ruling B): the top of the axis
-  // carries the vine's draped crest — the soft shell, low and wide along the
-  // band, the one thing past its edge (frame-vine's drapedCrest, one owner) —
-  // and every chain that reaches the axis is laid clear of it
-  const topAxis = Object.entries(model.info.anchors).find(([, a]) => Math.abs(a.pt[0]) < 1e-9 && a.pt[1] > (model.box.y0 + model.box.y1) / 2);
-  const crestWanted = topAxis && (CHAIN_RUNS[kind] || []).some((r) => p[r.control] === 'on' && (r.from === topAxis[0] || r.to === topAxis[0]));
-  const crest = crestWanted ? drapedCrest('shell', { M: moldW, frame: edgeFrame(sil, moldW), opening, Hz: (q) => Math.max(0, H(q)), fits: () => true, why: 'stand clear of the opening', slopes: kind === 'arch' }) : null;
-  if (crest) told.push(crest.note);
-  const avoid = crest && crest.el ? [crest.el] : null;
-  for (const run of CHAIN_RUNS[kind] || []) {
-    if (p[run.control] !== 'on') continue;
-    if (!model.info.anchors[run.from] || !model.info.anchors[run.to]) { told.push(`no ${!model.info.anchors[run.from] ? run.from : run.to} on this frame — its ${run.id} chain is not built`); continue; }
-    const path = runPath(model, run, scale, depth);
-    const axis = (id) => Math.abs(model.info.anchors[id].pt[0]) < 1e-9;
-    // CAPPED TO THE BAND (Eva's ruling B on the second sheet): the chain is
-    // built at its lead, and while any element cannot stand between the
-    // opening and the band's outer edge, again with every element smaller
-    // (the lead 15 % shorter, so more of them) — told
-    let ch = null, lf = 1;
-    for (; ; lf *= 0.85) {
-      ch = buildChain(path, { moldW, lead: length * lf, density: p.ornDensity, tightness: p.ornTightness, leaves: p.ornLeaves === 'on', leafSize: p.ornLeafSize, startAxis: axis(run.from), endAxis: axis(run.to), region: region.near(path.pts[Math.floor(path.pts.length / 2)], path.length + 6 * length), opening, past: beyondBy, avoid: axis(run.from) || axis(run.to) ? avoid : null });
-      if (!ch.pastBand || lf < CHAIN_CAP_MIN) break;
-    }
-    if (lf < 1) told.push(`chain ${run.id}: its elements made ${(100 * lf).toFixed(0)}% of their lead (${ch.n} of them) to stay inside the band${ch.pastBand ? ` — ${ch.pastBand} still do not fit and are not built` : ''}`);
-    ends.push({ id: run.from, P: path.pts[0], N: path.out[0], axis: axis(run.from), foot: ch.foot, path, at: 0 }, { id: run.to, P: path.pts.at(-1), N: path.out.at(-1), axis: axis(run.to), foot: ch.foot, path, at: path.length });
-    const reliefDepth = p.moldingDepth * scale * p.reliefScale;
-    const lp = { depth, moldW, prof: model.prof, reliefDepth, ramp: 0.35 * moldW };
-    const finish = (c) => {
-      // on the molding's own height field; off the band, the ramp down from its edge
-      c.lift = c.localY.map((y, i) => Math.max(moldingLift(y, wAt(c, i), lp), seatOn(H, c, i)));
-      // a LEAF lies over the scroll it laps: its base on the host's crown at
-      // the host's root (the stacked shell of phase 3c, standing on the molding)
-      if (c.kind === 'leaf') { const host = ch.curves.find((h) => h.kind !== 'leaf' && h.chainIndex === c.chainIndex); const hc = wireHeight(c.info.hostW, p.ornShape === 'round' ? 'round' : 'half-round') * p.ornProjection; const hl = host.lift[host.root]; c.lift = c.lift.map((z) => Math.max(z, hl) + hc); }
-      c.finish = finish;
-      return c;
-    };
-    for (const c of ch.curves) finish(c);
-    const curves = ch.curves, mirrored = curves.map(mirrorCurve);
-    const mine = [...curves, ...mirrored];
-    const gTris = mine.reduce((a, c) => a + solidTriBound(c.pts.length, profileFor(c, p).x.length), 0);
-    if (tris + gTris > triBudget) { told.push(`the ${run.id} chain is not built — it would take the relief to ${(tris + gTris).toLocaleString('en-US')} triangles, past the ${triBudget.toLocaleString('en-US')} budget`); continue; }
-    tris += gTris;
-    groups.push({ group: run.id, anchor: `${run.from}→${run.to}`, onAxis: false, curves, mirrored, push: depth, told: ch.told, chain: { path, depth, elements: ch.n, foot: ch.foot } });
-  }
-  // THE JUNCTIONS: one straight LEAF per anchor a built run ends at — on the
-  // AXIS (the crest, the bottom) a single leaf, its own mirror, pointing out
-  // between the two mirrored start C's; at an interior junction (a corner, a
-  // springing, an oval's side) a leaf on the bisector of the runs' outward
-  // normals, when Corners / springings is on. Its root on the molding at the
-  // runs' seat; its lift the molding's height there.
-  const byId = new Map(); for (const e of ends) { if (!byId.has(e.id)) byId.set(e.id, []); byId.get(e.id).push(e); }
-  for (const [id, es] of byId) {
-    const isAxis = es[0].axis;
-    if (!isAxis && p.ornCorners !== 'on') continue;
-    let nx = 0, ny = 0; for (const e of es) { nx += e.N[0]; ny += e.N[1]; } const nl = Math.hypot(nx, ny); nx /= nl; ny /= nl;
-    const foot = Math.min(...es.map((e) => e.foot));
-    const P = isAxis ? [0, es[0].P[1]] : es.reduce((a, e) => [a[0] + e.P[0] / es.length, a[1] + e.P[1] / es.length], [0, 0]);
-    // ONE PRIMITIVE EACH (Eva's ruling on §15–16, wired in phase 3e step 3):
-    // the axis motif is the PALMETTE element, an interior junction's the
-    // ROSETTE element (frame-elements.js), placed by placeMotif — the same
-    // law the vine places them by. Sized to the run's footprint as the leaf
-    // motifs they replace were (a centre leaf one footprint long; five petals
-    // under half a footprint each)
-    // CAPPED TO THE BAND (Eva's ruling B): the TOP of the axis carries the
-    // vine's draped crest — the soft shell, low and wide along the band, the
-    // one thing past its edge (frame-vine's drapedCrest, one owner) — and
-    // every other motif is held inside the band (placeMotif's `beyond`),
-    // made 10 % smaller at a time until it fits
-    if (topAxis && id === topAxis[0]) {
-      if (avoid) groups.push({ group: 'shell', anchor: id, onAxis: true, curves: [], mirrored: [], elements: avoid, push: depth, told: [], motif: { kind: 'shell', crest: true }, remake: null });
-      continue;
-    }
-    const kind = isAxis ? 'palmette' : 'rosette';
-    const spec = { size: isAxis ? foot : 0.98 * foot, at: P, out: [nx, ny], H, opening, onAxis: isAxis, sunk: kind === 'rosette', beyond: (q) => !pip(q, sil), reach: 0.5 * moldW };
-    let el = null, f0 = 1;
-    for (let q = 0; q < 16 && !el; q++, f0 *= 0.9) el = placeMotif(kind, { ...spec, size: spec.size * f0 });
-    f0 /= 0.9;
-    if (!el) { told.push(`the ${kind} at ${id} is not built — it cannot stand inside the band clear of the opening`); continue; }
-    if (f0 < 1) told.push(`the ${kind} at ${id} held inside the band at ${(100 * f0).toFixed(0)}% of its size`);
-    const spec0 = { ...spec, size: spec.size * f0 };
-    groups.push({ group: kind, anchor: id, onAxis: isAxis, curves: [], mirrored: [], elements: isAxis ? [el] : [el, mirrorElement(el)], push: depth, told: [], motif: { kind, ...spec0, H: undefined, opening: undefined, beyond: undefined }, remake: (f) => placeMotif(kind, { ...spec0, size: spec0.size * f }) });
-  }
-  settleChains(groups, told, region, opening);
-  // the budget, once everything is settled (a junction leaf counted too)
-  for (const g of groups) if (g.elements) tris += g.elements.reduce((a, e) => a + e.indices.length / 3, 0);
-  const all = groups.flatMap((g) => [...g.curves, ...g.mirrored]);
-  const elements = groups.flatMap((g) => g.elements || []);
-  const tip = all.length ? Math.min(...all.map((c) => c.info.tip ?? c.info.wire)) : MIN_FEATURE_MM;
-  return { scale, length, wire: MIN_FEATURE_MM, style: 'carved', layout: 'chains', tip, groups, curves: all, elements, region, H, told, tris: { bound: tris, frame: frameTris, budget: triBudget } };
-}
-
 /* The ornament of a frame model: groups at the asked anchors, built in print
    mm, mirrored, seated and checked. p carries the ornament controls. */
 export function ornamentFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
@@ -1443,9 +1093,10 @@ export function leafLift(c, shape, projection) {
 export function withOrnament(model, opts = {}) {
   const p = model.params;
   if (p.filigree !== 'scrolls') return model;
-  // the chains' hierarchy (phase 3e step 3): at strength 0 the chains of
-  // phase 3d, by branch; above it the VINE (frame-vine.js)
-  const orn = p.ornLayout === 'chains' ? ((p.ornHierarchy ?? 0) > 0 ? vineFor(model, opts) : chainsFor(model, opts)) : ornamentFor(model, opts);
+  // phase 3f step 2: the RINCEAU (frame-vine.js's vineFor, with
+  // frame-rinceau.js's laws) along the band, or the phase-3a GROUPS at the
+  // anchors. The chains of phase 3d are RETIRED (Eva, Nov 10)
+  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : vineFor(model, opts);
   const s = orn.scale;
   const shape = p.ornShape === 'round' ? 'round' : p.ornShape === 'half-round' ? 'half-round' : 'arris';
   // a tapered wire's local width rides on the spine as widthScale (the one
@@ -1477,7 +1128,7 @@ export function withOrnament(model, opts = {}) {
     if (k) { spine.widthScale = k; spine.depthScale = crownScale(c, depth); }
     // a leaf is a STACKED shell: its crown is lifted by its host's crown at
     // the host's root, so where the two overlap the leaf lies over the scroll
-    if (c.lift) spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth) : c.lift;
+    if (c.lift) spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth, c.seatExtra || null) : c.lift;
     const lift = c.lift ? 0 : lf ? leafLift(c, shape, p.ornProjection) : 0;
     return { spine, prof: profileFor(c, p), depth, lift, kind: lf ? 'leaf' : 'scroll' };
   });
