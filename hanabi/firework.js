@@ -66,7 +66,7 @@ const RADIAL_IDS = Object.values(LEGACY_RADIAL);
 export const PARAMS = {
   // the ENVELOPE of every type's count (a saved value is read onto it); each type
   // has its own label and range, TYPES[t].count, and paramFor() is what a control reads
-  count:      { label: 'Count', min: 3, max: 210, step: 1 },
+  count:      { label: 'Count', min: 1, max: 210, step: 1 },
   length:     { label: 'Length', min: 0.3, max: 1, step: 0.05 },
   trail:      { label: 'Trail length', min: 0, max: 1, step: 0.05 },
   starSize:   { label: 'Star size', min: 0.4, max: 2.5, step: 0.1 },
@@ -76,6 +76,10 @@ export const PARAMS = {
   core:       { label: 'Core', kind: 'bool' },
   outerColor: { label: 'Outer colour', kind: 'color' },
   coreColor:  { label: 'Core colour', kind: 'color' },
+  // phase 1's rising trail below a Scale / Full-bleed burst at ranks 1-3 (classic
+  // and the radial bursts). Its default is the DESIGN's (stemDefault): off for a
+  // design made since version 6, on for one saved before.
+  stem:       { label: 'Rising trail', kind: 'bool', note: 'the faint dotted trail below the burst, under Scale and Full bleed at ranks 1-3' },
 };
 const COLOR_PARAMS = ['outerColor', 'coreColor'];
 
@@ -118,11 +122,16 @@ export const TYPE_IDS = Object.keys(TYPES);
 // many; under Scale an escalating type draws fewer at the lower ranks. Detail
 // never changes it.
 export function countRange(motif) {
-  return TYPES[motif] ? TYPES[motif].count : { label: PARAMS.count.label, min: PARAMS.count.min, max: PARAMS.count.max };
+  return TYPES[motif] ? TYPES[motif].count : CATALOGUE_COUNT[motif] || { label: PARAMS.count.label, min: PARAMS.count.min, max: PARAMS.count.max };
 }
 // The control a parameter is given on a motif: its own label and range for count.
 export function paramFor(k, motif) {
-  if (k !== 'count' || !TYPES[motif]) return PARAMS[k];
+  if (k !== 'count') return PARAMS[k];
+  if (CATALOGUE_COUNT[motif]) {
+    const c = CATALOGUE_COUNT[motif];
+    return { ...PARAMS.count, label: c.label, min: c.min, max: c.max, note: `${c.note}; fewer at lower ranks under Scale` };
+  }
+  if (!TYPES[motif]) return PARAMS[k];
   const c = TYPES[motif].count;
   return { ...PARAMS.count, label: c.label, min: c.min, max: c.max, note: TYPES[motif].escalate ? 'fewer at lower ranks under Scale' : undefined };
 }
@@ -160,9 +169,32 @@ export const MOTIF_IDS = Object.keys(MOTIFS);
 // would leave its rect).
 export function motifParams(motif) {
   if (TYPES[motif]) return TYPES[motif].params;
-  if (MOTIFS[motif] && FIELD_MOTIFS.includes(motif)) return COLOR_PARAMS;
+  if (MOTIFS[motif] && FIELD_MOTIFS.includes(motif)) return ['count', ...COLOR_PARAMS];
+  if (CATALOGUE_COUNT[motif]) return ['count', 'rotation', ...COLOR_PARAMS];
+  if (motif === 'classic' || RADIAL_IDS.includes(motif)) return ['stem', 'rotation', ...COLOR_PARAMS];
   return MOTIFS[motif] ? ['rotation', ...COLOR_PARAMS] : [];
 }
+// THE CATALOGUE COUNTS (version 6, Nov 10): the spoke discs' spokes and the two
+// fields' rosettes and stars, as a count of their own. The stored count is what a
+// firework draws at rank 5 (so exactly, under Count); under Scale the lower ranks
+// draw fewer, in the catalogue's own ratios (COUNTS below), and a count left unset
+// is the catalogue's own escalation to the mark. A spoke disc with a core also
+// draws an inner ring of teardrops (6 + spokes / 8), not on this slider.
+export const CATALOGUE_COUNT = {
+  spoke:     { label: 'Spokes', min: 6, max: 160, note: 'the rays' },
+  spokecore: { label: 'Spokes', min: 6, max: 160, note: 'the outer rays (the core ring follows them)' },
+  rosettes:  { label: 'Count', min: 1, max: 30, note: 'the rosettes in the field' },
+  starfield: { label: 'Count', min: 1, max: 60, note: 'the stars in the field' },
+};
+export const catalogueCountDefault = (motif) => COUNTS[motif][4];
+// What a catalogue firework of count v draws at rank `rank` (5 under Count).
+export function catalogueCountAt(motif, v, rank) {
+  const c = COUNTS[motif], r = clampN(rank | 0 || 5, 1, 5);
+  return Math.max(CATALOGUE_COUNT[motif].min, Math.round((+v || 0) * c[r - 1] / c[4]));
+}
+// The rising trail's default: a design made since version 6 says (off); one
+// without the field (saved before, or built by an older page) draws it.
+export const stemDefault = (design) => !(design && design.stems === false);
 
 // The second tier under a burst (items 21 and 24 of the ruled list).
 export const TIERS = {
@@ -226,6 +258,8 @@ export function defaultSpec(suit, rank, allSuits, motif = 'classic', tier = 'non
   else if (TYPES[m]) spec = { version: SPEC_VERSION, motif: m, size: SIZES[er - 1], colors, seed, rank: er, ...TYPES[m].defaults };
   else {
     spec = { version: SPEC_VERSION, motif: m, size: (FIELD_MOTIFS.includes(m) ? FIELD_SIZES : SIZES)[er - 1], count: COUNTS[m][er - 1], colors, seed, core: er >= 3 };
+    // a counted catalogue motif carries its rank-5 count and the rank it draws at
+    if (CATALOGUE_COUNT[m]) { spec.count = COUNTS[m][4]; spec.rank = er; }
     if (RINGS[m]) spec.rings = RINGS[m][er - 1];
   }
   if (compose === 'count') spec.size = 1;
@@ -261,9 +295,14 @@ export function fireworkSpec(design, suit, rank, motifAt) {
   const takes = inheritKeys(spec.motif).filter((k) => !other || COLOR_PARAMS.includes(k));
   const mine = suit.firework && typeof suit.firework === 'object' ? suit.firework : {};
   for (const k of takes) if (mine[k] !== undefined && mine[k] !== '') spec[k] = mine[k];
-  if (!over) return spec;
-  if (!other) return { ...spec, ...over };
+  if (!over) return withStem(design, spec);
+  if (!other) return withStem(design, { ...spec, ...over });
   for (const k of takes) if (over[k] !== undefined && over[k] !== '') spec[k] = over[k];
+  return withStem(design, spec);
+}
+// Phase 1's rising trail: off where the spec (a suit, a card) or the design says.
+function withStem(design, spec) {
+  if (spec.trail && (spec.motif === 'classic' || RADIAL_IDS.includes(spec.motif)) && !(spec.stem ?? stemDefault(design))) spec.trail = false;
   return spec;
 }
 
@@ -556,6 +595,7 @@ export function renderFirework(spec, box) {
   if (TYPES[m]) return `<g class="hb-firework" data-motif="${m}">${drawType(spec, cx, cy, R, Math.max(0.26, r * 0.022), rand, colors)}</g>`;
   const w = Math.max(0.26, r * 0.022);
   const s = { ...spec, colors };
+  if (CATALOGUE_COUNT[m] && spec.rank) s.count = catalogueCountAt(m, spec.count, spec.rank);
   const sz = Math.max(0.05, Math.min(1, spec.size));
   // A burst is laid out on R less one stroke, so its outermost dots and line
   // caps land inside r rather than on it.

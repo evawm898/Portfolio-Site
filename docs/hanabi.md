@@ -166,6 +166,76 @@ names every rank where two suits' fireworks sit nearer than two draws of one typ
 threshold is measured from the types, never typed) and exits 0. H28 holds the report itself:
 silent on the default deck, and it names Red and Blue when Blue 3 is restyled as Red's peony.
 
+## The polish pass (schema version 6, Nov 10)
+
+**The catalogue counts.** Spoke disc, Spoke disc with a core, Rosette field and Starfield take a
+count, at both levels the board edits (the row and the card; a disc as one firework's style too —
+the fields are never a style), exactly as #551's nine types do. The stored count is what the
+firework draws at rank 5, so it is exact under Count; under Scale (and Column, Full bleed, Count +
+scale) the lower ranks draw fewer in the catalogue's own ratios (`COUNTS`), and a count left unset is
+the catalogue's own escalation to the mark — byte for byte what it drew (H31, against `5771675`).
+
+| motif | the count is | min | default | max | not on this slider |
+|---|---|---|---|---|---|
+| Spoke disc | Spokes (the rays) | 6 | 80 | 160 | the core dot |
+| Spoke disc with a core | Spokes (the outer rays) | 6 | 80 | 160 | the core's ring of teardrops (6 + spokes ÷ 8) |
+| Rosette field | Count (rosettes) | 1 | 15 | 30 | — |
+| Starfield | Count (stars) | 1 | 26 | 60 | — |
+
+`CATALOGUE_COUNT`, `catalogueCountAt()` (`firework.js`). **Saved designs draw as before**
+(`migrateCatalogueCounts`, `deck.js`): before version 6 a count at the SUIT or in a STYLE never reached
+these motifs (it may be left over from another type — switching a suit's type keeps its parameters), and
+a count on a CARD was drawn as given. So a suit count under one of the four is taken off the suit and
+handed to the cards of that row drawn as another type that inherited it; a card made one of the four
+under a suit of another type with a count is given the motif's own count; a card count becomes the
+count whose escalation at that rank is what it drew; a style count on a disc is dropped (it drew
+nothing). The file says how many it rewrote. H32 renders such designs against `5771675` byte for byte.
+
+**New designs open differently; saved ones keep what they had.** A file saved before version 6 that
+does not say is read with the old meaning (`V6_OLD_DEFAULTS`):
+
+| field | a new design | a file before version 6 |
+|---|---|---|
+| `corners` | `four` — numeral + symbol in every corner, the bottom pair turned 180° (so a fanned hand reads from either side) | `inverted` |
+| `stems` | `false` — phase 1's faint dotted rising trail is off | `true` |
+| `pips` | `grid` — the corner grid (below) | `field` |
+| `face.frame` | `none` | `none` |
+
+- **Four corners.** The bottom pair is `rotate(180 cx cy)` about the card's centre of the top pair, a
+  true 180° turn (H33 reads the transform and the centre restated from the size). Numerals are 8.2 mm
+  tall at mini with the large index (6.0 mm small), 11.6 mm on a poker card. The art never moves with the
+  corner mode: the field always left both index columns.
+- **The rising trail** (`stem`, a parameter of Classic and the four radial bursts; *Rising trail* in the
+  editor) is the faint dotted line under a Scale or Full-bleed burst at ranks 1–3. Its default is the
+  design's (`stemDefault`): off for a design made since version 6, on for one saved before; the suit, a
+  card, or one firework can set it either way. The nine types never drew one.
+- **The corner grid** (*Pip fit* in the Corner index section). Every face shares one grid: the safe zone
+  less the gap, with all four corner-index boxes reserved whatever the corner mode. Count's default pips
+  are fitted to it (`gridRoom`, `GRID_PIPS`) instead of to the field between the index columns, so ranks
+  1 and 2 use the room between the indices. Ranks 3–5 are unchanged. Drawn diameters (large index, field
+  → grid): poker rank 1 39.9 → 55.0 mm, rank 2 32.5 / 27.7 → 36.4 / 36.4; bridge 33.7 → 48.7; mini 25.6 →
+  36.3. H34 holds every default pip of every composition, preset and index inside the grid and clear of
+  every index box. An arrangement made by hand is literal as before; `ITEM_LIMITS.s` rose to 1.6 so a
+  grid pip written out literally (rank 1 is 1.35 of the field unit) survives the file.
+- **The frame** (*Frame*: None / Thin border / Inner frame; `face.frame`) prints: a thin rounded line in
+  the suit's colour half the safe margin in from the trim (never nearer than 0.8 mm), the inner frame a
+  second line inside it, over the art and the index, clear of the index boxes (H35).
+- **Rounded corners** (the toolbar; `view.round`, per browser, on by default) is the PREVIEW only: each
+  card clipped to its trim with corners of 0.05 of the shorter side (3.2 mm on a poker card) and a hairline
+  edge, so a card reads as an object against the dark page. The guides win (they show the bleed), and no
+  export asks for it (H35 reads `export.js`).
+
+**The panel.** Each suit's centre is one label and one dropdown a line, so no motif name is cut off
+("5 · Spoke disc with a core"); the tier reads *Tier, 4–5*; the corner, orientation and cutting options
+are short with the detail in a tooltip; every panel colour shows its swatch inside an edge and its hex
+beside it (the dark card face read as an empty box); colour pairs became one per line. B13 measures
+every option of every panel dropdown against its box at the default panel width, and every label for a
+wrap.
+
+**Centre all rank 1s, and centre row, skip a card already centred** within 0.05 mm (`CENTRE_TOL_MM`): it
+is not written, so it is not marked as overridden; the status names it. The editor's own Centre still
+writes.
+
 ## The fireworks
 
 **Nine firework TYPES** (phase 2) — each a distinct silhouette, not a recolour (H16): `peony`
@@ -207,7 +277,7 @@ firework's own style (Arrange → Style, marked when set).
 - **Peony's default moved 20 → 43** because 43 is what it always drew (20 + 14 + 9 over three
   rings): the count was the OUTER ring and Detail added the rest. The six arm types kept their
   3–60 range, so no saved value is clamped. Spoke disc is a catalogue motif,
-  not one of the nine types, and its count is still the rank's (no slider).
+  not one of the nine types; since version 6 it has a count of its own (below).
 - **Stars in rings (peony, ring).** The count is spread over the rings Detail asks for by phase
   2's own ring law inverted (`starPlan`): the largest outer ring whose rings hold no more than the
   count, the few left over on the outer ring, and fewer rings when the count cannot fill them
@@ -341,7 +411,7 @@ each face sheet, each back in the slot mirrored for a long- or short-edge flip.
 
 ## Verify
 
-`node tools/verify-hanabi.mjs` — H1–H28 in Node, B1–B11 in Chromium (the PDF is rasterised by
+`node tools/verify-hanabi.mjs` — H1–H35 in Node, B1–B13 in Chromium (the PDF is rasterised by
 `pdftoppm` and its crop marks and edges read against an imposition RESTATED in the gate).
 H10 holds the corner index to one style across suits, H11 a suit's centre to its own cards,
 H12 the tier to ranks 4–5 and clear of the index, H13 every motif to its box, H14 the rainbow index (B6 its control) — read off every
@@ -351,9 +421,14 @@ determinism, H20 the scene, H21 detail, H22 phase-2 designs unchanged against `e
 arranging (literal hand sizes, fitted pips, restacking), H24 Scale placement, H25 per-firework
 styles, H26 version-3 designs unchanged against `68ff42a`, H27 optical centring, H28 the greyscale
 likeness report, H29 the count (every type at its min, default and max, at every Detail, both levels),
-H30 version-4 designs migrated and unchanged against `d8286f1`; B5 the board (one greyscale), B7 real-pointer arranging, B8 the localStorage
+H30 version-4 designs migrated and unchanged against `d8286f1`, H31 the catalogue counts (exact, escalated,
+unset byte-identical to `5771675`), H32 version 6's defaults and version-5 designs unchanged against
+`5771675`, H33 four corners (a true 180° turn, inside the safe zone, legible at mini), H34 the corner grid,
+H35 the frame, the rounded preview and the rising trail; B5 the board (one greyscale), B7 real-pointer arranging, B8 the localStorage
 migration, B9 the Arrange panel, B10 the layout (rail, resize, zoom, kept per browser), B11 styles
-and Centre through the editor, B12 the count control (label, range, readout, both levels). `--design <file>` prints the likeness report for a saved design
-(non-blocking). `--negative-control` runs eighty-five mutants, fifteen of them of the page script;
+and Centre through the editor, B12 the count control (label, range, readout, both levels), B13 the polish pass (no dropdown cut off, one-line
+labels, hexes, the rounded preview, Centre all rank 1s skipping a centred card, the catalogue counts and the
+rising trail in the editor). `--design <file>` prints the likeness report for a saved design
+(non-blocking). `--negative-control` runs 105 mutants, eighteen of them of the page script;
 `--keep <dir>` saves the PDFs. Not in CI.
 Dev deps: `npm i --no-save jspdf@2.5.1 jszip@3.10.1 playwright-core`; needs `pdfinfo`/`pdftoppm`.
