@@ -989,7 +989,7 @@ by 1.375 mm on the eared rectangle. The standing mutant is `the-mapped-tangent-w
 **Fewer turns cannot undo a fold the PATH makes.** An S laid across an ear's corner, sharper than the
 element itself, folded onto itself: stations 0.13 mm apart after turning 3.46 rad. The coil re-check
 saw it and could only reduce turns, so the element was built anyway. An element whose coils still
-close at its final seat gives way now, told (`a-folded-element-is-built`).
+close at its final seat gives way now, told (`a-folded-element-is-built`). **[Fourth round of 3e step 3: that mutant is RETIRED — with the chains capped to the band an element is a third of its lead and folds nowhere: 0 over the gate's rows and 18 eared / notched states, measured (§17.10). The refusal stays as a guard.]**
 
 **No visible gap, and nothing in the opening** (`slitWorst`, the opening test).
 - Every stretch of an element within 2F of the band must reach an embed. An approach that comes near
@@ -1661,6 +1661,12 @@ springing rose are to be identified and fixed.
   reaching further ALONG the band's two slopes: a span of 1.8 M with the stretch cap raised to 1.8 gives
   24 mm across (2.0 / 2.0 gives 27), still 4.2 mm past the edge, measured. That is a different method from the one ruled, so it is a lettered option.
 
-Mutants (relief): `the-chains-are-not-capped` (CB1), `a-rose-at-the-corner` (VN2),
+Mutants (relief): `the-chains-are-not-capped` (OR1 — at its lead a chain seats nothing, so the row has no chain at all; CB1 cannot see an absent one), `a-rose-at-the-corner` (VN2),
 `the-crest-shell-is-pointed` (CB2 — the crest's record), `a-stem-ends-on-a-flat-face` (VN6);
-(elements) `the-crest-shell-is-sharp-again` (EL6).
+(elements) `the-crest-shell-is-sharp-again` (EL6). **Claims the capped chains moved** (CI found each on the
+previous head; each re-measured on this tree before it was changed): `the-chain-opening-check-removed` is
+OR7's alone (the capped elements no longer crowd each other in the opening — least gap 1.0000 mm);
+`the-weight-is-a-constant` no longer reaches CB2 (the chains rows build their crest whatever the weight;
+VN2 still sees the vine's); `the-carved-floor-removed` also reddens OR3; `the-element-mirror-is-broken`
+also reddens PL2 and PL3 (a capped element sits exactly on the opening's edge and its wire's embed); and
+`a-folded-element-is-built` is retired (above).
