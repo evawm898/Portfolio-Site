@@ -117,6 +117,7 @@ for (const [nm, q, where, radius] of [['mid-run — the rectangle\'s side', { sk
     if (!want(`${nm} ${vk}`)) continue;
     const params = { filigree: 'scrolls', ...q }, cells = [];
     for (const [who, T, nb] of [['before — the vine (main)', OLD, nodeOld], ['after — the rinceau', NEW, nodeNew]]) {
+      await T.page.evaluate((p) => window.__frame.setParams(p), params);
       const t = await target(T.page, where);
       cells.push({ label: `${who} · ${v.name}`, png: await shoot(T.page, params, { dir: v.dir, radius, target: t }), cap: capOf(nb(params)) });
     }
