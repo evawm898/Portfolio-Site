@@ -358,6 +358,23 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     rec('SC2 the drawn scroll is the law: each eye (the end vertices\' radius, extrapolated) is the restated floor (t + F)/2 within two steps of the spiral\'s own slope, each volute\'s drawn turns are the reported ones, never above the asked', sc2.length === 0, `worst eye ${(100 * worstEye).toFixed(3)}%, worst turns ${worstTurn.toFixed(4)}${sc2.length ? ' — ' + sc2.slice(0, 3).join('; ') : ''}`);
     rec('SC3 no wire comes within a feature of its own coil, eye or mouth (restated off the emitted chords, less the LOCAL widths off the emitted walls)', sc3.length === 0, `least self-gap ${worstGap.toFixed(4)} mm against ${F}${sc3.length ? ' — ' + sc3.slice(0, 3).join('; ') : ''}`);
     rec('SC8 the wire\'s width is the restated law off the emitted walls: constant at t, or tapered — t through the body, linear over each volute to max(F, ½ t) at the eye; never under F, and a tapered crown never under min(F, its body crown)', sc8.length === 0 && lawErr.false < 1e-9 && lawErr.true < 1e-9, `constant: thinnest ${thinnest.false.toFixed(4)} mm, law error ${lawErr.false.toExponential(1)}, least crown ${leastCrown.false.toFixed(4)} · tapered: thinnest ${thinnest.true.toFixed(4)} mm, law error ${lawErr.true.toExponential(1)}, least crown ${leastCrown.true.toFixed(4)}${sc8.length ? ' — ' + sc8.slice(0, 3).join('; ') : ''}`);
+    // SC9 the coil check does not depend on the HEADING a curve is laid at:
+    // one carved C mapped onto a straight run at 16 headings reads the same
+    // self-gap at every one, and the unmapped scroll's. Without the mapped
+    // tangent's unwrap (atan2 wraps at ±π) the check sees coils that are not
+    // there and the chains give way elements they should build — a valid
+    // ornament either way, so no clause on the frame's output can see it
+    // (measured: the default arch chain 90 -> 84 wires)
+    {
+      const c9 = FL.buildScroll({ kind: 'C', length: 30, tightness: 0.9, carved: true, wire: FL.carvedCap(30), balance: 0.6 }), g0 = FL.selfGap(c9).gap, sc9 = [];
+      for (let k = 0; k < 16; k++) {
+        const th = 2 * Math.PI * k / 16, d = [Math.cos(th), Math.sin(th)], no = [-d[1], d[0]], L = 200, n = 201;
+        const pts = Array.from({ length: n }, (_, i) => [d[0] * L * i / (n - 1), d[1] * L * i / (n - 1)]);
+        const g = FL.selfGap(FL.mapToPath(c9, { pts, s: pts.map((_, i) => L * i / (n - 1)), tan: pts.map(() => d), out: pts.map(() => no), length: L }, 80)).gap;
+        if (Math.abs(g - g0) > 1e-6) sc9.push(`heading ${(360 * k / 16).toFixed(1)}°: ${g.toFixed(4)} mm`);
+      }
+      rec('SC9 the coil check is independent of the heading: a carved C laid on a straight run at 16 headings reads its own unmapped self-gap at every one', sc9.length === 0, `${g0.toFixed(4)} mm at every heading${sc9.length ? ' — ' + sc9.slice(0, 3).join('; ') : ''}`);
+    }
     const thin = FL.buildScroll({ kind: 'C', length: 60, tightness: 0.5, wire: 0.6 });
     rec('SC4 a wire under the floor is built AT it and told', thin.info.wire === F && thin.info.told.some((x) => /wire 0\.60/.test(x)), thin.info.told.join('; '));
     // SC5 mirror: x -> -x to the bit, and the group's junctions
@@ -1202,9 +1219,9 @@ const MUTANTS = [
   { id: 'the-chain-budget-give-way-removed', file: 'filigree', from: 'if (tris + gTris > triBudget) { told.push(`the ${run.id} chain', to: 'if (false) { told.push(`the ${run.id} chain', breaks: ['TB2'] },
   // phase 3d — the chains
   { id: 'the-chain-is-not-seated', file: 'filigree', from: '    if (c.lift) spine.baseLift = orn.H ?', to: '    if (false) spine.baseLift = orn.H ?', breaks: ['OR9', 'CL1', 'VN5'] },   // unseated, a chain's leaves no longer stand on their host's crown (CL1)
-  { id: 'the-chain-slit-rule-removed', file: 'filigree', from: 'export function slitWorst(c, region) {\n  let worst = -Infinity;', to: 'export function slitWorst(c, region) {\n  return -Infinity;\n  let worst = -Infinity;', breaks: ['OR8', 'OR4', 'OR3'] },   // unpushed, an element grazes the band (OR4) and its neighbours (OR3)
+  // RETIRED (fourth round): the-chain-slit-rule-removed — capped (ruling B), a chain element is pushed back inside the band's edge before the slit rule is consulted, so it no longer binds: with slitWorst returning nothing, 0 of 21 states (three skeletons and the circle at default and dense, eared / notched / rounded corners at 6 / 16 / 40 mm, the crowded, sill-less and large-scale rows) build a single different chain point, measured. The rule stays as a guard.
   { id: 'the-chain-opening-check-removed', file: 'filigree', from: 'const intrusion = (o) => { if (!opening) return 0;', to: 'const intrusion = (o) => { return 0;', breaks: ['OR7'] },   // left in the opening (OR7). Before the chains were capped (ruling B) the elements also crowded each other there (OR3); at a third of their lead they no longer do — least gap 1.0000 mm, measured
-  { id: 'the-mapped-tangent-wraps', file: 'filigree', from: '  for (let i = 1; i < m; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', to: '  for (let i = 1; i < 0; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', breaks: ['OR3'] },   // the coil check blind where a mapped coil closes (found in the 3d build)
+  { id: 'the-mapped-tangent-wraps', file: 'filigree', from: '  for (let i = 1; i < m; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', to: '  for (let i = 1; i < 0; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI;', breaks: ['SC9'] },   // the coil check blind where a mapped coil closes (found in the 3d build, OR3). Since the chains are capped no real coil closes on the gate's rows and the wrap's damage runs the other way — false coils, elements given way (the default arch chain 90 -> 84 wires), a valid ornament no output clause can see — so SC9 tests the property itself
   { id: 'the-seat-is-read-off-the-centreline', file: 'filigree', from: 'spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth) : c.lift;', to: 'spine.baseLift = c.lift;', breaks: ['OR9', 'VN5'] },   // the seat read on the centreline's span, not at the emitted columns: crowns 0.989 mm where the floor is 1
   // RETIRED (fourth round): a-folded-element-is-built — once the chains are capped to the band (ruling B) an element is a third of its lead and no longer folds across a corner: 0 folds over the gate's rows and over 18 eared / notched states (corners 6–60 mm, dense, ornScale up to 8), measured. The refusal stays in the code as a guard; a mutant that can never apply is not kept.
   // PHASE 3e — the band pattern (frame-pattern.js)
