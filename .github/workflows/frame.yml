@@ -122,12 +122,14 @@ jobs:
       - name: Frame gate (part one Node, part two Chromium)
         run: node tools/verify-frame.mjs
 
-  # The relief negative control, sharded by mutant INDEX (k mod 26): every
+  # The relief negative control, sharded by mutant INDEX (k mod 19): every
   # mutant is in exactly one shard by construction. Changing the shard count
-  # is two edits: this matrix list and the n in --shard=k/n. 26 since the
-  # chains were capped (fourth round of 3e step 3): a mutant now runs up to
-  # ~21 min and three to a shard overran the 40-minute timeout, so at most
-  # two a shard (52 mutants on main, fewer on a PR) and 60 minutes.
+  # is two edits: this matrix list and the n in --shard=k/n. 26 from the
+  # chains' capping (fourth round of 3e step 3: a mutant ran up to ~21 min,
+  # two a shard, the slowest shard 53 min); 19 since the chains and the vine
+  # were retired for the rinceau (phase 3f step 2: the ornament rows' gate run
+  # measured 0.47x main's under the same load, 494 s against 1,060), so at
+  # most three a shard of the 56 mutants, and 60 minutes.
   # Eva's ruling A (phase 3e step 3): on a PULL REQUEST only the mutants whose
   # source module the PR's diff touches (--files, from the diff against its
   # base), so a PR that moves no frame module runs none; on a push to main,
@@ -139,7 +141,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -147,14 +149,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Relief negative control (shard ${{ matrix.shard }} of 26; a PR runs its touched modules' mutants, main and nightly all)
+      - name: Relief negative control (shard ${{ matrix.shard }} of 19; a PR runs its touched modules' mutants, main and nightly all)
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FILES=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" | tr '\n' ',')
             echo "the PR touches: $FILES"
-            node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/26 --files="$FILES"
+            node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/19 --files="$FILES"
           else
-            node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/26
+            node tools/verify-frame-relief.mjs --negative-control --shard=${{ matrix.shard }}/19
           fi
 
   frame-mutants:

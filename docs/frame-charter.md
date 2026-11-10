@@ -1950,6 +1950,12 @@ Every law is restated in the gate, never imported from `frame-rinceau.js`.
 
 `frame-rinceau.js` and `tools/shot-frame-rinceau-wired.mjs` join `frame.yml`'s path filter.
 
+**CI shards: 26 → 19.** On main (`2a46e1c`, run 42848070949) the relief negative control's 26 shards ran 8.9–53.1 min
+(two mutants a shard, the slowest against the 60-minute timeout). Retiring the chains and the vine rows took the gate's
+ornament rows to 0.47× main's run time under the same local load (494 s against 1,060 s, both beside three mutant
+shards), so a mutant now costs about half, and 19 shards hold at most three of the 56 each (an estimated ~35 min slowest,
+read the PR's own run before trusting it). The `verify` job ran 19.6 min on main.
+
 **Sheet:** `node tools/shot-frame-rinceau-wired.mjs <dir> --base <worktree of 2a46e1c>` →
 `docs/img/frame-rinceau-wired.png`: the three whole frames front-on at 180 mm, a mid-run close-up (the rectangle's side)
 and two corners (the rectangle's top right, the arch's springing), front-on and three-quarter, each this tree beside
