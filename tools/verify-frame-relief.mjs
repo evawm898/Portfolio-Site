@@ -1229,7 +1229,7 @@ const MUTANTS = [
   { id: 'the-stem-runs-on-past-the-corner', file: 'vine', from: 'if (out.A || out.B) {', to: 'if (false) {', breaks: ['CB1'] },   // the run-on past an interior end left uncut: out through the rectangle's corner
   // third round (Eva's rulings on the second sheet: B the chains capped, D a
   // rosette at the corners, E the crest's soft shell, and no cut slab)
-  { id: 'the-chains-are-not-capped', file: 'filigree', from: 'if (!ch.pastBand || lf < CHAIN_CAP_MIN) break;', to: 'break;', breaks: ['CB1'] },   // the chain at its lead: its scrolls 13-17 mm past the edge
+  { id: 'the-chains-are-not-capped', file: 'filigree', from: 'if (!ch.pastBand || lf < CHAIN_CAP_MIN) break;', to: 'break;', breaks: ['OR1'] },   // the chain at its lead: every element on the default arch and oval stands past the band, so none is seated and the row is left with NO chain (OR1: 0 wire solids) — CB1 cannot see a chain that is not there
   { id: 'a-rose-at-the-corner', file: 'vine', from: "(cls === 'crest' || cls === 'bottom' ? 'shell' : 'rosette')", to: "(cls === 'crest' || cls === 'bottom' ? 'shell' : 'rose')", breaks: ['VN2'] },   // the second sheet's half-size rose
   { id: 'the-crest-shell-is-pointed', file: 'vine', from: "soft: kind === 'shell' });", to: "soft: false });", breaks: ['CB2'] },   // #479's pointed scallops: the starburst
   { id: 'a-stem-ends-on-a-flat-face', file: 'vine', from: 'const finishStem = (c) => { roundEnds(c);', to: 'const finishStem = (c) => {', breaks: ['VN6'] },   // the collar at the springing
