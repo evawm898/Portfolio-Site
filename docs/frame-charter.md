@@ -1633,7 +1633,18 @@ springing rose are to be identified and fixed.
   rows (no wider than the feature). (3) NOT ORNAMENT: at the arch springing a dash at the light's edge and
   a different-shade bar on the band's outer wall are the head band and the jamb meeting face to face (the
   phase-2 embed): coplanar faces of two overlapping shells, drawn flickering by the viewer, fused in print.
-  Not changed here (it is every frame's STL) — a lettered option.
+  Not changed here (it is every frame's STL) — a lettered option. (4) THE BUD, found on the re-render: the
+  vine's buds are 5–7 mm across, and a bud's cup leaves were floored at the print floor — 1 mm thick and
+  lifted on 1.3 mm walls, a leaf 1.7 mm wide — so the cup was all wall: flat-topped blocks standing beside
+  the crest. Its rise and cup scaled off that FLOORED crown (a 4.85 mm bud stood 6.67 mm tall). Now the
+  rise and cup scale with the bud's own size, the rosette's petal tips and the cup leaves' tips and
+  margins roll down to the floor (`ROSETTE_LIP`, `BUD_LIP`, `BUD_LIP_V` — 0.85 of the width, because 0.5
+  folds the cupped leaf's facets to 101° and the full width to 64° against EL4's 55°), and a bud whose cup
+  leaf would be narrower than four print floors (`BUD_LEAF_MIN_W`, typed, flagged — read off the
+  renders) is its BERRIES ALONE, sunk into the molding over the root the leaves held. That is every bud
+  the vine places today; the 18 mm library bud keeps its cup. Proud elements are seated per vertex on the
+  molding (`drapeElement`), not lifted as one block to the highest point under them. The rectangle goes
+  322,160 → 284,480 triangles, relief depth 8.6 → 6.9 mm.
 - **B.** A chain is built at its lead and, while any element cannot stand between the opening and the
   outer edge, again with every element 15 % smaller (more of them), down to `CHAIN_CAP_MIN` of the lead,
   told: 32–38 % on the three defaults. A chain element is pushed back onto the molding by its overshoot as
