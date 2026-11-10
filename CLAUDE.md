@@ -12786,10 +12786,17 @@ TYPES (peony, chrysanthemum, ring, willow, palm, crossette, dahlia, glitter, blo
 their spec; the default deck gives every suit a different type. **Old designs open unchanged**: v1 A/B/C →
 (scale / column / bleed), v2 single/count/bleed → scale/column/bleed, phase-1 `peony` etc. → `radial-…`;
 H15 renders 9,000+ faces byte-identical to `d5cd4ef` read from git. Hanging/falling pieces stay ruled out.
-Optional scene band (`design.scene`, off). **Phase 2b (Nov 10): the Arrange panel and Detail** — a
+Optional scene band (`design.scene`, off). **Nov 10, round 3 (schema v4): per-firework styles, Centre, the
+layout** — a Count card's fireworks each take their own type/colours/Detail/params (`styles` keyed by n in the
+cell; another type starts from its own defaults, the suit's and card's parameters reach it as colours only;
+duplicates are one card); **Centre** writes the card's own items/place so the DRAWN extent (willow trails, a
+rotated burst) sits on the art field's centre (`centring`, `drawnExtent`, `layout.js`); the deck panel collapses
+to a rail, the editor resizes by its handle, the editor card zooms (`hanabi.layout.v1`, per browser, never in the
+design); ONE greyscale (the toolbar's). v3 designs read with no note and draw byte-identically (H26 vs `68ff42a`).
+The greyscale likeness of styled suits is a non-blocking report (`--design <file>`). **Phase 2b (Nov 10): the Arrange panel and Detail** — a
 card's fireworks are picked, moved, sized, turned and RESTACKED (items carry `n`, their drawing's seed,
 so a restack only changes paint order); a hand arrangement is taken literally (no shrink at the field
 edge) while the default pips stay fitted; a Scale card's one firework takes `place`. Detail (`density`,
 0–2) on all nine types, each default byte-identical to `e95f121` (H22), detail never rescaling a burst
-(H21). Gate: `node tools/verify-hanabi.mjs` (H1–H24, B1–B9;
-`--negative-control` 54 mutants, `--mutant=a,b` a subset), not in CI.
+(H21). Gate: `node tools/verify-hanabi.mjs` (H1–H28, B1–B11;
+`--negative-control` 72 mutants, `--mutant=a,b` a subset), not in CI.

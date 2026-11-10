@@ -47,14 +47,31 @@ the page as it shipped at `d5cd4ef` (read from git) and through this tree, byte 
 without the rainbow suit, with a phase-2 override in place) against `main` at `c7d8768`,
 setting aside the `<g class="hb-index">` wrapper the index now carries.
 
-## The Firework board (phase 2, schema version 3)
+## The Firework board (phase 2, schema version 3; per-firework styles version 4)
 
 The **Fireworks** tab is the board: rows are the suits in play (the rainbow row appears when
 that suit is on), columns ranks 1–5, each cell a live thumbnail of that card's centre art
 (`renderFace(…, { centreOnly: true })`). Clicking a cell opens the editor beside the board
 (below it under 1240 px), so a row (one suit's progression) and a column (one rank across
-suits) stay in view while editing. The board carries its own greyscale toggle (the toolbar's,
-synced), because its job is making every suit distinguishable without colour.
+suits) stay in view while editing. **There is one Greyscale control, the toolbar's** (the
+board had a second, synced copy until Nov 10; it was removed): it greys the board's cells and
+the editor's card.
+
+**The page's layout is the browser's, not the design's** (`localStorage` `hanabi.layout.v1`,
+every read and write in try/catch; a design file never carries it):
+
+- **The deck panel collapses to a rail** — the `‹` at its top (`#panelToggle`). Collapsed it is
+  a 34 px rail reading *Deck controls*; the preview, and so the board and its editor, take the
+  freed width. Below 900 px (one column) collapsing just hides the sections.
+- **The editor is as wide as its handle says** — drag the line between the board and the
+  editor (or focus it: ← / → 16 px, Shift for 64, Home / End). 280–960 px, and never so wide
+  that the board keeps under 320 px (the column is `min(chosen, max(280px, 100% − 352px))`, so a
+  narrower window takes it in without a write). The board's cells are at most 180 px and
+  reflow; they never overflow their column. Under 1240 px the editor sits below the board and
+  the handle is hidden.
+- **The editor's card zooms**: *Fit* (the editor's width, at most 68% of the window's height),
+  *100%* (print size, 96 px to the inch), *150%*, *200%*. Past the editor's width the card
+  scrolls inside it; dragging a firework still lands under the pointer.
 
 **Three levels of inheritance**, and the editor writes to whichever its scope says:
 
@@ -89,6 +106,65 @@ others. Under **Scale** the one firework's placement is the card's `place: { x, 
 x, y fractions of the field, s a multiple of the radius Scale gives it (0.3–1.6), rot added to its
 rotation; absent, the card draws its old markup by branch. Column, Full bleed and the two field
 motifs lay themselves out and have no Arrange panel.
+
+## Centre (optical centring)
+
+**Centre** (in the Arrange panel) centres what a card DRAWS in its art field — the box round
+every mark as rendered (stars, trails, petals, a willow's hanging trails; a rotated burst
+turned), not the firework's anchor. A willow's trails hang below its anchor, so centring it
+lifts it (6.1 mm on the default poker rank 1); a palm's fronds sit high, so it drops. The art
+field is `fieldArea` (the area less the corner-index columns, less a gap); every index style
+leaves it symmetric about the card's middle, so its centre is the card's centre, and it is the
+box the extent is centred in.
+
+- **One firework** (every rank 1 under Count, and a Scale card): that firework moves.
+- **Several** (Count ranks 2–5): the group moves as one, so the fireworks keep their places to
+  each other.
+- **Batch**: *Centre all rank 1s* (the board's bar) and *centre row* (each row head, every rank
+  of that suit). A card that lays itself out — Column, Full bleed, a field motif, or a Scale
+  burst over a second tier — is left alone and named.
+
+Centring WRITES the card's own arrangement (Count: `items`, the group as drawn, written out
+literally and moved) or placement (Scale: `place`) — normal per-card values, so the Across /
+Down sliders show them and *Reset arrangement* / *Reset placement* / *Reset to suit* undo them.
+A firework whose anchor would have to leave the field to centre the drawing stops at the edge
+and says so. `centring()` and `drawnExtent()` (`layout.js`) are the one owner; H27 holds every
+burst (all nine types and every catalogue and phase-1 burst, off-centre and turned) to the
+field's centre within 0.12 mm against an extent the gate reads itself.
+
+## Per-firework styles (schema version 4)
+
+On a Count card (ranks 2–5, and 1) each firework can carry its own style: pick it in the
+Arrange panel (click it on the card, or its number), and its **Style** section sets its type,
+outer and core colour, Detail and the type's parameters. By default every firework is drawn as
+the card (which inherits the suit). A card can therefore mix types — a 4 with three
+chrysanthemums and one crossette.
+
+- **Stored** in the cell: `design.fireworks[suit][rank].styles = { [n]: { motif?, …params } }`,
+  keyed by `n`, the firework it is (its drawing's seed), so a style stays with its firework
+  when the stacking order changes. `fireworkSpecAt()` (`firework.js`) merges it.
+- **Another type starts from its own defaults** with the suit's colours: the suit's and the
+  card's PARAMETERS were set for the card's own type and reach a restyled firework only as
+  colours (a peony suit's 14 stars do not become a crossette's 14 arms). Same type: everything
+  carries, per key.
+- **Marked**: the firework's number in the picker gets a seafoam underline, and the board cell
+  its dot. *Reset firework to suit* drops its style; ↺ drops one key.
+- **Batch**: *Style mix to every N* copies the card's styles to every other suit's N that
+  draws a Count (a colour set by hand travels; an inherited one stays each suit's own); a suit
+  drawn another way is left alone and named. **Duplicates are one card**: every copy of a suit
+  × rank renders from the one cell, so a style reaches all of them, and there is no per-copy
+  record (Eva's standing rule: identical by default).
+- Column, Full bleed and Scale draw one spec and ignore `styles`.
+- **Version 4.** A version-3 file has no styles and reads with no note and draws byte-identically
+  (H26, against `68ff42a`); a style for a firework the rank does not have, a field motif, or a
+  parameter out of its type is dropped and told.
+
+**Greyscale likeness — a report, not a gate.** H16 holds the nine types apart and the default
+suits to nine different types. Styles can make two suits' cards draw alike; the symbol still
+tells them apart (H2), so this WARNS: `node tools/verify-hanabi.mjs --design my-deck.json`
+names every rank where two suits' fireworks sit nearer than two draws of one type (the
+threshold is measured from the types, never typed) and exits 0. H28 holds the report itself:
+silent on the default deck, and it names Red and Blue when Blue 3 is restyled as Red's peony.
 
 ## The fireworks
 
@@ -224,15 +300,18 @@ each face sheet, each back in the slot mirrored for a long- or short-edge flip.
 
 ## Verify
 
-`node tools/verify-hanabi.mjs` — H1–H24 in Node, B1–B9 in Chromium (the PDF is rasterised by
+`node tools/verify-hanabi.mjs` — H1–H28 in Node, B1–B11 in Chromium (the PDF is rasterised by
 `pdftoppm` and its crop marks and edges read against an imposition RESTATED in the gate).
 H10 holds the corner index to one style across suits, H11 a suit's centre to its own cards,
 H12 the tier to ranks 4–5 and clear of the index, H13 every motif to its box, H14 the rainbow index (B6 its control) — read off every
 point it draws (paths are absolute M/L/Q/C/Z by contract, and the gate refuses anything else).
 H15 the migration against `d5cd4ef`, H16 the silhouettes, H17 Count, H18 inheritance, H19
 determinism, H20 the scene, H21 detail, H22 phase-2 designs unchanged against `e95f121`, H23
-arranging (literal hand sizes, fitted pips, restacking), H24 Scale placement; B5 the board, B7
-real-pointer arranging, B8 the localStorage migration, B9 the Arrange panel. `--negative-control`
-runs fifty-four mutants, eight of them of the page script;
+arranging (literal hand sizes, fitted pips, restacking), H24 Scale placement, H25 per-firework
+styles, H26 version-3 designs unchanged against `68ff42a`, H27 optical centring, H28 the greyscale
+likeness report; B5 the board (one greyscale), B7 real-pointer arranging, B8 the localStorage
+migration, B9 the Arrange panel, B10 the layout (rail, resize, zoom, kept per browser), B11 styles
+and Centre through the editor. `--design <file>` prints the likeness report for a saved design
+(non-blocking). `--negative-control` runs seventy-two mutants, thirteen of them of the page script;
 `--keep <dir>` saves the PDFs. Not in CI.
 Dev deps: `npm i --no-save jspdf@2.5.1 jszip@3.10.1 playwright-core`; needs `pdfinfo`/`pdftoppm`.

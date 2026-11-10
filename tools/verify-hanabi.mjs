@@ -36,7 +36,8 @@
      H16 the nine firework types are nine silhouettes: each drawn under 12 seeds as a
          binary mask (greyscale by construction), described by radial ink, top/bottom
          balance and pieces; every drawing sits nearer its own type's centroid than any
-         other's by a margin of 1.25. The default suits each draw a different type.
+         other's by a margin of 1.25. The default suits each draw a different type (their
+         DEFAULT types; per-firework styles are judged by the non-blocking report, H28).
      H17 Count: rank N is exactly N fireworks (Count, Count+scale, Column; one otherwise),
          every mark inside the centre field RESTATED from the size and the index, on every
          preset; a wrong-length arrangement is refused and said
@@ -59,13 +60,32 @@
          the drawn arrangement written out literally draws the same card
      H24 Scale's one firework placed by hand: moved, scaled and turned as the placement
          says, saved and read back, clamped; a field motif is never placed
+     H25 per-firework styles (schema 4): one firework restyled and no other, per key, another
+         type from its own defaults (the suit's parameters as colours only), kept with its
+         firework through a restack, saved and read back (bad entries dropped and told), ignored
+         off Count, carried to the rank's Count suits, duplicates one card, reset byte for byte
+     H26 a version-3 design (BASE3, 68ff42a, read from git) reads with no note and renders
+         byte-identically — the refactor of the Count drawing is the risk
+     H27 Centre: every burst (types, catalogue, phase 1; off-centre and turned) under Count and
+         Scale lands its DRAWN extent — read here, a rotate() applied — on the field's centre
+         (restated from the size and the index) within 0.12 mm; a group keeps its shape; what
+         lays itself out is not offered; a willow's anchor is not its extent
+     H28 the greyscale likeness report: silent on the default deck, names two suits styled alike
+         (the report itself never fails: --design <file> runs it on a saved design)
    PART TWO — Chromium, the real page (cdnjs served from node_modules, fonts blocked)
      B1  the page loads with no page error, grayscale and guides toggles act on the stage
      B2  the Centres view renders the viewed suit under each of the five compositions
      B8  a version-2 design in localStorage opens migrated, exactly as Node reads the file
      B5  the Firework board: 25 cells (30 with the rainbow); a row edit repaints its row
          only, a card edit its card only with a marker; reset to suit; the type gallery
-         sets one suit; the board's greyscale toggle
+         sets one suit; ONE greyscale control, reaching the board and the editor's card
+     B10 the layout, by real pointer: the panel collapses to a rail (the board takes the width)
+         and back; the editor's handle sets its width (exactly the drag), clamped 280..960 with
+         the board kept, arrow keys; the board never overflows; the card zoom (100% = print
+         size); each kept across a reload
+     B11 per-firework styles and Centre through the editor: one firework restyled, marked,
+         its Detail, reset; Centre on a willow 1 (the slider shows it, Reset undoes it); Centre
+         all rank 1s; centre row
      B7  arranging by hand with REAL pointer drags on the editor's card: a move lands where
          the pointer went (in mm), a resize grows, a turn turns, only that card moves; "use
          for every N" carries it to the rank column
@@ -80,8 +100,9 @@
    --negative-control re-runs against deliberately broken copies (of the modules, or of the
    page script for what only the board shows); each must fail the check that names it.
    A mutant may name `mayAlso`: collateral it is allowed but not required to redden (the clock mutant
-   seeds with a fraction, which some draws push out of the box).
+   seeds at random: some draws push a mark out of the box, and some move a type's silhouette, H16/H28).
    --mutant=a,b runs only those (reported as a subset); every anchor is still checked first.  --no-browser runs part one alone.  --keep <dir> copies the exported PDFs there.
+   --design <file> prints the greyscale likeness report for a saved design and exits 0.
 */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -97,71 +118,91 @@ const NO_BROWSER = ARGS.includes('--no-browser');
 const NEG = ARGS.includes('--negative-control');
 const KEEP = ARGS.includes('--keep') ? ARGS[ARGS.indexOf('--keep') + 1] : null;   // copy the PDFs here
 const ONLY = (ARGS.find((x) => x.startsWith('--mutant=')) || '').slice(9).split(',').filter(Boolean);   // a subset, said as one
+const DESIGN = ARGS.includes('--design') ? ARGS[ARGS.indexOf('--design') + 1] : null;   // the greyscale report on a saved design
 
 const MODULES = ['deck.js', 'symbols.js', 'firework.js', 'layout.js', 'export.js'];
 
 const MUTANTS = [
   { id: 'distribution-wrong', file: 'deck.js', from: "COPIES = { 1: 3, 2: 2, 3: 2, 4: 2, 5: 1 }", to: "COPIES = { 1: 3, 2: 2, 3: 2, 4: 2, 5: 2 }", breaks: ['H1'] },
-  { id: 'corner-drops-symbol', file: 'layout.js', from: "+ symbol(suit.symbol, (w - sym) / 2, digitH * 1.08, sym, symFill, numHalo);", to: ";", breaks: ['H2', 'H14', 'H15', 'H22'] },
-  { id: 'rank-does-not-escalate', file: 'firework.js', from: "4: { burstType: 'chrysanthemum', starCount: 18, rings: 3, size: 0.86", to: "4: { burstType: 'chrysanthemum', starCount: 12, rings: 1, size: 0.58", breaks: ['H3', 'H15'] },
-  { id: 'override-ignored', file: 'firework.js', from: "return over ? { ...spec, ...over } : spec;", to: "return spec;", breaks: ['H4', 'H15', 'H18', 'H22'] },
+  { id: 'corner-drops-symbol', file: 'layout.js', from: "+ symbol(suit.symbol, (w - sym) / 2, digitH * 1.08, sym, symFill, numHalo);", to: ";", breaks: ['H2', 'H14', 'H15', 'H22', 'H26'] },
+  { id: 'rank-does-not-escalate', file: 'firework.js', from: "4: { burstType: 'chrysanthemum', starCount: 18, rings: 3, size: 0.86", to: "4: { burstType: 'chrysanthemum', starCount: 12, rings: 1, size: 0.58", breaks: ['H3', 'H15', 'H26'] },
+  { id: 'override-ignored', file: 'firework.js', from: "if (!other) return { ...spec, ...over };", to: "if (!other) return spec;", breaks: ['H4', 'H15', 'H18', 'H22', 'H26'] },
   { id: 'crop-mark-off-trim', file: 'deck.js', from: "xs.add(+s.trimX.toFixed(6));", to: "xs.add(+(s.trimX - g.bleed).toFixed(6));", breaks: ['H6', 'B3'] },
   { id: 'duplex-not-mirrored', file: 'deck.js', from: "return r * imp.cols + c;", to: "return i;", breaks: ['H7'] },
   { id: 'shared-cut-keeps-inner-bleed', file: 'deck.js', from: "const l = c === 0 ? b : 0,", to: "const l = b,", breaks: ['H6'] },
   { id: 'no-halo', file: 'layout.js', from: "const halo = contrast(suit.primary, faceBg) < HALO_BELOW ? haloFor(suit.primary) : null;", to: "const halo = null;", breaks: ['H8'] },
   // H18 no longer reaches it: every type takes detail, so the one filtered key H18 tests (peony's trail) is
   // untaken by the deck-wide ring too. H11 and H15 are its witnesses.
-  { id: 'centre-is-deck-wide', file: 'firework.js', from: "const c = suit.centre || {};", to: "const c = design.suits[0].centre || {};", breaks: ['H11', 'H15', 'H22', 'H24'] },
+  { id: 'centre-is-deck-wide', file: 'firework.js', from: "const c = suit.centre || {};", to: "const c = design.suits[0].centre || {};", breaks: ['H11', 'H15', 'H22', 'H24', 'H25', 'H26', 'H27', 'H28'] },
   { id: 'index-follows-the-centre', file: 'layout.js', from: "g.h * (INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral)", to: "g.h * (plate ? INDEX_DIGIT.small : INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral)", breaks: ['H10', 'H15'] },
   { id: 'tier-at-every-rank', file: 'firework.js', from: "tier !== 'none' && TIER_RANKS.includes(rank) ?", to: "tier !== 'none' && rank >= 1 ?", breaks: ['H12', 'H15'] },
   { id: 'tier-over-the-index', file: 'layout.js', from: "const x0 = area.x + corner.w + gap, x1 = area.x + area.w - corner.w - gap;", to: "const x0 = area.x + gap, x1 = area.x + area.w - gap;", breaks: ['H12', 'H15'] },
   { id: 'motif-does-not-escalate', file: 'firework.js', from: "weeping: [16, 22, 30, 38, 48],", to: "weeping: [30, 30, 30, 30, 30],", breaks: ['H3', 'H15'] },
   // a tier is drawn by the same field painters, so H12 sees the escape too
   { id: 'field-escapes-its-rect', file: 'firework.js', from: "const x = rect.x + rho + rand() * (rect.w - 2 * rho),", to: "const x = rect.x + rand() * (rect.w + 2 * rho),", breaks: ['H13', 'H12', 'H15'] },
-  { id: 'rainbow-symbol-ignored', file: 'layout.js', from: "numFill = numeral.fill; symFill = numeral.symFill;", to: "numFill = numeral.fill;", breaks: ['H14', 'H15', 'H22'] },
+  { id: 'rainbow-symbol-ignored', file: 'layout.js', from: "numFill = numeral.fill; symFill = numeral.symFill;", to: "numFill = numeral.fill;", breaks: ['H14', 'H15', 'H22', 'H26'] },
   { id: 'rainbow-index-not-the-default', file: 'deck.js', from: "numeral: 'rainbow', centre: defaultCentre('glitter')", to: "numeral: 'solid', centre: defaultCentre('glitter')", breaks: ['H14', 'H22'] },
-  { id: 'rainbow-numeral-ignored', file: 'layout.js', from: "numFill = numeral.fill; symFill", to: "numFill = suit.primary; symFill", breaks: ['H14', 'H15', 'H22'] },
-  { id: 'rainbow-numeral-on-every-suit', file: 'layout.js', from: "if (suit.multicolor && suit.numeral === 'rainbow') {", to: "if (design.suits.some((x) => x.numeral === 'rainbow')) {", breaks: ['H14', 'H15', 'H22'] },
-  { id: 'rainbow-numeral-not-saved', file: 'deck.js', from: "if (NUMERAL_FILLS[r.numeral]) s.numeral = r.numeral;", to: "if (NUMERAL_FILLS[r.numeral]) s.numeral = 'solid';", breaks: ['H9', 'H14', 'H15'] },
+  { id: 'rainbow-numeral-ignored', file: 'layout.js', from: "numFill = numeral.fill; symFill", to: "numFill = suit.primary; symFill", breaks: ['H14', 'H15', 'H22', 'H26'] },
+  { id: 'rainbow-numeral-on-every-suit', file: 'layout.js', from: "if (suit.multicolor && suit.numeral === 'rainbow') {", to: "if (design.suits.some((x) => x.numeral === 'rainbow')) {", breaks: ['H14', 'H15', 'H22', 'H26'] },
+  { id: 'rainbow-numeral-not-saved', file: 'deck.js', from: "if (NUMERAL_FILLS[r.numeral]) s.numeral = r.numeral;", to: "if (NUMERAL_FILLS[r.numeral]) s.numeral = 'solid';", breaks: ['H9', 'H14', 'H15', 'H26'] },
   { id: 'v1-layout-misread', file: 'deck.js', from: "C: { index: 'band',  compose: 'bleed' },", to: "C: { index: 'band',  compose: 'scale' },", breaks: ['H9', 'H15'] },
   // ---- phase 2: the board, the types, the compositions, the migration
   { id: 'v2-single-read-as-count', file: 'deck.js', from: "V2_LAYOUTS = { single: 'scale',", to: "V2_LAYOUTS = { single: 'count',", breaks: ['H9', 'H15'] },
   { id: 'radial-not-renamed', file: 'deck.js', from: "const motifOf = (m) => (ver < 3 && LEGACY_RADIAL[m] ? LEGACY_RADIAL[m] : m);", to: "const motifOf = (m) => m;", breaks: ['H9', 'H15'] },
   // a RECOLOUR: every type draws one and the same peony, in its own colours
-  { id: 'every-type-is-a-recolour', file: 'firework.js', from: "if (TYPES[m]) return `<g class=\"hb-firework\" data-motif=\"${m}\">${drawType(spec,", to: "if (TYPES[m]) return `<g class=\"hb-firework\" data-motif=\"${m}\">${drawType({ ...spec, ...TYPES.peony.defaults, motif: 'peony' },", breaks: ['H16', 'H18', 'H21', 'H22'] },
+  { id: 'every-type-is-a-recolour', file: 'firework.js', from: "if (TYPES[m]) return `<g class=\"hb-firework\" data-motif=\"${m}\">${drawType(spec,", to: "if (TYPES[m]) return `<g class=\"hb-firework\" data-motif=\"${m}\">${drawType({ ...spec, ...TYPES.peony.defaults, motif: 'peony' },", breaks: ['H16', 'H18', 'H21', 'H22', 'H26', 'H28'] },
   // two types, one shape: blossom draws exactly what peony draws
   { id: 'blossom-draws-a-peony', file: 'firework.js', from: "  blossom(s, n, w, rand, o, c) {", to: "  blossom(s, n, w, rand, o, c) { return TYPE_DRAW.peony({ ...s, ...TYPES.peony.defaults }, escalatedCount('peony', TYPES.peony.defaults.count, s.rank), w, rand, o, c);", breaks: ['H16', 'H21', 'H22'] },
-  { id: 'default-pairing-collapses', file: 'deck.js', from: "symbol: 'heart', centre: defaultCentre('peony')", to: "symbol: 'heart', centre: defaultCentre('ring')", breaks: ['H16', 'H22'] },
-  { id: 'count-draws-one-short', file: 'layout.js', from: "return pl.items.map((it) => renderFirework(", to: "return pl.items.slice(1).map((it) => renderFirework(", breaks: ['H17', 'H18', 'H22', 'H23'] },
-  { id: 'firework-escapes-the-field', file: 'layout.js', from: "r: fitted ? Math.min(it.s * unit, room) : it.s * unit,", to: "r: it.s * unit * 1.3,", breaks: ['H17', 'H22', 'H23'] },
+  { id: 'default-pairing-collapses', file: 'deck.js', from: "symbol: 'heart', centre: defaultCentre('peony')", to: "symbol: 'heart', centre: defaultCentre('ring')", breaks: ['H16', 'H22', 'H25', 'H28'] },
+  { id: 'count-draws-one-short', file: 'layout.js', from: "return pl.items.map((it) => {\n    const spec = fireworkSpecAt(", to: "return pl.items.slice(1).map((it) => {\n    const spec = fireworkSpecAt(", breaks: ['H17', 'H18', 'H22', 'H23', 'H25', 'H26', 'H27'] },
+  { id: 'firework-escapes-the-field', file: 'layout.js', from: "r: fitted ? Math.min(it.s * unit, room) : it.s * unit,", to: "r: it.s * unit * 1.3,", breaks: ['H17', 'H22', 'H23', 'H26', 'H27'] },
   { id: 'arrangement-length-unchecked', file: 'deck.js', from: "if (!Array.isArray(items) || items.length !== rank) return null;", to: "if (!Array.isArray(items)) return null;", breaks: ['H17'] },
-  { id: 'cell-arrangement-ignored', file: 'layout.js', from: "if (o && Array.isArray(o.items) && o.items.length === rank) return { items: o.items, fitted: false };", to: ";", breaks: ['H17', 'B7', 'H22', 'H23', 'B9'] },
-  { id: 'suit-parameters-ignored', file: 'firework.js', from: "for (const k of takes) if (mine[k] !== undefined && mine[k] !== '') spec[k] = mine[k];", to: ";", breaks: ['H18', 'B5', 'H22'] },
-  { id: 'suit-parameters-unfiltered', file: 'firework.js', from: "for (const k of takes) if (mine[k]", to: "for (const k of Object.keys(mine)) if (mine[k]", breaks: ['H18'] },
+  { id: 'cell-arrangement-ignored', file: 'layout.js', from: "if (o && Array.isArray(o.items) && o.items.length === rank) return { items: o.items, fitted: false };", to: ";", breaks: ['H17', 'B7', 'H22', 'H23', 'B9', 'H25', 'H26', 'H27', 'B11'] },
+  { id: 'suit-parameters-ignored', file: 'firework.js', from: "for (const k of takes) if (mine[k] !== undefined && mine[k] !== '') spec[k] = mine[k];", to: ";", breaks: ['H18', 'B5', 'H22', 'H25', 'H26'] },
+  { id: 'suit-parameters-unfiltered', file: 'firework.js', from: "for (const k of takes) if (mine[k]", to: "for (const k of Object.keys(mine)) if (mine[k]", breaks: ['H18', 'H25'] },
   { id: 'rank-column-keeps-cell-arrangements', file: 'deck.js', from: "for (const s of design.suits) clearCell(design, s.id, rank, 'items');", to: ";", breaks: ['H18', 'B7'] },
-  { id: 'renderer-reads-the-clock', file: 'firework.js', from: "  const rand = rng(spec.seed);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", to: "  const rand = rng(Date.now() + Math.random() * 4e9);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", breaks: ['H19', 'H3', 'H4', 'H11', 'H14', 'H15', 'H18', 'H21', 'H22', 'H23', 'H24'], mayAlso: ['H13'] },
+  { id: 'renderer-reads-the-clock', file: 'firework.js', from: "  const rand = rng(spec.seed);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", to: "  const rand = rng(Date.now() + Math.random() * 4e9);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", breaks: ['H19', 'H3', 'H4', 'H11', 'H14', 'H15', 'H18', 'H21', 'H22', 'H23', 'H24', 'H25', 'H26', 'H27'], mayAlso: ['H13', 'H16', 'H28'] },
   { id: 'scene-over-the-index', file: 'layout.js', from: "const art = bg + sceneArt(design, g) + centreArt(design, suit, card.rank, g, ix);", to: "const art = bg + centreArt(design, suit, card.rank, g, ix) + sceneArt(design, g);", breaks: ['H20'] },
-  { id: 'scene-drawn-when-off', file: 'layout.js', from: "if (!sc || !sc.on) return '';", to: "if (!sc) return '';", breaks: ['H20', 'H15', 'H22'] },
+  { id: 'scene-drawn-when-off', file: 'layout.js', from: "if (!sc || !sc.on) return '';", to: "if (!sc) return '';", breaks: ['H20', 'H15', 'H22', 'H26'] },
   // the page: what only the board can show
   { id: 'card-edit-writes-the-row', file: '../hanabi.js', from: "if (view.scope === 'card') cellOf(design, suit.id, rank, true)[k] = v;", to: "if (false) cellOf(design, suit.id, rank, true)[k] = v;", breaks: ['B5'] },
-  { id: 'board-greyscale-not-wired', file: '../hanabi.js', from: "if (e.target.id === 'boardGray') { setGray(e.target.checked); return; }", to: "if (e.target.id === 'boardGray') return;", breaks: ['B5'] },
+  { id: 'greyscale-misses-the-editor-card', file: '../hanabi.js', from: "$('edCard').classList.toggle('is-gray', view.grayscale);", to: ";", breaks: ['B5'] },
   { id: 'drag-writes-the-rank-column', file: '../hanabi.js', from: "cellOf(design, suit.id, rank, true).items = d.items.map((x) => ({ ...x }));", to: "design.arrangements[rank] = d.items.map((x) => ({ ...x }));", breaks: ['B7'] },
   // ---- phase 2b: arranging by hand, and Detail on every type
   { id: 'detail-rescales-the-burst', file: 'firework.js', from: "const each = (fn, prims = all.filter((p) => !p.det)) =>", to: "const each = (fn, prims = all.filter((p) => !p.ghost)) =>", breaks: ['H21'] },
   { id: 'glitter-fitted-on-what-it-draws', file: 'firework.js', from: "const each = (fn, prims = all.filter((p) => !p.det)) =>", to: "const each = (fn, prims = all.filter((p) => !p.det && !p.ghost)) =>", breaks: ['H21'] },
   { id: 'a-type-takes-no-detail', file: 'firework.js', from: "params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 6,", to: "params: ['count', 'length', 'starSize', 'tips', 'core', 'rotation', ...COLOR_PARAMS], defaults: { count: 6,", breaks: ['H21'] },
   { id: 'chrysanthemum-detail-ignored', file: 'firework.js', from: "const dd = detailOf(s, 1), beads = Math.round(Math.max(0, dd - 1) * 3);", to: "const dd = 1, beads = 0;", breaks: ['H21'] },
-  { id: 'pips-not-fitted', file: 'layout.js', from: "return { items: DEFAULT_PIPS[rank], fitted: true };", to: "return { items: DEFAULT_PIPS[rank], fitted: false };", breaks: ['H22', 'H23', 'H17'] },
-  { id: 'hand-arrangement-fitted', file: 'layout.js', from: "r: fitted ? Math.min(it.s * unit, room) : it.s * unit,", to: "r: Math.min(it.s * unit, room),", breaks: ['H23'] },
-  { id: 'restack-reseeds', file: 'layout.js', from: "seed: spec.seed + it.n * 7919,", to: "seed: spec.seed + pl.items.indexOf(it) * 7919,", breaks: ['H23'] },
-  { id: 'stacking-order-not-saved', file: 'deck.js', from: "if (it.n !== undefined) o.n = it.n;", to: ";", breaks: ['H23'] },
+  { id: 'pips-not-fitted', file: 'layout.js', from: "return { items: DEFAULT_PIPS[rank], fitted: true };", to: "return { items: DEFAULT_PIPS[rank], fitted: false };", breaks: ['H22', 'H23', 'H17', 'H26'] },
+  { id: 'hand-arrangement-fitted', file: 'layout.js', from: "r: fitted ? Math.min(it.s * unit, room) : it.s * unit,", to: "r: Math.min(it.s * unit, room),", breaks: ['H23', 'H26', 'H27'] },
+  { id: 'restack-reseeds', file: 'layout.js', from: "seed: spec.seed + it.n * 7919,", to: "seed: spec.seed + pl.items.indexOf(it) * 7919,", breaks: ['H23', 'H26'] },
+  { id: 'stacking-order-not-saved', file: 'deck.js', from: "if (it.n !== undefined) o.n = it.n;", to: ";", breaks: ['H23', 'H26'] },
   { id: 'repeated-n-kept', file: 'deck.js', from: "if (!perm) for (const o of out) delete o.n;", to: ";", breaks: ['H23'] },
-  { id: 'place-ignored', file: 'layout.js', from: "const at = p ? { cx: p.cx, cy: p.cy, r: p.r } : sp.base;", to: "const at = sp.base;", breaks: ['H24'] },
+  { id: 'place-ignored', file: 'layout.js', from: "const at = p ? { cx: p.cx, cy: p.cy, r: p.r } : sp.base;", to: "const at = sp.base;", breaks: ['H24', 'H26', 'H27'] },
   { id: 'placement-not-read', file: 'deck.js', from: "if (o.place !== undefined) {", to: "if (o.place !== undefined && false) {", breaks: ['H24'] },
   { id: 'a-pick-writes-the-card', file: '../hanabi.js', from: "  view.item = i;\n  board.drag =", to: "  view.item = i;\n  if (mode === 'items') cellOf(design, suit.id, rank, true).items = curItems(suit, rank);\n  board.drag =", breaks: ['B9'] },
   { id: 'the-size-slider-sizes-every-firework', file: '../hanabi.js', from: "items[i] = { ...items[i], [k]: v };", to: "for (let j = 0; j < items.length; j++) items[j] = { ...items[j], [k]: v };", breaks: ['B9'] },
   { id: 'to-back-goes-to-the-front', file: '../hanabi.js', from: "{ back: 0, down: i - 1, up: i + 1, front: items.length - 1 }", to: "{ back: items.length - 1, down: i - 1, up: i + 1, front: 0 }", breaks: ['B9'] },
   { id: 'scale-drag-not-written', file: '../hanabi.js', from: "else cellOf(design, suit.id, rank, true).place = { ...d.items[0] };", to: "else;", breaks: ['B9'] },
+  // ---- this round: per-firework styles, optical centring, the v3 migration, the layout
+  { id: 'firework-style-ignored', file: 'layout.js', from: "const spec = fireworkSpecAt(design, suit, rank, it.n), reach", to: "const spec = fireworkSpec(design, suit, rank), reach", breaks: ['H17', 'H25', 'B11'] },
+  { id: 'style-keyed-by-stacking-slot', file: 'layout.js', from: "const spec = fireworkSpecAt(design, suit, rank, it.n), reach", to: "const spec = fireworkSpecAt(design, suit, rank, pl.items.indexOf(it)), reach", breaks: ['H25'] },
+  { id: 'style-reaches-every-firework', file: 'firework.js', from: "const st = o && o.styles && o.styles[n];", to: "const st = o && o.styles && Object.values(o.styles)[0];", breaks: ['H17', 'H25', 'B11'] },
+  { id: 'another-type-takes-the-suit-parameters', file: 'firework.js', from: ".filter((k) => !other || COLOR_PARAMS.includes(k));", to: ";", breaks: ['H25'] },
+  { id: 'styles-leak-into-the-card-spec', file: 'firework.js', from: "const { items, place, styles, ...rest } = o;", to: "const { items, place, ...rest } = o;", breaks: ['H25'] },
+  { id: 'styles-not-saved', file: 'deck.js', from: "if (st) o.styles = st; else delete o.styles;", to: "delete o.styles;", breaks: ['H25'] },
+  { id: 'style-mix-reaches-a-scale-suit', file: 'deck.js', from: "if (!COUNT_MODES.includes(s.centre.compose)) { skipped.push(s.id); continue; }", to: ";", breaks: ['H25'] },
+  { id: 'count-reach-dropped-in-the-refactor', file: 'layout.js', from: "{ cx: it.cx, cy: it.cy, r: it.r / reach });", to: "{ cx: it.cx, cy: it.cy, r: it.r });", breaks: ['H26'] },
+  { id: 'centre-on-the-anchors', file: 'layout.js', from: "const dx = fx - e.cx, dy = fy - e.cy;", to: "const dx = fx - pl.items.reduce((a, it) => a + it.cx, 0) / pl.items.length, dy = fy - pl.items.reduce((a, it) => a + it.cy, 0) / pl.items.length;", breaks: ['H27', 'B11'] },
+  { id: 'centre-misses-the-curves', file: 'layout.js', from: "for (let k = 1; k <= CURVE_SAMPLES; k++) {", to: "for (let k = CURVE_SAMPLES; k <= CURVE_SAMPLES; k++) {", breaks: ['H27'] },
+  { id: 'centre-ignores-a-rotated-burst', file: 'layout.js', from: "      if (a) { const dx = x - ox, dy = y - oy;", to: "      if (false) { const dx = x - ox, dy = y - oy;", breaks: ['H27'] },
+  { id: 'centre-breaks-the-group', file: 'layout.js', from: "const raw = literalItems(pl).map((it) => ({ ...it, x: it.x + dx / field.w, y: it.y + dy / field.h }));", to: "const raw = literalItems(pl).map((it, i) => (i ? it : { ...it, x: it.x + dx / field.w, y: it.y + dy / field.h }));", breaks: ['H27'] },
+  { id: 'centre-offered-under-a-tier', file: 'layout.js', from: "  if (spec.tier) return null;\n  const sp = scaleBurst(", to: "  const sp = scaleBurst(", breaks: ['H27'] },
+  { id: 'a-style-writes-the-whole-card', file: '../hanabi.js', from: "  } else setFireworkStyle(design, suit.id, rank, n, k, v);", to: "  } else cellOf(design, suit.id, rank, true)[k] = v;", breaks: ['B11'] },
+  { id: 'centre-all-skips-a-suit', file: '../hanabi.js', from: "centreMany(activeSuits(design).map((s) => [s, 1]), 'Every rank 1')", to: "centreMany(activeSuits(design).slice(1).map((s) => [s, 1]), 'Every rank 1')", breaks: ['B11'] },
+  { id: 'panel-rail-not-kept', file: '../hanabi.js', from: "layout.panel = layout.panel === 'rail' ? 'open' : 'rail'; persistLayout(); applyLayout();", to: "layout.panel = layout.panel === 'rail' ? 'open' : 'rail'; applyLayout();", breaks: ['B10'] },
+  { id: 'editor-width-not-clamped', file: '../hanabi.js', from: "layout.editorW = Math.round(Math.min(EDITOR_W.max, Math.max(EDITOR_W.min, w)));", to: "layout.editorW = Math.round(w);", breaks: ['B10'] },
+  { id: 'card-zoom-not-applied', file: '../hanabi.js', from: "card.style.width = `${Math.round(w)}px`;", to: ";", breaks: ['B10'] },
   { id: 'suit-rows-hold-stale-suits', file: '../hanabi.js', from: "const me = () => suitById(design, suit.id);", to: "const me = () => suit;", breaks: ['B6'] },
 ];
 
@@ -173,6 +214,8 @@ const CATALOGUE = (F) => F.MOTIF_IDS.filter((m) => m !== 'classic' && !m.startsW
 const BASE = 'd5cd4ef';
 // Phase 2 as it shipped (the Firework board, #542): H22's reference.
 const BASE2 = 'e95f121';
+// Phase 2b as it shipped (the Arrange panel and Detail, #548; schema version 3): H26's reference.
+const BASE3 = '68ff42a';
 const baseDirs = {};
 async function baseModules(commit = BASE) {
   if (baseDirs[commit]) return baseDirs[commit];
@@ -236,6 +279,47 @@ function describe({ grid, G }) {
 // a band weighs as its area (an inner band is a few cells, an outer one hundreds)
 const sdist = (a, b) => a.reduce((x, v, i) => x + Math.abs(v - b[i]) * (i < 8 ? (2 * i + 1) / 8 : 1), 0);
 
+// ---- the greyscale likeness REPORT (non-blocking). Per-firework styles can make
+// two suits' cards draw alike; the symbol still tells them apart (H2), so this
+// warns rather than fails. A card is described as the mean of its fireworks'
+// silhouettes (each drawn alone in one box, its own spec); two suits are named on
+// a rank where their cards sit nearer than LIKENESS — twice the median, over the
+// nine types, of how far one type's own drawings stray from their centroid
+// (measured here, never typed), i.e. as alike as two draws of one type.
+const LBOX = { cx: 40, cy: 40, r: 26 };
+const likenessMemo = new WeakMap();
+function likenessOf(F) {
+  if (likenessMemo.has(F)) return likenessMemo.get(F);
+  const spread = F.TYPE_IDS.map((t) => {
+    const ds = [...Array(12)].map((_, k) => describe(raster(F.renderFirework(F.defaultSpec({ id: `q${k}`, primary: '#E5484D', secondary: '#9FB4C8' }, 1 + (k % 5), [], t, 'none', 'count'), LBOX), LBOX)));
+    const c = ds[0].map((_, j) => ds.reduce((a, v) => a + v[j], 0) / ds.length);
+    return Math.max(...ds.map((v) => sdist(v, c)));
+  }).sort((a, b) => a - b);
+  const v = 2 * spread[Math.floor(spread.length / 2)];
+  likenessMemo.set(F, v);
+  return v;
+}
+function cardLook(D, L, F, d, s, r) {
+  const count = D.COUNT_MODES.includes(s.centre.compose);
+  const items = count ? L.placementFor(d, s, r).items : [{ n: 0, rot: 0 }];
+  const ds = items.map((it) => {
+    const sp = count ? F.fireworkSpecAt(d, s, r, it.n) : F.fireworkSpec(d, s, r);
+    return describe(raster(F.renderFirework({ ...sp, seed: sp.seed + it.n * 7919, rotation: (+sp.rotation || 0) + it.rot }, LBOX), LBOX));
+  });
+  return ds[0].map((_, j) => ds.reduce((a, v) => a + v[j], 0) / ds.length);
+}
+function greyscaleReport(D, L, F, d, likeness = likenessOf(F)) {
+  const suits = D.activeSuits(d), out = [];
+  for (const r of D.RANKS) {
+    const looks = suits.map((s) => cardLook(D, L, F, d, s, r));
+    for (let i = 0; i < suits.length; i++) for (let j = i + 1; j < suits.length; j++) {
+      const x = sdist(looks[i], looks[j]);
+      if (x < likeness) out.push(`${suits[i].name} and ${suits[j].name}, rank ${r}: their fireworks draw alike in greyscale (distance ${x.toFixed(3)} < ${likeness.toFixed(3)}); only the symbol tells them apart`);
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- part one
 async function partOne(dir) {
   const imp = (m) => import(pathToFileURL(path.join(dir, m)).href + `?t=${Date.now()}${Math.random()}`);
@@ -244,6 +328,7 @@ async function partOne(dir) {
   const check = (id, name, fn) => { try { const r = fn(); res.push({ id, name, ok: r === true, detail: r === true ? '' : String(r) }); } catch (e) { res.push({ id, name, ok: false, detail: 'threw ' + e.message }); } };
   const checkAsync = async (id, name, fn) => { try { const r = await fn(); res.push({ id, name, ok: r === true, detail: r === true ? '' : String(r) }); } catch (e) { res.push({ id, name, ok: false, detail: 'threw ' + e.message }); } };
   const COMPOSES = ['count', 'countscale', 'scale', 'column', 'bleed'];   // restated
+  const likeness = { get value() { return likenessOf(F); } };
   const symbolPath = (id) => S.SYMBOLS[id].d.slice(0, 40);
 
   check('H1', 'the standard distribution', () => {
@@ -705,6 +790,16 @@ async function partOne(dir) {
     if (r.design.fireworks.red || r.design.arrangements[4]) return 'a wrong-length arrangement was kept';
     if (r.notes.length < 2) return `a wrong-length arrangement was dropped without a note: ${r.notes.join('; ')}`;
     if (count(L.renderFace(r.design, { kind: 'card', suitId: 'red', rank: 3 })) !== 3) return 'red 3 is not three fireworks after a bad arrangement';
+    // mixed styles: still exactly N, each firework the type it was given
+    for (const compose of ['count', 'countscale']) for (const rank of [2, 3, 4, 5]) {
+      const m = D.defaultDesign(); D.suitById(m, 'yellow').centre.compose = compose;
+      const types = ['crossette', 'willow', 'ring', 'blossom', 'dahlia'].slice(0, rank);
+      types.forEach((t, n) => D.setFireworkStyle(m, 'yellow', rank, n, 'motif', t));
+      const svg = L.renderFace(m, { kind: 'card', suitId: 'yellow', rank });
+      if (count(svg) !== rank) return `a ${compose} ${rank} with mixed styles draws ${count(svg)} fireworks`;
+      const got = [...svg.matchAll(/<g class="hb-firework" data-motif="([\w-]+)"/g)].map((x) => x[1]).sort().join();
+      if (got !== [...types].sort().join()) return `a ${compose} ${rank} styled ${types.join()} draws ${got}`;
+    }
     // an arrangement moves its fireworks: the default and a cell's own differ
     const before = L.placementFor(d, D.suitById(d, 'red'), 2).items;
     D.cellOf(d, 'red', 2, true).items = [{ x: 0.1, y: 0.1, s: 0.3, rot: 0 }, { x: 0.9, y: 0.9, s: 0.3, rot: 0 }];
@@ -909,6 +1004,166 @@ async function partOne(dir) {
     if (L.renderFace(d, { kind: 'card', suitId: 'red', rank: 3 }) !== withPlace) return 'a placement moved a field motif';
     return true;
   });
+
+  // ---- H25: one firework of a Count card styled on its own (schema version 4).
+  check('H25', 'per-firework styles: one firework restyled, kept through a restack, saved, inherited, reset, carried to the rank', () => {
+    const d = D.defaultDesign(), red = D.suitById(d, 'red');
+    const fw = (svg) => svg.match(/<g class="hb-firework"[\s\S]*?<\/g>/g) || [];
+    const face = (s, r) => L.renderFace(d, { kind: 'card', suitId: s, rank: r });
+    const plain = fw(face('red', 4)), plainFace = face('red', 4);
+    // the style reaches its own firework (n 2) and no other, and no other card
+    const others = D.deckCards(d).filter((c) => c.kind === 'card' && !(c.suitId === 'red' && c.rank === 4)).map((c) => L.renderFace(d, c));
+    D.setFireworkStyle(d, 'red', 4, 2, 'motif', 'crossette');
+    const mixed = fw(face('red', 4));
+    if (mixed.length !== 4) return `a restyled 4 draws ${mixed.length} fireworks`;
+    const motifs = mixed.map((g) => /data-motif="([\w-]+)"/.exec(g)[1]);
+    if (motifs.join() !== 'peony,peony,crossette,peony') return `red 4 draws ${motifs.join()}, want the third (n 2) a crossette`;
+    if ([0, 1, 3].some((i) => mixed[i] !== plain[i])) return 'restyling firework 3 redrew another firework of the card';
+    if (D.deckCards(d).filter((c) => c.kind === 'card' && !(c.suitId === 'red' && c.rank === 4)).some((c, i) => L.renderFace(d, c) !== others[i])) return 'a firework style reached another card';
+    if ('styles' in F.fireworkSpec(d, red, 4)) return 'the styles leaked into the card spec';
+    // a style is per key: density alone keeps the card's type
+    D.setFireworkStyle(d, 'red', 4, 0, 'density', 3 / 2);
+    const sp0 = F.fireworkSpecAt(d, red, 4, 0);
+    if (sp0.motif !== 'peony' || sp0.density !== 1.5) return `a detail-only style drew ${sp0.motif} at detail ${sp0.density}`;
+    // another type starts from its own defaults: the suit's parameters were set for
+    // its own type and reach it as colours only
+    red.firework = { count: 14, outerColor: '#00FF88' };
+    const sp2 = F.fireworkSpecAt(d, red, 4, 2);
+    if (sp2.count !== F.TYPES.crossette.defaults.count || sp2.outerColor !== '#00FF88') return `the restyled crossette took count ${sp2.count} (want its own ${F.TYPES.crossette.defaults.count}) and outer colour ${sp2.outerColor} (want the suit's)`;
+    if (F.fireworkSpecAt(d, red, 4, 1).count !== 14) return 'an unstyled firework lost the suit\'s count';
+    red.firework = {};
+    // a restack carries the style with its firework (keyed by n, not by slot)
+    const items = L.literalItems(L.placementFor(d, red, 4));
+    D.cellOf(d, 'red', 4, true).items = D.restack(items, 2, 3);
+    const re = fw(face('red', 4)).map((g) => /data-motif="([\w-]+)"/.exec(g)[1]);
+    if (re.join() !== 'peony,peony,peony,crossette') return `after moving firework 3 to the front: ${re.join()}`;
+    delete D.cellOf(d, 'red', 4).items;
+    // saved and read back; bad entries dropped and told
+    const file = JSON.parse(D.serialiseDesign(d));
+    const back = D.normaliseDesign(file, S.SYMBOL_IDS);
+    if (back.notes.length || JSON.stringify(back.design.fireworks) !== JSON.stringify(d.fireworks)) return `styles did not round-trip: ${back.notes.join('; ')}`;
+    file.fireworks.red[4].styles = { 1: { motif: 'starfield' }, 7: { motif: 'ring' }, 3: { density: 'lots', motif: 'ring' } };
+    const bad = D.normaliseDesign(file, S.SYMBOL_IDS), bs = bad.design.fireworks.red[4].styles;
+    if (JSON.stringify(bs) !== JSON.stringify({ 3: { motif: 'ring' } }) || bad.notes.length !== 3) return `bad styles read as ${JSON.stringify(bs)} with ${bad.notes.length} notes (${bad.notes.join('; ')})`;
+    // a style on a card that is not a Count draws nothing different
+    D.suitById(d, 'blue').centre.compose = 'scale';
+    const sc = face('blue', 3); D.setFireworkStyle(d, 'blue', 3, 0, 'motif', 'peony');
+    if (face('blue', 3) !== sc) return 'a style moved a Scale card';
+    D.clearFireworkStyle(d, 'blue', 3, 0); D.suitById(d, 'blue').centre.compose = 'count';
+    // the style mix to the rank: every Count suit's 4, a Scale suit left alone
+    D.suitById(d, 'green').centre.compose = 'scale';
+    const r = D.applyStylesToRank(d, 'red', 4);
+    if (r.reached.join() !== 'white,blue,yellow' || r.skipped.join() !== 'green') return `the mix reached ${r.reached} and skipped ${r.skipped}`;
+    if (/data-motif="crossette"/.exec(face('blue', 4)) === null) return 'the mix did not reach blue 4';
+    D.suitById(d, 'green').centre.compose = 'count';
+    for (const s of ['white', 'blue', 'yellow']) D.clearCell(d, s, 4);
+    // duplicates of a card are one card
+    const copies = D.deckCards(d).filter((c) => c.kind === 'card' && c.suitId === 'red' && c.rank === 4).map((c) => L.renderFace(d, c));
+    if (copies.length !== 2 || copies[0] !== copies[1]) return 'the duplicates of red 4 differ';
+    // reset firework to suit, one key and then the whole style, back byte for byte
+    D.clearFireworkStyle(d, 'red', 4, 2, 'motif'); D.clearFireworkStyle(d, 'red', 4, 0);
+    if (face('red', 4) !== plainFace) return 'resetting the styles did not restore the card';
+    if (d.fireworks.red) return 'resetting the styles left an empty record';
+    return true;
+  });
+
+  // ---- H26: a #548-era design (version 3, BASE3) opens and draws exactly as it did.
+  await checkAsync('H26', `a version-3 design (${BASE3}) reads cleanly and renders byte-identically`, async () => {
+    const B = await baseModules(BASE3);
+    const bd = await import(pathToFileURL(path.join(B, 'deck.js')).href), bl = await import(pathToFileURL(path.join(B, 'layout.js')).href);
+    let n = 0;
+    for (const preset of ['poker', 'mini']) for (const index of ['large', 'band']) {
+      const d = bd.defaultDesign(); d.rainbow = true; d.size = { preset, ...bd.SIZE_PRESETS[preset] }; d.index = index;
+      Object.assign(d.suits.find((x) => x.id === 'red').firework, { count: 14, density: 1.6, rotation: 25 });
+      d.suits.find((x) => x.id === 'white').centre = { compose: 'count', motif: 'classic', tier: 'none' };   // a phase-1 burst under Count (its reach)
+      d.suits.find((x) => x.id === 'yellow').centre.compose = 'scale';
+      d.suits.find((x) => x.id === 'green').centre = { compose: 'countscale', motif: 'radial-willow', tier: 'none' };
+      d.fireworks = { blue: { 3: { starSize: 1.7, items: [{ x: 0.1, y: 0.2, s: 0.9, rot: 15, n: 2 }, { x: 0.6, y: 0.5, s: 0.5, rot: 0, n: 0 }, { x: 0.5, y: 0.95, s: 1.1, rot: -40, n: 1 }] } }, yellow: { 2: { place: { x: 0.3, y: 0.6, s: 1.3, rot: 20 } } } };
+      d.arrangements = { 5: [{ x: 0.2, y: 0.2, s: 0.5, rot: 0 }, { x: 0.8, y: 0.2, s: 0.5, rot: 0 }, { x: 0.5, y: 0.5, s: 0.7, rot: 30 }, { x: 0.2, y: 0.8, s: 0.5, rot: 0 }, { x: 0.8, y: 0.8, s: 0.5, rot: 0 }] };
+      const file = JSON.parse(bd.serialiseDesign(d));
+      if (file.version !== 3) return `the base wrote version ${file.version}`;
+      const { design, notes } = D.normaliseDesign(file, S.SYMBOL_IDS);
+      if (notes.length) return `a version-3 file read with notes: ${notes.join('; ')}`;
+      if (JSON.stringify({ ...design, version: 3 }) !== JSON.stringify(bd.normaliseDesign(file, S.SYMBOL_IDS).design)) return 'the version-3 file reads differently here';
+      for (const c of D.deckCards(design)) {
+        n++;
+        const a = L.renderFace(design, c), b = bl.renderFace(d, c);
+        if (a !== b) { let i = 0; while (a[i] === b[i]) i++; return `${preset}/${index} ${c.suitId || c.kind}${c.rank || ''}: differs at ${i}: …${a.slice(i - 20, i + 30)}…`; }
+      }
+    }
+    return n > 200 || `only ${n} faces`;
+  });
+
+  // ---- H27: optical centring. The extent is RESTATED here (the gate's own reading
+  // of every mark, a rotate() applied), and the field from the size and the index.
+  const extentOf = (svg) => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const grp of svg.split('<g class="hb-firework"').slice(1)) {
+      const tm = /^[^>]*transform="rotate\(([-\d.]+) ([-\d.]+) ([-\d.]+)\)"/.exec(grp);
+      const a = tm ? (+tm[1] * Math.PI) / 180 : 0;
+      for (const p of pointsOf('<g' + grp.slice(0, grp.indexOf('</g>')))) {
+        let { x, y } = p;
+        if (a) { const dx = x - +tm[2], dy = y - +tm[3]; x = +tm[2] + dx * Math.cos(a) - dy * Math.sin(a); y = +tm[3] + dx * Math.sin(a) + dy * Math.cos(a); }
+        x0 = Math.min(x0, x - p.pad); x1 = Math.max(x1, x + p.pad); y0 = Math.min(y0, y - p.pad); y1 = Math.max(y1, y + p.pad);
+      }
+    }
+    return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  };
+  const fieldOf = (d) => {
+    const DIGIT = { large: 0.13, small: 0.095 }, g = D.cardGeom(d), sr = g.safeRect, h = d.size.h;
+    let area, cw;
+    if (d.index === 'band') { const top = g.bleed + g.safe + h * 0.13 + h * 0.006; area = { x: sr.x, y: top, w: sr.w, h: g.fullH - 2 * top }; cw = 0; }
+    else { area = sr; cw = h * DIGIT[d.index] * 0.62; }
+    const gap = Math.max(0.8, area.h * 0.015), side = cw ? cw + gap : gap;
+    return { x: area.x + side, y: area.y + gap, w: area.w - 2 * side, h: area.h - 2 * gap };
+  };
+  check('H27', 'Centre: the drawn extent lands on the art field\'s centre, for every burst, a group kept together', () => {
+    const TOL = 0.12;   // mm: the two readings sample curves differently (24 against 16 points)
+    const write = (d, s, r, c) => { if (c.kind === 'items') D.cellOf(d, s.id, r, true).items = c.items; else D.cellOf(d, s.id, r, true).place = c.place; };
+    const art = (svg) => svg.slice(0, svg.indexOf('<g class="hb-index">'));
+    let willowLift = 0, n = 0;
+    for (const [preset, w, h] of [['poker', 63.5, 88.9], ['mini', 44, 63]]) for (const index of ['large', 'band']) {
+      const d = D.defaultDesign(); d.size = { preset, w, h }; d.index = index;
+      const F0 = fieldOf(d), fx = F0.x + F0.w / 2, fy = F0.y + F0.h / 2, red = D.suitById(d, 'red');
+      for (const m of F.STYLE_MOTIFS) for (const [compose, rank] of [['count', 1], ['scale', 3]]) {
+        red.centre = { compose, motif: m, tier: 'none' }; D.clearCell(d, 'red', rank);
+        if (compose === 'count') D.cellOf(d, 'red', rank, true).items = [{ x: 0.42, y: 0.58, s: 0.8, rot: 35 }];   // off-centre and turned
+        const c = L.centring(d, red, rank);
+        if (!c) return `${preset}/${index} ${m} ${compose}: no centring offered`;
+        if (c.clamped) return `${preset}/${index} ${m} ${compose}: clamped`;
+        if (m === 'willow' && compose === 'count') willowLift = Math.max(willowLift, -c.dy);
+        write(d, red, rank, c);
+        const e = extentOf(art(L.renderFace(d, { kind: 'card', suitId: 'red', rank })));
+        n++;
+        if (Math.hypot(e.cx - fx, e.cy - fy) > TOL) return `${preset}/${index} ${m} ${compose}: the drawn extent centres at ${e.cx.toFixed(2)},${e.cy.toFixed(2)}, the field at ${fx.toFixed(2)},${fy.toFixed(2)}`;
+      }
+      // a group: the extent of all four centred, and each firework keeps its place to the others
+      red.centre = { compose: 'count', motif: 'willow', tier: 'none' }; D.clearCell(d, 'red', 4);
+      const before = L.placementFor(d, red, 4).items;
+      write(d, red, 4, L.centring(d, red, 4));
+      const after = L.placementFor(d, red, 4).items, e = extentOf(art(L.renderFace(d, { kind: 'card', suitId: 'red', rank: 4 })));
+      if (Math.hypot(e.cx - fx, e.cy - fy) > TOL) return `${preset}/${index} a willow 4: the group's extent centres ${Math.hypot(e.cx - fx, e.cy - fy).toFixed(2)} mm off`;
+      for (let i = 1; i < 4; i++) if (Math.abs((after[i].cx - after[0].cx) - (before[i].cx - before[0].cx)) > 1e-6 || Math.abs((after[i].cy - after[0].cy) - (before[i].cy - before[0].cy)) > 1e-6 || Math.abs(after[i].r - before[i].r) > 1e-9) return `${preset}/${index}: centring moved firework ${i} relative to the others`;
+      // what lays itself out is not centred
+      for (const [compose, motif, tier] of [['column', 'peony', 'none'], ['bleed', 'peony', 'none'], ['scale', 'starfield', 'none'], ['scale', 'dome', 'rosettes']]) {
+        red.centre = { compose, motif, tier }; if (L.centring(d, red, 5)) return `${compose}/${motif}/${tier}: offered a centring`;
+      }
+    }
+    // the anchor is not the extent: a willow's trails hang below its centre
+    if (!(willowLift > 1)) return `a willow was lifted only ${willowLift.toFixed(2)} mm (its trails hang; centring its anchor would leave it low)`;
+    return n >= 4 * F.STYLE_MOTIFS.length * 2 || `only ${n} cards`;
+  });
+
+  // ---- H28: the greyscale likeness report finds two suits made alike by their styles.
+  check('H28', 'the greyscale likeness report: silent on the default deck, names two suits styled alike', () => {
+    const d = D.defaultDesign(); d.rainbow = true;
+    const clean = greyscaleReport(D, L, F, d, likeness.value);
+    if (clean.length) return `the default deck warns: ${clean.join('; ')}`;
+    for (let n = 0; n < 3; n++) D.setFireworkStyle(d, 'blue', 3, n, 'motif', 'peony');
+    const w = greyscaleReport(D, L, F, d, likeness.value);
+    if (w.length !== 1 || !/Red and Blue, rank 3/.test(w[0])) return `styling blue 3 as red's peony reported ${JSON.stringify(w)}`;
+    return true;
+  });
   return res;
 }
 
@@ -1030,12 +1285,16 @@ async function partTwo(overrides = {}) {
       await page.click('#editor [data-type=crossette]');
       const types = (await page.evaluate(() => window.__hanabi.design())).suits.map((x) => `${x.id}:${x.centre.motif}`).join();
       if (!types.includes('red:crossette') || types.split(',').filter((t) => t.endsWith(':crossette')).length !== 1) return `the type gallery set ${types}`;
-      await page.check('#boardGray');
+      // ONE greyscale control: the toolbar's, which reaches the board and the editor's card
+      const toggles = await page.$$eval('input[type=checkbox]', (els) => els.filter((e) => /grey/i.test(e.closest('label') ? e.closest('label').textContent : '')).length);
+      if (toggles !== 1) return `${toggles} greyscale toggles on the board view, want one`;
+      await page.check('#grayscale');
       const gray = await page.$eval('#stage .hb-cell svg', (e) => getComputedStyle(e).filter);
-      const bar = await page.$eval('#grayscale', (e) => e.checked);
-      await page.uncheck('#boardGray');
+      const edGray = await page.$eval('#edCard svg', (e) => getComputedStyle(e).filter);
+      await page.uncheck('#grayscale');
       const plain = await page.$eval('#stage .hb-cell svg', (e) => getComputedStyle(e).filter);
-      if (!gray.includes('grayscale') || !bar || plain.includes('grayscale')) return `board greyscale: filter "${gray}" then "${plain}", toolbar ${bar}`;
+      const edPlain = await page.$eval('#edCard svg', (e) => getComputedStyle(e).filter);
+      if (!gray.includes('grayscale') || !edGray.includes('grayscale') || plain.includes('grayscale') || edPlain.includes('grayscale')) return `greyscale: board "${gray}" then "${plain}", editor card "${edGray}" then "${edPlain}"`;
       return true;
     });
 
@@ -1117,6 +1376,117 @@ async function partTwo(overrides = {}) {
       const pxPerMm = await page.$eval('#edCard svg', (e) => e.getBoundingClientRect().width / e.viewBox.baseVal.width);
       const dmm = Math.hypot(S1.cx - S0.cx, S1.cy - S0.cy), want = Math.hypot(30, 20) / pxPerMm;
       if (!(await D()).fireworks.red[3].place || Math.abs(dmm - want) > 1.2) return `the Scale firework moved ${dmm.toFixed(2)} mm under a ${want.toFixed(2)} mm drag`;
+      await page.evaluate(() => document.getElementById('resetDesign').click());
+      await page.click('[data-view=suit]');
+      return true;
+    });
+
+    await check('B10', 'the layout: the panel collapses to a rail and back, the editor resizes by its handle, the card zooms; all kept per browser', async () => {
+      await page.evaluate(() => document.getElementById('resetDesign').click());
+      await page.click('[data-view=fireworks]');
+      await page.click('[data-cell="red:3"]');
+      const W = (sel) => page.$eval(sel, (e) => e.getBoundingClientRect().width);
+      const overflow = () => page.$eval('.hb-boardcol', (c) => c.scrollWidth - c.clientWidth);
+      const board0 = await W('.hb-board');
+      // the rail
+      await page.click('#panelToggle');
+      const rail = await W('#deckPanel'), board1 = await W('.hb-board');
+      if (!(rail <= 40) || await page.$eval('#panelToggle', (e) => e.getAttribute('aria-expanded')) !== 'false') return `collapsed panel ${rail}px wide`;
+      if (!(board1 > board0 + 100)) return `the board did not take the freed width: ${board0} -> ${board1}px`;
+      await page.reload(); await page.waitForFunction(() => window.__hanabi);
+      if (!(await W('#deckPanel') <= 40)) return 'the rail did not survive a reload';
+      await page.click('#panelToggle');
+      if (!(await W('#deckPanel') > 300)) return 'the panel did not open again';
+      await page.reload(); await page.waitForFunction(() => window.__hanabi);
+      if (!(await W('#deckPanel') > 300)) return 'the open panel did not survive a reload';
+      // the editor's width, by a real drag on its handle
+      await page.click('[data-view=fireworks]'); await page.click('[data-cell="red:3"]');
+      const drag = async (dx) => {
+        const h = await page.$eval('#edResize', (e) => { e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + Math.min(80, r.height / 2) }; });
+        await page.mouse.move(h.x, h.y); await page.mouse.down();
+        for (let k = 1; k <= 6; k++) await page.mouse.move(h.x + (dx * k) / 6, h.y);
+        await page.mouse.up();
+      };
+      const e0 = await W('#editor');
+      await drag(-160);
+      const e1 = await W('#editor'), L1 = await page.evaluate(() => window.__hanabi.layout());
+      if (Math.abs(e1 - (e0 + 160)) > 3 || Math.abs(L1.editorW - e1) > 1) return `a 160px drag took the editor ${e0} -> ${e1}px (stored ${L1.editorW})`;
+      if (await overflow() > 0) return `the board overflows its column by ${await overflow()}px at a wide editor`;
+      await page.reload(); await page.waitForFunction(() => window.__hanabi);
+      await page.click('[data-view=fireworks]'); await page.click('[data-cell="red:3"]');
+      if (Math.abs(await W('#editor') - e1) > 1) return `the editor width did not survive a reload: ${await W('#editor')} vs ${e1}`;
+      await drag(900);
+      const Lmin = await page.evaluate(() => window.__hanabi.layout());
+      if (Lmin.editorW !== 280 || Math.abs(await W('#editor') - 280) > 1) return `dragged past its minimum the editor is ${Lmin.editorW} (${await W('#editor')}px), want 280`;
+      if (await overflow() > 0) return `the board overflows its column by ${await overflow()}px at a narrow editor`;
+      await drag(-2000);
+      const Lmax = await page.evaluate(() => window.__hanabi.layout());
+      const boardLeft = await W('.hb-boardcol');
+      if (Lmax.editorW > 960 || boardLeft < 300) return `dragged past its maximum: stored ${Lmax.editorW}, the board left ${boardLeft}px`;
+      await page.focus('#edResize'); await page.keyboard.press('Home');
+      if ((await page.evaluate(() => window.__hanabi.layout())).editorW !== 280) return 'Home on the handle did not go to the minimum';
+      await page.keyboard.press('ArrowLeft');
+      if ((await page.evaluate(() => window.__hanabi.layout())).editorW !== 296) return 'ArrowLeft on the handle did not widen the editor by 16px';
+      // the card zoom: 100% is print size; fit fits the editor; kept
+      await page.click('#edZoom [data-zoom="100"]');
+      const mm = await page.evaluate(() => { const v = document.querySelector('#edCard svg').viewBox.baseVal; return v.width; });
+      const px = await W('#edCard svg');
+      if (Math.abs(px - (mm * 96) / 25.4) > 1.5) return `100% draws the card ${px.toFixed(1)}px for ${mm} mm (want ${((mm * 96) / 25.4).toFixed(1)})`;
+      await page.click('#edZoom [data-zoom="200"]');
+      const px2 = await W('#edCard svg');
+      if (Math.abs(px2 - 2 * px) > 2) return `200% is ${px2}px against 100%'s ${px}`;
+      await page.reload(); await page.waitForFunction(() => window.__hanabi);
+      await page.click('[data-view=fireworks]'); await page.click('[data-cell="red:3"]');
+      if (Math.abs(await W('#edCard svg') - px2) > 2) return 'the card zoom did not survive a reload';
+      await page.click('#edZoom [data-zoom="fit"]');
+      const fit = await W('#edCard svg'), wrap = await page.$eval('#edCardWrap', (e) => e.clientWidth);
+      if (fit > wrap || fit < Math.min(wrap - 10, 200)) return `fit draws the card ${fit}px in a ${wrap}px editor`;
+      // back to the default layout for the checks after this one
+      await page.evaluate(() => localStorage.removeItem('hanabi.layout.v1')); await page.reload(); await page.waitForFunction(() => window.__hanabi);
+      await page.click('[data-view=suit]');
+      return true;
+    });
+
+    await check('B11', 'per-firework styles and Centre through the editor: one firework restyled and reset; Centre, every rank 1, a row', async () => {
+      await page.evaluate(() => document.getElementById('resetDesign').click());
+      await page.click('[data-view=fireworks]');
+      await page.click('[data-cell="red:4"]');
+      const D = () => page.evaluate(() => window.__hanabi.design());
+      const a = await snap();
+      await page.click('#edItems [data-item="2"]');
+      await page.selectOption('#st-motif', 'crossette');
+      const d1 = await D();
+      if (JSON.stringify(d1.fireworks) !== JSON.stringify({ red: { 4: { styles: { 2: { motif: 'crossette' } } } } })) return `restyling wrote ${JSON.stringify(d1.fireworks)}`;
+      if (moved(a, await snap()) !== 'red:4') return `a firework style repainted ${moved(a, await snap())}`;
+      const types = await page.$$eval('#edCard .hb-firework', (g) => g.map((x) => x.dataset.motif).join());
+      if (types !== 'peony,peony,crossette,peony') return `the editor card draws ${types}`;
+      if (!(await page.$eval('#edItems [data-item="2"]', (e) => e.classList.contains('is-own'))) || await page.$eval('#edItems [data-item="1"]', (e) => e.classList.contains('is-own'))) return 'the restyled firework is not the one marked';
+      if (!(await page.$eval('[data-cell="red:4"]', (e) => e.classList.contains('is-own')))) return 'the board cell is not marked';
+      await setRange('#st-density', 1);
+      if ((await D()).fireworks.red[4].styles[2].density !== 1) return 'the detail slider did not write the firework\'s style';
+      if ((await D()).fireworks.red[4].styles[1]) return 'a style reached another firework';
+      await page.click('#stReset');
+      if (Object.keys((await D()).fireworks).length || moved(a, await snap())) return 'Reset firework to suit left a style behind';
+      // Centre: a willow 1 lands on the field's centre, written as the card's own arrangement
+      await page.click('[data-cell="blue:1"]');
+      const c0 = await page.evaluate(() => window.__hanabi.centring('blue', 1));
+      await page.click('#edCentre');
+      const c1 = await page.evaluate(() => window.__hanabi.centring('blue', 1)), items = (await D()).fireworks.blue[1].items;
+      if (!(Math.abs(c0.dy) > 1) || Math.hypot(c1.dx, c1.dy) > 0.01 || !items) return `Centre: before ${c0.dx.toFixed(2)},${c0.dy.toFixed(2)} mm off, after ${c1.dx.toFixed(3)},${c1.dy.toFixed(3)}; items ${JSON.stringify(items)}`;
+      if (Math.abs(+(await page.$eval('#ar-y', (e) => e.value)) - items[0].y) > 0.006) return 'the Down slider does not show the centred value';
+      if (!/moved/.test(await page.$eval('#edStatus', (e) => e.textContent))) return 'Centre said nothing';
+      await page.click('#edResetItems');
+      if ((await D()).fireworks.blue) return 'Reset arrangement did not undo the centring';
+      // Centre all rank 1s, then a row
+      await page.click('#centreRank1');
+      const d2 = await D();
+      for (const s of ['white', 'red', 'blue', 'yellow', 'green']) {
+        const c = await page.evaluate((s) => window.__hanabi.centring(s, 1), s);
+        if (Math.hypot(c.dx, c.dy) > 0.01) return `after Centre all rank 1s, ${s} 1 is ${Math.hypot(c.dx, c.dy).toFixed(3)} mm off`;
+      }
+      if (Object.keys(d2.fireworks).sort().join() !== 'blue,green,red,white,yellow' || Object.values(d2.fireworks).some((x) => Object.keys(x).join() !== '1')) return `Centre all rank 1s wrote ${JSON.stringify(Object.fromEntries(Object.entries(d2.fireworks).map(([k, v]) => [k, Object.keys(v)])))}`;
+      await page.click('[data-centre-row="green"]');
+      if (Object.keys((await D()).fireworks.green).join() !== '1,2,3,4,5') return 'centre row did not reach every green card';
       await page.evaluate(() => document.getElementById('resetDesign').click());
       await page.click('[data-view=suit]');
       return true;
@@ -1227,6 +1597,17 @@ function report(label, res) {
   return bad;
 }
 
+if (DESIGN) {
+  // the likeness report on a saved design: warnings only, never a failure
+  const imp = (m) => import(pathToFileURL(path.join(REPO, 'hanabi', m)).href);
+  const [D, L, F, S] = await Promise.all(['deck.js', 'layout.js', 'firework.js', 'symbols.js'].map(imp));
+  const { design, notes } = D.normaliseDesign(JSON.parse(fs.readFileSync(DESIGN, 'utf8')), S.SYMBOL_IDS);
+  if (!design) { console.log(`✕ ${notes.join('; ')}`); process.exit(1); }
+  const w = greyscaleReport(D, L, F, design);
+  for (const x of w) console.log(`WARN ${x}`);
+  console.log(`greyscale likeness: ${w.length ? `${w.length} pair${w.length === 1 ? '' : 's'} to look at` : 'every suit reads apart on every rank'} (non-blocking)`);
+  process.exit(0);
+}
 if (!NEG) {
   let bad = report('part one', await partOne(path.join(REPO, 'hanabi')));
   if (!NO_BROWSER) bad = bad.concat(report('part two', await partTwo()));

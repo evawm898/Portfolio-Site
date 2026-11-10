@@ -6,10 +6,11 @@ import {
   defaultDesign, normaliseDesign, serialiseDesign, activeSuits, cardCounts, deckCards,
   suitById, symbolClashes, imposition, copyCentreToAll, SIZE_PRESETS, INDEX_STYLES, COMPOSE, COUNT_MODES, NUMERAL_FILLS,
   RANKS, COPIES, VERSION, SCENES, cellHasOverride, cellOf, clearCell, applyArrangementToRank, ITEM_LIMITS, PLACE_LIMITS, restack,
+  setFireworkStyle, clearFireworkStyle, applyStylesToRank, cardGeom,
 } from './hanabi/deck.js';
 import { SYMBOLS, SYMBOL_IDS } from './hanabi/symbols.js';
-import { renderFace, renderBack, placementFor, scalePlacement, literalItems } from './hanabi/layout.js';
-import { fireworkSpec, defaultSpec, renderFirework, motifParams, MOTIFS, MOTIF_IDS, TIERS, TIER_RANKS, TYPES, PARAMS } from './hanabi/firework.js';
+import { renderFace, renderBack, placementFor, scalePlacement, literalItems, centring } from './hanabi/layout.js';
+import { fireworkSpec, fireworkSpecAt, fireworkStyle, defaultSpec, renderFirework, motifParams, MOTIFS, MOTIF_IDS, STYLE_MOTIFS, TIERS, TIER_RANKS, TYPES, PARAMS } from './hanabi/firework.js';
 import { exportPdf, exportZip, downloadBlob } from './hanabi/export.js';
 
 const STORE_KEY = 'hanabi.design.v1';   // the key predates version 2; normaliseDesign migrates what it holds
@@ -27,6 +28,21 @@ function loadStored() {
 let design = loadStored();
 let view = { mode: 'suit', suit: 'red', grayscale: false, guides: false, zoom: 150, cell: { suit: 'red', rank: 1 }, scope: 'row', item: 0 };
 try { Object.assign(view, JSON.parse(localStorage.getItem(VIEW_KEY) || '{}')); } catch { /* storage unavailable */ }
+
+// The page's own layout, per browser: the deck panel open or collapsed to a
+// rail, the card editor's width, and the editor card's zoom. Not part of the
+// design (a file carries the deck, not how this screen was arranged).
+const LAYOUT_KEY = 'hanabi.layout.v1';
+const EDITOR_W = { min: 280, max: 960, dflt: 330 };
+// (an array: an object with integer-like keys would list them before 'fit')
+const CARD_ZOOMS = [['fit', 'Fit'], ['100', '100%'], ['150', '150%'], ['200', '200%']];
+let layout = { panel: 'open', editorW: EDITOR_W.dflt, cardZoom: 'fit' };
+try { Object.assign(layout, JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}')); } catch { /* storage unavailable */ }
+layout.editorW = Math.min(EDITOR_W.max, Math.max(EDITOR_W.min, +layout.editorW || EDITOR_W.dflt));
+layout.cardZoom = String(layout.cardZoom);
+if (!CARD_ZOOMS.some(([k]) => k === layout.cardZoom)) layout.cardZoom = 'fit';
+if (layout.panel !== 'rail') layout.panel = 'open';
+function persistLayout() { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch { /* the page still works */ } }
 
 let saveTimer = 0;
 function persist() {
@@ -333,21 +349,25 @@ function boardSkeleton() {
   return `<div class="hb-boardwrap">
     <div class="hb-boardcol">
       <div class="hb-board__bar"><p class="hb-group__title"><b>Firework board</b> <span class="hb-sep">—</span> every suit × rank</p>
-        <label class="hb-check"><input type="checkbox" id="boardGray"> Greyscale</label></div>
+        <button type="button" class="hb-btn hb-btn--ghost" id="centreRank1" title="Centre the drawn firework of every rank-1 card in its art field">Centre all rank 1s</button></div>
       <div class="hb-board" role="grid" aria-label="Firework board"><div></div>${ranks}${rows}</div>
-      <p class="hb-note">A dot marks a card with settings of its own. Edits to a suit reach every card in its row that has not overridden that setting.</p>
+      <p class="hb-note" id="boardStatus" role="status" aria-live="polite"></p>
+      <p class="hb-note">A dot marks a card with settings of its own. Edits to a suit reach every card in its row that has not overridden that setting. The toolbar's Greyscale checks the board and the editor's card.</p>
     </div>
+    <div class="hb-resize" id="edResize" role="separator" aria-orientation="vertical" aria-label="Card editor width" tabindex="0"
+      aria-valuemin="${EDITOR_W.min}" aria-valuemax="${EDITOR_W.max}" aria-valuenow="${layout.editorW}" title="Drag to set the editor's width (arrow keys too)"></div>
     <div class="hb-editor" id="editor" aria-label="Card editor"></div>
   </div>`;
 }
 
 function paintBoard() {
   const { suit: sel, rank: selR } = selCell();
-  $('boardGray').checked = view.grayscale;
   for (const s of activeSuits(design)) {
     const head = $('stage').querySelector(`[data-row="${s.id}"]`);
+    const can = RANKS.some((r) => centring(design, s, r));
     if (head) head.innerHTML = `<span class="hb-board__sym" style="color:${s.primary}">${symbolSvg(s.symbol)}</span>`
-      + `<span><b>${escapeHtml(s.name)}</b><br><span class="hb-dim">${escapeHtml(MOTIFS[s.centre.motif].label)} · ${COMPOSE_SHORT[s.centre.compose]}</span></span>`;
+      + `<span><b>${escapeHtml(s.name)}</b><br><span class="hb-dim">${escapeHtml(MOTIFS[s.centre.motif].label)} · ${COMPOSE_SHORT[s.centre.compose]}</span>`
+      + (can ? `<br><button type="button" class="hb-rowcentre" data-centre-row="${s.id}" title="Centre every ${escapeHtml(s.name)} card's fireworks in its art field">centre row</button>` : '') + '</span>';
     for (const r of RANKS) {
       const cell = $('stage').querySelector(`[data-cell="${s.id}:${r}"]`);
       const own = cellHasOverride(design, s.id, r);
@@ -385,6 +405,7 @@ function paramControl(k) {
 }
 
 function buildEditor(suit, rank) {
+  board.styleSig = null;
   const spec = fireworkSpec(design, suit, rank), card = view.scope === 'card';
   const groups = {};
   for (const id of MOTIF_IDS) (groups[MOTIFS[id].group] ||= []).push(id);
@@ -395,13 +416,17 @@ function buildEditor(suit, rank) {
     <div class="hb-ed__head"><p class="hb-ed__title"><b>${escapeHtml(suit.name)} ${rank}</b></p>
       <button type="button" class="hb-btn hb-btn--ghost" id="edReset">Reset to suit</button></div>
     <p class="hb-ed__own" id="edOwn"></p>
-    <div class="hb-ed__card" id="edCard"></div>
+    <div class="hb-ed__zoom"><span>Card</span><div class="hb-seg" id="edZoom" role="radiogroup" aria-label="Editor card size">${CARD_ZOOMS.map(([k, v]) =>
+      `<button type="button" role="radio" data-zoom="${k}" title="${k === 'fit' ? 'Fit the editor' : k === '100' ? 'Print size (100%)' : `${v} of print size`}">${v}</button>`).join('')}</div></div>
+    <div class="hb-ed__cardwrap" id="edCardWrap"><div class="hb-ed__card" id="edCard"></div></div>
     <p class="hb-note" id="edHint">${mode ? 'Click a firework to pick it; drag it to move it, its square to resize it, its round handle to turn it. A firework keeps the size you give it wherever you put it, even past the field (the index stays on top).' : `This composition lays its fireworks out itself: switch the row to Count or Scale to place them by hand.`}</p>
     ${mode ? `<div class="hb-ed__sec" id="edArrange"><p class="hb-ed__label">Arrange <span class="hb-dim">— this card</span></p>
       ${mode === 'items' ? `<div class="hb-row hb-stack"><span class="hb-dim">Back</span><div class="hb-seg" id="edItems" role="radiogroup" aria-label="Pick a firework, back to front"></div><span class="hb-dim">Front</span></div>` : ''}
       <div class="hb-params">
         ${arrangeControl('x', 'Across', 0, 1, 0.01)}${arrangeControl('y', 'Down', 0, 1, 0.01)}
         ${arrangeControl('s', 'Size', ...(mode === 'items' ? ITEM_LIMITS.s : PLACE_LIMITS.s), 0.01)}${arrangeControl('rot', 'Turn', -180, 180, 5)}</div>
+      <div class="hb-actions"><button type="button" class="hb-btn hb-btn--ghost" id="edCentre" title="Centre what the ${mode === 'items' ? 'fireworks draw' : 'firework draws'} (stars, trails, petals) in the card's art field${mode === 'items' ? '; the group moves as one' : ''}">Centre</button></div>
+      <p class="hb-note" id="edStatus" role="status" aria-live="polite"></p>
       ${mode === 'items' ? `<div class="hb-actions" id="edOrder" aria-label="Stacking order">
         <button type="button" class="hb-btn hb-btn--ghost" data-order="back" title="Draw it under every other firework">To back</button>
         <button type="button" class="hb-btn hb-btn--ghost" data-order="down" title="One step further back">Backward</button>
@@ -410,8 +435,9 @@ function buildEditor(suit, rank) {
       <div class="hb-actions">
         <button type="button" class="hb-btn hb-btn--ghost" id="edApplyRank">Use for every ${rank}</button>
         <button type="button" class="hb-btn hb-btn--ghost" id="edResetItems">Reset arrangement</button>
-        <button type="button" class="hb-btn hb-btn--ghost" id="edResetRank">Rank ${rank} column to default</button></div>`
-      : `<div class="hb-actions"><button type="button" class="hb-btn hb-btn--ghost" id="edResetPlace">Back to the centre</button></div>`}</div>` : ''}
+        <button type="button" class="hb-btn hb-btn--ghost" id="edResetRank">Rank ${rank} column to default</button></div>
+      <div class="hb-ed__sub" id="edStyle"></div>`
+      : `<div class="hb-actions"><button type="button" class="hb-btn hb-btn--ghost" id="edResetPlace">Reset placement</button></div>`}</div>` : ''}
     <div class="hb-ed__sec"><p class="hb-ed__label">Rank composition <span class="hb-dim">— ${escapeHtml(suit.name)} row</span></p>
       <div class="hb-row"><label for="edCompose">Rank shown by</label><select id="edCompose">${Object.keys(COMPOSE).map((k) => `<option value="${k}" title="${COMPOSE[k]}">${COMPOSE_SHORT[k]}</option>`).join('')}</select></div>
       <div class="hb-row"><label for="edTier">Second tier</label><select id="edTier">${Object.entries(TIERS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div></div>
@@ -422,17 +448,77 @@ function buildEditor(suit, rank) {
       <p class="hb-ed__label">Parameters</p><div class="hb-params">${motifParams(spec.motif).map(paramControl).join('') || '<p class="hb-note">This firework has no parameters.</p>'}</div></div>`;
 }
 
+// ---- one firework's own style (Count): its type, colours, detail and the
+// type's parameters, over the card's. Rebuilt only when the picked firework or
+// its type changes, so a slider being dragged is never replaced.
+function styleControl(k) {
+  const P = PARAMS[k];
+  const clear = `<button type="button" class="hb-clear" data-sclear="${k}" title="Back to the card's value">↺</button>`;
+  if (P.kind === 'bool') return `<label class="hb-param hb-check" data-sparam="${k}"><input type="checkbox" data-s="${k}"> ${P.label}${clear}</label>`;
+  if (P.kind === 'color') return `<div class="hb-param" data-sparam="${k}"><label for="st-${k}">${P.label}</label><input type="color" id="st-${k}" data-s="${k}">${clear}</div>`;
+  return `<div class="hb-param" data-sparam="${k}"><label for="st-${k}">${P.label}</label>`
+    + `<input type="range" id="st-${k}" data-s="${k}" min="${P.min}" max="${P.max}" step="${P.step}"><output data-so="${k}"></output>${clear}</div>`;
+}
+function styleOptions(cardMotif) {
+  const groups = {};
+  for (const id of STYLE_MOTIFS) (groups[MOTIFS[id].group] ||= []).push(id);
+  return `<option value="">As the card — ${escapeHtml(MOTIFS[cardMotif].label)}</option>` + Object.entries(groups).map(([g, ids]) => `<optgroup label="${g}">${ids.map((id) =>
+    `<option value="${id}">${escapeHtml(motifLabel(id))}</option>`).join('')}</optgroup>`).join('');
+}
+function buildStyle(suit, rank, n, spec) {
+  $('edStyle').innerHTML = `<p class="hb-ed__label">Style <span class="hb-dim">— firework ${n + 1}, this card</span></p>
+    <div class="hb-row"><label for="st-motif">Type</label><select id="st-motif" data-s="motif">${styleOptions(fireworkSpec(design, suit, rank).motif)}</select></div>
+    <div class="hb-params">${motifParams(spec.motif).map(styleControl).join('') || '<p class="hb-note">This firework has no parameters.</p>'}</div>
+    <div class="hb-actions"><button type="button" class="hb-btn hb-btn--ghost" id="stReset">Reset firework to suit</button>
+      <button type="button" class="hb-btn hb-btn--ghost" id="stApplyRank" title="Give every other suit's ${rank} (drawn as a Count) this card's fireworks' styles">Style mix to every ${rank}</button></div>
+    <p class="hb-note" id="stNote"></p>`;
+}
+function paintStyle(suit, rank, n) {
+  if (!$('edStyle')) return;
+  const spec = fireworkSpecAt(design, suit, rank, n), st = fireworkStyle(design, suit.id, rank, n) || {};
+  const sig = [suit.id, rank, n, spec.motif].join('|');
+  if (sig !== board.styleSig) { buildStyle(suit, rank, n, spec); board.styleSig = sig; }
+  const box = $('edStyle');
+  if (document.activeElement !== $('st-motif')) $('st-motif').value = st.motif || '';
+  for (const el of box.querySelectorAll('[data-s]')) {
+    const k = el.dataset.s; if (k === 'motif') continue;
+    const P = PARAMS[k];
+    let v = spec[k];
+    if (P.kind === 'color') v = v || (k === 'coreColor' ? spec.colors[1] || spec.colors[0] : spec.colors[0]);
+    else if (v === undefined) v = P.kind === 'bool' ? false : k === 'rotation' ? 0 : P.min;
+    if (document.activeElement !== el || el.type === 'checkbox') { if (el.type === 'checkbox') el.checked = !!v; else el.value = P.kind === 'color' ? v.toLowerCase() : v; }
+    const out = box.querySelector(`[data-so="${k}"]`); if (out) out.textContent = fmtParam(k, v);
+    el.closest('[data-sparam]').classList.toggle('is-own', st[k] !== undefined);
+  }
+  $('stReset').disabled = !Object.keys(st).length;
+  const own = Object.keys(st).length;
+  $('stNote').textContent = (own ? `Firework ${n + 1} has a style of its own — as the card otherwise. ` : `Firework ${n + 1} is drawn as the card. `)
+    + `${COPIES[rank] > 1 ? `All ${COPIES[rank]} copies of ${suit.name} ${rank} are this card, so a style reaches every duplicate.` : `${suit.name} ${rank} has one copy.`}`;
+}
+
+// ---- the editor's card: its zoom (fit the editor, or a share of print size)
+function applyCardZoom() {
+  const card = $('edCard'), wrap = $('edCardWrap'); if (!card || !wrap) return;
+  const g = cardGeom(design), PX_PER_MM = 96 / 25.4;
+  let w;
+  if (layout.cardZoom === 'fit') w = Math.max(120, Math.min(wrap.clientWidth - 4, (window.innerHeight * 0.68) * (g.fullW / g.fullH)));
+  else w = g.fullW * PX_PER_MM * (+layout.cardZoom / 100);
+  card.style.width = `${Math.round(w)}px`;
+  for (const b of $('edZoom').children) b.setAttribute('aria-checked', String(b.dataset.zoom === String(layout.cardZoom)));
+}
+
 function paintEditor(suit, rank) {
   const ed = $('editor'); if (!ed.firstElementChild) return;
   const spec = fireworkSpec(design, suit, rank), own = cellOf(design, suit.id, rank) || {}, card = view.scope === 'card';
   const mode = arrangeMode(suit, rank), sel = selItem(suit, rank);
   const keys = Object.keys(own);
-  $('edOwn').textContent = keys.length ? `Its own ${keys.map((k) => (k === 'items' ? 'arrangement' : k === 'place' ? 'placement' : PARAMS[k] ? PARAMS[k].label.toLowerCase() : k)).join(', ')}` : `As the ${suit.name} row`;
+  $('edOwn').textContent = keys.length ? `Its own ${keys.map((k) => (k === 'items' ? 'arrangement' : k === 'place' ? 'placement' : k === 'styles' ? 'firework styles' : PARAMS[k] ? PARAMS[k].label.toLowerCase() : k)).join(', ')}` : `As the ${suit.name} row`;
   $('edReset').disabled = !keys.length;
   let svg = renderFace(design, { kind: 'card', suitId: suit.id, rank }, { idPrefix: 'ed' });
   if (mode) svg = svg.replace(/<\/svg>$/, handlesSvg(arrangePlacement(suit, rank), sel) + '</svg>');
   $('edCard').innerHTML = svg;
   $('edCard').classList.toggle('is-gray', view.grayscale);
+  applyCardZoom();
   $('edCompose').value = suit.centre.compose;
   $('edTier').value = suit.centre.tier; $('edTier').disabled = suit.centre.compose !== 'scale';
   for (const b of $('edScope').children) b.setAttribute('aria-checked', String(b.dataset.scope === view.scope));
@@ -449,7 +535,7 @@ function paintEditor(suit, rank) {
     const has = card ? own[k] !== undefined : suit.firework[k] !== undefined && suit.firework[k] !== '';
     el.closest('[data-param]').classList.toggle('is-own', has);
   }
-  for (const [id, on] of [['edApplyRank', true], ['edResetItems', !!own.items], ['edResetRank', !!design.arrangements[rank]], ['edResetPlace', !!own.place]]) if ($(id)) $(id).disabled = !on;
+  for (const [id, on] of [['edApplyRank', true], ['edResetItems', !!own.items], ['edResetRank', !!design.arrangements[rank]], ['edResetPlace', !!own.place], ['edCentre', !!centring(design, suit, rank)]]) if ($(id)) $(id).disabled = !on;
   if (!mode || !$('edArrange')) return;
   // the picked firework's own values
   const it = mode === 'items' ? curItems(suit, rank)[sel] : curPlace(suit, rank);
@@ -460,8 +546,10 @@ function paintEditor(suit, rank) {
   }
   if (mode === 'items') {
     const items = curItems(suit, rank);
-    $('edItems').innerHTML = items.map((x, i) => `<button type="button" role="radio" data-item="${i}" aria-checked="${i === sel}" title="Firework ${x.n + 1}">${x.n + 1}</button>`).join('');
+    $('edItems').innerHTML = items.map((x, i) => { const st = !!fireworkStyle(design, suit.id, rank, x.n);
+      return `<button type="button" role="radio" data-item="${i}" aria-checked="${i === sel}"${st ? ' class="is-own"' : ''} title="Firework ${x.n + 1}${st ? ' — a style of its own' : ''}">${x.n + 1}</button>`; }).join('');
     for (const b of $('edOrder').children) b.disabled = (b.dataset.order === 'back' || b.dataset.order === 'down') ? sel === 0 : sel === items.length - 1;
+    paintStyle(suit, rank, items[sel].n);
   }
 }
 function arrangeControl(k, label, min, max, step) {
@@ -501,10 +589,48 @@ function editorWrite(k, v) {
   else suit.firework[k] = v;
   changed();
 }
+// The picked firework's n (its identity, which a style is keyed by).
+function selN(suit, rank) { const items = curItems(suit, rank); return items[selItem(suit, rank)].n; }
+function styleWrite(k, v) {
+  const { suit, rank } = selCell(), n = selN(suit, rank);
+  if (k === 'motif') {
+    if (!v || v === fireworkSpec(design, suit, rank).motif) clearFireworkStyle(design, suit.id, rank, n, 'motif');
+    else setFireworkStyle(design, suit.id, rank, n, 'motif', v);
+  } else setFireworkStyle(design, suit.id, rank, n, k, v);
+  changed();
+}
+// Centre a card (Count: its group; Scale: its one firework), written as the
+// card's own arrangement or placement. null where the card lays itself out.
+function centreCard(suit, rank) {
+  const c = centring(design, suit, rank);
+  if (!c) return null;
+  if (c.kind === 'items') cellOf(design, suit.id, rank, true).items = c.items;
+  else cellOf(design, suit.id, rank, true).place = c.place;
+  return c;
+}
+const centreWord = (c) => {
+  const mm = Math.hypot(c.dx, c.dy);
+  if (mm < 0.05) return 'already centred';
+  const dirs = [c.dy < -0.05 ? 'up' : c.dy > 0.05 ? 'down' : '', c.dx < -0.05 ? 'left' : c.dx > 0.05 ? 'right' : ''].filter(Boolean).join(' and ');
+  return `moved ${mm.toFixed(1)} mm ${dirs}${c.clamped ? ' — held at the field\'s edge, as near centred as it goes' : ''}`;
+};
+function centreMany(cards, label) {
+  const done = [], left = [];
+  for (const [s, r] of cards) (centreCard(s, r) ? done : left).push(`${s.name} ${r}`);
+  changed();
+  $('boardStatus').textContent = `${label}: centred ${done.length} card${done.length === 1 ? '' : 's'}`
+    + (left.length ? `; ${left.join(', ')} lay${left.length === 1 ? 's' : ''} itself out (Column, Full bleed, a field or a second tier) and ${left.length === 1 ? 'was' : 'were'} left alone.` : '.');
+}
+
 function onEditor(e) {
   const { suit, rank } = selCell();
   const t = e.target;
   if (t.dataset.a) { arrangeWrite(t.dataset.a, +t.value); return; }
+  if (t.dataset.s) {
+    const k = t.dataset.s, P = PARAMS[k];
+    styleWrite(k, k === 'motif' ? t.value : P.kind === 'bool' ? t.checked : P.kind === 'color' ? t.value.toUpperCase() : +t.value);
+    return;
+  }
   if (t.dataset.p) {
     const P = PARAMS[t.dataset.p];
     editorWrite(t.dataset.p, P.kind === 'bool' ? t.checked : P.kind === 'color' ? t.value.toUpperCase() : +t.value);
@@ -515,6 +641,16 @@ function onEditorClick(e) {
   const { suit, rank } = selCell();
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.scope) { view.scope = b.dataset.scope; persistView(); renderBoard(); return; }
+  if (b.dataset.zoom) { layout.cardZoom = b.dataset.zoom; persistLayout(); applyCardZoom(); return; }
+  if (b.dataset.sclear) { clearFireworkStyle(design, suit.id, rank, selN(suit, rank), b.dataset.sclear); changed(); return; }
+  if (b.id === 'stReset') { clearFireworkStyle(design, suit.id, rank, selN(suit, rank)); changed(); return; }
+  if (b.id === 'stApplyRank') {
+    const { reached, skipped } = applyStylesToRank(design, suit.id, rank); changed();
+    const name = (id) => suitById(design, id).name;
+    $('edStatus').textContent = `${reached.length ? `Every ${rank} of ${reached.map(name).join(', ')} now draws this mix` : 'No other suit draws a Count'}${skipped.length ? `; ${skipped.map(name).join(', ')} ${skipped.length === 1 ? 'is' : 'are'} not a Count and kept ${skipped.length === 1 ? 'its' : 'their'} own.` : '.'}`;
+    return;
+  }
+  if (b.id === 'edCentre') { const c = centreCard(suit, rank); changed(); if (c && $('edStatus')) $('edStatus').textContent = `Centred: ${centreWord(c)}.`; return; }
   if (b.dataset.type) {
     if (view.scope === 'card') { if (b.dataset.type === suit.centre.motif) clearCell(design, suit.id, rank, 'motif'); else cellOf(design, suit.id, rank, true).motif = b.dataset.type; }
     else suit.centre.motif = b.dataset.type;
@@ -578,13 +714,15 @@ function onDragEnd() {
 }
 
 $('stage').addEventListener('click', (e) => {
+  if (e.target.closest('#centreRank1')) { centreMany(activeSuits(design).map((s) => [s, 1]), 'Every rank 1'); return; }
+  const row = e.target.closest('[data-centre-row]');
+  if (row) { const s = suitById(design, row.dataset.centreRow); centreMany(RANKS.map((r) => [s, r]), s.name); return; }
   const c = e.target.closest('[data-cell]');
   if (c) { const [s, r] = c.dataset.cell.split(':'); selectCell(s, +r); return; }
   if (e.target.closest('#editor')) onEditorClick(e);
 });
 $('stage').addEventListener('input', (e) => { if (e.target.closest('#editor') && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') onEditor(e); });
 $('stage').addEventListener('change', (e) => {
-  if (e.target.id === 'boardGray') { setGray(e.target.checked); return; }
   if (e.target.closest('#editor') && (e.target.type === 'checkbox' || e.target.tagName === 'SELECT')) onEditor(e);
 });
 $('stage').addEventListener('pointerdown', (e) => { if (e.target.closest('#edCard')) onDragStart(e); });
@@ -594,6 +732,50 @@ $('stage').addEventListener('mousedown', (e) => { if (e.target.closest('#edCard 
 $('stage').addEventListener('pointermove', onDragMove);
 $('stage').addEventListener('pointerup', onDragEnd);
 $('stage').addEventListener('pointercancel', onDragEnd);
+
+// ---------- the page's layout: the panel rail and the editor's width ----------
+function applyLayout() {
+  const rail = layout.panel === 'rail';
+  document.querySelector('.hb-body').classList.toggle('is-rail', rail);
+  const t = $('panelToggle');
+  t.setAttribute('aria-expanded', String(!rail));
+  t.title = rail ? 'Show the deck controls' : 'Collapse the deck controls to a rail';
+  t.querySelector('.hb-rail__icon').textContent = rail ? '›' : '‹';
+  document.documentElement.style.setProperty('--hb-ed-w', `${layout.editorW}px`);
+  const h = $('edResize'); if (h) h.setAttribute('aria-valuenow', String(layout.editorW));
+  applyCardZoom();
+}
+$('panelToggle').addEventListener('click', () => { layout.panel = layout.panel === 'rail' ? 'open' : 'rail'; persistLayout(); applyLayout(); });
+function setEditorW(w) {
+  layout.editorW = Math.round(Math.min(EDITOR_W.max, Math.max(EDITOR_W.min, w)));
+  applyLayout();
+}
+const resizer = { on: false };
+$('stage').addEventListener('pointerdown', (e) => {
+  const h = e.target.closest('#edResize'); if (!h) return;
+  // the drag moves the editor's edge by exactly what the pointer moves
+  resizer.on = true; resizer.x0 = e.clientX; resizer.w0 = $('editor').getBoundingClientRect().width;
+  h.setPointerCapture(e.pointerId); h.classList.add('is-drag'); e.preventDefault();
+});
+$('stage').addEventListener('pointermove', (e) => {
+  if (!resizer.on) return;
+  setEditorW(resizer.w0 + resizer.x0 - e.clientX);
+});
+function endResize(e) {
+  if (!resizer.on) return;
+  resizer.on = false; persistLayout();
+  const h = $('edResize'); if (h) { h.classList.remove('is-drag'); if (h.hasPointerCapture(e.pointerId)) h.releasePointerCapture(e.pointerId); }
+}
+$('stage').addEventListener('pointerup', endResize);
+$('stage').addEventListener('pointercancel', endResize);
+$('stage').addEventListener('keydown', (e) => {
+  if (e.target.id !== 'edResize') return;
+  const step = e.shiftKey ? 64 : 16;
+  const to = { ArrowLeft: layout.editorW + step, ArrowRight: layout.editorW - step, Home: EDITOR_W.min, End: EDITOR_W.max }[e.key];
+  if (to === undefined) return;
+  e.preventDefault(); setEditorW(to); persistLayout();
+});
+window.addEventListener('resize', () => applyCardZoom());
 
 // ---------- wiring ----------
 $('indexSeg').addEventListener('click', (e) => {
@@ -651,6 +833,7 @@ $('resetDesign').addEventListener('click', () => {
 $('grayscale').checked = view.grayscale;
 $('guides').checked = view.guides;
 $('zoom').value = view.zoom;
+applyLayout();
 buildSuitRows();
 syncReadouts();
 renderPreview();
@@ -664,6 +847,8 @@ window.__hanabi = {
   select: (suit, rank) => selectCell(suit, rank),
   placement: (suit, rank) => placementFor(design, suitById(design, suit), rank),
   placeOf: (suit, rank) => { const p = scalePlacement(design, suitById(design, suit), rank); return p && p.items[0]; },
+  layout: () => ({ ...layout, editorPx: $('editor') ? $('editor').getBoundingClientRect().width : null }),
+  centring: (suit, rank) => centring(design, suitById(design, suit), rank),
   exportPdf: (o) => exportPdf(design, o),
   exportZip: (o) => exportZip(design, o),
 };

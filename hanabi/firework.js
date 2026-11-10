@@ -209,22 +209,53 @@ export function defaultSpec(suit, rank, allSuits, motif = 'classic', tier = 'non
 export function cellOverride(design, suitId, rank) {
   const o = design.fireworks && design.fireworks[suitId] && design.fireworks[suitId][rank];
   if (!o || typeof o !== 'object') return null;
-  const { items, place, ...rest } = o;
+  const { items, place, styles, ...rest } = o;
   return rest;
 }
 
-export function fireworkSpec(design, suit, rank) {
+// motifAt: draw one firework of the card as ANOTHER type (a per-firework
+// style). That firework starts from its own type's defaults with the suit's
+// colours, and the suit's and the card's parameters reach it only as colours —
+// they were set for the card's own type. Absent, or the card's own type, this
+// is the card's spec exactly.
+export function fireworkSpec(design, suit, rank, motifAt) {
   const c = suit.centre || {};
   const compose = c.compose || 'scale';
   const tier = compose === 'scale' ? c.tier : 'none';
   const over = cellOverride(design, suit.id, rank);
   // a cell may override the type itself; the defaults are then that type's
-  const motif = over && MOTIFS[over.motif] ? over.motif : c.motif;
+  const cardMotif = over && MOTIFS[over.motif] ? over.motif : c.motif;
+  const other = !!(motifAt && MOTIFS[motifAt] && motifAt !== cardMotif);
+  const motif = other ? motifAt : cardMotif;
   const spec = defaultSpec(suit, rank, design.suits, motif, tier, compose);
-  const takes = motifParams(spec.motif);
+  const takes = motifParams(spec.motif).filter((k) => !other || COLOR_PARAMS.includes(k));
   const mine = suit.firework && typeof suit.firework === 'object' ? suit.firework : {};
   for (const k of takes) if (mine[k] !== undefined && mine[k] !== '') spec[k] = mine[k];
-  return over ? { ...spec, ...over } : spec;
+  if (!over) return spec;
+  if (!other) return { ...spec, ...over };
+  for (const k of takes) if (over[k] !== undefined && over[k] !== '') spec[k] = over[k];
+  return spec;
+}
+
+// ---- per-firework styles (schema version 4) ----
+// A Count card's fireworks may each carry a style of their own:
+// design.fireworks[suitId][rank].styles = { [n]: { motif?, ...params } }, keyed
+// by n — the firework it is (its drawing's seed, layout.js countPlacement), so
+// a style stays with its firework when the stacking order changes. Absent, a
+// firework is the card's spec, and the card draws exactly as it did.
+// A field motif fills a rect, so it is not offered as one firework's type.
+export const STYLE_MOTIFS = Object.keys(MOTIFS).filter((m) => !FIELD_MOTIFS.includes(m));
+export function fireworkStyle(design, suitId, rank, n) {
+  const o = design.fireworks && design.fireworks[suitId] && design.fireworks[suitId][rank];
+  const st = o && o.styles && o.styles[n];
+  return st && typeof st === 'object' && Object.keys(st).length ? st : null;
+}
+export function fireworkSpecAt(design, suit, rank, n) {
+  const st = fireworkStyle(design, suit.id, rank, n);
+  if (!st) return fireworkSpec(design, suit, rank);
+  const spec = fireworkSpec(design, suit, rank, STYLE_MOTIFS.includes(st.motif) ? st.motif : undefined);
+  for (const k of motifParams(spec.motif)) if (st[k] !== undefined && st[k] !== '') spec[k] = st[k];
+  return spec;
 }
 const f = (v) => +v.toFixed(3);
 

@@ -29,7 +29,11 @@
 
 <main class="hb-body">
 
-<aside class="hb-panel" aria-label="Deck controls">
+<aside class="hb-panel" id="deckPanel" aria-label="Deck controls">
+
+  <button type="button" class="hb-rail" id="panelToggle" aria-expanded="true" aria-controls="deckPanel" title="Collapse the deck controls to a rail">
+    <span class="hb-rail__label">Deck controls</span><span class="hb-rail__icon" aria-hidden="true">&lsaquo;</span>
+  </button>
 
   <details class="hb-sec" id="sec-suits" open>
     <summary><span class="hb-num">01</span>Suits <output class="hb-val" id="deckCount"></output></summary>
