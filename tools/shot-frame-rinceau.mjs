@@ -26,7 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { buildFrame, DEFAULTS } from '../frame-geometry.js';
+import { buildFrame, DEFAULTS, innerEdge, outerEdge } from '../frame-geometry.js';
 import { withOrnament } from '../frame-filigree.js';
 import { buildRelief, analyzeStl, exportStl, connected } from '../frame-relief.js';
 
@@ -35,6 +35,12 @@ const OUT = path.resolve(process.argv[2] || 'frame-rinceau-sheet');
 fs.mkdirSync(OUT, { recursive: true });
 const onlyAt = process.argv.indexOf('--only'), ONLY = onlyAt > 0 ? new RegExp(process.argv[onlyAt + 1]) : null;
 const refsAt = process.argv.indexOf('--refs'), REFS = refsAt > 0 ? path.resolve(process.argv[refsAt + 1]) : null;
+// --band: step 1b (§18.5) — Eva's picks (B medium wave, E medium turns, I the
+// light leaf with the longer, broader sheath) on the 9.5 mm band beside the
+// two ways to give a volute a whole turn: the band widened, or a frieze
+const BAND = process.argv.includes('--band');
+const PICKS = { rinWave: 'medium', rinTurns: 'medium', rinLeaf: 'sheath' };
+const BANDS = [['(a) keep the 9.5 mm band', 'keep'], ['(b) widen the band', 'widen'], ['(c) add a frieze', 'frieze']];
 
 // ---- the two runs ----
 const RUNS = {
@@ -64,7 +70,13 @@ function counts(params) {
   const vol = (o.items || []).filter((i) => i.kind === 'volute'), t = vol.map((i) => i.curves[0].info.turnsDrawn);
   const leaves = vol.reduce((n, i) => n + i.curves.length - 1, 0);
   const lowered = o.told.filter((x) => /made smaller|not built/.test(x)).map((x) => x.replace(/ along the vine/, '')).join('; ');
-  return { vol: vol.length, leaves, turns: t.length ? `${Math.min(...t).toFixed(2)}–${Math.max(...t).toFixed(2)}` : '—', tris: r.indices.length / 3, boundary: a.boundary, regions: c.comps, M: (p.moldingWidth * o.scale).toFixed(1), lowered };
+  const m0 = buildFrame(p), W = m0.params.moldingWidth, sp = m0.spines[0], sc = o.scale;
+  const box = (P) => { const xs = P.map((q) => q[0] * sc), ys = P.map((q) => q[1] * sc); return [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)]; };
+  const ar = (P) => { let a = 0; for (let i = 0; i < P.length; i++) { const [x0, y0] = P[i], [x1, y1] = P[(i + 1) % P.length]; a += x0 * y1 - x1 * y0; } return Math.abs(a) / 2; };
+  const inn = innerEdge(sp, W), out = outerEdge(sp, W), [ow, oh] = box(out), [iw, ih] = box(inn);
+  const fz = m0.params.rinFriezeAt;
+  const band = `band ${(W * sc).toFixed(1)} mm${fz ? ` (molding ${(m0.params.rinMolding * sc).toFixed(1)} + step + frieze ${((fz[1] - fz[0]) * W * sc).toFixed(1)} + sight bead)` : ''} · outer ${ow.toFixed(0)}×${oh.toFixed(0)} · opening ${iw.toFixed(0)}×${ih.toFixed(0)} mm (${(100 * ar(inn) / ar(out)).toFixed(0)}% of the outer area)`;
+  return { band, vol: vol.length, leaves, turns: t.length ? `${Math.min(...t).toFixed(2)}–${Math.max(...t).toFixed(2)}` : '—', tris: r.indices.length / 3, boundary: a.boundary, regions: c.comps, M: (p.moldingWidth * o.scale).toFixed(1), lowered };
 }
 
 // ---- the page ----
@@ -136,6 +148,30 @@ const runCells = async (group, name, extra) => {
   }
   if (cells.length) rows.push({ head: `${group} — ${name}`, cells });
 };
+if (BAND) {
+  // per run: the three options side by side, front-on then three-quarter;
+  // then each option's whole rectangle and oval front-on (the proportions)
+  for (const [rk, run] of Object.entries(RUNS)) for (const [vk, v] of Object.entries(VIEWS)) {
+    if (!want(`${rk} · ${vk}`)) continue;
+    const cells = [];
+    for (const [name, mode] of BANDS) {
+      const params = { ...run.params, ...ON, ...PICKS, rinBand: mode }, n = counts(params);
+      await page.evaluate((p) => window.__frame.setParams(p), params);
+      const t = await target(rk);
+      cells.push({ label: `${name} · ${v.name}`, png: await shoot(params, { dir: v.dir, radius: 70, target: t }), cap: `${n.band}<br>${n.vol} volutes, turns drawn ${n.turns} · ${n.tris.toLocaleString('en-US')} tris · boundary ${n.boundary} · regions ${n.regions}${n.lowered ? ' · ' + n.lowered : ''}` });
+    }
+    rows.push({ head: `${run.label} — ${v.name}`, cells });
+  }
+  for (const [sk, q] of [['rectangle', { skeleton: 'rect' }], ['oval', { skeleton: 'oval' }]]) {
+    if (!want(`whole · ${sk}`)) continue;
+    const cells = [];
+    for (const [name, mode] of BANDS) {
+      const params = { ...q, ...ON, ...PICKS, rinBand: mode }, n = counts(params);
+      cells.push({ label: `${name} · whole ${sk}, front-on`, png: await shoot(params, { dir: [0, 0, 1], radius: 330 }), cap: `${n.band}<br>${n.vol} volutes, turns drawn ${n.turns} · ${n.tris.toLocaleString('en-US')} tris · boundary ${n.boundary} · regions ${n.regions}` });
+    }
+    rows.push({ head: `the proportions — the whole ${sk} at 180 mm, the rinceau on every run (preview: the junctions and crest as the vine has them)`, cells });
+  }
+} else {
 await runCells('before', 'the current vine (main)', { filigree: 'scrolls' });
 for (const [g, n, v] of VARIANTS) await runCells(g, n, { ...ON, ...v });
 // the preview: the three default frames, the rinceau on every run
@@ -146,17 +182,18 @@ for (const [sk, q] of [['arch', {}], ['rectangle', { skeleton: 'rect' }], ['oval
   prev.push({ label: `${sk} · full frame, front-on`, png: await shoot(params, { dir: [0, 0, 1], radius: 385 }), cap: `${n.vol} volutes · ${n.tris.toLocaleString('en-US')} tris · boundary ${n.boundary} · regions ${n.regions}` });
 }
 if (prev.length) rows.push({ head: 'preview, NOT the ruling — the three default frames with the rinceau on every run (the junctions and crest as the vine has them; step 2 wires it)', cells: prev });
+}
 await page.evaluate(() => window.__frame.pinCamera(null));
 
 const refs = REFS ? `<h2>Eva's references</h2><div class="row">${fs.readdirSync(REFS).filter((f) => /\.(png|jpe?g|webp)$/i.test(f)).map((f) => `<div class="cell"><img src="data:image/${path.extname(f).slice(1).replace('jpg', 'jpeg')};base64,${fs.readFileSync(path.join(REFS, f)).toString('base64')}"><div class="cap"><b>${f}</b></div></div>`).join('')}</div>` : '<h2>references 1 and 2 — not in the repository: hold the sheet beside them</h2>';
 const html = `<!doctype html><meta charset="utf-8"><title>/frame — the rinceau vocabulary</title>
 <style>body{background:#0A0A0C;color:#EDEDE8;font:11px/1.5 "Space Mono",monospace;margin:20px}h1{font:600 22px "Playfair Display",serif;margin:0 0 4px}h2{font:400 11px monospace;letter-spacing:.18em;text-transform:uppercase;color:#5FA0A0;margin:22px 0 8px}.row{display:flex;gap:10px;flex-wrap:wrap}.cell{width:380px}.cell img{width:100%;display:block;background:#0A0A0C;border:1px solid rgba(237,237,232,.22)}.cap{color:#8A8A85;margin-top:4px;font-size:9.5px}.cap b{color:#EDEDE8;font-weight:400}</style>
-<h1>/frame — phase 3f step 1: the rinceau, vocabulary</h1><div>One continuous stem per run waving across the band; at every wave a tendril branches off into the hollow and curls into a carved volute (arris), alternating sides; acanthus sheathes each branch point and laps over the volute's root. Relief view: the STL's own positions under the one fixed light. Nothing here has been printed; the 1.0 mm floor is an assumption. Captions: the Node build of the same params. ${errors.length ? 'PAGE ERRORS: ' + errors.join(' | ') : 'no page errors'}</div>
+<h1>/frame — phase 3f step ${BAND ? '1b: the rinceau band — keep, widen, or a frieze' : '1: the rinceau, vocabulary'}</h1><div>One continuous stem per run waving across the band; at every wave a tendril branches off into the hollow and curls into a carved volute (arris), alternating sides; acanthus sheathes each branch point and laps over the volute's root. Relief view: the STL's own positions under the one fixed light. Nothing here has been printed; the 1.0 mm floor is an assumption. Captions: the Node build of the same params. ${errors.length ? 'PAGE ERRORS: ' + errors.join(' | ') : 'no page errors'}</div>
 ${refs}
 ${rows.map((r) => `<h2>${r.head}</h2><div class="row">${r.cells.map((c) => `<div class="cell"><img src="data:image/png;base64,${c.png}"><div class="cap"><b>${c.label}</b><br>${c.cap}</div></div>`).join('')}</div>`).join('')}`;
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 const sheet = await browser.newPage({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 1 });
 await sheet.goto(`file://${path.join(OUT, 'index.html')}`);
-await sheet.screenshot({ path: path.join(OUT, 'frame-rinceau-sheet.png'), fullPage: true });
+await sheet.screenshot({ path: path.join(OUT, BAND ? 'frame-rinceau-band.png' : 'frame-rinceau-sheet.png'), fullPage: true });
 await browser.close(); server.close();
 console.log(`${rows.reduce((a, r) => a + r.cells.length, 0)} cells → ${OUT}/index.html, frame-rinceau-sheet.png${errors.length ? '\nPAGE ERRORS: ' + errors.join(' | ') : ''}`);

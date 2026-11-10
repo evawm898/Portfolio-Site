@@ -16,7 +16,10 @@
    STEP 1 STATE: reached only through the hidden param `ornRinceau: 'on'`
    (with `rinWave` / `rinTurns` / `rinLeaf`), which no control writes — the
    vocabulary sheet (tools/shot-frame-rinceau.mjs) sets it. With it absent
-   every frame builds as on main, by branch. Read docs/frame-charter.md §18. */
+   every frame builds as on main, by branch. Read docs/frame-charter.md §18.
+   STEP 1b (§18.5): the picks are B / E / I (`sheath`), and a hidden
+   `rinBand` ('widen' | 'frieze', frame-geometry's rinceauBand) prototypes
+   the band a whole turn needs. */
 
 import { MIN_FEATURE_MM } from './frame-registry.js';
 import { scrollCurve, buildLeaf, carvedCap, selfGap, LEAF_ASPECT } from './frame-filigree.js';
@@ -33,13 +36,18 @@ export const RIN_LEAF = {
   // full: the sheath leaf longer and broader, plus a second leaf on the
   // stem's own continuation (the acanthus calyx about the node)
   full: { leaves: 2, len: 0.38, aspect: 0.62, lobes: 5, lap: 1.0 },
+  // sheath (Eva's pick I, on the vocabulary sheet): LIGHT's one leaf, at
+  // FULL's longer, broader sheath — no calyx leaf
+  sheath: { leaves: 1, len: 0.38, aspect: 0.62, lobes: 5, lap: 1.0 },
 };
 
 /* the stem and the tendril, × the molding width M, each [base, slope in w_h] */
-/* the fit's schedule: [size, turns] shares tried in order — a volute that does
-   not fit is first given FEWER TURNS (a curved run compresses its coils),
-   then made smaller; past the last it is not built (told, as a count) */
-export const RIN_TRY = [[1, 1], [1, 0.85], [0.85, 0.85], [1, 0.7], [0.85, 0.7], [0.72, 0.7], [0.85, 0.55], [0.72, 0.55], [0.6, 0.55]];
+/* the fit: at each SIZE share (tried in order) the volute takes the most
+   turns that fit, bisected down to RIN_TK_MIN of what its own coil gap holds
+   on a straight run (a curved run compresses its inner coils); past the last
+   size it is not built (told, as a count) */
+export const RIN_SIZES = [1, 0.85, 0.72, 0.6];
+export const RIN_TK_MIN = 0.45;
 export const RIN = {
   A: [0.3, 0.1],       // the meander's amplitude (capped by the band, in vineFor)
   P: [1.15, 0.55],     // its half wavelength (one volute per half wave)

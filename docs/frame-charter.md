@@ -1790,3 +1790,74 @@ ends square (a swept wire's end face) — `roundEnds` is the stem's and is owed 
 `frame-rinceau.js` is NOT yet in `frame.yml`'s path filter (an edit to an existing workflow file costs later frozen
 tags — CLAUDE.md); step 2 adds it, since then the module is load-bearing. This PR's gate runs regardless, through
 `frame-vine.js`. Every relief-mutant anchor still matches exactly once after the edits to `frame-vine.js`.
+
+
+### 18.5 Step 1b — the band: keep it, widen it, or add a frieze (STOPPED FOR A SHEET; nothing wired)
+
+**Eva's picks on the vocabulary sheet (Nov 10): B (medium wave), E (medium turns), I (the light leaf with a longer,
+broader sheath — `RIN_LEAF.sheath`: one leaf at FULL's length and breadth, no calyx).** Before step 2 she asked for
+one more option, because the 9.5 mm band caps a volute under a turn: a band wide enough for 1–1¼ turns at the
+default 180 mm print, rendered beside the 9.5 mm one, and its cost to the frame's proportions.
+
+**The fit changed first, and it is why the vocabulary sheet's turn figures no longer reproduce.** `RIN_TRY` (a
+fixed ladder of [size, turns] shares) is replaced by `RIN_SIZES` × a BISECTION of the turns on the MAPPED path
+(down to `RIN_TK_MIN` of what the coil gap holds on a straight run): a curved run compresses its inner coils, so the
+gap the local tendril holds is not the gap it keeps, and the ladder's steps left turns on the table. The step-1
+sheet (`docs/img/frame-rinceau-vocabulary.png`) stays as the record the picks were made on.
+
+**Measured (Node, picks B/E/I unless named; turns = the tendril's own tangent, root to eye):**
+
+| band (print mm) | straight run (rect side) | curved run (oval crest → side) |
+|---|---|---|
+| 9.5 (as today) | 0.70–0.90, median 0.75 (light leaf: 0.84–0.91, med 0.86) | 0.52–0.77, med 0.74 |
+| 11.7 | 0.82–0.98, med 0.94 | 0.77–0.87, med 0.83 |
+| 13.8 | 0.97–1.06, med 1.00 | 0.52–0.90, med 0.88 |
+| **16.0 (the prototype)** | **1.03–1.07, med 1.06** | **0.58–0.96, med 0.93** |
+| 18.0 | 1.06–1.07 | 0.64–0.99, med 0.95 |
+| 21.2 (the control's max) | 1.06 | 0.49–1.06, med 0.99 |
+| 21.2, turns F (many) | 1.05–1.19, med 1.15 | 0.49–1.03, med 0.99 |
+
+- **A medium volute reaches a whole turn on a straight run at a ~14 mm band and stops at ~1.06 past 16 mm.**
+  Above 16 mm the limit is the LAW, not the band: everything scales with M (self-similar) and only the fixed
+  floors shrink relatively, so the turns approach the carved scroll's own asymptote — its width is 0.7 × the local
+  radius, so its coils need their own pitch. **1¼ is reached at no band width** (turns F saturates at ~1.15–1.2 at
+  18–21 mm); more needs a thinner volute stroke, which is a change to the approved carved law.
+- **The curved run lags the straight one at every width** (median 0.93 against 1.06 at 16 mm): the run's
+  curvature compresses the inner volutes' coils (`self gap`) and the wavelength (`cOf`), and the one volute at the
+  crest end is held back by the shell. It reaches a median of ~1.0 only at the control's maximum.
+- **At 16 mm the sheath leaf (I) costs nothing; at 9.5 mm it costs ~0.1 turn** (its crossing with the tendril
+  binds before the coil gap does).
+
+**The two ways, built as a HIDDEN prototype** (`rinBand: 'widen' | 'frieze'` read by `buildFrame` through
+`rinceauBand`; no control writes it, and absent nothing runs): the bay is `RIN_BAY_MM` = 16 print mm, read
+through printHeight ÷ height.
+- **(b) WIDEN** — the molding drawn 16 mm wide (the profile stretched, its depth unchanged; 18 → 30.2 drawing
+  units). The junction motifs grow with it (the crest shell 24 → 38 mm across).
+- **(c) FRIEZE** — the 9.5 mm ogee as it was, a 0.8 mm step down, a FLAT frieze 16 mm wide at 0.4 of the depth,
+  a 1.6 mm sight-edge bead at the opening: one composite band of 27.9 mm (past the Profile width control's 40
+  drawing-unit maximum, which is why it is built after the clamp). The rinceau runs on the flat alone (its laws
+  read the flat's width; every wire's edge stays on it), and the motifs are the molding's (sized by its 9.5 mm).
+  **On the oval the shell crest is not built — the stems run on the frieze, inside the molding the crest stands
+  on, and it cannot join both without grazing (told)**; step 2 would seat the crest on the frieze or bring the
+  stems up to it. **The corners in the whole rectangle are the vine's junctions as they stand** (the stems' run-on
+  crosses the step at the mitre) — a preview, not a construction.
+
+**The proportions (default rect 180 × 340 and oval 0.75, at 180 mm print, rinceau on):**
+
+| | band | rect outer | rect opening | opening ÷ outer | oval outer | oval opening | opening ÷ outer |
+|---|---|---|---|---|---|---|---|
+| (a) keep | 9.5 | 105 × 180 | 86 × 161 | 73 % | 137 × 180 | 118 × 161 | 77 % |
+| (b) widen | 16.0 | 111 × 180 | 79 × 148 | 59 % | 139 × 180 | 107 × 148 | 63 % |
+| (c) frieze | 27.9 | 123 × 180 | 67 × 124 | 38 % | 142 × 180 | 86 × 124 | 42 % |
+
+The rectangle's height is held (the outer box is `height`), so a wider band takes its width outward by the
+band's growth and its opening inward on all four sides; the oval's height is held the same way.
+
+Every option: boundary edges 0, one voxel region (relief = export). Relief tris, whole frames: rect 429,832 /
+357,984 / 323,712, oval 310,040 / 244,144 / 238,552 — a wider band carries FEWER, larger volutes. **Shipped
+bytes: the 18-state relief STL is byte-identical to `main` (`2a46e1c`)** — every change is a branch on `rin`,
+`frz` (null unless `rinFriezeAt`) or `rinceauBand` (null unless `rinBand`).
+
+Sheet: `node tools/shot-frame-rinceau.mjs <dir> --band` → `docs/img/frame-rinceau-band.png` (each run front-on and
+three-quarter in the three options, the camera on one mid-run point at one radius, then the whole rectangle and oval
+front-on). Nothing has been printed; every floor is an assumption.

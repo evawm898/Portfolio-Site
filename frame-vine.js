@@ -50,7 +50,7 @@ import {
   CHAIN_RUNS, CHAIN_SEAT, runPath, mapToPath, bandRegion, moldingHeightField, seatOn, slitWorst, mirrorCurve,
   wireClear, wireClearBound, joinsCleanly, LEAF_CROSS, buildScroll, buildLeaf, carvedCap, LEAF_ASPECT, wAt, selfGap, profileFor, rigid, pip, placeMotif, wireHeight, wireProfile, LEAF_RELIEF,
 } from './frame-filigree.js';
-import { rinceauSpec, rinceauTendril, acanthusLeaf, RIN, RIN_TRY } from './frame-rinceau.js';
+import { rinceauSpec, rinceauTendril, acanthusLeaf, RIN, RIN_SIZES, RIN_TK_MIN } from './frame-rinceau.js';
 import { placeElement, relift, liftEach, drapeElement, mirrorElement, symmetrizeElement, remapElement, wireElementContact, elementClear, elementDepth, footprintTouches } from './frame-elements.js';
 
 /* the field's constants (one each, every one a measured choice in §17) */
@@ -346,9 +346,13 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   const leaves = p.ornLeaves === 'on';
   // the RINCEAU (phase 3f step 1, frame-rinceau.js): a hidden switch, null on every shipped frame
   const rin = rinceauSpec(p);
+  // on a FRIEZE (step 1b's prototype, frame-geometry's rinceauBand) the
+  // rinceau's laws read the FLAT's width, and it runs on the flat alone
+  const frz = rin && p.rinFriezeAt ? { a: p.rinFriezeAt[0] * M, b: p.rinFriezeAt[1] * M } : null;
+  const Mr = frz ? frz.b - frz.a : M;
   // the band in a run's local frame: the path lies `depth` inside the outer
   // edge, so the band spans y ∈ [depth − M, depth]; its centre line y_c
-  const yc = depth - M / 2;
+  const yc = frz ? depth - (frz.a + frz.b) / 2 : depth - M / 2;
   let tris = model.spines.reduce((a, sp) => a + solidTriBound(sp.pts.length + 2, model.prof.x.length + 1), 0);
   const frameTris = tris;
   const W = weightOverride || ((x, L, Aa, Ab) => withStrength(weightAt(x, L, Aa, Ab), h));
@@ -361,16 +365,16 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const path = runPath(model, run, scale, depth), L = path.length;
     const cFrom = anchorClass(model, run.from), cTo = anchorClass(model, run.to);
     const Aa = ampOf(cFrom), Ab = ampOf(cTo);
-    const kap = pathCurvature(path, M);
-    const comp = kap.map((k) => 1 / (1 + CURVE_K * M * Math.abs(k)));
+    const kap = pathCurvature(path, Mr);
+    const comp = kap.map((k) => 1 / (1 + CURVE_K * Mr * Math.abs(k)));
     const wOf = (x) => W(x, L, Aa, Ab);
     const cOf = (x) => at1(comp, path, x);
     const axisA = cFrom === 'crest' || cFrom === 'bottom', axisB = cTo === 'crest' || cTo === 'bottom';
     // the stem's width, amplitude and half wavelength follow w_h
-    const wsOf = (x) => Math.max(F, ((rin ? RIN.stemW : STEM_W)[0] + (rin ? RIN.stemW : STEM_W)[1] * wOf(x)) * M);
+    const wsOf = (x) => Math.max(F, ((rin ? RIN.stemW : STEM_W)[0] + (rin ? RIN.stemW : STEM_W)[1] * wOf(x)) * Mr);
     let ak = 1;      // the meander's share: lowered where the run's own turns fold it (below)
-    const ampOfX = (x) => ak * Math.max(0.5, Math.min(((rin ? RIN.A : STEM_A)[0] + (rin ? RIN.A : STEM_A)[1] * wOf(x)) * M, M / 2 - wsOf(x) / 2 - 0.6 * F));
-    const P0 = rin ? (x) => M * (RIN.P[0] + RIN.P[1] * wOf(x)) * rin.wave * cOf(x) / dens : (x) => M * (STEM_P[0] + STEM_P[1] * wOf(x)) * cOf(x) / dens;
+    const ampOfX = (x) => ak * Math.max(0.5, Math.min(((rin ? RIN.A : STEM_A)[0] + (rin ? RIN.A : STEM_A)[1] * wOf(x)) * Mr, Mr / 2 - wsOf(x) / 2 - 0.6 * F));
+    const P0 = rin ? (x) => Mr * (RIN.P[0] + RIN.P[1] * wOf(x)) * rin.wave * cOf(x) / dens : (x) => M * (STEM_P[0] + STEM_P[1] * wOf(x)) * cOf(x) / dens;
     // the stem's x range: a feature short of the axis (its mirror) at an
     // axis end; run on past an interior end
     const ws0 = wsOf(0), wsL = wsOf(L);
@@ -509,7 +513,9 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   // the CREST (the axis at the top): a draped shell, the one thing
   // that may stand past the band; every other motif inside the band
   const motifKind = (cls, wcl) => (wcl === 'heavy' ? (cls === 'crest' || cls === 'bottom' ? 'shell' : 'rosette') : wcl === 'medium' ? 'rosette' : null);
-  const frame = edgeFrame(sil, M);
+  // (on a frieze the motifs are the MOLDING's: sized by its own width)
+  const Mm = frz ? p.rinMolding * scale : M;
+  const frame = edgeFrame(sil, Mm);
   // a motif's fit: it JOINS every stem that ends at it (an overlap of the
   // embed, no graze) and grazes nothing (the other stems, its mirror, the
   // motifs already kept)
@@ -528,14 +534,14 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     if (!mk) continue;
     let el = null, note = '';
     if (e.cls === 'crest' && wcl === 'heavy') {
-      const r = drapedCrest(mk, { M, frame, opening, Hz, fits: (c) => joins(e, c, true), why: 'join both stems', slopes: kind === 'arch' });
+      const r = drapedCrest(mk, { M: Mm, frame, opening, Hz, fits: (c) => joins(e, c, true), why: 'join both stems', slopes: kind === 'arch' });
       told.push(r.note);
       if (!r.el) continue;
       el = r.el;
     } else {
       let nx = 0, ny = 0; for (const q of e.items) { nx += q.N[0]; ny += q.N[1]; } const nl = Math.hypot(nx, ny);
       const P = onAxis ? [0, e.items[0].P[1]] : e.items.reduce((a, q) => [a[0] + q.P[0] / e.items.length, a[1] + q.P[1] / e.items.length], [0, 0]);
-      const size = mk === 'palmette' ? (1.6 + 1.2 * w) * M : mk === 'shell' ? (1.4 + 1.0 * w) * M : mk === 'rose' ? (1.2 + 0.8 * w) * M : (1.0 + 0.6 * w) * M;
+      const size = mk === 'palmette' ? (1.6 + 1.2 * w) * Mm : mk === 'shell' ? (1.4 + 1.0 * w) * Mm : mk === 'rose' ? (1.2 + 0.8 * w) * Mm : (1.0 + 0.6 * w) * Mm;
       // a SHELL opens from its hinge, so its hinge sits inward of the stems'
       // meeting point by a quarter of its size
       // CAPPED TO THE BAND: the weight's size, made 10 % smaller until the
@@ -543,7 +549,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       let f = 1;
       for (let q = 0; q < 16; q++, f *= 0.9) {
         const sz = size * f, inset = mk === 'shell' ? 0.25 * sz : 0;
-        const c = placeMotif(mk, { size: sz, at: [P[0] - inset * nx / nl, P[1] - inset * ny / nl], out: [nx / nl, ny / nl], H, opening, onAxis, sunk: mk === 'rosette', beyond, reach: 0.5 * M });
+        const c = placeMotif(mk, { size: sz, at: [P[0] - inset * nx / nl, P[1] - inset * ny / nl], out: [nx / nl, ny / nl], H, opening, onAxis, sunk: mk === 'rosette', beyond, reach: 0.5 * Mm });
         if (c && joins(e, c, onAxis)) { el = c; break; }
       }
       if (!el) { told.push(`the ${mk} at ${id} is not built — it cannot fit inside the band and join its stems`); continue; }
@@ -562,7 +568,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const thA = r.theta(0), thB = r.theta(r.L);
     const kMin = Math.ceil((thA - Math.PI / 2) / Math.PI - 1e-9), kMax = Math.floor((thB - Math.PI / 2) / Math.PI + 1e-9);
     const solveX = (target) => { let lo = 0, hi = r.L; for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (r.theta(m) < target) lo = m; else hi = m; } return (lo + hi) / 2; };
-    const guard = (x) => x > 0.35 * M && x < r.L - 0.35 * M;
+    const guard = (x) => x > 0.35 * Mr && x < r.L - 0.35 * Mr;
     let nExt = 0;
     for (let k = kMin; k <= kMax; k++) {
       const x = solveX(Math.PI / 2 + k * Math.PI); if (!guard(x)) continue;
@@ -570,7 +576,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       cand.push({ r, x, w, side, at: 'extremum', n: nExt++ });
     }
     if (!rin) for (let k = Math.ceil(thA / Math.PI - 1e-9); k <= Math.floor(thB / Math.PI + 1e-9); k++) {
-      const x = solveX(k * Math.PI); if (!guard(x) || x < 0.8 * M || x > r.L - 0.8 * M) continue;
+      const x = solveX(k * Math.PI); if (!guard(x) || x < 0.8 * Mr || x > r.L - 0.8 * Mr) continue;
       cand.push({ r, x, w: r.wOf(x), side: 0, at: 'zero' });
     }
   }
@@ -587,7 +593,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   const keptWires = [...stems, ...stems.map((st) => { const m = mirrorCurve(st); m.mirrorOf = st; return m; })];
   const keptEls = elements.flatMap((o) => [o.el, o.mirror].filter(Boolean));
   const near = (c) => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of c.pts) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); } return region.near([(x0 + x1) / 2, (y0 + y1) / 2], Math.hypot(x1 - x0, y1 - y0) / 2 + 3 * F + 4); };
-  const bandOK = (c) => !c.pts.some((q) => opening(q)) && c.pts.every((q, i) => silDistance(sil, q) >= wAt(c, i) / 2) && !(slitWorst(c, near(c)) > -Infinity);   // in the band: not in the opening, not past the outer edge (the wire's half width inside it)
+  const bandOK = (c) => !c.pts.some((q) => opening(q)) && c.pts.every((q, i) => silDistance(sil, q) >= wAt(c, i) / 2) && !(slitWorst(c, near(c)) > -Infinity) && (!frz || c.pts.every((q, i) => { const d = silDistance(sil, q); return d >= frz.a + wAt(c, i) / 2 && d <= frz.b - wAt(c, i) / 2; }));   // in the band: not in the opening, not past the outer edge (the wire's half width inside it)
   const clearOf = (a, b) => (wireClearBound(a, b) >= Fm ? Infinity : wireClear(a, b));
   let dropped = 0, shrunk = 0;
   for (const c of cand) {
@@ -612,7 +618,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
         const P = r.P0(c.x) * r.sc;   // the local half wavelength as laid (the phase's own scale)
         const xb = Math.min(r.L, c.x + RIN.branch * P), yb = r.yOf(xb), dydx = (r.yOf(xb + 0.05) - r.yOf(xb - 0.05)) / 0.1;
         const tanb = Math.atan2(dydx, 1), phi = tanb - c.side * RIN.diverge;
-        const len = (RIN.len[0] + RIN.len[1] * w) * M * cc * f;
+        const len = (RIN.len[0] + RIN.len[1] * w) * Mr * cc * f;
         const rootB = [xb - Math.cos(phi) * 0.75 * r.wsOf(xb), yb - Math.sin(phi) * 0.75 * r.wsOf(xb)];
         // fewer turns are taken off what the coil gap HOLDS at this size (asked past it, the bisection already lowered them)
         const cap = RIN.wireK * r.wsOf(xb), held = tk < 1 ? rinceauTendril(len, rin.turns, cap).info.turnsHeld : rin.turns;
@@ -697,7 +703,20 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       return true;
     };
     let it = null, q = 0;
-    if (kd === 'volute') { for (; q < RIN_TRY.length; q++) { const t = make(...RIN_TRY[q]); if (fits(t)) { it = t; break; } } if (q === RIN_TRY.length) q = 6; }
+    if (kd === 'volute') {
+      // at each size share the volute takes the MOST turns that fit on the
+      // MAPPED path (bisected — a curved run compresses the coils on its
+      // inner side, so the gap the local tendril holds is not the gap it
+      // keeps), and only where no turns fit is it made smaller
+      for (const f of RIN_SIZES) {
+        const t1 = make(f, 1); if (fits(t1)) { it = t1; break; }
+        q = 1;
+        let a = RIN_TK_MIN, b = 1, best = null;
+        const t0 = make(f, a);
+        if (fits(t0)) { best = t0; for (let k = 0; k < 6; k++) { const m = (a + b) / 2, t = make(f, m); if (fits(t)) { best = t; a = m; } else b = m; } }
+        if (best) { it = best; break; }
+      }
+    }
     else for (; q < 6; q++) { const t = make(0.85 ** q); if (fits(t)) { it = t; break; } }
     if (!it) { dropped++; continue; }
     if (q) shrunk++;

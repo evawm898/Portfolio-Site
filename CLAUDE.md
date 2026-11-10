@@ -12563,6 +12563,13 @@ acanthus sheathing the branch, lapping the volute) read by `vineFor` behind hidd
 `rinTurns`, `rinLeaf`) no control writes — absent, the relief STL is byte-identical to `main` on 18 states. At the
 default 180 mm print a volute holds at most ~0.9 turn (the band's 1 mm floors and 2 mm no-slit rule), so "many"
 builds as "medium" there. Sheet: `node tools/shot-frame-rinceau.mjs <dir>` → `docs/img/frame-rinceau-vocabulary.png`.
+**Step 1b (Nov 10, §18.5 — STOPPED FOR A SHEET):** Eva picked B / E / I (medium wave, medium turns, the light leaf with a
+longer broader sheath, `RIN_LEAF.sheath`). The fit now bisects the turns on the MAPPED path (`RIN_SIZES`, `RIN_TK_MIN`;
+`RIN_TRY` is gone). A medium volute reaches a turn on a straight run at a ~14 mm band and stops at ~1.06 past 16 mm (the
+carved law's asymptote, not the band); 1¼ is reached at NO width; curved runs lag (median 0.93 at 16 mm). A hidden
+`rinBand: 'widen' | 'frieze'` (`rinceauBand` in `buildFrame`, `RIN_BAY_MM` 16) prototypes the two ways; the rect's
+opening falls 73 % → 59 % → 38 % of the outer area. Sheet: `node tools/shot-frame-rinceau.mjs <dir> --band` →
+`docs/img/frame-rinceau-band.png`.
 **SECOND ROUND (Eva's rulings on the first sheet, charter §17.8): THE BAND IS THE CAP.** Nothing stands past the
 band's outer edge (the frame's own `plateOutline`) but the CREST, which is DRAPED on an edge frame (arc length
 along the edge × offset along its averaged normal) — at most `CREST.rise` 0.45 M past the edge, reaching
