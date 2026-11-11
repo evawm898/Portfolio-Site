@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 /* shot-frame-chains.mjs <dir> [--refs <dir>] — phase 3d's contact sheet:
+   RETIRED LAYOUT (phase 3f step 2): the chains are gone — run this against
+   a worktree of 2a46e1c to reproduce its sheet; on this tree it draws the
+   rinceau.
    the RUNNING CHAINS seated on the molding, on all three skeletons at the
    default and dense (density 5, every run on), as the STL will print it (the
    page's own 3D view, one pinned camera on every whole cell), the engraving,

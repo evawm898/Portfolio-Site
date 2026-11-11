@@ -5,7 +5,7 @@
    exportSvg(model), the same string the button saves. */
 
 import { PARAM_SPEC, SECTIONS, DEFAULTS, PROFILE_PRESETS, HATCH_WEIGHT_RANGE, MIN_FEATURE_MM } from './frame-registry.js';
-import { buildFrame, exportSvg, toneAcross, profileFor } from './frame-geometry.js';
+import { buildFrame, exportSvg, toneAcross, profileFor, rinceauBandFloor } from './frame-geometry.js';
 import { buildRelief, exportStl } from './frame-relief.js';
 import { ProfileEditor } from './frame-profile-editor.js';
 import { withOrnament } from './frame-filigree.js';
@@ -110,7 +110,27 @@ function buildNow() {
   stats.reliefMs = performance.now() - t2;
   document.getElementById('paper').innerHTML = exportSvg(model, fixedView ? { view: fixedView } : {}).svg;
   if (viewer) { viewer.setMesh(relief); if (!pinnedCamera) viewer.frame(); viewer.render(); }
+  applyDead();
   writeReadout();
+}
+/* THE PROFILE WIDTH's DEAD TRAVEL, marked on the control (Eva's ruling (d),
+   Nov 11): with the rinceau on, every value at or under the width the band is
+   widened to builds the same 16 mm band — the track is hatched from its left
+   end to a tick at that width and the read-out says so. The range is not
+   narrowed: the whole travel stays reachable, it is only told. */
+let deadFloor = null;
+function applyDead() {
+  const spec = PARAM_SPEC.find((s) => s.id === 'moldingWidth'), wrap = ctrlEl.moldingWidth;
+  deadFloor = rinceauBandFloor(params, profile);
+  const out = document.getElementById('moldingWidth-out');
+  if (deadFloor == null || !(deadFloor > spec.min)) {
+    wrap.classList.remove('fr-ctrl--dead'); wrap.style.removeProperty('--fr-dead'); delete wrap.dataset.dead;
+    out.textContent = fmtVal(spec, params.moldingWidth);
+    return;
+  }
+  const frac = Math.min(1, (deadFloor - spec.min) / (spec.max - spec.min));
+  wrap.classList.add('fr-ctrl--dead'); wrap.style.setProperty('--fr-dead', frac.toFixed(4)); wrap.dataset.dead = deadFloor.toFixed(2);
+  out.textContent = `${fmtVal(spec, params.moldingWidth)} · ${params.moldingWidth <= deadFloor ? 'held at' : 'dead under'} ${deadFloor.toFixed(1)} (16 mm band)`;
 }
 
 /* ---------------- the relief view ---------------- */
@@ -178,15 +198,13 @@ function writeReadout() {
     + `floor: ${r.floorNote}${floorWarn ? '\n' + floorWarn : ''}`;
   const o = model.ornament;
   const ornLine = o
-    ? (o.layout === 'vine'
-      ? `ornament <b>a vine</b> — one stem per run (${o.weight.runs.map((r) => `${r.from}→${r.to}`).join(', ')}, mirrored), seated on the molding · hierarchy <b>${o.weight.h.toFixed(2)}</b>: `
-        + `junction motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · along the stems <b>${['cluster', 'rosette', 'leaf', 'bud', 'sprig'].map((k) => [k, o.items.filter((it) => it.kind === k).length]).filter(([, n]) => n).map(([k, n]) => `${n} ${n > 1 ? (k === 'leaf' ? 'leaves' : k + 's') : k}`).join(', ') || 'the bare stem'}</b> (per side) · `
-      : o.layout === 'chains'
-      ? `ornament <b>${o.groups.filter((g) => g.chain).length}</b> running chains (${o.groups.filter((g) => g.chain).map((g) => g.anchor).join(', ')}, mirrored) seated on the molding, <b>${o.groups.filter((g) => !g.chain).length}</b> junction motifs, `
+    ? (o.layout === 'rinceau'
+      ? `ornament <b>a rinceau</b> — one stem per run (${o.weight.runs.map((r) => `${r.from}→${r.to}`).join(', ')}, mirrored), seated on the molding · hierarchy <b>${o.weight.h.toFixed(2)}</b>: `
+        + `junction motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · <b>${o.items.length}</b> volutes per side, turns drawn <b>${o.items.length ? `${Math.min(...o.items.map((it) => it.curves[0].info.turnsDrawn)).toFixed(2)}–${Math.max(...o.items.map((it) => it.curves[0].info.turnsDrawn)).toFixed(2)}` : '—'}</b>, <b>${o.items.reduce((n, it) => n + it.curves.length - 1, 0)}</b> acanthus leaves · `
       : `ornament <b>${o.groups.length}</b> groups (${o.groups.map((g) => g.anchor).join(', ')}, mirrored), `)
       + `<b>${o.curves.filter((c) => c.kind !== 'leaf').length}</b> scrolls, <b>${o.curves.filter((c) => c.kind === 'leaf').length}</b> leaves · lead <b>${o.length.toFixed(1)} mm</b>, `
       + (o.style === 'carved' ? `stroke <b>carved</b> (${o.shape}): <b>${o.groups.length ? o.groups[0].curves[0].info.wire.toFixed(2) : '—'} mm</b> body, width 0.7 × the local radius, thinning to <b>${o.tip.toFixed(2)} mm</b> at the eye` : `wire <b>${o.wire.toFixed(2)} mm</b> (${o.shape}, <b>${o.style}</b>${o.style === 'tapered' ? `, thinning to <b>${o.tip.toFixed(2)} mm</b> at the eye` : ''})`)
-      + ` — print mm; ${o.layout === 'vine' || o.layout === 'chains' ? 'held inside the band, the crest alone past its edge' : 'it may stand past the frame (overall height is the frame\'s)'} · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> of ${o.tris.budget.toLocaleString('en-US')} triangles`
+      + ` — print mm; ${o.layout === 'rinceau' ? 'held inside the band, the crest alone past its edge' : 'it may stand past the frame (overall height is the frame\'s)'} · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> of ${o.tris.budget.toLocaleString('en-US')} triangles`
       + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
     : 'ornament: none';
   const pt = model.pattern;
@@ -234,6 +252,7 @@ window.__frame = {
   setAdvanced: (on) => setAdvanced(on),
   readout: () => document.getElementById('readout').textContent,
   controls: () => Object.fromEntries(PARAM_SPEC.map((s) => [s.id, !ctrlEl[s.id].hidden])),
+  dead: () => ({ floor: deadFloor, mark: ctrlEl.moldingWidth.classList.contains('fr-ctrl--dead') ? +ctrlEl.moldingWidth.style.getPropertyValue('--fr-dead') : null, out: document.getElementById('moldingWidth-out').textContent }),
 };
 
 loadParams(params, null);

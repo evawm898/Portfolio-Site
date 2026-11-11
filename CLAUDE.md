@@ -12583,6 +12583,51 @@ Measured traps: the axis stop must read the stem's own y (the arch's apex is a m
 loops the mapped stem (`untangle` cuts and rounds it); `joinsCleanly` passes a wire that never touches;
 `node --check` does NOT catch an illegal `continue` — import the module. Six mutants; relief shards 12 → 16, then 26 at 60 min (fourth round: three capped-chain mutants overran 40).
 Sheet: `node tools/shot-frame-vine.mjs <dir> [--refs <dir>] [--only <regex>]`.
+**Phase 3f step 1 (Nov 10): THE RINCEAU VOCABULARY — STOPPED FOR A SHEET, NOTHING WIRED** (charter §18; read
+`frame-rinceau.js`'s header before touching it). Eva ruled the leafy runs (chains, vine) wrong; a rinceau replaces
+both in step 2. Built: a stem law and an item law (a sweep-then-volute tendril at every wave, alternating sides;
+acanthus sheathing the branch, lapping the volute) read by `vineFor` behind hidden params (`ornRinceau`, `rinWave`,
+`rinTurns`, `rinLeaf`) no control writes — absent, the relief STL is byte-identical to `main` on 18 states. At the
+default 180 mm print a volute holds at most ~0.9 turn (the band's 1 mm floors and 2 mm no-slit rule), so "many"
+builds as "medium" there. Sheet: `node tools/shot-frame-rinceau.mjs <dir>` → `docs/img/frame-rinceau-vocabulary.png`.
+**Step 1b (Nov 10, §18.5 — STOPPED FOR A SHEET):** Eva picked B / E / I (medium wave, medium turns, the light leaf with a
+longer broader sheath, `RIN_LEAF.sheath`). The fit now bisects the turns on the MAPPED path (`RIN_SIZES`, `RIN_TK_MIN`;
+`RIN_TRY` is gone). A medium volute reaches a turn on a straight run at a ~14 mm band and stops at ~1.06 past 16 mm (the
+carved law's asymptote, not the band); 1¼ is reached at NO width; curved runs lag (median 0.93 at 16 mm). A hidden
+`rinBand: 'widen' | 'frieze'` (`rinceauBand` in `buildFrame`, `RIN_BAY_MM` 16) prototypes the two ways; the rect's
+opening falls 73 % → 59 % → 38 % of the outer area. Sheet: `node tools/shot-frame-rinceau.mjs <dir> --band` →
+`docs/img/frame-rinceau-band.png`.
+**Step 2 (Nov 10, §18.6 — RULED Nov 11: (a) as built, (d) the dead travel marked): THE RINCEAU IS THE DEFAULT LAYOUT AND THE CHAINS ARE RETIRED** (Eva's
+(b) and (d); read §18.6 before touching `vineFor`, `frame-rinceau.js`, `rinceauBand` or the RN / BW1 families).
+- `ornLayout` is `rinceau` | `groups` (a stored `chains` reads as the rinceau). `chainsFor`, `buildChain`, `settleChains`,
+  `moldingLift` and the vine's items are gone; `vineFor` is the rinceau's one owner. Hierarchy 0 is an even weight.
+  Tightness hides under it. The hidden step-1 params and the frieze are gone.
+- The band is widened to `RIN_BAY_MM` 16 print mm at the frame's OWN scale (a secant solve on the built box: the arch's
+  box is taller than its height). Under the rinceau the Profile width slider has dead travel below ~30 units — told.
+- Weighted up on the wide band: stem 0.16 + 0.07 w, tendril 1.25 + 0.5 w, two acanthus leaves (sheath 0.42 × 0.75 at
+  −0.45 rad, calyx 0.85 of it). Straight-run turns median 1.06 on the rectangle and the arch; the oval 0.89.
+- `seatEmitted` takes a per-row `extra` (a leaf's crest margin survives the emitted reading); every item wire is
+  self-gap checked; the draped crest's rise is read back off its plan.
+- Gates RN1–RN3, RN5, RN6, BW1 (laws restated, never imported); 56 mutants (five retired, eight new; the negative control
+  copies `frame-rinceau.js`). Sheet: `node tools/shot-frame-rinceau-wired.mjs <dir> --base <worktree of 2a46e1c>` →
+  `docs/img/frame-rinceau-wired.png`.
+**Step 2b (Nov 11, §18.7): THE FLOWER IS THE FEATURE — supersedes "the rosettes sink into the molding" for the rinceau**
+(Eva's ruling on the step-2 sheet; read §18.7 before touching `standMotifs`, `domeFlower`, `elementTop`, `STAND`,
+`raisedCrestLift`, `rinceauBandFloor`, `.fr-ctrl--dead` or FW1–FW3 / DW1).
+- Relief order: crest shell > flowers > rinceau (stem, volutes, acanthus) > molding. On the step-2 tree every rosette's crown
+  sat 0.7–1.9 mm under the stems crossing it and a stem stood up to 4.0 mm over its top.
+- `standMotifs` runs after the wires are built (`withOrnament`, rinceau only). A FLOWER (every junction motif but the crest) is
+  DOMED: its heart raised until its crown stands 1 mm (+0.1) over every wire within 2 mm, falling to nothing at the tips, plus a
+  gentle cover (`STAND.ease` 0.3) so every wire under it lies 0.1 mm under its top. The CREST keeps its plan (`el.plan`) and is
+  draped again over the molding raised by d (`raisedCrestLift`, crestLift's own law) until it covers its stems and stands 1 mm
+  over every flower. Nothing moves in plan.
+- A rigid BLOCK raise was rendered first and stood the outer petals as cut walls at the band's edge; a 45° cover printed every
+  stem through the petals. Both were set aside on the sheet.
+- The Profile width's dead travel under the rinceau is hatched on the track to a tick at `rinceauBandFloor` (the width the band
+  is widened to) and told in the read-out.
+- Gates: FW1 (a flower's crown 1 mm over the wires near it), FW2 (no wire over any motif's top) and FW3 (the crest highest),
+  all off the relief; three mutants (59). DW1 is page-side (its must-fail was run by hand). Sheet:
+  `node tools/shot-frame-flowers.mjs <dir> --base <worktree of cd90cf5>` → `docs/img/frame-flowers.png`.
 **SECOND ROUND (Eva's rulings on the first sheet, charter §17.8): THE BAND IS THE CAP.** Nothing stands past the
 band's outer edge (the frame's own `plateOutline`) but the CREST, which is DRAPED on an edge frame (arc length
 along the edge × offset along its averaged normal) — at most `CREST.rise` 0.45 M past the edge, reaching

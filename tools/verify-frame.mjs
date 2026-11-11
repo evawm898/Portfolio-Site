@@ -610,6 +610,23 @@ async function partTwo(G, R) {
   });
   check('X1 the drawing on screen IS the export string (every path d, in order)', same.same, `${same.n} paths`);
 
+  // DW the Profile width's dead travel under the rinceau marked ON the
+  // control (Eva's ruling (d), Nov 11): the mark's fraction is the floor the
+  // NODE build widens the band to, restated against the control's own range;
+  // no mark with the rinceau off; the read-out says it
+  {
+    const dw = [];
+    for (const q of [{ filigree: 'scrolls' }, { filigree: 'scrolls', skeleton: 'rect' }, { filigree: 'scrolls', skeleton: 'oval', moldingWidth: 36 }]) {
+      await page.evaluate((v) => window.__frame.setParams(v), q);
+      const d = await page.evaluate(() => window.__frame.dead());
+      const m = G.buildFrame({ ...q, moldingWidth: 6 }), want = m.params.bandAsked != null ? m.params.moldingWidth : null, frac = want == null ? null : (want - 6) / (40 - 6);
+      if (want == null || d.floor == null || Math.abs(d.floor - want) > 1e-9 || d.mark == null || Math.abs(d.mark - frac) > 1e-4 || !/16 mm band/.test(d.out)) dw.push(`${JSON.stringify(q)}: floor ${d.floor} want ${want}, mark ${d.mark} want ${frac}, read-out "${d.out}"`);
+    }
+    await page.evaluate(() => window.__frame.setParams({}));
+    const off = await page.evaluate(() => window.__frame.dead());
+    if (off.floor != null || off.mark != null || /16 mm band/.test(off.out)) dw.push(`rinceau off: still marked (${JSON.stringify(off)})`);
+    check('DW1 the Profile width slider marks its dead travel under the rinceau on the control itself: hatched to a tick at the width the band is widened to (the Node build\'s, restated), told in the read-out; no mark with the rinceau off', dw.length === 0, dw.join('; ') || 'three rinceau frames marked, the plain frame not');
+  }
   // V pixel diff at a fixed camera
   const VIEW = { x0: -240, y0: -40, x1: 240, y1: 640 };
   await page.addStyleTag({ content: '.fr-panel,.fr-header{display:none!important} .fr-stage{right:0!important;padding:10px!important}' });
@@ -646,18 +663,19 @@ async function partTwo(G, R) {
     // the wire's thickness is the tapered and constant styles' — a carved
     // stroke derives its width from the curve (phase 3c), so it is probed there
     ornWire: { ...ORN, ornLayout: 'groups', ornWireStyle: 'tapered' },
-    // the groups' controls (hidden under the chains) are probed on the groups;
+    // the groups' controls (hidden under the rinceau) are probed on the groups;
     // the layout itself and the bottom (no arch bottom run) on a rectangle
     ornLayout: ORN, ornScale: { ...ORN, ornLayout: 'groups' }, ornWireStyle: { ...ORN, ornLayout: 'groups' }, ornBottom: { ...ORN, skeleton: 'rect' },
     // the default carved lead (23 mm) holds only 0.50–0.53 turns — its fat
     // body leaves the eye little room (charter §13.6) — so the slider's
     // travel is probed on a 46 mm lead (scale 5), where it spans 0.50–0.70
-    // (on the scroll GROUPS: the capped chains' elements are a third of their
-    // lead — Eva's ruling B — so tightness moves them under the bar; the
-    // groups' lead is the one this probe was sized for)
+    // (on the scroll GROUPS: the rinceau's volutes take the coil gap's own
+    // turns and hide the slider; the groups' lead is the one this probe was
+    // sized for)
     ornTightness: { ...ORN, ornLayout: 'groups', ornScale: 5 },
     // phase 3e step 3: the hierarchy is probed with the filigree on (its
-    // minimum, 0, is phase 3d's chains — the vine gone)
+    // minimum, 0, is an even weight along every run: the rinceau's volutes
+    // all one size)
     ornHierarchy: ORN,
     // the band pattern's rows are hidden and inert at 'none': probed with the beading on
     bandEdge: { bandPattern: 'beading' }, bandSize: { bandPattern: 'beading' }, bandPitch: { bandPattern: 'beading' } };

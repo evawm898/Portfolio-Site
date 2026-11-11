@@ -49,6 +49,12 @@ details.fr-sec>summary:hover{color:var(--teal);}
 .fr-ctrl label{display:flex;justify-content:space-between;color:var(--dim);font-size:11px;margin-bottom:3px;}
 .fr-ctrl output{color:var(--paper);}
 .fr-ctrl input[type=range]{width:100%;accent-color:var(--teal);}
+/* THE PROFILE WIDTH's DEAD TRAVEL under the rinceau (Eva's ruling (d)): the
+   track hatched from its left end to a tick at --fr-dead (a fraction of the
+   range; the thumb's centre travels 8 px to width − 8 px). A mark, not a
+   control: pointer-events off, the whole travel stays reachable. */
+.fr-ctrl{position:relative;}
+.fr-ctrl--dead::after{content:"";position:absolute;pointer-events:none;left:0;bottom:0;height:16px;width:calc(8px + var(--fr-dead,0) * (100% - 16px));border-right:2px solid var(--teal);background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--teal) 30%,transparent) 0 2px,transparent 2px 6px);opacity:.55;}
 .fr-ctrl select{width:100%;background:var(--ink-soft);color:var(--paper);border:1px solid var(--line-strong);font-family:var(--font-mono);font-size:11px;padding:4px;}
 
 .fr-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}

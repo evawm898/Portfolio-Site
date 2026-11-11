@@ -1688,3 +1688,352 @@ OR7's alone (the capped elements no longer crowd each other in the opening — l
 VN2 still sees the vine's); `the-carved-floor-removed` also reddens OR3; `the-element-mirror-is-broken`
 also reddens PL2 and PL3 (a capped element sits exactly on the opening's edge and its wire's embed); and
 `a-folded-element-is-built` is retired (above).
+
+## 18. Phase 3f — the rinceau (step 1 the vocabulary, 1b the band, step 2 wired — §18.6, RULED (a) + (d); step 2b the flowers in front — §18.7)
+
+Read `frame-rinceau.js`'s header before touching the rinceau. **Step 1 ships no control and moves no
+shipped byte**: the rinceau is reached only through hidden params (`ornRinceau: 'on'`, `rinWave`,
+`rinTurns`, `rinLeaf`) that no control writes — the sheet sets them — and with them absent every frame
+builds as on `main`, by branch (measured below).
+
+### 18.0 The ruling (Eva, Nov 10) and what was checked first
+
+- Crests, rosettes, the band cap and the weight field are right; **the leafy runs are not**: the chains read
+  as a row of leaf clumps, the vine as a gentle stem with leaves stuck on. Wanted: a RINCEAU — one stem per
+  run in an S, a tendril at every wave curling into a volute (the approved carved scroll, arris), volutes
+  alternating sides, acanthus sheathing each branch point and lapping over the volute; size following w(s);
+  curvature-aware; inside the band; mirror exact; floors held. It replaces the vine's stem AND the chains
+  (step 2, after the pick).
+- **Checked: the vine's machinery is the rinceau's.** `vineFor` already owns everything the ruling keeps — the
+  run paths (`runPath`, `offsetCurve`), the seat law (the molding's own height field at the emitted columns),
+  w(s), the curvature compression, the band cap, the junction motifs, the settling, the mirror, the budget. What
+  the vine gets wrong is the two things the rinceau changes: the stem's meander (low, long) and what springs at
+  each wave (a bud / leaf / sprig picked by weight, a tendril only near a peak, ~½ turn). So the rinceau is a
+  new item law and stem law read by `vineFor` (`rin`), not a second vine — one owner of runs, seat and settling.
+
+### 18.1 The construction (`frame-rinceau.js`, read by `vineFor`)
+
+- **The stem** is the vine's (one per run, y = y_c + A sin θ, θ' = π / P), with the rinceau's own laws: amplitude
+  `RIN.A` [0.30, 0.10] × M (capped by the band, so it swings near both edges), half wavelength `RIN.P`
+  [1.15, 0.55] × M × the WAVE factor (`RIN_WAVE`: loose 1.4 / medium 1.0 / tight 0.72), width `RIN.stemW`
+  [0.12, 0.05] × M (thinner than the vine's: the volutes carry the weight). Every extremum gets a volute (the
+  zero crossings nothing), so they alternate sides by construction.
+- **The tendril** (`rinceauTendril`) branches `RIN.branch` 0.18 of the half wave past the extremum, on the stem's
+  descent, leaving the stem's tangent by only `RIN.diverge` 0.25 rad (a branch, not a spur), and is the second
+  half of a carved C: a SWEEP (radius `RIN.sweep` 1.1 × its length) across the hollow, then a VOLUTE
+  (`RIN.share` 0.62 of its length) winding toward the crest of its own wave. Its length `RIN.len` [1.05, 0.45]
+  × M follows w(s) and the compression; its width the carved law under `RIN.wireK` 0.85 of the stem's (a
+  branch is thinner than its stem). The asked VOLUTE turns (`RIN_TURNS` few 0.6 / medium 0.95 / many 1.35) are
+  lowered by bisection until every coil gap is F + 0.1 (the vine's clearance); the turn DRAWN (root to eye,
+  the tendril's own tangent) is what the captions report.
+- **Two shapes were tried and refused first (measured on plan dumps):** (1) the vine's own tendril law, a C half
+  with a 0.42 L body — tiny ½-turn hooks pinched against the stem; (2) a single spiral whose radius falls
+  linearly from the stem — its eye drags back toward its own root on the stem, so every turn past ~0.7 met
+  the stem a second time (a graze) and the three turn variants built identically (0.62–0.68 everywhere, even
+  on a 16 mm band). The sweep-then-volute is the classical form and the one that lets the volute sit in the
+  middle of the hollow.
+- **The fit's schedule** (`RIN_TRY`): a volute that does not fit is first given FEWER TURNS (a curved run
+  compresses its coils — the oval's refusals are all coil gaps after mapping), then made smaller; past the
+  last it is not built (told, as a count).
+- **The acanthus** (`acanthusLeaf`: phase 3c's leaf, broader, 4–5 lobes, a 1.0 rad curl so it hugs the curl):
+  LIGHT one sheath leaf rooted on the stem just behind the branch, its heading 0.3 rad off the tendril's toward
+  the stem, so it covers the crotch and lies over the tendril's sweep; FULL a longer, broader sheath plus a
+  second leaf on the stem's continuation turning the other way (the calyx about the node). Each acanthus is a
+  stacked shell riding a crown higher than its tendril (`lap`) and falling over 3.5 stem widths, so it laps OVER
+  the volute's root. With the tendril it is a CROSSING by phase 3c's leaf rule (`LEAF_CROSS`, F/2 of overlap
+  at every approach), never a graze; with everything else the vine's clearances.
+
+### 18.2 Measured (Node, the hidden params; relief = export)
+
+Every row: boundary edges 0, one voxel region.
+
+| run | variant | volutes | turns drawn | relief tris |
+|---|---|---|---|---|
+| straight (rect side) | medium / medium / light | 13 | 0.84–0.91 | 340,944 |
+| straight | wave loose / tight | 10 / 18 | 0.84–0.91 | 277,752 / 447,760 |
+| straight | turns few / many | 13 / 13 | 0.70 / 0.84–0.91 | 305,176 / 340,944 |
+| straight | leaf full | 13 (26 leaves) | 0.61–0.67 | 443,656 |
+| straight | many, 300 mm print | 13 | 1.03–1.12 | 427,848 |
+| curved (oval crest → side) | medium | 10 | 0.60–0.75 | 288,560 |
+| curved | wave loose / tight | 7 / 13 | 0.68–0.75 | 235,432 / 345,632 |
+| curved | leaf full | 10 (20 leaves) | 0.60–0.75 | 387,760 |
+
+- **At the default 180 mm print a volute holds at most ~0.9 of a turn, so "many" builds as "medium" there.**
+  The bay under a wave is ~0.75 M deep (7 mm of the 9.5 mm band), and the 1 mm floors, the F + 0.1 coil gap and
+  the 2 mm no-slit rule against the band's edges leave a ~4 mm volute. At 300 mm (M 15.9) "medium" reaches
+  ~1.05 and "many" 1.12. More turns need a wider band or a larger print — the ruling's choice is of the LAW;
+  what the default can hold is a measurement.
+- **The full calyx costs turns**: its sheath leaf's crossing with the tendril binds, so the schedule lowers the
+  turns (0.61–0.67 on the straight run).
+- Whole frames (the rinceau on every run the vine builds, its crest and motifs unchanged): arch 447,948, rect
+  433,912, oval 290,864 (the vine: 329,788 / 284,672 / 200,184); tight + full 690,092 / 694,256 / 466,840; at
+  density 5, bottom on, 600 mm, tight + full: 1,286,300 / 1,476,136 / 1,497,016 — the last two give items way
+  to the 1.5 M budget (the vine's own give-way, told). Builds 4–8 s at the defaults (Node).
+- **Shipped bytes: identical.** With the hidden params absent, `vineFor` takes every old branch; the relief STL
+  of 18 states (three skeletons × filigree off, the vine, the chains, the groups, dense, h ½ leaves off) is
+  byte-identical to a worktree of `main` (`2a46e1c`).
+
+### 18.3 The sheet
+
+`node tools/shot-frame-rinceau.mjs <dir> [--only <regex>] [--refs <dir>]` → `docs/img/frame-rinceau-vocabulary.png`:
+the vine as on main (the before), then each variant on the straight band and the curved run, front-on and
+three-quarter (Relief view, a mid-run camera), and a preview of the three default frames with the rinceau on
+every run (NOT the ruling). Captions are the Node build's counts. References 1 and 2 are not in the repository.
+
+### 18.4 Not done (step 2, after the pick)
+
+The registry controls, retiring the chains (and their mutants), hierarchy 0 = a uniform rinceau, the
+junctions (the stems' ends at the crest and corners as the vine has them), the gates (stem continuity, a
+volute detached, a leaf floating, the mirror broken, w(s) ignored) and the CI shard count. The volute's tip
+ends square (a swept wire's end face) — `roundEnds` is the stem's and is owed to the tendril and the leaves.
+
+`frame-rinceau.js` is NOT yet in `frame.yml`'s path filter (an edit to an existing workflow file costs later frozen
+tags — CLAUDE.md); step 2 adds it, since then the module is load-bearing. This PR's gate runs regardless, through
+`frame-vine.js`. Every relief-mutant anchor still matches exactly once after the edits to `frame-vine.js`.
+
+
+### 18.5 Step 1b — the band: keep it, widen it, or add a frieze (STOPPED FOR A SHEET; nothing wired)
+
+**Eva's picks on the vocabulary sheet (Nov 10): B (medium wave), E (medium turns), I (the light leaf with a longer,
+broader sheath — `RIN_LEAF.sheath`: one leaf at FULL's length and breadth, no calyx).** Before step 2 she asked for
+one more option, because the 9.5 mm band caps a volute under a turn: a band wide enough for 1–1¼ turns at the
+default 180 mm print, rendered beside the 9.5 mm one, and its cost to the frame's proportions.
+
+**The fit changed first, and it is why the vocabulary sheet's turn figures no longer reproduce.** `RIN_TRY` (a
+fixed ladder of [size, turns] shares) is replaced by `RIN_SIZES` × a BISECTION of the turns on the MAPPED path
+(down to `RIN_TK_MIN` of what the coil gap holds on a straight run): a curved run compresses its inner coils, so the
+gap the local tendril holds is not the gap it keeps, and the ladder's steps left turns on the table. The step-1
+sheet (`docs/img/frame-rinceau-vocabulary.png`) stays as the record the picks were made on.
+
+**Measured (Node, picks B/E/I unless named; turns = the tendril's own tangent, root to eye):**
+
+| band (print mm) | straight run (rect side) | curved run (oval crest → side) |
+|---|---|---|
+| 9.5 (as today) | 0.70–0.90, median 0.75 (light leaf: 0.84–0.91, med 0.86) | 0.52–0.77, med 0.74 |
+| 11.7 | 0.82–0.98, med 0.94 | 0.77–0.87, med 0.83 |
+| 13.8 | 0.97–1.06, med 1.00 | 0.52–0.90, med 0.88 |
+| **16.0 (the prototype)** | **1.03–1.07, med 1.06** | **0.58–0.96, med 0.93** |
+| 18.0 | 1.06–1.07 | 0.64–0.99, med 0.95 |
+| 21.2 (the control's max) | 1.06 | 0.49–1.06, med 0.99 |
+| 21.2, turns F (many) | 1.05–1.19, med 1.15 | 0.49–1.03, med 0.99 |
+
+- **A medium volute reaches a whole turn on a straight run at a ~14 mm band and stops at ~1.06 past 16 mm.**
+  Above 16 mm the limit is the LAW, not the band: everything scales with M (self-similar) and only the fixed
+  floors shrink relatively, so the turns approach the carved scroll's own asymptote — its width is 0.7 × the local
+  radius, so its coils need their own pitch. **1¼ is reached at no band width** (turns F saturates at ~1.15–1.2 at
+  18–21 mm); more needs a thinner volute stroke, which is a change to the approved carved law.
+- **The curved run lags the straight one at every width** (median 0.93 against 1.06 at 16 mm): the run's
+  curvature compresses the inner volutes' coils (`self gap`) and the wavelength (`cOf`), and the one volute at the
+  crest end is held back by the shell. It reaches a median of ~1.0 only at the control's maximum.
+- **At 16 mm the sheath leaf (I) costs nothing; at 9.5 mm it costs ~0.1 turn** (its crossing with the tendril
+  binds before the coil gap does).
+
+**The two ways, built as a HIDDEN prototype** (`rinBand: 'widen' | 'frieze'` read by `buildFrame` through
+`rinceauBand`; no control writes it, and absent nothing runs): the bay is `RIN_BAY_MM` = 16 print mm, read
+through printHeight ÷ height.
+- **(b) WIDEN** — the molding drawn 16 mm wide (the profile stretched, its depth unchanged; 18 → 30.2 drawing
+  units). The junction motifs grow with it (the crest shell 24 → 38 mm across).
+- **(c) FRIEZE** — the 9.5 mm ogee as it was, a 0.8 mm step down, a FLAT frieze 16 mm wide at 0.4 of the depth,
+  a 1.6 mm sight-edge bead at the opening: one composite band of 27.9 mm (past the Profile width control's 40
+  drawing-unit maximum, which is why it is built after the clamp). The rinceau runs on the flat alone (its laws
+  read the flat's width; every wire's edge stays on it), and the motifs are the molding's (sized by its 9.5 mm).
+  **On the oval the shell crest is not built — the stems run on the frieze, inside the molding the crest stands
+  on, and it cannot join both without grazing (told)**; step 2 would seat the crest on the frieze or bring the
+  stems up to it. **The corners in the whole rectangle are the vine's junctions as they stand** (the stems' run-on
+  crosses the step at the mitre) — a preview, not a construction.
+
+**The proportions (default rect 180 × 340 and oval 0.75, at 180 mm print, rinceau on):**
+
+| | band | rect outer | rect opening | opening ÷ outer | oval outer | oval opening | opening ÷ outer |
+|---|---|---|---|---|---|---|---|
+| (a) keep | 9.5 | 105 × 180 | 86 × 161 | 73 % | 137 × 180 | 118 × 161 | 77 % |
+| (b) widen | 16.0 | 111 × 180 | 79 × 148 | 59 % | 139 × 180 | 107 × 148 | 63 % |
+| (c) frieze | 27.9 | 123 × 180 | 67 × 124 | 38 % | 142 × 180 | 86 × 124 | 42 % |
+
+The rectangle's height is held (the outer box is `height`), so a wider band takes its width outward by the
+band's growth and its opening inward on all four sides; the oval's height is held the same way.
+
+Every option: boundary edges 0, one voxel region (relief = export). Relief tris, whole frames: rect 429,832 /
+357,984 / 323,712, oval 310,040 / 244,144 / 238,552 — a wider band carries FEWER, larger volutes. **Shipped
+bytes: the 18-state relief STL is byte-identical to `main` (`2a46e1c`)** — every change is a branch on `rin`,
+`frz` (null unless `rinFriezeAt`) or `rinceauBand` (null unless `rinBand`).
+
+Sheet: `node tools/shot-frame-rinceau.mjs <dir> --band` → `docs/img/frame-rinceau-band.png` (each run front-on and
+three-quarter in the three options, the camera on one mid-run point at one radius, then the whole rectangle and oval
+front-on). Nothing has been printed; every floor is an assumption.
+
+### 18.6 Step 2 — the rinceau wired (STOPPED FOR A SHEET)
+
+**Eva's rulings on the step-1b sheet (Nov 10): (b) widen the band to 16 mm when the rinceau is on; (d) accept ~1.05
+turns. Then:** on the 16 mm whole-frame previews the rinceau read thin — a fine stem with small curls far apart on a
+wide band — so the ornament's weight was scaled with the band (the stem thicker, the acanthus fuller, closer to H, and
+larger), the turns held at ~1.0 on a straight run; then step 2 as briefed.
+
+**What changed.**
+- **The layout's default is the rinceau** (`ornLayout`: `rinceau` | `groups`). The vine's stem and its items (clusters,
+  buds, leaves, sprigs, the zero-crossing rosettes) and phase 3d's **chains are RETIRED** — `chainsFor`, `buildChain`,
+  `settleChains`, `moldingLift`, `truncateCurve` and their constants are gone from `frame-filigree.js`; the runs,
+  `runPath`, `mapToPath`, the seat, `slitWorst` and `placeMotif` stay (the rinceau runs on them). A stored `chains`
+  reads as the rinceau (`buildFrame`). `vineFor` keeps its name and is the rinceau's one owner: the runs, the seat, the
+  weight field, the compression, the band cap, the junction motifs (the crest's soft shell, the corner rosettes), the
+  budget; `frame-rinceau.js` supplies the laws. The hidden params (`ornRinceau`, `rinWave`, `rinTurns`, `rinLeaf`,
+  `rinBand`) and the frieze prototype are gone; the picks are constants (`RIN_WAVE` 1.0, `RIN_TURNS` 0.95).
+- **Hierarchy 0 is an even weight** (w = ½ on every run, every volute one size): the chains it used to select are
+  retired. Label: "Hierarchy (0 = even)".
+- **Tightness hides under the rinceau** (its volutes take the coil gap's own turns; it never reached them). The groups'
+  scale, wire and wire style hide there as before.
+- **The band** (`rinceauBand` in `buildFrame`): with the rinceau on, the molding is drawn at least `RIN_BAY_MM` = 16
+  print mm wide at the frame's OWN print scale — `w = 16 × boxHeight(w) ÷ printHeight`, solved by the secant method on
+  the box the build measures (4–6 builds), because the arch's box is half a band taller than its height and an eared
+  rectangle's grows with its ears: the first cut read the scale as `printHeight ÷ height` and left the arch at 15.2 mm
+  and the eared rectangle 2.4e-6 mm short. A band already wider is left alone. `p.bandAsked` keeps the control's value;
+  the read-out says the band was widened and by how much. **Consequence, told and not hatched: under the rinceau the
+  Profile width slider has dead travel** — at the default 180 mm print every value under ~30 drawing units builds the
+  16 mm band.
+- **The weight, scaled with the band** (`frame-rinceau.js`; every figure × the band width M, `[base, slope in w]`):
+  - stem `RIN.stemW` 0.12 + 0.05 w → **0.16 + 0.07 w** (2.6–3.7 mm on 16 mm);
+  - tendril `RIN.len` 1.05 + 0.45 w → **1.25 + 0.5 w** (the volute itself bigger in its bay);
+  - acanthus: pick I's one sheath leaf (0.38 of the tendril, aspect 0.62) → **TWO, as H** — the sheath at **0.42** of
+    the longer tendril (1.33× pick I's length) and **0.75** broad, and a calyx leaf **0.85** of it on the stem going on;
+    the sheath lies further over the stem (`RIN.sheath` −0.3 → **−0.45** rad), because at −0.3 the fuller leaf grazed
+    the tendril's sweep on 10 of 13 rejections and the fit made the volutes smaller (medians 0.96 / 0.89 on rect / arch).
+  - Scanned against the straight-run turns (Node, the default frames): leaf 0.45 × 0.70 at −0.3 → rect 0.96, arch 1.02,
+    6–7 volutes shrunk; 0.42 × 0.75 at −0.45 with the calyx at 0.85 → **rect 1.06, arch 1.07, 3–4 shrunk**. Shipped.
+- **Two defects the wider ornament exposed, both fixed at their owner:**
+  - `seatEmitted` read the molding at the emitted columns and replaced a leaf's lift with it, dropping the leaf's crest
+    margin wherever the emitted reading was higher — 0.955 mm of crest over the molding against the 1.0 floor (OR9). It
+    now takes a per-row `extra` (the leaf's shortfall, per row because the crown follows the leaf's width: crownScale).
+  - a leaf mapped across an eared corner's jog folded over itself (−0.23 mm, OR3): the fit now checks every item wire's
+    own self-gap, not only the tendril's; and a draped crest on the eared rectangle stood 0.02 mm past the 0.45 M rise
+    (the frame's averaged normals): the rise is now read back off the draped plan and lowered (1, 0.99 … 0.9) until it
+    holds (CB2).
+- **Within one volute every pair of wires** (tendril, sheath, calyx) is a crossing (LEAF_CROSS) or a feature clear; the
+  step-1 fit checked only the tendril and the first leaf.
+
+**Measured (Node, relief = export, the default frames at 180 mm; every row boundary 0, one voxel region).**
+
+| frame | band | volutes per side | turns drawn | acanthus | relief tris |
+|---|---|---|---|---|---|
+| arch | 16.0 | 7 | 0.89–1.07, median 1.06 | 14 | 425,964 |
+| rectangle | 16.0 | 8 | 0.56–1.07, median 1.06 | 16 | 416,536 |
+| oval | 16.0 | 5 | 0.56–0.94, median 0.89 | 10 | 286,264 |
+
+The low ends are the top run's first volute beside the crest and the oval's curved run (the curvature compresses the
+coils, as §18.5 measured). The triangle budget at the worst reachable state (density 5, every run on, 600 mm): arch
+1,022,316, rectangle 1,279,352, oval 1,286,888 — 85.8 % of the 1.5 M at most; nothing gives way. Builds 3–6 s at the
+defaults (Node).
+
+**The gates (`tools/verify-frame-relief.mjs`).** The ornament rows are the rinceau on every skeleton (default, dense,
+every corner treatment, the circle; hierarchy ½ and 0; leaves off; a 340 mm print whose band is already wider) beside
+the phase-3a groups (carved, tapered, constant); the chains rows are gone. OR7–OR9 and CB1–CB3 read the rinceau rows
+(CB3 is now a ratio: the arch crest at least 2.3 band widths across — 39.6 mm on the 16 mm band, it grows with the
+band); VN2 is "every item a volute at an extremum: a tendril and, leaves on, two acanthus leaves"; VN4 is split into:
+- **RN1** the stem is continuous: one stem solid per run per side, no two emitted rows more than 2 mm apart;
+- **RN2** every volute's emitted walls overlap its stem's by the embed;
+- **RN3** no acanthus leaf floats: the same, for every leaf;
+- **RN5** the size follows w(s): on a straight run (a mitred rectangle's side, the arch's jamb, a band and a half from
+  either end) every volute's emitted length is (1.25 + 0.5 w) × the band at the RESTATED weight, at a size share
+  1 / 0.85 / 0.72 / 0.6 within 3 % (worst 0.01 %);
+- **RN6** the turns: the median on every default frame's straight run in [0.95, 1.15] (1.060);
+- **BW1** the band: max(asked, 16 print mm) on every rinceau row, the asked width on every groups row.
+
+Every law is restated in the gate, never imported from `frame-rinceau.js`.
+
+**Mutants: 53 → 56.** Retired with the code they tested: `the-chain-budget-give-way-removed`,
+`the-chain-opening-check-removed`, `the-chains-are-not-capped`, `a-heavy-element-mid-run`,
+`an-element-floats-off-its-stem`. New (Eva's list, and the two the chains carried): `the-stem-has-a-gap` (RN1),
+`a-volute-detached` (RN2), `an-acanthus-leaf-floats` (RN3), `the-size-ignores-the-weight` (RN5),
+`the-volutes-are-given-few-turns` (RN6, the first mutant on `frame-rinceau.js`, which the negative control now copies),
+`the-band-is-not-widened` (BW1, RN6 — it declares `orn: true`, so the ornament rows run for a geometry mutant), `the-rinceau-band-check-removed` (CB1 — the opening test alone fired nothing, and with the whole band test gone the volutes stand past the outer edge, not in the opening; OR7's rinceau witness is `a-volute-detached`), `the-rinceau-budget-give-way-removed`
+(TB2); the mirror is `the-mirror-is-broken` (OR5). Re-anchored: `the-seat-is-read-off-the-centreline`,
+`the-crest-stands-up`.
+
+`frame-rinceau.js` and `tools/shot-frame-rinceau-wired.mjs` join `frame.yml`'s path filter.
+
+**CI shards: 26 → 19.** On main (`2a46e1c`, run 42848070949) the relief negative control's 26 shards ran 8.9–53.1 min
+(two mutants a shard, the slowest against the 60-minute timeout). Retiring the chains and the vine rows took the gate's
+ornament rows to 0.47× main's run time under the same local load (494 s against 1,060 s, both beside three mutant
+shards), so a mutant now costs about half, and 19 shards hold at most three of the 56 each (an estimated ~35 min slowest,
+read the PR's own run before trusting it). The `verify` job ran 19.6 min on main.
+
+**Sheet:** `node tools/shot-frame-rinceau-wired.mjs <dir> --base <worktree of 2a46e1c>` →
+`docs/img/frame-rinceau-wired.png`: the three whole frames front-on at 180 mm, a mid-run close-up (the rectangle's side)
+and two corners (the rectangle's top right, the arch's springing), front-on and three-quarter, each this tree beside
+main's 9.5 mm vine, both pages served from their own trees. `shot-frame-rinceau.mjs`, `shot-frame-vine.mjs` and
+`shot-frame-chains.mjs` are the record of the retired states: run them against a worktree of `babf787` / `2a46e1c`.
+
+### 18.7 Step 2b — the flower is the feature, and the Profile width's dead travel marked (Eva's rulings on §18.6, Nov 11)
+
+**Ruled on the step-2 sheet:** (a) the rinceau as built; (d) the Profile width slider's dead travel marked on the control
+itself. **And one change before merge: where a flower is present it is the feature and reads in front** — on the step-2
+sheet the stem swept past the rosette and the rosette sat sunk beside it. **This SUPERSEDES "the rosettes sink into the
+molding" (§17.10) for the rinceau's flowers.** The relief's order is now: **the crest shell highest > the flowers > the
+rinceau (stem, volutes, acanthus) > the molding**, a flower's crown at least 1 mm over the highest stem or leaf near it, the
+stems running UNDER a flower (ending beneath it or emerging from behind it, embedded in its underside), never over it.
+
+**Measured first, on the step-2 tree** (Node, export; heights over the back, read off each relief by the sheet tool): every
+corner, springing and side rosette's crown sat **0.7–1.9 mm under** the highest stem near it (crowns 3.19–3.65 mm, the wires
+4.35–5.30) and a wire stood up to **4.01 mm over** a rosette's own top surface; the crest shell's crown (4.60–4.68) sat under the
+stems that end in it (4.93–5.28), a wire 1.13–1.42 mm over its top.
+
+**The construction: one stand pass, after the wires are seated and built** (`standMotifs` in `frame-vine.js`, called by
+`withOrnament` on the rinceau layout; `STAND = { step: 1 mm (MIN_FEATURE_MM), margin: 0.1 (VINE_MARGIN), near: 2 mm }`):
+- the wires are built exactly as the relief builds them (`bandSolid`, their seats and crowns), and every motif's top is read
+  off its own triangles (`elementTop`, bucketed, the base and the walls skipped);
+- **a FLOWER** (every junction motif but the crest: the rosettes, a bottom shell) is DOMED (`domeFlower`): every top vertex
+  raised by δ(q) = max(0, C(q) + e, h·(1 − s(ρ))). **C is the COVER**: over every wire vertex under the flower, what its top
+  falls short of the wire + 0.1, spread at a gentle `STAND.ease` 0.3 (the greatest of r − 0.3·|q − p|), so the petals ride over
+  the stems that run beneath them as one broad hill; **h is the HEART's raise**, full inside the boss's reach (a quarter of the
+  footprint) and falling by a smoothstep to nothing at the tips, so the petals fall back to where they lay and the flower domes
+  out of the molding; h is stepped by the crown's own deficit, e tops C up should the drawn triangles read under it between
+  their vertices. Its mirror is re-made from it (mirror to the bit); on the axis the field reads a point and its mirror alike.
+  **Two constructions were rendered and set aside first** (both in the session's own sheets, not committed): the flower raised
+  as ONE BLOCK covers and clears exactly, but a petal over the band's falling outer edge then stands as a tall cut wall from
+  three-quarter — the slab the fourth round ruled out; draped with the cover spread at 45° the walls go, but every stem shows
+  through the petals as a ridge. The gentle spread keeps both away;
+- **the CREST** keeps its undraped plan (`el.plan`) and is draped again over the molding RAISED by d inside the band
+  (`raisedCrestLift`: crestLift's own law, its doubles at d = 0, the band's reach per point cached) — so past the band's edge it
+  still falls at 45° and stands no slab — d stepped by the deficit until it covers its own stems likewise and its crown stands
+  1 mm + 0.1 over every flower's and every wire near it;
+- **nothing moves in plan**, so every plan clause (the band cap CB1/CB2, the opening, the joins, the grazes PL2) holds as placed;
+  no stem is trimmed: at the rectangle's top-right corner both stems end beneath the rosette, elsewhere (the arch's springing,
+  the oval's side) a stem passes under the flower and goes on past it — it emerges from behind the flower, never over it. The flower's size is unchanged (Eva allowed it to grow to hold the corner; none needed to).
+
+**Measured, the default frames at 180 mm (Node, export; over the back):**
+
+| frame | rosette crown before → after | highest wire near | wire over its top, before → after | crest crown before → after |
+|---|---|---|---|---|
+| arch | 3.65 → 6.88 | 5.14 | +3.90 → −0.10 | 4.62 → 7.98 (wires under it by 1.94) |
+| rectangle (top-right / bottom-right) | 3.65 → 5.69 · 3.19 → 6.19 | 4.35 · 5.09 | +2.71 / +3.07 → −0.10 | 4.60 → 7.29 (1.52) |
+| oval | 3.54 → 6.48 | 5.30 | +4.01 → −0.10 | 4.68 → 7.58 (1.77) |
+
+Triangles unchanged on every frame (425,964 / 416,536 / 286,264 — nothing is added, only lifted); boundary 0, one region. The
+stand pass costs nothing measurable in build time once the crest's molding reach is shared with its first drape (`el.raise`):
+`withOrnament` 4.2 / 2.8 / 4.9 s against the step-2 tree's 4.2 / 2.7 / 5.3 (the first cut read the reach twice, +2–3 s).
+Over the gate's rows FW1 reads 59 flowers at a least lead of 1.100 mm, FW2 every wire 0.100 mm under any top, FW3 16 crests at
+1.100 mm. **What the dome leaves:** the rosette's own petal-tip lip still reads as a faceted end on the outer petals from
+three-quarter, as it did on the step-2 sheet — the element's shape, not the stand.
+
+
+**Gates:** `verify-frame-relief.mjs` **FW1** (a flower's crown a feature over every rinceau wire within 2 F of its footprint),
+**FW2** (no rinceau wire vertex over any motif's own top surface), **FW3** (the crest's crown a feature over every flower's and
+over the wires near it), all read off the relief alone — the step and the reach restated, never imported. Three mutants
+(56 → 59): `the-flowers-are-not-stood` (FW1, FW2), `a-stem-passes-over-the-flower` (the cover rule dropped, the crown rule kept:
+FW2), `the-crest-is-not-highest` (FW3). `verify-frame.mjs` **DW1**: with the rinceau on, the Profile width control carries
+`.fr-ctrl--dead` hatched from its left end to a tick at the width the band is widened to (`rinceauBandFloor`, restated in the
+gate off a Node build at the control's minimum), the read-out says it; no mark with the rinceau off. Part two (the page) runs no
+mutants by the gate's own design; DW1's must-fail was run by hand (`deadFloor = null` served for `frame.js`: the floor and the
+mark read null where the clean page reads 31.86 / 0.7605).
+
+**CI's first run on the stand pass found a real defect and three honest claims.** `the-axis-motif-is-not-its-own-mirror`
+MISSED PL4: the first `domeFlower` re-symmetrized an on-axis flower after draping it — a SECOND owner of the axis symmetry,
+which repaired the placement the mutant breaks. Removed: the dome's field is exactly symmetric on the axis (the cover reads a
+point and its mirror, the fall a distance from a centre on x = 0), so the drape keeps the placed flower's own symmetry to the
+bit and PL4 sees the placement again. Three mutants gained FW reds that are true about them: `the-weight-is-a-constant` (no
+anchor is heavy, so no crest anywhere: FW3 has nothing to measure), `the-crest-stands-up` (a crest 2.5 M past the edge has its
+crown past the raised molding's reach, so the stand cannot make it the highest: FW3), `the-mirror-is-broken` (a left flower
+is its right one mirrored, domed over the right wires, so a left wire moved 0.02 mm can stand under its rim: FW2).
+
+**Sheet:** `node tools/shot-frame-flowers.mjs <dir> --base <worktree of cd90cf5>` → `docs/img/frame-flowers.png`: the three
+whole frames front-on at 180 mm, the rectangle's top-right corner and the arch's springing front-on and three-quarter, and the
+arch's crest, each this tree beside the step-2 sheet's; every caption the heights off that tree's own relief.
