@@ -856,7 +856,12 @@ export function domeFlower(el0, W, onAxis = false) {
   let R = 0; for (let k = 0; k < P0.length; k += 3) R = Math.max(R, Math.hypot(P0[k] - c[0], P0[k + 1] - c[1]));
   const rho0 = 0.25 * R;   // the boss's own reach: the heart is raised whole inside it
   const fall = (q) => { const t = Math.min(1, Math.max(0, (Math.hypot(q[0] - c[0], q[1] - c[1]) - rho0) / (R - rho0))); return t * t * (3 - 2 * t); };
-  const build = (h, e) => { let el = drapeElement(el0, (q) => Math.max(0, C(q) + e, h * (1 - fall(q)))); if (onAxis) { const s = symmetrizeElement(el); if (!s.asymmetric) el = s; } return { ...el, sunk: el0.sunk, out: el0.out, pushed: el0.pushed, lift: el0.lift }; };
+  // on the axis the field is exactly symmetric (C reads a point and its
+  // mirror, the fall a distance from a centre on x = 0), so the drape keeps
+  // the placed flower's own mirror symmetry to the bit — and is NOT
+  // re-symmetrized here: that would be a second owner of the axis symmetry,
+  // and it hid a placement that was not its own mirror (PL4's mutant)
+  const build = (h, e) => ({ ...drapeElement(el0, (q) => Math.max(0, C(q) + e, h * (1 - fall(q)))), sunk: el0.sunk, out: el0.out, pushed: el0.pushed, lift: el0.lift });
   let h = 0, e = 0, el = el0, def = { cover: Infinity, crown: Infinity };
   for (let k = 0; k < 12; k++) {
     el = build(h, e); def = standDeficit(el, W);

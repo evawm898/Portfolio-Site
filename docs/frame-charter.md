@@ -2025,6 +2025,15 @@ gate off a Node build at the control's minimum), the read-out says it; no mark w
 mutants by the gate's own design; DW1's must-fail was run by hand (`deadFloor = null` served for `frame.js`: the floor and the
 mark read null where the clean page reads 31.86 / 0.7605).
 
+**CI's first run on the stand pass found a real defect and three honest claims.** `the-axis-motif-is-not-its-own-mirror`
+MISSED PL4: the first `domeFlower` re-symmetrized an on-axis flower after draping it — a SECOND owner of the axis symmetry,
+which repaired the placement the mutant breaks. Removed: the dome's field is exactly symmetric on the axis (the cover reads a
+point and its mirror, the fall a distance from a centre on x = 0), so the drape keeps the placed flower's own symmetry to the
+bit and PL4 sees the placement again. Three mutants gained FW reds that are true about them: `the-weight-is-a-constant` (no
+anchor is heavy, so no crest anywhere: FW3 has nothing to measure), `the-crest-stands-up` (a crest 2.5 M past the edge has its
+crown past the raised molding's reach, so the stand cannot make it the highest: FW3), `the-mirror-is-broken` (a left flower
+is its right one mirrored, domed over the right wires, so a left wire moved 0.02 mm can stand under its rim: FW2).
+
 **Sheet:** `node tools/shot-frame-flowers.mjs <dir> --base <worktree of cd90cf5>` → `docs/img/frame-flowers.png`: the three
 whole frames front-on at 180 mm, the rectangle's top-right corner and the arch's springing front-on and three-quarter, and the
 arch's crest, each this tree beside the step-2 sheet's; every caption the heights off that tree's own relief.
