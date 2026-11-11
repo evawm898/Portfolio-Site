@@ -150,8 +150,8 @@ const MODULES = ['deck.js', 'symbols.js', 'firework.js', 'layout.js', 'export.js
 
 const MUTANTS = [
   { id: 'distribution-wrong', file: 'deck.js', from: "COPIES = { 1: 3, 2: 2, 3: 2, 4: 2, 5: 1 }", to: "COPIES = { 1: 3, 2: 2, 3: 2, 4: 2, 5: 2 }", breaks: ['H1'] },
-  { id: 'corner-drops-symbol', file: 'layout.js', from: "+ symbol(suit.symbol, (w - sym) / 2, digitH * 1.08, sym, symFill, numHalo);", to: ";", breaks: ['H2', 'H14', 'H15', 'H22', 'H26', 'H30', 'H32'] },
-  { id: 'rank-does-not-escalate', file: 'firework.js', from: "4: { burstType: 'chrysanthemum', starCount: 18, rings: 3, size: 0.86", to: "4: { burstType: 'chrysanthemum', starCount: 12, rings: 1, size: 0.58", breaks: ['H3', 'H15', 'H26', 'H32'] },
+  { id: 'corner-drops-symbol', file: 'layout.js', from: "+ symbol(suit.symbol, (w - sym) / 2, digitH * 1.08, sym, symFill, numHalo);", to: ";", breaks: ['H2', 'H14', 'H15', 'H22', 'H26', 'H30', 'H32', 'H38'] },
+  { id: 'rank-does-not-escalate', file: 'firework.js', from: "4: { burstType: 'chrysanthemum', starCount: 18, rings: 3, size: 0.86", to: "4: { burstType: 'chrysanthemum', starCount: 12, rings: 1, size: 0.58", breaks: ['H3', 'H15', 'H26', 'H32', 'H38'] },
   { id: 'override-ignored', file: 'firework.js', from: "if (!other) return withStem(design, { ...spec, ...over });", to: "if (!other) return withStem(design, spec);", breaks: ['H4', 'H15', 'H18', 'H22', 'H26', 'H30', 'H31', 'H32', 'H35'] },
   { id: 'crop-mark-off-trim', file: 'deck.js', from: "xs.add(+s.trimX.toFixed(6));", to: "xs.add(+(s.trimX - g.bleed).toFixed(6));", breaks: ['H6', 'B3'] },
   { id: 'duplex-not-mirrored', file: 'deck.js', from: "return r * imp.cols + c;", to: "return i;", breaks: ['H7'] },
@@ -159,37 +159,37 @@ const MUTANTS = [
   { id: 'no-halo', file: 'layout.js', from: "const halo = cOf(suit.primary) < HALO_BELOW ? haloFor(suit.primary) : null;", to: "const halo = null;", breaks: ['H8'] },
   // H18 no longer reaches it: every type takes detail, so the one filtered key H18 tests (peony's trail) is
   // untaken by the deck-wide ring too. H11 and H15 are its witnesses.
-  { id: 'centre-is-deck-wide', file: 'firework.js', from: "const c = suit.centre || {};", to: "const c = design.suits[0].centre || {};", breaks: ['H11', 'H15', 'H22', 'H24', 'H25', 'H26', 'H27', 'H28', 'H29', 'H30', 'H31', 'H32'] },
-  { id: 'index-follows-the-centre', file: 'layout.js', from: "g.h * (INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral)", to: "g.h * (plate ? INDEX_DIGIT.small : INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral)", breaks: ['H10', 'H15', 'H32'] },
-  { id: 'tier-at-every-rank', file: 'firework.js', from: "tier !== 'none' && TIER_RANKS.includes(rank) ?", to: "tier !== 'none' && rank >= 1 ?", breaks: ['H12', 'H15'] },
-  { id: 'tier-over-the-index', file: 'layout.js', from: "const x0 = area.x + corner.w + gap, x1 = area.x + area.w - corner.w - gap;", to: "const x0 = area.x + gap, x1 = area.x + area.w - gap;", breaks: ['H12', 'H15'] },
+  { id: 'centre-is-deck-wide', file: 'firework.js', from: "const c = suit.centre || {};", to: "const c = design.suits[0].centre || {};", breaks: ['H11', 'H15', 'H22', 'H24', 'H25', 'H26', 'H27', 'H28', 'H29', 'H30', 'H31', 'H32', 'H38'] },
+  { id: 'index-follows-the-centre', file: 'layout.js', from: "g.h * (INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral)", to: "g.h * (plate ? INDEX_DIGIT.small : INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral)", breaks: ['H10', 'H15', 'H32', 'H38'] },
+  { id: 'tier-at-every-rank', file: 'firework.js', from: "tier !== 'none' && TIER_RANKS.includes(rank) ?", to: "tier !== 'none' && rank >= 1 ?", breaks: ['H12', 'H15', 'H38'] },
+  { id: 'tier-over-the-index', file: 'layout.js', from: "const x0 = area.x + corner.w + gap, x1 = area.x + area.w - corner.w - gap;", to: "const x0 = area.x + gap, x1 = area.x + area.w - gap;", breaks: ['H12', 'H15', 'H38'] },
   { id: 'motif-does-not-escalate', file: 'firework.js', from: "weeping: [16, 22, 30, 38, 48],", to: "weeping: [30, 30, 30, 30, 30],", breaks: ['H3', 'H15'] },
   // a tier is drawn by the same field painters, so H12 sees the escape too
-  { id: 'field-escapes-its-rect', file: 'firework.js', from: "const x = rect.x + rho + rand() * (rect.w - 2 * rho),", to: "const x = rect.x + rand() * (rect.w + 2 * rho),", breaks: ['H13', 'H12', 'H15', 'H31', 'H32'] },
-  { id: 'rainbow-symbol-ignored', file: 'layout.js', from: "numFill = numeral.fill; symFill = numeral.symFill;", to: "numFill = numeral.fill;", breaks: ['H14', 'H15', 'H22', 'H26', 'H30', 'H32'] },
+  { id: 'field-escapes-its-rect', file: 'firework.js', from: "const x = rect.x + rho + rand() * (rect.w - 2 * rho),", to: "const x = rect.x + rand() * (rect.w + 2 * rho),", breaks: ['H13', 'H12', 'H15', 'H31', 'H32', 'H38'] },
+  { id: 'rainbow-symbol-ignored', file: 'layout.js', from: "numFill = numeral.fill; symFill = numeral.symFill;", to: "numFill = numeral.fill;", breaks: ['H14', 'H15', 'H22', 'H26', 'H30', 'H32', 'H38'] },
   { id: 'rainbow-index-not-the-default', file: 'deck.js', from: "numeral: 'rainbow', centre: defaultCentre('glitter')", to: "numeral: 'solid', centre: defaultCentre('glitter')", breaks: ['H14', 'H22'] },
-  { id: 'rainbow-numeral-ignored', file: 'layout.js', from: "numFill = numeral.fill; symFill", to: "numFill = suit.primary; symFill", breaks: ['H14', 'H15', 'H22', 'H26', 'H30', 'H32'] },
-  { id: 'rainbow-numeral-on-every-suit', file: 'layout.js', from: "if (suit.multicolor && suit.numeral === 'rainbow') {", to: "if (design.suits.some((x) => x.numeral === 'rainbow')) {", breaks: ['H14', 'H15', 'H22', 'H26', 'H30', 'H32'] },
-  { id: 'rainbow-numeral-not-saved', file: 'deck.js', from: "if (NUMERAL_FILLS[r.numeral]) s.numeral = r.numeral;", to: "if (NUMERAL_FILLS[r.numeral]) s.numeral = 'solid';", breaks: ['H9', 'H14', 'H15', 'H26', 'H22', 'H30', 'H32'] },
+  { id: 'rainbow-numeral-ignored', file: 'layout.js', from: "numFill = numeral.fill; symFill", to: "numFill = suit.primary; symFill", breaks: ['H14', 'H15', 'H22', 'H26', 'H30', 'H32', 'H38'] },
+  { id: 'rainbow-numeral-on-every-suit', file: 'layout.js', from: "if (suit.multicolor && suit.numeral === 'rainbow') {", to: "if (design.suits.some((x) => x.numeral === 'rainbow')) {", breaks: ['H14', 'H15', 'H22', 'H26', 'H30', 'H32', 'H38'] },
+  { id: 'rainbow-numeral-not-saved', file: 'deck.js', from: "if (NUMERAL_FILLS[r.numeral]) s.numeral = r.numeral;", to: "if (NUMERAL_FILLS[r.numeral]) s.numeral = 'solid';", breaks: ['H9', 'H14', 'H15', 'H26', 'H22', 'H30', 'H32', 'H38'] },
   { id: 'v1-layout-misread', file: 'deck.js', from: "C: { index: 'band',  compose: 'bleed' },", to: "C: { index: 'band',  compose: 'scale' },", breaks: ['H9', 'H15'] },
   // ---- phase 2: the board, the types, the compositions, the migration
   { id: 'v2-single-read-as-count', file: 'deck.js', from: "V2_LAYOUTS = { single: 'scale',", to: "V2_LAYOUTS = { single: 'count',", breaks: ['H9', 'H15'] },
   { id: 'radial-not-renamed', file: 'deck.js', from: "const motifOf = (m) => (ver < 3 && LEGACY_RADIAL[m] ? LEGACY_RADIAL[m] : m);", to: "const motifOf = (m) => m;", breaks: ['H9', 'H15'] },
   // a RECOLOUR: every type draws one and the same peony, in its own colours
-  { id: 'every-type-is-a-recolour', file: 'firework.js', from: "if (TYPES[m]) return `<g class=\"hb-firework\" data-motif=\"${m}\">${drawType(spec,", to: "if (TYPES[m]) return `<g class=\"hb-firework\" data-motif=\"${m}\">${drawType({ ...spec, ...TYPES.peony.defaults, motif: 'peony' },", breaks: ['H16', 'H18', 'H21', 'H22', 'H26', 'H28', 'H29', 'H30', 'H32'] },
+  { id: 'every-type-is-a-recolour', file: 'firework.js', from: "if (TYPES[m]) return `<g class=\"hb-firework\" data-motif=\"${m}\">${drawType(spec,", to: "if (TYPES[m]) return `<g class=\"hb-firework\" data-motif=\"${m}\">${drawType({ ...spec, ...TYPES.peony.defaults, motif: 'peony' },", breaks: ['H16', 'H18', 'H21', 'H22', 'H26', 'H28', 'H29', 'H30', 'H32', 'H38'] },
   // two types, one shape: blossom draws exactly what peony draws
   { id: 'blossom-draws-a-peony', file: 'firework.js', from: "  blossom(s, n, w, rand, o, c) {", to: "  blossom(s, n, w, rand, o, c) { return TYPE_DRAW.peony({ ...s, ...TYPES.peony.defaults }, escalatedCount('peony', TYPES.peony.defaults.count, s.rank), w, rand, o, c);", breaks: ['H16', 'H21', 'H22', 'H29'] },
-  { id: 'default-pairing-collapses', file: 'deck.js', from: "symbol: 'heart', centre: defaultCentre('peony')", to: "symbol: 'heart', centre: defaultCentre('ring')", breaks: ['H16', 'H22', 'H25', 'H28'] },
-  { id: 'count-draws-one-short', file: 'layout.js', from: "return pl.items.map((it) => {\n    const spec = fireworkSpecAt(", to: "return pl.items.slice(1).map((it) => {\n    const spec = fireworkSpecAt(", breaks: ['H17', 'H18', 'H22', 'H23', 'H25', 'H26', 'H27', 'H29', 'H30', 'H31', 'H32'] },
-  { id: 'firework-escapes-the-field', file: 'layout.js', from: "r: fitted ? Math.min(it.s * unit, room) : it.s * unit,", to: "r: it.s * unit * 1.3,", breaks: ['H17', 'H22', 'H23', 'H26', 'H27', 'H30', 'H32', 'H34'] },
+  { id: 'default-pairing-collapses', file: 'deck.js', from: "symbol: 'heart', centre: defaultCentre('peony')", to: "symbol: 'heart', centre: defaultCentre('ring')", breaks: ['H16', 'H22', 'H25', 'H28', 'H38'] },
+  { id: 'count-draws-one-short', file: 'layout.js', from: "return pl.items.map((it) => {\n    const spec = fireworkSpecAt(", to: "return pl.items.slice(1).map((it) => {\n    const spec = fireworkSpecAt(", breaks: ['H17', 'H18', 'H22', 'H23', 'H25', 'H26', 'H27', 'H29', 'H30', 'H31', 'H32', 'H36', 'H38'] },
+  { id: 'firework-escapes-the-field', file: 'layout.js', from: "r: fitted ? Math.min(it.s * unit, room) : it.s * unit,", to: "r: it.s * unit * 1.3,", breaks: ['H17', 'H22', 'H23', 'H26', 'H27', 'H30', 'H32', 'H34', 'H37', 'H38'] },
   { id: 'arrangement-length-unchecked', file: 'deck.js', from: "if (!Array.isArray(items) || items.length !== rank) return null;", to: "if (!Array.isArray(items)) return null;", breaks: ['H17'] },
   { id: 'cell-arrangement-ignored', file: 'layout.js', from: "if (o && Array.isArray(o.items) && o.items.length === rank) return { items: o.items, fitted: false };", to: ";", breaks: ['H17', 'B7', 'H22', 'H23', 'B9', 'H25', 'H26', 'H27', 'B11'] },
   { id: 'suit-parameters-ignored', file: 'firework.js', from: "for (const k of takes) if (mine[k] !== undefined && mine[k] !== '') spec[k] = mine[k];", to: ";", breaks: ['H18', 'B5', 'H22', 'H25', 'H26', 'H29', 'H30', 'B12', 'H31', 'H32', 'H35', 'B13'] },
   { id: 'suit-parameters-unfiltered', file: 'firework.js', from: "for (const k of takes) if (mine[k]", to: "for (const k of Object.keys(mine)) if (mine[k]", breaks: ['H18', 'H25'] },
   { id: 'rank-column-keeps-cell-arrangements', file: 'deck.js', from: "for (const s of design.suits) clearCell(design, s.id, rank, 'items');", to: ";", breaks: ['H18', 'B7'] },
-  { id: 'renderer-reads-the-clock', file: 'firework.js', from: "  const rand = rng(spec.seed);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", to: "  const rand = rng(Date.now() + Math.random() * 4e9);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", breaks: ['H19', 'H3', 'H4', 'H11', 'H14', 'H15', 'H18', 'H21', 'H22', 'H23', 'H24', 'H25', 'H26', 'H27', 'H30', 'H31', 'H32', 'H34', 'H35'], mayAlso: ['H13', 'H16', 'H28'] },
-  { id: 'scene-over-the-index', file: 'layout.js', from: "const art = bg.ground + sceneArt(design, g) + bg.fx + centre;", to: "const art = bg.ground + bg.fx + centre + sceneArt(design, g);", breaks: ['H20'] },
-  { id: 'scene-drawn-when-off', file: 'layout.js', from: "if (!sc || !sc.on) return '';", to: "if (!sc) return '';", breaks: ['H20', 'H15', 'H22', 'H26', 'H30', 'H32'] },
+  { id: 'renderer-reads-the-clock', file: 'firework.js', from: "  const rand = rng(spec.seed);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", to: "  const rand = rng(Date.now() + Math.random() * 4e9);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", breaks: ['H19', 'H3', 'H4', 'H11', 'H14', 'H15', 'H18', 'H21', 'H22', 'H23', 'H24', 'H25', 'H26', 'H27', 'H30', 'H31', 'H32', 'H34', 'H35'], mayAlso: ['H13', 'H16', 'H28', 'H36', 'H38'] },
+  { id: 'scene-over-the-index', file: 'layout.js', from: "const art = bg.ground + sceneArt(design, g) + bg.fx + centre;", to: "const art = bg.ground + bg.fx + centre + sceneArt(design, g);", breaks: ['H20', 'H38'] },
+  { id: 'scene-drawn-when-off', file: 'layout.js', from: "if (!sc || !sc.on) return '';", to: "if (!sc) return '';", breaks: ['H20', 'H15', 'H22', 'H26', 'H30', 'H32', 'H38'] },
   // the page: what only the board can show
   { id: 'card-edit-writes-the-row', file: '../hanabi.js', from: "if (view.scope === 'card') cellOf(design, suit.id, rank, true)[k] = v;", to: "if (false) cellOf(design, suit.id, rank, true)[k] = v;", breaks: ['B5'] },
   { id: 'greyscale-misses-the-editor-card', file: '../hanabi.js', from: "$('edCard').classList.toggle('is-gray', view.grayscale);", to: ";", breaks: ['B5'] },
@@ -201,7 +201,7 @@ const MUTANTS = [
   { id: 'glitter-fitted-on-what-it-draws', file: 'firework.js', from: "const each = (fn, prims = all.filter((p) => !p.det)) =>", to: "const each = (fn, prims = all.filter((p) => !p.det && !p.ghost)) =>", breaks: ['H30'] },
   { id: 'a-type-takes-no-detail', file: 'firework.js', from: "params: ['count', 'length', 'starSize', 'density', 'tips', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Arms', min: 3, max: 60 },\n                   defaults: { count: 6,", to: "params: ['count', 'length', 'starSize', 'tips', 'core', 'rotation', ...COLOR_PARAMS], count: { label: 'Arms', min: 3, max: 60 },\n                   defaults: { count: 6,", breaks: ['H21'] },
   { id: 'chrysanthemum-detail-ignored', file: 'firework.js', from: "const dd = detailOf(s, 1), beads = Math.round(Math.max(0, dd - 1) * 3);", to: "const dd = 1, beads = 0;", breaks: ['H21'] },
-  { id: 'pips-not-fitted', file: 'layout.js', from: "return { items: (design.pips === 'grid' ? GRID_PIPS : DEFAULT_PIPS)[rank], fitted: true };", to: "return { items: (design.pips === 'grid' ? GRID_PIPS : DEFAULT_PIPS)[rank], fitted: false };", breaks: ['H22', 'H23', 'H17', 'H26', 'H30', 'H32', 'H34'] },
+  { id: 'pips-not-fitted', file: 'layout.js', from: "return { items: (design.pips === 'grid' ? GRID_PIPS : DEFAULT_PIPS)[rank], fitted: true };", to: "return { items: (design.pips === 'grid' ? GRID_PIPS : DEFAULT_PIPS)[rank], fitted: false };", breaks: ['H22', 'H23', 'H17', 'H26', 'H30', 'H32', 'H34', 'H37', 'H38'] },
   { id: 'hand-arrangement-fitted', file: 'layout.js', from: "r: fitted ? Math.min(it.s * unit, room) : it.s * unit,", to: "r: Math.min(it.s * unit, room),", breaks: ['H23', 'H26', 'H27'] },
   { id: 'restack-reseeds', file: 'layout.js', from: "seed: spec.seed + it.n * 7919,", to: "seed: spec.seed + pl.items.indexOf(it) * 7919,", breaks: ['H23', 'H26'] },
   { id: 'stacking-order-not-saved', file: 'deck.js', from: "if (it.n !== undefined) o.n = it.n;", to: ";", breaks: ['H23', 'H26'] },
@@ -233,10 +233,10 @@ const MUTANTS = [
   { id: 'card-zoom-not-applied', file: '../hanabi.js', from: "card.style.width = `${Math.round(w)}px`;", to: ";", breaks: ['B10'] },
   { id: 'suit-rows-hold-stale-suits', file: '../hanabi.js', from: "const me = () => suitById(design, suit.id);", to: "const me = () => suit;", breaks: ['B6'] },
   // the count (version 5): what is drawn, and the migration that keeps a version-4 design's drawing
-  { id: 'peony-detail-adds-stars', file: 'firework.js', from: "const rr = 1 - k / (rings + 0.6), nk = plan[k], ph", to: "const rr = 1 - k / (rings + 0.6), nk = Math.max(5, Math.round(n * rr)), ph", breaks: ['H22', 'H26', 'H29', 'H30', 'H32'] },
+  { id: 'peony-detail-adds-stars', file: 'firework.js', from: "const rr = 1 - k / (rings + 0.6), nk = plan[k], ph", to: "const rr = 1 - k / (rings + 0.6), nk = Math.max(5, Math.round(n * rr)), ph", breaks: ['H22', 'H26', 'H29', 'H30', 'H32', 'H38'] },
   { id: 'ring-count-is-the-outer-ring', file: 'firework.js', from: "ph = rand() * Math.PI * 2, n0 = plan[0];", to: "ph = rand() * Math.PI * 2, n0 = n;", breaks: ['H22', 'H29', 'H30'] },
   { id: 'glitter-detail-is-the-count', file: 'firework.js', from: "const out = [], m = Math.max(6, n), roundShare", to: "const out = [], m = Math.max(6, Math.round(n * detailOf(s, 1))), roundShare", breaks: ['H29'] },
-  { id: 'scale-escalates-nothing', file: 'firework.js', from: "const plan = ringCounts(type, escalatedCount(type, n, rank), rings);", to: "const plan = ringCounts(type, n, rings);", breaks: ['H22', 'H30', 'H32'] },
+  { id: 'scale-escalates-nothing', file: 'firework.js', from: "const plan = ringCounts(type, escalatedCount(type, n, rank), rings);", to: "const plan = ringCounts(type, n, rings);", breaks: ['H22', 'H30', 'H32', 'H38'] },
   { id: 'the-count-control-is-shared', file: 'firework.js', from: "  if (k !== 'count') return PARAMS[k];", to: "  return PARAMS[k];", breaks: ['H29', 'B12', 'H31', 'B13'] },
   { id: 'the-editor-count-is-shared', file: '../hanabi.js', from: "function paramControl(k, motif) {\n  const P = paramFor(k, motif);", to: "function paramControl(k, motif) {\n  const P = PARAMS[k];", breaks: ['B12', 'B13'] },
   { id: 'the-style-count-is-shared', file: '../hanabi.js', from: "function styleControl(k, motif) {\n  const P = paramFor(k, motif);", to: "function styleControl(k, motif) {\n  const P = PARAMS[k];", breaks: ['B12'] },
@@ -255,20 +255,20 @@ const MUTANTS = [
   { id: 'migration-keeps-the-stale-suit-count', file: 'deck.js', from: "delete s.firework.count; moved++;", to: "moved++;", breaks: ['H32'] },
   { id: 'migration-forgets-the-type-cards', file: 'deck.js', from: "if (mc !== sm && takesCount(mc) && !hasN(o.count)) o.count = suitN;", to: ";", breaks: ['H32'] },
   { id: 'old-designs-take-four-corners', file: 'deck.js', from: "d.corners = pick(raw.corners, Object.keys(CORNER_MODES), old6 ? old6.corners : d.corners);", to: "d.corners = pick(raw.corners, Object.keys(CORNER_MODES), d.corners);", breaks: ['H32', 'H15'] },
-  { id: 'new-designs-keep-two-corners', file: 'deck.js', from: "    corners: 'four',", to: "    corners: 'inverted',", breaks: ['H32'] },
+  { id: 'new-designs-keep-two-corners', file: 'deck.js', from: "    corners: 'four',", to: "    corners: 'inverted',", breaks: ['H32', 'H38'] },
   { id: 'stems-on-in-new-designs', file: 'deck.js', from: "    stems: false,", to: "    stems: true,", breaks: ['H32', 'H35', 'B13'] },
   { id: 'stem-parameter-ignored', file: 'firework.js', from: "&& !(spec.stem ?? stemDefault(design))) spec.trail = false;", to: "&& !stemDefault(design)) spec.trail = false;", breaks: ['H35'] },
-  { id: 'grid-ignores-the-index-boxes', file: 'layout.js', from: "  for (const b of grid.boxes) room = Math.min(room,", to: "  for (const b of []) room = Math.min(room,", breaks: ['H34'] },
-  { id: 'grid-not-the-default', file: 'deck.js', from: "    pips: 'grid',", to: "    pips: 'field',", breaks: ['H32', 'H34'] },
-  { id: 'grid-boxes-too-short', file: 'layout.js', from: ".map(([x, y]) => ({ x, y, w: k.w, h: k.h }))", to: ".map(([x, y]) => ({ x, y, w: k.w, h: k.h * 0.4 }))", breaks: ['H34'] },
-  { id: 'four-corners-not-turned', file: 'layout.js', from: "  if (mode === 'four') return tl + tr + inv(tl) + inv(tr);", to: "  if (mode === 'four') return tl + tr + `<g transform=\"translate(0 ${f(h - idx.h)})\">${tl + tr}</g>`;", breaks: ['H33', 'H32'] },
-  { id: 'frame-in-the-safe-zone', file: 'layout.js', from: "inset = Math.max(0.8, g.safe * 0.5), sw", to: "inset = g.safe, sw", breaks: ['H35'] },
-  { id: 'frame-under-the-index', file: 'layout.js', from: "artPanel(g, art + ix.svg + frameArt(design, suit, g), idPrefix)", to: "artPanel(g, art + frameArt(design, suit, g) + ix.svg, idPrefix)", breaks: ['H35'] },
-  { id: 'rounded-in-every-render', file: 'layout.js', from: "  if (round && !guides) {", to: "  if (!guides) {", breaks: ['H35', 'H15', 'H22', 'H26', 'H30', 'H32'] },
+  { id: 'grid-ignores-the-index-boxes', file: 'layout.js', from: "  for (const b of grid.boxes) room = Math.min(room,", to: "  for (const b of []) room = Math.min(room,", breaks: ['H34', 'H38'] },
+  { id: 'grid-not-the-default', file: 'deck.js', from: "    pips: 'grid',", to: "    pips: 'field',", breaks: ['H32', 'H34', 'H38'] },
+  { id: 'grid-boxes-too-short', file: 'layout.js', from: ".map(([x, y]) => ({ x, y, w: k.w, h: k.h }))", to: ".map(([x, y]) => ({ x, y, w: k.w, h: k.h * 0.4 }))", breaks: ['H34', 'H38'] },
+  { id: 'four-corners-not-turned', file: 'layout.js', from: "  if (mode === 'four') return tl + tr + inv(tl) + inv(tr);", to: "  if (mode === 'four') return tl + tr + `<g transform=\"translate(0 ${f(h - idx.h)})\">${tl + tr}</g>`;", breaks: ['H33', 'H32', 'H38'] },
+  { id: 'frame-in-the-safe-zone', file: 'layout.js', from: "inset = Math.max(0.8, g.safe * 0.5), sw", to: "inset = g.safe, sw", breaks: ['H35', 'H38'] },
+  { id: 'frame-under-the-index', file: 'layout.js', from: "artPanel(g, art + ix.svg + frameArt(design, suit, g), idPrefix)", to: "artPanel(g, art + frameArt(design, suit, g) + ix.svg, idPrefix)", breaks: ['H35', 'H38'] },
+  { id: 'rounded-in-every-render', file: 'layout.js', from: "  if (round && !guides) {", to: "  if (!guides) {", breaks: ['H35', 'H15', 'H22', 'H26', 'H30', 'H32', 'H37', 'H38'] },
   { id: 'centre-all-rewrites-centred-cards', file: '../hanabi.js', from: "    else if (Math.hypot(c.dx, c.dy) < CENTRE_TOL_MM) already.push(name);", to: "    else if (false) already.push(name);", breaks: ['B11', 'B13'] },
-  { id: 'colour-hex-not-shown', file: '../hanabi.js', from: "for (const out of document.querySelectorAll('.hb-panel .hb-hex')) out.textContent = $(out.dataset.for).value.toUpperCase();", to: ";", breaks: ['B13'] },
+  { id: 'colour-hex-not-shown', file: '../hanabi.js', from: "for (const out of document.querySelectorAll('.hb-panel .hb-hex')) out.textContent = $(out.dataset.for).value.toUpperCase();", to: ";", breaks: ['B13', 'B14'] },
   // version 7: the background and the white border (H36-H39, B3, B14)
-  { id: 'smoke-not-seeded', file: 'layout.js', from: "let st = sm.seed >>> 0;", to: "let st = (Math.random() * 4294967296) >>> 0;", breaks: ['H36'] },
+  { id: 'smoke-not-seeded', file: 'layout.js', from: "let st = sm.seed >>> 0;", to: "let st = (Math.random() * 4294967296) >>> 0;", breaks: ['H36', 'H19'] },
   { id: 'smoke-ignores-rank', file: 'layout.js', from: "const t = design.background.smoke.rank && rank ? (rank - 1) / 4 : 1;", to: "const t = 1;", breaks: ['H36'] },
   { id: 'horizon-too-tall', file: 'layout.js', from: "const hc = mixHex(bottom, HORIZON_TINT, 0.55), y0 = A.y + A.h * 0.6;", to: "const hc = mixHex(bottom, HORIZON_TINT, 0.55), y0 = A.y + A.h * 0.5;", breaks: ['H36'] },
   { id: 'glow-reach-wrong', file: 'layout.js', from: "export const GLOW_REACH = 1.7, LIT_REACH = 1.8;", to: "export const GLOW_REACH = 1.2, LIT_REACH = 1.8;", breaks: ['H36'] },
@@ -276,7 +276,7 @@ const MUTANTS = [
   { id: 'glow-not-per-firework', file: 'layout.js', from: "if (bursts) bursts.push(burstOf(spec, suit, it.cx, it.cy, it.r / reach));", to: "", breaks: ['H36'], mayAlso: ['H39'] },
   { id: 'background-off-draws-the-sky', file: 'layout.js', from: "if (!b || !b.on) return { ground: rect(design.face.bg), fx: '', defs: '' };", to: "if (!b) return { ground: rect(design.face.bg), fx: '', defs: '' };", breaks: ['H36', 'H38'], mayAlso: ['H10', 'H15', 'H22', 'H26', 'H30', 'H32', 'H14', 'H20', 'H35', 'B14'] },
   { id: 'drift-not-read', file: 'deck.js', from: "    t.drift = lim('drift', m.drift, t.drift);\n", to: "", breaks: ['H36'] },
-  { id: 'border-ignored', file: 'deck.js', from: "const bo = +design.border || 0, e = bo + s;", to: "const bo = 0, e = s;", breaks: ['H37', 'B3', 'B14'], mayAlso: ['H35', 'H20', 'H36', 'H39'] },
+  { id: 'border-ignored', file: 'deck.js', from: "const bo = +design.border || 0, e = bo + s;", to: "const bo = 0, e = s;", breaks: ['H37', 'B3', 'B14', 'H17', 'H34', 'B12', 'B13'], mayAlso: ['H35', 'H20', 'H36', 'H39'] },
   { id: 'safe-from-the-trim', file: 'deck.js', from: "const bo = +design.border || 0, e = bo + s;", to: "const bo = +design.border || 0, e = s;", breaks: ['H37'], mayAlso: ['H35', 'H17', 'H34', 'H33', 'H36', 'H39'] },
   { id: 'art-not-clipped', file: 'layout.js', from: "<g clip-path=\"url(#${p}art)\">${inner}</g>", to: "${inner}", breaks: ['H37'], mayAlso: ['B14'] },
   { id: 'frame-from-the-trim', file: 'layout.js', from: "const t = g.border ? g.art : g.trim, inset = Math.max(0.8, g.safe * 0.5)", to: "const t = g.trim, inset = Math.max(0.8, g.safe * 0.5)", breaks: ['H35'] },
@@ -2358,8 +2358,10 @@ async function partTwo(overrides = {}) {
     // for the preview, the board and the export (the exported PNG compared pixel for pixel
     // with the preview's own card rasterised the same way).
     await check('B14', 'the Background section: master toggle, collapsed sub-sections, slider readouts, presets, reroll, reset; the border; preview = board = export, pixel for pixel', async () => {
+      // the panel as a visitor opens it: reload, THEN reset (a reset just before a reload races the
+      // page's 150 ms debounced save, and the reload would restore whatever the last check left)
+      await page.reload(); await page.waitForFunction(() => window.__hanabi);
       await page.click('#resetDesign');
-      await page.reload(); await page.waitForFunction(() => window.__hanabi);   // the panel as a visitor opens it
       await page.evaluate(() => { document.querySelector('[data-view="suit"]').click(); const s = document.getElementById('viewSuit'); s.value = 'red'; s.dispatchEvent(new Event('change')); if (document.getElementById('roundCorners').checked) document.getElementById('roundCorners').click(); if (document.getElementById('guides').checked) document.getElementById('guides').click(); document.getElementById('sec-bg').open = true; });
       const card5 = () => page.evaluate(() => document.querySelectorAll('#stage .hb-card svg')[4].outerHTML);
       const st = await page.evaluate(() => ({
@@ -2568,6 +2570,8 @@ if (!NEG) {
       const ok = !missed.length && !extra.length;
       if (!ok) failed++;
       console.log(`${ok ? 'ok  ' : 'BAD '} ${m.id}: red ${red.join(',') || 'nothing'}${missed.length ? ` — MISSED ${missed}` : ''}${extra.length ? ` — UNCLAIMED ${extra}` : ''}`);
+      // HANABI_DETAIL=1: what each unclaimed red said (to tell true collateral from a broken check)
+      if (process.env.HANABI_DETAIL) for (const r of res) if (!r.ok && extra.includes(r.id)) console.log(`       ${r.id}: ${r.detail.slice(0, 300)}`);
     } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   }
   console.log(`negative control: ${RUN.length - failed}/${RUN.length} behave${ONLY.length ? ` (a SUBSET of ${MUTANTS.length})` : ''}`);
