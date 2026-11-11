@@ -1472,7 +1472,7 @@ Off the emitted mesh, over every vine row of the relief gate: **thinnest wire 1.
 1.1099 mm, root embeds 2.093–6.476 mm, stem seat depth 0.0000 mm** (every row ON the molding), items'
 least joint with their stem 1.033 mm, least motif joint 4.828 mm.
 
-**Found, pre-existing, not fixed — AN OPEN DEFECT for its own session (Eva's ruling 6, second round):** the page and Node do not build the same relief. On `main` (`03d6ee3`) the
+**[Nov 11: FIXED — both defects below, §19. The cause was the engines' transcendental Math (the arch's +384 is a `ceil` on an exact 60° tie), and the page now computes Node's doubles through `frame-math.js`. The springing is one band (`continues`), and every other join is an inset stub.]** **Found, pre-existing, not fixed — AN OPEN DEFECT for its own session (Eva's ruling 6, second round):** the page and Node do not build the same relief. On `main` (`03d6ee3`) the
 default arch is 68,460 triangles in the page and 68,076 in Node with the filigree OFF (+384 — the page's
 setParams path, not the ornament), and the oval's STL hashes differ at an equal count (last-bit
 arithmetic across the two engines). Every relief gate measures Node; nothing compares the page's STL with
@@ -2037,3 +2037,171 @@ is its right one mirrored, domed over the right wires, so a left wire moved 0.02
 **Sheet:** `node tools/shot-frame-flowers.mjs <dir> --base <worktree of cd90cf5>` → `docs/img/frame-flowers.png`: the three
 whole frames front-on at 180 mm, the rectangle's top-right corner and the arch's springing front-on and three-quarter, and the
 arch's crest, each this tree beside the step-2 sheet's; every caption the heights off that tree's own relief.
+
+## 19. STL integrity — one build, no coincident join faces, the print-readiness report (Nov 11)
+
+Read before touching `frame-math.js`, `reliefSpines`, a spine's `embed` / `continues`, `stubInset`, `plateOutline`,
+`frame-print.js`, the relief's `roles`, or `tools/verify-frame-stl.mjs`. Both §17.6 open defects are closed here. No look
+changed: the SVG is byte-identical on every row, and the STL moves only at the junctions (the census at the end).
+
+### 19.1 One build: the page's STL is Node's (SP)
+
+**The cause was measured, not guessed: it was the engines' Math, not the page's code path.** Built with the same params
+(read back off the page's own `getParams()`), the page and Node took the same code path, read no cache, and had no stale
+default. What differed was the last bits of `Math.sin`, `cos`, `atan`, `atan2`, `exp`, `log` and `pow`: Chrome 153
+against Node 22's V8 12.4, 20,000 random inputs a function, **3–18 % differ**. `Math.hypot` and `Math.sqrt` agree.
+
+Two consequences follow:
+- **A last bit becomes a float32 move now and then.** That is the oval's STL, which differed at an equal triangle count.
+- **It becomes a discrete decision where the frame rounds a transcendental.** The arch's 1.5° arc ladder takes
+  `Math.ceil(angle / 1.5°)`, and an equilateral arch's sub-arch sweeps exactly 60°, a whole 40 steps. `ceil` of 40 and of
+  40.000000000000007 are 40 and 41, which is the arch's +384 triangles (two sub-arches, one extra row each), with the
+  filigree off.
+
+**The fix makes the page compute Node's doubles by construction.** `frame-math.js` is a line-for-line port of V8's own
+fdlibm (`src/base/ieee754.cc` at 12.4.254.21, the code Node runs for `Math.*`). It is written in `+ − × ÷` and `sqrt`,
+which are correctly rounded in every engine, plus word access through one `Float64Array`. Every frame geometry module
+calls `FM.*`, and `a ** b` became `FM.pow` (that operator IS `Math.pow`).
+
+**The Node build is unchanged.** FM1 compares every function with the running Node's `Math.*` under `Object.is` over
+1.4 M inputs a function, in seven ranges including the long reduction path and every exponent, plus the special values.
+0 differ, so the 51 rows that hold below hold to the byte. CI's Node 20 (V8 11.3) carries the same fdlibm, and FM1 is
+the witness for that too.
+
+**SP, in Chromium:** the SHA-256 of the very bytes Get STL saves (`window.__frame.stlDigest`) equals Node's `exportStl`
+SHA over 15 rows:
+- all three skeletons at the default, rinceau, dense rinceau and groups;
+- a backed stepped-sill cove arch, four mullions with no sill, and circle beading.
+
+**15 of 15 equal**, with equal triangle counts.
+
+**FM0** refuses any transcendental `Math.` call or `**` in the nine geometry modules (comments and strings blanked). A
+module missing from that list is not read, and the list IS the coverage.
+
+### 19.2 No coincident join faces (CP1)
+
+**The springing seam was one instance of a class.** Every embedded junction in the old relief ran its full section into
+the neighbour. The stub's top and bottom therefore lay in the neighbour's own top and back planes, and its walls on the
+neighbour's walls wherever the two shared a section. Measured with CP1's bars, the old default arch had coincident join
+faces at:
+- the springing (head against jamb);
+- every light against its mullion;
+- the jamb feet on the sill;
+- the backed plate's wall against the band walls.
+
+**The fix is at the boundary owners, three of them, not at call sites.**
+
+1. **A JOIN BETWEEN TWO BANDS OF ONE SECTION THAT CONTINUE INTO EACH OTHER IS NOT A JOIN.** The skeleton declares it:
+   `s.continues = { start, end }` replaces `embed` on the head (into both jambs) and on each light (into its mullion).
+   `reliefSpines(model)` is the one owner that sweeps such a chain as ONE band. Reversed members have their embeds swapped
+   with them. The joint vertex is the earlier member's, and the gate keeps a `members` record so R can hold every chain row
+   to its own member's `offsetCurve`. The springing therefore has no face at all.
+   - A declared continuation that does not meet its band is recorded (`unmet`) and fails B. It never throws: a geometry
+     defect is a red check, never a crash, and `a-detached-mullion` is that check's witness.
+2. **AN EMBED IS A NARROWER, SHALLOWER STUB.** `stubInset(bandWidth) = min(EMBED_MM / 10, bandWidth / 8)`. The stub's
+   columns are clamped that far inside the band's own outer columns, and its bottom is raised by the same amount, so a stub
+   is strictly inside the neighbour in every direction and no face of it lies in a plane of the neighbour's. The stub's
+   rows still run from `offsetCurve` (R is unchanged), and the sill's LIP is inset the same way.
+3. **THE BACKED PLATE STANDS ON THE BAND CENTRELINES** (`plateOutline(model, w/2, …)`), so its wall is buried inside the
+   bands rather than lying on their outer walls. With no sill, the arch's open bottom gets a 0.1-plate chamfer, so the top
+   edge is not flush with the jamb feet.
+
+**CP1** applies to every row (80: every profile preset on every skeleton and corner treatment, with and without a stepped
+sill; 0 and 4 mullions; lancet and semicircle; backed, recessed and no-sill; small and large print; the rinceau, the
+groups, beading and leaves). It asks for no pair of triangles of DIFFERENT shells, one of them a JOIN face, that are
+coincident or near-coincident. A join face is a stub strip, a lip, an end cap or a plate wall (`frame-relief.js`
+`ROLE`, telemetry that never reaches the STL). Near-coincident means:
+- planes within 3°;
+- every vertex within 0.05 mm (and within tan 3° of its triangle's own size) of the other's plane;
+- an overlap above 1e-6 mm².
+
+The positions read are the float32s the STL writes, and the back plane is NOT excluded. The 3° bar is twice the arc
+ladder's step (the old stubs sat 0.45–1.92° off their neighbour's tangent, and the new ones leave at 5.7°). 0.05 mm is
+half the finest SLS/MJF layer. **Measured: 0 pairs over 80 rows and 58,160 join faces.**
+
+**What a union would still remove, REPORTED (CP2) and never failed.** The export contract is overlapping closed shells
+that the slicer unions. Three classes of coincident pair remain, and they are not joins:
+- **BACK.** Every overlapping pair of shells shares the bed plane z = 0. Default arch 21,790 pairs / 152 mm²; backed
+  arch 71,779 / 4,142 mm²; rectangle and oval 0.
+- **BODY.** Two bands' own surfaces where they overlap at one height. On the default arch this is 22 pairs / 7.2 mm², two
+  sub-arches springing from one mullion row. The flat preset's plateaus give 21,814 and the stepped preset's 2,727.
+- **WIRE END.** An ornament wire's end cap against another ornament face (a tendril's root under the acanthus that
+  sheathes it). The arch rinceau has 28 pairs, 3.69 mm².
+
+A boolean union of the shells is the only thing that removes these three classes, and whether to export one is Eva's
+question (§19.5).
+
+### 19.3 The print-readiness report (PR), the three default frames at 180 mm
+
+`frame-print.js` `measurePrint(relief)` is read-only and pure. The page's read-out (beside Get STL: the box, the relief
+above the plate, back z, triangles, the file, shells and the assumed-floor flag, plus a **Measure print** button for the
+rest) and the gate call the same code.
+
+Measurements are vertical rays on a 0.1 mm grid. Each shell's crossings are paired by parity and the intervals unioned:
+the shells overlap, so a sum over shells would count every overlap twice. The plan widths come from an exact Euclidean
+distance transform of the footprint, read at its NECK cells (a local minimum of the distance along a ridge). The last
+millimetre before a ridge's end is excluded, because a cusp is narrow all the way to its tip: the arch's spandrel cusp read
+a 0.1 mm "gap" before that rule.
+
+| | arch | rectangle | oval |
+|---|---|---|---|
+| box (mm) | 101.71 × 180.00 × 5.08 | 104.82 × 180.00 × 5.18 | 137.38 × 180.00 × 5.18 |
+| relief above the 2.00 mm plate | 3.08 mm | 3.18 mm | 3.18 mm |
+| volume (union) | 23.94 cm³ | 20.06 cm³ | 17.85 cm³ |
+| triangles · file | 66,132 · 3.15 MiB | 1,568 · 0.07 MiB | 47,040 · 2.24 MiB |
+| narrowest feature (plan) | 5.42 mm | 9.50 mm | 9.38 mm |
+| narrowest gap (plan) | 24.1 mm | 85.7 mm | none enclosed |
+| thinnest material above the back | 2.31 mm | 2.33 mm | 2.32 mm |
+| back | z = 0 exactly, 100 % of the footprint on it, 0 overhanging rays, every ray's crossings pair | same | same |
+
+The units are millimetres: the STL is written in print mm, and `printHeight` 180 is the box's height to the float.
+
+**What depends on the undecided print process (ruling 3), flagged:**
+- the 1.0 mm `MIN_FEATURE_MM` every floor is compared against;
+- the 0.05 mm coincidence bar (half an SLS/MJF layer; an FDM layer is 2–6× that);
+- whether a 2.00 mm plate is stiff enough at 180 mm;
+- whether the shells must be unioned before upload (§19.5).
+
+The default frames clear the 1.0 mm floor everywhere on all three measures. **Not the defaults, measured:**
+- The dense groups arch reads a 0.90 mm feature and a 0.10 mm gap between two scroll wires. That is the groups layout's
+  own clearance, not the junctions', and this session does not change it.
+- The rinceau rows have 260 (arch) / 652 (rectangle) overhanging rays, rays meeting material over an empty space; they
+  are counted, not located, in this session. Neither default carries the rinceau.
+
+### 19.4 What moved (Node, against `03ff907`), and why
+
+- **24 of 75 rows move:**
+  - every arch row (the springing, the lights, the stubs);
+  - `rect backed` and `oval recessed` (the plate's wall, at equal triangle counts).
+- **The 51 closed-skeleton pierced rows hold to the byte**, ornament and band patterns included.
+- **Triangles:**
+  - default arch 68,076 → 66,132 (−1,944: the end caps and stub strips the continuations remove);
+  - 0 mullions −1,168; 4 mullions −2,720.
+  - Every arch ornament row keeps that −1,944, with its wires moved in z only: at most 0.0076 mm (rinceau) and 0.046 mm
+    (dense), at the jamb feet, where the molding height they are seated on dropped by the stub inset.
+- **The SVG is byte-identical on every row** (S, 0 of 14 against `e759041`).
+- **S2 is restated as a partition:** 463,582 vertices held; 5,470 new and 13,894 lost, every one at a junction (a stub
+  row, a chain's joint row, a plate vertex).
+
+### 19.5 Questions for Eva (asked as lettered options in the PR)
+
+1. **The BACK / BODY / WIRE END coincidences.**
+   - (a) Export a boolean union, one closed surface: heavier, and a new dependency.
+   - (b) Keep the overlapping-shell contract and say in the read-out that the slicer must union.
+   - (c) Remove BODY and WIRE END in the geometry and keep BACK, which every slicer unions.
+2. **The embed is `MIN_FEATURE_MM` in MODEL units.** That is 0.53 print mm on the default 180 mm arch, not 1.0. The fix
+   is a scale-aware embed, a byte move on every frame.
+3. **With no sill, the jambs' feet stand on the bed**, and the plate's chamfer is 0.1 plate thick. Whether a 0.2 mm edge
+   is printable is the print process's question.
+
+### 19.6 Gates — `node tools/verify-frame-stl.mjs` (in `frame.yml`'s verify job)
+
+- **FM0, FM1, SP, CP1, CP2 (report), PR** as above.
+- `--no-browser` skips SP.
+- `--negative-control` runs seven mutants in a temporary copy of the modules, with every anchor checked first:
+  - `the-page-reads-the-engines-own-atan2` (FM0, SP);
+  - `frame-math-sin-is-a-bit-off` (FM1);
+  - `the-stub-is-full-section`, `the-springing-is-two-bands`, `the-plate-stands-on-the-silhouette`,
+    `the-lip-is-not-inset` (each CP1);
+  - `a-stub-bottom-sinks-below-the-back` (PR).
+- The relief gate's R, B, L, X2 and S2 read the chains (`reliefSpines`), and B fails on an unmet continuation.

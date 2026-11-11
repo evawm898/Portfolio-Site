@@ -52,6 +52,7 @@ import {
 } from './frame-filigree.js';
 import { rinceauSpec, rinceauTendril, acanthusLeaf, RIN, RIN_SIZES, RIN_TK_MIN } from './frame-rinceau.js';
 import { placeElement, relift, liftEach, drapeElement, mirrorElement, symmetrizeElement, remapElement, wireElementContact, elementClear, elementDepth, footprintTouches } from './frame-elements.js';
+import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 /* the field's constants (one each, every one a measured choice in §17) */
 export const HIER = {
@@ -179,7 +180,7 @@ export function crestLift(Hz) {
   const R = CREST_LIFT_RINGS, D = 32;
   return ([x, y]) => {
     let m = 0;
-    for (const r of R) for (let a = 0; a < (r ? D : 1); a++) { const t = 2 * Math.PI * a / D, dx = r * Math.cos(t), dy = r * Math.sin(t); const f = CREST.slope * (r < CREST.round ? r * r / (2 * CREST.round) : r - CREST.round / 2); m = Math.max(m, Hz([x + dx, y + dy]) - f, Hz([-x - dx, y + dy]) - f); }
+    for (const r of R) for (let a = 0; a < (r ? D : 1); a++) { const t = 2 * Math.PI * a / D, dx = r * FM.cos(t), dy = r * FM.sin(t); const f = CREST.slope * (r < CREST.round ? r * r / (2 * CREST.round) : r - CREST.round / 2); m = Math.max(m, Hz([x + dx, y + dy]) - f, Hz([-x - dx, y + dy]) - f); }
     return m > 0 ? m + 0.01 : 0;
   };
 }
@@ -265,7 +266,7 @@ export function weightProfile(model, h = 1, step = 1) {
 /* the path's curvature, smoothed over a window (mm), per station */
 function pathCurvature(path, win) {
   const n = path.pts.length, ds = path.length / Math.max(1, n - 1), ang = [0];
-  for (let k = 1; k < n; k++) { let d = Math.atan2(path.tan[k][1], path.tan[k][0]) - Math.atan2(path.tan[k - 1][1], path.tan[k - 1][0]); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; ang.push(ang[k - 1] + d); }
+  for (let k = 1; k < n; k++) { let d = FM.atan2(path.tan[k][1], path.tan[k][0]) - FM.atan2(path.tan[k - 1][1], path.tan[k - 1][0]); while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; ang.push(ang[k - 1] + d); }
   const half = Math.max(1, Math.round(win / 2 / ds));
   return path.pts.map((_, k) => { const a = Math.max(0, k - half), b = Math.min(n - 1, k + half); return b > a ? (ang[b] - ang[a]) / ((b - a) * ds) : 0; });
 }
@@ -306,7 +307,7 @@ function untangle(c, xs, ys) {
   }
   if (!cut) return null;
   const n = pts.length;
-  const turnAt = (k) => { const a = pts[k - 1], b = pts[k], q = pts[k + 1]; return Math.abs(Math.atan2((b[0] - a[0]) * (q[1] - b[1]) - (b[1] - a[1]) * (q[0] - b[0]), (b[0] - a[0]) * (q[0] - b[0]) + (b[1] - a[1]) * (q[1] - b[1]))); };
+  const turnAt = (k) => { const a = pts[k - 1], b = pts[k], q = pts[k + 1]; return Math.abs(FM.atan2((b[0] - a[0]) * (q[1] - b[1]) - (b[1] - a[1]) * (q[0] - b[0]), (b[0] - a[0]) * (q[0] - b[0]) + (b[1] - a[1]) * (q[1] - b[1]))); };
   const rho = (k) => { const a = pts[k - 1], b = pts[k], q = pts[k + 1]; const A2 = Math.hypot(q[0] - b[0], q[1] - b[1]), B2 = Math.hypot(a[0] - q[0], a[1] - q[1]), C2 = Math.hypot(a[0] - b[0], a[1] - b[1]); const ar = Math.abs((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / 2; return ar > 1e-15 ? A2 * B2 * C2 / (4 * ar) : Infinity; };
   const kinks = []; for (let k = 1; k < n - 1; k++) if (turnAt(k) > 0.35) kinks.push(k);
   let ok = false;
@@ -319,9 +320,9 @@ function untangle(c, xs, ys) {
     ok = true; for (let k = 1; k < n - 1; k++) if (w[k] / 2 >= 0.9 * rho(k)) { ok = false; break; }
   }
   if (!ok) return null;
-  const tan = pts.map((_, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)]; return Math.atan2(b[1] - a[1], b[0] - a[0]); });
+  const tan = pts.map((_, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)]; return FM.atan2(b[1] - a[1], b[0] - a[0]); });
   for (let i = 1; i < n; i++) { while (tan[i] - tan[i - 1] > Math.PI) tan[i] -= 2 * Math.PI; while (tan[i] - tan[i - 1] < -Math.PI) tan[i] += 2 * Math.PI; }
-  const nrm = tan.map((f, i) => { const nn = [-Math.sin(f), Math.cos(f)]; return nn[0] * N0[i][0] + nn[1] * N0[i][1] >= 0 ? nn : [-nn[0], -nn[1]]; });
+  const nrm = tan.map((f, i) => { const nn = [-FM.sin(f), FM.cos(f)]; return nn[0] * N0[i][0] + nn[1] * N0[i][1] >= 0 ? nn : [-nn[0], -nn[1]]; });
   return { curve: { ...c, pts, tan, nrm, w }, xs: X, ys: Y, cut };
 }
 
@@ -397,7 +398,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const axisStop = (end) => { const wnt = (F + (end ? wsL : ws0)) / 2 + AXIS_GAP; let lo = 0, hi = Math.min(L / 2, 6 * wnt); for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2, xx = end ? L - m : m; if (mappedX(xx, end) < wnt) lo = m; else hi = m; } return hi; };
     const rawAt = (x) => { const t = (x - x0) / (x1 - x0) * n, k = Math.min(n - 1, Math.max(0, Math.floor(t))); return raw[k] + (raw[k + 1] - raw[k]) * (t - k); };
     const theta = (x) => th0 + (rawAt(x) - rawAt(0)) * sc;
-    const yOf = (x) => yc + ampOfX(Math.min(L, Math.max(0, x))) * Math.sin(theta(x));
+    const yOf = (x) => yc + ampOfX(Math.min(L, Math.max(0, x))) * FM.sin(theta(x));
     const layout = () => {
       raw = null;
       for (let pass = 0; pass < 6; pass++) {
@@ -409,7 +410,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
         for (let k = 0; k <= n; k++) xs.push(x0 + (x1 - x0) * k / n);
         for (let k = 1; k <= n; k++) { const xm = (xs[k - 1] + xs[k]) / 2; raw.push(raw[k - 1] + Math.PI / P0(Math.min(L, Math.max(0, xm))) * (xs[k] - xs[k - 1])); }
         span = rawAt(L) - rawAt(0); want = wantOf(span); sc = want / span;
-        sB = Math.sign(Math.sin(th0 + want)) || 1;
+        sB = Math.sign(FM.sin(th0 + want)) || 1;
         if (pass && sB === pB && Math.abs(x0 - px0) < 1e-9 && Math.abs(x1 - px1) < 1e-9) return;
       }
     };
@@ -423,8 +424,8 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
       ak = a;
       layout();
       lp = xs.map((x) => [x, yOf(x)]);
-      const tanL = lp.map((_, i) => { const q0 = lp[Math.max(0, i - 1)], q1 = lp[Math.min(n, i + 1)]; return Math.atan2(q1[1] - q0[1], q1[0] - q0[0]); });
-      const local = { kind: 'stem', pts: lp, nrm: tanL.map((f) => [-Math.sin(f), Math.cos(f)]), tan: tanL, w: xs.map((x) => wsOf(Math.min(L, Math.max(0, x)))), root: 0, info: { kind: 'stem', role: 'stem', wire: 0, tip: 0 } };
+      const tanL = lp.map((_, i) => { const q0 = lp[Math.max(0, i - 1)], q1 = lp[Math.min(n, i + 1)]; return FM.atan2(q1[1] - q0[1], q1[0] - q0[0]); });
+      const local = { kind: 'stem', pts: lp, nrm: tanL.map((f) => [-FM.sin(f), FM.cos(f)]), tan: tanL, w: xs.map((x) => wsOf(Math.min(L, Math.max(0, x)))), root: 0, info: { kind: 'stem', role: 'stem', wire: 0, tip: 0 } };
       local.info.wire = Math.max(...local.w); local.info.tip = Math.min(...local.w);
       let cand = mapToPath(local, path, 0), kx = xs, ky = lp.map((q) => q[1]);
       // a run that turns inward (a notched corner) loops the mapped stem:
@@ -567,7 +568,7 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     let nExt = 0;
     for (let k = kMin; k <= kMax; k++) {
       const x = solveX(Math.PI / 2 + k * Math.PI); if (!guard(x)) continue;
-      const side = Math.sign(Math.sin(r.theta(x))) || 1, w = r.wOf(x);
+      const side = Math.sign(FM.sin(r.theta(x))) || 1, w = r.wOf(x);
       cand.push({ r, x, w, side, at: 'extremum', n: nExt++ });
     }
   }
@@ -594,12 +595,12 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
     const make = (f, tk = 1) => {
       const P = r.P0(c.x) * r.sc;   // the local half wavelength as laid (the phase's own scale)
       const xb = Math.min(r.L, c.x + RIN.branch * P), yb = r.yOf(xb), dydx = (r.yOf(xb + 0.05) - r.yOf(xb - 0.05)) / 0.1;
-      const tanb = Math.atan2(dydx, 1), phi = tanb - c.side * RIN.diverge;
+      const tanb = FM.atan2(dydx, 1), phi = tanb - c.side * RIN.diverge;
       const len = (RIN.len[0] + RIN.len[1] * w) * M * cc * f;
       // its root starts back across the stem, behind the stem's centre line
       // along its own heading, so the joint is a full overlap and never the
       // two wires' edges kissing
-      const rootB = [xb - Math.cos(phi) * 0.75 * r.wsOf(xb), yb - Math.sin(phi) * 0.75 * r.wsOf(xb)];
+      const rootB = [xb - FM.cos(phi) * 0.75 * r.wsOf(xb), yb - FM.sin(phi) * 0.75 * r.wsOf(xb)];
       // fewer turns are taken off what the coil gap HOLDS at this size (asked past it, the bisection already lowered them)
       const cap = RIN.wireK * r.wsOf(xb), held = tk < 1 ? rinceauTendril(len, rin.turns, cap).info.turnsHeld : rin.turns;
       const tt = rinceauTendril(len, held * tk, cap); tt.info.turnsAsked = rin.turns;
@@ -611,13 +612,13 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
         // the sheath leaf: rooted on the stem just behind the branch, lying
         // along the tendril's outer side, curling with it
         const ph1 = tanb - c.side * (RIN.diverge + RIN.sheath), xr = xb - 0.3 * r.wsOf(xb);
-        const r1 = [xr - Math.cos(ph1) * 0.75 * r.wsOf(xr), r.yOf(xr) - Math.sin(ph1) * 0.75 * r.wsOf(xr)];
+        const r1 = [xr - FM.cos(ph1) * 0.75 * r.wsOf(xr), r.yOf(xr) - FM.sin(ph1) * 0.75 * r.wsOf(xr)];
         const lf = lay(acanthusLeaf(ll, fl, -c.side), r1, ph1, false, r.path); lf.info = { ...lf.info, role: 'acanthus' }; out.push(lf);
         if (fl.leaves > 1) {
           // the calyx's second leaf: on the stem's continuation, turning
           // the other way, over the stem going on
           const ph2 = tanb + c.side * RIN.calyx;
-          const r2 = [xb - Math.cos(ph2) * 0.75 * r.wsOf(xb), yb - Math.sin(ph2) * 0.75 * r.wsOf(xb)];
+          const r2 = [xb - FM.cos(ph2) * 0.75 * r.wsOf(xb), yb - FM.sin(ph2) * 0.75 * r.wsOf(xb)];
           const l2 = lay(acanthusLeaf(RIN.calyxLen * ll, fl, c.side), r2, ph2, false, r.path); l2.info = { ...l2.info, role: 'acanthus' }; out.push(l2);
         }
       }
@@ -820,7 +821,7 @@ export function raisedCrestLift(Hz) {
   const reach = (x, y) => {
     const k = `${x},${y}`; if (cache.has(k)) return cache.get(k);
     let m = -Infinity;
-    for (const r of R) for (let a = 0; a < (r ? D : 1); a++) { const t = 2 * Math.PI * a / D, dx = r * Math.cos(t), dy = r * Math.sin(t); const f = CREST.slope * (r < CREST.round ? r * r / (2 * CREST.round) : r - CREST.round / 2); const h1 = Hz([x + dx, y + dy]), h2 = Hz([-x - dx, y + dy]); if (h1 > 0) m = Math.max(m, h1 - f); if (h2 > 0) m = Math.max(m, h2 - f); }
+    for (const r of R) for (let a = 0; a < (r ? D : 1); a++) { const t = 2 * Math.PI * a / D, dx = r * FM.cos(t), dy = r * FM.sin(t); const f = CREST.slope * (r < CREST.round ? r * r / (2 * CREST.round) : r - CREST.round / 2); const h1 = Hz([x + dx, y + dy]), h2 = Hz([-x - dx, y + dy]); if (h1 > 0) m = Math.max(m, h1 - f); if (h2 > 0) m = Math.max(m, h2 - f); }
     cache.set(k, m); return m;
   };
   return (d) => ([x, y]) => { const m = Math.max(0, reach(x, y) + d); return m > 0 ? m + 0.01 : 0; };

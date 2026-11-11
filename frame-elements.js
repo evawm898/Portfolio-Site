@@ -24,6 +24,7 @@
 
 import { Mesh, sphereSolid, PATTERN_LAT, PATTERN_LON } from './frame-relief.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
+import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 /* THE LAYOUTS the wiring session will hand the chains' junction motifs (one
    primitive each, Eva's ruling — see the header). Lengths are × the motif's
@@ -92,10 +93,10 @@ const F = MIN_FEATURE_MM;
    of the distance in from the edge over LIP of the span, zl the floor
    (F + LIP.over, never above the top it rolls). */
 export const LIP = { u: 0.2, over: 0.05 };
-const lipW = (d, span) => Math.sin(Math.PI / 2 * Math.min(1, Math.max(0, d) / span));
+const lipW = (d, span) => FM.sin(Math.PI / 2 * Math.min(1, Math.max(0, d) / span));
 const lipZ = (z, w) => { const zl = Math.min(z, F + LIP.over); return zl + (z - zl) * w; };
 export function bladeGrid({ at = [0, 0], ang = 0, L, hw, crown, lift = () => 0, tilt = 0, cup = 0, nu = 24, nv = 12, lipU = 0 }) {
-  const ca = Math.cos(ang), sa = Math.sin(ang), grid = [], hMax = Math.max(...Array.from({ length: nu + 1 }, (_, k) => hw(k / nu)));
+  const ca = FM.cos(ang), sa = FM.sin(ang), grid = [], hMax = Math.max(...Array.from({ length: nu + 1 }, (_, k) => hw(k / nu)));
   for (let i = 0; i <= nu; i++) {
     const u = i / nu, h = hw(u), row = [];
     for (let j = 0; j <= nv; j++) {
@@ -110,11 +111,11 @@ export function bladeGrid({ at = [0, 0], ang = 0, L, hw, crown, lift = () => 0, 
 /* a BLUNT petal's half width: a superellipse about the blade's middle,
    W/2 · (1 − |2u − 1|^n)^(1/n) (n 2 a true ellipse, higher a rounder end,
    squarer sides), narrowed toward the base by (u + b)/(1 + b); floored at F/2 */
-export const bluntHalf = (W, n = 2.6, b = 0.35) => (u) => Math.max(F / 2, W / 2 * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(2 * u - 1), n)), 1 / n) * (u + b) / (1 + b));
+export const bluntHalf = (W, n = 2.6, b = 0.35) => (u) => Math.max(F / 2, W / 2 * FM.pow(Math.max(0, 1 - FM.pow(Math.abs(2 * u - 1), n)), 1 / n) * (u + b) / (1 + b));
 /* a rounded blade's half width: W/2 · sin(π u^p)^q, floored at F/2 */
-export const roundedHalf = (W, p = 0.75, q = 0.8) => (u) => Math.max(F / 2, W / 2 * Math.pow(Math.sin(Math.PI * Math.pow(u, p)), q));
+export const roundedHalf = (W, p = 0.75, q = 0.8) => (u) => Math.max(F / 2, W / 2 * FM.pow(FM.sin(Math.PI * FM.pow(u, p)), q));
 /* a soft dome across a blade: crown · (1 − v²)^k, floored at the feature at the midrib */
-export const domeCrown = (crown, k = 0.6) => (u, v) => Math.max(F, crown) * Math.pow(Math.max(0, 1 - v * v), k) * Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, u)) * 0.5 + Math.PI * 0.25), 0.5);
+export const domeCrown = (crown, k = 0.6) => (u, v) => Math.max(F, crown) * FM.pow(Math.max(0, 1 - v * v), k) * FM.pow(FM.sin(Math.PI * Math.min(1, Math.max(0, u)) * 0.5 + Math.PI * 0.25), 0.5);
 
 /* ------------------------------------------------------------------ */
 /* (a) THE SHELL — cupped, ribs converging on a hinge, a scalloped edge   */
@@ -147,18 +148,18 @@ export function shellGrid({ R, size, nu = 30, nv = 88, at = [0, 0], soft = false
     for (let j = 0; j <= nv; j++) {
       const th = -fan + 2 * fan * j / nv;
       const phase = (th + fan) / (2 * fan) * ribs * Math.PI;
-      const rib = Math.cos(phase) ** 2;               // 1 on a rib's crest, 0 in a groove
+      const rib = FM.pow(FM.cos(phase), 2);               // 1 on a rib's crest, 0 in a groove
       // the rim: lobes on the crests, notches in the grooves
-      const lobe = soft ? Math.pow((rib + SHELL_SOFT.eps) / (1 + SHELL_SOFT.eps), 0.25) : rib;
+      const lobe = soft ? FM.pow((rib + SHELL_SOFT.eps) / (1 + SHELL_SOFT.eps), 0.25) : rib;
       const rimR = R * (1 - (soft ? SHELL_SOFT.scallop : SHELL_SCALLOP) * (1 - lobe));
       const rho = u * rimR;
       // the ears: below SHELL_EAR of the radius the outline is a straight
       // hinge line, |x| growing linearly, so the fan's root is a flat hinge
       const earW = SHELL_EAR * R;
-      const x0 = rho * Math.sin(th), y0 = rho * Math.cos(th);
+      const x0 = rho * FM.sin(th), y0 = rho * FM.cos(th);
       const ear = smooth((rho - 0.0) / earW);
-      const x = x0 * (0.55 + 0.45 * ear), y = y0 - (1 - ear) * 0.25 * earW * Math.abs(Math.sin(th));
-      const dish = size * (soft ? SHELL_SOFT.dish : SHELL_DISH) * Math.pow(u, 2.2);
+      const x = x0 * (0.55 + 0.45 * ear), y = y0 - (1 - ear) * 0.25 * earW * Math.abs(FM.sin(th));
+      const dish = size * (soft ? SHELL_SOFT.dish : SHELL_DISH) * FM.pow(u, 2.2);
       const ridge = size * (soft ? SHELL_SOFT.rib : SHELL_RIB) * rib * smooth((u - 0.1) / 0.45) * (0.55 + 0.45 * u);
       const zt = F + 0.4 + dish + ridge;
       row.push([at[0] + x, at[1] + y, soft ? lipZ(zt, lipW(1 - u, LIP.u) * lipW(fan - Math.abs(th), LIP.u * fan)) : zt]);
@@ -196,7 +197,7 @@ export function buildPalmette({ size = 24, base = false, layout = PALMETTE, kind
   patchSolid(mesh, bossGrid([0, 0], rB, layout.bossRise * rB, F + 0.3), 'boss');
   layout.leaves.forEach((lf, k) => {
     const L = lf.len * foot, W = layout.width * L;
-    const g = curvedBladeGrid({ at: [0.3 * rB * Math.sin(lf.angle), rB * 0.6 * Math.cos(lf.angle)], ang: Math.PI / 2 + lf.angle, L, hw: roundedHalf(W, 0.72, 0.85), crown: midribCrown(Math.max(F, layout.crown * W)), flare: lf.flare, tilt: layout.tilt * L, lift: () => F + 0.3, nu: 26, nv: 14 });
+    const g = curvedBladeGrid({ at: [0.3 * rB * FM.sin(lf.angle), rB * 0.6 * FM.cos(lf.angle)], ang: Math.PI / 2 + lf.angle, L, hw: roundedHalf(W, 0.72, 0.85), crown: midribCrown(Math.max(F, layout.crown * W)), flare: lf.flare, tilt: layout.tilt * L, lift: () => F + 0.3, nu: 26, nv: 14 });
     patchSolid(mesh, g, `${kind}-leaf-${k}`);
   });
   return done(mesh, kind, { size, boss: rB });
@@ -206,16 +207,16 @@ export function buildPalmette({ size = 24, base = false, layout = PALMETTE, kind
    blade grid scales its crown by the row's half-width over the widest, so a
    tip narrowed to the floor carries no spike — the midrib's width is a share of
    the row's, and on a 1 mm row it was a 130° crest. */
-export const midribCrown = (crown) => (u, v) => crown * (0.45 * Math.pow(Math.max(0, 1 - v * v), 0.5) + 0.55 * Math.exp(-((v / 0.22) ** 2))) * (0.7 + 0.3 * Math.sin(Math.PI * Math.min(1, u * 1.1)));
+export const midribCrown = (crown) => (u, v) => crown * (0.45 * FM.pow(Math.max(0, 1 - v * v), 0.5) + 0.55 * FM.exp(-FM.pow(v / 0.22, 2))) * (0.7 + 0.3 * FM.sin(Math.PI * Math.min(1, u * 1.1)));
 /* an oblate dome: radius r, height h, superellipse profile z = h (1 − (ρ/r)^2.4)^(1/2.4), on seat z0;
    its angular seam (the two coincident columns' walls) on −y, the element's
    own axis — a seam off the axis showed as a crack across a placed boss */
 export function bossGrid(c, r, h, z0, nu = 10, nv = 40) {
-  const grid = []; for (let i = 0; i <= nu; i++) { const row = []; const q = i / nu, rr = r * q, z = z0 + h * Math.pow(Math.max(0, 1 - Math.pow(q, 2.4)), 1 / 2.4); for (let j = 0; j <= nv; j++) { const a = -Math.PI / 2 + 2 * Math.PI * j / nv; row.push([c[0] + rr * Math.cos(a), c[1] + rr * Math.sin(a), z]); } grid.push(row); } return grid;
+  const grid = []; for (let i = 0; i <= nu; i++) { const row = []; const q = i / nu, rr = r * q, z = z0 + h * FM.pow(Math.max(0, 1 - FM.pow(q, 2.4)), 1 / 2.4); for (let j = 0; j <= nv; j++) { const a = -Math.PI / 2 + 2 * Math.PI * j / nv; row.push([c[0] + rr * FM.cos(a), c[1] + rr * FM.sin(a), z]); } grid.push(row); } return grid;
 }
 /* a flat disc of radius r at height z (a fan from its centre) */
 export function discGrid(c, r, z, nu = 6, nv = 40) {
-  const grid = []; for (let i = 0; i <= nu; i++) { const row = []; for (let j = 0; j <= nv; j++) { const a = 2 * Math.PI * j / nv, rr = r * i / nu; row.push([c[0] + rr * Math.cos(a), c[1] + rr * Math.sin(a), z]); } grid.push(row); } return grid;
+  const grid = []; for (let i = 0; i <= nu; i++) { const row = []; for (let j = 0; j <= nv; j++) { const a = 2 * Math.PI * j / nv, rr = r * i / nu; row.push([c[0] + rr * FM.cos(a), c[1] + rr * FM.sin(a), z]); } grid.push(row); } return grid;
 }
 /* a square slab of a feature's thickness under an element (the sheet's base) */
 function slab(mesh, size) { const h = 0.75 * size, g = [[[-h, -h, F], [h, -h, F]], [[-h, h, F], [h, h, F]]]; patchSolid(mesh, g, 'base'); }
@@ -225,9 +226,9 @@ function slab(mesh, size) { const h = 0.75 * size, g = [[[-h, -h, F], [h, -h, F]
 export function curvedBladeGrid({ at, ang, L, hw, crown, lift = () => 0, tilt = 0, cup = 0, flare = 0, nu = 24, nv = 12, lipU = 0, lipV = 0 }) {
   const grid = [], hMax = Math.max(...Array.from({ length: nu + 1 }, (_, k) => hw(k / nu)));
   let x = 0, y = 0, f = ang; const centre = [[0, 0, f]];
-  for (let i = 1; i <= nu; i++) { const u = (i - 0.5) / nu, ds = L / nu, dphi = flare * u * ds / L; x += ds * Math.cos(f + dphi / 2); y += ds * Math.sin(f + dphi / 2); f += dphi; centre.push([x, y, f]); }
+  for (let i = 1; i <= nu; i++) { const u = (i - 0.5) / nu, ds = L / nu, dphi = flare * u * ds / L; x += ds * FM.cos(f + dphi / 2); y += ds * FM.sin(f + dphi / 2); f += dphi; centre.push([x, y, f]); }
   for (let i = 0; i <= nu; i++) {
-    const u = i / nu, h = hw(u), [cx, cy, ph] = centre[i], nx = -Math.sin(ph), ny = Math.cos(ph), row = [];
+    const u = i / nu, h = hw(u), [cx, cy, ph] = centre[i], nx = -FM.sin(ph), ny = FM.cos(ph), row = [];
     for (let j = 0; j <= nv; j++) { const v = 2 * j / nv - 1; row.push([at[0] + cx + v * h * nx, at[1] + cy + v * h * ny, lipU || lipV ? lipZ(Math.max(0, lift(u) + crown(u, v) * Math.min(1, hw(u) / hMax) + tilt * u * u + cup * v * v), (lipU ? lipW(1 - u, lipU) : 1) * (lipV ? lipW(1 - Math.abs(v), lipV) : 1)) : Math.max(0, lift(u) + crown(u, v) * Math.min(1, hw(u) / hMax) + tilt * u * u + cup * v * v)]); }
     grid.push(row);
   }
@@ -261,7 +262,7 @@ export function buildRose({ size = 26, seed = 7, base = false } = {}) {
     // the crown and the tip's lift scale with the petal's own LENGTH (a short
     // inner petal rising a full crown over a few mm turned its tip 51°)
     const kL = L / (R * 0.92 * 1.08);
-    const g = bladeGrid({ at: [rho * 0.42 * Math.cos(ang), rho * 0.42 * Math.sin(ang)], ang, L, hw: bluntHalf(W, 2.8, 0.3), crown: (u, v) => kL * crown * (0.25 + 0.75 * Math.pow(u, 1.3)) * (0.55 + 0.45 * Math.pow(Math.abs(v), 1.8)), lift: () => lift, tilt: 1.6 * kL * crown * (1 - 0.5 * t), nu: 22, nv: 16 });
+    const g = bladeGrid({ at: [rho * 0.42 * FM.cos(ang), rho * 0.42 * FM.sin(ang)], ang, L, hw: bluntHalf(W, 2.8, 0.3), crown: (u, v) => kL * crown * (0.25 + 0.75 * FM.pow(u, 1.3)) * (0.55 + 0.45 * FM.pow(Math.abs(v), 1.8)), lift: () => lift, tilt: 1.6 * kL * crown * (1 - 0.5 * t), nu: 22, nv: 16 });
     patchSolid(mesh, g, `rose-${k}`);
   }
   sphereSolid(mesh, [0, 0, F + 0.3 + crown * 3.2 - 0.3 * 0.14 * R], 0.14 * R, PATTERN_LAT, PATTERN_LON);
@@ -287,7 +288,7 @@ export function buildRosette({ size = 20, base = false } = {}) {
   for (let i = 0; i < n; i++) {
     const ang = 2 * Math.PI * i / n, L = ROSETTE.len * R, W = ROSETTE.width * 2 * Math.PI * (0.55 * R) / n;
     const lift = F + 0.3 + (i % 2 ? 0.4 * crown : 0);
-    const g = bladeGrid({ at: [0.1 * R * Math.cos(ang), 0.1 * R * Math.sin(ang)], ang, L, hw: bluntHalf(W, 3.0, 0.25), crown: (u, v) => crown * Math.pow(Math.max(0, 1 - v * v), 0.3) * (0.8 - 0.15 * Math.exp(-((v / 0.3) ** 2))) * (0.75 + 0.25 * Math.sin(Math.PI * u)), lift: () => lift, nu: 18, nv: 16 , lipU: ROSETTE_LIP });
+    const g = bladeGrid({ at: [0.1 * R * FM.cos(ang), 0.1 * R * FM.sin(ang)], ang, L, hw: bluntHalf(W, 3.0, 0.25), crown: (u, v) => crown * FM.pow(Math.max(0, 1 - v * v), 0.3) * (0.8 - 0.15 * FM.exp(-FM.pow(v / 0.3, 2))) * (0.75 + 0.25 * FM.sin(Math.PI * u)), lift: () => lift, nu: 18, nv: 16 , lipU: ROSETTE_LIP });
     patchSolid(mesh, g, `rosette-${i}`);
   }
   const rb = ROSETTE.boss * R;
@@ -374,7 +375,7 @@ export function elementAt(kind, size, soft = false) {
    walls stand on it), a bead's equator. Closed (the first point repeated). */
 function partLoops(P, parts) {
   return parts.map((pt) => {
-    if (pt.kind === 'bead') { const out = []; for (let k = 0; k <= 24; k++) { const a = 2 * Math.PI * k / 24; out.push([pt.c[0] + pt.r * Math.cos(a), pt.c[1] + pt.r * Math.sin(a)]); } return out; }
+    if (pt.kind === 'bead') { const out = []; for (let k = 0; k <= 24; k++) { const a = 2 * Math.PI * k / 24; out.push([pt.c[0] + pt.r * FM.cos(a), pt.c[1] + pt.r * FM.sin(a)]); } return out; }
     const at = (i, j) => { const k = 3 * (pt.base + i * pt.nv + j); return [P[k], P[k + 1]]; };
     const loop = [];
     for (let j = 0; j < pt.nv; j++) loop.push(at(0, j));
@@ -395,7 +396,7 @@ function partLoops(P, parts) {
 export function footprintTouches(el, test) {
   for (let i = 0; i < el.parts.length; i++) {
     const pt = el.parts[i];
-    if (pt.kind === 'bead') { for (let k = 0; k < 96; k++) { const a = 2 * Math.PI * k / 96; if (test([pt.c[0] + pt.r * Math.cos(a), pt.c[1] + pt.r * Math.sin(a)])) return true; } }
+    if (pt.kind === 'bead') { for (let k = 0; k < 96; k++) { const a = 2 * Math.PI * k / 96; if (test([pt.c[0] + pt.r * FM.cos(a), pt.c[1] + pt.r * FM.sin(a)])) return true; } }
     else if (el.loops[i].some((q) => test(q))) return true;
   }
   return false;
@@ -407,7 +408,7 @@ export function footprintTouches(el, test) {
    relative to the plate's top (the relief adds plateT to every z > 0). */
 export function placeElement(kind, { size, at = [0, 0], angle = 0, lift = 0, soft = false } = {}) {
   const e = elementAt(kind, size, soft);
-  const ca = Math.cos(angle), sa = Math.sin(angle), src = e.positions, P = new Float64Array(src.length);
+  const ca = FM.cos(angle), sa = FM.sin(angle), src = e.positions, P = new Float64Array(src.length);
   for (let k = 0; k < src.length; k += 3) {
     const x = src[k], y = src[k + 1], z = src[k + 2];
     P[k] = at[0] + ca * x - sa * y; P[k + 1] = at[1] + sa * x + ca * y; P[k + 2] = z === 0 ? 0 : z + lift;

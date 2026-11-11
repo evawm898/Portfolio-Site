@@ -46,10 +46,11 @@
    The wire thickness is floored at it and told. */
 
 import { offsetCurve, outerEdge, innerEdge, sweepSpine } from './frame-geometry.js';
-import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound, plateOutline } from './frame-relief.js';
+import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound, plateOutline, reliefSpines } from './frame-relief.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
 import { placeElement, relift, drapeElement, mirrorElement, symmetrizeElement, wireElementContact, elementClear, footprintTouches } from './frame-elements.js';
 import { vineFor, silDistance, drapedCrest, edgeFrame, crestLift, standMotifs } from './frame-vine.js';
+import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 export const SCROLL_STEP_DEG = 3;
 export const SCROLL_MAX_STEP_MM = 1.0;
@@ -83,7 +84,7 @@ export const carvedWidth = (rho, cap) => Math.min(cap, Math.max(MIN_FEATURE_MM, 
 /* the wire's profile samples across its width */
 export const WIRE_SAMPLES = 8;
 
-const sinc = (x) => (Math.abs(x) < 1e-8 ? 1 - x * x / 6 : Math.sin(x) / x);
+const sinc = (x) => (Math.abs(x) < 1e-8 ? 1 - x * x / 6 : FM.sin(x) / x);
 const smooth = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
 /* The tightness control → the volute's asked turns. */
@@ -93,7 +94,7 @@ export const tightnessTurns = (tau) => VOLUTE_TURNS[0] + (VOLUTE_TURNS[1] - VOLU
 /* The turn of a stretch of length Ls whose radius of curvature runs linearly
    from ra to rb (a log spiral when it runs to the pole):
    ∫ ds/ρ = Ls · ln(ra/rb) / (ra − rb). */
-export const linTurn = (Ls, ra, rb) => (Math.abs(ra - rb) < 1e-12 * ra ? Ls / ra : Ls * Math.log(ra / rb) / (ra - rb));
+export const linTurn = (Ls, ra, rb) => (Math.abs(ra - rb) < 1e-12 * ra ? Ls / ra : Ls * FM.log(ra / rb) / (ra - rb));
 /* The radius at which a volute of length Lv must START to make `turns`
    full turns down to the eye re (bisection; the turn falls as the start
    radius grows). Past what Lv can hold at any start radius (Lv / re radians)
@@ -125,7 +126,7 @@ function halfCurve(h, rMid, rv, re, sign, ramp, phi0, share) {
     ds = Math.min(SCROLL_MAX_STEP_MM, rho(s + ds / 2) * dTh, h - s);     // re-read at the step's midpoint
     const kmid = kap(s + ds / 2), dphi = kmid * ds;
     const c = ds * sinc(dphi / 2);
-    x += c * Math.cos(f + dphi / 2); y += c * Math.sin(f + dphi / 2);
+    x += c * FM.cos(f + dphi / 2); y += c * FM.sin(f + dphi / 2);
     f += dphi; s += ds;
     pts.push([x, y]); phi.push(f); kk.push(kap(s)); u.push(s);
   }
@@ -161,7 +162,7 @@ export function scrollCurve(spec) {
   const pts = [], tan = [], u = [], kap = [];
   for (let i = A.pts.length - 1; i >= 1; i--) { pts.push(A.pts[i]); tan.push(A.phi[i] - Math.PI); u.push(-A.u[i]); kap.push(-A.kap[i]); }
   for (let i = 0; i < B.pts.length; i++) { pts.push(B.pts[i]); tan.push(B.phi[i]); u.push(B.u[i]); kap.push(B.kap[i]); }
-  const nrm = tan.map((f) => [-Math.sin(f), Math.cos(f)]);
+  const nrm = tan.map((f) => [-FM.sin(f), FM.cos(f)]);
   const built = [h1, h2].map((h, i) => linTurn(h * share, rv[i], re) / (2 * Math.PI));
   const out = { kind, pts, nrm, tan, u, kap, root: A.pts.length - 1, info: { L, t, rMid, rv, eye: re, h1, h2, turnsAsked: turns, turnsBuilt: built, share, taper: !!spec.taper, carved: !!spec.carved, tip: tEye } };
   // a CARVED stroke: the local width is the self-similar law on the curve's
@@ -271,7 +272,7 @@ export function buildScroll(spec) {
    `at`; `mirror` reflects x → −x AFTER placing (exact: the doubles are
    negated, never recomputed). */
 export function placeCurve(c, { at = [0, 0], angle = 0, flip = false, mirror = false } = {}) {
-  const ca = Math.cos(angle), sa = Math.sin(angle), r0 = c.pts[c.root];
+  const ca = FM.cos(angle), sa = FM.sin(angle), r0 = c.pts[c.root];
   const map = ([x, y]) => { let X = x - r0[0], Y = y - r0[1]; if (flip) Y = -Y; return [at[0] + ca * X - sa * Y, at[1] + sa * X + ca * Y]; };
   const rot = ([x, y]) => { if (flip) y = -y; return [ca * x - sa * y, sa * x + ca * y]; };
   let pts = c.pts.map(map), nrm = c.nrm.map(rot);
@@ -298,7 +299,7 @@ export function buildGroup({ n = 3, length = 60, tightness = 0.5, wire = 1.6, ra
   for (let i = 1; i < n; i++) stations.push((i % 2 ? -1 : 1) * (0.18 + 0.14 * Math.floor((i - 1) / 2)));
   const placeChild = (frac, i, tau) => {
     const order = Math.floor(i / 2) + 1;
-    const len = length * ratio ** order, tw = carved ? carvedCap(len) : Math.max(MIN_FEATURE_MM, wire * Math.sqrt(ratio) ** order);
+    const len = length * FM.pow(ratio, order), tw = carved ? carvedCap(len) : Math.max(MIN_FEATURE_MM, wire * FM.pow(Math.sqrt(ratio), order));
     const child = buildScroll({ kind: i % 2 ? 'S' : 'C', length: len, tightness: tau, wire: tw, balance, taper, carved });
     // the lead's station at arc length frac · L from its root, on its BACK
     // (the side opposite its normal)
@@ -361,12 +362,12 @@ export const LEAF_LOBES = 4;
 export const LEAF_FOLD = 1.6;
 export const LEAF_ASPECT = 0.38;       // the blade's width as a fraction of its length
 export const LEAF_RELIEF = 0.18;       // the blade's crown as a fraction of its width (× ornament relief)
-export const leafKappa = (s, L, side = 1, theta = LEAF_CURL) => side * theta * (LEAF_CURL_POWER + 1) / L * Math.pow(Math.max(0, s) / L, LEAF_CURL_POWER);
+export const leafKappa = (s, L, side = 1, theta = LEAF_CURL) => side * theta * (LEAF_CURL_POWER + 1) / L * FM.pow(Math.max(0, s) / L, LEAF_CURL_POWER);
 export function leafEnvelope(s, L, W, lobes = LEAF_LOBES) {
   const a = Math.min(1, Math.max(0, s / L));
-  const env = Math.pow(Math.sin(Math.PI * Math.pow(a, 0.75)), 0.8);
+  const env = FM.pow(FM.sin(Math.PI * FM.pow(a, 0.75)), 0.8);
   const fr = (a * lobes) % 1;
-  return W * env * (0.5 + 0.5 * Math.sqrt(Math.max(0, Math.sin(Math.PI * fr))));
+  return W * env * (0.5 + 0.5 * Math.sqrt(Math.max(0, FM.sin(Math.PI * fr))));
 }
 export const leafWidth = (s, L, W, kap, lobes = LEAF_LOBES) => Math.max(MIN_FEATURE_MM, Math.min(leafEnvelope(s, L, W, lobes), LEAF_FOLD / Math.max(1e-12, Math.abs(kap))));
 export function buildLeaf({ length, width, side = 1, curl = LEAF_CURL, lobes = LEAF_LOBES, step = 0.4, minStations = 48 } = {}) {
@@ -382,10 +383,10 @@ export function buildLeaf({ length, width, side = 1, curl = LEAF_CURL, lobes = L
   let x = 0, y = 0, f = 0;
   for (let i = 1; i <= n; i++) {
     const sm = (i - 0.5) * ds, dphi = leafKappa(sm, L, side, curl) * ds, c = ds * sinc(dphi / 2);
-    x += c * Math.cos(f + dphi / 2); y += c * Math.sin(f + dphi / 2); f += dphi;
+    x += c * FM.cos(f + dphi / 2); y += c * FM.sin(f + dphi / 2); f += dphi;
     pts.push([x, y]); tan.push(f); u.push(i * ds); kap.push(leafKappa(i * ds, L, side, curl));
   }
-  const nrm = tan.map((g) => [-Math.sin(g), Math.cos(g)]);
+  const nrm = tan.map((g) => [-FM.sin(g), FM.cos(g)]);
   const w = u.map((s, i) => leafWidth(s, L, W, kap[i], lobes));
   return { kind: 'leaf', pts, nrm, tan, u, kap, w, root: 0, info: { kind: 'leaf', L, wire: W, tip: MIN_FEATURE_MM, side, curl, lobes, told } };
 }
@@ -425,7 +426,7 @@ export function buildCluster(group, { size = 1, layout = LEAF_LAYOUT } = {}) {
       lf.info = { ...lf.info, hostWire: lead.info.wire, hostW: wAt(lead, lead.root), role: 'leaf', shortened: q };
       if (fits(lf)) got = lf;
     }
-    if (got) { leaves.push(got); if (got.info.shortened) told.push(`leaf ${k + 1} shortened to ${(100 * 0.85 ** got.info.shortened).toFixed(0)}% — at full length it grazes another wire of the group`); }
+    if (got) { leaves.push(got); if (got.info.shortened) told.push(`leaf ${k + 1} shortened to ${(100 * FM.pow(0.85, got.info.shortened)).toFixed(0)}% — at full length it grazes another wire of the group`); }
     else told.push(`leaf ${k + 1} not built — it grazes another wire of the group at every length`);
   });
   return { leaves, told };
@@ -445,7 +446,7 @@ export function wireProfile(shape = 'half-round') {
   const x = new Float64Array(WIRE_SAMPLES + 1), z = new Float64Array(WIRE_SAMPLES + 1);
   for (let i = 0; i <= WIRE_SAMPLES; i++) {
     x[i] = i / WIRE_SAMPLES;
-    const c = Math.sqrt(Math.max(0, 1 - (2 * x[i] - 1) ** 2));
+    const c = Math.sqrt(Math.max(0, 1 - FM.pow(2 * x[i] - 1, 2)));
     z[i] = shape === 'half-round' ? c : 0.5 + 0.5 * c;
   }
   return { x, z, shape };
@@ -462,7 +463,7 @@ export function arrisProfile() {
   for (let i = 0; i <= ARRIS_SAMPLES; i++) {
     x[i] = i / ARRIS_SAMPLES;
     const u = Math.abs(2 * x[i] - 1), dome = Math.sqrt(Math.max(0, 1 - u * u));
-    z[i] = Math.max(0, (1 - u) ** 0.55 * (0.72 + 0.28 * Math.cos(Math.PI * u * 1.6) ** 2)) * dome ** 0.25;
+    z[i] = Math.max(0, FM.pow(1 - u, 0.55) * (0.72 + 0.28 * FM.pow(FM.cos(Math.PI * u * 1.6), 2))) * FM.pow(dome, 0.25);
   }
   return { x, z, shape: 'arris' };
 }
@@ -471,7 +472,7 @@ export function arrisProfile() {
 export const LEAF_SAMPLES = 16;
 export function leafProfile() {
   const x = new Float64Array(LEAF_SAMPLES + 1), z = new Float64Array(LEAF_SAMPLES + 1);
-  for (let i = 0; i <= LEAF_SAMPLES; i++) { x[i] = i / LEAF_SAMPLES; const u = 2 * x[i] - 1; z[i] = 0.28 + 0.5 * Math.exp(-((u / 0.12) ** 2)) + 0.22 * u ** 4; }
+  for (let i = 0; i <= LEAF_SAMPLES; i++) { x[i] = i / LEAF_SAMPLES; const u = 2 * x[i] - 1; z[i] = 0.28 + 0.5 * FM.exp(-FM.pow(u / 0.12, 2)) + 0.22 * FM.pow(u, 4); }
   return { x, z, shape: 'leaf' };
 }
 export const wireHeight = (t, shape) => (shape === 'round' ? t : t / 2);
@@ -634,7 +635,7 @@ export function bandRegion(model, scale) {
 /* A rigid motion of a curve: an optional reflection of LOCAL x, a rotation
    by `angle`, a translation by `at`. Normals and tangents follow. */
 export function rigid(c, { at = [0, 0], angle = 0, mirrorX = false }) {
-  const ca = Math.cos(angle), sa = Math.sin(angle);
+  const ca = FM.cos(angle), sa = FM.sin(angle);
   const R = ([x, y]) => { if (mirrorX) x = -x; return [ca * x - sa * y, sa * x + ca * y]; };
   return { ...c, pts: c.pts.map((p) => { const q = R(p); return [q[0] + at[0], q[1] + at[1]]; }), nrm: c.nrm.map(R), tan: c.tan.map((f) => angle + (mirrorX ? Math.PI - f : f)) };
 }
@@ -831,7 +832,7 @@ export function mapToPath(c, path, x0 = 0) {
   };
   const pts = c.pts.map(([x, y]) => { const f = frameAt(x0 + x); return [f.P[0] + y * f.N[0], f.P[1] + y * f.N[1]]; });
   const m = pts.length;
-  const tanA = pts.map((_, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(m - 1, i + 1)]; return Math.atan2(b[1] - a[1], b[0] - a[0]); });
+  const tanA = pts.map((_, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(m - 1, i + 1)]; return FM.atan2(b[1] - a[1], b[0] - a[0]); });
   // UNWRAPPED (atan2 wraps at ±π): selfGap finds a coil by stations whose
   // tangents differ by a half turn or more, and a wrapped angle hides a
   // stretch that turned a whole turn — the mapped coil's check went blind
@@ -839,7 +840,7 @@ export function mapToPath(c, path, x0 = 0) {
   for (let i = 1; i < m; i++) { while (tanA[i] - tanA[i - 1] > Math.PI) tanA[i] -= 2 * Math.PI; while (tanA[i] - tanA[i - 1] < -Math.PI) tanA[i] += 2 * Math.PI; }
   // keep the source's sense of left: the mapped normal is the source normal
   // carried through the frame, re-orthogonalised against the new tangent
-  const nrm = tanA.map((f, i) => { const nn = [-Math.sin(f), Math.cos(f)]; const src = c.nrm[i], fr = frameAt(x0 + c.pts[i][0]); const tl = [fr.N[1], -fr.N[0]]; const carried = [src[0] * tl[0] + src[1] * fr.N[0], src[0] * tl[1] + src[1] * fr.N[1]]; return nn[0] * carried[0] + nn[1] * carried[1] >= 0 ? nn : [-nn[0], -nn[1]]; });
+  const nrm = tanA.map((f, i) => { const nn = [-FM.sin(f), FM.cos(f)]; const src = c.nrm[i], fr = frameAt(x0 + c.pts[i][0]); const tl = [fr.N[1], -fr.N[0]]; const carried = [src[0] * tl[0] + src[1] * fr.N[0], src[0] * tl[1] + src[1] * fr.N[1]]; return nn[0] * carried[0] + nn[1] * carried[1] >= 0 ? nn : [-nn[0], -nn[1]]; });
   const out = { ...c, pts, nrm, tan: tanA };
   if (c.info && c.info.carved && c.w) {
     const cap = c.info.wire;
@@ -877,7 +878,7 @@ export function slitWorst(c, region) {
 export function moldingHeightField(model, scale) {
   const p = model.params, mesh = new Mesh();
   const reliefDepth = p.moldingDepth * scale * p.reliefScale;
-  for (const sp of model.spines) bandSolid(mesh, sp, model.prof, { scale, plateT: 0, reliefDepth });
+  for (const sp of reliefSpines(model)) bandSolid(mesh, sp, model.prof, { scale, plateT: 0, reliefDepth });
   const P = mesh.pos, cell = 2, grid = new Map(), tris = [], key = (i, j) => i * 100003 + j;
   for (const bp of mesh.parts) {
     const last = bp.closed ? bp.V : bp.V - 1;
@@ -953,7 +954,7 @@ export function placeMotif(kind, { size, at, out, H, opening, onAxis = false, su
   // on the axis the normal IS ±y and the point IS on x = 0 (a path's own
   // last bits are not)
   if (onAxis) { out = [0, Math.sign(out[1]) || 1]; at = [0, at[1]]; }
-  const angle = Math.atan2(out[1], out[0]) - Math.PI / 2;
+  const angle = FM.atan2(out[1], out[0]) - Math.PI / 2;
   const Hz = (q) => Math.max(0, H(q));
   let c = at, el = null;
   if (beyond) {
@@ -1013,11 +1014,11 @@ export function ornamentFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
       if (!anchor) { told.push(`no ${id} on this frame — its ${g} group is not built`); continue; }
       const { Po, out } = anchorFrame(model, anchor, scale);
       const onAxis = Math.abs(Po[0]) < 1e-9;
-      const theta = Math.atan2(-out[0], out[1]);
+      const theta = FM.atan2(-out[0], out[1]);
       // the long half's direction: along +x local under theta; on the axis it
       // points away from the axis (right); elsewhere away from the frame's
       // middle — up in the upper half, down in the lower, up at the sides
-      const dir = [Math.cos(theta), Math.sin(theta)];
+      const dir = [FM.cos(theta), FM.sin(theta)];
       let mirrorX = false;
       if (onAxis) mirrorX = dir[0] < 0;
       else { const upper = Po[1] >= yMid - 1e-9; mirrorX = upper ? dir[1] < 0 : dir[1] > 0; }

@@ -159,9 +159,10 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     cRows.push({ name, ...c });
     const P = relief.positions, s = relief.scale;
     // R registration
-    let rBad = 0, rN = 0, nullN = 0;
+    let rBad = 0, rN = 0, nullN = 0, memberN = 0;
+    const bands = RL.reliefSpines ? RL.reliefSpines(model) : model.spines;
     for (const part of relief.parts.filter((q) => q.kind === 'band')) {
-      const spine = model.spines.find((q) => q.id === part.id);
+      const spine = bands.find((q) => q.id === part.id);
       const prof = model.prof, w = spine.bandWidth;
       const ext = RL.embedSpine(spine);
       const j = ext.spine.joins && ext.spine.joins.length ? ext.spine.joins[0] : -1;
@@ -176,12 +177,26 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
           rN++;
           if (!(P[k] === want[0] * s && P[k + 1] === want[1] * s && P[k + 2] === z)) rBad++;
         }
+        // a CHAIN (charter §19) carries its members' own vertices: every
+        // member row is offsetCurve of the MEMBER, the skeleton's own spine
+        // (a joint row is the earlier member's, so a later member's row 0 is
+        // the one row not held — its vertex is dropped by construction)
+        for (const [mi, mb] of (spine.members || []).entries()) {
+          const msp = model.spines.find((q) => q.id === mb.id), moff = G.offsetCurve(msp, d);
+          for (let r = mi ? 1 : 0; r < mb.n; r++) {
+            const row = mb.from + r, mrow = mb.reversed ? mb.n - 1 - r : r;
+            if (!moff[mrow]) continue;   // trimmed at the member's own join: the mitre clause above holds it
+            const k = 3 * part.T(row + part.rowOffset, i + part.colOffset);
+            memberN++;
+            if (!(P[k] === moff[mrow][0] * s && P[k + 1] === moff[mrow][1] * s && P[k + 2] === z)) rBad++;
+          }
+        }
       }
     }
-    rRows.push({ name, bad: rBad, n: rN, nulls: nullN });
+    rRows.push({ name, bad: rBad, n: rN, nulls: nullN, members: memberN });
     // B embeds land
     for (const part of relief.parts.filter((q) => q.kind === 'band')) {
-      const spine = model.spines.find((q) => q.id === part.id);
+      const spine = bands.find((q) => q.id === part.id);
       const mid = Math.floor((model.prof.x.length - 1) / 2) + part.colOffset;
       const probe = (row, neighbourId, what) => {
         const k = 3 * part.T(row, mid);
@@ -193,6 +208,10 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         if (inside) worstB = Math.min(worstB, dist);
         bRows.push({ name, id: part.id, what, ok: inside && dist > 0, detail: `${what} → ${neighbourId}: ${inside ? 'inside' : 'OUTSIDE'}, ${dist.toFixed(4)} mm from its boundary` });
       };
+      // a declared CONTINUATION that does not meet its band (reliefSpines
+      // leaves the member its own band and records it): the junction is not
+      // there, so it fails here beside an embed that does not land
+      for (const u of part.unmet || []) bRows.push({ name, id: part.id, what: 'continues', ok: false, detail: `continuation unmet: ${u}` });
       if (part.embedStart) probe(0, spine.embed.start, 'start');
       if (part.embedEnd) probe(part.V - 1, spine.embed.end, 'end');
       if (part.lip) {
@@ -210,8 +229,12 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
       const xInL = G.innerEdge(model.spines.find((q) => q.id === 'jambL'), w)[0][0];
       const xInR = G.innerEdge(model.spines.find((q) => q.id === 'jambR'), w)[0][0];
       const clear2d = (xInR - xInL - n * wm) / (n + 1);
-      const jamb = relief.parts.find((q) => q.id === 'jambL'), mull = relief.parts.find((q) => q.id === 'mullion1');
-      const xj = P[3 * jamb.T(jamb.rowOffset, jamb.C - 1)], xm = P[3 * mull.T(mull.rowOffset, mull.colOffset)];
+      // the jamb's foot row and the mullion's, wherever the relief swept them
+      // (charter §19: the jambs run in the head's chain, the left one
+      // reversed, a mullion in its sub-arch's chain, reversed)
+      const rowOf = (id) => { for (const q of relief.parts.filter((x) => x.kind === 'band')) { if (q.id === id) return { part: q, row: q.rowOffset }; const mb = (q.members || []).find((x) => x.id === id); if (mb) return { part: q, row: q.rowOffset + mb.from + (mb.reversed ? mb.n - 1 : 0) }; } return null; };
+      const J = rowOf('jambL'), M = rowOf('mullion1');
+      const xj = P[3 * J.part.T(J.row, J.part.C - 1)], xm = P[3 * M.part.T(M.row, M.part.colOffset)];
       const clear3d = (xm - xj) / s;
       lRows.push({ name, clear2d, clear3d, d: Math.abs(clear3d - clear2d) });
     }
@@ -254,11 +277,11 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     console.log('     per row (tris · boundary · nonManifold(unrated) · regions@cell):');
     for (let i = 0; i < wRows.length; i++) console.log(`       ${wRows[i].name.padEnd(30)} ${String(wRows[i].triangles).padStart(6)} · ${wRows[i].boundary} · ${String(wRows[i].nonManifold).padStart(4)} · ${cRows[i].comps}@${cRows[i].cell}${cRows[i].first ? ` (first ${cRows[i].first})` : ''}`);
   }
-  rec('R every grid vertex is offsetCurve × scale and plateT + z·depth, exactly; a null offset is the mitre point', rRows.every((r) => r.bad === 0) && rRows.some((r) => r.nulls > 0), `${rRows.reduce((a, r) => a + r.n, 0)} vertices, ${rRows.reduce((a, r) => a + r.bad, 0)} off, ${rRows.reduce((a, r) => a + r.nulls, 0)} at a mitre`);
+  rec('R every grid vertex is offsetCurve × scale and plateT + z·depth, exactly; a null offset is the mitre point; every row of a CHAIN is its member spine\'s own offsetCurve', rRows.every((r) => r.bad === 0) && rRows.some((r) => r.nulls > 0) && rRows.some((r) => r.members > 0), `${rRows.reduce((a, r) => a + r.n, 0)} vertices, ${rRows.reduce((a, r) => a + r.bad, 0)} off, ${rRows.reduce((a, r) => a + r.nulls, 0)} at a mitre, ${rRows.reduce((a, r) => a + r.members, 0)} chain vertices held to their member`);
   rec('L a pierced light\'s clear width in the STL equals the 2-D clear width (1e-6 mm)', lRows.length > 0 && lRows.every((r) => r.d <= 1e-6), lRows.map((r) => `${r.name}: ${r.clear3d.toFixed(6)} vs ${r.clear2d.toFixed(6)}`).join(' · '));
   rec('Q the seam of every closed band: the closing strip is there (row V−1 joined to row 0, no duplicated vertex), the seam row is ON x = 0, and the surface turns across the seam exactly as across its antipode', qRows.length > 0 && qRows.every((r) => r.closing === r.wantClosing && r.dup > 1e-6 && r.step <= 1e-9 && r.gap === 0), `${qRows.length} closed rows; worst |seam turn − antipode turn| ${Math.max(...qRows.map((r) => r.step)).toExponential(1)} rad, seam xy gap ${Math.max(...qRows.map((r) => r.gap)).toExponential(1)} mm, closing strip ${qRows[0] ? qRows[0].closing : '—'} triangles${qRows.filter((r) => !(r.closing === r.wantClosing && r.dup > 1e-6 && r.step <= 1e-9 && r.gap === 0)).slice(0, 3).map((r) => `; ${r.name}: closing ${r.closing}/${r.wantClosing}, dup ${r.dup.toFixed(4)}, step ${r.step.toExponential(1)}, gap ${r.gap.toExponential(1)}`).join('')}`);
   rec('L2 a closed frame\'s opening across its sides in the STL equals the restated opening (2a − w, 2A − w), 1e-6 mm', l2Rows.length > 0 && l2Rows.every((r) => r.d <= 1e-6), `${l2Rows.length} open rows, worst ${Math.max(...l2Rows.map((r) => r.d)).toExponential(1)} mm${l2Rows.filter((r) => r.d > 1e-6).slice(0, 2).map((r) => `; ${r.name} ${r.got.toFixed(4)} vs ${r.want.toFixed(4)}`).join('')}`);
-  rec('B every declared embed lands strictly inside the band it names', bRows.length > 0 && bRows.every((r) => r.ok), `${bRows.length} embeds, nearest to a boundary ${worstB === Infinity ? '—' : worstB.toFixed(4)} mm${bRows.filter((r) => !r.ok).map((r) => `; ${r.name} ${r.id} ${r.detail}`).join('')}`);
+  rec('B every declared embed lands strictly inside the band it names, and every declared continuation meets the band it names', bRows.length > 0 && bRows.every((r) => r.ok), `${bRows.length} embeds, nearest to a boundary ${worstB === Infinity ? '—' : worstB.toFixed(4)} mm${bRows.filter((r) => !r.ok).map((r) => `; ${r.name} ${r.id} ${r.detail}`).join('')}`);
   if (label === 'shipped') { const d = bRows.filter((r) => r.name === 'sill stepped'); console.log(`     embeds on 'sill stepped': ${d.map((r) => `${r.id} ${r.detail}`).join(' | ')}`); }
 
   // F the floor, both ways
@@ -274,7 +297,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
   // X2 the SVG never reads the embed
   const m = G.buildFrame({ sill: 'stepped', mullions: 2 });
   const withEmbed = G.exportSvg(m).svg;
-  for (const sp of m.spines) delete sp.embed;
+  for (const sp of m.spines) { delete sp.embed; delete sp.continues; }
   const m2 = { ...m, bands: m.spines.map((sp) => G.sweepSpine(sp, m.prof, m.params)) };
   rec('X2 the SVG is the same string with every embed declaration deleted', G.exportSvg(m2).svg === withEmbed, `${withEmbed.length} chars`);
 
@@ -1118,14 +1141,42 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     if (BASE) {
       const GB = await import(pathToFileURL(path.join(BASE, 'frame-geometry.js')).href);
       const RB = fs.existsSync(path.join(BASE, 'frame-relief.js')) ? await import(pathToFileURL(path.join(BASE, 'frame-relief.js')).href) : null;
-      let moved = 0, stlMoved = 0, stlN = 0;
-      for (const [, p] of ARCH_ROWS) {
+      let moved = 0, stlN = 0, s2bad = [], s2in = 0, s2out = 0, s2held = 0;
+      // the vertex set of a relief as the STL writes it (float32), and the
+      // JUNCTION vertices — what the seam fix (charter §19) may move: an
+      // embedded end's stub row, a band's first and last rows where it meets
+      // another band (a joint), and the backed plate
+      const f32k = (P, i) => `${Math.fround(P[i])},${Math.fround(P[i + 1])},${Math.fround(P[i + 2])}`;
+      const vset = (rel) => { const S = new Set(); for (let i = 0; i < rel.positions.length; i += 3) S.add(f32k(rel.positions, i)); return S; };
+      const junction = (rel) => {
+        const J = new Set(), P = rel.positions;
+        for (const q of rel.parts) {
+          if (q.kind === 'plate') { for (let v = q.base; v < q.base + 2 * q.n; v++) J.add(f32k(P, 3 * v)); continue; }
+          if (q.kind !== 'band' || q.closed || /^orn/.test(q.id)) continue;
+          for (const r of [0, q.rowOffset, q.V - 1 - (q.embedEnd ? 1 : 0), q.V - 1]) for (let c = 0; c < q.C; c++) { J.add(f32k(P, 3 * q.T(r, c))); J.add(f32k(P, 3 * (q.T(r, c) + q.V * q.C))); }
+        }
+        return J;
+      };
+      for (const [name, p] of ARCH_ROWS) {
         const m = G.buildFrame(p), mb = GB.buildFrame(p);
         if (G.exportSvg(m).svg !== GB.exportSvg(mb).svg) moved++;
-        if (RB) { stlN++; const a = RL.exportStl(RL.buildRelief(m)), b = RB.exportStl(RB.buildRelief(mb)); if (a.length !== b.length || a.some((v, i) => v !== b[i])) stlMoved++; }
+        if (RB) {
+          stlN++;
+          const a = RL.buildRelief(m), b = RB.buildRelief(mb), A = vset(a), B = vset(b), JA = junction(a), JB = junction(b);
+          let badIn = 0, badOut = 0;
+          for (const k of A) { if (B.has(k)) s2held++; else { s2in++; if (!JA.has(k)) badIn++; } }
+          for (const k of B) if (!A.has(k)) { s2out++; if (!JB.has(k)) badOut++; }
+          if (badIn || badOut) s2bad.push(`${name}: ${badIn} new vertices and ${badOut} lost ones away from every junction`);
+        }
       }
       check(`S the SVG strings are byte-identical to ${path.basename(BASE)} on every arch row`, moved === 0, `${moved} of ${ARCH_ROWS.length} moved`);
-      if (RB) check(`S2 the STL bytes are byte-identical to ${path.basename(BASE)} on every arch row`, stlMoved === 0, `${stlMoved} of ${stlN} moved`);
+      // S2 was "the STL bytes are byte-identical to the base on every arch
+      // row" until the seam fix (charter §19), which moves every arch row's
+      // STL on purpose — at the junctions and nowhere else. So the claim is
+      // the PARTITION: every vertex either tree writes and the other does not
+      // is a junction vertex of the tree that writes it; every other vertex is
+      // the base's own, bit for bit (as a float32 triple).
+      if (RB) check(`S2 the STL moves against ${path.basename(BASE)} at the junctions only (a stub row, a joint row, the backed plate) — every other vertex the base's own, as float32`, s2bad.length === 0 && s2in > 0, `${stlN} arch rows: ${s2held} vertices held, ${s2in} new and ${s2out} lost, all at a junction${s2bad.length ? ' — ' + s2bad.slice(0, 3).join('; ') : ''}`);
       else console.log(`     S2 (STL byte identity): SKIPPED — ${path.basename(BASE)} has no frame-relief.js`);
     } else console.log('     S/S2 (SVG and STL byte identity against a base worktree): SKIPPED — pass --base <worktree of e759041>');
   }
@@ -1343,7 +1394,7 @@ const MUTANTS = [
   // phase 3e step 3 — the placed elements and the vine (PL / VN). Each one a
   // failure the brief named; each claims what it must redden
   { id: 'the-weight-is-a-constant', file: 'vine', from: 'export function weightAt(x, L, Aa, Ab) {', to: 'export function weightAt(x, L, Aa, Ab) {\n  return 0.5;', breaks: ['VN1', 'VN2', 'RN5', 'CB2', 'CB3', 'FW3'] },   // at 0.5 the crest anchor is medium and takes a rosette (VN2, and CB2 / CB3: a crest that is not the soft shell); every volute's length then reads off the restated weight (RN5); no crest anywhere, so FW3 has none to measure
-  { id: 'the-element-mirror-is-broken', file: 'elements', from: '  for (let k = 0; k < P.length; k += 3) P[k] = -P[k];', to: '  for (let k = 0; k < P.length; k += 3) P[k] = 0.02 - P[k];', breaks: ['PL4'] },   // PL4 is its witness (PL2 / PL3 fired through the chains' capped elements, retired with them)
+  { id: 'the-element-mirror-is-broken', file: 'elements', from: '  for (let k = 0; k < P.length; k += 3) P[k] = -P[k];', to: '  for (let k = 0; k < P.length; k += 3) P[k] = 0.02 - P[k];', breaks: ['PL4', 'FW2'] },   // PL4 is its witness (PL2 / PL3 fired through the chains' capped elements, retired with them); FW2 too since #550: a mirrored motif 0.02 off its stems' mirror leaves a wire over the top its dome was raised against (measured on 03ff907 and on this tree alike)
   { id: 'the-axis-motif-is-not-its-own-mirror', file: 'filigree', from: '  if (onAxis) { el = symmetrizeElement(el); if (el.asymmetric) return null; }', to: '', breaks: ['PL4'] },
   { id: 'the-stem-lifts-off-the-molding', file: 'vine', from: 'roundEnds(c); c.lift = c.pts.map(() => 0);', to: 'roundEnds(c); c.lift = c.pts.map(() => 0.5);', breaks: ['VN5'] },
   // phase 3e step 3, second round (Eva's rulings 1-2: the band is the cap)
