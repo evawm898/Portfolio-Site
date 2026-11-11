@@ -12588,7 +12588,7 @@ opening falls 73 % → 59 % → 38 % of the outer area. Sheet: `node tools/shot-
 (Eva's ruling on the step-2 sheet; read §18.7 before touching `standMotifs`, `domeFlower`, `elementTop`, `STAND`,
 `raisedCrestLift`, `rinceauBandFloor`, `.fr-ctrl--dead` or FW1–FW3 / DW1).
 - Relief order: crest shell > flowers > rinceau (stem, volutes, acanthus) > molding. On the step-2 tree every rosette's crown
-  sat 0.7–2.0 mm under the stems crossing it and a stem stood up to 3.9 mm over its top.
+  sat 0.7–1.9 mm under the stems crossing it and a stem stood up to 4.0 mm over its top.
 - `standMotifs` runs after the wires are built (`withOrnament`, rinceau only). A FLOWER (every junction motif but the crest) is
   DOMED: its heart raised until its crown stands 1 mm (+0.1) over every wire within 2 mm, falling to nothing at the tips, plus a
   gentle cover (`STAND.ease` 0.3) so every wire under it lies 0.1 mm under its top. The CREST keeps its plan (`el.plan`) and is

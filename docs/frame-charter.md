@@ -1971,10 +1971,10 @@ molding" (§17.10) for the rinceau's flowers.** The relief's order is now: **the
 rinceau (stem, volutes, acanthus) > the molding**, a flower's crown at least 1 mm over the highest stem or leaf near it, the
 stems running UNDER a flower (ending beneath it or emerging from behind it, embedded in its underside), never over it.
 
-**Measured first, on the step-2 tree** (Node, export; the heights over the back off each relief): every corner, springing
-and side rosette's crown sat **0.7–2.0 mm under** the stems that cross it (crowns 5.2–5.65 mm, the stems 6.3–7.3), and a
-wire stood **2.7–3.9 mm over** a rosette's own top surface; the crest shell's crown (6.6) sat under the stems that end in it
-(7.1–7.4), a wire 1.2–1.4 mm over its top.
+**Measured first, on the step-2 tree** (Node, export; heights over the back, read off each relief by the sheet tool): every
+corner, springing and side rosette's crown sat **0.7–1.9 mm under** the highest stem near it (crowns 3.19–3.65 mm, the wires
+4.35–5.30) and a wire stood up to **4.01 mm over** a rosette's own top surface; the crest shell's crown (4.60–4.68) sat under the
+stems that end in it (4.93–5.28), a wire 1.13–1.42 mm over its top.
 
 **The construction: one stand pass, after the wires are seated and built** (`standMotifs` in `frame-vine.js`, called by
 `withOrnament` on the rinceau layout; `STAND = { step: 1 mm (MIN_FEATURE_MM), margin: 0.1 (VINE_MARGIN), near: 2 mm }`):
@@ -1996,10 +1996,24 @@ wire stood **2.7–3.9 mm over** a rosette's own top surface; the crest shell's 
   still falls at 45° and stands no slab — d stepped by the deficit until it covers its own stems likewise and its crown stands
   1 mm + 0.1 over every flower's and every wire near it;
 - **nothing moves in plan**, so every plan clause (the band cap CB1/CB2, the opening, the joins, the grazes PL2) holds as placed;
-  the stems already end beneath their junction's flower (the run-on past the anchor lies under its footprint), so no stem is
-  trimmed. The flower's size is unchanged (Eva allowed it to grow to hold the corner; none needed to).
+  no stem is trimmed: at the rectangle's top-right corner both stems end beneath the rosette, elsewhere (the arch's springing,
+  the oval's side) a stem passes under the flower and goes on past it — it emerges from behind the flower, never over it. The flower's size is unchanged (Eva allowed it to grow to hold the corner; none needed to).
 
-MEASURED_BLOCK
+**Measured, the default frames at 180 mm (Node, export; over the back):**
+
+| frame | rosette crown before → after | highest wire near | wire over its top, before → after | crest crown before → after |
+|---|---|---|---|---|
+| arch | 3.65 → 6.88 | 5.14 | +3.90 → −0.10 | 4.62 → 7.98 (wires under it by 1.94) |
+| rectangle (top-right / bottom-right) | 3.65 → 5.69 · 3.19 → 6.19 | 4.35 · 5.09 | +2.71 / +3.07 → −0.10 | 4.60 → 7.29 (1.52) |
+| oval | 3.54 → 6.48 | 5.30 | +4.01 → −0.10 | 4.68 → 7.58 (1.77) |
+
+Triangles unchanged on every frame (425,964 / 416,536 / 286,264 — nothing is added, only lifted); boundary 0, one region. The
+stand pass costs nothing measurable in build time once the crest's molding reach is shared with its first drape (`el.raise`):
+`withOrnament` 4.2 / 2.8 / 4.9 s against the step-2 tree's 4.2 / 2.7 / 5.3 (the first cut read the reach twice, +2–3 s).
+Over the gate's rows FW1 reads 59 flowers at a least lead of 1.100 mm, FW2 every wire 0.100 mm under any top, FW3 16 crests at
+1.100 mm. **What the dome leaves:** the rosette's own petal-tip lip still reads as a faceted end on the outer petals from
+three-quarter, as it did on the step-2 sheet — the element's shape, not the stand.
+
 
 **Gates:** `verify-frame-relief.mjs` **FW1** (a flower's crown a feature over every rinceau wire within 2 F of its footprint),
 **FW2** (no rinceau wire vertex over any motif's own top surface), **FW3** (the crest's crown a feature over every flower's and
