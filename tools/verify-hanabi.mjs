@@ -2361,7 +2361,7 @@ async function partTwo(overrides = {}) {
       // the panel as a visitor opens it: reload, THEN reset (a reset just before a reload races the
       // page's 150 ms debounced save, and the reload would restore whatever the last check left)
       await page.reload(); await page.waitForFunction(() => window.__hanabi);
-      await page.click('#resetDesign');
+      await page.evaluate(() => document.getElementById('resetDesign').click());   // its section is collapsed after a reload
       await page.evaluate(() => { document.querySelector('[data-view="suit"]').click(); const s = document.getElementById('viewSuit'); s.value = 'red'; s.dispatchEvent(new Event('change')); if (document.getElementById('roundCorners').checked) document.getElementById('roundCorners').click(); if (document.getElementById('guides').checked) document.getElementById('guides').click(); document.getElementById('sec-bg').open = true; });
       const card5 = () => page.evaluate(() => document.querySelectorAll('#stage .hb-card svg')[4].outerHTML);
       const st = await page.evaluate(() => ({
@@ -2444,7 +2444,8 @@ async function partTwo(overrides = {}) {
     for (const cut of ['separate', 'shared']) await check('B3', `the PDF (${cut}, ${cut === 'separate' ? '3 mm white border' : 'no border'}): pages, orientation, crop marks on trim, art to the edge${cut === 'separate' ? ' less the border, the border white' : ''}`, async () => {
       const duplex = cut === 'separate', BO = cut === 'separate' ? 3 : 0;
       const out = await page.evaluate(async ([cut, duplex, BO]) => {
-        const d = window.__hanabi.design(); d.border = BO; d.print = { ...d.print, paper: 'letter', orientation: 'auto', cut, duplex, flip: 'long', cropMarks: true }; window.__hanabi.setDesign(d);
+        // the deck B3 and B4 count (61 faces): no rainbow, whatever an earlier check left
+        const d = window.__hanabi.design(); d.rainbow = false; d.border = BO; d.print = { ...d.print, paper: 'letter', orientation: 'auto', cut, duplex, flip: 'long', cropMarks: true }; window.__hanabi.setDesign(d);
         const { doc, imp, pages } = await window.__hanabi.exportPdf({ returnDoc: true });
         return { b64: doc.output('datauristring').split(',')[1], cols: imp.cols, rows: imp.rows, perSheet: imp.perSheet, pages };
       }, [cut, duplex, BO]);
