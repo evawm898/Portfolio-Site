@@ -10,6 +10,7 @@ import { buildRelief, exportStl } from './frame-relief.js';
 import { ProfileEditor } from './frame-profile-editor.js';
 import { withOrnament } from './frame-filigree.js';
 import { withPattern } from './frame-pattern.js';
+import { measurePrint } from './frame-print.js';
 
 /* ---------------- state ---------------- */
 let params = { ...DEFAULTS };
@@ -112,7 +113,40 @@ function buildNow() {
   if (viewer) { viewer.setMesh(relief); if (!pinnedCamera) viewer.frame(); viewer.render(); }
   applyDead();
   writeReadout();
+  writePrintLine();
 }
+/* PRINT READINESS beside the STL button (charter §19): the cheap half on
+   every build — the box, the height over the back and the plate, the
+   triangles and the file — and the ray-measured half (frame-print.js, the
+   same code and the same 0.1 mm rays the charter's numbers come from) on
+   Measure print, marked stale the moment the frame changes. */
+let printStale = null;
+function writePrintLine() {
+  const P = relief.positions, n = relief.indices.length / 3;
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < P.length; i += 3) for (let k = 0; k < 3; k++) { const v = Math.fround(P[i + k]); if (v < lo[k]) lo[k] = v; if (v > hi[k]) hi[k] = v; }
+  document.getElementById('printLine').innerHTML =
+    `print <b>${(hi[0] - lo[0]).toFixed(1)} × ${(hi[1] - lo[1]).toFixed(1)} × ${(hi[2] - lo[2]).toFixed(2)} mm</b> (millimetres, as the STL says) · relief <b>${(hi[2] - relief.plateT).toFixed(2)} mm</b> over a <b>${relief.plateT.toFixed(2)} mm</b> back plate · back at z = <b>${lo[2]}</b>`
+    + `
+<b>${n.toLocaleString('en-US')}</b> triangles · STL <b>${((84 + 50 * n) / 1048576).toFixed(2)} MiB</b> · ${relief.parts.length} closed shells, overlapping (the slicer unions them)`
+    + `
+the ${MIN_FEATURE_MM.toFixed(1)} mm floor is ASSUMED — the print process is undecided, and every wall, gap and floor here is read against it`;
+  const out = document.getElementById('printMeasure');
+  if (printStale !== null && printStale !== relief) out.innerHTML = out.innerHTML ? `<span class="warn">stale — the frame changed since it was measured</span>` : '';
+}
+function measureNow() {
+  const r = measurePrint(relief, { cell: 0.1 });
+  printStale = relief;
+  const F = MIN_FEATURE_MM, under = (v) => (v < F ? ` <span class="warn">under the ${F.toFixed(1)} mm floor</span>` : '');
+  document.getElementById('printMeasure').innerHTML =
+    `volume <b>${(r.volumeMm3 / 1000).toFixed(2)} cm³</b> (the union, 0.1 mm rays) · narrowest feature <b>${r.feature.mm.toFixed(2)} mm</b>${under(r.feature.mm)} · narrowest gap <b>${Number.isFinite(r.gap.mm) ? r.gap.mm.toFixed(2) + ' mm' : 'none enclosed'}</b>${Number.isFinite(r.gap.mm) ? under(r.gap.mm) : ''}`
+    + `
+thinnest <b>${r.thinMm.toFixed(2)} mm</b> above the back${under(r.thinMm)} · <b>${(100 * r.rest).toFixed(2)} %</b> of the footprint rests on z = 0${r.overhangRays ? ` · <span class="warn">${r.overhangRays} rays meet material over an empty space</span>` : ' · nothing overhangs'}`
+    + `
+measured in plan off the vertical rays (frame-print.js: a feature or gap leaning off the vertical reads its larger thickness)`;
+  return r;
+}
+document.getElementById('measureBtn').addEventListener('click', () => measureNow());
 /* THE PROFILE WIDTH's DEAD TRAVEL, marked on the control (Eva's ruling (d),
    Nov 11): with the rinceau on, every value at or under the width the band is
    widened to builds the same 16 mm band — the track is hatched from its left
@@ -242,6 +276,9 @@ window.__frame = {
   // control writes (the print controls move this and never the paper)
   stl: () => { const b = exportStl(relief); let h = 0; for (let i = 0; i < b.length; i++) h = (h * 31 + b[i]) >>> 0; return { bytes: b.length, triangles: relief.indices.length / 3, hash: h, info: relief.info }; },
   stlBytes: () => Array.from(exportStl(relief)),
+  // the SHA-256 of the very bytes Get STL saves, hex — the parity gate
+  // (tools/verify-frame-stl-parity.mjs) compares it with Node's build
+  stlDigest: async () => { const b = exportStl(relief); const h = new Uint8Array(await crypto.subtle.digest('SHA-256', b)); return { sha256: Array.from(h, (x) => x.toString(16).padStart(2, '0')).join(''), bytes: b.length, triangles: relief.indices.length / 3 }; },
   view: () => view,
   setView: (name) => setView(name),
   view3dInk: () => (viewer ? viewer.ink() : null),
@@ -252,6 +289,8 @@ window.__frame = {
   setAdvanced: (on) => setAdvanced(on),
   readout: () => document.getElementById('readout').textContent,
   controls: () => Object.fromEntries(PARAM_SPEC.map((s) => [s.id, !ctrlEl[s.id].hidden])),
+  measurePrint: () => { const r = measureNow(); return { ...r, feature: r.feature.mm, gap: r.gap.mm }; },
+  printReport: () => document.getElementById('printReport').textContent,
   dead: () => ({ floor: deadFloor, mark: ctrlEl.moldingWidth.classList.contains('fr-ctrl--dead') ? +ctrlEl.moldingWidth.style.getPropertyValue('--fr-dead') : null, out: document.getElementById('moldingWidth-out').textContent }),
 };
 

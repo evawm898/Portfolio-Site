@@ -38,10 +38,18 @@
 
 import { offsetCurve, outerEdge, profileSamples, PROFILE_PRESETS } from './frame-geometry.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
+import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 export { MIN_FEATURE_MM };
 /* The embed is the minimum feature: a length derived from a length. */
 export const EMBED_MM = MIN_FEATURE_MM;
+/* The stub's inset (charter §19): a tenth of the embed — so the stub's faces
+   leave the end row at atan(1/10) = 5.7°, four times the 1.5° arc ladder
+   step whose chord-against-tangent mismatch the old full-section stub sat
+   inside — never more than an eighth of the band, so a narrow band keeps a
+   stub. Model units (the embed's own); the vertical inset is the same length
+   at the print scale. */
+export const stubInset = (bandWidth, e = EMBED_MM) => Math.min(e / 10, bandWidth / 8);
 
 /* ------------------------------------------------------------------ */
 /* The embed                                                           */
@@ -71,17 +79,101 @@ export function embedSpine(spine, e = EMBED_MM) {
 }
 
 /* ------------------------------------------------------------------ */
+/* The relief's bands: a CONTINUATION chain is one band               */
+/* ------------------------------------------------------------------ */
+
+/* The spines the relief sweeps (the STL-integrity session, charter §19).
+   A spine declaring `continues` (archSkeleton: the head out of each jamb, a
+   sub-arch ending on a mullion running on down it) is ONE band with the
+   spines it names — no junction, no stub, no shared row: two closed shells
+   meeting end to end with one section are a seam however they overlap.
+   Every other spine is swept as itself. The chain's vertices are its
+   members' own (offsetCurve on the chain IS offsetCurve on the member at
+   every member vertex: pts + d·nrm, and the only join, a sub-arch's apex,
+   trims nothing on a jamb or a mullion); at a joint the EARLIER member's
+   vertex and normal stand (the next member's equal-to-an-ulp first vertex is
+   dropped). A member is REVERSED where its own direction runs into the joint
+   from the far side (the left jamb, the mullion), its embeds swapped with
+   it. `members` maps chain rows back to member rows for the gate. */
+const samePt = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= 1e-9 * (1 + Math.hypot(a[0], a[1]));
+function reversedSpine(sp) {
+  const n = sp.pts.length, r = (a) => (a ? a.slice().reverse() : a);
+  const out = { ...sp, pts: r(sp.pts), nrm: r(sp.nrm), joins: (sp.joins || []).map((j) => n - 1 - j).reverse() };
+  if (sp.embed) out.embed = { ...sp.embed, start: sp.embed.end ?? null, end: sp.embed.start ?? null };
+  for (const k of ['widthScale', 'depthScale', 'baseLift']) if (sp[k]) out[k] = r(sp[k]);
+  return out;
+}
+export function reliefSpines(model) {
+  const byId = new Map(model.spines.map((s) => [s.id, s]));
+  // resolve every declared continuation first: a member that does not meet
+  // the end it is declared on is NOT absorbed — it stays its own band, and
+  // the declaration is recorded in `unmet` on the chain's head (the relief
+  // gate's B clause fails on it, as it does on an embed that does not land),
+  // rather than throwing: a geometry defect is a red check, never a crash
+  const plan = new Map(), absorbed = new Set();
+  for (const s of model.spines) {
+    if (!s.continues) continue;
+    const r = { start: null, end: null, unmet: [] };
+    if (s.continues.start) {
+      const m = byId.get(s.continues.start);
+      if (m && samePt(m.pts[m.pts.length - 1], s.pts[0])) r.start = { sp: m, reversed: false };
+      else if (m && samePt(m.pts[0], s.pts[0])) r.start = { sp: reversedSpine(m), reversed: true };
+      else r.unmet.push(`${s.continues.start} does not meet ${s.id}'s start`);
+    }
+    if (s.continues.end) {
+      const m = byId.get(s.continues.end), last = s.pts[s.pts.length - 1];
+      if (m && samePt(m.pts[0], last)) r.end = { sp: m, reversed: false };
+      else if (m && samePt(m.pts[m.pts.length - 1], last)) r.end = { sp: reversedSpine(m), reversed: true };
+      else r.unmet.push(`${s.continues.end} does not meet ${s.id}'s end`);
+    }
+    if (r.start) absorbed.add(r.start.sp.id);
+    if (r.end) absorbed.add(r.end.sp.id);
+    plan.set(s.id, r);
+  }
+  const out = [];
+  for (const s of model.spines) {
+    if (absorbed.has(s.id)) continue;
+    const r = plan.get(s.id);
+    if (!r || (!r.start && !r.end)) { out.push(r && r.unmet.length ? { ...s, unmet: r.unmet } : s); continue; }
+    const chain = [];
+    if (r.start) chain.push(r.start);
+    chain.push({ sp: s, reversed: false });
+    if (r.end) chain.push(r.end);
+    const pts = [], nrm = [], joins = [], members = [];
+    for (const [k, { sp, reversed }] of chain.entries()) {
+      if (sp.bandWidth !== s.bandWidth) throw new Error(`reliefSpines: ${sp.id} and ${s.id} do not share a section`);
+      const skip = k ? 1 : 0, from = pts.length - skip;
+      members.push({ id: reversed ? sp.id : sp.id, from, n: sp.pts.length, reversed });
+      for (const j of sp.joins || []) joins.push(from + j);
+      pts.push(...sp.pts.slice(skip)); nrm.push(...sp.nrm.slice(skip));
+    }
+    const first = chain[0].sp, lastSp = chain[chain.length - 1].sp;
+    out.push({ ...s, id: chain.map((c) => c.sp.id).join('+'), pts, nrm, joins, members, continues: undefined,
+      embed: { start: first.embed?.start ?? null, end: lastSp.embed?.end ?? null }, ...(r.unmet.length ? { unmet: r.unmet } : {}) });
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------ */
 /* Mesh accumulator                                                    */
 /* ------------------------------------------------------------------ */
 
+/* A triangle's ROLE (charter §19): what the coincident-face gate asks about.
+   Telemetry only — it never reaches the STL. JOIN faces (a stub's strip, the
+   sill's lip, a band's end cap, the backed plate's wall) are where two shells
+   are made to meet; BODY faces are a band's own top, bottom and walls. */
+export const ROLE = { other: 0, top: 1, bottom: 2, wall: 3, cap: 4, stub: 5, plateWall: 6, wireCap: 7 };
+/* an ornament wire's or a pattern leaf's end is a WIRE CAP, not a join face:
+   the ornament places its own ends (a tendril on its stem, a leaf over its
+   branch) and declares no junction the relief builds */
 export class Mesh {
-  constructor() { this.pos = []; this.idx = []; this.parts = []; }
+  constructor() { this.pos = []; this.idx = []; this.parts = []; this.roles = []; this.role = 0; }
   vertex(x, y, z) { this.pos.push(x, y, z); return this.pos.length / 3 - 1; }
   tri(a, b, c) {
     const P = this.pos;
     const same = (i, j) => P[3 * i] === P[3 * j] && P[3 * i + 1] === P[3 * j + 1] && P[3 * i + 2] === P[3 * j + 2];
     if (same(a, b) || same(b, c) || same(c, a)) return;    // degenerate: dropped, parity kept
-    this.idx.push(a, b, c);
+    this.idx.push(a, b, c); this.roles.push(this.role);
   }
   quad(a, b, c, d) { this.tri(a, b, c); this.tri(a, c, d); }
 }
@@ -117,7 +209,7 @@ function bandColumns(spine, prof, e) {
   return { ds, zs, lip };
 }
 
-export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embedMm = EMBED_MM }) {
+export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embedMm = EMBED_MM, capRole = ROLE.cap }) {
   const ext = embedSpine(spine, embedMm);
   const S = ext.spine;
   const { ds, zs, lip } = bandColumns(spine, prof, embedMm);
@@ -144,24 +236,63 @@ export function bandSolid(mesh, spine, prof, { scale, plateT, reliefDepth, embed
   else for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, plateT + zs[c] * reliefDepth);
   for (let v = 0; v < V; v++) for (let c = 0; c < C; c++) mesh.vertex(xy[c][v][0] * scale, xy[c][v][1] * scale, 0);
   const T = (v, c) => base + v * C + c, B = (v, c) => base + V * C + v * C + c;
+  // THE STUB IS INSET (the STL-integrity session, charter §19): an embedded
+  // end's extension row is the band's own section pulled in by stubInset on
+  // every side — its columns clamped inside the walls, its top lowered and
+  // its bottom lifted off the back — so the stub lies strictly INSIDE the
+  // neighbour it is embedded in. At full section it lay within 0.013 mm and
+  // under 1° of the neighbour's own surfaces (the springing seam: a jamb's
+  // straight stub against the head's first chord, the head's chord stub
+  // against the jamb), its outer wall exactly in the sill's end face, and its
+  // bottom in the back plane under the neighbour's. The end row itself is
+  // untouched: the stub's faces leave it at atan(1/10) = 5.7°.
+  const stubRows = [...(ext.start ? [0] : []), ...(ext.end ? [V - 1] : [])];
+  if (stubRows.length) {
+    const cm = stubInset(spine.bandWidth, embedMm), cz = cm * scale;
+    const lo = ds[0] + cm, hi = ds[C - 1] - cm;
+    const zAt = (d) => { let k = 0; while (k < C - 2 && d > ds[k + 1]) k++; const t = (d - ds[k]) / (ds[k + 1] - ds[k]); return zs[k] + (zs[k + 1] - zs[k]) * t; };
+    const P = mesh.pos;
+    for (let c = 0; c < C; c++) {
+      const d = Math.min(hi, Math.max(lo, ds[c]));
+      const off = d === ds[c] ? null : offsetCurve(S, d);
+      for (const v of stubRows) {
+        const q = off ? (off[v] || xy[c][v]) : xy[c][v];
+        const top = plateT + (lz ? lz[v] : 0) + zAt(d) * reliefDepth * (dz ? dz[v] : 1) - cz;
+        const t3 = 3 * T(v, c), b3 = 3 * B(v, c);
+        P[t3] = q[0] * scale; P[t3 + 1] = q[1] * scale; P[t3 + 2] = top;
+        P[b3] = q[0] * scale; P[b3 + 1] = q[1] * scale; P[b3 + 2] = cz;
+      }
+    }
+  }
+  // the sill's OUTER LIP into the step is a stub across the band: its top
+  // lowered and its bottom lifted by the same inset, every row (so the lip's
+  // top is not the step's, nor its bottom the back plane under the step)
+  if (lip) {
+    const cz = stubInset(spine.bandWidth, embedMm) * scale, P = mesh.pos;
+    for (let v = 0; v < V; v++) { P[3 * T(v, 0) + 2] -= cz; P[3 * B(v, 0) + 2] = cz; }
+  }
   // a CLOSED loop: row V−1 joins row 0 by the same quads every other pair of
   // rows gets (the CLOSING STRIP) and there are no end caps — no vertex is
   // duplicated and nothing is drawn at the seam that is not drawn elsewhere.
   const strips = closed ? V : V - 1, nx = (v) => (v + 1) % V;
+  const stubStrip = (v) => (ext.start && v === 0) || (ext.end && v === V - 2);
+  const R = (v, c, body) => { mesh.role = stubStrip(v) || (lip && c === 0) ? ROLE.stub : body; };
   for (let v = 0; v < strips; v++) for (let c = 0; c < C - 1; c++) {
-    mesh.quad(T(v, c), T(nx(v), c), T(nx(v), c + 1), T(v, c + 1));
-    mesh.quad(B(v, c), B(v, c + 1), B(nx(v), c + 1), B(nx(v), c));
+    R(v, c, ROLE.top); mesh.quad(T(v, c), T(nx(v), c), T(nx(v), c + 1), T(v, c + 1));
+    R(v, c, ROLE.bottom); mesh.quad(B(v, c), B(v, c + 1), B(nx(v), c + 1), B(nx(v), c));
   }
   for (let v = 0; v < strips; v++) {
-    mesh.quad(T(v, 0), B(v, 0), B(nx(v), 0), T(nx(v), 0));               // outer wall
-    mesh.quad(T(v, C - 1), T(nx(v), C - 1), B(nx(v), C - 1), B(v, C - 1)); // inner wall
+    R(v, 0, ROLE.wall); mesh.quad(T(v, 0), B(v, 0), B(nx(v), 0), T(nx(v), 0));               // outer wall
+    R(v, -1, ROLE.wall); mesh.quad(T(v, C - 1), T(nx(v), C - 1), B(nx(v), C - 1), B(v, C - 1)); // inner wall
   }
+  mesh.role = capRole;
   if (!closed) for (let c = 0; c < C - 1; c++) {
     mesh.quad(T(0, c), T(0, c + 1), B(0, c + 1), B(0, c));               // start end
     mesh.quad(T(V - 1, c), B(V - 1, c), B(V - 1, c + 1), T(V - 1, c + 1)); // far end
   }
+  mesh.role = ROLE.other;
   orientOutward(mesh, t0);
-  mesh.parts.push({ id: spine.id, kind: 'band', closed, base, V, C, t0, t1: mesh.idx.length / 3, rowOffset: ext.start ? 1 : 0, colOffset: lip ? 1 : 0, embedStart: ext.start, embedEnd: ext.end, lip, T: (v, c) => base + v * C + c });
+  mesh.parts.push({ id: spine.id, kind: 'band', closed, base, V, C, t0, t1: mesh.idx.length / 3, rowOffset: ext.start ? 1 : 0, colOffset: lip ? 1 : 0, embedStart: ext.start, embedEnd: ext.end, lip, members: spine.members || null, unmet: spine.unmet || null, T: (v, c) => base + v * C + c });
 }
 
 /* The join whose trimming stretch vertex i lies in on a closed loop: the
@@ -180,15 +311,22 @@ function nearestJoin(S, i) {
 /* The frame's outer silhouette: the jambs' outer edges, the head's outer
    edge, closed across the drawing's bottom. Read off outerEdge — the owner
    of those boundaries — never restated. */
-export function plateOutline(model) {
-  const w = model.params.moldingWidth;
+/* inset (model mm, default 0 — the silhouette itself, which every gate and
+   the ornament read): the outline pulled in by that much on every side. The
+   BACKED plate stands on the bands' CENTRELINES (inset half a band, charter
+   §19): built on the silhouette its walls were the bands' own outer walls,
+   one face drawn twice the whole way round. Its bottom edge is inset on its
+   own (bottomInset): with no sill there is no band under the opening's foot,
+   so the plate keeps the drawing's bottom there. */
+export function plateOutline(model, inset = 0, bottomInset = inset) {
+  const w = model.params.moldingWidth - 2 * inset;
   // a closed frame's silhouette IS its loop's outer edge (closed, so the
   // repeated first point is dropped for the ear clipper)
   if (model.spines.length === 1 && model.spines[0].closed) return outerEdge(model.spines[0], w).slice(0, -1);
   const sp = (id) => model.spines.find((s) => s.id === id);
   const headOut = outerEdge(sp('head'), w);                // right springing → apex → left
   const xo = outerEdge(sp('jambR'), w)[0][0];
-  const yB = model.box.y0;
+  const yB = model.box.y0 + bottomInset;
   const poly = [[-xo, yB], [-xo, model.info.springY], ...headOut.slice().reverse(), [xo, model.info.springY], [xo, yB]];
   // the head's outer edge already carries the two springing points; drop
   // exact repeats so the ear clipper sees a simple polygon
@@ -225,12 +363,17 @@ export function earClip(poly) {
   return tris;
 }
 
-function plateSolid(mesh, outline, { scale, plateT }) {
+/* top: the outline the plate's TOP face carries, vertex for vertex the
+   bottom's (default the same: a prism) — a chamfer where the two differ */
+function plateSolid(mesh, outline, { scale, plateT, top = outline }) {
   const base = mesh.pos.length / 3, t0 = mesh.idx.length / 3, n = outline.length;
-  for (const [x, y] of outline) mesh.vertex(x * scale, y * scale, plateT);
+  for (const [x, y] of top) mesh.vertex(x * scale, y * scale, plateT);
   for (const [x, y] of outline) mesh.vertex(x * scale, y * scale, 0);
-  for (const [a, b, c] of earClip(outline)) { mesh.tri(base + a, base + b, base + c); mesh.tri(base + n + c, base + n + b, base + n + a); }
+  mesh.role = ROLE.top;
+  for (const [a, b, c] of earClip(outline)) { mesh.role = ROLE.top; mesh.tri(base + a, base + b, base + c); mesh.role = ROLE.bottom; mesh.tri(base + n + c, base + n + b, base + n + a); }
+  mesh.role = ROLE.plateWall;
   for (let i = 0; i < n; i++) { const k = (i + 1) % n; mesh.quad(base + i, base + n + i, base + n + k, base + k); }
+  mesh.role = ROLE.other;
   orientOutward(mesh, t0);
   mesh.parts.push({ id: 'plate', kind: 'plate', base, n, t0, t1: mesh.idx.length / 3 });
 }
@@ -245,7 +388,7 @@ function plateSolid(mesh, outline, { scale, plateT }) {
 export function sphereSolid(mesh, c, r, lat, lon) {
   const base = mesh.pos.length / 3, t0 = mesh.idx.length / 3;
   const top = mesh.vertex(c[0], c[1], c[2] + r);
-  for (let i = 1; i < lat; i++) { const th = Math.PI * i / lat; for (let j = 0; j < lon; j++) { const ph = 2 * Math.PI * j / lon; mesh.vertex(c[0] + r * Math.sin(th) * Math.cos(ph), c[1] + r * Math.sin(th) * Math.sin(ph), c[2] + r * Math.cos(th)); } }
+  for (let i = 1; i < lat; i++) { const th = Math.PI * i / lat; for (let j = 0; j < lon; j++) { const ph = 2 * Math.PI * j / lon; mesh.vertex(c[0] + r * FM.sin(th) * FM.cos(ph), c[1] + r * FM.sin(th) * FM.sin(ph), c[2] + r * FM.cos(th)); } }
   const bot = mesh.vertex(c[0], c[1], c[2] - r);
   const V = (i, j) => base + 1 + (i - 1) * lon + (j % lon);
   for (let j = 0; j < lon; j++) mesh.tri(top, V(1, j), V(1, j + 1));
@@ -304,12 +447,12 @@ export function buildRelief(model) {
   if (reliefDepth < MIN_FEATURE_MM) underFloor.push(`relief ${reliefDepth.toFixed(2)} mm deep`);
   const prof = model.prof;
   const mesh = new Mesh();
-  for (const s of model.spines) bandSolid(mesh, s, prof, { scale, plateT, reliefDepth });
+  for (const s of reliefSpines(model)) bandSolid(mesh, s, prof, { scale, plateT, reliefDepth });
   // the ornament's wires: built in print mm already (scale 1), each its own
   // closed solid standing on the plate thickness, overlapping its molding by
   // the embed it was seated with (frame-filigree.js)
   if (model.ornament) {
-    for (const o of model.ornament.solids) bandSolid(mesh, o.spine, o.prof, { scale: 1, plateT: plateT + (o.lift || 0), reliefDepth: o.depth });
+    for (const o of model.ornament.solids) bandSolid(mesh, o.spine, o.prof, { scale: 1, plateT: plateT + (o.lift || 0), reliefDepth: o.depth, capRole: ROLE.wireCap });
     const crown = Math.min(...model.ornament.solids.map((o) => o.depth * (o.spine.depthScale ? Math.min(...o.spine.depthScale) : 1)));
     if (model.ornament.solids.length && crown < MIN_FEATURE_MM) underFloor.push(`ornament crown ${crown.toFixed(2)} mm high`);
     // the PLACED ELEMENTS (phase 3e step 3: the junction motifs and the vine's
@@ -324,7 +467,7 @@ export function buildRelief(model) {
   if (model.pattern) {
     const part0 = mesh.parts.length;
     for (const b of model.pattern.beads) sphereSolid(mesh, [b.c[0], b.c[1], plateT + b.z], b.r, PATTERN_LAT, PATTERN_LON);
-    for (const l of model.pattern.leaves) bandSolid(mesh, l.spine, l.prof, { scale: 1, plateT, reliefDepth: l.depth });
+    for (const l of model.pattern.leaves) bandSolid(mesh, l.spine, l.prof, { scale: 1, plateT, reliefDepth: l.depth, capRole: ROLE.wireCap });
     // every part the pattern emitted, in the pattern's own order, carries
     // its record (the gate reads the mesh, never the record, and uses the
     // record only to know which part is which)
@@ -337,13 +480,21 @@ export function buildRelief(model) {
   if (p.lights === 'backed' || p.lights === 'recessed') {
     panelT = p.lights === 'backed' ? plateT : MIN_FEATURE_MM;
     if (p.lights === 'recessed' && plateT <= MIN_FEATURE_MM) told.push(`recessed reads as backed: the plate is already at the ${FLOOR_NOTE} floor`);
-    plate = plateOutline(model); plateSolid(mesh, plate, { scale, plateT: panelT });
+    // on the centrelines (plateOutline's header); with no sill the bottom
+    // edge stays the drawing's bottom, where the jambs' foot caps stand — so
+    // the plate's TOP face pulls that edge up at the stubs' own 1:10 against
+    // its height, and its foot wall leans off the caps' plane (charter §19)
+    const hw = p.moldingWidth / 2, open = arch && p.sill === 'none';
+    plate = plateOutline(model, hw, open ? 0 : hw);
+    const top = open ? plateOutline(model, hw, 0.1 * panelT / scale) : plate;
+    if (top.length !== plate.length) throw new Error('buildRelief: the plate\'s chamfered top does not match its outline');
+    plateSolid(mesh, plate, { scale, plateT: panelT, top });
   }
   if (mesh.idx.length / 3 > FRAME_TRI_BUDGET) told.push(`the relief is ${(mesh.idx.length / 3).toLocaleString('en-US')} triangles, past the ${FRAME_TRI_BUDGET.toLocaleString('en-US')} budget`);
-  const positions = Float64Array.from(mesh.pos), indices = Uint32Array.from(mesh.idx);
+  const positions = Float64Array.from(mesh.pos), indices = Uint32Array.from(mesh.idx), roles = Uint8Array.from(mesh.roles);
   let z1 = 0; for (let i = 2; i < positions.length; i += 3) if (positions[i] > z1) z1 = positions[i];
   return {
-    positions, indices, parts: mesh.parts, scale, plateT, reliefDepth, plate, panelT,
+    positions, indices, roles, parts: mesh.parts, scale, plateT, reliefDepth, plate, panelT,
     info: { scale, plateT, reliefDepth, bandW, mullW, told, underFloor, triangles: indices.length / 3, heightMm: p.printHeight, widthMm: (model.box.x1 - model.box.x0) * scale, ornament: model.ornament ? { groups: model.ornament.groups.length, wires: model.ornament.solids.length, told: model.ornament.told } : null, pattern: model.pattern ? { kind: model.pattern.kind, beads: model.pattern.beads.length, leaves: model.pattern.leaves.length, told: model.pattern.told } : null, depthMm: z1, floorNote: FLOOR_NOTE },
   };
 }

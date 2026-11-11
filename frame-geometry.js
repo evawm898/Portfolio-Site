@@ -21,6 +21,7 @@
    The arch's opening is centred on x = 0 with the sill's underside at y = 0. */
 
 import { DEFAULTS, LIGHT, PROFILE_PRESETS, PROFILE_SAMPLES, PARAM_SPEC, HATCH_WEIGHT_RANGE, HATCH_WEIGHT_STEPS, MIN_FEATURE_MM, ANCHORS } from './frame-registry.js';
+import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 export { DEFAULTS, LIGHT, PROFILE_PRESETS, PROFILE_SAMPLES, HATCH_WEIGHT_RANGE, HATCH_WEIGHT_STEPS, ANCHORS };
 
@@ -93,8 +94,8 @@ function arcSpine(id, c, r, t0, t1, stepDeg = 1.5) {
   const pts = [], nrm = [];
   for (let i = 0; i <= n; i++) {
     const t = t0 + (t1 - t0) * i / n;
-    pts.push([c[0] + r * Math.cos(t), c[1] + r * Math.sin(t)]);
-    nrm.push([-Math.cos(t), -Math.sin(t)]);
+    pts.push([c[0] + r * FM.cos(t), c[1] + r * FM.sin(t)]);
+    nrm.push([-FM.cos(t), -FM.sin(t)]);
   }
   return { id, pts, nrm };
 }
@@ -182,7 +183,7 @@ export function archArcs(a, pointedness) {
   const R = a * (1 + 2 * pointedness);
   const cx = R - a;                            // |centre x|; 0 at the semicircle
   const rise = Math.sqrt(R * R - cx * cx);
-  const tApex = Math.atan2(rise, cx);          // from the right arc centre (-cx, 0) to the apex (0, rise)
+  const tApex = FM.atan2(rise, cx);          // from the right arc centre (-cx, 0) to the apex (0, rise)
   return { R, cx, rise, tApex };
 }
 
@@ -281,22 +282,29 @@ export function archSkeleton(p) {
     });
   }
   for (const s of spines) if (s.bandWidth === undefined) s.bandWidth = w;
-  // EMBED declarations (phase 2, charter §4): where a band's END touches a
-  // neighbour face to face — a jamb standing ON the sill's top edge, the head
-  // starting AT the jamb's top, a mullion ending AT its light's springing —
-  // the relief extends that end INTO the neighbour named here, so the two
-  // closed shells overlap rather than graze. The sub-arches need none: half
-  // their band is already buried in the jamb or mullion they end on (ruling
-  // 4 / ruling 3). A stepped sill's band touches the step along y = 0, so the
-  // sill declares an OUTER lip into it. Only frame-relief.js reads these; the
-  // SVG and every 2-D consumer never do (the gate measures that: the default's
-  // SVG is byte-identical with the field present).
+  // JUNCTION declarations (phase 2, charter §4; re-declared by the
+  // STL-integrity session, §19). Only frame-relief.js reads them; the SVG and
+  // every 2-D consumer never do (the gate measures that: X2).
+  //   EMBED — a band's END touching a DIFFERENT band face to face: a jamb or a
+  //   mullion standing ON the sill's top edge. The relief extends that end
+  //   INTO the neighbour named here by an inset stub, so the two closed shells
+  //   overlap with no face in common. A stepped sill's band touches the step
+  //   along y = 0, so the sill declares an OUTER lip into it.
+  //   CONTINUES — a band whose end IS the next band's start, with the same
+  //   section and the same normal there: the head springs out of each jamb
+  //   (its arcs leave the springing tangent to the jamb), and a sub-arch
+  //   ending on a mullion runs on down it. The relief sweeps such a chain as
+  //   ONE band — no junction at all. Phase 2 embedded them like a T, and the
+  //   two 1 mm stubs then lay within 0.013 mm and under 1° of the other
+  //   band's own surfaces: the springing seam (§17.10, item 3).
+  //   The sub-arch STARTING on a mullion needs neither: its start row is the
+  //   chain's own row there, so its end cap lies inside the chain.
   const hasSill = p.sill !== 'none';
   for (const s of spines) {
-    if (/^jamb/.test(s.id)) s.embed = { start: hasSill ? 'sill' : null, end: 'head' };
-    else if (/^mullion/.test(s.id)) s.embed = { start: hasSill ? 'sill' : null, end: `light${s.id.slice(7) - 1}` };
-    else if (s.id === 'head') s.embed = { start: 'jambR', end: 'jambL' };
+    if (/^jamb/.test(s.id) || /^mullion/.test(s.id)) s.embed = { start: hasSill ? 'sill' : null, end: null };
+    else if (s.id === 'head') s.continues = { start: 'jambR', end: 'jambL' };
     else if (s.id === 'sill') s.embed = { outer: p.sill === 'stepped' ? 'sillStep' : null };
+    else if (/^light\d+$/.test(s.id) && +s.id.slice(5) >= 1) s.continues = { end: `mullion${+s.id.slice(5)}` };
   }
   // named anchors (registry ANCHORS.arch): every one ON a spine
   const sp = (id) => spines.find((s) => s.id === id);
@@ -341,7 +349,7 @@ const anchorAt = (spine, i) => ({ spine: spine.id, index: i, pt: spine.pts[i], n
    0..4m), rotated by whole quarter turns, which negate and swap exactly. */
 export function quarterTable(m) {
   const T = new Array(m + 1);
-  for (let j = 0; 2 * j <= m; j++) { const t = (90 * j / m) * Math.PI / 180; T[j] = [Math.cos(t), Math.sin(t)]; }
+  for (let j = 0; 2 * j <= m; j++) { const t = (90 * j / m) * Math.PI / 180; T[j] = [FM.cos(t), FM.sin(t)]; }
   for (let j = 0; 2 * j < m; j++) T[m - j] = [T[j][1], T[j][0]];
   if (m % 2 === 0) T[m / 2] = [Math.SQRT1_2, Math.SQRT1_2];   // 45°: cos and sin are ONE double (Math.cos and Math.sin differ there by an ulp)
   return T;
@@ -471,7 +479,7 @@ export function ovalSkeleton(p) {
   if (k > kHi) { info.clamped.push(`aspect ${k.toFixed(2)} folds the inner edge at the top — held at ${kHi.toFixed(3)}`); k = kHi; }
   const A = k * B, cy = w / 2 + B;
   info.A = A; info.B = B; info.cy = cy; info.aspect = k;
-  info.minRadius = Math.min(A, B) ** 2 / Math.max(A, B);
+  info.minRadius = FM.pow(Math.min(A, B), 2) / Math.max(A, B);
   const m = 2 * Math.ceil(45 / OVAL_STEP_DEG), n = 4 * m;   // a multiple of 8: both axes' ends and the diagonals are vertices
   const T = quarterTable(m);
   const pts = [], nrm = [];
@@ -528,8 +536,8 @@ function creaseIndices(prof, p) {
   const out = [];
   const n = prof.x.length - 1, k = p.moldingDepth / p.moldingWidth;
   for (let i = 1; i < n; i++) {
-    const a0 = Math.atan((prof.z[i] - prof.z[i - 1]) / (prof.x[i] - prof.x[i - 1]) * k);
-    const a1 = Math.atan((prof.z[i + 1] - prof.z[i]) / (prof.x[i + 1] - prof.x[i]) * k);
+    const a0 = FM.atan((prof.z[i] - prof.z[i - 1]) / (prof.x[i] - prof.x[i - 1]) * k);
+    const a1 = FM.atan((prof.z[i + 1] - prof.z[i]) / (prof.x[i + 1] - prof.x[i]) * k);
     if (Math.abs(a1 - a0) * 180 / Math.PI > CREASE_DEG) out.push(i);
   }
   return out;

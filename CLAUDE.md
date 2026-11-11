@@ -12656,6 +12656,28 @@ controls and the code came out and every frame file is `04d4e52`'s; the implemen
 `claude/laughing-sagan-i2xbof`. Re-opening it is a new ruling. Sheets: `node tools/shot-frame-scrolls.mjs <dir>`, `node
 tools/shot-frame-filigree.mjs <dir>`; gates SC1–SC7, OR1–OR6 and K5.
 
+**STL integrity (Nov 11, charter §19; read it before touching `frame-math.js`, `reliefSpines`, a spine's `embed` /
+`continues`, `stubInset`, `plateOutline`, `frame-print.js` or `tools/verify-frame-stl.mjs`).**
+- **The page's STL is Node's, byte for byte.**
+  - The page/Node mismatch was the ENGINES' transcendental Math: Chrome and Node differ in the last bit on 3–18 % of
+    inputs. The arch's +384 was `ceil(60°/1.5°)` landing on an exact tie.
+  - Every frame geometry module now calls `frame-math.js` (V8's fdlibm ported to arithmetic) and never `Math.sin` & co. or
+    `**`; FM0 refuses one.
+  - Node's bytes did not move (FM1, 1.4 M inputs a function, 0 differ). SP compares the SHA-256 of the bytes Get STL
+    saves, in Chromium, against Node's on 15 rows.
+- **No join face coincides with another shell's.**
+  - A head continuing into its jambs, or a light into its mullion, is ONE band (`continues`, swept by `reliefSpines`). An
+    unmet continuation fails B and never throws.
+  - Every other embed is a stub inset by `stubInset` in width and from the back.
+  - The backed plate stands on the band centrelines.
+  - CP1: 0 pairs over 80 rows, at 3° / 0.05 mm, back plane included.
+  - The back plane, equal-height plateaus and ornament wire ends still coincide. They are REPORTED (CP2), because only a
+    union removes them, and that is Eva's question.
+- **The print-readiness report** (`measurePrint`: box, relief height, union volume, plan feature and gap, rest on z = 0)
+  is on the page beside Get STL and in §19.3.
+- **What moved:** 24 of 75 rows, every arch row plus backed/recessed. The default arch is 68,076 → 66,132 triangles, the
+  SVG is unmoved, and the 51 closed pierced rows hold to the byte.
+
 ## `/marble` — the paper-marbling simulator (pointer only)
 
 Hidden page (`marble.html`, `marble.css`, `marble.js`, `marble-math.js`, `noindex`, unlinked).

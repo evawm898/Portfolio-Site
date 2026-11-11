@@ -71,6 +71,10 @@ button.fr-btn--solid:hover{color:var(--paper);border-color:var(--teal);}
 .fr-presets{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 6px;}
 .fr-presets button{padding:3px 7px;font-size:10px;}
 
+.fr-print{font-size:10.5px;line-height:1.6;color:var(--dim);white-space:pre-wrap;margin:6px 0 2px;}
+.fr-print b{color:var(--paper);font-weight:400;}
+.fr-print .warn{color:var(--paper);} .fr-print .warn::before{content:'! ';}
+.fr-print .fr-btn{margin:4px 0;}
 .fr-readout{font-size:10.5px;line-height:1.6;color:var(--dim);border-top:1px solid var(--line);padding-top:10px;margin-top:6px;white-space:pre-wrap;}
 .fr-readout b{color:var(--paper);font-weight:400;}
 .fr-readout .warn{color:var(--paper);} .fr-readout .warn::before{content:'! ';}

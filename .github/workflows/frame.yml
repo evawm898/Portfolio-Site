@@ -30,7 +30,10 @@ on:
       - frame-elements.js
       - frame-vine.js
       - frame-rinceau.js
+      - frame-math.js
+      - frame-print.js
       - tools/verify-frame.mjs
+      - tools/verify-frame-stl.mjs
       - tools/verify-frame-elements.mjs
       - tools/shot-frame-elements.mjs
       - tools/shot-frame-vine.mjs
@@ -60,7 +63,10 @@ on:
       - frame-elements.js
       - frame-vine.js
       - frame-rinceau.js
+      - frame-math.js
+      - frame-print.js
       - tools/verify-frame.mjs
+      - tools/verify-frame-stl.mjs
       - tools/verify-frame-elements.mjs
       - tools/shot-frame-elements.mjs
       - tools/shot-frame-vine.mjs
@@ -123,6 +129,15 @@ jobs:
           node tools/verify-frame-elements.mjs --negative-control
       - name: Frame gate (part one Node, part two Chromium)
         run: node tools/verify-frame.mjs
+      # §19, the STL-integrity session: the page's STL is Node's (SP, in
+      # Chromium), frame-math.js is this Node's Math to the bit (FM1 — on
+      # Node 20 here, the witness that V8 11.3 carries the same fdlibm), no
+      # join face coincides with another shell's (CP1), the print-readiness
+      # report (PR); and its seven mutants, Node only.
+      - name: STL integrity gate (one build, no coincident join faces, print readiness) + its negative control
+        run: |
+          node tools/verify-frame-stl.mjs
+          node tools/verify-frame-stl.mjs --negative-control
 
   # The relief negative control, sharded by mutant INDEX (k mod 19): every
   # mutant is in exactly one shard by construction. Changing the shard count
