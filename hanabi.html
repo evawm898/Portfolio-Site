@@ -62,6 +62,10 @@
       <label for="bleed">Bleed mm</label><input type="number" id="bleed" min="0" max="5" step="0.25">
       <label for="safe">Safe mm</label><input type="number" id="safe" min="0" max="8" step="0.25">
     </div>
+    <div class="hb-row hb-row--pair">
+      <label for="border" title="White print border: an unprinted white margin between the trim and the art, so edge wear does not show. The safe zone is measured from the art's edge. 0: the art runs to the bleed">Border mm</label><input type="number" id="border" min="0" max="5" step="0.25">
+    </div>
+    <p class="hb-note" id="borderNote"></p>
   </details>
 
   <details class="hb-sec" id="sec-face" open>
@@ -102,8 +106,34 @@
     </div>
   </details>
 
+  <details class="hb-sec" id="sec-bg" open>
+    <summary><span class="hb-num">04</span>Background <output class="hb-val" id="bgVal"></output></summary>
+    <label class="hb-check"><input type="checkbox" id="bgOn"> Sky and smoke behind the fireworks</label>
+    <div id="bgRows">
+      <details class="hb-sub" id="sub-sky">
+        <summary>Sky <output class="hb-val" id="skyVal"></output></summary>
+        <label class="hb-check"><input type="checkbox" id="skyOn"> Sky gradient, top to bottom</label>
+        <div class="hb-chips" id="skyPresets" role="group" aria-label="Sky presets"></div>
+        <div class="hb-row"><label for="skyTop">Top</label><input type="color" id="skyTop"></div>
+        <div class="hb-row"><label for="skyBottom">Bottom</label><input type="color" id="skyBottom"></div>
+        <div class="hb-row hb-row--slider"><label for="bgHorizon">Horizon glow</label><input type="range" id="bgHorizon" min="0" max="1" step="0.05"><output class="hb-val" for="bgHorizon" id="bgHorizonVal"></output></div>
+        <div class="hb-row hb-row--slider"><label for="bgGlow">Burst glow</label><input type="range" id="bgGlow" min="0" max="1" step="0.05"><output class="hb-val" for="bgGlow" id="bgGlowVal"></output></div>
+      </details>
+      <details class="hb-sub" id="sub-smoke">
+        <summary>Smoke haze <output class="hb-val" id="smokeVal"></output></summary>
+        <div class="hb-row hb-row--slider"><label for="smokeAmount">Amount</label><input type="range" id="smokeAmount" min="0" max="1" step="0.01"><output class="hb-val" for="smokeAmount" id="smokeAmountVal"></output></div>
+        <div class="hb-row hb-row--slider"><label for="smokeDrift" title="1×: round puffs; higher stretches them across, like smoke drifting on a breeze">Drift</label><input type="range" id="smokeDrift" min="1" max="4" step="0.1"><output class="hb-val" for="smokeDrift" id="smokeDriftVal"></output></div>
+        <div class="hb-row hb-row--slider"><label for="smokeLit" title="How far a puff near a firework takes on its colour">Lit by bursts</label><input type="range" id="smokeLit" min="0" max="1" step="0.05"><output class="hb-val" for="smokeLit" id="smokeLitVal"></output></div>
+        <div class="hb-row"><label for="smokeColor">Colour</label><input type="color" id="smokeColor"></div>
+        <label class="hb-check" title="Rank 1 shows a light haze; the same puffs thicken rank by rank to 5"><input type="checkbox" id="smokeRank"> Builds with rank</label>
+        <div class="hb-actions"><button type="button" class="hb-btn hb-btn--ghost" id="smokeReroll">Reroll smoke</button><output class="hb-val" id="smokeSeed"></output></div>
+      </details>
+      <div class="hb-actions"><button type="button" class="hb-btn hb-btn--ghost" id="bgReset">Reset background to defaults</button></div>
+    </div>
+  </details>
+
   <details class="hb-sec" id="sec-back">
-    <summary><span class="hb-num">04</span>Card back</summary>
+    <summary><span class="hb-num">05</span>Card back</summary>
     <div class="hb-row"><label for="backBg">Ground</label><input type="color" id="backBg"></div>
     <div class="hb-row"><label for="backFg">Ink</label><input type="color" id="backFg"></div>
     <div class="hb-row">
@@ -117,7 +147,7 @@
   </details>
 
   <details class="hb-sec" id="sec-tokens">
-    <summary><span class="hb-num">05</span>Tokens <span class="hb-dim">8 clue &middot; 3 fuse</span></summary>
+    <summary><span class="hb-num">06</span>Tokens <span class="hb-dim">8 clue &middot; 3 fuse</span></summary>
     <div class="hb-row"><label for="clueBg">Clue ground</label><input type="color" id="clueBg"></div>
     <div class="hb-row"><label for="clueFg">Clue ink</label><input type="color" id="clueFg"></div>
     <div class="hb-row"><label for="fuseBg">Fuse ground</label><input type="color" id="fuseBg"></div>
@@ -126,7 +156,7 @@
   </details>
 
   <details class="hb-sec" id="sec-firework">
-    <summary><span class="hb-num">06</span>Firework spec <span class="hb-dim">read only</span></summary>
+    <summary><span class="hb-num">07</span>Firework spec <span class="hb-dim">read only</span></summary>
     <p class="hb-note">Each card's centre art is drawn from a spec: the type's defaults, then the suit's parameters, then the card's own. The <b>Fireworks</b> board edits them; this shows the merged spec for one card.</p>
     <div class="hb-row"><label for="specSuit">Suit</label><select id="specSuit"></select></div>
     <div class="hb-row"><label for="specRank">Rank</label><select id="specRank"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
@@ -134,7 +164,7 @@
   </details>
 
   <details class="hb-sec" id="sec-export" open>
-    <summary><span class="hb-num">07</span>Export</summary>
+    <summary><span class="hb-num">08</span>Export</summary>
     <div class="hb-row">
       <label for="paper">Paper</label>
       <select id="paper"><option value="letter">Letter &mdash; 8.5 &times; 11 in</option><option value="a4">A4 &mdash; 210 &times; 297 mm</option></select>
@@ -162,7 +192,7 @@
   </details>
 
   <details class="hb-sec" id="sec-file">
-    <summary><span class="hb-num">08</span>Design file</summary>
+    <summary><span class="hb-num">09</span>Design file</summary>
     <div class="hb-actions">
       <button type="button" class="hb-btn hb-btn--ghost" id="saveJson">Save .json</button>
       <label class="hb-btn hb-btn--ghost">Load .json<input type="file" id="loadJson" accept=".json,application/json" hidden></label>

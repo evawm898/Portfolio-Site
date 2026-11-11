@@ -7,6 +7,7 @@ import {
   suitById, symbolClashes, imposition, copyCentreToAll, SIZE_PRESETS, INDEX_STYLES, COMPOSE, COUNT_MODES, NUMERAL_FILLS,
   RANKS, COPIES, VERSION, SCENES, cellHasOverride, cellOf, clearCell, applyArrangementToRank, ITEM_LIMITS, PLACE_LIMITS, restack,
   setFireworkStyle, clearFireworkStyle, applyStylesToRank, cardGeom, FRAMES, PIP_FITS,
+  BORDER_LIMITS, SKY_PRESETS, BG_LIMITS, defaultBackground,
 } from './hanabi/deck.js';
 import { SYMBOLS, SYMBOL_IDS } from './hanabi/symbols.js';
 import { renderFace, renderBack, placementFor, scalePlacement, literalItems, centring } from './hanabi/layout.js';
@@ -168,6 +169,18 @@ const bindings = [
   bindValue('sizeH', () => design.size.h, (v) => { if (+v >= 30 && +v <= 140) design.size.h = +v; }, 'change'),
   bindValue('bleed', () => design.bleed, (v) => { if (+v >= 0 && +v <= 5) design.bleed = +v; }, 'change'),
   bindValue('safe', () => design.safe, (v) => { if (+v >= 0 && +v <= 8) design.safe = +v; }, 'change'),
+  bindValue('border', () => design.border, (v) => { if (v !== '' && +v >= BORDER_LIMITS.min && +v <= BORDER_LIMITS.max) design.border = +v; }, 'change'),
+  bindValue('bgOn', () => design.background.on, (v) => { design.background.on = v; }, 'change'),
+  bindValue('skyOn', () => design.background.sky.on, (v) => { design.background.sky.on = v; }, 'change'),
+  bindValue('skyTop', () => design.background.sky.top.toLowerCase(), (v) => { design.background.sky.top = v.toUpperCase(); }),
+  bindValue('skyBottom', () => design.background.sky.bottom.toLowerCase(), (v) => { design.background.sky.bottom = v.toUpperCase(); }),
+  bindValue('bgHorizon', () => design.background.horizon, (v) => { design.background.horizon = +v; }),
+  bindValue('bgGlow', () => design.background.glow, (v) => { design.background.glow = +v; }),
+  bindValue('smokeAmount', () => design.background.smoke.amount, (v) => { design.background.smoke.amount = +v; }),
+  bindValue('smokeDrift', () => design.background.smoke.drift, (v) => { design.background.smoke.drift = +v; }),
+  bindValue('smokeLit', () => design.background.smoke.lit, (v) => { design.background.smoke.lit = +v; }),
+  bindValue('smokeColor', () => design.background.smoke.color.toLowerCase(), (v) => { design.background.smoke.color = v.toUpperCase(); }),
+  bindValue('smokeRank', () => design.background.smoke.rank, (v) => { design.background.smoke.rank = v; }, 'change'),
   bindValue('corners', () => design.corners, (v) => { design.corners = v; }, 'change'),
   bindValue('pips', () => design.pips, (v) => { if (PIP_FITS[v]) design.pips = v; }, 'change'),
   bindValue('faceBg', () => design.face.bg.toLowerCase(), (v) => { design.face.bg = v.toUpperCase(); }),
@@ -215,6 +228,7 @@ function syncReadouts() {
   const sheets = imp.perSheet ? Math.ceil(n.total / imp.perSheet) : 0;
   $('flipRow').hidden = !design.print.duplex;
   $('sceneRows').hidden = !design.scene.on;
+  syncBackground();
   $('sceneVal').textContent = design.scene.on ? `${SCENES[design.scene.kind].toLowerCase()}, ${Math.round(design.scene.height * 100)}%` : 'off';
   $('impositionNote').textContent = imp.perSheet
     ? `${imp.paper.label} ${imp.paper.orientation}: ${imp.cols} × ${imp.rows} = ${imp.perSheet} cards a sheet — ${n.total} faces on ${sheets} sheet${sheets === 1 ? '' : 's'}${design.print.duplex ? `, each followed by its back sheet (${2 * sheets} pages)` : ', + 1 sheet of backs'}.`
@@ -233,6 +247,41 @@ function syncReadouts() {
   syncSpec();
   syncControls();
 }
+// ---------- the background (version 7) ----------
+const skyPreset = (b) => Object.keys(SKY_PRESETS).find((k) => SKY_PRESETS[k].top === b.sky.top && SKY_PRESETS[k].bottom === b.sky.bottom);
+function syncBackground() {
+  const b = design.background, sm = b.smoke, pre = skyPreset(b);
+  $('bgRows').hidden = !b.on;
+  $('bgVal').textContent = b.on ? `on — ${b.sky.on ? (pre ? SKY_PRESETS[pre].label : 'custom sky') : 'flat face'}, smoke ${sm.amount.toFixed(2)}` : 'off — the flat card face';
+  $('skyVal').textContent = b.sky.on ? (pre ? SKY_PRESETS[pre].label : 'custom') : 'flat';
+  $('smokeVal').textContent = sm.amount > 0 ? `${sm.amount.toFixed(2)}${sm.rank ? ', builds with rank' : ''}` : 'none';
+  $('skyTop').disabled = $('skyBottom').disabled = !b.sky.on;
+  for (const c of $('skyPresets').children) { c.setAttribute('aria-pressed', String(c.dataset.sky === pre && b.sky.on)); c.disabled = !b.sky.on; }
+  $('bgHorizonVal').textContent = b.horizon.toFixed(2);
+  $('bgGlowVal').textContent = b.glow.toFixed(2);
+  $('smokeAmountVal').textContent = sm.amount.toFixed(2);
+  $('smokeDriftVal').textContent = `${sm.drift.toFixed(1)}×`;
+  $('smokeLitVal').textContent = sm.lit.toFixed(2);
+  $('smokeSeed').textContent = `seed ${sm.seed}`;
+  const g = cardGeom(design);
+  $('borderNote').textContent = design.border
+    ? `A ${design.border} mm white border: the art is inset from the trim, with rounded corners; the bleed prints white, so a cut that drifts shows nothing. The safe zone (${design.safe} mm) is measured from the art's edge — ${(g.art.w).toFixed(1)} × ${(g.art.h).toFixed(1)} mm of art.`
+    : 'No white border: the art runs to the bleed.';
+}
+function buildSkyChips() {
+  $('skyPresets').innerHTML = Object.entries(SKY_PRESETS).map(([k, p]) =>
+    `<button type="button" class="hb-chip" data-sky="${k}" title="${p.top} → ${p.bottom}"><span class="hb-chip__sw" style="background:linear-gradient(${p.top},${p.bottom})"></span>${p.label}</button>`).join('');
+}
+$('skyPresets').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-sky]'); if (!c) return;
+  const p = SKY_PRESETS[c.dataset.sky]; design.background.sky.top = p.top; design.background.sky.bottom = p.bottom; changed();
+});
+$('smokeReroll').addEventListener('click', () => {
+  let s; do { s = Math.floor(Math.random() * 2 ** 32); } while (s === design.background.smoke.seed);
+  design.background.smoke.seed = s; changed();
+});
+$('bgReset').addEventListener('click', () => { design.background = defaultBackground(); changed(); });
+
 function syncSpec() {
   const suit = suitById(design, $('specSuit').value) || activeSuits(design)[0];
   $('specOut').textContent = JSON.stringify(fireworkSpec(design, suit, +$('specRank').value), null, 1);
@@ -862,6 +911,7 @@ for (const el of document.querySelectorAll('.hb-panel .hb-row input[type=color]'
 }
 $('zoom').value = view.zoom;
 applyLayout();
+buildSkyChips();
 buildSuitRows();
 syncReadouts();
 renderPreview();
