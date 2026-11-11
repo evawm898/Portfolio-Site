@@ -80,6 +80,17 @@
          the suit, on a card and in a firework's style, under Count and Scale, opens migrated (the
          count rewritten as what its Detail drew; an old glitter keeps its fit as `legacy`) and
          renders byte-identically; the migrated count is what the peony draws
+     H31-H35 the catalogue counts, version 6, four corners, the corner grid, the frame (see docs/hanabi.md)
+     H36 the background (version 7): Eva's defaults RESTATED, every field round-trips (clamped, a bad seed
+         told), drawn sky -> horizon -> glows -> smoke -> fireworks -> index, the sky, the horizon, one glow
+         per firework and every puff (its place, size, alpha, rank share and lit colour) restated from a
+         restated generator; another seed moves the smoke and nothing else; each effect at 0 draws nothing
+     H37 the white border: the bleed box white, everything else clipped to the art panel (the trim less the
+         border, 0.05 corners), the index and the band from the art's edge, backs and tokens; 0 is full bleed
+     H38 a version-6 design (BASE6, c7d4ba6, read from git) opens with no border and no background, told once,
+         and renders byte-identically; a new design with both off is the version-6 default to the byte
+     H39 greyscale: every mark of every suit's rank 5 against the ground composited under it (restated) at
+         3:1 or better, the smoke costing at most a tenth of it (HANABI_REPORT=1 prints the table)
    PART TWO — Chromium, the real page (cdnjs served from node_modules, fonts blocked)
      B1  the page loads with no page error, grayscale and guides toggles act on the stage
      B2  the Centres view renders the viewed suit under each of the five compositions
@@ -107,6 +118,10 @@
      B3  the print PDF: page count, and on page 1 rasterised by pdftoppm the crop marks are
          ink at the positions H6 computed and the card art starts exactly at the bleed box
      B4  the PNG zip: one file per face + back, each 300 dpi of the bleed box
+     B14 the Background section in the real page (toggle, collapsed sub-sections, readouts, a preset, reroll,
+         reset, the border input), and the exported red 5 equal pixel for pixel to the preview's own card
+         rasterised at the export's size, at poker and mini, its white border pure white; the board's
+         thumbnail carries the same haze (B3 prints one PDF with the 3 mm border and one without)
 
    --negative-control re-runs against deliberately broken copies (of the modules, or of the
    page script for what only the board shows); each must fail the check that names it.
@@ -141,7 +156,7 @@ const MUTANTS = [
   { id: 'crop-mark-off-trim', file: 'deck.js', from: "xs.add(+s.trimX.toFixed(6));", to: "xs.add(+(s.trimX - g.bleed).toFixed(6));", breaks: ['H6', 'B3'] },
   { id: 'duplex-not-mirrored', file: 'deck.js', from: "return r * imp.cols + c;", to: "return i;", breaks: ['H7'] },
   { id: 'shared-cut-keeps-inner-bleed', file: 'deck.js', from: "const l = c === 0 ? b : 0,", to: "const l = b,", breaks: ['H6'] },
-  { id: 'no-halo', file: 'layout.js', from: "const halo = contrast(suit.primary, faceBg) < HALO_BELOW ? haloFor(suit.primary) : null;", to: "const halo = null;", breaks: ['H8'] },
+  { id: 'no-halo', file: 'layout.js', from: "const halo = cOf(suit.primary) < HALO_BELOW ? haloFor(suit.primary) : null;", to: "const halo = null;", breaks: ['H8'] },
   // H18 no longer reaches it: every type takes detail, so the one filtered key H18 tests (peony's trail) is
   // untaken by the deck-wide ring too. H11 and H15 are its witnesses.
   { id: 'centre-is-deck-wide', file: 'firework.js', from: "const c = suit.centre || {};", to: "const c = design.suits[0].centre || {};", breaks: ['H11', 'H15', 'H22', 'H24', 'H25', 'H26', 'H27', 'H28', 'H29', 'H30', 'H31', 'H32'] },
@@ -173,7 +188,7 @@ const MUTANTS = [
   { id: 'suit-parameters-unfiltered', file: 'firework.js', from: "for (const k of takes) if (mine[k]", to: "for (const k of Object.keys(mine)) if (mine[k]", breaks: ['H18', 'H25'] },
   { id: 'rank-column-keeps-cell-arrangements', file: 'deck.js', from: "for (const s of design.suits) clearCell(design, s.id, rank, 'items');", to: ";", breaks: ['H18', 'B7'] },
   { id: 'renderer-reads-the-clock', file: 'firework.js', from: "  const rand = rng(spec.seed);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", to: "  const rand = rng(Date.now() + Math.random() * 4e9);\n  const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];\n  if (TYPES[m])", breaks: ['H19', 'H3', 'H4', 'H11', 'H14', 'H15', 'H18', 'H21', 'H22', 'H23', 'H24', 'H25', 'H26', 'H27', 'H30', 'H31', 'H32', 'H34', 'H35'], mayAlso: ['H13', 'H16', 'H28'] },
-  { id: 'scene-over-the-index', file: 'layout.js', from: "const art = bg + sceneArt(design, g) + centreArt(design, suit, card.rank, g, ix);", to: "const art = bg + centreArt(design, suit, card.rank, g, ix) + sceneArt(design, g);", breaks: ['H20'] },
+  { id: 'scene-over-the-index', file: 'layout.js', from: "const art = bg.ground + sceneArt(design, g) + bg.fx + centre;", to: "const art = bg.ground + bg.fx + centre + sceneArt(design, g);", breaks: ['H20'] },
   { id: 'scene-drawn-when-off', file: 'layout.js', from: "if (!sc || !sc.on) return '';", to: "if (!sc) return '';", breaks: ['H20', 'H15', 'H22', 'H26', 'H30', 'H32'] },
   // the page: what only the board can show
   { id: 'card-edit-writes-the-row', file: '../hanabi.js', from: "if (view.scope === 'card') cellOf(design, suit.id, rank, true)[k] = v;", to: "if (false) cellOf(design, suit.id, rank, true)[k] = v;", breaks: ['B5'] },
@@ -248,10 +263,27 @@ const MUTANTS = [
   { id: 'grid-boxes-too-short', file: 'layout.js', from: ".map(([x, y]) => ({ x, y, w: k.w, h: k.h }))", to: ".map(([x, y]) => ({ x, y, w: k.w, h: k.h * 0.4 }))", breaks: ['H34'] },
   { id: 'four-corners-not-turned', file: 'layout.js', from: "  if (mode === 'four') return tl + tr + inv(tl) + inv(tr);", to: "  if (mode === 'four') return tl + tr + `<g transform=\"translate(0 ${f(h - idx.h)})\">${tl + tr}</g>`;", breaks: ['H33', 'H32'] },
   { id: 'frame-in-the-safe-zone', file: 'layout.js', from: "inset = Math.max(0.8, g.safe * 0.5), sw", to: "inset = g.safe, sw", breaks: ['H35'] },
-  { id: 'frame-under-the-index', file: 'layout.js', from: "frame(g, art + ix.svg + frameArt(design, suit, g), {", to: "frame(g, art + frameArt(design, suit, g) + ix.svg, {", breaks: ['H35'] },
+  { id: 'frame-under-the-index', file: 'layout.js', from: "artPanel(g, art + ix.svg + frameArt(design, suit, g), idPrefix)", to: "artPanel(g, art + frameArt(design, suit, g) + ix.svg, idPrefix)", breaks: ['H35'] },
   { id: 'rounded-in-every-render', file: 'layout.js', from: "  if (round && !guides) {", to: "  if (!guides) {", breaks: ['H35', 'H15', 'H22', 'H26', 'H30', 'H32'] },
   { id: 'centre-all-rewrites-centred-cards', file: '../hanabi.js', from: "    else if (Math.hypot(c.dx, c.dy) < CENTRE_TOL_MM) already.push(name);", to: "    else if (false) already.push(name);", breaks: ['B11', 'B13'] },
   { id: 'colour-hex-not-shown', file: '../hanabi.js', from: "for (const out of document.querySelectorAll('.hb-panel .hb-hex')) out.textContent = $(out.dataset.for).value.toUpperCase();", to: ";", breaks: ['B13'] },
+  // version 7: the background and the white border (H36-H39, B3, B14)
+  { id: 'smoke-not-seeded', file: 'layout.js', from: "let st = sm.seed >>> 0;", to: "let st = (Math.random() * 4294967296) >>> 0;", breaks: ['H36'] },
+  { id: 'smoke-ignores-rank', file: 'layout.js', from: "const t = design.background.smoke.rank && rank ? (rank - 1) / 4 : 1;", to: "const t = 1;", breaks: ['H36'] },
+  { id: 'horizon-too-tall', file: 'layout.js', from: "const hc = mixHex(bottom, HORIZON_TINT, 0.55), y0 = A.y + A.h * 0.6;", to: "const hc = mixHex(bottom, HORIZON_TINT, 0.55), y0 = A.y + A.h * 0.5;", breaks: ['H36'] },
+  { id: 'glow-reach-wrong', file: 'layout.js', from: "export const GLOW_REACH = 1.7, LIT_REACH = 1.8;", to: "export const GLOW_REACH = 1.2, LIT_REACH = 1.8;", breaks: ['H36'] },
+  { id: 'smoke-never-lit', file: 'layout.js', from: "if (sm.lit > 0 && bursts.length) {", to: "if (false) {", breaks: ['H36'] },
+  { id: 'glow-not-per-firework', file: 'layout.js', from: "if (bursts) bursts.push(burstOf(spec, suit, it.cx, it.cy, it.r / reach));", to: "", breaks: ['H36'], mayAlso: ['H39'] },
+  { id: 'background-off-draws-the-sky', file: 'layout.js', from: "if (!b || !b.on) return { ground: rect(design.face.bg), fx: '', defs: '' };", to: "if (!b) return { ground: rect(design.face.bg), fx: '', defs: '' };", breaks: ['H36', 'H38'], mayAlso: ['H10', 'H15', 'H22', 'H26', 'H30', 'H32', 'H14', 'H20', 'H35', 'B14'] },
+  { id: 'drift-not-read', file: 'deck.js', from: "    t.drift = lim('drift', m.drift, t.drift);\n", to: "", breaks: ['H36'] },
+  { id: 'border-ignored', file: 'deck.js', from: "const bo = +design.border || 0, e = bo + s;", to: "const bo = 0, e = s;", breaks: ['H37', 'B3', 'B14'], mayAlso: ['H35', 'H20', 'H36', 'H39'] },
+  { id: 'safe-from-the-trim', file: 'deck.js', from: "const bo = +design.border || 0, e = bo + s;", to: "const bo = +design.border || 0, e = s;", breaks: ['H37'], mayAlso: ['H35', 'H17', 'H34', 'H33', 'H36', 'H39'] },
+  { id: 'art-not-clipped', file: 'layout.js', from: "<g clip-path=\"url(#${p}art)\">${inner}</g>", to: "${inner}", breaks: ['H37'], mayAlso: ['B14'] },
+  { id: 'frame-from-the-trim', file: 'layout.js', from: "const t = g.border ? g.art : g.trim, inset = Math.max(0.8, g.safe * 0.5)", to: "const t = g.trim, inset = Math.max(0.8, g.safe * 0.5)", breaks: ['H35'] },
+  { id: 'old-designs-take-the-border', file: 'deck.js', from: "const old7 = ver < 7;", to: "const old7 = false;", breaks: ['H38'], mayAlso: ['H15', 'H22', 'H26', 'H30', 'H32', 'B8'] },
+  { id: 'reroll-keeps-the-seed', file: '../hanabi.js', from: "design.background.smoke.seed = s; changed();", to: "changed();", breaks: ['B14'] },
+  { id: 'export-draws-another-haze', file: 'export.js', from: "cache.set(key, await svgToCanvas(renderFace(design, c, { px }), px.w, px.h));", to: "cache.set(key, await svgToCanvas(renderFace({ ...design, background: { ...design.background, smoke: { ...design.background.smoke, seed: design.background.smoke.seed + 1 } } }, c, { px }), px.w, px.h));", breaks: ['B14'] },
+  { id: 'master-toggle-dead', file: '../hanabi.js', from: "bindValue('bgOn', () => design.background.on, (v) => { design.background.on = v; }, 'change'),", to: "bindValue('bgOn', () => design.background.on, () => {}, 'change'),", breaks: ['B14'] },
   { id: 'rounded-preview-not-passed', file: '../hanabi.js', from: "{ guides: view.guides, round: view.round, idPrefix: `p${uid++}` }), `${suit.name}", to: "{ guides: view.guides, idPrefix: `p${uid++}` }), `${suit.name}", breaks: ['B13'] },
 ];
 
@@ -269,6 +301,8 @@ const BASE3 = '68ff42a';
 const BASE4 = 'd8286f1';
 // The count as it shipped (#551; schema version 5): H31's and H32's reference.
 const BASE5 = '5771675';
+// The polish pass as it shipped (#552; schema version 6): H38's reference.
+const BASE6 = 'c7d4ba6';
 const baseDirs = {};
 async function baseModules(commit = BASE) {
   if (baseDirs[commit]) return baseDirs[commit];
@@ -429,6 +463,12 @@ async function partOne(dir) {
   const check = (id, name, fn) => { try { const r = fn(); res.push({ id, name, ok: r === true, detail: r === true ? '' : String(r) }); } catch (e) { res.push({ id, name, ok: false, detail: 'threw ' + e.message }); } };
   const checkAsync = async (id, name, fn) => { try { const r = await fn(); res.push({ id, name, ok: r === true, detail: r === true ? '' : String(r) }); } catch (e) { res.push({ id, name, ok: false, detail: 'threw ' + e.message }); } };
   const COMPOSES = ['count', 'countscale', 'scale', 'column', 'bleed'];   // restated
+  // Every file saved before version 7 is told that it opens with no border and no
+  // background (H38 holds that note); the older checks read past it.
+  const V7NOTE = /^saved before version 7: /;
+  const normalise7 = (raw, ids) => { const r = D.normaliseDesign(raw, ids); return { ...r, notes: r.notes.filter((x) => !V7NOTE.test(x)) }; };
+  // a design as version 6 drew it: no white border, no background (H36-H38 hold the new ones)
+  const pre7 = (d) => { d.border = 0; d.background.on = false; return d; };
   const likeness = { get value() { return likenessOf(F); } };
   const symbolPath = (id) => S.SYMBOLS[id].d.slice(0, 40);
 
@@ -588,16 +628,16 @@ async function partOne(dir) {
     d.suits[3].firework = { count: 30, trail: 0.4, tips: false, coreColor: '#FF00AA', outerColor: '' };
     d.arrangements = { 2: [{ x: 0.5, y: 0.2, s: 0.6, rot: 0 }, { x: 0.5, y: 0.8, s: 0.9, rot: 45 }] };
     d.scene = { on: true, kind: 'rooftops', color: '#223344', height: 0.3 };
-    const { design, notes } = D.normaliseDesign(JSON.parse(D.serialiseDesign(d)), S.SYMBOL_IDS);
+    const { design, notes } = normalise7(JSON.parse(D.serialiseDesign(d)), S.SYMBOL_IDS);
     if (notes.length) return notes.join('; ');
     if (JSON.stringify(design) !== JSON.stringify({ ...d })) return 'did not come back identical';
-    const newer = D.normaliseDesign({ ...d, version: D.VERSION + 1 }, S.SYMBOL_IDS);
+    const newer = normalise7({ ...d, version: D.VERSION + 1 }, S.SYMBOL_IDS);
     if (newer.design !== null) return 'newer version read';
     // version 1: one layout for the deck. RESTATED, not read from deck.js.
     const want = { A: ['large', 'scale'], B: ['small', 'column'], C: ['band', 'bleed'] };
     for (const [L1, [index, compose]] of Object.entries(want)) {
       const v1 = { format: 'hanabi-deck', version: 1, layout: L1, suits: D.defaultSuits().map(({ centre, firework, ...s }) => s) };
-      const r = D.normaliseDesign(v1, S.SYMBOL_IDS);
+      const r = normalise7(v1, S.SYMBOL_IDS);
       if (r.design.index !== index || r.design.suits.some((s) => s.centre.compose !== compose || s.centre.motif !== 'classic')) return `v1 layout ${L1} read as ${r.design.index}/${r.design.suits[0].centre.compose}`;
       if (!r.notes.some((n) => n.includes(`layout ${L1}`))) return `v1 layout ${L1} read without saying so`;
     }
@@ -605,7 +645,7 @@ async function partOne(dir) {
     // phase-1 radial bursts keep drawing themselves under a new name, told
     for (const [layout, compose] of [['single', 'scale'], ['count', 'column'], ['bleed', 'bleed']]) {
       const v2 = { format: 'hanabi-deck', version: 2, suits: D.defaultSuits().map(({ centre, firework, ...s }) => ({ ...s, centre: { layout, motif: 'willow', tier: 'none' } })) };
-      const r = D.normaliseDesign(v2, S.SYMBOL_IDS);
+      const r = normalise7(v2, S.SYMBOL_IDS);
       if (r.design.suits.some((s) => s.centre.compose !== compose || s.centre.motif !== 'radial-willow')) return `v2 ${layout}/willow read as ${r.design.suits[0].centre.compose}/${r.design.suits[0].centre.motif}`;
       if (!r.notes.some((n) => n.includes('radial'))) return 'a renamed phase-1 firework loaded without a note';
     }
@@ -613,7 +653,7 @@ async function partOne(dir) {
     // suit keeps its own firework with no second tier, and SAYS so
     const old = JSON.parse(D.serialiseDesign(D.defaultDesign()));
     old.suits[0].centre = { compose: 'scale', motif: 'sparks', tier: 'streamers' };
-    const o = D.normaliseDesign(old, S.SYMBOL_IDS), oc = o.design.suits[0].centre;
+    const o = normalise7(old, S.SYMBOL_IDS), oc = o.design.suits[0].centre;
     if (oc.motif !== D.defaultDesign().suits[0].centre.motif || oc.tier !== 'none') return `a removed firework read as ${oc.motif}/${oc.tier}`;
     if (!o.notes.some((n) => n.includes('"sparks"')) || !o.notes.some((n) => n.includes('"streamers"'))) return `a removed firework or tier loaded without a note: ${o.notes.join('; ')}`;
     return true;
@@ -661,7 +701,7 @@ async function partOne(dir) {
         const norm = (s) => {
           const svg = L.renderFace(d, { kind: 'card', suitId: s.id, rank: r }, { idPrefix: 'x' });
           const ix = svg.slice(svg.indexOf('<g class="hb-index">'));
-          return ix.split(S.SYMBOLS[s.symbol].d).join('SYM').split(s.primary).join('COL').replace(/#[0-9A-F]{6}/gi, (h) => (h.toUpperCase() === d.face.bg ? h : 'INK'))
+          return ix.split(S.SYMBOLS[s.symbol].d).join('SYM').split(s.primary).join('COL').replace(/#[0-9A-F]{6}/gi, (h) => (L.groundColours(d).includes(h.toUpperCase()) || h.toUpperCase() === d.face.bg ? h : 'INK'))
             .replace(/<rect x="[-\d.]+" y="[-\d.]+" width="[\d.]+" height="[\d.]+" rx="[\d.]+" fill="#[0-9A-F]{6}" fill-opacity="0.85"\/>/gi, '');
         };
         const plain = D.activeSuits(d).filter((s) => !s.multicolor);
@@ -786,13 +826,13 @@ async function partOne(dir) {
     D.suitById(d, 'blue').primary = '#3E8EF0';
     D.suitById(d, 'green').primary = '#10301C';   // a stop that does not stand off the dark card
     if (!/stroke="#FFFFFF" stroke-width="18"/.test(L.renderFace(d, { kind: 'card', suitId: 'rainbow', rank: 3 }, { idPrefix: 'x' }))) return 'a gradient with a dark stop got no halo';
-    const back = D.normaliseDesign(JSON.parse(D.serialiseDesign(d)), S.SYMBOL_IDS);
+    const back = normalise7(JSON.parse(D.serialiseDesign(d)), S.SYMBOL_IDS);
     if (D.suitById(back.design, 'rainbow').numeral !== 'rainbow' || back.notes.length) return `the numeral fill did not round-trip: ${back.notes.join('; ')}`;
     const odd = JSON.parse(D.serialiseDesign(d)); odd.suits.find((x) => x.id === 'rainbow').numeral = 'plaid';
-    const o = D.normaliseDesign(odd, S.SYMBOL_IDS);
+    const o = normalise7(odd, S.SYMBOL_IDS);
     if (D.suitById(o.design, 'rainbow').numeral !== 'rainbow' || !o.notes.some((n) => n.includes('"plaid"'))) return 'an unknown index fill loaded without a note, or not as the default';
     const bare = JSON.parse(D.serialiseDesign(d)); bare.suits.forEach((x) => { delete x.numeral; });
-    if (D.suitById(D.normaliseDesign(bare, S.SYMBOL_IDS).design, 'rainbow').numeral !== 'rainbow') return 'a file without the field did not get the rainbow default';
+    if (D.suitById(normalise7(bare, S.SYMBOL_IDS).design, 'rainbow').numeral !== 'rainbow') return 'a file without the field did not get the rainbow default';
     return true;
   });
 
@@ -818,7 +858,7 @@ async function partOne(dir) {
       files.push([`v1 ${L1}`, bd.normaliseDesign(v1, S.SYMBOL_IDS).design, v1]);
     }
     for (const [tag, base, file] of files) {
-      const { design } = D.normaliseDesign(file, S.SYMBOL_IDS);
+      const { design } = normalise7(file, S.SYMBOL_IDS);
       if (!design) return `${tag}: refused`;
       for (const c of bd.deckCards(base)) {
         if (c.copy) continue; n++;
@@ -866,7 +906,7 @@ async function partOne(dir) {
       const g = D.cardGeom(d), sr = g.safeRect;
       // the field: the area less the index columns, less a gap (restated)
       let area, cw;
-      if (index === 'band') { const top = g.bleed + g.safe + h * 0.13 + h * 0.006; area = { x: sr.x, y: top, w: sr.w, h: g.fullH - 2 * top }; cw = 0; }
+      if (index === 'band') { const top = g.bleed + d.border + g.safe + h * 0.13 + h * 0.006; area = { x: sr.x, y: top, w: sr.w, h: g.fullH - 2 * top }; cw = 0; }
       else { area = sr; cw = h * DIGIT[index] * 0.62; }
       const gap = Math.max(0.8, area.h * 0.015), side = cw ? cw + gap : gap;
       const field = { x: area.x + side, y: area.y + gap, w: area.w - 2 * side, h: area.h - 2 * gap };
@@ -888,7 +928,7 @@ async function partOne(dir) {
     const d = D.defaultDesign();
     const file = JSON.parse(D.serialiseDesign(d));
     file.fireworks = { red: { 3: { items: [{ x: 0.5, y: 0.5, s: 0.5, rot: 0 }] } } }; file.arrangements = { 4: [{ x: 0.5, y: 0.5, s: 0.5 }] };
-    const r = D.normaliseDesign(file, S.SYMBOL_IDS);
+    const r = normalise7(file, S.SYMBOL_IDS);
     if (r.design.fireworks.red || r.design.arrangements[4]) return 'a wrong-length arrangement was kept';
     if (r.notes.length < 2) return `a wrong-length arrangement was dropped without a note: ${r.notes.join('; ')}`;
     if (count(L.renderFace(r.design, { kind: 'card', suitId: 'red', rank: 3 })) !== 3) return 'red 3 is not three fireworks after a bad arrangement';
@@ -967,7 +1007,9 @@ async function partOne(dir) {
     const d = D.defaultDesign();
     if (d.scene.on) return 'the scene ships on';
     if (D.deckCards(d).some((c) => /hb-scene/.test(L.renderFace(d, c)))) return 'a scene drawn while off';
-    for (const height of [0.08, 0.3, 0.45]) for (const kind of Object.keys(D.SCENES)) {
+    const h0 = d.size.h;
+    for (const border of [3, 0]) for (const height of [0.08, 0.3, 0.45]) for (const kind of Object.keys(D.SCENES)) {
+      d.border = border;
       d.scene = { on: true, kind, color: '#223344', height };
       const g = D.cardGeom(d), svg = L.renderFace(d, { kind: 'card', suitId: 'red', rank: 3 });
       const at = svg.indexOf('class="hb-scene"');
@@ -976,7 +1018,9 @@ async function partOne(dir) {
       const pts = [...svg.slice(at).match(/d="([^"]+)"/)[1].matchAll(/(-?[\d.]+) (-?[\d.]+)/g)].map((m) => [+m[1], +m[2]]);
       const top = Math.min(...pts.map((p) => p[1]));
       if (pts.some(([x, y]) => x < -1e-6 || x > g.fullW + 1e-6 || y > g.fullH + 1e-6)) return `${kind}: the scene leaves the bleed box`;
-      if (top < g.fullH * (1 - height) - 1e-6 || top > g.fullH * (1 - height * 0.4)) return `${kind} at ${height}: its top at ${top.toFixed(2)} of ${g.fullH.toFixed(2)}`;
+      // in the art panel: the bleed box, or the trim less the white border (restated)
+      const ay = d.border ? g.bleed + d.border : 0, ah = d.border ? h0 - 2 * d.border : g.fullH;
+      if (top < ay + ah * (1 - height) - 1e-6 || top > ay + ah * (1 - height * 0.4)) return `${kind} at ${height}, border ${d.border}: its top at ${top.toFixed(2)} of ${(ay + ah).toFixed(2)}`;
     }
     return true;
   });
@@ -1041,8 +1085,8 @@ async function partOne(dir) {
     for (const preset of ['poker', 'bridge', 'mini']) for (const index of ['large', 'small', 'band']) for (const edited of [false, 'rainbow', true]) {
       const db = bd.defaultDesign();
       db.size = { preset, ...bd.SIZE_PRESETS[preset] }; db.index = index; if (edited === true) edit(db); else if (edited) db.rainbow = true;
-      let dn = Object.assign(D.defaultDesign(), D.V6_OLD_DEFAULTS); dn.size = { preset, ...D.SIZE_PRESETS[preset] }; dn.index = index; if (edited === 'rainbow') dn.rainbow = true;   // version 6's new defaults: H32
-      if (edited === true) dn = D.normaliseDesign(JSON.parse(bd.serialiseDesign(db)), S.SYMBOL_IDS).design;
+      let dn = pre7(Object.assign(D.defaultDesign(), D.V6_OLD_DEFAULTS)); dn.size = { preset, ...D.SIZE_PRESETS[preset] }; dn.index = index; if (edited === 'rainbow') dn.rainbow = true;   // version 6's new defaults: H32
+      if (edited === true) dn = normalise7(JSON.parse(bd.serialiseDesign(db)), S.SYMBOL_IDS).design;
       for (const c of D.deckCards(dn)) { const e = same(`${preset}/${index}${edited ? `/${edited === true ? 'edited' : edited}` : ''} ${c.kind} ${c.suitId || ''}${c.rank || ''}`, L.renderFace(dn, c), bl.renderFace(db, c)); if (e) return e; }
     }
     return n > 2500 || `only ${n} compared`;
@@ -1076,10 +1120,10 @@ async function partOne(dir) {
     if (after[4] !== before[0] || after[0] !== before[1]) return 'the restacked firework is not drawn last (on top)';
     // n survives the file only as a permutation
     const file = JSON.parse(D.serialiseDesign(d));
-    const r1 = D.normaliseDesign(file, S.SYMBOL_IDS).design;
+    const r1 = normalise7(file, S.SYMBOL_IDS).design;
     if (JSON.stringify(r1.fireworks.red[5].items.map((x) => x.n)) !== JSON.stringify(D.cellOf(d, 'red', 5).items.map((x) => x.n))) return 'the stacking order did not round-trip';
     file.fireworks.red[5].items[1].n = file.fireworks.red[5].items[2].n;
-    if (D.normaliseDesign(file, S.SYMBOL_IDS).design.fireworks.red[5].items.some((x) => x.n !== undefined)) return 'a repeated n was kept';
+    if (normalise7(file, S.SYMBOL_IDS).design.fireworks.red[5].items.some((x) => x.n !== undefined)) return 'a repeated n was kept';
     return true;
   });
 
@@ -1101,12 +1145,12 @@ async function partOne(dir) {
     if (L.renderFace(d, { kind: 'card', suitId: 'red', rank: 2 }) !== L.renderFace(D.defaultDesign().suits && (() => { const e = D.defaultDesign(); D.suitById(e, 'red').centre.compose = 'scale'; return e; })(), { kind: 'card', suitId: 'red', rank: 2 })) return 'the placement reached another card';
     // saved, read back, clamped
     const file = JSON.parse(D.serialiseDesign(d));
-    if (JSON.stringify(D.normaliseDesign(file, S.SYMBOL_IDS).design.fireworks.red[3].place) !== JSON.stringify(D.cellOf(d, 'red', 3).place)) return 'the placement did not round-trip';
+    if (JSON.stringify(normalise7(file, S.SYMBOL_IDS).design.fireworks.red[3].place) !== JSON.stringify(D.cellOf(d, 'red', 3).place)) return 'the placement did not round-trip';
     file.fireworks.red[3].place = { x: 3, y: -1, s: 9, rot: 999 };
-    const back = D.normaliseDesign(file, S.SYMBOL_IDS).design.fireworks.red[3].place;
+    const back = normalise7(file, S.SYMBOL_IDS).design.fireworks.red[3].place;
     if (back.x !== 1 || back.y !== 0 || back.s !== D.PLACE_LIMITS.s[1] || back.rot !== 180) return `out-of-range placement read as ${JSON.stringify(back)}`;
     file.fireworks.red[3].place = 'left';
-    const bad = D.normaliseDesign(file, S.SYMBOL_IDS);
+    const bad = normalise7(file, S.SYMBOL_IDS);
     if (bad.design.fireworks.red || !bad.notes.some((x) => /placement/.test(x))) return 'a placement not understood was kept or dropped silently';
     // a field motif fills its rect and is never placed
     red.centre.motif = 'starfield';
@@ -1152,10 +1196,10 @@ async function partOne(dir) {
     delete D.cellOf(d, 'red', 4).items;
     // saved and read back; bad entries dropped and told
     const file = JSON.parse(D.serialiseDesign(d));
-    const back = D.normaliseDesign(file, S.SYMBOL_IDS);
+    const back = normalise7(file, S.SYMBOL_IDS);
     if (back.notes.length || JSON.stringify(back.design.fireworks) !== JSON.stringify(d.fireworks)) return `styles did not round-trip: ${back.notes.join('; ')}`;
     file.fireworks.red[4].styles = { 1: { motif: 'starfield' }, 7: { motif: 'ring' }, 3: { density: 'lots', motif: 'ring' } };
-    const bad = D.normaliseDesign(file, S.SYMBOL_IDS), bs = bad.design.fireworks.red[4].styles;
+    const bad = normalise7(file, S.SYMBOL_IDS), bs = bad.design.fireworks.red[4].styles;
     if (JSON.stringify(bs) !== JSON.stringify({ 3: { motif: 'ring' } }) || bad.notes.length !== 3) return `bad styles read as ${JSON.stringify(bs)} with ${bad.notes.length} notes (${bad.notes.join('; ')})`;
     // a style on a card that is not a Count draws nothing different
     D.suitById(d, 'blue').centre.compose = 'scale';
@@ -1194,14 +1238,14 @@ async function partOne(dir) {
       d.arrangements = { 5: [{ x: 0.2, y: 0.2, s: 0.5, rot: 0 }, { x: 0.8, y: 0.2, s: 0.5, rot: 0 }, { x: 0.5, y: 0.5, s: 0.7, rot: 30 }, { x: 0.2, y: 0.8, s: 0.5, rot: 0 }, { x: 0.8, y: 0.8, s: 0.5, rot: 0 }] };
       const file = JSON.parse(bd.serialiseDesign(d));
       if (file.version !== 3) return `the base wrote version ${file.version}`;
-      const { design, notes } = D.normaliseDesign(file, S.SYMBOL_IDS);
+      const { design, notes } = normalise7(file, S.SYMBOL_IDS);
       // the one note a version-3 file may carry is version 5's count migration
       const other = notes.filter((x) => !/firework counts? rewritten as the stars/.test(x));
       if (other.length) return `a version-3 file read with notes: ${other.join('; ')}`;
       if (!notes.length) return 'the hand-set peony count and Detail were not migrated (no note)';
       // and it reads as the base read it, but for the count keys version 5 rewrites
-      // (and version 6's new fields, which the old schema had none of: H32 holds their reading)
-      const strip = (x) => JSON.stringify(x, (k, v) => (['count', 'density', 'legacy', 'version', 'stems', 'pips', 'frame'].includes(k) ? undefined : v));
+      // (and version 6's and 7's new fields, which the old schema had none of: H32 and H38 hold their reading)
+      const strip = (x) => JSON.stringify(x, (k, v) => (['count', 'density', 'legacy', 'version', 'stems', 'pips', 'frame', 'border', 'background'].includes(k) ? undefined : v));
       if (strip(design) !== strip(bd.normaliseDesign(file, S.SYMBOL_IDS).design)) return 'the version-3 file reads differently here';
       for (const c of D.deckCards(design)) {
         n++;
@@ -1230,7 +1274,7 @@ async function partOne(dir) {
   const fieldOf = (d) => {
     const DIGIT = { large: 0.13, small: 0.095 }, g = D.cardGeom(d), sr = g.safeRect, h = d.size.h;
     let area, cw;
-    if (d.index === 'band') { const top = g.bleed + g.safe + h * 0.13 + h * 0.006; area = { x: sr.x, y: top, w: sr.w, h: g.fullH - 2 * top }; cw = 0; }
+    if (d.index === 'band') { const top = g.bleed + d.border + g.safe + h * 0.13 + h * 0.006; area = { x: sr.x, y: top, w: sr.w, h: g.fullH - 2 * top }; cw = 0; }
     else { area = sr; cw = h * DIGIT[d.index] * 0.62; }
     const gap = Math.max(0.8, area.h * 0.015), side = cw ? cw + gap : gap;
     return { x: area.x + side, y: area.y + gap, w: area.w - 2 * side, h: area.h - 2 * gap };
@@ -1351,7 +1395,7 @@ async function partOne(dir) {
       const db = bd.defaultDesign(); db.rainbow = true; db.size = { preset, ...bd.SIZE_PRESETS[preset] }; edit(db);
       const file = JSON.parse(bd.serialiseDesign(db));
       if (file.version !== 4) return `the base wrote version ${file.version}`;
-      const { design, notes } = D.normaliseDesign(file, S.SYMBOL_IDS);
+      const { design, notes } = normalise7(file, S.SYMBOL_IDS);
       if (notes.some((x) => !/firework counts? rewritten as the stars/.test(x))) return `${label}: read with notes ${notes.join('; ')}`;
       if (notes.length) migrated++;
       if (label === 'nothing set by hand' && notes.length) return 'a version-4 file with nothing set by hand was rewritten';
@@ -1361,14 +1405,14 @@ async function partOne(dir) {
         if (a !== b) { let i = 0; while (a[i] === b[i]) i++; return `${label} ${preset} ${c.suitId || c.kind}${c.rank || ''}: differs at ${i}: …${a.slice(i - 30, i + 30)}… vs …${b.slice(i - 30, i + 30)}…`; }
       }
       // version 5 written and read back is the same design, with nothing to migrate again
-      const again = D.normaliseDesign(JSON.parse(D.serialiseDesign(design)), S.SYMBOL_IDS);
+      const again = normalise7(JSON.parse(D.serialiseDesign(design)), S.SYMBOL_IDS);
       if (again.notes.length) return `${label}: the version-5 file read with notes ${again.notes.join('; ')}`;
       if (JSON.stringify(again.design) !== JSON.stringify(design)) return `${label}: the version-5 file does not round-trip`;
     }
     // the migrated count IS what is drawn: red's peony at count 14 / Detail 1.6 drew four rings (round(1 + 2 x 1.6)),
     // each 14 x (1 - k / 4.6), at least 5
     const db = bd.defaultDesign(); Object.assign(db.suits.find((x) => x.id === 'red').firework, { count: 14, density: 1.6 });
-    const m = D.normaliseDesign(JSON.parse(bd.serialiseDesign(db)), S.SYMBOL_IDS).design;
+    const m = normalise7(JSON.parse(bd.serialiseDesign(db)), S.SYMBOL_IDS).design;
     const red = m.suits.find((x) => x.id === 'red'), want = 14 + Math.round(14 * (1 - 1 / 4.6)) + Math.round(14 * (1 - 2 / 4.6)) + Math.max(5, Math.round(14 * (1 - 3 / 4.6)));
     if (red.firework.count !== want) return `red's migrated count is ${red.firework.count}; its Detail drew ${want} stars`;
     const svg = L.renderFace(m, { kind: 'card', suitId: 'red', rank: 1 }), pl = L.placementFor(m, red, 1), it = pl.items[0];
@@ -1441,14 +1485,14 @@ async function partOne(dir) {
   // migrated and draws byte-identically; one with nothing set reads with no note at all.
   await checkAsync('H32', `version 6: new designs open with four corners, no rising trail, the corner grid, no frame; a version-5 design (${BASE5}) keeps its own and renders byte-identically`, async () => {
     const d0 = D.defaultDesign();
-    if (d0.version !== 6 || d0.corners !== 'four' || d0.stems !== false || d0.pips !== 'grid' || d0.face.frame !== 'none') return `the defaults are version ${d0.version}, ${d0.corners}, stems ${d0.stems}, ${d0.pips}, frame ${d0.face.frame}`;
+    if (d0.version < 6 || d0.corners !== 'four' || d0.stems !== false || d0.pips !== 'grid' || d0.face.frame !== 'none') return `the defaults are version ${d0.version}, ${d0.corners}, stems ${d0.stems}, ${d0.pips}, frame ${d0.face.frame}`;
     const B = await baseModules(BASE5);
     const bd = await import(pathToFileURL(path.join(B, 'deck.js')).href), bl = await import(pathToFileURL(path.join(B, 'layout.js')).href);
     // a file that does not say: before version 6, the old meaning; from version 6, the new
     for (const [ver, want] of [[5, ['inverted', true, 'field']], [6, ['four', false, 'grid']]]) {
       const raw = JSON.parse(D.serialiseDesign(D.defaultDesign())); raw.version = ver;
       delete raw.corners; delete raw.stems; delete raw.pips; delete raw.face.frame;
-      const r = D.normaliseDesign(raw, S.SYMBOL_IDS).design;
+      const r = normalise7(raw, S.SYMBOL_IDS).design;
       if (r.corners !== want[0] || r.stems !== want[1] || r.pips !== want[2] || r.face.frame !== 'none') return `a version-${ver} file that does not say reads ${r.corners}, stems ${r.stems}, ${r.pips}, frame ${r.face.frame}`;
     }
     let n = 0, migrated = 0;
@@ -1466,7 +1510,7 @@ async function partOne(dir) {
       const db = bd.defaultDesign(); db.rainbow = true; db.corners = corners; db.size = { preset, ...bd.SIZE_PRESETS[preset] }; edit(db);
       const file = JSON.parse(bd.serialiseDesign(db));
       if (file.version !== 5) return `the base wrote version ${file.version}`;
-      const { design, notes } = D.normaliseDesign(file, S.SYMBOL_IDS);
+      const { design, notes } = normalise7(file, S.SYMBOL_IDS);
       if (notes.some((x) => !/catalogue firework counts? rewritten/.test(x))) return `${label}: read with notes ${notes.join('; ')}`;
       if (notes.length) migrated++;
       if (label === 'nothing set by hand' && notes.length) return 'a version-5 file with nothing set by hand was rewritten';
@@ -1477,7 +1521,7 @@ async function partOne(dir) {
         const a = L.renderFace(design, c), b = bl.renderFace(db, c);
         if (a !== b) { let i = 0; while (a[i] === b[i]) i++; return `${label} ${preset} ${corners} ${c.suitId || c.kind}${c.rank || ''}: differs at ${i}: …${a.slice(i - 30, i + 30)}… vs …${b.slice(i - 30, i + 30)}…`; }
       }
-      const again = D.normaliseDesign(JSON.parse(D.serialiseDesign(design)), S.SYMBOL_IDS);
+      const again = normalise7(JSON.parse(D.serialiseDesign(design)), S.SYMBOL_IDS);
       if (again.notes.length) return `${label}: the version-6 file read with notes ${again.notes.join('; ')}`;
       if (JSON.stringify(again.design) !== JSON.stringify(design)) return `${label}: the version-6 file does not round-trip`;
     }
@@ -1533,7 +1577,7 @@ async function partOne(dir) {
       const d = D.defaultDesign(); d.rainbow = true; d.size = { preset, w, h }; d.index = index;
       const g = D.cardGeom(d), sr = g.safeRect;
       let area = sr, bw = 0, bh = 0;
-      if (index === 'band') { const top = g.bleed + g.safe + h * 0.13 + h * 0.006; area = { x: sr.x, y: top, w: sr.w, h: g.fullH - 2 * top }; }
+      if (index === 'band') { const top = g.bleed + d.border + g.safe + h * 0.13 + h * 0.006; area = { x: sr.x, y: top, w: sr.w, h: g.fullH - 2 * top }; }
       else { bw = 0.62 * h * DIGIT[index]; bh = 1.7 * h * DIGIT[index]; }
       const gap = Math.max(0.8, area.h * 0.015);
       const boxes = bw ? [[area.x, area.y], [area.x + area.w - bw, area.y], [area.x, area.y + area.h - bh], [area.x + area.w - bw, area.y + area.h - bh]] : [];
@@ -1576,12 +1620,12 @@ async function partOne(dir) {
         const svg = L.renderFace(d, card), grp = (svg.match(/<g class="hb-frame">([\s\S]*?)<\/g>/) || [])[1] || '';
         const rects = [...grp.matchAll(/<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"[^>]*stroke="([^"]+)"[^>]*stroke-width="([\d.]+)"/g)];
         if (rects.length !== k) return `frame ${fr}: ${rects.length} lines`;
-        const inset = Math.max(0.8, safe * 0.5);   // restated
+        const inset = Math.max(0.8, safe * 0.5) + d.border;   // restated: from the art panel's edge
         const r0 = rects[0];
         if (Math.abs(+r0[1] - (d.bleed + inset)) > 1e-3 || Math.abs(+r0[3] - (w - 2 * inset)) > 1e-3) return `frame ${fr} at ${preset}, safe ${safe}: the line is at ${(+r0[1] - d.bleed).toFixed(2)} mm, want ${inset}`;
         if (r0[5] !== D.suitById(d, 'red').primary) return `frame ${fr}: drawn in ${r0[5]}`;
         for (const r of rects) if (+r[1] < d.bleed || +r[1] + +r[3] > d.bleed + w) return `frame ${fr}: a line outside the trim`;
-        if (safe >= 3 && rects.some((r) => +r[1] + +r[6] / 2 > d.bleed + safe - 0.1)) return `frame ${fr} at safe ${safe}: a line reaches the safe zone (the index)`;
+        if (safe >= 3 && rects.some((r) => +r[1] + +r[6] / 2 > d.bleed + d.border + safe - 0.1)) return `frame ${fr} at safe ${safe}: a line reaches the safe zone (the index)`;
         if (svg.indexOf('class="hb-frame"') < svg.indexOf('class="hb-index"')) return 'the frame is drawn under the index';
         if (L.renderFace(d, card, { centreOnly: true }).includes('hb-frame')) return 'the board\'s thumbnail draws the frame';
       }
@@ -1590,9 +1634,9 @@ async function partOne(dir) {
       const round = L.renderFace(d, card, { round: true, idPrefix: 'q' });
       const cp = (round.match(/<clipPath id="qclip"><rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)" rx="([-\d.]+)"/) || []);
       if (!cp.length || Math.abs(+cp[3] - w) > 1e-3 || Math.abs(+cp[5] - Math.min(w, h) * 0.05) > 1e-3 || !round.includes('clip-path="url(#qclip)"')) return `${preset}: the rounded preview is not the trim at ${(Math.min(w, h) * 0.05).toFixed(2)} mm corners`;
-      if (L.renderFace(d, card, { round: true, guides: true }).includes('clipPath') || none.includes('clipPath')) return 'a clip without the rounded preview, or under the guides';
-      for (const k of ['clue', 'fuse']) if (!L.renderFace(d, { kind: k }, { round: true }).includes('clipPath')) return `the ${k} token is not rounded in the preview`;
-      if (!L.renderBack(d, { round: true }).includes('clipPath')) return 'the back is not rounded in the preview';
+      if (L.renderFace(d, card, { round: true, guides: true }).includes('hb-round') || none.includes('hb-round')) return 'a clip without the rounded preview, or under the guides';
+      for (const k of ['clue', 'fuse']) if (!L.renderFace(d, { kind: k }, { round: true }).includes('hb-round')) return `the ${k} token is not rounded in the preview`;
+      if (!L.renderBack(d, { round: true }).includes('hb-round')) return 'the back is not rounded in the preview';
     }
     if (/round\s*:/.test(fs.readFileSync(path.join(REPO, 'hanabi', 'export.js'), 'utf8'))) return 'export.js asks for the rounded preview';
     // the rising trail: off in a new design, on in one that does not say (saved before), and the suit's own either way
@@ -1607,6 +1651,229 @@ async function partOne(dir) {
     D.cellOf(d, 'white', 1, true).stem = false; if (trail(d)) return 'a card\'s rising trail off still draws it';
     return true;
   });
+
+  // ---- H36-H39: version 7 — the face background and the white print border. Every
+  // number here is RESTATED from Eva's choices (Nov 11), never read from the module.
+  const BG_WANT = { on: true, sky: { on: true, top: '#0B1530', bottom: '#020409' }, horizon: 0.55, glow: 0.25, smoke: { amount: 0.1, drift: 1, lit: 1, color: '#9AA3B4', rank: true } };
+  const SKY_WANT = { night: ['#0B1530', '#020409'], petrol: ['#0E3236', '#030809'], indigo: ['#1E1F55', '#05050F'], ink: ['#101317', '#07090B'] };
+  const rgbR = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const hexR = (c) => '#' + c.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+  const mixR = (a, b, t) => { const A = rgbR(a), B = rgbR(b); return hexR(A.map((v, i) => v + (B[i] - v) * t)); };
+  // the art panel: the bleed box with no border, else the trim less the border (restated)
+  const artR = (d) => { const b = d.bleed, bo = d.border; return bo ? { x: b + bo, y: b + bo, w: d.size.w - 2 * bo, h: d.size.h - 2 * bo } : { x: 0, y: 0, w: d.size.w + 2 * b, h: d.size.h + 2 * b }; };
+  // the smoke's puffs, restated: 42 draws of an LCG from the design's seed, 5-20 mm at
+  // poker (scaled by the card's shorter side), 8% kept clear top and bottom
+  const puffsR = (d) => {
+    const A = artR(d), k = Math.min(d.size.w, d.size.h) / 63.5; let st = d.background.smoke.seed >>> 0;
+    const rand = () => { st = (Math.imul(st, 1103515245) + 12345) >>> 0; return st / 4294967296; };
+    return Array.from({ length: 42 }, () => { const x = A.x + rand() * A.w, y = A.y + A.h * (0.08 + 0.84 * rand()), r = (5 + 15 * rand()) * k, a = 0.05 + 0.07 * rand(); return { x, y, r, a }; });
+  };
+  const ellipsesOf = (svg) => [...svg.matchAll(/<ellipse cx="([-\d.]+)" cy="([-\d.]+)" rx="([-\d.]+)" ry="([-\d.]+)" fill="url\(#[^)]*pf([0-9A-F]{6})\)" fill-opacity="([\d.]+)"\/>/g)].map((m) => ({ cx: +m[1], cy: +m[2], rx: +m[3], ry: +m[4], col: '#' + m[5], op: +m[6] }));
+  const glowsOf = (svg) => [...svg.matchAll(/<circle class="hb-glow" cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)" fill="url\(#[^)]*gl([0-9A-F]{6})\)" fill-opacity="([\d.]+)"\/>/g)].map((m) => ({ cx: +m[1], cy: +m[2], r: +m[3], col: '#' + m[4], op: +m[5] }));
+
+  check('H36', "the background: Eva's defaults, every field round-trips, drawn in order, each effect where and as strong as it says, the smoke seeded, by rank and lit", () => {
+    const d = D.defaultDesign(), b = d.background;
+    if (JSON.stringify({ ...b, smoke: { ...b.smoke, seed: undefined } }) !== JSON.stringify({ ...BG_WANT, smoke: { ...BG_WANT.smoke, seed: undefined } })) return `the default background is ${JSON.stringify(b)}`;
+    if (d.border !== 3 || d.version < 7) return `a new design: border ${d.border} mm, version ${d.version}`;
+    for (const [k, [t, bt]] of Object.entries(SKY_WANT)) if (!D.SKY_PRESETS[k] || D.SKY_PRESETS[k].top !== t || D.SKY_PRESETS[k].bottom !== bt) return `sky preset ${k} is not ${t} -> ${bt}`;
+    // every field round-trips; out of range is clamped; a bad seed is told
+    const e = D.defaultDesign(); e.border = 1.75;
+    e.background = { on: false, sky: { on: false, top: '#123456', bottom: '#654321' }, horizon: 0.3, glow: 0.8, smoke: { amount: 0.42, drift: 2.7, lit: 0.35, color: '#ABCDEF', rank: false, seed: 987654321 } };
+    const back = D.normaliseDesign(JSON.parse(D.serialiseDesign(e)), S.SYMBOL_IDS);
+    if (back.notes.length) return `a version-7 file read with notes: ${back.notes.join('; ')}`;
+    if (JSON.stringify(back.design.background) !== JSON.stringify(e.background) || back.design.border !== 1.75) return `the background did not round-trip: ${JSON.stringify(back.design.background)}, border ${back.design.border}`;
+    const bad = JSON.parse(D.serialiseDesign(e)); bad.border = 9; bad.background.smoke.drift = 10; bad.background.horizon = -1; bad.background.smoke.seed = -4;
+    const rb = D.normaliseDesign(bad, S.SYMBOL_IDS);
+    if (rb.design.border !== 5 || rb.design.background.smoke.drift !== 4 || rb.design.background.horizon !== 0 || rb.design.background.smoke.seed === -4 || !rb.notes.some((x) => /smoke seed/.test(x))) return 'out-of-range background fields are not clamped, or a bad seed is kept silently';
+    let n = 0;
+    for (const [preset, w, h] of [['poker', 63.5, 88.9], ['mini', 44, 63]]) for (const border of [3, 0]) {
+      const dd = D.defaultDesign(); dd.size = { preset, w, h }; dd.border = border; dd.rainbow = true;
+      const A = artR(dd), puffs = puffsR(dd);
+      for (const s of D.activeSuits(dd)) for (const rank of [1, 2, 3, 4, 5]) {
+        const svg = L.renderFace(dd, { kind: 'card', suitId: s.id, rank }, { idPrefix: 'x' }); n++;
+        const body = svg.slice(svg.indexOf('</defs>'));
+        // the order: sky, horizon, glows, smoke, fireworks, index
+        const at = ['url(#xsky)', 'class="hb-horizon"', 'class="hb-glow"', 'class="hb-smoke"', 'class="hb-firework"', 'class="hb-index"'].map((k) => body.indexOf(k));
+        if (at.some((x) => x < 0) || at.some((x, i) => i && x < at[i - 1])) return `${preset} ${s.id} ${rank}: drawn out of order (${at.join(', ')})`;
+        // the sky: top -> bottom across the art panel
+        const sky = new RegExp(`<linearGradient id="xsky" gradientUnits="userSpaceOnUse" x1="0" y1="([-\\d.]+)" x2="0" y2="([-\\d.]+)"><stop offset="0" stop-color="${BG_WANT.sky.top}"/><stop offset="1" stop-color="${BG_WANT.sky.bottom}"/>`).exec(svg);
+        if (!sky || Math.abs(+sky[1] - A.y) > 1e-3 || Math.abs(+sky[2] - (A.y + A.h)) > 1e-3) return `${preset}/${border}: the sky is not top to bottom over the art panel`;
+        // the horizon: the bottom 40%, the bottom colour 55% toward #8F96C0, at 0.45 x 0.55
+        const hc = mixR(BG_WANT.sky.bottom, '#8F96C0', 0.55);
+        const hz = /<linearGradient id="xhz" gradientUnits="userSpaceOnUse" x1="0" y1="([-\d.]+)" x2="0" y2="([-\d.]+)"><stop offset="0" stop-color="(#[0-9A-F]{6})" stop-opacity="0"\/><stop offset="1" stop-color="(#[0-9A-F]{6})" stop-opacity="([\d.]+)"\/>/.exec(svg);
+        const hr = /<rect class="hb-horizon" x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"/.exec(svg);
+        if (!hz || !hr || hz[3] !== hc || hz[4] !== hc || Math.abs(+hz[5] - 0.45 * 0.55) > 1e-3 || Math.abs(+hz[1] - (A.y + 0.6 * A.h)) > 1e-3 || Math.abs(+hr[2] - (A.y + 0.6 * A.h)) > 1e-3 || Math.abs(+hr[4] - 0.4 * A.h) > 1e-3)
+          return `${preset}/${border}: the horizon glow is not the bottom 40% in ${hc} at ${0.45 * 0.55}`;
+        // the glows: one behind every firework, 1.7 x its radius, its colour at 0.42 x 0.25
+        const fws = (body.match(/class="hb-firework"/g) || []).length, gl = glowsOf(svg);
+        if (gl.length !== fws) return `${preset} ${s.id} ${rank}: ${gl.length} glows for ${fws} fireworks`;
+        const pl = L.placementFor(dd, s, rank);
+        for (const [i, it] of pl.items.entries()) {
+          const q = gl[i], R = it.r / (s.centre.motif === 'classic' ? 1.14 : 1);
+          if (Math.abs(q.cx - it.cx) > 1e-3 || Math.abs(q.cy - it.cy) > 1e-3 || Math.abs(q.r - 1.7 * R) > 2e-3) return `${preset} ${s.id} ${rank}: glow ${i} at ${q.cx},${q.cy} r ${q.r}, want ${it.cx.toFixed(3)},${it.cy.toFixed(3)} r ${(1.7 * R).toFixed(3)}`;
+          if (q.col !== s.primary.toUpperCase() || Math.abs(q.op - 0.42 * 0.25) > 1e-3) return `${preset} ${s.id} ${rank}: glow in ${q.col} at ${q.op}`;
+        }
+        // the smoke: the first 40%->100% of the puffs as rank rises, alpha (0.05-0.12) x 0.1 x 1.6 x (0.35 -> 1), lit toward the nearest firework
+        const t = (rank - 1) / 4, wantN = Math.round(42 * (0.4 + 0.6 * t)), fac = 0.35 + 0.65 * t, el = ellipsesOf(svg);
+        if (el.length !== wantN) return `${preset} ${s.id} ${rank}: ${el.length} puffs, want ${wantN}`;
+        for (const [i, p] of el.entries()) {
+          const w0 = puffs[i];
+          if (Math.abs(p.cx - w0.x) > 1e-3 || Math.abs(p.cy - w0.y) > 1e-3 || Math.abs(p.ry - w0.r) > 1e-3 || Math.abs(p.rx - w0.r * BG_WANT.smoke.drift) > 1e-3) return `${preset} ${s.id} ${rank}: puff ${i} at ${p.cx},${p.cy} r ${p.ry}, restated ${w0.x.toFixed(3)},${w0.y.toFixed(3)} r ${w0.r.toFixed(3)}`;
+          if (Math.abs(p.op - w0.a * 0.1 * 1.6 * fac) > 1e-4) return `${preset} ${s.id} ${rank}: puff ${i} at alpha ${p.op}, want ${(w0.a * 0.16 * fac).toFixed(4)}`;
+          let best = 0;
+          for (const it of pl.items) best = Math.max(best, 1 - Math.hypot(w0.x - it.cx, w0.y - it.cy) / (1.8 * it.r / (s.centre.motif === 'classic' ? 1.14 : 1)));
+          const col = best > 0 ? mixR(BG_WANT.smoke.color, mixR(s.primary, '#FFFFFF', 0.15), 0.75 * best) : BG_WANT.smoke.color;
+          if (p.col !== col) return `${preset} ${s.id} ${rank}: puff ${i} lit ${p.col}, want ${col}`;
+        }
+      }
+    }
+    // seeded: the same seed is the same face; another seed moves the smoke and nothing else
+    const d1 = D.defaultDesign(), card = { kind: 'card', suitId: 'blue', rank: 4 };
+    const a = L.renderFace(d1, card), a2 = L.renderFace(JSON.parse(JSON.stringify(d1)), card);
+    if (a !== a2) return 'the same design drew two faces';
+    d1.background.smoke.seed = 7; const c = L.renderFace(d1, card);
+    const strip = (x) => x.replace(/<g class="hb-smoke">[\s\S]*?<\/g>/, '').replace(/<radialGradient id="hbblue4pf[\s\S]*?<\/radialGradient>/g, '');
+    if (c === a || strip(c) !== strip(a)) return 'another smoke seed did not move the smoke, or moved something else';
+    // builds with rank off: every puff at full strength on every rank
+    d1.background.smoke.rank = false;
+    for (const rank of [1, 5]) { const el = ellipsesOf(L.renderFace(d1, { kind: 'card', suitId: 'red', rank })); if (el.length !== 42) return `builds-with-rank off: ${el.length} puffs at rank ${rank}`; }
+    // each effect at 0 draws nothing; the master off is the flat face
+    const z = D.defaultDesign(); z.background.horizon = 0; z.background.glow = 0; z.background.smoke.amount = 0; z.background.sky.on = false;
+    const zs = L.renderFace(z, card, { idPrefix: 'x' });
+    if (/hb-horizon|hb-glow|hb-smoke|xsky/.test(zs) || !zs.includes(`fill="${z.face.bg}"`)) return 'an effect at 0 still draws, or the sky off is not the face colour';
+    const off = D.defaultDesign(); off.background.on = false;
+    if (/hb-horizon|hb-glow|hb-smoke|sky|<ellipse/.test(L.renderFace(off, card))) return 'the background off still draws an effect';
+    return n > 100 || `only ${n} faces`;
+  });
+
+  // ---- H37: the white print border insets the art panel by the set amount (poker and
+  // mini, restated), the bleed white and nothing printed on it; the safe zone measured
+  // from the art's edge; backs and tokens the same; 0 the full bleed it was.
+  check('H37', 'the white border: the art panel inset by the border, white outside it, everything clipped to it, the index measured from its edge; backs and tokens too; 0 is full bleed', () => {
+    let n = 0;
+    for (const [preset, w, h] of [['poker', 63.5, 88.9], ['mini', 44, 63]]) for (const border of [3, 1.5, 5, 0]) for (const index of ['large', 'band']) {
+      const d = D.defaultDesign(); d.size = { preset, w, h }; d.border = border; d.index = index; d.rainbow = true;
+      const b = d.bleed, fw = w + 2 * b, fh = h + 2 * b, ax = b + border, aw = w - 2 * border, ah = h - 2 * border, rr = Math.min(aw, ah) * 0.05;
+      const faces = [...D.activeSuits(d).flatMap((s) => [1, 5].map((rank) => ({ kind: 'card', suitId: s.id, rank }))), { kind: 'clue' }, { kind: 'fuse' }];
+      for (const c of faces) {
+        const svg = L.renderFace(d, c, { idPrefix: 'x' }); n++;
+        const tag = `${preset}/${index} border ${border} ${c.suitId || c.kind}${c.rank || ''}`;
+        const body = svg.slice(svg.indexOf('</defs>') >= 0 ? svg.indexOf('</defs>') + 7 : svg.indexOf('>') + 1);
+        if (!border) {
+          if (/hb-border|xart/.test(svg)) return `${tag}: a border or an art clip with no border`;
+          if (!body.startsWith(`<rect x="0" y="0" width="${+fw.toFixed(3)}" height="${+fh.toFixed(3)}"`)) return `${tag}: the ground is not the whole bleed box`;
+          continue;
+        }
+        if (!body.startsWith(`<rect class="hb-border" x="0" y="0" width="${+fw.toFixed(3)}" height="${+fh.toFixed(3)}" fill="#FFFFFF"/><g clip-path="url(#xart)">`)) return `${tag}: the bleed box is not white under an art clip`;
+        const cp = /<clipPath id="xart"><rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)" rx="([-\d.]+)"/.exec(svg);
+        if (!cp || Math.abs(+cp[1] - ax) > 1e-3 || Math.abs(+cp[2] - ax) > 1e-3 || Math.abs(+cp[3] - aw) > 1e-3 || Math.abs(+cp[4] - ah) > 1e-3 || Math.abs(+cp[5] - rr) > 1e-3) return `${tag}: the art clip is not the trim less ${border} mm with ${rr.toFixed(2)} mm corners`;
+        // everything after the white rect is inside the clip group, which closes last
+        if (!body.endsWith('</g></svg>') || (body.match(/class="hb-border"/g) || []).length !== 1) return `${tag}: something is drawn outside the art clip`;
+        const ground = /<g clip-path="url\(#xart\)"><rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"/.exec(body);
+        if (!ground || Math.abs(+ground[1] - ax) > 1e-3 || Math.abs(+ground[3] - aw) > 1e-3 || Math.abs(+ground[4] - ah) > 1e-3) return `${tag}: the ground is not the art panel`;
+        if (c.kind !== 'card') continue;
+        // every firework mark inside the art panel
+        for (const p of pointsOf(body.slice(body.indexOf('<g class="hb-firework"'), body.indexOf('<g class="hb-index">')))) if (p.x < ax - 0.05 || p.x > ax + aw + 0.05 || p.y < ax - 0.05 || p.y > ax + ah + 0.05) return `${tag}: a firework mark at ${p.x.toFixed(2)},${p.y.toFixed(2)} on the white border`;
+        // the index measured from the art's edge
+        const ix = body.slice(body.indexOf('<g class="hb-index">'));
+        if (index === 'large') {
+          const t0 = /^<g class="hb-index"><g transform="translate\(([-\d.]+) ([-\d.]+)\)">/.exec(ix);
+          if (!t0 || Math.abs(+t0[1] - (ax + d.safe)) > 1e-3 || Math.abs(+t0[2] - (ax + d.safe)) > 1e-3) return `${tag}: the index at ${t0 && t0[1]}, want the art edge + safe = ${ax + d.safe}`;
+        } else {
+          const band = /^<g class="hb-index"><rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)"/.exec(ix);
+          if (!band || Math.abs(+band[1] - ax) > 1e-3 || Math.abs(+band[2] - ax) > 1e-3 || Math.abs(+band[3] - aw) > 1e-3 || Math.abs(+band[4] - (d.safe + 0.13 * h)) > 1e-3) return `${tag}: the band is not across the art panel from its top`;
+        }
+      }
+      const bk = L.renderBack(d, { idPrefix: 'x' });
+      if (border && !bk.includes('class="hb-border"')) return `${preset} border ${border}: the back has no white border`;
+      const ol = /<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)" rx="[\d.]+" fill="none"/.exec(bk);
+      const want = (border ? ax : b) + d.safe * 0.6;
+      if (!ol || Math.abs(+ol[1] - want) > 1e-3) return `${preset} border ${border}: the back's outline at ${ol && ol[1]}, want ${want}`;
+    }
+    return n > 100 || `only ${n} faces`;
+  });
+
+  // ---- H38: a design saved before version 7 (BASE6, c7d4ba6, read from git) opens with no
+  // border and no background, says so once, and renders byte-identically — every face, the
+  // back and the tokens; and a new design with the background off and no border is the
+  // version-6 default to the byte.
+  await checkAsync('H38', `a version-6 design (${BASE6}) opens with no border and no background, told, and renders byte-identically; background off + border 0 is the version-6 face`, async () => {
+    const B = await baseModules(BASE6);
+    const bd = await import(pathToFileURL(path.join(B, 'deck.js')).href), bl = await import(pathToFileURL(path.join(B, 'layout.js')).href);
+    let n = 0;
+    const same = (tag, a, b) => { n++; if (a === b) return null; let i = 0; while (a[i] === b[i]) i++; return `${tag}: differs at ${i}: …${a.slice(i - 30, i + 30)}… vs …${b.slice(i - 30, i + 30)}…`; };
+    const edits = [
+      ['the default', () => {}],
+      ['scene, frame, a full-bleed and a Scale suit', (d) => { d.scene = { on: true, kind: 'rooftops', color: '#223344', height: 0.25 }; d.face.frame = 'inner'; d.suits.find((x) => x.id === 'red').centre = { compose: 'bleed', motif: 'peony', tier: 'none' }; d.suits.find((x) => x.id === 'blue').centre = { compose: 'scale', motif: 'classic', tier: 'rosettes' }; }],
+      ['the band index on a custom face colour', (d) => { d.index = 'band'; d.face.bg = '#203040'; d.corners = 'upright'; }],
+    ];
+    for (const [label, edit] of edits) for (const preset of ['poker', 'mini']) {
+      const db = bd.defaultDesign(); db.rainbow = true; db.size = { preset, ...bd.SIZE_PRESETS[preset] }; edit(db);
+      const file = JSON.parse(bd.serialiseDesign(db));
+      if (file.version !== 6) return `the base wrote version ${file.version}`;
+      const { design, notes } = D.normaliseDesign(file, S.SYMBOL_IDS);
+      if (notes.length !== 1 || !V7NOTE.test(notes[0]) || !/0 mm/.test(notes[0])) return `${label}: read with notes ${JSON.stringify(notes)} — want the one version-7 note`;
+      if (design.border !== 0 || design.background.on !== false) return `${label}: opens with border ${design.border} and the background ${design.background.on ? 'on' : 'off'}`;
+      for (const c of D.deckCards(design)) { const e = same(`${label} ${preset} ${c.suitId || c.kind}${c.rank || ''}`, L.renderFace(design, c), bl.renderFace(db, c)); if (e) return e; }
+      for (const o of [{}, { round: true, idPrefix: 'q' }, { centreOnly: true, idPrefix: 'b' }]) { const e = same(`${label} ${preset} red 3 ${JSON.stringify(o)}`, L.renderFace(design, { kind: 'card', suitId: 'red', rank: 3 }, o), bl.renderFace(db, { kind: 'card', suitId: 'red', rank: 3 }, o)); if (e) return e; }
+      const e = same(`${label} ${preset} back`, L.renderBack(design), bl.renderBack(db)); if (e) return e;
+      // a version-7 file of it reads with no note at all
+      const again = D.normaliseDesign(JSON.parse(D.serialiseDesign(design)), S.SYMBOL_IDS);
+      if (again.notes.length || again.design.border !== 0 || again.design.background.on) return `${label}: the version-7 file of it reads ${again.notes.join('; ')}`;
+    }
+    // a new design, background off and no border: the version-6 default face, byte for byte
+    for (const preset of ['poker', 'mini']) {
+      const dn = pre7(D.defaultDesign()), db = bd.defaultDesign(); dn.size = db.size = { preset, ...D.SIZE_PRESETS[preset] };
+      for (const c of D.deckCards(dn)) { const e = same(`new design, off ${preset} ${c.suitId || c.kind}${c.rank || ''}`, L.renderFace(dn, c), bl.renderFace(db, c)); if (e) return e; }
+    }
+    return n > 300 || `only ${n} compared`;
+  });
+
+  // ---- H39: greyscale legibility under the default background. Every mark of every suit's
+  // rank 5 (the busiest card, the thickest smoke) is measured against the ground UNDER it —
+  // the sky at its height, the horizon, every glow and every puff composited there (restated,
+  // in sRGB, as the browser composites) — by luminance contrast, which is what greyscale keeps.
+  check('H39', 'greyscale: under the default background every suit\'s rank 5 still reads — each mark against the composited ground under it', () => {
+    const lerpC = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+    const over = (dst, col, al) => lerpC(dst, rgbR(col), Math.max(0, Math.min(1, al)));
+    const report = [];
+    for (const [preset, w, h] of [['poker', 63.5, 88.9], ['mini', 44, 63]]) {
+      const d = D.defaultDesign(); d.rainbow = true; d.size = { preset, w, h };
+      const A = artR(d);
+      for (const s of D.activeSuits(d)) {
+        let worst = Infinity, worstOff = Infinity;
+        for (const smoke of [true, false]) {
+          const dd = JSON.parse(JSON.stringify(d)); if (!smoke) dd.background.smoke.amount = 0;
+          const svg = L.renderFace(dd, { kind: 'card', suitId: s.id, rank: 5 }, { idPrefix: 'x' });
+          const gl = glowsOf(svg), el = ellipsesOf(svg);
+          const ground = (x, y) => {
+            let c = lerpC(rgbR(BG_WANT.sky.top), rgbR(BG_WANT.sky.bottom), Math.min(1, Math.max(0, (y - A.y) / A.h)));
+            const y0 = A.y + 0.6 * A.h;
+            if (y > y0) c = over(c, mixR(BG_WANT.sky.bottom, '#8F96C0', 0.55), 0.45 * 0.55 * (y - y0) / (0.4 * A.h));
+            for (const q of gl) { const t = Math.hypot(x - q.cx, y - q.cy) / q.r; if (t < 1) c = over(c, q.col, q.op * (1 - t)); }
+            for (const p of el) { const t = Math.hypot((x - p.cx) / p.rx, (y - p.cy) / p.ry); if (t < 1) c = over(c, p.col, p.op * (t < 0.55 ? 1 - 0.5 * t / 0.55 : 0.5 * (1 - (t - 0.55) / 0.45))); }
+            return hexR(c);
+          };
+          const fw = svg.slice(svg.indexOf('<g class="hb-firework"'), svg.indexOf('<g class="hb-index">'));
+          for (const m of fw.matchAll(/<(circle|line|path)\b([^>]*)\/>/g)) {
+            const at = m[2], col = (/(?:fill|stroke)="(#[0-9A-Fa-f]{6})"/.exec(at) || [])[1];
+            const op = +((/(?:fill-|stroke-)?opacity="([\d.]+)"/.exec(at) || [])[1] ?? 1);
+            if (!col || op < 0.8) continue;
+            const p = m[1] === 'circle' ? /cx="([-\d.]+)" cy="([-\d.]+)"/.exec(at) : m[1] === 'line' ? /x1="([-\d.]+)" y1="([-\d.]+)"/.exec(at) : /d="M([-\d.]+) ([-\d.]+)/.exec(at);
+            if (!p) continue;
+            const cst = L.contrast(col.toUpperCase(), ground(+p[1], +p[2]));
+            if (smoke) worst = Math.min(worst, cst); else worstOff = Math.min(worstOff, cst);
+          }
+        }
+        report.push(`${preset} ${s.id} ${worst.toFixed(2)} (no smoke ${worstOff.toFixed(2)})`);
+        if (!(worst >= 3)) return `${preset} ${s.id} 5: a mark at ${worst.toFixed(2)}:1 against the ground under it (below 3) — ${report.join(', ')}`;
+        if (worst < worstOff * 0.9) return `${preset} ${s.id} 5: the smoke takes the worst mark from ${worstOff.toFixed(2)} to ${worst.toFixed(2)}`;
+      }
+    }
+    if (process.env.HANABI_REPORT) console.log('H39 worst mark contrast, rank 5: ' + report.join('; '));
+    return true;
+  });
+
   return res;
 }
 
@@ -2009,8 +2276,8 @@ async function partTwo(overrides = {}) {
       if (hexes.length < 8 || hexes.some((h) => h.hex !== h.v)) return `a colour without its hex: ${JSON.stringify(hexes.filter((h) => h.hex !== h.v))}`;
       await page.$eval('#faceBg', (e) => { e.value = '#223344'; e.dispatchEvent(new Event('input', { bubbles: true })); });
       if (await page.$eval('#faceBg', (e) => e.parentElement.querySelector('.hb-hex').textContent) !== '#223344' || (await page.evaluate(() => window.__hanabi.design().face.bg)) !== '#223344') return 'the card face hex does not follow the colour';
-      // the rounded preview: on by default, a clip on every stage card, none under the guides or when off
-      const clips = () => page.$$eval('#stage .hb-card svg', (s) => s.filter((x) => x.querySelector('clipPath')).length + '/' + s.length);
+      // the rounded preview: on by default, the rounded clip (.hb-round; the white border's art clip is another) on every stage card, none under the guides or when off
+      const clips = () => page.$$eval('#stage .hb-card svg', (s) => s.filter((x) => x.querySelector('.hb-round')).length + '/' + s.length);
       if (!(await page.isChecked('#roundCorners')) || !/^(\d+)\/\1$/.test(await clips())) return `the rounded preview is not on by default: ${await clips()} cards clipped`;
       await page.check('#guides'); const g = await clips(); await page.uncheck('#guides');
       await page.uncheck('#roundCorners'); const off = await clips(); await page.check('#roundCorners');
@@ -2087,13 +2354,98 @@ async function partTwo(overrides = {}) {
     });
 
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hanabi-'));
-    for (const cut of ['separate', 'shared']) await check('B3', `the PDF (${cut}): pages, orientation, crop marks on trim, art to the edge`, async () => {
-      const duplex = cut === 'separate';
-      const out = await page.evaluate(async ([cut, duplex]) => {
-        const d = window.__hanabi.design(); d.print = { ...d.print, paper: 'letter', orientation: 'auto', cut, duplex, flip: 'long', cropMarks: true }; window.__hanabi.setDesign(d);
+    // ---- B14: the Background section and the white border in the real page, and one haze
+    // for the preview, the board and the export (the exported PNG compared pixel for pixel
+    // with the preview's own card rasterised the same way).
+    await check('B14', 'the Background section: master toggle, collapsed sub-sections, slider readouts, presets, reroll, reset; the border; preview = board = export, pixel for pixel', async () => {
+      await page.click('#resetDesign');
+      await page.reload(); await page.waitForFunction(() => window.__hanabi);   // the panel as a visitor opens it
+      await page.evaluate(() => { document.querySelector('[data-view="suit"]').click(); const s = document.getElementById('viewSuit'); s.value = 'red'; s.dispatchEvent(new Event('change')); if (document.getElementById('roundCorners').checked) document.getElementById('roundCorners').click(); if (document.getElementById('guides').checked) document.getElementById('guides').click(); document.getElementById('sec-bg').open = true; });
+      const card5 = () => page.evaluate(() => document.querySelectorAll('#stage .hb-card svg')[4].outerHTML);
+      const st = await page.evaluate(() => ({
+        on: document.getElementById('bgOn').checked, rows: !document.getElementById('bgRows').hidden,
+        subs: ['sub-sky', 'sub-smoke'].map((id) => document.getElementById(id).open),
+        vals: ['bgHorizonVal', 'bgGlowVal', 'smokeAmountVal', 'smokeDriftVal', 'smokeLitVal'].map((id) => document.getElementById(id).textContent),
+        rank: document.getElementById('smokeRank').checked, sky: document.getElementById('skyOn').checked,
+        hex: ['skyTop', 'skyBottom', 'smokeColor'].map((id) => document.querySelector(`output[data-for="${id}"]`).textContent),
+        border: document.getElementById('border').value, chip: [...document.querySelectorAll('#skyPresets [aria-pressed="true"]')].map((c) => c.dataset.sky),
+      }));
+      if (!st.on || !st.rows || st.subs.some(Boolean) || !st.rank || !st.sky) return `the section does not open on with both sub-sections collapsed: ${JSON.stringify(st)}`;
+      if (st.vals.join(' ') !== '0.55 0.25 0.10 1.0× 1.00') return `slider readouts ${st.vals.join(' ')}`;
+      await page.evaluate(() => { for (const id of ['sub-sky', 'sub-smoke']) document.getElementById(id).open = true; });
+      if (st.hex.join(' ') !== '#0B1530 #020409 #9AA3B4' || st.chip.join() !== 'night' || +st.border !== 3) return `defaults shown: ${st.hex.join(' ')}, chip ${st.chip}, border ${st.border}`;
+      // a slider: the design, its readout and the card follow
+      await page.evaluate(() => { const el = document.getElementById('bgHorizon'); el.value = '0.8'; el.dispatchEvent(new Event('input')); });
+      const h = await page.evaluate(() => [window.__hanabi.design().background.horizon, document.getElementById('bgHorizonVal').textContent]);
+      if (h[0] !== 0.8 || h[1] !== '0.80' || !/stop-opacity="0\.36"/.test(await card5())) return `the horizon slider wrote ${h[0]}, reads ${h[1]}, or did not reach the card`;
+      // a preset chip
+      await page.click('#skyPresets [data-sky="petrol"]');
+      const pe = await page.evaluate(() => [window.__hanabi.design().background.sky, [...document.querySelectorAll('#skyPresets [aria-pressed="true"]')].map((c) => c.dataset.sky).join()]);
+      if (pe[0].top !== '#0E3236' || pe[0].bottom !== '#030809' || pe[1] !== 'petrol' || !(await card5()).includes('stop-color="#0E3236"')) return `the petrol chip: ${JSON.stringify(pe)}`;
+      // reroll: the seed and the smoke move, nothing else
+      const before = await card5(), seed0 = await page.evaluate(() => window.__hanabi.design().background.smoke.seed);
+      await page.click('#smokeReroll');
+      const after = await card5(), seed1 = await page.evaluate(() => window.__hanabi.design().background.smoke.seed);
+      const noSmoke = (x) => x.replace(/<g class="hb-smoke">[\s\S]*?<\/g>/, '').replace(/<radialGradient id="[^"]*pf[\s\S]*?<\/radialGradient>/g, '').replace(/ id="p\d+/g, ' id="p').replace(/#p\d+/g, '#p');
+      if (seed1 === seed0 || before === after || noSmoke(before) !== noSmoke(after)) return `reroll: seed ${seed0} -> ${seed1}; the smoke ${before === after ? 'did not move' : 'moved something else too'}`;
+      // master off: the flat face; reset: Eva's defaults
+      await page.click('#bgOn');
+      const off = await card5();
+      if (/hb-smoke|hb-glow|hb-horizon|sky\)/.test(off) || !(await page.evaluate(() => document.getElementById('bgRows').hidden))) return 'the master toggle off still draws the background, or shows its controls';
+      await page.click('#bgOn'); await page.click('#bgReset');
+      const rs = await page.evaluate(() => window.__hanabi.design().background);
+      if (rs.horizon !== 0.55 || rs.sky.top !== '#0B1530' || rs.smoke.seed !== 20251111 || !rs.on) return `reset to ${JSON.stringify(rs)}`;
+      // the border input
+      for (const [v, want] of [['0', false], ['2.5', true]]) {
+        await page.evaluate((v) => { const el = document.getElementById('border'); el.value = v; el.dispatchEvent(new Event('change')); }, v);
+        const c = await card5();
+        if (c.includes('hb-border') !== want || await page.evaluate(() => window.__hanabi.design().border) !== +v) return `border ${v}: the card ${want ? 'has no' : 'has a'} white border`;
+      }
+      // preview = board = export: the red 5 at poker and mini
+      for (const preset of ['poker', 'mini']) {
+        await page.evaluate((preset) => { const el = document.getElementById('sizePreset'); el.value = preset; el.dispatchEvent(new Event('change')); }, preset);
+        await page.evaluate(() => { const el = document.getElementById('border'); el.value = '3'; el.dispatchEvent(new Event('change')); });
+        const cmp = await page.evaluate(async () => {
+          const ex = await import('./hanabi/export.js');
+          const svg = document.querySelectorAll('#stage .hb-card svg')[4].outerHTML;
+          const zip = await window.JSZip.loadAsync(await window.__hanabi.exportZip({ returnBlob: true }));
+          const name = Object.keys(zip.files).find((n) => /-red-5a\.png$/.test(n));
+          const bmp = await createImageBitmap(await zip.file(name).async('blob'));
+          const c1 = document.createElement('canvas'); c1.width = bmp.width; c1.height = bmp.height; c1.getContext('2d').drawImage(bmp, 0, 0);
+          // the export writes the pixel size on the svg (frame()'s px); the preview inlines it
+          // without, and a rasteriser treats the two sizes differently (pre-existing, with the
+          // background off too), so the preview's own markup is given the export's size
+          const c2 = await ex.svgToCanvas(svg.replace(' preserveAspectRatio', ` width="${bmp.width}" height="${bmp.height}" preserveAspectRatio`), bmp.width, bmp.height);
+          const a = c1.getContext('2d').getImageData(0, 0, bmp.width, bmp.height).data, b = c2.getContext('2d').getImageData(0, 0, bmp.width, bmp.height).data;
+          let diff = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) diff++;
+          // the white border on the export: a band of pure white round the art, the art dark inside it
+          const d = window.__hanabi.design(), dpmm = bmp.width / (d.size.w + 2 * d.bleed), y = Math.round(bmp.height / 2);
+          const px = (mm) => { const i = (y * bmp.width + Math.round(mm * dpmm)) * 4; return [a[i], a[i + 1], a[i + 2]]; };
+          const whites = [0.3, d.bleed, d.bleed + d.border - 0.3].map(px), inside = px(d.bleed + d.border + 0.4);
+          // the board's thumbnail of red 5 carries the same haze (ids aside)
+          document.querySelector('[data-view="fireworks"]').click();
+          const thumb = document.querySelector('#stage [data-cell="red:5"] svg');
+          const haze = (s) => ((s || '').match(/<g class="hb-smoke">[\s\S]*?<\/g>/) || [''])[0].replace(/url\(#[a-z0-9]+?pf/g, 'url(#pf');
+          const thumbSvg = thumb && thumb.outerHTML;
+          document.querySelector('[data-view="suit"]').click();
+          return { diff, n: a.length, w: bmp.width, whites, inside, hazeSame: !!thumbSvg && haze(thumbSvg) === haze(svg) && haze(svg).length > 100 };
+        });
+        if (cmp.diff) return `${preset}: the export's red 5 differs from the preview's in ${cmp.diff} of ${cmp.n} channel values`;
+        if (cmp.whites.some((c) => c.some((v) => v !== 255)) || cmp.inside.every((v) => v > 120)) return `${preset}: the exported border is ${JSON.stringify(cmp.whites)}, inside ${cmp.inside}`;
+        if (!cmp.hazeSame) return `${preset}: the board's thumbnail does not carry the preview's haze`;
+      }
+      await page.evaluate(() => { const el = document.getElementById('sizePreset'); el.value = 'poker'; el.dispatchEvent(new Event('change')); });
+      return true;
+    });
+
+    // separate bleeds with the default 3 mm white border; shared cuts with none (full bleed)
+    for (const cut of ['separate', 'shared']) await check('B3', `the PDF (${cut}, ${cut === 'separate' ? '3 mm white border' : 'no border'}): pages, orientation, crop marks on trim, art to the edge${cut === 'separate' ? ' less the border, the border white' : ''}`, async () => {
+      const duplex = cut === 'separate', BO = cut === 'separate' ? 3 : 0;
+      const out = await page.evaluate(async ([cut, duplex, BO]) => {
+        const d = window.__hanabi.design(); d.border = BO; d.print = { ...d.print, paper: 'letter', orientation: 'auto', cut, duplex, flip: 'long', cropMarks: true }; window.__hanabi.setDesign(d);
         const { doc, imp, pages } = await window.__hanabi.exportPdf({ returnDoc: true });
         return { b64: doc.output('datauristring').split(',')[1], cols: imp.cols, rows: imp.rows, perSheet: imp.perSheet, pages };
-      }, [cut, duplex]);
+      }, [cut, duplex, BO]);
       const dir = fs.mkdtempSync(path.join(tmp, cut));
       const pdf = path.join(dir, 'deck.pdf');
       fs.writeFileSync(pdf, Buffer.from(out.b64, 'base64'));
@@ -2130,9 +2482,18 @@ async function partTwo(overrides = {}) {
       // the grid's outer edge: art just inside, paper just outside; and between the
       // first two cards no paper shows (separate: bleed meets bleed; shared: one cut)
       const midY = y0 + B + CH / 2;
-      if (white(ppm.px(mm(x0 + 0.4), mm(midY))) || !white(ppm.px(mm(x0 - 0.6), mm(midY)))) return 'outer bleed edge is not where restated';
-      const between = x0 + pX + (cut === 'shared' ? B : 0);
-      for (const dx of [-0.8, 0, 0.8]) if (white(ppm.px(mm(between + dx), mm(midY)))) return `paper showing between cards at ${dx} mm`;
+      if (!BO) {
+        if (white(ppm.px(mm(x0 + 0.4), mm(midY))) || !white(ppm.px(mm(x0 - 0.6), mm(midY)))) return 'outer bleed edge is not where restated';
+        const between = x0 + pX + (cut === 'shared' ? B : 0);
+        for (const dx of [-0.8, 0, 0.8]) if (white(ppm.px(mm(between + dx), mm(midY)))) return `paper showing between cards at ${dx} mm`;
+        return true;
+      }
+      // the white border: the bleed and the border white, the art starting BO inside the trim
+      const artL = x0 + B + BO, artR = x0 + B + CW - BO, art2L = x0 + pX + B + BO;
+      if (white(ppm.px(mm(artL + 0.5), mm(midY)))) return 'no art just inside the border';
+      for (const x of [x0 + 0.4, x0 + B, artL - 0.7]) if (!white(ppm.px(mm(x), mm(midY)))) return `ink at ${(x - x0).toFixed(1)} mm from the card's bleed edge, inside the white border`;
+      if (white(ppm.px(mm(artR - 0.5), mm(midY))) || white(ppm.px(mm(art2L + 0.5), mm(midY)))) return 'the art does not end at the border';
+      for (let x = artR + 0.7; x < art2L - 0.6; x += 0.5) if (!white(ppm.px(mm(x), mm(midY)))) return `ink at ${(x - artR).toFixed(1)} mm past the art's edge, between two cards`;
       return true;
     });
 

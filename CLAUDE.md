@@ -12886,5 +12886,12 @@ card's fireworks are picked, moved, sized, turned and RESTACKED (items carry `n`
 so a restack only changes paint order); a hand arrangement is taken literally (no shrink at the field
 edge) while the default pips stay fitted; a Scale card's one firework takes `place`. Detail (`density`,
 0–2) on all nine types, each default byte-identical to `e95f121` (H22), detail never rescaling a burst
-(H21). Gate: `node tools/verify-hanabi.mjs` (H1–H35, B1–B13;
-`--negative-control` 105 mutants, `--mutant=a,b` a subset), not in CI.
+(H21). **Nov 11 (schema v7): the face BACKGROUND and the WHITE PRINT BORDER** (read "The background and the white print
+border" in `docs/hanabi.md` before touching `backgroundArt`, `smokePuffs`, `artPanel`, `cardGeom`'s `art` / `artR` or
+H36–H39 / B14) — Eva's choices are the defaults (Night sky, horizon 0.55, burst glow 0.25, smoke 0.1 / drift 1× / lit 1 /
+`#9AA3B4` / builds with rank, a stored deck-wide smoke seed with Reroll; a 3 mm border). The safe zone is measured from
+the art panel's edge; the bleed is white and everything is clipped to the art; backs and tokens take the border too;
+0 mm is the full bleed byte for byte. A file before v7 opens with both off and one note (H38 vs `c7d4ba6`). The preview
+inlines a card's SVG without the export's pixel size and a rasteriser treats the two sizes differently (pre-existing):
+B14 compares the export with the preview's markup given that size. Gate: `node tools/verify-hanabi.mjs` (H1–H39, B1–B14;
+`--negative-control` 121 mutants, `--mutant=a,b` a subset), not in CI.

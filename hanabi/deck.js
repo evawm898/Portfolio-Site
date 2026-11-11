@@ -46,7 +46,13 @@ import { MOTIF_IDS, MOTIFS, TYPES, TIER_IDS, LEGACY_RADIAL, PARAMS, STYLE_MOTIFS
 // New designs open with four corner indices, phase 1's rising trail off, the
 // corner-grid pips and no frame; a file saved before version 6 keeps what it
 // had — two corners, the trail, the field pips (V6_OLD_DEFAULTS).
-export const VERSION = 6;
+// 7 (Nov 11): the face BACKGROUND — a sky gradient, a horizon glow, a glow
+// behind every firework and a seeded smoke haze (design.background) — and the
+// WHITE PRINT BORDER (design.border, mm): an unprinted margin between the trim
+// and the art, so edge wear does not show. New designs have both (3 mm, the
+// background on); a file saved before version 7 opens with neither, so it looks
+// exactly as it did, and is told.
+export const VERSION = 7;
 
 // The standard per-suit distribution: three 1s, two 2s, two 3s, two 4s, one 5.
 // The optional rainbow suit uses the same distribution (10 more cards).
@@ -62,6 +68,9 @@ export const SIZE_PRESETS = {
 };
 export const SIZE_LIMITS = { min: 30, max: 140 };   // custom size bounds, mm
 export const BLEED_LIMITS = { min: 0, max: 5 };
+// The white print border (version 7): mm of unprinted card between the trim and
+// the art panel. The safe zone is measured from the art panel's edge.
+export const BORDER_LIMITS = { min: 0, max: 5, dflt: 3 };
 export const SAFE_LIMITS = { min: 0, max: 8 };
 
 // How the rainbow suit's corner index (numeral and symbol) is filled: its own
@@ -127,6 +136,56 @@ export const PIP_FITS = {
 // What a file saved before version 6 meant where it does not say.
 export const V6_OLD_DEFAULTS = { corners: 'inverted', stems: true, pips: 'field' };
 
+// ---- the face background (version 7; Eva's choices, Nov 11) ----
+// Drawn under the fireworks in this order: sky -> horizon glow -> (scene band)
+// -> burst glows -> smoke -> fireworks -> index. Deck-wide. OFF is the flat
+// card face colour (design.face.bg), exactly as before.
+export const SKY_PRESETS = {
+  night:  { label: 'Night',       top: '#0B1530', bottom: '#020409' },
+  petrol: { label: 'Petrol dusk', top: '#0E3236', bottom: '#030809' },
+  indigo: { label: 'Indigo',      top: '#1E1F55', bottom: '#05050F' },
+  ink:    { label: 'Ink',         top: '#101317', bottom: '#07090B' },
+};
+// [min, max, step] of every slider, and the defaults Eva chose.
+export const BG_LIMITS = { horizon: [0, 1, 0.05], glow: [0, 1, 0.05], amount: [0, 1, 0.01], drift: [1, 4, 0.1], lit: [0, 1, 0.05] };
+export const SMOKE_SEED = 20251111;
+export function defaultBackground() {
+  return {
+    on: true,
+    sky: { on: true, top: SKY_PRESETS.night.top, bottom: SKY_PRESETS.night.bottom },
+    horizon: 0.55,
+    glow: 0.25,
+    smoke: { amount: 0.1, drift: 1, lit: 1, color: '#9AA3B4', rank: true, seed: SMOKE_SEED },
+  };
+}
+// What a file saved before version 7 meant: no background, no border.
+export const V7_OLD = { backgroundOn: false, border: 0 };
+export const V7_NOTE = 'saved before version 7: the white print border is 0 mm and the sky-and-smoke background is off, so it looks exactly as it did (a new design has a 3 mm border and the background on)';
+export function readBackground(raw, d, notes) {
+  if (!raw || typeof raw !== 'object') return;
+  if (typeof raw.on === 'boolean') d.on = raw.on;
+  if (raw.sky && typeof raw.sky === 'object') {
+    if (typeof raw.sky.on === 'boolean') d.sky.on = raw.sky.on;
+    d.sky.top = hex(raw.sky.top, d.sky.top);
+    d.sky.bottom = hex(raw.sky.bottom, d.sky.bottom);
+  }
+  const lim = (k, v, dv) => { const [lo, hi] = BG_LIMITS[k]; return clamp(num(v, dv), lo, hi); };
+  d.horizon = lim('horizon', raw.horizon, d.horizon);
+  d.glow = lim('glow', raw.glow, d.glow);
+  if (raw.smoke && typeof raw.smoke === 'object') {
+    const m = raw.smoke, t = d.smoke;
+    t.amount = lim('amount', m.amount, t.amount);
+    t.drift = lim('drift', m.drift, t.drift);
+    t.lit = lim('lit', m.lit, t.lit);
+    t.color = hex(m.color, t.color);
+    if (typeof m.rank === 'boolean') t.rank = m.rank;
+    if (m.seed !== undefined) {
+      if (Number.isInteger(m.seed) && m.seed >= 0 && m.seed < 2 ** 32) t.seed = m.seed;
+      else notes.push(`smoke seed ${JSON.stringify(m.seed)} not understood — ${t.seed} kept`);
+    }
+  }
+}
+
 export const BACK_PATTERNS = ['none', 'stars', 'dots', 'stripes', 'rays'];
 export const BACK_MARKS = ['none', 'burst', 'ring'];
 export const PAPERS = {
@@ -156,6 +215,7 @@ export function defaultDesign() {
     size: { preset: 'poker', w: 63.5, h: 88.9 },
     bleed: 3,
     safe: 3,
+    border: BORDER_LIMITS.dflt,
     index: 'large',
     corners: 'four',
     face: { bg: '#0B1018', frame: 'none' },
@@ -170,6 +230,7 @@ export function defaultDesign() {
     // The rank columns' arrangements under Count: { [rank]: items }.
     arrangements: {},
     scene: { on: false, kind: 'treeline', color: '#16222E', height: 0.18 },
+    background: defaultBackground(),
     print: { paper: 'letter', orientation: 'auto', cut: 'separate', duplex: false, flip: 'long', cropMarks: true },
   };
 }
@@ -206,13 +267,22 @@ export function suitById(design, id) {
 
 // Card geometry in mm. Origin at the BLEED corner: the trim rect sits at
 // (bleed, bleed), the safe rect inside it.
+// The ART PANEL (`art`) is what the face's ground, background and centre fill:
+// the whole bleed box with no border (full bleed, as before), or the trim inset
+// by the white border with rounded corners (`artR`, the art panel's own 0.05 of
+// its shorter side). The safe zone is measured from the art panel's edge, so a
+// border of 0 is exactly the geometry before version 7.
+export const ART_CORNER = 0.05;
 export function cardGeom(design) {
   const w = design.size.w, h = design.size.h, b = design.bleed, s = design.safe;
+  const bo = +design.border || 0, e = bo + s;
+  const art = bo ? { x: b + bo, y: b + bo, w: w - 2 * bo, h: h - 2 * bo } : { x: 0, y: 0, w: w + 2 * b, h: h + 2 * b };
   return {
-    w, h, bleed: b, safe: s,
+    w, h, bleed: b, safe: s, border: bo,
     fullW: w + 2 * b, fullH: h + 2 * b,
     trim: { x: b, y: b, w, h },
-    safeRect: { x: b + s, y: b + s, w: w - 2 * s, h: h - 2 * s },
+    art, artR: bo ? Math.min(art.w, art.h) * ART_CORNER : 0,
+    safeRect: { x: b + e, y: b + e, w: w - 2 * e, h: h - 2 * e },
   };
 }
 
@@ -299,6 +369,12 @@ export function normaliseDesign(raw, symbolIds) {
   }
   d.bleed = clamp(num(raw.bleed, d.bleed), BLEED_LIMITS.min, BLEED_LIMITS.max);
   d.safe = clamp(num(raw.safe, d.safe), SAFE_LIMITS.min, SAFE_LIMITS.max);
+  // before version 7: no border and no background, whatever the file says
+  const old7 = ver < 7;
+  d.border = old7 ? V7_OLD.border : clamp(num(raw.border, d.border), BORDER_LIMITS.min, BORDER_LIMITS.max);
+  if (old7) d.background.on = V7_OLD.backgroundOn;
+  else readBackground(raw.background, d.background, notes);
+  if (old7) notes.push(V7_NOTE);
   d.index = legacy ? legacy.index : pick(raw.index, Object.keys(INDEX_STYLES), d.index);
   // before version 6 a file that does not say meant two corners, the trail and the field pips
   const old6 = ver < 6 ? V6_OLD_DEFAULTS : null;

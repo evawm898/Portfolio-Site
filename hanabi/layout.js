@@ -89,13 +89,17 @@ function glyph(def, x, y, size, color, weight = 7) {
 // `numeral` = { fill, symFill, cols } paints the numeral and the symbol with a
 // gradient each (url(#…)); their halo is decided by the colour that stands off
 // the card worst.
-function cornerIndex(rank, suit, faceBg, digitH, plate = false, numeral = null) {
-  const halo = contrast(suit.primary, faceBg) < HALO_BELOW ? haloFor(suit.primary) : null;
+// `ground` is the face colour, or (under the background) every colour the
+// ground takes: a mark's contrast is its worst against any of them.
+function cornerIndex(rank, suit, ground, digitH, plate = false, numeral = null) {
+  const grounds = Array.isArray(ground) ? ground : [ground], faceBg = grounds[0];
+  const cOf = (c) => Math.min(...grounds.map((b) => contrast(c, b)));
+  const halo = cOf(suit.primary) < HALO_BELOW ? haloFor(suit.primary) : null;
   let numFill = suit.primary, symFill = suit.primary, numHalo = halo;
   if (numeral) {
-    const worst = numeral.cols.reduce((a, c) => (contrast(c, faceBg) < contrast(a, faceBg) ? c : a));
+    const worst = numeral.cols.reduce((a, c) => (cOf(c) < cOf(a) ? c : a));
     numFill = numeral.fill; symFill = numeral.symFill;
-    numHalo = contrast(worst, faceBg) < HALO_BELOW ? haloFor(worst) : null;
+    numHalo = cOf(worst) < HALO_BELOW ? haloFor(worst) : null;
   }
   const dw = digitH * (DIGIT_BOX.w / DIGIT_BOX.h);
   const sym = digitH * 0.62;
@@ -144,11 +148,14 @@ function frame(g, inner, { guides, px, defs = '', round, idPrefix }) {
 // half the safe margin in from the trim (never nearer than 0.8 mm, clear of the
 // knife's wander), or that line with a second inside it. In the suit's colour,
 // over the art and the index.
+// Under a white print border the frame is measured from the ART PANEL's edge
+// (the same inset), so it stays on the art and clear of the index.
 export function frameArt(design, suit, g) {
   const fr = design.face && design.face.frame;
   if (!fr || fr === 'none') return '';
-  const t = g.trim, inset = Math.max(0.8, g.safe * 0.5), sw = Math.max(0.25, g.w * 0.005);
-  const rect = (d, w, op) => `<rect x="${f(t.x + d)}" y="${f(t.y + d)}" width="${f(t.w - 2 * d)}" height="${f(t.h - 2 * d)}" rx="${f(Math.max(0.5, Math.min(g.w, g.h) * ROUND_CORNER - d))}" fill="none" stroke="${suit.primary}" stroke-opacity="${op}" stroke-width="${f(w)}"/>`;
+  const t = g.border ? g.art : g.trim, inset = Math.max(0.8, g.safe * 0.5), sw = Math.max(0.25, g.w * 0.005);
+  const corner = g.border ? g.artR : Math.min(g.w, g.h) * ROUND_CORNER;
+  const rect = (d, w, op) => `<rect x="${f(t.x + d)}" y="${f(t.y + d)}" width="${f(t.w - 2 * d)}" height="${f(t.h - 2 * d)}" rx="${f(Math.max(0.5, corner - d))}" fill="none" stroke="${suit.primary}" stroke-opacity="${op}" stroke-width="${f(w)}"/>`;
   return `<g class="hb-frame">${rect(inset, sw, 0.75)}${fr === 'inner' ? rect(inset + sw * 3.2, sw * 0.6, 0.5) : ''}</g>`;
 }
 
@@ -185,10 +192,11 @@ function indexArt(design, suit, rank, g, idPrefix, plate) {
       defs = indexGradient(id, cols, DIGIT_BOX.h * 0.08, DIGIT_BOX.h * 0.92) + indexGradient(sid, cols, 2, 98);
       numeral = { fill: `url(#${id})`, symFill: `url(#${sid})`, cols };
     }
-    const idx = cornerIndex(rank, suit, design.face.bg, g.h * (INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral);
+    const idx = cornerIndex(rank, suit, groundColours(design), g.h * (INDEX_DIGIT[design.index] || INDEX_DIGIT.large), plate, numeral);
     return { svg: `<g class="hb-index">${placeCorners(idx, s, g, design.corners)}</g>`, defs, area: s, corner: { w: idx.w, h: idx.h } };
   }
-  const bandH = g.bleed + g.safe + g.h * 0.13;
+  // the band runs across the art panel (the bleed box with no border) from its top
+  const A = g.art, bandH = s.y - A.y + g.h * 0.13;
   const dH = g.h * 0.105;
   let defs = '', bandFill = suit.primary;
   if (suit.multicolor) {
@@ -208,16 +216,16 @@ function indexArt(design, suit, rank, g, idPrefix, plate) {
       + symbol(suit.symbol, g.fullW / 2 - sym / 2, y + (dH - sym) / 2, sym, ink, null)
     : digit(rank, s.x, y, dH, ink, null, 12) + symbol(suit.symbol, s.x + dw + dH * 0.3, y + (dH - sym) / 2, sym, ink, null));
   const rule = g.h * 0.006;
-  const yD = bandH - g.h * 0.03 - dH;
-  const band = `<rect x="0" y="0" width="${f(g.fullW)}" height="${f(bandH)}" fill="${bandFill}"/>`
-    + `<rect x="0" y="${f(bandH)}" width="${f(g.fullW)}" height="${f(rule)}" fill="${ink}" fill-opacity="0.6"/>` + content(yD);
+  const yD = bandH - g.h * 0.03 - dH;   // below the band's top
+  const band = `<rect x="${f(A.x)}" y="${f(A.y)}" width="${f(A.w)}" height="${f(bandH)}" fill="${bandFill}"/>`
+    + `<rect x="${f(A.x)}" y="${f(A.y + bandH)}" width="${f(A.w)}" height="${f(rule)}" fill="${ink}" fill-opacity="0.6"/>` + content(A.y + yD);
   const cx = g.fullW / 2, cy = g.fullH / 2;
   const bottom = design.corners === 'upright'
-    ? `<rect x="0" y="${f(g.fullH - bandH)}" width="${f(g.fullW)}" height="${f(bandH)}" fill="${bandFill}"/>`
-      + `<rect x="0" y="${f(g.fullH - bandH - rule)}" width="${f(g.fullW)}" height="${f(rule)}" fill="${ink}" fill-opacity="0.6"/>`
-      + content(g.fullH - yD - dH)
+    ? `<rect x="${f(A.x)}" y="${f(A.y + A.h - bandH)}" width="${f(A.w)}" height="${f(bandH)}" fill="${bandFill}"/>`
+      + `<rect x="${f(A.x)}" y="${f(A.y + A.h - bandH - rule)}" width="${f(A.w)}" height="${f(rule)}" fill="${ink}" fill-opacity="0.6"/>`
+      + content(A.y + A.h - yD - dH)
     : `<g transform="rotate(180 ${f(cx)} ${f(cy)})">${band}</g>`;
-  const top = bandH + rule;
+  const top = A.y + bandH + rule;
   return { svg: `<g class="hb-index">${band + bottom}</g>`, defs, area: { x: s.x, y: top, w: s.w, h: g.fullH - 2 * top }, corner: { w: 0, h: 0 } };
 }
 
@@ -326,15 +334,24 @@ export function placementFor(design, suit, rank) {
 // A Count card's fireworks as drawn, one string each in stacking order. Each is
 // its own spec (fireworkSpecAt: the card's, unless that firework carries a
 // style of its own), seeded by n, the firework it is.
-function countArt(design, suit, rank, pl) {
+function countArt(design, suit, rank, pl, bursts = null) {
   return pl.items.map((it) => {
     const spec = fireworkSpecAt(design, suit, rank, it.n), reach = REACH(spec);
+    if (bursts) bursts.push(burstOf(spec, suit, it.cx, it.cy, it.r / reach));
     return renderFirework({ ...spec, seed: spec.seed + it.n * 7919, rotation: (+spec.rotation || 0) + it.rot },
       { cx: it.cx, cy: it.cy, r: it.r / reach });
   });
 }
 
-function centreArt(design, suit, rank, g, ix) {
+// Where a firework is drawn, for the background's glows and its lit smoke: its
+// centre, the radius it reaches (its box times its size) and its colour (the
+// suit's, or the firework's own outer colour where a style or card sets one).
+function burstOf(spec, suit, cx, cy, r) {
+  return { cx, cy, R: r * Math.max(0.05, Math.min(1, +spec.size || 1)), color: spec.outerColor || suit.primary };
+}
+// bursts: an array the centre's fireworks are reported into (the background reads it)
+function centreArt(design, suit, rank, g, ix, bursts = null) {
+  const push = (sp, cx, cy, r) => { if (bursts) bursts.push(burstOf(sp, suit, cx, cy, r)); };
   const compose = (suit.centre && suit.centre.compose) || 'scale';
   const spec = fireworkSpec(design, suit, rank);
   const cx = g.fullW / 2, cy = g.fullH / 2, a = ix.area, k = ix.corner;
@@ -342,7 +359,11 @@ function centreArt(design, suit, rank, g, ix) {
     // Full bleed: the burst is sized to the card's half-diagonal and runs off
     // every edge; the svg viewport clips it at the bleed line. A field fills
     // the trim, so no piece is cut in half by the knife.
-    return renderFirework(spec, { cx, cy, r: Math.hypot(g.fullW, g.fullH) / 2 * 0.98, rect: g.trim });
+    // Under a white border the art panel stands in for the bleed box (and the
+    // art clip, not the viewport, cuts the burst).
+    const A = g.art, r = Math.hypot(A.w, A.h) / 2 * 0.98;
+    push(spec, cx, cy, r);
+    return renderFirework(spec, { cx, cy, r, rect: g.border ? A : g.trim });
   }
   if (compose === 'column') {
     // phase 1's 'count': the rank as a stack, always sized for five
@@ -351,12 +372,12 @@ function centreArt(design, suit, rank, g, ix) {
     const r = Math.min(slot * 0.46, (a.w - 2 * k.w) * 0.42);
     const top = cy - (rank * slot) / 2;
     let art = '';
-    for (let i = 0; i < rank; i++) art += renderFirework({ ...one, seed: one.seed + i * 7919 }, { cx, cy: top + slot * (i + 0.5), r });
+    for (let i = 0; i < rank; i++) { push(one, cx, top + slot * (i + 0.5), r); art += renderFirework({ ...one, seed: one.seed + i * 7919 }, { cx, cy: top + slot * (i + 0.5), r }); }
     return art;
   }
   if (compose === 'count' || compose === 'countscale') {
     const ar = cellArrangement(design, suit.id, rank);
-    return countArt(design, suit, rank, countPlacement(fieldArea(a, k), ar.items, ar.fitted, pipGrid(design, ix))).join('');
+    return countArt(design, suit, rank, countPlacement(fieldArea(a, k), ar.items, ar.fitted, pipGrid(design, ix)), bursts).join('');
   }
   const sp = scaleBurst(design, suit, rank, g, ix, spec);
   const p = sp.place;
@@ -364,6 +385,7 @@ function centreArt(design, suit, rank, g, ix) {
   // fills its rect and is never placed)
   const at = p ? { cx: p.cx, cy: p.cy, r: p.r } : sp.base;
   const s2 = p && p.rot ? { ...spec, rotation: (+spec.rotation || 0) + p.rot } : spec;
+  push(spec, at.cx, at.cy, at.r);
   if (spec.tier) return renderFirework(s2, at) + renderTier(spec, sp.tierRect);
   return renderFirework(s2, { ...at, rect: sp.field });
 }
@@ -489,7 +511,8 @@ export function centring(design, suit, rank) {
 export function sceneArt(design, g) {
   const sc = design.scene;
   if (!sc || !sc.on) return '';
-  const H = g.fullH * sc.height, base = g.fullH, W = g.fullW;
+  // in the art panel's own coordinates (the bleed box with no border), placed at its corner
+  const A = g.art, H = A.h * sc.height, base = A.h, W = A.w;
   let st = sc.kind === 'rooftops' ? 7 : 3;
   const rand = () => { st = (Math.imul(st, 1103515245) + 12345) >>> 0; return st / 4294967296; };
   const pts = [[0, base]];
@@ -517,7 +540,120 @@ export function sceneArt(design, g) {
   }
   pts.push([W, base]);
   const cl = pts.map(([x, y]) => [Math.min(W, Math.max(0, x)), Math.max(base - H, y)]);
-  return `<path class="hb-scene" d="M${cl.map(([x, y]) => `${f(x)} ${f(y)}`).join(' L')} Z" fill="${sc.color}"/>`;
+  return `<path class="hb-scene" d="M${cl.map(([x, y]) => `${f(x + A.x)} ${f(y + A.y)}`).join(' L')} Z" fill="${sc.color}"/>`;
+}
+
+// ---- the face background (version 7): sky, horizon glow, burst glows, smoke ----
+//
+// Deck-wide (design.background). OFF: the flat face colour, the markup it always
+// was. ON, in the art panel, under the fireworks:
+//   sky      a vertical gradient, top -> bottom (sky.on; else the face colour)
+//   horizon  over the bottom 40%, transparent above to the bottom colour mixed 55%
+//            toward HORIZON_TINT at the edge, at 0.45 x horizon
+//   glows    behind every firework a radial gradient of its colour, 1.7 x its radius,
+//            at 0.42 x glow in the centre, fading to nothing
+//   smoke    SMOKE_PUFFS soft radial puffs, 5-20 mm at poker size (scaled by the
+//            card's shorter side), placed by a seeded generator over the art panel
+//            (8% kept clear top and bottom); alpha (0.05-0.12) x amount x 1.6 x the
+//            rank factor; drift stretches them across. "Builds with rank": the rank
+//            factor runs 0.35 -> 1 over ranks 1-5 and only the first 40% -> 100% of
+//            the puffs are drawn, so the same puffs thicken through a suit. "Lit":
+//            each puff's colour moves toward the nearest firework's colour (a touch
+//            of white in it) by up to 75%, full at its centre, none past 1.8 x its radius.
+// The seed is the design's (smoke.seed), so preview, board and export are one haze.
+export const SMOKE_PUFFS = 42;
+export const HORIZON_TINT = '#8F96C0';
+export const GLOW_REACH = 1.7, LIT_REACH = 1.8;
+const rgbOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const hexOf = (c) => '#' + c.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+export function mixHex(a, b, t) { const A = rgbOf(a), B = rgbOf(b); return hexOf(A.map((v, i) => v + (B[i] - v) * t)); }
+const puffCache = new Map();
+// The deck's puffs in card mm: { x, y, r, a } (a the 0.05-0.12 draw), in their fixed order.
+export function smokePuffs(design, g) {
+  const sm = design.background.smoke, A = g.art, k = Math.min(g.w, g.h) / 63.5;
+  const key = `${sm.seed}|${A.x}|${A.y}|${A.w}|${A.h}|${k}`;
+  if (puffCache.has(key)) return puffCache.get(key);
+  let st = sm.seed >>> 0;
+  const rand = () => { st = (Math.imul(st, 1103515245) + 12345) >>> 0; return st / 4294967296; };
+  const out = [];
+  for (let i = 0; i < SMOKE_PUFFS; i++) {
+    const x = A.x + rand() * A.w, y = A.y + A.h * (0.08 + 0.84 * rand()), r = (5 + 15 * rand()) * k, a = 0.05 + 0.07 * rand();
+    out.push({ x, y, r, a });
+  }
+  puffCache.set(key, out);
+  if (puffCache.size > 64) puffCache.delete(puffCache.keys().next().value);
+  return out;
+}
+// The rank's share of the puffs and their strength.
+export function smokeRank(design, rank) {
+  const t = design.background.smoke.rank && rank ? (rank - 1) / 4 : 1;
+  return { n: Math.round(SMOKE_PUFFS * (0.4 + 0.6 * t)), factor: design.background.smoke.rank && rank ? 0.35 + 0.65 * t : 1 };
+}
+// The colours the face's ground takes (the index's halo is decided against the worst).
+export function groundColours(design) {
+  const b = design.background;
+  if (!b || !b.on) return [design.face.bg];
+  const top = b.sky.on ? b.sky.top : design.face.bg, bottom = b.sky.on ? b.sky.bottom : design.face.bg;
+  return [top, bottom, b.horizon > 0 ? mixHex(bottom, mixHex(bottom, HORIZON_TINT, 0.55), 0.45 * b.horizon) : bottom];
+}
+// returns { ground, fx, defs }: the ground (+ horizon) under the scene band, and the
+// glows + smoke over it, under the fireworks. rank null: a face with no rank (a token).
+export function backgroundArt(design, g, bursts, rank, p) {
+  const b = design.background, A = g.art;
+  const rr = g.artR ? ` rx="${f(g.artR)}" ry="${f(g.artR)}"` : '';
+  const rect = (fill, extra = '') => `<rect x="${f(A.x)}" y="${f(A.y)}" width="${f(A.w)}" height="${f(A.h)}"${rr} fill="${fill}"${extra}/>`;
+  if (!b || !b.on) return { ground: rect(design.face.bg), fx: '', defs: '' };
+  let defs = '', ground;
+  const bottom = b.sky.on ? b.sky.bottom : design.face.bg;
+  if (b.sky.on) {
+    defs += `<linearGradient id="${p}sky" gradientUnits="userSpaceOnUse" x1="0" y1="${f(A.y)}" x2="0" y2="${f(A.y + A.h)}"><stop offset="0" stop-color="${b.sky.top}"/><stop offset="1" stop-color="${b.sky.bottom}"/></linearGradient>`;
+    ground = rect(`url(#${p}sky)`);
+  } else ground = rect(design.face.bg);
+  if (b.horizon > 0) {
+    const hc = mixHex(bottom, HORIZON_TINT, 0.55), y0 = A.y + A.h * 0.6;
+    defs += `<linearGradient id="${p}hz" gradientUnits="userSpaceOnUse" x1="0" y1="${f(y0)}" x2="0" y2="${f(A.y + A.h)}"><stop offset="0" stop-color="${hc}" stop-opacity="0"/><stop offset="1" stop-color="${hc}" stop-opacity="${f(0.45 * b.horizon)}"/></linearGradient>`;
+    ground += `<rect class="hb-horizon" x="${f(A.x)}" y="${f(y0)}" width="${f(A.w)}" height="${f(A.h * 0.4)}" fill="url(#${p}hz)"/>`;
+  }
+  const grads = new Set();
+  const grad = (kind, c, stops) => {
+    const id = `${p}${kind}${c.slice(1)}`;
+    if (!grads.has(id)) { grads.add(id); defs += `<radialGradient id="${id}">${stops.map(([o, op]) => `<stop offset="${o}" stop-color="${c}" stop-opacity="${op}"/>`).join('')}</radialGradient>`; }
+    return id;
+  };
+  let fx = '';
+  if (b.glow > 0) for (const q of bursts) {
+    const id = grad('gl', q.color, [[0, 1], [1, 0]]);
+    fx += `<circle class="hb-glow" cx="${f(q.cx)}" cy="${f(q.cy)}" r="${f(q.R * GLOW_REACH)}" fill="url(#${id})" fill-opacity="${f(0.42 * b.glow)}"/>`;
+  }
+  const sm = b.smoke;
+  if (sm.amount > 0) {
+    const { n, factor } = smokeRank(design, rank);
+    const puffs = smokePuffs(design, g).slice(0, n);
+    let haze = '';
+    for (const pf of puffs) {
+      const alpha = Math.min(1, pf.a * sm.amount * 1.6 * factor);
+      let col = sm.color;
+      if (sm.lit > 0 && bursts.length) {
+        let best = 0, bc = null;
+        for (const q of bursts) { const pr = 1 - Math.hypot(pf.x - q.cx, pf.y - q.cy) / (LIT_REACH * q.R); if (pr > best) { best = pr; bc = q.color; } }
+        if (bc) col = mixHex(sm.color, mixHex(bc, '#FFFFFF', 0.15), 0.75 * best * sm.lit);
+      }
+      const id = grad('pf', col, [[0, 1], [0.55, 0.5], [1, 0]]);
+      haze += `<ellipse cx="${f(pf.x)}" cy="${f(pf.y)}" rx="${f(pf.r * sm.drift)}" ry="${f(pf.r)}" fill="url(#${id})" fill-opacity="${+alpha.toFixed(4)}"/>`;
+    }
+    if (haze) fx += `<g class="hb-smoke">${haze}</g>`;
+  }
+  return { ground, fx, defs };
+}
+// The white print border: the bleed box white (unprinted), and everything else
+// clipped to the art panel. No border: the markup as it was.
+function artPanel(g, inner, p) {
+  if (!g.border) return { inner, defs: '' };
+  const A = g.art, rr = f(g.artR);
+  return {
+    inner: `<rect class="hb-border" x="0" y="0" width="${f(g.fullW)}" height="${f(g.fullH)}" fill="#FFFFFF"/><g clip-path="url(#${p}art)">${inner}</g>`,
+    defs: `<clipPath id="${p}art"><rect x="${f(A.x)}" y="${f(A.y)}" width="${f(A.w)}" height="${f(A.h)}" rx="${rr}" ry="${rr}"/></clipPath>`,
+  };
 }
 
 // ---- public renderers ----
@@ -529,16 +665,19 @@ export function renderFace(design, card, opts = {}) {
   const g = cardGeom(design);
   const suit = suitById(design, card.suitId);
   const idPrefix = opts.idPrefix || `hb${card.suitId}${card.rank}`;
-  const bg = `<rect x="0" y="0" width="${f(g.fullW)}" height="${f(g.fullH)}" fill="${design.face.bg}"/>`;
   // A full-bleed centre runs under a corner index, so the index sits on a
   // plate of the face colour; a band index carries its own ground.
   const plate = suit.centre && suit.centre.compose === 'bleed';
   const ix = indexArt(design, suit, card.rank, g, idPrefix, plate);
   // opts.centreOnly: the board's thumbnails — the card's ground, scene and
   // centre art, without the corner index.
-  const art = bg + sceneArt(design, g) + centreArt(design, suit, card.rank, g, ix);
-  if (opts.centreOnly) return frame(g, art, opts);
-  return frame(g, art + ix.svg + frameArt(design, suit, g), { ...opts, idPrefix, defs: ix.defs });
+  const bursts = [];
+  const centre = centreArt(design, suit, card.rank, g, ix, bursts);
+  const bg = backgroundArt(design, g, bursts, card.rank, idPrefix);
+  const art = bg.ground + sceneArt(design, g) + bg.fx + centre;
+  if (opts.centreOnly) { const pa = artPanel(g, art, idPrefix); return frame(g, pa.inner, { ...opts, defs: bg.defs + pa.defs }); }
+  const pa = artPanel(g, art + ix.svg + frameArt(design, suit, g), idPrefix);
+  return frame(g, pa.inner, { ...opts, idPrefix, defs: ix.defs + bg.defs + pa.defs });
 }
 
 function backPattern(design, g) {
@@ -573,8 +712,10 @@ function backPattern(design, g) {
 
 export function renderBack(design, opts = {}) {
   const g = cardGeom(design), { bg, fg, mark } = design.back;
-  let inner = `<rect x="0" y="0" width="${f(g.fullW)}" height="${f(g.fullH)}" fill="${bg}"/>` + backPattern(design, g);
-  const t = g.trim, inset = g.safe * 0.6;
+  const A = g.art;
+  let inner = `<rect x="${f(A.x)}" y="${f(A.y)}" width="${f(A.w)}" height="${f(A.h)}" fill="${bg}"/>` + backPattern(design, g);
+  // the outline is inset from the trim, or from the art panel under a border
+  const t = g.border ? A : g.trim, inset = g.safe * 0.6;
   inner += `<rect x="${f(t.x + inset)}" y="${f(t.y + inset)}" width="${f(t.w - 2 * inset)}" height="${f(t.h - 2 * inset)}" rx="${f(g.w * 0.04)}" fill="none" stroke="${fg}" stroke-opacity="0.7" stroke-width="${f(g.w * 0.008)}"/>`;
   const cx = g.fullW / 2, cy = g.fullH / 2, R = Math.min(g.w, g.h) * 0.3;
   if (mark === 'burst') {
@@ -585,7 +726,8 @@ export function renderBack(design, opts = {}) {
       + `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(R * 0.62)}" fill="none" stroke="${fg}" stroke-width="${f(g.w * 0.006)}"/>`
       + `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(R * 0.14)}" fill="${fg}"/>`;
   }
-  return frame(g, inner, opts);
+  const p = opts.idPrefix || 'hbback', pa = artPanel(g, inner, p);
+  return frame(g, pa.inner, { ...opts, defs: pa.defs });
 }
 
 export function renderToken(design, kind, opts = {}) {
@@ -593,11 +735,13 @@ export function renderToken(design, kind, opts = {}) {
   const bg = kind === 'clue' ? T.clueBg : T.fuseBg, fg = kind === 'clue' ? T.clueFg : T.fuseFg;
   const def = TOKEN_GLYPHS[kind], s = g.safeRect;
   const big = Math.min(s.w, s.h) * 0.62, small = g.h * 0.09;
-  let inner = `<rect x="0" y="0" width="${f(g.fullW)}" height="${f(g.fullH)}" fill="${bg}"/>`;
+  const A = g.art;
+  let inner = `<rect x="${f(A.x)}" y="${f(A.y)}" width="${f(A.w)}" height="${f(A.h)}" fill="${bg}"/>`;
   inner += `<circle cx="${f(g.fullW / 2)}" cy="${f(g.fullH / 2)}" r="${f(big * 0.68)}" fill="none" stroke="${fg}" stroke-opacity="0.35" stroke-width="${f(g.w * 0.01)}"/>`;
   inner += glyph(def, g.fullW / 2 - big / 2, g.fullH / 2 - big / 2, big, fg);
   const cx = g.fullW / 2, cy = g.fullH / 2;
   const corner = glyph(def, s.x, s.y, small, fg, 9);
   inner += corner + `<g transform="rotate(180 ${f(cx)} ${f(cy)})">${corner}</g>`;
-  return frame(g, inner, opts);
+  const p = opts.idPrefix || `hb${kind}`, pa = artPanel(g, inner, p);
+  return frame(g, pa.inner, { ...opts, defs: pa.defs });
 }

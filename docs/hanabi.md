@@ -236,6 +236,54 @@ wrap.
 is not written, so it is not marked as overridden; the status names it. The editor's own Centre still
 writes.
 
+## The background and the white print border (schema version 7, Nov 11)
+
+Eva's cards are dark art on white card stock. Two deck-wide settings; Eva chose every default.
+
+**The background** (`design.background`; panel section 04, a master toggle with two sub-sections,
+*Sky* and *Smoke haze*, collapsed by default). OFF is the flat card face colour, the markup it always
+was. ON draws, in the art panel, in this order: sky → horizon glow → (scene band) → burst glows → smoke
+→ fireworks → index.
+
+| effect | how it is drawn | default |
+|---|---|---|
+| Sky | a vertical gradient over the art panel, top → bottom (off: the face colour). Presets Night `#0B1530→#020409`, Petrol dusk `#0E3236→#030809`, Indigo `#1E1F55→#05050F`, Ink `#101317→#07090B` | on, Night |
+| Horizon glow | over the bottom 40%, transparent above to the bottom colour mixed 55% toward `#8F96C0`, at 0.45 × the value at the edge | 0.55 |
+| Burst glow | behind every firework, a radial gradient of its colour (the suit's, or a firework's own outer colour), 1.7 × its radius, 0.42 × the value at the centre | 0.25 |
+| Smoke haze | 42 soft radial puffs, 5–20 mm at poker size (scaled by the card's shorter side), placed by a seeded generator over the art panel (8% clear top and bottom); alpha (0.05–0.12) × amount × 1.6 × the rank factor | 0.1 |
+| Drift | the puffs stretched across | 1× (round) |
+| Lit by bursts | a puff's colour moves toward the nearest firework's colour (with 15% white) by up to 75%, full at its centre, none past 1.8 × its radius | 1 |
+| Smoke colour | | `#9AA3B4` |
+| Builds with rank | the rank factor runs 0.35 → 1 over ranks 1–5 and only the first 40% → 100% of the puffs are drawn, so the same puffs thicken through a suit; off, every rank draws all 42 at full strength | on |
+
+- **The smoke seed is the deck's** (`background.smoke.seed`, default 20251111) and *Reroll smoke* draws
+  a new one; the haze is a pure function of it, so the preview, the board's thumbnails and the export are
+  one haze (B14 compares the exported PNG with the preview's own card, pixel for pixel).
+- **The halo** under the background is decided against the worst of the colours the ground takes (the
+  sky's top and bottom, and the horizon-lit bottom), so a mark that stands off one end of the sky but
+  not the other still gets it. A plate under a full-bleed centre takes the sky's top colour.
+- **Greyscale (H39)**: every mark of every suit's rank 5, measured against the ground composited under
+  it (sky, horizon, glows, every puff) by luminance contrast. Worst mark, poker, smoke on (off):
+  white 11.9 (13.0), red 4.2 (4.5), blue 4.8 (5.0), yellow 8.9 (9.5), green 6.1 (6.5), rainbow 3.6
+  (3.9); mini the same within 0.1. At amount 0.1 the smoke costs 6–9% of a mark's contrast and no suit
+  goes under 3:1. The rainbow is the nearest: its red stars on the lit sky.
+
+**The white print border** (`design.border`, mm, 0–5, default 3; panel 02, *Border mm*): an unprinted
+white margin between the trim and the ART PANEL, so edge wear does not show. `cardGeom()` owns it:
+`art` is the trim less the border with rounded corners (`artR`, 0.05 of the panel's shorter side — 2.9
+mm on a poker card), and the safe zone is measured from the art panel's edge, so the index, the band,
+the fields and the corner grid all move in with it. The bleed box is white and everything else is
+clipped to the art panel, so a cutting drift shows white card. **0 is the full bleed it was**: the art
+panel is the bleed box, no clip, the markup byte for byte. The scene band, a full-bleed centre and the
+*Frame* (measured from the art panel's edge, the same inset as before) sit inside the art; the back and
+the tokens take the border too (a back's bleed would otherwise show the same wear).
+
+**Saved designs look exactly as they did**: a file saved before version 7 opens with border 0 and the
+background off, and says so in one load note. H38 renders version-6 files (BASE6, `c7d4ba6`, read from
+git) against that page byte for byte, and a new design with the background off and no border is the
+version-6 default to the byte. A design kept in this browser's storage opens the same way (no note):
+turn the background on and set the border, or *Reset*.
+
 ## The fireworks
 
 **Nine firework TYPES** (phase 2) — each a distinct silhouette, not a recolour (H16): `peony`
@@ -411,7 +459,7 @@ each face sheet, each back in the slot mirrored for a long- or short-edge flip.
 
 ## Verify
 
-`node tools/verify-hanabi.mjs` — H1–H35 in Node, B1–B13 in Chromium (the PDF is rasterised by
+`node tools/verify-hanabi.mjs` — H1–H39 in Node, B1–B14 in Chromium (the PDF is rasterised by
 `pdftoppm` and its crop marks and edges read against an imposition RESTATED in the gate).
 H10 holds the corner index to one style across suits, H11 a suit's centre to its own cards,
 H12 the tier to ranks 4–5 and clear of the index, H13 every motif to its box, H14 the rainbow index (B6 its control) — read off every
@@ -424,11 +472,18 @@ likeness report, H29 the count (every type at its min, default and max, at every
 H30 version-4 designs migrated and unchanged against `d8286f1`, H31 the catalogue counts (exact, escalated,
 unset byte-identical to `5771675`), H32 version 6's defaults and version-5 designs unchanged against
 `5771675`, H33 four corners (a true 180° turn, inside the safe zone, legible at mini), H34 the corner grid,
-H35 the frame, the rounded preview and the rising trail; B5 the board (one greyscale), B7 real-pointer arranging, B8 the localStorage
+H35 the frame (from the art panel's edge under a border), the rounded preview and the rising trail; H36 the
+background (Eva's defaults restated, every field round-trips, the drawing order, the sky, horizon, glows and
+every puff restated — position, size, alpha, rank and lit colour — the seed, each effect at 0), H37 the white
+border (the art panel inset and clipped, the bleed white, the index from the art's edge, backs and tokens; poker
+and mini), H38 version-6 designs unchanged against `c7d4ba6`, H39 greyscale legibility under the background; B5 the board (one greyscale), B7 real-pointer arranging, B8 the localStorage
 migration, B9 the Arrange panel, B10 the layout (rail, resize, zoom, kept per browser), B11 styles
 and Centre through the editor, B12 the count control (label, range, readout, both levels), B13 the polish pass (no dropdown cut off, one-line
 labels, hexes, the rounded preview, Centre all rank 1s skipping a centred card, the catalogue counts and the
-rising trail in the editor). `--design <file>` prints the likeness report for a saved design
-(non-blocking). `--negative-control` runs 105 mutants, eighteen of them of the page script;
+rising trail in the editor), B14 the Background section (toggle, collapsed sub-sections, readouts, presets,
+reroll, reset, the border input) and preview = board = export pixel for pixel at poker and mini, with the
+exported border pure white; B3 now prints one PDF with the 3 mm border (the art inset, the margins white) and one
+without. `--design <file>` prints the likeness report for a saved design
+(non-blocking). `--negative-control` runs 121 mutants, twenty of them of the page script;
 `--keep <dir>` saves the PDFs. Not in CI.
 Dev deps: `npm i --no-save jspdf@2.5.1 jszip@3.10.1 playwright-core`; needs `pdfinfo`/`pdftoppm`.
