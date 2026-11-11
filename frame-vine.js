@@ -45,7 +45,7 @@
    chains' motifs use: the same primitive. */
 
 import { MIN_FEATURE_MM } from './frame-registry.js';
-import { FRAME_TRI_BUDGET, solidTriBound, plateOutline, EMBED_MM } from './frame-relief.js';
+import { FRAME_TRI_BUDGET, solidTriBound, plateOutline, EMBED_MM, Mesh, bandSolid } from './frame-relief.js';
 import {
   CHAIN_RUNS, CHAIN_SEAT, runPath, mapToPath, bandRegion, moldingHeightField, seatOn, slitWorst, mirrorCurve,
   wireClear, wireClearBound, joinsCleanly, LEAF_CROSS, buildScroll, buildLeaf, carvedCap, LEAF_ASPECT, wAt, selfGap, profileFor, rigid, pip, placeMotif, wireHeight, wireProfile, LEAF_RELIEF, crownScale,
@@ -211,7 +211,12 @@ export function drapedCrest(kind, { M, frame, opening, Hz, fits, why, slopes = f
   }
   if (!el) return { el: null, note: `the ${kind} crest is not built — draped low on the band it cannot ${why} without grazing` };
   const cr = el.crest;
-  el = symmetrizeElement(liftEach(el, crestLift(Hz)));
+  // the lift is raisedCrestLift's at d = 0 — crestLift's own doubles (see
+  // there) — kept with the undraped plan so the stand pass (standMotifs)
+  // drapes it again higher without reading the molding a second time
+  const plan = el, raise = raisedCrestLift(Hz);
+  el = symmetrizeElement(liftEach(el, raise(0)));
+  el.plan = plan; el.raise = raise;
   if (el.asymmetric) return { el: null, note: `the ${kind} crest is not built — its draped lift is not symmetric` };
   el.sunk = false; el.out = [0, 1]; el.pushed = 0; el.crest = cr;
   let xw = 0; for (const l of el.loops) for (const [x] of l) xw = Math.max(xw, Math.abs(x));
@@ -737,4 +742,167 @@ export function vineFor(model, { triBudget = FRAME_TRI_BUDGET, weightOverride = 
   const tip = all.length ? Math.min(...all.map((c) => c.info.tip ?? c.info.wire)) : F;
   const weight = { h, runs: keptRuns.map((r) => ({ id: r.run.id, from: r.run.from, to: r.run.to, L: r.L, Aa: r.Aa, Ab: r.Ab, cFrom: r.cFrom, cTo: r.cTo })) };
   return { scale, length: M, wire: F, style: 'carved', layout: 'rinceau', tip, groups, curves: all, elements: els, items, motifs: keptMotifs, weight, region, H, told, tris: { bound: tris, frame: frameTris, budget: triBudget } };
+}
+
+/* THE FLOWER IS THE FEATURE (Eva's ruling on the step-2 sheet, Nov 11 —
+   superseding "the rosettes sink into the molding" for the rinceau's
+   flowers). The relief's order is: the crest shell highest, then the flowers
+   (every other junction motif: the corner, springing and side rosettes, a
+   bottom shell), then the rinceau (its stems, volutes and acanthus), then the
+   molding. So, once the wires are seated and built (withOrnament hands this
+   their solids):
+     - a FLOWER is DOMED (domeFlower, below) until (a) every wire vertex under
+       its footprint lies under the flower's own top surface by STAND.margin —
+       the stems run UNDER it, ending beneath it or emerging from behind it,
+       embedded in its underside, never over it — and (b) its crown stands
+       STAND.step over the highest wire within STAND.near of its footprint;
+     - the CREST is draped again over the molding raised by d (the same
+       crestLift, so past the band's edge it still falls at CREST.slope and
+       stands no slab) until it covers its own stems likewise and its crown
+       stands STAND.step over every flower's and every wire near it.
+   Nothing moves in plan, so every plan check
+   (the band cap, the opening, the joins, the grazes) holds as placed. The
+   heights are read off the solids as built (the relief adds one plate
+   thickness to every part, so relative heights are the file's), the wires at
+   their emitted vertices and a motif at its own top triangles. */
+export const STAND = { step: MIN_FEATURE_MM, margin: VINE_MARGIN, near: 2 * MIN_FEATURE_MM, ease: 0.3 };   // ease: the cover's spread (mm of raise per mm away from a stem) — 1 (45°) printed every stem through the petals, measured on the sheet
+/* an element's top surface: z(x, y) the highest of its triangles over the
+   point (-Infinity off its footprint), bucketed */
+export function elementTop(el) {
+  const P = el.positions, I = el.indices, cell = 0.5, B = new Map(), tris = [];
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, crown = 0;
+  for (let k = 2; k < P.length; k += 3) crown = Math.max(crown, P[k]);
+  for (let t = 0; t < I.length / 3; t++) {
+    const a = I[3 * t], b = I[3 * t + 1], c = I[3 * t + 2];
+    const ax = P[3 * a], ay = P[3 * a + 1], bx = P[3 * b], by = P[3 * b + 1], cx = P[3 * c], cy = P[3 * c + 1];
+    const d = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy);
+    if (Math.abs(d) < 1e-12) continue;   // a wall: no top over any point
+    if (P[3 * a + 2] === 0 && P[3 * b + 2] === 0 && P[3 * c + 2] === 0) continue;   // the base
+    const tx0 = Math.min(ax, bx, cx), tx1 = Math.max(ax, bx, cx), ty0 = Math.min(ay, by, cy), ty1 = Math.max(ay, by, cy);
+    x0 = Math.min(x0, tx0); x1 = Math.max(x1, tx1); y0 = Math.min(y0, ty0); y1 = Math.max(y1, ty1);
+    const id = tris.length; tris.push([a, b, c, d]);
+    for (let i = Math.floor(tx0 / cell); i <= Math.floor(tx1 / cell); i++) for (let j = Math.floor(ty0 / cell); j <= Math.floor(ty1 / cell); j++) { const k = `${i},${j}`; if (!B.has(k)) B.set(k, []); B.get(k).push(id); }
+  }
+  const at = (x, y) => {
+    const list = B.get(`${Math.floor(x / cell)},${Math.floor(y / cell)}`); if (!list) return -Infinity;
+    let best = -Infinity;
+    for (const id of list) {
+      const [a, b, c, d] = tris[id], ax = P[3 * a], ay = P[3 * a + 1], bx = P[3 * b], by = P[3 * b + 1], cx = P[3 * c], cy = P[3 * c + 1];
+      const l1 = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / d, l2 = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / d, l3 = 1 - l1 - l2;
+      if (l1 < -1e-9 || l2 < -1e-9 || l3 < -1e-9) continue;
+      best = Math.max(best, l1 * P[3 * a + 2] + l2 * P[3 * b + 2] + l3 * P[3 * c + 2]);
+    }
+    return best;
+  };
+  return { at, crown, box: { x0, y0, x1, y1 } };
+}
+/* what an element is short of standing: the most any wire vertex under it
+   rises past its top less the margin, and the most its crown falls short of
+   STAND.step over the wires near it (and over `over`, a height it must clear) */
+export function standDeficit(el, W, over = -Infinity) {
+  const top = elementTop(el), { box } = top, n = STAND.near;
+  let cover = -Infinity, near = -Infinity;
+  for (let v = 0; v < W.length; v += 3) {
+    const x = W[v], y = W[v + 1];
+    if (x < box.x0 - n || x > box.x1 + n || y < box.y0 - n || y > box.y1 + n) continue;
+    const z = W[v + 2], s = top.at(x, y);
+    if (s > -Infinity) { cover = Math.max(cover, z + STAND.margin - s); near = Math.max(near, z); continue; }
+    // near: within STAND.near of the footprint (read at its four sides)
+    if (top.at(x + n, y) > -Infinity || top.at(x - n, y) > -Infinity || top.at(x, y + n) > -Infinity || top.at(x, y - n) > -Infinity) near = Math.max(near, z);
+  }
+  return { cover, crown: Math.max(near, over) + STAND.step + STAND.margin - top.crown, top };
+}
+/* the crest's lift over the molding raised by d inside the band: the same
+   law as crestLift (and its doubles at d = 0), the band's reach per point
+   cached so a raise costs nothing to try again */
+export function raisedCrestLift(Hz) {
+  const R = CREST_LIFT_RINGS, D = 32, cache = new Map();
+  const reach = (x, y) => {
+    const k = `${x},${y}`; if (cache.has(k)) return cache.get(k);
+    let m = -Infinity;
+    for (const r of R) for (let a = 0; a < (r ? D : 1); a++) { const t = 2 * Math.PI * a / D, dx = r * Math.cos(t), dy = r * Math.sin(t); const f = CREST.slope * (r < CREST.round ? r * r / (2 * CREST.round) : r - CREST.round / 2); const h1 = Hz([x + dx, y + dy]), h2 = Hz([-x - dx, y + dy]); if (h1 > 0) m = Math.max(m, h1 - f); if (h2 > 0) m = Math.max(m, h2 - f); }
+    cache.set(k, m); return m;
+  };
+  return (d) => ([x, y]) => { const m = Math.max(0, reach(x, y) + d); return m > 0 ? m + 0.01 : 0; };
+}
+/* A FLOWER STOOD AS A DOME (not a rigid block: raised whole, a petal over
+   the band's falling edge stood as a cut wall — the slab Eva ruled out in
+   the fourth round). Every top vertex is raised by
+     δ(q) = max(0, C(q) + e, h − h · s(ρ(q)))
+   — C the COVER: over every wire vertex under the flower, what the flower's
+   top there falls short of the wire plus the margin, spread gently (the
+   greatest of r − STAND.ease·|q − p|), so the petals ride over the stems
+   beneath them as one broad hill (at 45° every stem showed through them as
+   a ridge); h the HEART's raise, full at the boss and falling
+   (s the smoothstep over the petals' reach, from the boss's edge to the
+   footprint's rim) to nothing at the tips, so the petals fall back to where
+   they lay and the flower domes out of the molding; e a top-up should the
+   drawn triangles read under C between their vertices. h is stepped by the
+   crown's own deficit until the crown stands STAND.step over the wires near
+   it. On the axis the field is read at a point and its mirror alike. */
+export function domeFlower(el0, W, onAxis = false) {
+  const top0 = elementTop(el0), { box } = top0;
+  const pts = [];
+  for (let v = 0; v < W.length; v += 3) {
+    const x = W[v], y = W[v + 1];
+    if (x < box.x0 || x > box.x1 || y < box.y0 || y > box.y1) continue;
+    const s0 = top0.at(x, y); if (s0 === -Infinity) continue;
+    const r = W[v + 2] + STAND.margin - s0; if (r > 0) pts.push([x, y, r]);
+  }
+  const C1 = ([x, y]) => { let m = -Infinity; for (const [px, py, r] of pts) m = Math.max(m, r - STAND.ease * Math.hypot(x - px, y - py)); return m; };
+  const C0 = onAxis ? (q) => Math.max(C1(q), C1([-q[0], q[1]])) : C1;
+  const memo = new Map(), C = (q) => { const k = `${q[0]},${q[1]}`; let v = memo.get(k); if (v === undefined) { v = pts.length ? C0(q) : -Infinity; memo.set(k, v); } return v; };
+  const c = el0.at, P0 = el0.positions;
+  let R = 0; for (let k = 0; k < P0.length; k += 3) R = Math.max(R, Math.hypot(P0[k] - c[0], P0[k + 1] - c[1]));
+  const rho0 = 0.25 * R;   // the boss's own reach: the heart is raised whole inside it
+  const fall = (q) => { const t = Math.min(1, Math.max(0, (Math.hypot(q[0] - c[0], q[1] - c[1]) - rho0) / (R - rho0))); return t * t * (3 - 2 * t); };
+  const build = (h, e) => { let el = drapeElement(el0, (q) => Math.max(0, C(q) + e, h * (1 - fall(q)))); if (onAxis) { const s = symmetrizeElement(el); if (!s.asymmetric) el = s; } return { ...el, sunk: el0.sunk, out: el0.out, pushed: el0.pushed, lift: el0.lift }; };
+  let h = 0, e = 0, el = el0, def = { cover: Infinity, crown: Infinity };
+  for (let k = 0; k < 12; k++) {
+    el = build(h, e); def = standDeficit(el, W);
+    if (def.cover <= 1e-9 && def.crown <= 1e-9) break;
+    if (def.cover > 1e-9) e += def.cover;
+    if (def.crown > 1e-9) h = Math.max(h, C(c) + e) + def.crown;
+  }
+  el.stood = Math.max(h, C(c) + e, 0);
+  if (def.cover > 1e-9 || def.crown > 1e-9) el.standShort = Math.max(def.cover, def.crown);
+  return el;
+}
+export function standMotifs(orn, solids) {
+  const motifs = orn.motifs || [];
+  if (!motifs.length) return orn;
+  const mesh = new Mesh();
+  for (const o of solids) bandSolid(mesh, o.spine, o.prof, { scale: 1, plateT: o.lift || 0, reliefDepth: o.depth });
+  const W = mesh.pos;
+  const swap = new Map();   // an old element → the one standing in its place
+  let flowerCrown = -Infinity, flowers = 0, raisedMax = 0;
+  const kinds = new Set();
+  for (const o of motifs) {
+    if (o.crest) continue;
+    const el = domeFlower(o.el, W, o.onAxis);
+    const mirror = o.mirror ? mirrorElement(el) : null;
+    swap.set(o.el, el); if (o.mirror) swap.set(o.mirror, mirror);
+    o.el = el; o.mirror = mirror; o.stood = el.stood;
+    flowerCrown = Math.max(flowerCrown, elementTop(el).crown); flowers++; raisedMax = Math.max(raisedMax, el.stood); kinds.add(o.kind);
+  }
+  if (flowers) orn.told.push(`the ${[...kinds].join(' and ')}${flowers > 1 ? 's' : ''} stand in front: domed up to ${raisedMax.toFixed(2)} mm at the heart, every stem under one running beneath it, its crown ${STAND.step.toFixed(1)} mm over the rinceau near it`);
+  const Hz = (q) => Math.max(0, orn.H(q));
+  for (const o of motifs) {
+    if (!o.crest || !o.el.plan) continue;
+    const lift = o.el.raise || raisedCrestLift(Hz), plan = o.el.plan;
+    let el = o.el, d = 0, def = standDeficit(el, W, flowerCrown), short = Math.max(def.cover, def.crown);
+    for (let k = 0; k < 10 && short > 1e-9; k++) {
+      d += short;
+      const c = symmetrizeElement(liftEach(plan, lift(d)));
+      if (c.asymmetric) break;
+      Object.assign(c, { sunk: false, out: o.el.out, pushed: o.el.pushed, crest: o.el.crest, plan, raise: lift, at: o.el.at });
+      el = c; def = standDeficit(el, W, flowerCrown); short = Math.max(def.cover, def.crown);
+    }
+    if (short > 1e-9) orn.told.push(`the crest cannot be raised over its stems and the flowers (${short.toFixed(2)} mm short)`);
+    else if (d > 0) orn.told.push(`the crest is draped ${d.toFixed(2)} mm higher, the highest of the relief: over its own stems and ${STAND.step.toFixed(1)} mm over every flower`);
+    swap.set(o.el, el); o.el = el; o.stood = d;
+  }
+  orn.elements = orn.elements.map((e) => swap.get(e) || e);
+  for (const g of orn.groups) if (g.elements) g.elements = g.elements.map((e) => swap.get(e) || e);
+  return orn;
 }

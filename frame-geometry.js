@@ -747,6 +747,19 @@ export function buildFrame(params, customProfile = null) {
   return m;
 }
 
+/* THE PROFILE WIDTH's DEAD TRAVEL under the rinceau (Eva's ruling (d), Nov 11):
+   the drawing-unit width the band is widened to — at or under it every value
+   of the control builds the same band — read off a build at the control's own
+   minimum, so it holds whatever the control reads now; null when nothing is
+   widened (the rinceau off, or a frame whose band already holds 16 mm). */
+export function rinceauBandFloor(params, customProfile = null) {
+  const p = { ...DEFAULTS, ...params };
+  const spec = PARAM_SPEC.find((s) => s.id === 'moldingWidth');
+  if (!rinceauBand({ ...p, moldingWidth: spec.min })) return null;
+  const m = buildFrame({ ...p, moldingWidth: spec.min }, customProfile);
+  return m.params.bandAsked != null ? m.params.moldingWidth : null;
+}
+
 /* ------------------------------------------------------------------ */
 /* SVG                                                                 */
 /* ------------------------------------------------------------------ */

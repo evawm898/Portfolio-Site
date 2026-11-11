@@ -5,7 +5,7 @@
    exportSvg(model), the same string the button saves. */
 
 import { PARAM_SPEC, SECTIONS, DEFAULTS, PROFILE_PRESETS, HATCH_WEIGHT_RANGE, MIN_FEATURE_MM } from './frame-registry.js';
-import { buildFrame, exportSvg, toneAcross, profileFor } from './frame-geometry.js';
+import { buildFrame, exportSvg, toneAcross, profileFor, rinceauBandFloor } from './frame-geometry.js';
 import { buildRelief, exportStl } from './frame-relief.js';
 import { ProfileEditor } from './frame-profile-editor.js';
 import { withOrnament } from './frame-filigree.js';
@@ -110,7 +110,27 @@ function buildNow() {
   stats.reliefMs = performance.now() - t2;
   document.getElementById('paper').innerHTML = exportSvg(model, fixedView ? { view: fixedView } : {}).svg;
   if (viewer) { viewer.setMesh(relief); if (!pinnedCamera) viewer.frame(); viewer.render(); }
+  applyDead();
   writeReadout();
+}
+/* THE PROFILE WIDTH's DEAD TRAVEL, marked on the control (Eva's ruling (d),
+   Nov 11): with the rinceau on, every value at or under the width the band is
+   widened to builds the same 16 mm band — the track is hatched from its left
+   end to a tick at that width and the read-out says so. The range is not
+   narrowed: the whole travel stays reachable, it is only told. */
+let deadFloor = null;
+function applyDead() {
+  const spec = PARAM_SPEC.find((s) => s.id === 'moldingWidth'), wrap = ctrlEl.moldingWidth;
+  deadFloor = rinceauBandFloor(params, profile);
+  const out = document.getElementById('moldingWidth-out');
+  if (deadFloor == null || !(deadFloor > spec.min)) {
+    wrap.classList.remove('fr-ctrl--dead'); wrap.style.removeProperty('--fr-dead'); delete wrap.dataset.dead;
+    out.textContent = fmtVal(spec, params.moldingWidth);
+    return;
+  }
+  const frac = Math.min(1, (deadFloor - spec.min) / (spec.max - spec.min));
+  wrap.classList.add('fr-ctrl--dead'); wrap.style.setProperty('--fr-dead', frac.toFixed(4)); wrap.dataset.dead = deadFloor.toFixed(2);
+  out.textContent = `${fmtVal(spec, params.moldingWidth)} · ${params.moldingWidth <= deadFloor ? 'held at' : 'dead under'} ${deadFloor.toFixed(1)} (16 mm band)`;
 }
 
 /* ---------------- the relief view ---------------- */
@@ -232,6 +252,7 @@ window.__frame = {
   setAdvanced: (on) => setAdvanced(on),
   readout: () => document.getElementById('readout').textContent,
   controls: () => Object.fromEntries(PARAM_SPEC.map((s) => [s.id, !ctrlEl[s.id].hidden])),
+  dead: () => ({ floor: deadFloor, mark: ctrlEl.moldingWidth.classList.contains('fr-ctrl--dead') ? +ctrlEl.moldingWidth.style.getPropertyValue('--fr-dead') : null, out: document.getElementById('moldingWidth-out').textContent }),
 };
 
 loadParams(params, null);

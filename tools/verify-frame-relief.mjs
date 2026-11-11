@@ -536,6 +536,7 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     // the arch's default crest REACHES 24 mm across (the emitted plan)
     const CRR = { rise: 0.45, span: { shell: 1.35 }, slopes: 1.8, archAcross: 2.3 };
     const cb1 = [], cb2 = [], cb3 = [];
+    const fw1 = [], fw2 = [], fw3 = []; let fwFlowers = 0, fwCrests = 0, fwLead = Infinity, fwOver = -Infinity, fwCrestLead = Infinity;
     let archCrestRows = 0, archAcrossMin = Infinity;
     let stemEndMax = 0;
     let cbVerts = 0, cbRows = 0, crestPast = 0, crestAlong = 0, crestsSeen = 0;
@@ -781,6 +782,46 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
         else if (r.mirrorOf) { const j = recs.indexOf(r.mirrorOf); if (j < 0) { pl4.push(`${name}: a mirrored ${e.kind} with no source`); continue; } const A = vs(feet2[j].parts), B = vs(e.parts); if (A.length !== B.length || A.some((q, k) => B[k][0] !== -q[0] || B[k][1] !== q[1] || B[k][2] !== q[2])) pl4.push(`${name}: the left ${e.kind} is not the right with x negated`); }
         else if (!recs.some((o) => o.mirrorOf === r)) pl4.push(`${name}: the ${e.kind} at (${r.at[0].toFixed(1)}, ${r.at[1].toFixed(1)}) has no mirror and is not on the axis`);
       }
+      // ---- FW: THE FLOWER IS THE FEATURE (Eva, Nov 11): read off the
+      // relief alone — each motif's top surface its own emitted triangles,
+      // the rinceau's wires their emitted vertices. FW1 a flower's crown a
+      // feature over every wire within 2 F of its footprint; FW2 no wire
+      // vertex over any motif's top surface (the stems run beneath it); FW3
+      // the crest the highest: a feature over every flower's crown and over
+      // the wires near it. The step (F) and the reach (2 F) restated here.
+      if (orn.layout === 'rinceau' && feet2.length) {
+        const I = rel.indices, WV = new Set(); for (const pt of parts) for (let t = pt.t0; t < pt.t1; t++) for (let k = 0; k < 3; k++) WV.add(I[3 * t + k]);
+        const wv = [...WV];
+        const topOf = (e) => {
+          const cell = 0.5, B = new Map(); let crown = -Infinity, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+          for (const pt of e.parts) for (let t = pt.t0; t < pt.t1; t++) {
+            const a = I[3 * t], b = I[3 * t + 1], c = I[3 * t + 2]; for (const v of [a, b, c]) crown = Math.max(crown, P[3 * v + 2]);
+            const xs = [P[3 * a], P[3 * b], P[3 * c]], ys = [P[3 * a + 1], P[3 * b + 1], P[3 * c + 1]];
+            const tx0 = Math.min(...xs), tx1 = Math.max(...xs), ty0 = Math.min(...ys), ty1 = Math.max(...ys);
+            x0 = Math.min(x0, tx0); x1 = Math.max(x1, tx1); y0 = Math.min(y0, ty0); y1 = Math.max(y1, ty1);
+            for (let i = Math.floor(tx0 / cell); i <= Math.floor(tx1 / cell); i++) for (let j = Math.floor(ty0 / cell); j <= Math.floor(ty1 / cell); j++) { const kk = `${i},${j}`; if (!B.has(kk)) B.set(kk, []); B.get(kk).push(t); }
+          }
+          const at = (x, y) => { let best = -Infinity; for (const t of B.get(`${Math.floor(x / cell)},${Math.floor(y / cell)}`) || []) { const a = I[3 * t], b = I[3 * t + 1], c = I[3 * t + 2]; const ax = P[3 * a], ay = P[3 * a + 1], bx = P[3 * b], by = P[3 * b + 1], cx = P[3 * c], cy = P[3 * c + 1]; const d = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy); if (Math.abs(d) < 1e-12) continue; const l1 = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / d, l2 = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / d, l3 = 1 - l1 - l2; if (l1 < -1e-9 || l2 < -1e-9 || l3 < -1e-9) continue; best = Math.max(best, l1 * P[3 * a + 2] + l2 * P[3 * b + 2] + l3 * P[3 * c + 2]); } return best; };
+          return { crown, at, box: { x0, x1, y0, y1 } };
+        };
+        const reach = 2 * F, flowerCrowns = [], crests = [];
+        for (const e of feet2) {
+          const T = topOf(e); let near = -Infinity, over = -Infinity;
+          for (const v of wv) {
+            const x = P[3 * v], y = P[3 * v + 1], z = P[3 * v + 2];
+            if (x < T.box.x0 - reach || x > T.box.x1 + reach || y < T.box.y0 - reach || y > T.box.y1 + reach) continue;
+            const sz = T.at(x, y);
+            if (sz > -Infinity) { over = Math.max(over, z - sz); near = Math.max(near, z); }
+            else if ([[reach, 0], [-reach, 0], [0, reach], [0, -reach]].some(([dx, dy]) => T.at(x + dx, y + dy) > -Infinity)) near = Math.max(near, z);
+          }
+          fwOver = Math.max(fwOver, over);
+          if (over > 1e-6) fw2.push(`${name}: a wire stands ${over.toFixed(3)} mm over the ${e.rec.crest ? 'crest ' : ''}${e.kind} ${e.id}'s top`);
+          if (e.rec.crest) { crests.push({ e, T, near }); continue; }
+          fwFlowers++; flowerCrowns.push(T.crown); fwLead = Math.min(fwLead, T.crown - near);
+          if (T.crown - near < F - 1e-6) fw1.push(`${name}: the ${e.kind} ${e.id}'s crown ${(T.crown - near).toFixed(3)} mm over the rinceau near it`);
+        }
+        for (const { e, T, near } of crests) { fwCrests++; const top = Math.max(near, ...flowerCrowns); fwCrestLead = Math.min(fwCrestLead, T.crown - top); if (T.crown - top < F - 1e-6) fw3.push(`${name}: the crest ${e.kind}'s crown ${(T.crown - top).toFixed(3)} mm over the highest flower or wire near it`); }
+      }
       // ---- VN / RN: the rinceau (its stems, its field, its volutes) ----
       if (orn.layout === 'rinceau') {
         vineRows++;
@@ -912,6 +953,9 @@ async function run(G, R, RL, label = 'shipped', FL = null, PT = null) {
     rec('BW1 the band is widened for the rinceau (Eva\'s ruling (b)): max(the asked width, 16 print mm) on every rinceau row, exactly the asked width on every groups row', bandRows > 0 && bw1.length === 0, `${bandRows} rows${bw1.length ? ' — ' + bw1.slice(0, 3).join('; ') : ''}`);
     rec('VN5 the stem is SEATED: every emitted row\'s edge stands ON the highest molding under its own vertices (within 1e-6 mm: a lifted stem floats, a sunk one is buried)', vn5.length === 0 && stemSeatMax > -Infinity, `stem seat depth ${stemSeatMin.toFixed(4)}–${stemSeatMax.toFixed(4)} mm${vn5.length ? ' — ' + vn5.slice(0, 3).join('; ') : ''}`);
     rec('VN6 every stem\'s two ends are ROUNDED off: its emitted first and last rows no wider than the feature (Eva\'s third round: nothing reads as a cut slab)', stemsSeen > 0 && vn6.length === 0, `widest stem end ${stemEndMax.toFixed(3)} mm${vn6.length ? ' — ' + vn6.slice(0, 3).join('; ') : ''}`);
+    rec('FW1 THE FLOWER IS THE FEATURE (Eva, Nov 11): every flower (each junction motif but the crest) has its crown a feature over every rinceau wire within 2 F of its footprint, read off the relief', fwFlowers > 0 && fw1.length === 0, `${fwFlowers} flowers, least lead ${fwLead.toFixed(3)} mm${fw1.length ? ' — ' + fw1.slice(0, 3).join('; ') : ''}`);
+    rec('FW2 no stem passes over a flower: no rinceau wire vertex stands over any motif\'s own top surface (the stems end beneath it or emerge from behind it)', fwFlowers > 0 && fw2.length === 0, `worst wire over a top ${fwOver.toFixed(3)} mm${fw2.length ? ' — ' + fw2.slice(0, 3).join('; ') : ''}`);
+    rec('FW3 the crest is the highest: its crown a feature over every flower\'s and over the wires near it', fwCrests > 0 && fw3.length === 0, `${fwCrests} crests, least lead ${fwCrestLead.toFixed(3)} mm${fw3.length ? ' — ' + fw3.slice(0, 3).join('; ') : ''}`);
     rec('CB1 nothing stands past the band\'s outer edge (the frame\'s own silhouette) but the crest: every emitted wire vertex and every placed element\'s footprint inside it, on every rinceau row (Eva\'s ruling 1 on the first vine sheet)', cbRows > 0 && cbVerts > 0 && cb1.length === 0, `${cbVerts} wire vertices on ${cbRows} rinceau rows${cb1.length ? ' — ' + cb1.slice(0, 3).join('; ') : ''}`);
     rec('CB2 the crest past the edge is LOW and ALONG the band: no vertex further out than 0.45 of the molding width, and everything past the edge within the crest\'s span (+ the rise) of the axis along the edge', crestsSeen > 0 && cb2.length === 0, `${crestsSeen} crests, past the edge ${crestPast.toFixed(3)} M at most, along it ${crestAlong.toFixed(3)} M${cb2.length ? ' — ' + cb2.slice(0, 3).join('; ') : ''}`);
     rec('CB3 the arch\'s crest spreads ALONG its slopes (Eva\'s ruling (b), fourth sheet): on every default arch the emitted crest is at least 2.3 band widths across (24 mm on the 9.5 mm band, 2.53 M; it grows with the widened band; not spread along the slopes it is 1.9 M)', archCrestRows > 0 && cb3.length === 0, `${archCrestRows} arch crests, narrowest ${archAcrossMin.toFixed(1)} mm across${cb3.length ? ' — ' + cb3.slice(0, 3).join('; ') : ''}`);
@@ -1329,6 +1373,10 @@ const MUTANTS = [
   { id: 'the-band-is-not-widened', file: 'geometry', orn: true, from: '  const rb = rinceauBand(p);\n  if (!rb) return build();', to: '  const rb = null;\n  if (!rb) return build();', breaks: ['BW1', 'RN6'] },
   { id: 'the-rinceau-band-check-removed', file: 'vine', from: 'const bandOK = (c) => !c.pts.some((q) => opening(q)) &&', to: 'const bandOK = (c) => true || ', breaks: ['CB1'] },   // the opening test alone is redundant at the defaults (measured, nothing fired), and with the whole band test gone the volutes stand past the OUTER edge, not in the opening (CB1, measured) — OR7's rinceau witness is a-volute-detached
   { id: 'the-rinceau-budget-give-way-removed', file: 'vine', from: '  if (total() > triBudget) {', to: '  if (false) {', breaks: ['TB2'] },
+  // THE FLOWER IS THE FEATURE (Eva, Nov 11): the flowers left sunk; their cover dropped (only the crown rule); the crest not held over the flowers
+  { id: 'the-flowers-are-not-stood', file: 'vine', from: '    const el = domeFlower(o.el, W, o.onAxis);', to: '    const el = o.el;', breaks: ['FW1', 'FW2'] },
+  { id: 'a-stem-passes-over-the-flower', file: 'vine', from: '    const r = W[v + 2] + STAND.margin - s0; if (r > 0) pts.push([x, y, r]);', to: '    const r = W[v + 2] + STAND.margin - s0; if (r > 1e9) pts.push([x, y, r]);', breaks: ['FW2'] },
+  { id: 'the-crest-is-not-highest', file: 'vine', from: '    flowerCrown = Math.max(flowerCrown, elementTop(el).crown); ', to: '    ', breaks: ['FW3'] },
 ];
 
 

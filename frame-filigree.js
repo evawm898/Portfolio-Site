@@ -49,7 +49,7 @@ import { offsetCurve, outerEdge, innerEdge, sweepSpine } from './frame-geometry.
 import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound, plateOutline } from './frame-relief.js';
 import { MIN_FEATURE_MM } from './frame-registry.js';
 import { placeElement, relift, drapeElement, mirrorElement, symmetrizeElement, wireElementContact, elementClear, footprintTouches } from './frame-elements.js';
-import { vineFor, silDistance, drapedCrest, edgeFrame, crestLift } from './frame-vine.js';
+import { vineFor, silDistance, drapedCrest, edgeFrame, crestLift, standMotifs } from './frame-vine.js';
 
 export const SCROLL_STEP_DEG = 3;
 export const SCROLL_MAX_STEP_MM = 1.0;
@@ -1132,5 +1132,8 @@ export function withOrnament(model, opts = {}) {
     const lift = c.lift ? 0 : lf ? leafLift(c, shape, p.ornProjection) : 0;
     return { spine, prof: profileFor(c, p), depth, lift, kind: lf ? 'leaf' : 'scroll' };
   });
+  // THE FLOWER IS THE FEATURE (Eva, Nov 11): the rinceau's motifs raised
+  // over the wires as built, crest highest (frame-vine's standMotifs)
+  if (orn.layout === 'rinceau') standMotifs(orn, solids);
   return { ...model, bands: [...model.bands, ...bands], frameBox: model.box, box: { x0, y0, x1, y1 }, strokes, ornament: { ...orn, spines, solids, shape } };
 }

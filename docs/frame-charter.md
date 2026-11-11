@@ -1689,7 +1689,7 @@ VN2 still sees the vine's); `the-carved-floor-removed` also reddens OR3; `the-el
 also reddens PL2 and PL3 (a capped element sits exactly on the opening's edge and its wire's embed); and
 `a-folded-element-is-built` is retired (above).
 
-## 18. Phase 3f — the rinceau (step 1 the vocabulary, 1b the band, step 2 wired — §18.6, STOPPED FOR A SHEET)
+## 18. Phase 3f — the rinceau (step 1 the vocabulary, 1b the band, step 2 wired — §18.6, RULED (a) + (d); step 2b the flowers in front — §18.7)
 
 Read `frame-rinceau.js`'s header before touching the rinceau. **Step 1 ships no control and moves no
 shipped byte**: the rinceau is reached only through hidden params (`ornRinceau: 'on'`, `rinWave`,
@@ -1961,3 +1961,56 @@ read the PR's own run before trusting it). The `verify` job ran 19.6 min on main
 and two corners (the rectangle's top right, the arch's springing), front-on and three-quarter, each this tree beside
 main's 9.5 mm vine, both pages served from their own trees. `shot-frame-rinceau.mjs`, `shot-frame-vine.mjs` and
 `shot-frame-chains.mjs` are the record of the retired states: run them against a worktree of `babf787` / `2a46e1c`.
+
+### 18.7 Step 2b — the flower is the feature, and the Profile width's dead travel marked (Eva's rulings on §18.6, Nov 11)
+
+**Ruled on the step-2 sheet:** (a) the rinceau as built; (d) the Profile width slider's dead travel marked on the control
+itself. **And one change before merge: where a flower is present it is the feature and reads in front** — on the step-2
+sheet the stem swept past the rosette and the rosette sat sunk beside it. **This SUPERSEDES "the rosettes sink into the
+molding" (§17.10) for the rinceau's flowers.** The relief's order is now: **the crest shell highest > the flowers > the
+rinceau (stem, volutes, acanthus) > the molding**, a flower's crown at least 1 mm over the highest stem or leaf near it, the
+stems running UNDER a flower (ending beneath it or emerging from behind it, embedded in its underside), never over it.
+
+**Measured first, on the step-2 tree** (Node, export; the heights over the back off each relief): every corner, springing
+and side rosette's crown sat **0.7–2.0 mm under** the stems that cross it (crowns 5.2–5.65 mm, the stems 6.3–7.3), and a
+wire stood **2.7–3.9 mm over** a rosette's own top surface; the crest shell's crown (6.6) sat under the stems that end in it
+(7.1–7.4), a wire 1.2–1.4 mm over its top.
+
+**The construction: one stand pass, after the wires are seated and built** (`standMotifs` in `frame-vine.js`, called by
+`withOrnament` on the rinceau layout; `STAND = { step: 1 mm (MIN_FEATURE_MM), margin: 0.1 (VINE_MARGIN), near: 2 mm }`):
+- the wires are built exactly as the relief builds them (`bandSolid`, their seats and crowns), and every motif's top is read
+  off its own triangles (`elementTop`, bucketed, the base and the walls skipped);
+- **a FLOWER** (every junction motif but the crest: the rosettes, a bottom shell) is DOMED (`domeFlower`): every top vertex
+  raised by δ(q) = max(0, C(q) + e, h·(1 − s(ρ))). **C is the COVER**: over every wire vertex under the flower, what its top
+  falls short of the wire + 0.1, spread at a gentle `STAND.ease` 0.3 (the greatest of r − 0.3·|q − p|), so the petals ride over
+  the stems that run beneath them as one broad hill; **h is the HEART's raise**, full inside the boss's reach (a quarter of the
+  footprint) and falling by a smoothstep to nothing at the tips, so the petals fall back to where they lay and the flower domes
+  out of the molding; h is stepped by the crown's own deficit, e tops C up should the drawn triangles read under it between
+  their vertices. Its mirror is re-made from it (mirror to the bit); on the axis the field reads a point and its mirror alike.
+  **Two constructions were rendered and set aside first** (both in the session's own sheets, not committed): the flower raised
+  as ONE BLOCK covers and clears exactly, but a petal over the band's falling outer edge then stands as a tall cut wall from
+  three-quarter — the slab the fourth round ruled out; draped with the cover spread at 45° the walls go, but every stem shows
+  through the petals as a ridge. The gentle spread keeps both away;
+- **the CREST** keeps its undraped plan (`el.plan`) and is draped again over the molding RAISED by d inside the band
+  (`raisedCrestLift`: crestLift's own law, its doubles at d = 0, the band's reach per point cached) — so past the band's edge it
+  still falls at 45° and stands no slab — d stepped by the deficit until it covers its own stems likewise and its crown stands
+  1 mm + 0.1 over every flower's and every wire near it;
+- **nothing moves in plan**, so every plan clause (the band cap CB1/CB2, the opening, the joins, the grazes PL2) holds as placed;
+  the stems already end beneath their junction's flower (the run-on past the anchor lies under its footprint), so no stem is
+  trimmed. The flower's size is unchanged (Eva allowed it to grow to hold the corner; none needed to).
+
+MEASURED_BLOCK
+
+**Gates:** `verify-frame-relief.mjs` **FW1** (a flower's crown a feature over every rinceau wire within 2 F of its footprint),
+**FW2** (no rinceau wire vertex over any motif's own top surface), **FW3** (the crest's crown a feature over every flower's and
+over the wires near it), all read off the relief alone — the step and the reach restated, never imported. Three mutants
+(56 → 59): `the-flowers-are-not-stood` (FW1, FW2), `a-stem-passes-over-the-flower` (the cover rule dropped, the crown rule kept:
+FW2), `the-crest-is-not-highest` (FW3). `verify-frame.mjs` **DW1**: with the rinceau on, the Profile width control carries
+`.fr-ctrl--dead` hatched from its left end to a tick at the width the band is widened to (`rinceauBandFloor`, restated in the
+gate off a Node build at the control's minimum), the read-out says it; no mark with the rinceau off. Part two (the page) runs no
+mutants by the gate's own design; DW1's must-fail was run by hand (`deadFloor = null` served for `frame.js`: the floor and the
+mark read null where the clean page reads 31.86 / 0.7605).
+
+**Sheet:** `node tools/shot-frame-flowers.mjs <dir> --base <worktree of cd90cf5>` → `docs/img/frame-flowers.png`: the three
+whole frames front-on at 180 mm, the rectangle's top-right corner and the arch's springing front-on and three-quarter, and the
+arch's crest, each this tree beside the step-2 sheet's; every caption the heights off that tree's own relief.

@@ -610,6 +610,23 @@ async function partTwo(G, R) {
   });
   check('X1 the drawing on screen IS the export string (every path d, in order)', same.same, `${same.n} paths`);
 
+  // DW the Profile width's dead travel under the rinceau marked ON the
+  // control (Eva's ruling (d), Nov 11): the mark's fraction is the floor the
+  // NODE build widens the band to, restated against the control's own range;
+  // no mark with the rinceau off; the read-out says it
+  {
+    const dw = [];
+    for (const q of [{ filigree: 'scrolls' }, { filigree: 'scrolls', skeleton: 'rect' }, { filigree: 'scrolls', skeleton: 'oval', moldingWidth: 36 }]) {
+      await page.evaluate((v) => window.__frame.setParams(v), q);
+      const d = await page.evaluate(() => window.__frame.dead());
+      const m = G.buildFrame({ ...q, moldingWidth: 6 }), want = m.params.bandAsked != null ? m.params.moldingWidth : null, frac = want == null ? null : (want - 6) / (40 - 6);
+      if (want == null || d.floor == null || Math.abs(d.floor - want) > 1e-9 || d.mark == null || Math.abs(d.mark - frac) > 1e-4 || !/16 mm band/.test(d.out)) dw.push(`${JSON.stringify(q)}: floor ${d.floor} want ${want}, mark ${d.mark} want ${frac}, read-out "${d.out}"`);
+    }
+    await page.evaluate(() => window.__frame.setParams({}));
+    const off = await page.evaluate(() => window.__frame.dead());
+    if (off.floor != null || off.mark != null || /16 mm band/.test(off.out)) dw.push(`rinceau off: still marked (${JSON.stringify(off)})`);
+    check('DW1 the Profile width slider marks its dead travel under the rinceau on the control itself: hatched to a tick at the width the band is widened to (the Node build\'s, restated), told in the read-out; no mark with the rinceau off', dw.length === 0, dw.join('; ') || 'three rinceau frames marked, the plain frame not');
+  }
   // V pixel diff at a fixed camera
   const VIEW = { x0: -240, y0: -40, x1: 240, y1: 640 };
   await page.addStyleTag({ content: '.fr-panel,.fr-header{display:none!important} .fr-stage{right:0!important;padding:10px!important}' });

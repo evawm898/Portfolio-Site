@@ -35,6 +35,7 @@ on:
       - tools/shot-frame-elements.mjs
       - tools/shot-frame-vine.mjs
       - tools/shot-frame-rinceau-wired.mjs
+      - tools/shot-frame-flowers.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
@@ -64,6 +65,7 @@ on:
       - tools/shot-frame-elements.mjs
       - tools/shot-frame-vine.mjs
       - tools/shot-frame-rinceau-wired.mjs
+      - tools/shot-frame-flowers.mjs
       - tools/verify-frame-relief.mjs
       - tools/shot-frame-sheet.mjs
       - tools/shot-frame-relief.mjs
