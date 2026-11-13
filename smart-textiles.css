@@ -20,6 +20,8 @@
   --st-skin:   #5E5352;       /* skin, as a muted tissue tone */
   --st-muscle: #6E4B53;       /* muscle tissue */
   --st-ceramic:#B9B4AA;       /* Peltier ceramic plate */
+  --st-gold:   #C6A75E;       /* gold plating (study page) */
+  --st-nickel: #A9ADA7;       /* nickel plating (study page) */
 }
 
 .st-lede-sub { font-family: var(--mono); font-size: 0.92rem; line-height: 1.7; color: var(--ink-faint); max-width: 44rem; margin-top: 1rem; }
@@ -65,3 +67,11 @@
 @media (max-width: 680px) {
   .st-grid--2, .st-grid--3 { grid-template-columns: 1fr; }
 }
+
+/* the way into the study session (smart-textiles-study.html) */
+.st-study-link { display: block; max-width: 34rem; margin-top: 1.8rem; padding: 1rem 1.2rem 1.05rem; border: 1px solid var(--line); border-left: 2px solid var(--petrol-bright); border-radius: 6px; background: var(--black-raised); text-decoration: none; }
+.st-study-link:hover { border-color: var(--ink-dim); border-left-color: var(--petrol-bright); }
+.st-study-link:focus-visible { outline: 2px solid var(--petrol-bright); outline-offset: 2px; }
+.st-study-link__eyebrow { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--petrol-bright); }
+.st-study-link__title { display: block; font-family: var(--serif); font-size: 1.3rem; color: var(--ink); margin-top: 0.35rem; }
+.st-study-link__sub { display: block; font-size: 12.5px; line-height: 1.6; color: var(--ink-dim); margin-top: 0.35rem; }
