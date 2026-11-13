@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Defining Durability — Field Notes — Eva Maskalenko</title>
-<meta name="description" content="Field Notes: Defining Durability — looking at the different ways textiles fail, how durability is measured, and what those tests actually tell us.">
+<meta name="description" content="Field Notes: Defining Durability — performance retained over time: abrasion, pilling and snagging, strength, seams, fatigue, colourfastness, and what each test actually measures.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -13,6 +13,66 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="styles.css">
+<style>
+
+  /* Page-local styles. Everything below uses the site's custom properties;
+     the same figure frame as Quantifying Comfort, so the two pages read as a set. */
+  .dd-fig { margin: 1.5rem 0; border: 1px solid var(--line); background: var(--black-raised); }
+  .dd-fig__controls { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.5rem; padding: 1rem 1.25rem 0.5rem; }
+  .dd-fig__controls--row { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; align-items: center; }
+  .dd-fig__ctl { display: block; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+  .dd-fig__ctl span { display: flex; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.25rem; }
+  .dd-fig__ctl output { color: var(--ink); letter-spacing: 0.02em; text-transform: none; text-align: right; }
+  .dd-fig input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; margin: 0; background: transparent; cursor: pointer; }
+  .dd-fig input[type="range"]::-webkit-slider-runnable-track { height: 1px; background: var(--line-strong); }
+  .dd-fig input[type="range"]::-moz-range-track { height: 1px; background: var(--line-strong); }
+  .dd-fig input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -5.5px; background: var(--black); border: 1px solid var(--petrol-bright); border-radius: 0; }
+  .dd-fig input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; background: var(--black); border: 1px solid var(--petrol-bright); border-radius: 0; }
+  .dd-fig input[type="range"]:focus-visible { outline: none; }
+  .dd-fig input[type="range"]:focus-visible::-webkit-slider-thumb { background: var(--petrol-bright); }
+  .dd-toggle { display: inline-flex; border: 1px solid var(--line-strong); }
+  .dd-toggle__k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin-right: 0.5rem; }
+  .dd-toggle button { appearance: none; background: transparent; border: 0; border-right: 1px solid var(--line-strong); color: var(--ink-dim); font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.45rem 0.7rem; cursor: pointer; }
+  .dd-toggle button:last-child { border-right: 0; }
+  .dd-toggle button:hover { color: var(--ink); }
+  .dd-toggle button[aria-pressed="true"] { background: var(--color-deep); color: var(--color-ink); } /* text on deep is ink (DESIGN.md rule 5) */
+  .dd-toggle button:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: -3px; }
+  .dd-fig__svg { display: block; width: 100%; height: auto; font-family: var(--mono); }
+  .dd-fig__canvas { display: block; width: 100%; aspect-ratio: 5 / 2; cursor: pointer; outline: none; }
+  .dd-fig__canvas:focus-visible { box-shadow: inset 0 0 0 1px var(--petrol-bright); }
+  .dd-fig__cap { padding: 0.75rem 1.25rem 1rem; font-size: 11px; line-height: 1.6; color: var(--ink-dim); border-top: 1px solid var(--line); min-height: 2.6em; }
+  .dd-fig__cap strong { color: var(--ink); font-weight: 500; }
+  .dd-t { font-size: 9.5px; fill: var(--ink-dim); }
+  .dd-toggle { flex-wrap: wrap; max-width: 100%; }
+  .dd-sub { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+  .dd-do { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0.9rem 0 0; }
+  .dd-do dt { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--petrol-bright); padding-top: 0.3em; }
+  .dd-do dd { color: var(--ink); }
+  @media (max-width: 480px) { .dd-fig__controls { grid-template-columns: 1fr; } .dd-do { grid-template-columns: 1fr; gap: 0.1rem; } .dd-do dd { margin-bottom: 0.5rem; } }
+
+  .dd-fig__canvas--live { aspect-ratio: auto; height: 300px; }
+  .dd-restart { appearance: none; margin-left: auto; background: transparent; border: 1px solid var(--line-strong); color: var(--ink-dim); font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 0.45rem 0.7rem; cursor: pointer; }
+  .dd-restart:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .dd-restart:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: 2px; }
+  .dd-std { font-size: 10px; letter-spacing: 0.1em; color: var(--ink-dim); }
+  .dd-rank { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0 1.25rem 1rem; border: 1px solid var(--line); }
+  .dd-rank div { padding: 0.55rem 0.7rem; border-right: 1px solid var(--line); font-size: 10.5px; line-height: 1.5; color: var(--ink-dim); }
+  .dd-rank div:last-child { border-right: 0; }
+  .dd-rank b { display: block; font-weight: 500; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+  .dd-rank strong { color: var(--ink); font-weight: 500; }
+  .dd-note { font-size: 11px; color: var(--ink-dim); padding: 0 1.25rem 1rem; line-height: 1.6; }
+  /* the instrument's orange is artwork (DESIGN.md rules 9-10): shown as a swatch, never as text */
+  .dd-swatch { display: inline-block; width: 0.7em; height: 0.7em; margin-left: 0.4em; border-radius: 50%; vertical-align: baseline; }
+  .dd-swatch--orange { background: #D85A30; }
+  .dd-swatch--teal { background: #2fa3a3; }
+  .dd-swatch--grey { background: #7d8686; }
+  .dd-swatch--tan { background: #B9A47A; }
+  .dd-key { display: flex; flex-wrap: wrap; gap: 0.3rem 1.1rem; margin-top: 1rem; font-size: 11px; color: var(--ink-dim); }
+  .dd-key span { white-space: nowrap; }
+  .dd-key .dd-swatch { margin: 0 0.4em 0 0; }
+  @media (max-width: 480px) { .dd-rank { grid-template-columns: 1fr; } .dd-rank div { border-right: 0; border-bottom: 1px solid var(--line); } .dd-rank div:last-child { border-bottom: 0; } .dd-restart { margin-left: 0; } }
+
+</style>
 </head>
 <body id="top">
 
@@ -33,15 +93,253 @@
       <span class="project__year">Field Notes</span>
     </div>
     <h1 class="project__title">Defining Durability</h1>
-    <p class="project__lede">Looking at the different ways textiles fail, how durability is measured, and what those tests actually tell us.</p>
+    <p class="project__lede">&mdash; Do something to the fabric N times, then measure what&rsquo;s left. How textile labs test durability, machine by machine, and why their numbers don&rsquo;t convert.</p>
   </div>
 
   <div class="project__body">
 
     <section class="project__section">
-      <h2 class="project__section-title"><span>01</span>Coming Soon</h2>
+      <h2 class="project__section-title"><span>01</span>Performance over time</h2>
       <div class="project__section-body">
-        <p>Full write-up in progress &mdash; check back soon.</p>
+        <p>Durability is <strong>performance retained over time</strong>. Nearly every test has the same shape: <strong>do something to the fabric N times, then measure what&rsquo;s left.</strong></p>
+        <p>Different machines do different things to it, so their numbers aren&rsquo;t interchangeable. That&rsquo;s why a spec always names the test: &ldquo;30,000 double rubs&rdquo; means nothing without &ldquo;Wyzenbeek, ASTM D4157&rdquo; beside it.</p>
+        <p>In the figures below, fabric is drawn in teal<span class="dd-swatch dd-swatch--teal" aria-hidden="true"></span>, the machine in grey<span class="dd-swatch dd-swatch--grey" aria-hidden="true"></span>, abradants in tan<span class="dd-swatch dd-swatch--tan" aria-hidden="true"></span>, and the instrument&rsquo;s output in orange<span class="dd-swatch dd-swatch--orange" aria-hidden="true"></span> on its own chart. Every count, curve and end point is <strong>illustrative</strong> unless a source is named: the shapes follow the methods, the values are not measurements. Each test plays once when it scrolls into view; Restart, or a click on the figure, runs it again.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>02</span>Abrasion</h2>
+      <div class="project__section-body">
+        <p>Rubbing, until something gives. Three machines dominate, and <strong>they rub differently, report in different units, and don&rsquo;t always rank fabrics in the same order.</strong></p>
+        <figure class="dd-fig" aria-labelledby="ddAbrCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <span class="dd-toggle__k">Fabric</span>
+            <div class="dd-toggle" role="group" aria-label="Hypothetical fabric"><button type="button" data-abr="A" aria-pressed="true">Fabric A</button><button type="button" data-abr="B" aria-pressed="false">Fabric B</button></div>
+          </div>
+          <div class="dd-rank" role="list" aria-label="Which fabric each machine ranks first">
+            <div role="listitem"><b>Martindale</b><strong>A</strong> lasts longer: 40,000 vs 25,000 cycles</div>
+            <div role="listitem"><b>Wyzenbeek</b><strong>B</strong> lasts longer: 50,000 vs 30,000 double rubs</div>
+            <div role="listitem"><b>Taber</b><strong>A</strong> loses less: 62 vs 95 mg at 1,000 cycles</div>
+          </div>
+          <figcaption class="dd-note" id="ddAbrCap">Fabric A and Fabric B are <strong>hypothetical</strong>: the numbers are made up to show how a ranking can flip between machines, and describe no real fabric. The toggle drives all three machines below.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>03</span>Martindale</h2>
+      <div class="project__section-body">
+        <p class="dd-std">ASTM D4966 &middot; ISO 12947</p>
+        <dl class="dd-do"><dt>In use</dt><dd>Sitting, shifting, brushing against things: wear that comes from every direction.</dd><dt>The machine</dt><dd>A small disc of the sample, under load, is rubbed against a stationary wool abradant along a Lissajous figure.</dd></dl>
+        <figure class="dd-fig" id="ddMart" aria-labelledby="ddMartCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <span class="dd-toggle__k">Fabric</span>
+            <div class="dd-toggle" role="group" aria-label="Hypothetical fabric"><button type="button" data-abr="A" aria-pressed="true">Fabric A</button><button type="button" data-abr="B" aria-pressed="false">Fabric B</button></div>
+            <button type="button" class="dd-restart" data-restart>&#8635; Restart</button>
+          </div>
+          <canvas class="dd-fig__canvas dd-fig__canvas--live" role="img" aria-label="Top view: a small teal sample disc traces a Lissajous path over a large tan wool abradant, leaving a fading trail; the path opens from a straight line into a widening ellipse and closes to the perpendicular line. Beside it, the sample face as a grid of thread dots that disappear from the centre outward until there is a hole. A chart plots crossings worn through against cycles."></canvas>
+          <figcaption class="dd-fig__cap" id="ddMartCap" data-readout></figcaption>
+        </figure>
+        <p>The path is the point. It opens from a straight line into a widening ellipse and closes to the line at right angles, and one whole figure is <strong>16 rubs</strong> (ISO 12947-1). Over a figure the sample is rubbed in every direction in turn, so the test <strong>doesn&rsquo;t favour warp or weft</strong>. It runs until a thread breaks or a hole appears, and reports <strong>cycles</strong>.</p>
+        <p>The same machine also runs a pilling test (<a href="#pilling">section 06</a>).</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>04</span>Wyzenbeek</h2>
+      <div class="project__section-body">
+        <p class="dd-std">ASTM D4157 &middot; oscillatory cylinder</p>
+        <dl class="dd-do"><dt>In use</dt><dd>Sliding in and out of the same seat, along the same line, for years.</dd><dt>The machine</dt><dd>A curved drum faced with abradant swings back and forth under a sample clamped flat across its top, under tension.</dd></dl>
+        <figure class="dd-fig" id="ddWyz" aria-labelledby="ddWyzCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <span class="dd-toggle__k">Fabric</span>
+            <div class="dd-toggle" role="group" aria-label="Hypothetical fabric"><button type="button" data-abr="A" aria-pressed="true">Fabric A</button><button type="button" data-abr="B" aria-pressed="false">Fabric B</button></div>
+            <button type="button" class="dd-restart" data-restart>&#8635; Restart</button>
+          </div>
+          <canvas class="dd-fig__canvas dd-fig__canvas--live" role="img" aria-label="Side view: a curved drum segment faced with tan abradant swings back and forth about a pivot below it, under a teal sample clamped flat at both ends across its top. Beside it, a top view of the sample's weave with a band wearing along the rub direction and the threads across it breaking. A chart plots yarns broken against double rubs."></canvas>
+          <figcaption class="dd-fig__cap" id="ddWyzCap" data-readout></figcaption>
+        </figure>
+        <p>It rubs in <strong>one direction only</strong>, so warp and weft are tested as separate specimens. One forward-and-back pass is a <strong>double rub</strong>, the unit on upholstery specs.</p>
+        <p>The Association for Contract Textiles&rsquo; guidelines give thresholds in both units, side by side, with no conversion between them: <strong>15,000 double rubs</strong> (Wyzenbeek) or <strong>20,000 cycles</strong> (Martindale) for low-traffic upholstery, and <strong>30,000</strong> or <strong>40,000</strong> for high traffic.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>05</span>Taber</h2>
+      <div class="project__section-body">
+        <p class="dd-std">ASTM D3884 &middot; rotary platform</p>
+        <dl class="dd-do"><dt>In use</dt><dd>Scuffing and grinding: a heel on a floor mat, a bag strap on a seat.</dd><dt>The machine</dt><dd>The sample turns on a platform under two abrasive wheels, which are turned only by the sample moving beneath them.</dd></dl>
+        <figure class="dd-fig" id="ddTaber" aria-labelledby="ddTaberCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <span class="dd-toggle__k">Fabric</span>
+            <div class="dd-toggle" role="group" aria-label="Hypothetical fabric"><button type="button" data-abr="A" aria-pressed="true">Fabric A</button><button type="button" data-abr="B" aria-pressed="false">Fabric B</button></div>
+            <button type="button" class="dd-restart" data-restart>&#8635; Restart</button>
+          </div>
+          <canvas class="dd-fig__canvas dd-fig__canvas--live" role="img" aria-label="Top view: a teal sample with radial grid lines turns on a turntable under two tan abrasive wheels whose stripes show them rolling. A ring-shaped wear track darkens over time, with a criss-cross scuff texture that turns with the table. A chart plots mass loss against cycles."></canvas>
+          <figcaption class="dd-fig__cap" id="ddTaberCap" data-readout></figcaption>
+        </figure>
+        <p>The wheels don&rsquo;t just roll: their axes miss the platform&rsquo;s centre, so each one <strong>slides a little as it rolls</strong>, and that slip is what abrades. The two wheels slip in opposite senses, which wears a ring-shaped track scuffed criss-cross. Results are usually reported as <strong>mass loss</strong>, or appearance, <strong>after a set number of cycles</strong>. ASTM D3884 is published as a guide rather than a test method.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>06</span>Pilling and snagging</h2>
+      <div class="project__section-body">
+        <p class="dd-sub" id="pilling">Pilling</p>
+        <p>Pilling is not wear-through. Fibres <strong>work loose and ball up</strong>: first a fuzz, then tangles held to the surface by a few anchoring fibres. The surface is graded by eye against reference photographs, <strong>5 (no pilling) to 1 (very severe)</strong>.</p>
+        <figure class="dd-fig" id="ddPill" aria-labelledby="ddPillCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <button type="button" class="dd-restart" data-restart>&#8635; Restart</button>
+          </div>
+          <canvas class="dd-fig__canvas dd-fig__canvas--live" role="img" aria-label="A teal knit fabric face: fuzz sprouts from it, then tangles into small balls held on by a few fibres. Below, a reference card of five swatches from 5, no pilling, to 1, very severe; the matching grade is outlined. A chart plots the grade against test time."></canvas>
+          <figcaption class="dd-fig__cap" id="ddPillCap" data-readout></figcaption>
+        </figure>
+        <p>Three common ways to make it happen: <strong>Martindale pilling</strong> (ASTM D4970), the same machine as section 03; the <strong>random tumble</strong> tester (ASTM D3512), which tumbles specimens in a cork-lined chamber; and the <strong>ICI pill box</strong> (ISO 12945-1), which tumbles specimens mounted on tubes in a rotating cork-lined box.</p>
+        <p class="dd-sub">Snagging</p>
+        <p>A snag is a loop pulled out of the fabric by something sharp, a branch or a ring. The <strong>mace test</strong> (ASTM D3939) bounces a spiked ball on a fabric-covered turning drum and grades the pulled loops against reference photographs.</p>
+        <figure class="dd-fig" id="ddSnag" aria-labelledby="ddSnagCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <button type="button" class="dd-restart" data-restart>&#8635; Restart</button>
+          </div>
+          <canvas class="dd-fig__canvas dd-fig__canvas--live" role="img" aria-label="Side view: a teal knit fabric covers a turning grey drum; a grey spiked ball on a chain bounces on it, and wherever a spike catches it pulls a loop out of the knit, which is then carried round with the drum. A chart counts pulled loops against revolutions."></canvas>
+          <figcaption class="dd-fig__cap" id="ddSnagCap" data-readout></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>07</span>Strength: three ways to break</h2>
+      <div class="project__section-body">
+        <p>Three ways to pull a fabric apart, on the same layout: the specimen on the left, the instrument&rsquo;s force trace on the right.</p>
+        <p class="dd-sub">Tensile &middot; ASTM D5034 grab &middot; D5035 strip</p>
+        <figure class="dd-fig" id="ddTensile" aria-labelledby="ddTensileCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <span class="dd-toggle__k">Grip</span>
+            <div class="dd-toggle" role="group" aria-label="Grip"><button type="button" data-opt="grip:grab" aria-pressed="true">Grab</button><button type="button" data-opt="grip:strip" aria-pressed="false">Strip</button></div>
+            <button type="button" class="dd-restart" data-restart>&#8635; Restart</button>
+          </div>
+          <canvas class="dd-fig__canvas dd-fig__canvas--live" role="img" aria-label="A teal woven strip between a grey fixed jaw above and a moving jaw below is pulled until its yarns snap across the middle. Grab grips only the middle of a wider specimen; strip grips the full width. A chart plots force against extension: it climbs, peaks, and drops at the break."></canvas>
+          <figcaption class="dd-fig__cap" id="ddTensileCap" data-readout></figcaption>
+        </figure>
+        <p class="dd-sub">Tear &middot; ASTM D1424 Elmendorf &middot; D2261 tongue &middot; D5587 trapezoid</p>
+        <figure class="dd-fig" id="ddTear" aria-labelledby="ddTearCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <button type="button" class="dd-restart" data-restart>&#8635; Restart</button>
+          </div>
+          <canvas class="dd-fig__canvas dd-fig__canvas--live" role="img" aria-label="A teal woven specimen with a slit; its two tongues are gripped and pulled apart, and the tear runs along as the yarns crossing its path load and snap one at a time. A chart plots force against jaw travel as a jagged sawtooth."></canvas>
+          <figcaption class="dd-fig__cap" id="ddTearCap" data-readout></figcaption>
+        </figure>
+        <p class="dd-sub">Burst &middot; ASTM D3786 diaphragm &middot; D3787 ball</p>
+        <figure class="dd-fig" id="ddBurst" aria-labelledby="ddBurstCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <button type="button" class="dd-restart" data-restart>&#8635; Restart</button>
+          </div>
+          <canvas class="dd-fig__canvas dd-fig__canvas--live" role="img" aria-label="Side section: a teal knit is clamped in a grey ring; a grey ball pushes up from below, stretching the knit into a dome with its loops spreading, until it ruptures. A chart plots force against ball travel, rising then dropping at the burst."></canvas>
+          <figcaption class="dd-fig__cap" id="ddBurstCap" data-readout></figcaption>
+        </figure>
+        <p>Tensile pulls along one direction. Tear starts from a cut and asks how hard it is to keep it going: each tooth of the trace is one yarn. Burst pushes on a clamped circle, so the fabric is stretched in every direction at once.</p>
+        <p>Knits are burst-tested because <strong>pulling a knit in one direction mostly measures how far it stretches</strong>, not when it breaks. And for many fabrics <strong>tear is what actually fails in use</strong>: a small cut or snag that keeps running.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>08</span>Seams</h2>
+      <div class="project__section-body">
+        <p>A seam can fail two ways. <strong>Seam strength</strong>: the seam itself breaks. <strong>Seam slippage</strong>: the seam holds, but the yarns beside it slide apart and open a gap.</p>
+        <figure class="dd-fig" aria-labelledby="ddSeamCap">
+          <svg class="dd-fig__svg" viewBox="0 0 360 210" role="img" aria-label="Two panels. Left, seam strength: two teal fabric pieces pulled apart, the stitches broken and the pieces separated at the seam line. Right, seam slippage: the stitches are intact, but beside the seam the crosswise yarns have slid away, leaving a gap where only the lengthwise yarns span it.">
+            <defs>
+              <pattern id="ddWeave" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#0f3b3c"/><rect x="0" y="1" width="6" height="2.2" fill="#2fa3a3"/><rect x="1" y="0" width="2" height="6" fill="#6fb7ae" opacity="0.85"/></pattern>
+              <pattern id="ddWarp" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#060707"/><rect x="1" y="0" width="2" height="6" fill="#6fb7ae"/></pattern>
+            </defs>
+            <text x="90" y="16" class="dd-t" text-anchor="middle">SEAM STRENGTH</text>
+            <text x="90" y="27" class="dd-t" text-anchor="middle">the seam breaks</text>
+            <rect x="30" y="40" width="120" height="58" fill="url(#ddWeave)"/>
+            <rect x="30" y="122" width="120" height="58" fill="url(#ddWeave)"/>
+            <g stroke="#e9ecec" stroke-width="1.2" fill="none" stroke-linecap="round">
+              <path d="M36 98 l2 5 M48 98 l-1 6 M60 98 l2 4 M72 98 l1 6 M84 98 l-2 5 M96 98 l2 6 M108 98 l-1 4 M120 98 l2 5 M132 98 l-1 6 M144 98 l1 4"/>
+              <path d="M36 122 l-1 -5 M48 122 l2 -4 M60 122 l-1 -6 M72 122 l1 -4 M84 122 l2 -6 M96 122 l-1 -4 M108 122 l1 -6 M120 122 l-2 -4 M132 122 l1 -5 M144 122 l-1 -6"/>
+            </g>
+            <g stroke="#8b9494" stroke-width="1.1" fill="#8b9494"><path d="M90 40 V35" fill="none"/><path d="M86 36 L90 32 L94 36 Z"/><path d="M90 180 V194" fill="none"/><path d="M86 190 L90 196 L94 190 Z"/></g>
+            <text x="156" y="113" class="dd-t">gap</text>
+            <text x="270" y="16" class="dd-t" text-anchor="middle">SEAM SLIPPAGE</text>
+            <text x="270" y="27" class="dd-t" text-anchor="middle">yarns slide, seam holds</text>
+            <rect x="210" y="40" width="120" height="50" fill="url(#ddWeave)"/>
+            <rect x="210" y="90" width="120" height="16" fill="url(#ddWarp)"/>
+            <rect x="210" y="106" width="120" height="74" fill="url(#ddWeave)"/>
+            <rect x="210" y="104" width="120" height="7" fill="#1c6b6b"/>
+            <g stroke="#e9ecec" stroke-width="1.3" fill="none"><path d="M212 111 H328" stroke-dasharray="5 3"/></g>
+            <g stroke="#8b9494" stroke-width="1.1" fill="#8b9494"><path d="M270 40 V35" fill="none"/><path d="M266 36 L270 32 L274 36 Z"/><path d="M270 180 V194" fill="none"/><path d="M266 190 L270 196 L274 190 Z"/></g>
+            <text x="336" y="100" class="dd-t">gap</text>
+            <text x="336" y="114" class="dd-t">seam</text>
+          </svg>
+          <figcaption class="dd-fig__cap" id="ddSeamCap">Both specimens are pulled across the seam. <strong>Left:</strong> the stitches give and the pieces part. <strong>Right:</strong> every stitch holds, but the yarns next to the seam slide away from it and open a gap; the garment has failed while the seam has not.</figcaption>
+        </figure>
+        <p>ASTM D1683 covers both in woven fabrics, reporting seam strength and the force at which yarns slip at the seam. For woven upholstery, slippage at the seam has its own method, ASTM D4034.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>09</span>Fatigue: recovery that fades</h2>
+      <div class="project__section-body">
+        <p>How far a fabric stretches and how well it comes back is on <a href="quantifying-comfort.html">Quantifying Comfort</a>, as a feel. Here it&rsquo;s the same loop, <strong>retained</strong>: run it again and again and each loop leaves a little more permanent growth.</p>
+        <figure class="dd-fig" id="ddFatigue" aria-labelledby="ddFatigueCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <button type="button" class="dd-restart" data-restart>&#8635; Restart</button>
+          </div>
+          <canvas class="dd-fig__canvas dd-fig__canvas--live" role="img" aria-label="A teal knit strip in grey jaws stretches and returns again and again while a cycle counter climbs; each time it comes back a little longer than its original length, marked by a dashed line. One chart draws each load-extension loop, earlier loops fading, the loops drifting right and down. A second chart plots recovery percentage against cycles, falling from 100%."></canvas>
+          <figcaption class="dd-fig__cap" id="ddFatigueCap" data-readout></figcaption>
+        </figure>
+        <p><strong>Elastane</strong> is what gives most stretch fabrics their recovery, and it degrades with repeated stretching, laundering, heat, sweat and especially chlorine: in one study, swimwear fabrics containing elastane lost about 65% of their breaking force after 300 hours in chlorinated water (Poto&ccaron;i&cacute; Matkovi&cacute; et al., 2024). That matters most for garments worn against the skin every day, where the fabric is stretched, washed and sweated in on repeat.</p>
+        <p>Cyclic tests exist for the loop itself: ASTM D4964 takes elastic fabrics through repeated loading cycles and reads tension and recovery, and ISO 20932-1 runs its strip test for an agreed number of cycles.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>10</span>Colourfastness and shrinkage</h2>
+      <div class="project__section-body">
+        <p><strong>Crocking</strong> is colour rubbing off. On a crockmeter (AATCC TM8), a white test cloth on a rubbing finger is rubbed back and forth over the dyed fabric, and the stain it picks up is graded.</p>
+        <figure class="dd-fig" id="ddCrock" aria-labelledby="ddCrockCap">
+          <div class="dd-fig__controls dd-fig__controls--row">
+            <button type="button" class="dd-restart" data-restart>&#8635; Restart</button>
+          </div>
+          <canvas class="dd-fig__canvas dd-fig__canvas--live" role="img" aria-label="Side view: a grey rubbing finger wrapped in a white test cloth moves back and forth over a teal dyed fabric; the cloth picks up colour, shown afterwards beside a five-step staining scale."></canvas>
+          <figcaption class="dd-fig__cap" id="ddCrockCap" data-readout></figcaption>
+        </figure>
+        <ul class="project__list">
+          <li><strong>Light:</strong> exposure under a xenon-arc lamp, then the colour change is graded (AATCC TM16.3).</li>
+          <li><strong>Wash:</strong> an accelerated laundering run that stands in for several home washes (AATCC TM61).</li>
+          <li><strong>Perspiration:</strong> the fabric is wetted with artificial perspiration, held under pressure against undyed fabrics, and both are graded (AATCC TM15).</li>
+          <li><strong>Shrinkage:</strong> dimensional change is measured between marks before and after home laundering (AATCC TM135).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="project__section project__section--disclaimer">
+      <h2 class="project__section-title"><span>11</span>Sources</h2>
+      <div class="project__section-body">
+        <ul class="project__list">
+          <li>ASTM D4966-22, <em>Standard Test Method for Abrasion Resistance of Textile Fabrics (Martindale Abrasion Tester Method)</em>.</li>
+          <li>ISO 12947-1:1998, <em>Textiles &mdash; Determination of the abrasion resistance of fabrics by the Martindale method &mdash; Part 1: Martindale abrasion testing apparatus</em> (one cycle traces the Lissajous figure in 16 rubs); Parts 2&ndash;4: specimen breakdown, mass loss, appearance change.</li>
+          <li>ASTM D4157-13(2022), <em>Standard Test Method for Abrasion Resistance of Textile Fabrics (Oscillatory Cylinder Method)</em>.</li>
+          <li>ASTM D3884-22, <em>Standard Guide for Abrasion Resistance of Textile Fabrics (Rotary Platform Abrader Method)</em>.</li>
+          <li>Taber Industries, rotary platform abraser operating manual &mdash; rub-wear from a turning sample against the sliding rotation of two abrading wheels.</li>
+          <li>Association for Contract Textiles, <em>Performance Guidelines</em>, abrasion: 15,000 double rubs Wyzenbeek / 20,000 cycles Martindale (low traffic); 30,000 / 40,000 (high traffic); no conversion between the two tests.</li>
+          <li>ASTM D4970/D4970M-22, <em>&hellip; Pilling Resistance and Other Related Surface Changes of Textile Fabrics: Martindale Tester</em> (pills defined as balls of tangled fibres held to the surface by one or more fibres).</li>
+          <li>ASTM D3512/D3512M-22, <em>&hellip; Pilling Resistance and Other Related Surface Changes of Textile Fabrics: Random Tumble Pilling Tester</em> (scale 5, no pilling, to 1, very severe).</li>
+          <li>ISO 12945-1:2020, <em>Textiles &mdash; Determination of fabric propensity to surface pilling, fuzzing or matting &mdash; Part 1: Pilling box method</em>.</li>
+          <li>Gintis, D. and Mead, E.&nbsp;J., 1959 &mdash; &ldquo;The mechanism of pilling,&rdquo; <em>Textile Research Journal</em> 29(7):578&ndash;585.</li>
+          <li>ASTM D3939/D3939M, <em>Standard Test Method for Snagging Resistance of Fabrics (Mace)</em>.</li>
+          <li>ASTM D5034-21(2025), <em>Breaking Strength and Elongation of Textile Fabrics (Grab Test)</em>; ASTM D5035-11(2024), <em>Breaking Force and Elongation of Textile Fabrics (Strip Method)</em>.</li>
+          <li>ASTM D1424, <em>Tearing Strength of Fabrics by Falling-Pendulum (Elmendorf-Type) Apparatus</em>; ASTM D2261-13(2024), <em>&hellip; Tongue (Single Rip) Procedure (Constant-Rate-of-Extension Tensile Testing Machine)</em>; ASTM D5587-15(2024), <em>&hellip; Trapezoid Procedure</em>.</li>
+          <li>ASTM D3786/D3786M-18(2023), <em>Bursting Strength of Textile Fabrics &mdash; Diaphragm Bursting Strength Tester Method</em>; ASTM D3787-16(2020), <em>Bursting Strength of Textiles &mdash; Constant-Rate-of-Traverse (CRT) Ball Burst Test</em>.</li>
+          <li>ASTM D1683/D1683M-22, <em>Failure in Sewn Seams of Woven Fabrics</em> (rupture, slippage, or both); ASTM D4034/D4034M, <em>Resistance to Yarn Slippage at the Sewn Seam in Woven Upholstery Fabrics</em>.</li>
+          <li>ASTM D4964, <em>Tension and Elongation of Elastic Fabrics (Constant-Rate-of-Extension Type Tensile Testing Machine)</em>; ISO 20932-1:2018, <em>Textiles &mdash; Determination of the elasticity of fabrics &mdash; Part 1: Strip tests</em>.</li>
+          <li>Poto&ccaron;i&cacute; Matkovi&cacute;, V.&nbsp;M., Salopek &Ccaron;ubri&cacute;, I. and Krstovi&cacute;, K., 2024 &mdash; &ldquo;The impact of chlorinated water and sun exposure on the durability and performance of swimwear materials,&rdquo; <em>Polymers</em> 16(21):3050.</li>
+          <li>AATCC TM8, <em>Colorfastness to Crocking: Crockmeter</em>; TM16.3, <em>Colorfastness to Light: Xenon-Arc</em>; TM61, <em>Colorfastness to Laundering: Accelerated</em>; TM15, <em>Colorfastness to Perspiration</em>; TM135, <em>Dimensional Changes of Fabrics after Home Laundering</em>.</li>
+          <li>Checked and left out: ASTM D434 (yarn slippage at a standard seam) was withdrawn in 2004; D1683 and D4034 are cited instead.</li>
+          <li>All figures are illustrative: their shapes follow these methods; their values, including Fabric A and Fabric B, are not measurements.</li>
+        </ul>
       </div>
     </section>
 
@@ -69,6 +367,8 @@
     </div>
   </div>
 </footer>
+
+<script src="defining-durability.js" defer></script>
 
 <a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
 
