@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Smart Textiles: Study Session — Field Notes — Eva Maskalenko</title>
-<meta name="description" content="A study session for Field Notes No. 09, Smart Textiles: how electrons flow, why yarns resist, which metal to use and why, resistive versus capacitive sensing, and how sensor and heater stack-ups are built. Animated diagrams, labs, mnemonics and games.">
+<meta name="description" content="A study session for Field Notes No. 09, Smart Textiles: how electrons flow, why yarns resist, which metal to use and why, resistive versus capacitive sensing, how sensor and heater stack-ups are built, and how stretch and stiffness (Young’s modulus, Poisson’s ratio) decide what survives on a moving body. Animated diagrams, labs, mnemonics and games.">
 <meta name="robots" content="noindex">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="alternate icon" href="favicon.ico">
@@ -353,6 +353,99 @@
     <h3 class="st-sub">Harder: no options to pick from</h3>
     <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
     <div class="sx-hard" data-sx-hard="stack"></div>
+  </section>
+
+  <!-- ================= 06 · STRETCH ================= -->
+  <section class="tx-topic" id="stretch" data-sx-chapter="stretch">
+    <div class="tx-topic-head">
+      <h2><span class="sx-n">06</span>Stretch and Stiffness</h2>
+      <div class="tx-topic-copy">
+        <p>A smart garment puts metal, plastic film and rubber on a fabric that moves, and almost every mechanical failure comes from them stretching by different amounts. Two numbers describe most of it. <b>Young&rsquo;s modulus</b> (E) says how stiff a material is: how hard you have to pull for a given stretch. <b>Poisson&rsquo;s ratio</b> (&nu;) says how much it narrows when you stretch it.</p>
+        <p class="muted">The name is Poisson&rsquo;s <i>ratio</i>, not law. And for textiles there&rsquo;s a catch: a knit or a weave is a structure, not a plain material, so its &ldquo;E&rdquo; and &ldquo;&nu;&rdquo; change with how far and which way you pull. The labs show both the material numbers and what structures do with them.</p>
+      </div>
+    </div>
+
+    <h3 class="st-sub">Watch</h3>
+    <figure class="st-cell sx-wide" data-st="curves">
+      <div class="st-toggles" role="group" aria-label="Material">
+        <button type="button" class="st-btn" data-st-for="curves" data-st-key="mat" data-st-value="metal" aria-pressed="true">Copper</button>
+        <button type="button" class="st-btn" data-st-for="curves" data-st-key="mat" data-st-value="fibre" aria-pressed="false">Polyester fibre</button>
+        <button type="button" class="st-btn" data-st-for="curves" data-st-key="mat" data-st-value="knit" aria-pressed="false">Knit</button>
+        <button type="button" class="st-btn" data-st-for="curves" data-st-key="mat" data-st-value="rubber" aria-pressed="false">Silicone</button>
+      </div>
+      <div class="st-anim"><svg role="img" aria-label="A bar of the chosen material is pulled and let go, beside its stress-strain curve traced as it happens. Copper rises steeply, bends over almost at once, and comes back down to a permanent stretch. Polyester fibre goes up and down one steep straight line. A knit traces a J: flat then steep. Silicone stretches a long way at very low stress and comes back."></svg></div>
+      <figcaption><span class="label">Pull it, let go</span><span class="state">Stiffness is stress over strain</span><span class="sub">The slope of the first straight part is Young&rsquo;s modulus. Note each material&rsquo;s axes: copper&rsquo;s run to 1% stretch, silicone&rsquo;s to 150%. Copper&rsquo;s straight part ends almost immediately, and after that it doesn&rsquo;t come all the way back.</span></figcaption>
+    </figure>
+    <div class="sx-panel sx-panel--solo">
+      <span class="sx-eyebrow">The units, as a cheat sheet</span>
+      <dl class="sx-units">
+        <dt>&epsilon; &middot; strain</dt><dd><b>The stretch.</b> Change in length &divide; original length. No units: 0.1 is 10%.</dd>
+        <dt>&sigma; &middot; stress</dt><dd><b>The pull, spread out.</b> Force &divide; cross-section area, in pascals. 1 MPa = 1 N on each square millimetre.</dd>
+        <dt>E &middot; Young&rsquo;s modulus</dt><dd><b>The stiffness.</b> &sigma; &divide; &epsilon; in the straight region. Copper ~120 GPa, polyester fibre ~10 GPa, silicone ~1 MPa.</dd>
+        <dt>&nu; &middot; Poisson&rsquo;s ratio</dt><dd><b>The narrowing.</b> Sideways strain &divide; stretch, with a minus sign. Cork 0, metal ~0.3, rubber 0.5, auxetics below 0.</dd>
+        <dt>GF &middot; gauge factor</dt><dd><b>The sensitivity.</b> Fractional change in resistance &divide; strain. About 2 for metal and liquid metal; far higher for carbon-loaded rubber.</dd>
+      </dl>
+    </div>
+
+    <h3 class="st-sub">Play: Poisson&rsquo;s ratio</h3>
+    <figure class="st-cell sx-wide sx-lab" data-st="poisson">
+      <div class="st-toggles" role="group" aria-label="Material">
+        <button type="button" class="st-btn" data-st-for="poisson" data-st-key="mat" data-st-value="cork" aria-pressed="false">Cork (&nu; 0)</button>
+        <button type="button" class="st-btn" data-st-for="poisson" data-st-key="mat" data-st-value="metal" aria-pressed="false">Steel (&nu; 0.3)</button>
+        <button type="button" class="st-btn" data-st-for="poisson" data-st-key="mat" data-st-value="rubber" aria-pressed="true">Rubber (&nu; 0.5)</button>
+        <button type="button" class="st-btn" data-st-for="poisson" data-st-key="mat" data-st-value="aux" aria-pressed="false">Auxetic (&nu; &minus;0.4)</button>
+        <button type="button" class="st-btn" data-st-for="poisson" data-st-key="mat" data-st-value="bias" aria-pressed="false">Weave on the bias (&nu; ~1)</button>
+      </div>
+      <div class="st-anim"><svg role="img" aria-label="A block is pulled lengthwise from its outline at rest. Depending on the material it narrows, keeps its width, or widens (the auxetic one, drawn as bow-tie cells). The read-out gives the change in length, width, area and volume."></svg></div>
+      <div class="sx-controls">
+        <label class="sx-slider"><span>Stretch</span><input type="range" min="0" max="0.2" step="0.01" value="0.1" data-sx-for="poisson" data-sx-key="strain"><output data-sx-out="poisson.strain">10%</output></label>
+      </div>
+      <figcaption><span class="label">Poisson lab</span><span class="state">Pull it long, it goes thin</span><span class="sub">The picture exaggerates the stretch 2.5&times; so small changes show; the numbers are for the stretch you set. Watch the volume line: rubber keeps it, cork gains it, and the bias weave shows why a structure isn&rsquo;t limited to &nu; = &frac12;.</span></figcaption>
+    </figure>
+    <div class="sx-chal" data-sx-chal="poisson"></div>
+
+    <h3 class="st-sub">Play: stretch a conductor</h3>
+    <figure class="st-cell sx-wide sx-lab" data-st="gauge">
+      <div class="st-toggles" role="group" aria-label="Conductor">
+        <button type="button" class="st-btn" data-st-for="gauge" data-st-key="mat" data-st-value="metal" aria-pressed="false">Straight copper trace</button>
+        <button type="button" class="st-btn" data-st-for="gauge" data-st-key="mat" data-st-value="liquid" aria-pressed="true">Liquid metal in silicone</button>
+      </div>
+      <div class="st-anim"><svg role="img" aria-label="A conductor drawn at its rest length and width, then at the stretch you set: longer, and narrower by Poisson's ratio. Electrons run along it, slower as resistance rises. The read-out gives the resistance ratio and the gauge factor; past about 0.2% the copper trace shows cracks."></svg></div>
+      <div class="sx-controls">
+        <label class="sx-slider"><span>Stretch</span><input type="range" min="0" max="0.3" step="0.001" value="0.1" data-sx-for="gauge" data-sx-key="strain"><output data-sx-out="gauge.strain">10.0%</output></label>
+      </div>
+      <figcaption><span class="label">Gauge factor lab</span><span class="state">Longer and thinner: hit twice</span><span class="sub">R = &rho;L/A, so stretching raises R by the extra length <i>and</i> the smaller cross-section. That&rsquo;s a stretch sensor in one line. It&rsquo;s also why the copper is hopeless here: it stops springing back at about 0.2%, a hundredth of what the liquid metal takes.</span></figcaption>
+    </figure>
+    <div class="sx-chal" data-sx-chal="gauge"></div>
+
+    <h3 class="st-sub">Watch: stiff things on stretchy things</h3>
+    <figure class="st-cell sx-wide" data-st="serpentine">
+      <div class="st-anim"><svg role="img" aria-label="Three strips of stretchy base pulled 30% and released. On the first, a straight metal trace splits into separate pieces. On the second, a wavy serpentine trace flattens out and stays connected, electrons still flowing along it. On the third, a stiff island stays the same size while the soft material beside it stretches more, with the strain marked at the island's edges."></svg></div>
+      <figcaption><span class="label">Straight, wavy, island</span><span class="state">Serpentines turn stretch into bend</span><span class="sub">The metal can&rsquo;t stretch, but it can bend: a wave just flattens. A stiff patch can&rsquo;t stretch either, so the soft fabric beside it takes its share, and the strain piles up at its edges, where things peel and crack.</span></figcaption>
+    </figure>
+    <h3 class="st-sub">Watch: a sensor made to stretch</h3>
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="capstretch">
+        <div class="st-anim"><svg role="img" aria-label="A silicone capacitor with stretchy electrodes on both faces, shown side-on and from above as it is stretched up to 1.6 times its length. The gap between the electrodes narrows and their area grows; the read-out shows the capacitance rising in step with the stretch."></svg></div>
+        <figcaption><span class="label">A capacitor that stretches</span><span class="state">C rises in step</span><span class="sub">Rubber keeps its volume (&nu; = &frac12;), so stretching it makes the plates bigger and closer together at once. Together that&rsquo;s C &times; the stretch, a clean straight line, which is why soft capacitive strain sensors are popular.</span></figcaption>
+      </figure>
+      <div class="sx-panel">
+        <span class="sx-eyebrow">Two ways to read a stretch</span>
+        <dl class="sx-units">
+          <dt>Resistive</dt><dd><b>R &times; &lambda;&sup2;</b> for liquid metal (it keeps its volume). Steeper, so a bigger signal, but contacts and cracks add noise, and a stretched knit can go either way.</dd>
+          <dt>Capacitive</dt><dd><b>C &times; &lambda;</b> for a rubber capacitor. A smaller change, but a straight line that comes back to the same place, and no current flows through anything that can crack.</dd>
+          <dt>Either way</dt><dd>Put the sensor where the stretch is, and keep stiff parts (pods, snaps, glue) away from it: a stiff island nearby changes how much stretch the sensor sees.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <h3 class="st-sub">Remember</h3>
+    <div class="sx-cards" data-sx-cards="stretch"></div>
+    <h3 class="st-sub">Check</h3>
+    <div class="sx-quiz" data-sx-quiz="stretch"></div>
+    <h3 class="st-sub">Harder: no options to pick from</h3>
+    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
+    <div class="sx-hard" data-sx-hard="stretch"></div>
   </section>
 
   <!-- ================= MIXED ROUND ================= -->

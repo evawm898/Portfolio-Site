@@ -14,7 +14,7 @@
 // back when it's done, so the chapter widgets and the Hard round use the same code.
 
 import { CARDS, CARD_MORE, STACKS, CHAPTERS } from './smart-textiles-study-data.js';
-import { yarnCalc, heaterCalc, capCalc, FILS } from './smart-textiles-study-scenes.js';
+import { yarnCalc, heaterCalc, capCalc, FILS, poissonCalc, gaugeCalc } from './smart-textiles-study-scenes.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -60,6 +60,15 @@ export const ARROWS = [
   { id: 'a-loose', ch: 'stack', q: 'An EMG sleeve fits loosely instead of compressing the arm.', rows: [['Steadiness of the skin contact', 'down'], ['Motion artefact (noise)', 'up']], why: 'Contact pressure is signal quality. A shifting contact changes the electrode-skin impedance, and that change reads as signal.' },
   { id: 'a-shield', ch: 'stack', q: 'You remove the ground shield under a capacitive pad worn on the thigh.', rows: [['How much the leg affects the reading', 'up']], why: 'The body is a 100 pF giant next to a 1 pF sensor. With no grounded layer between them, the leg moving reads as pressure.' },
   { id: 'a-tpubase', ch: 'stack', q: 'You print silver ink straight onto a knit instead of onto a TPU base.', rows: [['Continuity of the trace', 'down'], ['Trace resistance', 'up']], why: 'Fabric is a sieve: the ink wicks into the gaps and breaks into islands, so the trace is patchy and resists more, or breaks.' },
+  { id: 'a-silicone', ch: 'stretch', q: 'You stretch a silicone strap 10%.', rows: [['Length', 'up'], ['Width', 'down'], ['Volume', 'same']], why: 'Pull it long, it goes thin. Rubber’s ν is ½, so it loses in width and thickness exactly what it gains in length.' },
+  { id: 'a-cork', ch: 'stretch', q: 'You stretch a material whose Poisson’s ratio is 0 (cork-like).', rows: [['Length', 'up'], ['Width', 'same'], ['Volume', 'up']], why: 'ν = 0: no sideways change at all, so all the stretch is extra volume.' },
+  { id: 'a-auxetic', ch: 'stretch', q: 'You pull an auxetic (bow-tie cell) spacer lengthwise.', rows: [['Length', 'up'], ['Width', 'up']], why: 'Auxetics get fatter when you pull: the re-entrant cells unfold sideways.' },
+  { id: 'a-liquid', ch: 'stretch', q: 'You stretch a liquid-metal channel sealed in silicone.', rows: [['Channel length', 'up'], ['Channel cross-section', 'down'], ['Resistance', 'up']], why: 'Longer and thinner: hit twice. R rises as about the square of the stretch.' },
+  { id: 'a-capstretch', ch: 'stretch', q: 'You stretch a silicone capacitor that has stretchy electrodes on both faces.', rows: [['Electrode area', 'up'], ['Gap between electrodes', 'down'], ['Capacitance', 'up']], why: 'Bigger plates and a thinner gap both raise C: it rises in step with the stretch.' },
+  { id: 'a-thinfilm', ch: 'stretch', q: 'You swap a 0.2 mm TPU film for a 0.1 mm one in a laminate.', rows: [['Bending stiffness', 'down'], ['How easily the panel drapes', 'up']], why: 'Twice as thick, eight times as stiff, and the reverse: half as thick bends eight times as easily.' },
+  { id: 'a-serp', ch: 'stretch', q: 'A panel with a serpentine trace on it is stretched 20%.', rows: [['Distance between the trace’s two ends', 'up'], ['Height of the trace’s waves', 'down'], ['Length of the metal path itself', 'same']], why: 'Serpentines turn stretch into bend: the waves flatten out, the metal doesn’t get longer.' },
+  { id: 'a-pod', ch: 'stretch', q: 'You bond a rigid pod onto the middle of a stretch sleeve, then stretch the sleeve.', rows: [['Strain under the pod', 'down'], ['Strain right at the pod’s edges', 'up']], why: 'Stiff on soft breaks at the edge: the soft part beside the pod takes the stretch the pod won’t.' },
+  { id: 'a-yield', ch: 'stretch', q: 'You stretch a copper wire by 1% and let go.', rows: [['Its length after you let go, compared with before', 'up']], why: 'Metal only springs back a tiny bit. 1% is far past copper’s yield, so most of it stays.' },
 ];
 
 // ---------------------------------------------------------------------------------------------
@@ -100,6 +109,20 @@ export const PROBLEMS = {
     return { q: `An air-gap capacitive pad measures C₀. You ${ch[0][0]} and ${ch[1][0]}. The new capacitance is how many times C₀?`, ans: k, unit: '× C₀', hints: ['C = εA/d: area and filling on top, gap underneath. Each change multiplies C.', `${ch[0][0]}: × ${sig(ch[0][1])}. ${ch[1][0]}: × ${sig(ch[1][1])}. Multiply them.`], work: `${sig(ch[0][1])} × ${sig(ch[1][1])} = ${sig(k)}` }; } },
   'rc': { ch: 'sense', make() { const R = rnd([0.5, 1, 2, 4]), C = rnd([1, 1.2, 2, 5, 10]), t = R * C;
     return { q: `A chip charges an electrode through ${R} MΩ. The electrode is ${C} pF. What is the time constant τ = RC?`, ans: t, unit: 'µs', hints: ['Mega (10⁶) times pico (10⁻¹²) is micro (10⁻⁶): MΩ × pF = µs.', `${R} × ${C} = ?`], work: `${R} MΩ × ${C} pF = ${sig(t)} µs` }; } },
+  'strain': { ch: 'stretch', make() { const L = rnd([50, 80, 100, 120, 150, 200, 250]), d = rnd([2, 4, 5, 8, 10, 15, 20, 30]), e = d / L * 100;
+    return { q: `A ${L} mm strip of stretch fabric is pulled to ${L + d} mm. What is the strain, in percent?`, ans: e, unit: '%', hints: ['Strain is stretch per length: ε = ΔL ÷ L.', `${d} ÷ ${L} = ?, then × 100 for percent.`], work: `${d} ÷ ${L} = ${sig(e / 100)} = ${sig(e)}%` }; } },
+  'stress': { ch: 'stretch', make() { const F = rnd([5, 10, 15, 20, 30]), w = rnd([10, 20, 25]), t = rnd([0.1, 0.2, 0.5]), sg = F / (w * t);
+    return { q: `A TPU strip ${w} mm wide and ${t} mm thick carries a pull of ${F} N. What is the stress in it?`, ans: sg, unit: 'MPa', hints: ['Stress is force over cross-section area: σ = F ÷ A. 1 N per mm² is 1 MPa.', `A = ${w} × ${t} = ${sig(w * t)} mm². ${F} ÷ ${sig(w * t)} = ?`], work: `${F} N ÷ ${sig(w * t)} mm² = ${sig(sg)} MPa` }; } },
+  'modulus': { ch: 'stretch', make() { const sg = rnd([0.2, 0.5, 1, 2, 3]), e = rnd([1, 2, 4, 5, 10, 20]), E = sg / (e / 100);
+    return { q: `A film stretches ${e}% under a stress of ${sg} MPa, still in its straight first region. What is its Young’s modulus?`, ans: E, unit: 'MPa', hints: ['Stiffness is stress over strain: E = σ ÷ ε, with ε as a decimal.', `${e}% = ${e / 100}. ${sg} ÷ ${e / 100} = ?`], work: `${sg} MPa ÷ ${e / 100} = ${sig(E)} MPa` }; } },
+  'poisson-w': { ch: 'stretch', make() { const w = rnd([10, 20, 25, 30, 40, 50]), nu = rnd([0.3, 0.4, 0.5]), e = rnd([2, 4, 5, 8, 10]), wn = w * (1 - nu * e / 100);
+    return { q: `A ${w} mm wide strip with Poisson’s ratio ${nu} is stretched ${e}% lengthwise. About how wide is it now?`, ans: wn, unit: 'mm', hints: ['Pull it long, it goes thin: width change ≈ −ν × stretch.', `${nu} × ${e}% = ${sig(nu * e)}% narrower. ${w} × (1 − ${sig(nu * e / 100)}) = ?`], work: `${w} × (1 − ${nu} × ${e / 100}) = ${sig(wn)} mm` }; } },
+  'gauge-R': { ch: 'stretch', make() { const R0 = rnd([2, 5, 10, 20, 50]), e = rnd([10, 20, 25, 30, 50]), R = R0 * (1 + e / 100) ** 2;
+    return { q: `A liquid-metal trace in silicone reads ${R0} Ω relaxed. It’s stretched ${e}%. What does it read now? (Liquid metal keeps its volume.)`, ans: R, unit: 'Ω', hints: ['Longer and thinner: hit twice. Length × λ, cross-section ÷ λ, so R × λ².', `λ = ${sig(1 + e / 100)}. ${R0} × ${sig(1 + e / 100)}² = ?`], work: `${R0} × ${sig(1 + e / 100)}² = ${sig(R)} Ω` }; } },
+  'bend': { ch: 'stretch', make() { const k = rnd([2, 3, 0.5, 1.5]), r = k ** 3;
+    return { q: `You change a TPU film to ${k}× its thickness, same material. How many times its old bending stiffness does it have now?`, ans: r, unit: '×', hints: ['Twice as thick, eight times as stiff: bending stiffness goes with thickness cubed.', `${k}³ = ?`], work: `${k}³ = ${sig(r)}×` }; } },
+  'cap-stretch': { ch: 'stretch', make() { const C0 = rnd([5, 10, 20, 50]), L = rnd([1.2, 1.3, 1.5, 1.8, 2]), C = C0 * L;
+    return { q: `A silicone capacitive strain sensor reads ${C0} pF relaxed. It’s stretched to ${L}× its length. What does it read?`, ans: C, unit: 'pF', hints: ['Stretch a rubber capacitor and C rises in step: area × √λ, gap ÷ √λ, so C × λ.', `${C0} × ${L} = ?`], work: `${C0} × ${L} = ${sig(C)} pF` }; } },
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -110,6 +133,8 @@ export const ORDERS = [
   { id: 'o-ladder', ch: 'metals', q: 'Rank these by resistivity, best conductor first.', items: ['Silver', 'Copper', 'Gold', 'Aluminium', 'Nickel', 'Stainless steel', 'Nichrome', 'Carbon fibre'], why: 'Some Cats Get Angry first (1.59, 1.68, 2.44, 2.65 × 10⁻⁸ Ω·m), then nickel 6.99, stainless 72, nichrome 110, carbon fibre about 1,500.' },
   { id: 'o-capread', ch: 'sense', q: 'Put the steps of reading a capacitive pad (by timing a charge) in order.', items: ['Discharge the electrode to 0 V', 'Start a timer and charge it through a resistor', 'The voltage rises, slower if C is bigger', 'Stop the timer when the voltage crosses the threshold', 'Compare the time with the untouched baseline'], why: 'Empty the bucket, open the tap, watch it fill, note when it reaches the line, compare with an empty-hand reading.' },
   { id: 'o-emg', ch: 'stack', q: 'Order a muscle signal’s path from the muscle to a number.', items: ['Muscle fibres fire', 'A tiny voltage appears at the skin surface', 'The silver electrode picks it up', 'The snap carries it through the fabric', 'The amplifier boosts the microvolts', 'The ADC turns the voltage into numbers'], why: 'The pod sits right behind the snap so the microvolt signal has a short way to travel before it’s amplified.' },
+  { id: 'o-stiff', ch: 'stretch', q: 'Rank by Young’s modulus, stiffest first.', items: ['Carbon fibre', 'Stainless steel', 'Copper', 'Silver', 'Polyester fibre', 'Nylon fibre', 'TPU', 'Silicone'], why: 'About 230, 190, 120, 80, 10 and 3 GPa, then TPU about 0.01–0.05 GPa and silicone about 0.001 GPa (1 MPa).' },
+  { id: 'o-poisson', ch: 'stretch', q: 'Rank by Poisson’s ratio, lowest first.', items: ['Auxetic spacer', 'Cork', 'Glass', 'Steel', 'Silicone rubber'], why: 'Below zero, about 0, about 0.2, about 0.3, about 0.5. Cork zero, metal a third, rubber a half.' },
 ];
 
 // ---------------------------------------------------------------------------------------------
@@ -301,6 +326,15 @@ export const CHALLENGES = {
     ['With air, take twice as long as air at 3 mm does.', v => v.eps === 1 && within(v.us, capCalc(3, 1).us * 2)],
     ['With polyester, read the same as air at 1 mm.', v => v.eps === 3 && within(v.us, capCalc(1, 1).us)],
     ['Show how water fools C: get a reading over 100 µs.', v => v.eps === 80 && v.us > 100]] },
+  poisson: { read: st => ({ ...poissonCalc(st.mat, +st.strain), mat: st.mat }), now: v => `now ν ${sig(v.nu)}: length +${sig(v.e * 100)}%, width ${v.width >= 0 ? '+' : '−'}${sig(Math.abs(v.width) * 100)}%`, targets: [
+    ['Make the block exactly 3% narrower.', v => within(-v.width, 0.03)],
+    ['Stretch it the full 20% with no narrowing at all.', v => v.e >= 0.2 - 1e-9 && Math.abs(v.width) < 1e-9],
+    ['Make it get wider as you stretch it.', v => v.width > 1e-9],
+    ['Stretch it at least 10% and keep its volume exactly.', v => v.mat !== 'bias' && v.e >= 0.1 - 1e-9 && Math.abs(v.vol) < 1e-9]] },
+  gauge: { read: st => { const c = gaugeCalc(st.mat, +st.strain); return { mat: st.mat, e: c.e, ratio: c.ratio, gf: c.gf, yielded: c.yielded }; }, now: v => `now R × ${sig(v.ratio, 4)} at ${sig(v.e * 100)}% stretch, gauge factor ${sig(v.gf)}`, targets: [
+    ['Raise the liquid metal’s resistance by 20%.', v => v.mat === 'liquid' && within(v.ratio - 1, 0.2)],
+    ['Stretch the copper at least 0.15% without it yielding.', v => v.mat === 'metal' && v.e >= 0.0015 - 1e-9 && !v.yielded],
+    ['Make the liquid metal’s gauge factor read 2.2.', v => v.mat === 'liquid' && within(v.gf, 2.2)]] },
 };
 export function mountChallenge(host, player, spec, onWin, start = 0) {
   let at = Math.min(start, spec.targets.length), last = '';

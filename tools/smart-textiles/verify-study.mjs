@@ -3,7 +3,7 @@
 // and 390.
 //   NODE_PATH=/opt/node22/lib/node_modules node tools/smart-textiles/verify-study.mjs [--negative-control]
 // Per width:
-//   V1  every [data-st] host has a scene; 18 mounted
+//   V1  every [data-st] host has a scene; 23 mounted
 //   V2  every scene, scrolled to, draws different markup 400 ms apart, and no stretch of any loop longer than
 //       300 ms draws the same frame twice (nothing is static)
 //   V3  every <text> of every scene lies inside its viewBox, at 12 points in the loop, with every lab slider
@@ -28,11 +28,14 @@
 //   V17 Spot the fault: the right tap reads right and is stored; a wrong layer tap and a wrong gap tap read wrong
 //   V18 lab challenges advance when the lab's own state meets the target, and the progress is stored
 //   V19 the Hard round is 8 items, interleaved, and an arrow grid missed last time comes first
+//   V20 chapter 06's lab formulas (Poisson width and volume, the stretched conductor's R, its gauge factor, copper's
+//       yield) against the physics restated in the gate, and every stretch challenge reachable on the sliders
 // --negative-control [--mutant=a,b] re-serves the page with a defect planted, one at a time, and requires the named check
 // to fail: storage never written (V6, V11), the Next button shown early (V7), Build the Stack accepting any
 // layer (V9), a slider that writes nothing (V5), the mixed round unranked (V10), Type the line accepting
 // anything (V13), arrows ungraded (V14), a 30% tolerance (V15), an order check that locks everything (V16),
-// any layer tap or any gap tap counted right (V17), challenges that never advance (V18), the Hard round unranked (V19).
+// any layer tap or any gap tap counted right (V17), challenges that never advance (V18), the Hard round unranked (V19), the Poisson width with its sign flipped and a
+// stretched conductor that only gets longer, never thinner (V20).
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -40,7 +43,7 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const { chromium } = createRequire('/opt/node22/lib/node_modules/')('playwright');
 const DATA = await import(pathToFileURL(path.join(REPO, 'smart-textiles-study-data.js')).href);
 const HARD = await import(pathToFileURL(path.join(REPO, 'smart-textiles-study-hard.js')).href);
-const N_SCENES = 18;
+const N_SCENES = 23;
 
 function serve(patch = {}) {
   const server = http.createServer((q, r) => {
@@ -95,7 +98,10 @@ async function run(patch = {}, quiet = false) {
         const variants = { ohm: [{ V: 0.5, R: 10 }, { V: 12, R: 500 }, { V: 12, R: 10 }], yarnR: ['silver', 'copper', 'steel', 'nichrome', 'carbon'].flatMap(mat => [{ mat, len: 0.1, fil: 0 }, { mat, len: 2, fil: 7 }]),
           heater: ['10', '30', '100'].flatMap(yarn => [{ yarn, n: 1, len: 0.1 }, { yarn, n: 8, len: 2 }, { yarn, n: 1, len: 2 }, { yarn, n: 8, len: 0.1 }]),
           divider: [{ press: 0 }, { press: 1 }], bucket: ['1', '3', '80'].flatMap(eps => [{ eps, gap: 0.5 }, { eps, gap: 6 }]),
-          circuit: ['both', 'electrons', 'current'].map(view => ({ view })), stack: [] };
+          circuit: ['both', 'electrons', 'current'].map(view => ({ view })), stack: [],
+          curves: ['metal', 'fibre', 'knit', 'rubber'].map(mat => ({ mat })),
+          poisson: ['cork', 'metal', 'rubber', 'aux', 'bias'].flatMap(mat => [{ mat, strain: 0 }, { mat, strain: 0.2 }]),
+          gauge: ['metal', 'liquid'].flatMap(mat => [{ mat, strain: 0 }, { mat, strain: 0.002 }, { mat, strain: 0.3 }]) };
         for (const p of window.__sxPlayers) {
           const [x0, y0, vw, vh] = p.scene.vb.split(' ').map(Number), keep = { ...p.state }, was = p.running;
           p.running = false;
@@ -137,7 +143,7 @@ async function run(patch = {}, quiet = false) {
         }
         return { n: document.querySelectorAll('input[data-sx-for]').length, bad };
       });
-      ok('V5', sl.n === 8 && !sl.bad.length, `${w}px ${sl.n} sliders${sl.bad.length ? ', dead: ' + sl.bad.join(', ') : ', each writes state, read-out and drawing'}`);
+      ok('V5', sl.n === 10 && !sl.bad.length, `${w}px ${sl.n} sliders${sl.bad.length ? ', dead: ' + sl.bad.join(', ') : ', each writes state, read-out and drawing'}`);
 
       if (w === 1280) {
         // V6 cards
@@ -315,11 +321,38 @@ async function run(patch = {}, quiet = false) {
           await setSlider('ohm', 'V', 5); await setSlider('ohm', 'R', 100); await page.waitForTimeout(60);
           await setSlider('divider', 'press', 0.18); await page.waitForTimeout(60);
           await tap('[data-st-for="heater"][data-st-value="10"]'); await setSlider('heater', 'n', 2); await setSlider('heater', 'len', 1.2); await page.waitForTimeout(60);
+          await tap('[data-st-for="poisson"][data-st-value="metal"]'); await setSlider('poisson', 'strain', 0.1);
+          await tap('[data-st-for="gauge"][data-st-value="liquid"]'); await setSlider('gauge', 'strain', 0.095); await page.waitForTimeout(60);
           const doneCount = async n => page.$$eval(`[data-sx-chal="${n}"] li[data-state="done"]`, e => e.length);
-          const c18 = { ohm: await doneCount('ohm'), divider: await doneCount('divider'), heater: await doneCount('heater'), bucket: await doneCount('bucket') };
+          const c18 = { ohm: await doneCount('ohm'), divider: await doneCount('divider'), heater: await doneCount('heater'), bucket: await doneCount('bucket'), poisson: await doneCount('poisson'), gauge: await doneCount('gauge') };
           const chalRec = (await store()).hard?.chal || {};
-          ok('V18', c18.ohm === 1 && c18.divider === 1 && c18.heater === 1 && c18.bucket === 0 && chalRec.ohm === 1 && chalRec.heater === 1, `targets met: ${JSON.stringify(c18)} (bucket untouched); stored ${JSON.stringify(chalRec)}`);
+          ok('V18', c18.ohm === 1 && c18.divider === 1 && c18.heater === 1 && c18.bucket === 0 && c18.poisson === 1 && c18.gauge === 1 && chalRec.ohm === 1 && chalRec.heater === 1 && chalRec.poisson === 1, `targets met: ${JSON.stringify(c18)} (bucket untouched); stored ${JSON.stringify(chalRec)}`);
         } catch (e) { ok('V18', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V20 chapter 06: the lab formulas against the physics restated here, as the page serves them
+          const r20 = await page.evaluate(async () => {
+            const S = await import('/smart-textiles-study-scenes.js'), bad = [];
+            const NU = { cork: 0, metal: 0.3, rubber: 0.5, aux: -0.4, bias: 1 };
+            for (const [mat, nu] of Object.entries(NU)) for (const e of [0.01, 0.05, 0.2]) {
+              const c = S.poissonCalc(mat, e);
+              if (Math.abs(c.width - (-nu * e)) > 1e-12) bad.push(`${mat} ${e} width ${c.width}`);
+              if (Math.abs(c.vol - (1 - 2 * nu) * e) > 1e-12) bad.push(`${mat} ${e} volume ${c.vol}`);
+            }
+            for (const [mat, nu] of [['metal', 0.34], ['liquid', 0.5]]) for (const e of [0.001, 0.1, 0.3]) {
+              const L = 1 + e, A = (1 + e) ** (-2 * nu), want = L / A, c = S.gaugeCalc(mat, e);
+              if (Math.abs(c.ratio - want) > 1e-9) bad.push(`${mat} ${e} R ratio ${c.ratio} vs ${want}`);
+              if (e <= 0.001 && Math.abs(c.gf - (1 + 2 * nu)) > 0.01) bad.push(`${mat} small-strain GF ${c.gf}`);
+            }
+            if (S.gaugeCalc('metal', 0.0021).yielded !== true || S.gaugeCalc('metal', 0.002).yielded !== false) bad.push('copper yield at 0.2%');
+            return bad;
+          });
+          const unreach = [];
+          for (const [name, mats, max, step] of [['poisson', ['cork', 'metal', 'rubber', 'aux', 'bias'], 0.2, 0.01], ['gauge', ['metal', 'liquid'], 0.3, 0.001]]) {
+            const spec = HARD.CHALLENGES[name];
+            spec.targets.forEach(([text, f]) => { let hit = false; for (const mat of mats) for (let k = 0; k * step <= max + 1e-9 && !hit; k++) if (f(spec.read({ mat, strain: +(k * step).toFixed(4) }))) hit = true; if (!hit) unreach.push(`${name}: ${text}`); });
+          }
+          ok('V20', !r20.length && !unreach.length, `${r20.length ? r20.slice(0, 3).join(' | ') : 'Poisson width −νε and volume (1−2ν)ε, R × (1+ε)^(1+2ν), GF → 1+2ν, copper yield at 0.2%'}; ${unreach.length ? 'unreachable: ' + unreach.join(' | ') : 'every stretch challenge reachable on the sliders'}`);
+        } catch (e) { ok('V20', false, 'threw: ' + String(e.message).split('\n')[0]); }
         try {
           // V19 hard round
           const miss = HARD.ARROWS.find(x => x.ch === 'stack');
@@ -358,6 +391,8 @@ if (process.argv.includes('--negative-control')) {
     ['order-locks-everything', { 'smart-textiles-study-hard.js': ['order.forEach((v, i) => { if (v === i) locked.add(i); });', 'order.forEach((v, i) => locked.add(i));'] }, ['V16']],
     ['fault-any-layer-right', { 'smart-textiles-study-hard.js': ["answer(f.type === 'swap' &&", 'answer(true ||'] }, ['V17']],
     ['fault-any-gap-right', { 'smart-textiles-study-hard.js': ["answer(f.type === 'missing' &&", 'answer(true ||'] }, ['V17']],
+    ['poisson-width-sign', { 'smart-textiles-study-scenes.js': ['width: -nu * e', 'width: nu * e'] }, ['V20', 'V18']],
+    ['gauge-ignores-thinning', { 'smart-textiles-study-scenes.js': ['ratio = (1 + e) ** (1 + 2 * g.nu)', 'ratio = (1 + e)'] }, ['V20', 'V18']],
     ['challenge-never-advances', { 'smart-textiles-study-hard.js': ['if (at < spec.targets.length && spec.targets[at][1](v))', 'if (false)'] }, ['V18']],
     ['hard-round-unranked', { 'smart-textiles-study.js': ["ranked('arrows', ARROWS).slice(0, 3)", 'shuffle(ARROWS).slice(0, 3)'] }, ['V19']],
   ];

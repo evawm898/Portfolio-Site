@@ -73,6 +73,8 @@ const READOUT = {
   'heater.len': v => `${(+v).toFixed(2)} m`,
   'divider.press': v => `${Math.round(v * 100)}%`,
   'bucket.gap': v => `${(+v).toFixed(1)} mm`,
+  'poisson.strain': v => `${Math.round(v * 100)}%`,
+  'gauge.strain': v => `${(v * 100).toFixed(1)}%`,
 };
 for (const input of $$('input[data-sx-for]')) {
   const p = player(input.dataset.sxFor), key = input.dataset.sxKey, id = `${input.dataset.sxFor}.${key}`;

@@ -30,6 +30,7 @@
 .sx-cta:hover { color: var(--ink); }
 
 /* ---------- panels and the units list ---------- */
+.sx-panel--solo { margin-top: 2rem; }
 .sx-panel { border: 1px solid var(--line); border-radius: 6px; background: var(--black-raised); padding: 1.2rem 1.3rem; align-self: start; }
 .sx-units { margin: 0.8rem 0 0; display: grid; grid-template-columns: 7.2rem 1fr; gap: 0.7rem 1rem; font-size: 12.5px; line-height: 1.55; }
 .sx-units dt { font-family: var(--mono); color: var(--petrol-bright); }

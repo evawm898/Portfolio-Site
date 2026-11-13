@@ -780,7 +780,224 @@ function drawRings(S, t, sel) {
   return s;
 }
 
+
+// =============================================================================================
+// 06 · STRETCH AND STIFFNESS
+// =============================================================================================
+// Stress–strain for four materials. The bar is pulled, then let go: copper yields almost at once and
+// stays stretched; polyester fibre springs back; a knit makes a J; rubber is soft and springs back.
+// Axes are each material's own, because they differ by a factor of a thousand in stress.
+export const CURVES = {
+  metal: { name: 'copper wire', xr: 0.01, yr: 120, xl: '1%', yl: '120 MPa', nu: 0.34, emax: 0.008, exag: 40,
+    E: 120000, sy: 70, H: 3000, eLabel: 'E ≈ 120 GPa, but it yields at about 0.06%',
+    note: ['Let go and it stays about 0.7% longer.', 'It yielded almost at once.'] },
+  fibre: { name: 'polyester fibre', xr: 0.02, yr: 200, xl: '2%', yl: '200 MPa', nu: 0.4, emax: 0.012, exag: 25,
+    E: 10000, eLabel: 'E ≈ 10 GPa', note: ['Below its yield it springs straight back.', 'Stiff: a fibre barely stretches.'] },
+  knit: { name: 'jersey knit', xr: 0.6, yr: 12, xl: '60%', yl: '12 N/cm', nu: 0.7, emax: 0.5, exag: 0.7,
+    eLabel: 'no single E: the curve is a J', note: ['Loops reshape first: easy.', 'Then the fibres take the load: steep.'] },
+  rubber: { name: 'silicone rubber', xr: 1.5, yr: 1, xl: '150%', yl: '1 MPa', nu: 0.5, emax: 1.2, exag: 0.3,
+    E: 1, eLabel: 'E ≈ 1 MPa', note: ['Soft, and springs back from a big stretch.', '100,000× less stiff than copper.'] },
+};
+function curveLoad(m, k, e) {
+  if (k === 'metal') { const ey = m.sy / m.E; return e <= ey ? m.E * e : m.sy + m.H * (e - ey); }
+  if (k === 'fibre') return m.E * e;
+  if (k === 'knit') return 4 * e + 140 * e ** 4;            // N/cm: soft, then steep
+  const l = 1 + e; return (m.E / 3) * (l - 1 / (l * l));    // neo-Hookean, engineering stress
+}
+// v in [0,1]: load to emax over 0..0.55, unload over 0.55..1
+function curvePath(k, v) {
+  const m = CURVES[k];
+  if (v <= 0.55) { const e = m.emax * v / 0.55; return { e, s: curveLoad(m, k, e) }; }
+  const w = (v - 0.55) / 0.45, smax = curveLoad(m, k, m.emax);
+  if (k === 'metal') { const eset = m.emax - smax / m.E, e = lerp(m.emax, eset, w); return { e, s: Math.max(0, smax - m.E * (m.emax - e)) }; }
+  const e = lerp(m.emax, 0, w);
+  return { e, s: curveLoad(m, k, e) * (k === 'knit' ? 0.82 : 1) };     // a knit unloads a little lower (hysteresis)
+}
+const curves = {
+  vb: '0 0 720 266', dur: 8000, state: { mat: 'metal' },
+  draw(t, st) {
+    const k = CURVES[st.mat] ? st.mat : 'metal', m = CURVES[k], u = fr(t), p = curvePath(k, u);
+    let s = '';
+    // the bar, pulled from the right (stretch drawn to a visible size)
+    const vis = Math.min(0.45, p.e * m.exag), x0 = 50, L0 = 170, w0 = 46, yc = 112;
+    const len = L0 * (1 + vis), w = w0 * Math.max(0.3, 1 - m.nu * vis);
+    s += rect(x0 - 22, yc - 34, 22, 68, { fill: C.raised, stroke: C.line });
+    s += rect(x0, yc - w / 2, len, w, { fill: k === 'metal' ? C.copper : k === 'rubber' ? C.ink2 : C.raised, 'fill-opacity': k === 'rubber' ? 0.25 : k === 'metal' ? 0.85 : 1, stroke: C.ink2, 'stroke-width': 1 });
+    if (k === 'knit') for (let i = 0; i < 9; i++) s += path(`M${x0 + (i + 0.5) * len / 9 - 6},${yc - w / 2 + 3} Q${x0 + (i + 0.5) * len / 9},${yc + w / 2 + 2} ${x0 + (i + 0.5) * len / 9 + 6},${yc - w / 2 + 3}`, { stroke: C.ink2, 'stroke-width': 1 });
+    if (k === 'fibre') for (let i = 0; i < 5; i++) s += line(x0, yc - w / 2 + (i + 0.5) * w / 5, x0 + len, yc - w / 2 + (i + 0.5) * w / 5, { stroke: C.dim, 'stroke-width': 0.6 });
+    s += rect(x0 + len, yc - 34, 22, 68, { fill: C.raised, stroke: C.line });
+    const pull = clamp(p.s / m.yr * 1.4);
+    if (pull > 0.03) s += arrow(x0 + len + 24, yc, x0 + len + 24 + 50 * pull, yc, { color: C.plum, sw: 1.6, head: 6 });
+    s += line(x0, yc + w0 / 2 + 18, x0 + L0, yc + w0 / 2 + 18, { stroke: C.faint, 'stroke-width': 0.8, 'stroke-dasharray': '3 3' }) + L(x0, yc + w0 / 2 + 32, 'length at rest');
+    s += L(x0 - 22, 40, m.name) + T(x0 - 22, 58, `strain ${fmt(p.e * 100, 2)}%`, { fill: C.ink });
+    if (m.exag > 1) s += L(x0 - 22, 222, `stretch drawn ${m.exag}× larger`);
+    // the curve
+    const px = 380, py = 40, pw = 300, ph = 150;
+    s += plot({ x: px, y: py, w: pw, h: ph, u, mode: 'xy', grid: [0.5],
+      series: [{ curve: v => { const q = curvePath(k, v); return { x: q.e / m.xr, y: q.s / m.yr }; }, color: k === 'metal' ? C.copper : C.petrol, ghost: true }],
+      title: k === 'knit' ? 'force per width vs stretch' : 'stress vs strain', xl: m.xl, xl0: '0', yl: m.yl, yl0: '0' });
+    s += T(px, 222, m.eLabel, { fill: C.ink });
+    s += T(px, 240, m.note[0]) + T(px, 256, m.note[1]);
+    if (k === 'metal' && p.e > m.sy / m.E) s += L(px + 6, py + 14, 'past yield: plastic, permanent', { fill: C.plum });
+    return s;
+  },
+};
+
+// Poisson lab: stretch a block; it narrows by ν × the stretch (or widens, if ν < 0).
+export const POISSON = {
+  cork: { name: 'cork', nu: 0 }, metal: { name: 'steel', nu: 0.3 }, rubber: { name: 'rubber', nu: 0.5 },
+  aux: { name: 'auxetic structure', nu: -0.4 }, bias: { name: 'weave on the bias', nu: 1.0 },
+};
+export const poissonCalc = (mat, strain) => { const nu = (POISSON[mat] || POISSON.rubber).nu, e = +strain; return { nu, e, width: -nu * e, area: (1 + e) * (1 - nu * e) - 1, vol: (1 - 2 * nu) * e }; };
+function lattice(kind, X, Y, W, Hh, sx, sy) {
+  // draw a motif in unit cells, scaled by the stretch, clipped to the block
+  const cw = 26, chh = 22; let s = '';
+  const nx = Math.ceil(W / (cw * sx)) + 1, ny = Math.ceil(Hh / (chh * sy)) + 1;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+    const ox = X + i * cw * sx, oy = Y + j * chh * sy;
+    if (ox > X + W || oy > Y + Hh) continue;
+    const P = (a, b) => ({ x: Math.min(X + W, ox + a * sx), y: Math.min(Y + Hh, oy + b * sy) });
+    if (kind === 'aux') s += path(poly([P(2, 2), P(13, 8), P(24, 2), P(24, 20), P(13, 14), P(2, 20), P(2, 2)]), { stroke: C.ink2, 'stroke-width': 0.8 });
+    else if (kind === 'cork') s += circ(ox + 13 * sx, oy + 11 * sy, 7, { fill: 'none', stroke: C.ink2, 'stroke-width': 0.7 });
+    else if (kind === 'bias') s += path(poly([P(0, 0), P(26, 22)]), { stroke: C.ink2, 'stroke-width': 0.8 }) + path(poly([P(26, 0), P(0, 22)]), { stroke: C.ink2, 'stroke-width': 0.8 });
+  }
+  return s;
+}
+const poisson = {
+  vb: '0 0 720 260', dur: 5000, state: { mat: 'rubber', strain: 0.1 },
+  draw(t, st) {
+    const k = POISSON[st.mat] ? st.mat : 'rubber', c = poissonCalc(k, st.strain), live = c.e * (0.5 - 0.5 * Math.cos(fr(t) * TAU));
+    const shown = 2.5, sx = 1 + live * shown, sy = 1 - c.nu * live * shown;     // drawn 2.5× so a small stretch is visible
+    let s = '';
+    const cx = 210, cy = 120, W0 = 220, H0 = 100;
+    s += rect(cx - W0 / 2, cy - H0 / 2, W0, H0, { fill: 'none', stroke: C.faint, 'stroke-width': 1, 'stroke-dasharray': '4 3' });
+    const W = W0 * sx, Hh = H0 * sy, X = cx - W / 2, Y = cy - Hh / 2;
+    s += rect(X, Y, W, Hh, { fill: k === 'metal' ? C.steel : k === 'rubber' ? C.ink2 : C.raised, 'fill-opacity': k === 'metal' ? 0.5 : k === 'rubber' ? 0.22 : 1, stroke: C.ink, 'stroke-width': 1.2 });
+    s += lattice(k, X, Y, W, Hh, sx, sy);
+    s += arrow(X - 6, cy, X - 36, cy, { color: C.plum, sw: 1.5, head: 6 }) + arrow(X + W + 6, cy, X + W + 36, cy, { color: C.plum, sw: 1.5, head: 6 });
+    if (Math.abs(c.nu) > 0.01) { const dir = c.nu > 0 ? 1 : -1; s += arrow(cx, Y - 26 + (dir > 0 ? 0 : 14), cx, Y - 26 + (dir > 0 ? 14 : 0), { color: C.indigo, sw: 1.2 }) + arrow(cx, Y + Hh + 26 - (dir > 0 ? 0 : 14), cx, Y + Hh + 26 - (dir > 0 ? 14 : 0), { color: C.indigo, sw: 1.2 }); }
+    s += L(cx - W0 / 2, 26, `${POISSON[k].name}, stretch drawn 2.5× larger`);
+    // read-outs, for the stretch the slider sets
+    const X2 = 440;
+    s += H(X2, 52, `ν = ${c.nu < 0 ? '−' + Math.abs(c.nu) : c.nu}`, { size: 15 });
+    s += T(X2, 76, `length  +${fmt(c.e * 100, 1)}%`, { fill: C.ink });
+    s += T(X2, 96, `width   ${c.width >= 0 ? '+' : '−'}${fmt(Math.abs(c.width) * 100, 1)}%   (ν × stretch)`);
+    s += T(X2, 116, `area    ${c.area >= 0 ? '+' : '−'}${fmt(Math.abs(c.area) * 100, 1)}%`);
+    s += T(X2, 136, k === 'bias' ? 'volume  (a structure: yarns rotate)' : `volume  ${c.vol >= 0 ? '+' : '−'}${fmt(Math.abs(c.vol) * 100, 1)}%   ((1 − 2ν) × stretch)`);
+    s += T(X2, 172, k === 'rubber' ? 'ν = ½: rubber keeps its volume.' : k === 'cork' ? 'ν = 0: no bulge sideways (why a cork fits).' : k === 'aux' ? 'ν < 0: pull it and it gets fatter.' : k === 'bias' ? 'ν > ½ only happens in structures.' : 'Metals sit near a third.', { fill: C.ink });
+    if (c.nu > 0) s += T(X2, 192, 'Pull it long, it goes thin.');
+    s += T(X2, 230, 'small-stretch rule: width change ≈ −ν × stretch', { size: 9 });
+    return s;
+  },
+};
+
+// Gauge lab: stretch a conductor; R goes up from length AND from the thinner cross-section.
+export const GAUGE = {
+  metal: { name: 'straight copper trace', nu: 0.34, yieldAt: 0.002 },
+  liquid: { name: 'liquid metal in silicone', nu: 0.5, yieldAt: Infinity },
+};
+export const gaugeCalc = (mat, strain) => { const g = GAUGE[mat] || GAUGE.liquid, e = +strain, ratio = (1 + e) ** (1 + 2 * g.nu); return { g, e, ratio, gf: e > 0 ? (ratio - 1) / e : 1 + 2 * g.nu, yielded: e > g.yieldAt }; };
+const gauge = {
+  vb: '0 0 720 260', dur: 5000, state: { mat: 'liquid', strain: 0.1 },
+  draw(t, st) {
+    const k = GAUGE[st.mat] ? st.mat : 'liquid', c = gaugeCalc(k, st.strain), g = c.g;
+    let s = '';
+    const x0 = 40, L0 = 280, w0 = 40, yc = 92, len = L0 * (1 + c.e), w = w0 * (1 + c.e) ** -g.nu;
+    if (k === 'liquid') s += rect(x0 - 8, yc - w0 / 2 - 14, L0 * 1.3 + 16, w0 + 28, { fill: C.ink2, 'fill-opacity': 0.08, stroke: C.line, rx: 6 });
+    s += rect(x0, yc - w0 / 2, L0, w0, { fill: 'none', stroke: C.faint, 'stroke-dasharray': '4 3' });
+    s += rect(x0, yc - w / 2, len, w, { fill: k === 'metal' ? C.copper : C.silver, 'fill-opacity': 0.75, stroke: C.ink2 });
+    if (k === 'metal' && c.yielded) { const n = Math.min(9, 1 + Math.floor(c.e * 60)); for (let i = 0; i < n; i++) { const x = x0 + (i + 0.5) * len / n; s += path(`M${x},${yc - w / 2} L${x + 4},${yc - w / 6} L${x - 3},${yc + w / 6} L${x + 2},${yc + w / 2}`, { stroke: C.plum, 'stroke-width': 1.4 }); } }
+    const ph = adv(st, 'g', t, 1.4 / c.ratio);
+    s += electrons([{ x: x0, y: yc }, { x: x0 + len, y: yc }], ph, { n: 12, r: 2 });
+    s += L(x0, 30, g.name);
+    s += line(x0, yc + 34, x0 + len, yc + 34, { stroke: C.faint, 'stroke-width': 0.8 }) + L(x0 + len / 2, yc + 48, `L × ${fmt(1 + c.e, 3)}`, { anchor: 'middle' });
+    s += L(x0 + len + 10, yc + 4, `A × ${fmt((1 + c.e) ** (-2 * g.nu), 3)}`);
+    // numbers
+    s += H(40, 186, `R × ${fmt(c.ratio, 3)}  (+${fmt((c.ratio - 1) * 100, 1)}%)`);
+    s += T(40, 206, `gauge factor over this stretch: ${fmt(c.gf, 2)}   (≈ 1 + 2ν = ${fmt(1 + 2 * g.nu, 2)} for small stretches)`);
+    s += T(40, 226, 'R = ρL/A: longer AND thinner, so R gets hit twice.', { fill: C.ink });
+    if (k === 'metal') s += T(40, 246, c.yielded ? `! ${fmt(c.e * 100, 1)}% is far past copper’s yield (about 0.2%): it stays stretched, then cracks.` : 'Still springy: copper yields at only about 0.2%.', { fill: c.yielded ? C.ink : C.dim });
+    else s += T(40, 246, 'A liquid can’t crack: stretch it as far as the silicone allows.');
+    // R vs strain plot
+    s += plot({ x: 520, y: 40, w: 170, h: 110, u: clamp(c.e / 0.3), grid: [0.5], f: v => (((1 + 0.3 * v) ** (1 + 2 * g.nu)) - 1) / ((1.3 ** (1 + 2 * g.nu)) - 1), title: 'R vs stretch', xl: '30%', xl0: '0', color: k === 'metal' ? C.copper : C.petrol });
+    return s;
+  },
+};
+
+// Stiff on soft: a straight trace cracks, a serpentine unbends, a stiff island makes the soft part
+// around it take all the stretch.
+function serpAmp(lam, a0, wl) {
+  // keep a sine's arc length per period while its wavelength stretches to lam × wl
+  const arc = (a, w) => { let L = 0, px = 0, py = 0; for (let i = 1; i <= 60; i++) { const x = w * i / 60, y = a * Math.sin(TAU * i / 60); L += Math.hypot(x - px, y - py); px = x; py = y; } return L; };
+  const target = arc(a0, wl); let lo = 0, hi = a0;
+  for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (arc(mid, wl * lam) > target) hi = mid; else lo = mid; }
+  return lo;
+}
+const serpentine = {
+  vb: '0 0 720 300', dur: 7000,
+  draw(t) {
+    const e = 0.3 * (0.5 - 0.5 * Math.cos(fr(t) * TAU)), lam = 1 + e;
+    let s = '';
+    const x0 = 30, W0 = 360, W = W0 * lam;
+    const sub = (y, h) => rect(x0, y, W, h, { fill: C.ink2, 'fill-opacity': 0.08, stroke: C.line, rx: 3 });
+    // 1 · straight trace
+    let y = 30;
+    s += sub(y, 50) + L(x0, y - 8, 'straight metal trace on a stretchy base');
+    const segs = 8, sl = W0 / segs;
+    for (let i = 0; i < segs; i++) { const xs = x0 + i * sl * lam; s += line(xs + 2, y + 25, xs + sl - 2 + (e > 0.01 ? 0 : sl * (lam - 1)), y + 25, { stroke: C.copper, 'stroke-width': 4 }); if (e > 0.01 && i < segs - 1) s += path(`M${xs + sl + 1},${y + 19} l3,6 l-3,6`, { stroke: C.plum, 'stroke-width': 1.2 }); }
+    s += T(512, y + 22, e > 0.01 ? '✕ cracked: open circuit' : 'intact', { fill: e > 0.01 ? C.ink : C.dim });
+    s += T(512, y + 38, `metal asked to stretch ${Math.round(e * 100)}%`, { size: 9 });
+    // 2 · serpentine
+    y = 120;
+    s += sub(y, 56) + L(x0, y - 8, 'serpentine trace on the same base');
+    const wl0 = 45, a0 = 16, a = serpAmp(lam, a0, wl0), wl = wl0 * lam, n = Math.round(W0 / wl0);
+    const wave = sample(n * 24, v => ({ x: x0 + v * n * wl, y: y + 28 + a * Math.sin(TAU * v * n) }));
+    s += path(poly(wave), { stroke: C.copper, 'stroke-width': 3 }) + electrons(wave, fr(t) * 3, { n: 14, r: 2 });
+    s += T(512, y + 26, '✓ still connected', { fill: C.ink });
+    s += T(512, y + 42, `wave height ${Math.round(a0)} → ${Math.round(a)}: it unbends`, { size: 9 });
+    // 3 · stiff island
+    y = 216;
+    s += sub(y, 50) + L(x0, y - 8, 'a stiff island (a pod, a printed patch) on the base');
+    const isl = 110, soft = W0 - isl, softW = soft + (W - W0), ix = x0 + softW / 2;
+    s += rect(ix, y + 6, isl, 38, { fill: C.raised, stroke: C.ink2 });
+    for (let i = 0; i <= 6; i++) { const xl = x0 + i * (softW / 2) / 6, xr = ix + isl + i * (softW / 2) / 6; s += line(xl, y + 2, xl, y + 48, { stroke: C.faint, 'stroke-width': 0.7 }) + line(xr, y + 2, xr, y + 48, { stroke: C.faint, 'stroke-width': 0.7 }); }
+    for (let i = 1; i < 6; i++) s += line(ix + i * isl / 6, y + 8, ix + i * isl / 6, y + 42, { stroke: C.faint, 'stroke-width': 0.7 });
+    if (e > 0.02) s += circ(ix, y + 25, 9, { fill: 'none', stroke: C.plum, 'stroke-width': 1.4 }) + circ(ix + isl, y + 25, 9, { fill: 'none', stroke: C.plum, 'stroke-width': 1.4 });
+    s += T(512, y + 22, `soft part: ${Math.round(e * W0 / soft * 100)}%, island: 0%`, { fill: C.ink });
+    s += T(512, y + 38, 'the strain piles up at its edges', { size: 9 });
+    s += T(360, 292, 'Serpentines turn stretch into bend. Stiff on soft cracks at the edge.', { anchor: 'middle', fill: C.ink });
+    return s;
+  },
+};
+
+// A stretchable capacitor (two soft electrodes, silicone between): area up, gap down, C up with λ.
+const capstretch = {
+  vb: '0 0 360 250', dur: 6000,
+  draw(t) {
+    const lam = 1 + 0.6 * (0.5 - 0.5 * Math.cos(fr(t) * TAU)), r = 1 / Math.sqrt(lam);
+    let s = '';
+    // side view
+    const x0 = 20, L0 = 150, g0 = 34, yc = 60, Lx = L0 * lam, g = g0 * r;
+    s += L(x0, 22, 'side view');
+    s += rect(x0, yc - g / 2 - 4, Lx, 4, { fill: C.silver }) + rect(x0, yc + g / 2, Lx, 4, { fill: C.silver });
+    s += rect(x0, yc - g / 2, Lx, g, { fill: C.ink2, 'fill-opacity': 0.15 });
+    for (let x = x0 + 8; x < x0 + Lx - 4; x += 12) s += line(x, yc - g / 2 + 1, x, yc + g / 2 - 1, { stroke: C.indigo, 'stroke-width': 0.8, 'stroke-dasharray': '2 2' });
+    s += L(x0 + Lx + 8, yc + 3, `gap × ${fmt(r, 2)}`);
+    // top view
+    const ty = 120, W0 = 50, Wd = W0 * r;
+    s += L(x0, ty - 8, 'top view');
+    s += rect(x0, ty, Lx, Wd, { fill: C.silver, 'fill-opacity': 0.6, stroke: C.ink2 });
+    s += L(x0 + Lx + 8, ty + Wd / 2 + 3, `area × ${fmt(lam * r, 2)}`);
+    // read-out
+    s += H(x0, 206, `C × ${fmt(lam, 2)}`, { size: 14 }) + T(x0 + 82, 206, `(stretch × ${fmt(lam, 2)})`);
+    s += T(x0, 226, 'area × √λ, gap × 1/√λ, so C × λ.');
+    s += T(180, 244, 'Stretch a rubber capacitor: C grows in step.', { anchor: 'middle', fill: C.ink, size: 9.5 });
+    return s;
+  },
+};
+
 export const STUDY_SCENES = {
   circuit, marbles, ohm, yarnR, lanes, contacts, heater, ladder, galvanic, tcr, migration,
   roadcanyon, divider, bucket, selfmutual, water, crossing, stack: makeStackScene(STACKS),
+  curves, poisson, gauge, serpentine, capstretch,
 };
