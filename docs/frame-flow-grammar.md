@@ -143,3 +143,71 @@ units of M so it transfers to the frame's own band.
 5. **Two layouts**: (A) ON-BAND, inside the 16 mm band (the band cap); (B) OUTER CONTOUR, the elements standing
    beyond the molding by an envelope offset per §4 (crest highest, a waist, feet), every element attached at its root
    and the chain one connected solid on the flat back.
+
+## 9. The measured forms (round 4, Nov 14 — `node tools/frame-forms-trace.mjs`)
+
+Round 3 (`frame-mass.js`) placed the right material in the right places, and every critic still read it as "a web
+behind a wire": the outline of each element came from C2's thin spine. Round 4 builds each element's outline from
+the bronze's own forms, so they were measured first.
+
+**How.** Six elements of R2 were traced by eye on 7–9× crops, gridded every 5 px. The traces are data in the tool,
+in the photograph's own pixels (± 2 px ≈ ± 0.05 M). `docs/img/frame-forms-trace.png` draws them as line art.
+`--refs <dir>` lays them over the photograph, and that output is not committed.
+
+For each centreline, the tool:
+- smooths it (three Chaikin passes);
+- resamples it every 0.5 px;
+- measures its length (in M; M = 38 px), its turn, and its curvature κ·M at eleven stations along its length,
+  smoothed over ± 4 px.
+
+**The widths are read by eye, and stated as a reading.** A threshold transect across the strap was tried first,
+but it reads the bronze's highlights as gaps and its shadows as metal: it gave 0.03–1.6 M on one strap.
+
+| | element | length | turn | κ·M at 0, 0.1 … 1 of its length | width (M): root · crown · entering its end | its end |
+|---|---|---|---|---|---|---|
+| E1 | the shoulder C (root at the waist → volute toward the crest) | 4.07 M | 1.34 | 0 · .68 · .73 · .90 · .98 · .82 · 1.04 · 1.44 · 3.09 · 7.64 · 7.88 | .45 · .47 · .37 | a volute: outer Ø 0.75 M, ≈ 1.05 turns, a ball eye Ø 0.16 M in a dark ring; its root curls the same way into a small tail volute (Ø 0.5 M) inside the arch |
+| E2 | the crest C (from under the shell → volute facing it) | 2.68 M | 1.12 | 0 · .22 · .29 · .59 · 1.19 · 2.83 · 4.00 · 3.11 · 3.39 · 6.99 · 6.58 | .32 · .30 · .26 | a volute: outer Ø 0.55 M, ≈ 0.9 turn, a ball eye Ø 0.15 M |
+| E3 | the foot (reeded, from under the bottom shell, curling under) | 3.57 M | 1.14 | 0 · .16 · .23 · .64 · 1.32 · 1.64 · 2.61 · 2.37 · 3.87 · 5.07 · 1.70 | .53 · .53 · .40 | a CLOSED curl: outer Ø 0.8–0.9 M round a dark hollow Ø 0.4–0.5 M, ≈ 0.9 turn |
+| E4 | the node (the lower stem rolled over outward) | 3.64 M | 0.60 | 0 · .02 · .08 · .28 · .87 · 1.84 · .50 · 2.15 · 3.19 · 5.64 · .13 | .55 · .55 · .50 | a ROLL: outer Ø 0.95 M round a hollow Ø 0.18 M, ≈ 0.75 turn |
+| E5 | a flank flame (reeded acanthus, tip rolled out) | 4.60 M | 0.49 | 0 · 0 · .14 · .18 · .27 · .22 · .35 · .08 · .20 · 6.17 · .61 | .35 · .75 · .45 | a HOOK: outer Ø 0.6 M, its hollow OPEN (≈ 0.3 M), ≈ 0.6 turn |
+| E6 | the crest shell | rim 1.79 M | — | — | five lobes ≈ 0.47 M at the rim | a cupped fan: five broad LOBES touching at a scalloped rim, each tip rolled; ≈ 22 fine flutes (pitch ≈ 0.08 M); the lobes span ± 58° |
+
+**What the measurements say, and where they correct the brief.**
+
+- **Nothing is a comma.** The brief (from round 3's §10.6) asked for "a swelling comma ~1 M wide at its fullest".
+  The bronze's bodies are not that:
+  - the C-scrolls are STRAPS of near-constant width: 0.45–0.47 M on E1 and 0.3 M on E2, narrowing only to
+    enter their volutes (0.37 M);
+  - the flank's reeded straps hold 0.53–0.55 M;
+  - only the flame swells, from 0.35 M at the root to 0.75 M at 60–70 % of its length.
+
+  What reads as mass at a distance is several straps and flames lying side by side.
+- **Two curvature laws, not one.**
+  - The C's (E1, E2) are an ARC: κ ≈ 0.7–1.0 /M held over the first 60 % of the length, then rising steeply into
+    the volute (3–8 /M).
+  - The straps and flames (E3, E4, E5) are nearly STRAIGHT (κ ≤ 0.3 /M) for 40–80 % of their length, then turn
+    all at once.
+
+  The grammar's "monotone curvature, a clothoid" (§2) is right about the volute and wrong about the body. The
+  measured body is either a held arc or a straight run.
+- **Three kinds of end, not one.**
+  - A VOLUTE (the C's): a spiral, ≥ 1 turn, round a ball eye.
+  - A ROLL (the node): a curl of near-constant radius round a small hollow.
+  - A HOOK (a flame's tip): an open curl, ≈ 0.6 turn.
+
+  The foot's closed curl sits between a roll and a volute.
+- **Surface: channels and reeds.**
+  - A C strap is CHANNELLED: a raised bead along each edge with a hollow between.
+  - Every strap and flame is REEDED: 3–5 parallel reeds of ≈ 0.1 M, converging at a flame's root.
+  - The shell is FLUTED: ≈ 22 radial flutes inside 5 broad lobes.
+- **Where the leaves attach.**
+  - A pointed tongue hangs from E1's crown on the inner side.
+  - The flank flames spring from the frame just ABOVE the node (arc 0.55, the node's roll at 0.63, 1.26 M out),
+    so the lower flank runs on without a break: foot → stem → node → flames.
+  - A fan leaf marks the meeting (arc 0.23), pointing down and out.
+  - The crest C's pour out from under the shell's lower lobes.
+
+**At the 180 mm print the volutes cannot be the bronze's size.** M is 9.5 mm at the default print, so the bronze's
+0.75 M volute is 7 mm across. A coil of ≥ 1 turn with a pierced gap of 1.3 mm and a pierced eye of 1.3 mm does not
+fit in 7 mm. Round 4's C volutes are therefore 1.2–1.4 M across, grown until the coil keeps its gap, and stated as
+a consequence of the floor, not as the bronze's proportion.
