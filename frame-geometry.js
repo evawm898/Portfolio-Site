@@ -710,7 +710,7 @@ export function profileFor(p, custom) {
    was widened. */
 export const RIN_BAY_MM = 16;
 function rinceauBand(p) {
-  if (p.filigree !== 'scrolls' || p.ornLayout === 'groups') return null;
+  if (p.filigree !== 'scrolls' || p.ornLayout === 'groups' || p.ornFlow === 'contour' || p.ornFlow === 'composed' || p.ornFlow === 'mass') return null;   // the flow study's contour layout stands its volutes past the band: the band is the one asked
   const bay = RIN_BAY_MM / (p.printHeight / p.height);
   return bay > p.moldingWidth ? bay : null;
 }

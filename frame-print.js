@@ -103,7 +103,7 @@ function verticalRays(X, I, shell, cell) {
 /* the exact squared Euclidean distance transform (Felzenszwalb–Huttenlocher)
    of a binary raster: for every cell, the squared distance in cells to the
    nearest cell where `isSite` holds */
-function edt2(nx, ny, isSite) {
+export function edt2(nx, ny, isSite) {
   const INF = 1e20, n = Math.max(nx, ny), f = new Float64Array(n), d = new Float64Array(nx * ny);
   const v = new Int32Array(n), z = new Float64Array(n + 1), out = new Float64Array(n);
   const pass = (m) => {
@@ -132,7 +132,7 @@ function edt2(nx, ny, isSite) {
    width at a cell is twice the distance to the other side's nearest CELL
    CENTRE less one cell (the boundary lies half a cell short of both). */
 export const CUSP_MM = 1;   // MIN_FEATURE_MM's own length: the last millimetre before a ridge's end
-function narrowest(R, d2, inRegion) {
+export function narrowest(R, d2, inRegion) {
   const { nx, ny, cell } = R;
   const ridge = new Uint8Array(nx * ny);
   for (let i = 1; i < nx - 1; i++) for (let j = 1; j < ny - 1; j++) {
@@ -174,8 +174,48 @@ function narrowest(R, d2, inRegion) {
   return { mm: best, at };
 }
 
+/* The narrowest SLIT in plan of a set of 2-D strokes (the flow study's composer
+   asks it of a candidate leaf among its neighbours before the relief exists):
+   strokes [{ pts, w (array or number) }] drawn as round-ended capsules, plus an
+   optional solid(q) predicate (the band), on a raster of `cell` over `box`
+   [x0, y0, x1, y1]; the empty side's least neck by measurePrint's own rule
+   (narrowest, the cusp's last CUSP_MM excluded). */
+export function planSlit2D(strokes, box, { cell = 0.2, solid = null } = {}) {
+  const [x0, y0, x1, y1] = box, nx = Math.max(3, Math.ceil((x1 - x0) / cell)), ny = Math.max(3, Math.ceil((y1 - y0) / cell));
+  const gx = (i) => x0 + (i + 0.5) * cell, gy = (j) => y0 + (j + 0.5) * cell;
+  const S = new Uint8Array(nx * ny);
+  if (solid) for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) if (solid([gx(i), gy(j)])) S[i * ny + j] = 1;
+  for (const st of strokes) {
+    const P = st.pts, wAt = (k) => (Array.isArray(st.w) || ArrayBuffer.isView(st.w) ? st.w[k] : st.w);
+    for (let k = 0; k < P.length - 1; k++) {
+      const a = P[k], b = P[k + 1], ra = wAt(k) / 2, rb = wAt(k + 1) / 2, r = Math.max(ra, rb);
+      const bx0 = Math.min(a[0], b[0]) - r, bx1 = Math.max(a[0], b[0]) + r, by0 = Math.min(a[1], b[1]) - r, by1 = Math.max(a[1], b[1]) + r;
+      if (bx1 < x0 || bx0 > x1 || by1 < y0 || by0 > y1) continue;
+      const i0 = Math.max(0, Math.floor((bx0 - x0) / cell)), i1 = Math.min(nx - 1, Math.ceil((bx1 - x0) / cell)), j0 = Math.max(0, Math.floor((by0 - y0) / cell)), j1 = Math.min(ny - 1, Math.ceil((by1 - y0) / cell));
+      const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1e-12;
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+        // a RIBBON, not a chain of capsules: a cell is in the stroke where its foot on a segment is interior (or at the
+        // stroke's own two ends) — a round cap at every station would fill a lobed leaf's notches the sweep leaves open
+        const tr = (px0, py0) => (px0 * dx + py0 * dy) / l2;
+        const px = gx(i) - a[0], py = gy(j) - a[1], t0 = tr(px, py);
+        // (a JOIN disk at an interior vertex fills the convex wedge two segments leave, at the least of its three
+        // radii, so it never widens a notch)
+        let t = t0, rr;
+        if (t0 < 0 && k > 0) { t = 0; rr = Math.min(ra, wAt(k - 1) / 2, rb); }
+        else if (t0 > 1 && k < P.length - 2) { t = 1; rr = Math.min(rb, wAt(k + 2) / 2, ra); }
+        else { t = Math.max(0, Math.min(1, t0)); rr = ra + (rb - ra) * t; }
+        const ex = px - t * dx, ey = py - t * dy;
+        if (ex * ex + ey * ey <= rr * rr) S[i * ny + j] = 1;
+      }
+    }
+  }
+  const R = { nx, ny, cell, gx, gy };
+  return narrowest(R, edt2(nx, ny, (k) => S[k] === 1), (k) => S[k] === 0);
+}
+
 /* The report (cell: the rays' pitch in mm). */
-export function measurePrint(relief, { cell = 0.1 } = {}) {
+export function measurePrint(relief, opts = {}) {
+  const { cell = 0.1 } = opts;
   const X = F32(relief.positions), I = relief.indices, shell = shellOf(relief);
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < X.length; i += 3) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], X[i + k]); hi[k] = Math.max(hi[k], X[i + k]); }
@@ -187,12 +227,15 @@ export function measurePrint(relief, { cell = 0.1 } = {}) {
   outside[0] = 1;
   while (stack.length) { const k = stack.pop(), i = Math.floor(k / R.ny), j = k % R.ny; for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ii = i + a, jj = j + b; if (ii < 0 || jj < 0 || ii >= R.nx || jj >= R.ny) continue; const m = ii * R.ny + jj; if (empty(m) && !outside[m]) { outside[m] = 1; stack.push(m); } } }
   const gap = narrowest(R, edt2(R.nx, R.ny, solid), (k) => empty(k) && !outside[k]);
+  // opt-in (the flow study): the narrowest SLIT anywhere — the empty side's neck whether enclosed or open to the
+  // outside (a near-slit between a wire and the molding is open at its end and the enclosed gap never sees it)
+  const slit = opts.slit ? narrowest(R, edt2(R.nx, R.ny, solid), empty) : null;
   const tris = I.length / 3;
   return {
     box: { x: hi[0] - lo[0], y: hi[1] - lo[1], z: hi[2] - lo[2], lo, hi },
     heightMm: hi[2], abovePlateMm: hi[2] - relief.plateT, plateT: relief.plateT,
     backZ: lo[2], rest: v.rest, rays: v.rays, oddRays: v.odd, overhangRays: v.multi, thinMm: v.thin,
-    volumeMm3: v.volume, cell, feature, gap,
+    volumeMm3: v.volume, cell, feature, gap, ...(slit ? { slit } : {}),
     triangles: tris, bytes: 84 + 50 * tris, shells: relief.parts.length,
   };
 }

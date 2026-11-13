@@ -231,7 +231,16 @@ function writeReadout() {
     + `band <b>${r.bandW.toFixed(2)} mm</b>${info.kind === 'arch' && p.mullions > 0 ? `, mullion <b>${r.mullW.toFixed(2)} mm</b>` : ''}, plate <b>${r.plateT.toFixed(2)} mm</b>, relief depth <b>${r.reliefDepth.toFixed(2)} mm</b> · interior <b>${p.lights}</b>${r.panelT != null ? ` (${r.panelT.toFixed(2)} mm plate)` : ''}\n`
     + `floor: ${r.floorNote}${floorWarn ? '\n' + floorWarn : ''}`;
   const o = model.ornament;
-  const ornLine = o
+  const ornLine = o && o.layout === 'flow' && o.mode === 'mass'
+    ? `ornament <b>the composed contour as carved mass (study, round 3)</b> — ${o.flow.scrolls.length} scrolls a side, filled, unioned and inflated (${o.massStats.flames} flames, ${o.massStats.groundLeaves} ground leaves a side; raster ${o.massStats.cell.toFixed(2)} mm) · motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> triangles`
+      + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
+    : o && o.layout === 'flow' && o.mode === 'composed'
+    ? `ornament <b>the composed contour (study)</b> — ${o.flow.scrolls.length} scrolls a side along the envelope (${o.flow.scrolls.map((x) => `${x.type}${x.built ? '' : ' (not built)'}`).join(' → ')}, mirrored), ${o.flow.handoffs.filter((h) => !h.fill).length} hand-offs · motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> triangles`
+      + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
+    : o && o.layout === 'flow'
+    ? `ornament <b>the flow study (${o.mode === 'contour' ? 'outer contour' : 'on the band'})</b> — ${o.flow.flows.map((f) => `${f.from} ${f.dir > 0 ? '→' : '←'} ${f.kept} element${f.kept === 1 ? '' : 's'}`).join(', ')} (mirrored) · motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> triangles`
+      + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
+    : o
     ? (o.layout === 'rinceau'
       ? `ornament <b>a rinceau</b> — one stem per run (${o.weight.runs.map((r) => `${r.from}→${r.to}`).join(', ')}, mirrored), seated on the molding · hierarchy <b>${o.weight.h.toFixed(2)}</b>: `
         + `junction motifs <b>${o.motifs.map((m) => `${m.kind} at ${m.anchor}`).join(', ') || 'none'}</b> · <b>${o.items.length}</b> volutes per side, turns drawn <b>${o.items.length ? `${Math.min(...o.items.map((it) => it.curves[0].info.turnsDrawn)).toFixed(2)}–${Math.max(...o.items.map((it) => it.curves[0].info.turnsDrawn)).toFixed(2)}` : '—'}</b>, <b>${o.items.reduce((n, it) => n + it.curves.length - 1, 0)}</b> acanthus leaves · `

@@ -74,7 +74,7 @@ const NEG = args.includes('--negative-control'), NOBROWSER = args.includes('--no
    The area floor drops slivers that touch along a line. */
 export const CP_ANGLE_DEG = 3, CP_DIST_MM = 0.05, CP_AREA_MM2 = 1e-6;
 
-const GEOMETRY_MODULES = ['frame-geometry.js', 'frame-relief.js', 'frame-filigree.js', 'frame-pattern.js', 'frame-elements.js', 'frame-vine.js', 'frame-rinceau.js', 'frame-registry.js', 'frame-print.js'];
+const GEOMETRY_MODULES = ['frame-geometry.js', 'frame-relief.js', 'frame-filigree.js', 'frame-pattern.js', 'frame-elements.js', 'frame-vine.js', 'frame-rinceau.js', 'frame-flow.js', 'frame-compose.js', 'frame-mass.js', 'frame-registry.js', 'frame-print.js'];
 const COPY = ['frame.html', 'frame.css', 'frame.js', 'frame-math.js', 'frame-view3d.js', 'frame-profile-editor.js', ...GEOMETRY_MODULES];
 
 /* ---------------- rows ---------------- */

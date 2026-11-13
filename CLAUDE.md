@@ -12678,6 +12678,29 @@ tools/shot-frame-filigree.mjs <dir>`; gates SC1–SC7, OR1–OR6 and K5.
 - **What moved:** 24 of 75 rows, every arch row plus backed/recessed. The default arch is 68,076 → 66,132 triangles, the
   SVG is unmoved, and the 51 closed pierced rows hold to the byte.
 
+**THE FILIGREE FLOW STUDY IS MERGED AS A PROTOTYPE BEHIND A HIDDEN OPTION; NOTHING SHIPS** (Nov 13–14, #555 —
+read `docs/frame-flow-study.md` and `docs/frame-flow-grammar.md` before touching `frame-flow.js`,
+`frame-compose.js`, `frame-mass.js`, `ornFlow` or the F family of `tools/verify-frame-flow.mjs`).
+- **The option.** `ornFlow` is `'band' | 'contour' | 'composed' | 'mass'` and no control writes it. Absent, every
+  frame is `main`'s, by branch: FF0 checks the STL bytes and the SVG, 9 of 9.
+- **The three rounds:**
+  - **Round 1 GREW the ornament** (`frame-flow.js`). Best critic score 4.5: "a wire with hooks".
+  - **Round 2 COMPOSED it** (`frame-compose.js`, kept as C2). It builds the silhouette envelope first, then a
+    head-to-tail chain of C and S scrolls whose ends meet as back-to-back G1 volutes. Score 5: "a coat hanger".
+  - **Round 3 built C2's spines as CARVED MASS** (`frame-mass.js`). The construction:
+    - filled regions on a raster, unioned, closed and opened;
+    - inflated with a height that steps down by element;
+    - one watertight marching-squares element.
+
+    Coverage is 57.5 / 68.7 / 62.2 % (oval / rect / arch) against the 2.webp bronze's 59.3 %
+    (`tools/frame-mass-coverage.mjs`). Attachment is 90–99 %. Score 5.5: "a web behind a wire".
+- **The diagnosis for round 4: replace the SPINE, not the construction.** A mass hung on C2's thin sweeps inherits
+  their shape. Each body should be its own outline, about 1 M wide. Volutes should wind ≥ 1 turn into a pierced eye.
+  Nodes should differ in kind. The raster, the union, the inflation, the element and the coverage instrument all
+  carry over (§10.6).
+- **None of it is in CI.** Run `node tools/verify-frame-flow.mjs [--only mass] [--base <main worktree>]` by hand.
+- **The stock reference photos are never committed.**
+
 ## `/marble` — the paper-marbling simulator (pointer only)
 
 Hidden page (`marble.html`, `marble.css`, `marble.js`, `marble-math.js`, `noindex`, unlinked).

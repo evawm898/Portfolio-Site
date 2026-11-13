@@ -50,6 +50,9 @@ import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound, plateOutlin
 import { MIN_FEATURE_MM } from './frame-registry.js';
 import { placeElement, relift, drapeElement, mirrorElement, symmetrizeElement, wireElementContact, elementClear, footprintTouches } from './frame-elements.js';
 import { vineFor, silDistance, drapedCrest, edgeFrame, crestLift, standMotifs } from './frame-vine.js';
+import { flowFor } from './frame-flow.js';   // the flow study's prototype (hidden param ornFlow)
+import { composeFor, frameOf } from './frame-compose.js';
+import { massFor, MASS } from './frame-mass.js';   // the flow study's round 3: the composed contour as carved mass (ornFlow 'mass')   // the flow study's round 2: the composed contour (ornFlow 'composed')
 import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 export const SCROLL_STEP_DEG = 3;
@@ -1097,7 +1100,22 @@ export function withOrnament(model, opts = {}) {
   // phase 3f step 2: the RINCEAU (frame-vine.js's vineFor, with
   // frame-rinceau.js's laws) along the band, or the phase-3a GROUPS at the
   // anchors. The chains of phase 3d are RETIRED (Eva, Nov 10)
-  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : vineFor(model, opts);
+  // the FLOW STUDY (Nov 13, frame-flow.js): a hidden param, `ornFlow` 'band' or
+  // 'contour', replaces the rinceau with the flow model; absent, this is the
+  // line it always was
+  const flow = p.ornLayout !== 'groups' && (p.ornFlow === 'band' || p.ornFlow === 'contour');
+  const composed = p.ornLayout !== 'groups' && p.ornFlow === 'composed';   // round 2: the composed contour (frame-compose.js)
+  // round 3 (frame-mass.js): the composed spines built as carved MASS — filled regions, unioned, inflated
+  const mass = p.ornLayout !== 'groups' && p.ornFlow === 'mass';
+  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : composed ? composeFor(model, opts) : mass ? composeFor({ ...model, params: { ...p, ornLeaves: 'off' } }, { ...opts, rvMul: MASS.rvMul, turnsAdd: MASS.turnsAdd, shellMul: MASS.shellMul }) : flow ? flowFor(model, opts) : vineFor(model, opts);
+  let massTop = null;
+  if (mass && orn.flow && orn.flow.side) {
+    const ms = massFor(model, orn, frameOf(orn.flow.side));
+    orn.told.push(...ms.told); orn.massStats = ms.stats; orn.mode = 'mass';
+    orn.spinesKept = orn.curves; orn.curves = [];
+    orn.elements = [...orn.elements, ms.element]; massTop = ms.top;
+    orn.tris.bound = orn.tris.frame + ms.stats.triangles + orn.motifs.reduce((a, o) => a + (o.onAxis ? 1 : 2) * o.el.indices.length / 3, 0);
+  }
   const s = orn.scale;
   const shape = p.ornShape === 'round' ? 'round' : p.ornShape === 'half-round' ? 'half-round' : 'arris';
   // a tapered wire's local width rides on the spine as widthScale (the one
@@ -1126,7 +1144,7 @@ export function withOrnament(model, opts = {}) {
     const depth = lf || orn.style === 'carved' ? Math.max(MIN_FEATURE_MM, raw) : raw;
     const spine = { id: `orn${i}`, pts: c.pts, nrm: c.nrm, bandWidth: c.info.wire };
     const k = wScale(c);
-    if (k) { spine.widthScale = k; spine.depthScale = crownScale(c, depth); }
+    if (k) { spine.widthScale = k; spine.depthScale = crownScale(c, depth); if (c.info.crownFloor) spine.depthScale = spine.depthScale.map((v) => Math.max(v, c.info.crownFloor)); }
     // a leaf is a STACKED shell: its crown is lifted by its host's crown at
     // the host's root, so where the two overlap the leaf lies over the scroll
     if (c.lift) spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth, c.seatExtra || null) : c.lift;
@@ -1135,6 +1153,6 @@ export function withOrnament(model, opts = {}) {
   });
   // THE FLOWER IS THE FEATURE (Eva, Nov 11): the rinceau's motifs raised
   // over the wires as built, crest highest (frame-vine's standMotifs)
-  if (orn.layout === 'rinceau') standMotifs(orn, solids);
+  if (orn.layout === 'rinceau' || orn.layout === 'flow') standMotifs(orn, solids, massTop);
   return { ...model, bands: [...model.bands, ...bands], frameBox: model.box, box: { x0, y0, x1, y1 }, strokes, ornament: { ...orn, spines, solids, shape } };
 }

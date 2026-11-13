@@ -874,12 +874,13 @@ export function domeFlower(el0, W, onAxis = false) {
   if (def.cover > 1e-9 || def.crown > 1e-9) el.standShort = Math.max(def.cover, def.crown);
   return el;
 }
-export function standMotifs(orn, solids) {
+export function standMotifs(orn, solids, top = null) {
   const motifs = orn.motifs || [];
   if (!motifs.length) return orn;
   const mesh = new Mesh();
-  for (const o of solids) bandSolid(mesh, o.spine, o.prof, { scale: 1, plateT: o.lift || 0, reliefDepth: o.depth });
-  const W = mesh.pos;
+  // (the flow study's round 3 hands the MASS's own top vertices instead: the shells stand over it)
+  if (!top) for (const o of solids) bandSolid(mesh, o.spine, o.prof, { scale: 1, plateT: o.lift || 0, reliefDepth: o.depth });
+  const W = top || mesh.pos;
   const swap = new Map();   // an old element → the one standing in its place
   let flowerCrown = -Infinity, flowers = 0, raisedMax = 0;
   const kinds = new Set();
