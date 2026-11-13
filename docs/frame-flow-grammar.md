@@ -123,7 +123,7 @@ units of M so it transfers to the frame's own band.
 |---|---|
 | two sources and a meeting (§1) | no direction: the stem waves at a constant phase from axis to junction; every volute is the same shape at its w(s) |
 | hand-off: the tail becomes the next start (§2) | volutes are tendrils hung off one sine-wave stem; nothing hands off |
-| size follows the outline's radius and rises/falls along the flow (§3) | one law, `len = (1.25 + 0.5 w) M`; w falls smoothly from anchors, so neighbours differ by a few % (the closest pair: §8) |
+| size follows the outline's radius and rises/falls along the flow (§3) | one law, `len = (1.25 + 0.5 w) M`; w falls smoothly from anchors, so neighbours differ by a few % — measured (`tools/frame-flow-measure.mjs`, the right side's volute tendrils): the oval's 14 of 45 pairs share a shape (closest d 0.10: 16.4 / 16.3 mm, 0.92 / 0.93 turns), the rectangle's 6 of 36 and the arch's 7 of 21 at d 0.00 (21.2 / 21.2 mm, 1.06 / 1.06 turns — one shape, drawn again) |
 | a long element where the outline is flat (§3) | half wavelength (1.15 + 0.55 w) M × compression: the curve only ever SHRINKS elements |
 | an outer envelope (§4) | the band is the cap (Eva's earlier ruling): everything inside a 16 mm band |
 | opposed volutes at a meeting (§2) | stems end under a rosette |

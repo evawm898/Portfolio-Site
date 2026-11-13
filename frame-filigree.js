@@ -1131,7 +1131,7 @@ export function withOrnament(model, opts = {}) {
     const depth = lf || orn.style === 'carved' ? Math.max(MIN_FEATURE_MM, raw) : raw;
     const spine = { id: `orn${i}`, pts: c.pts, nrm: c.nrm, bandWidth: c.info.wire };
     const k = wScale(c);
-    if (k) { spine.widthScale = k; spine.depthScale = crownScale(c, depth); }
+    if (k) { spine.widthScale = k; spine.depthScale = crownScale(c, depth); if (c.info.crownFloor) spine.depthScale = spine.depthScale.map((v) => Math.max(v, c.info.crownFloor)); }
     // a leaf is a STACKED shell: its crown is lifted by its host's crown at
     // the host's root, so where the two overlap the leaf lies over the scroll
     if (c.lift) spine.baseLift = orn.H ? seatEmitted(orn.H, spine, profileFor(c, p), c.lift, depth, c.seatExtra || null) : c.lift;
