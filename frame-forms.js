@@ -60,8 +60,8 @@ export const FORMS = {
   vol: { r0: 0.42, r0Max: 0.7, turns: 1.15, wEnd: 1.3 },        // a C's volute: the coil's centre radius at entry (M; grown to r0Max for a pierced coil), turns, the coil's width at the eye (mm)
   tail: { r0: 0.28, turns: 0.9 },
   flame: { w: [0.3, 0.7, 0.36], peak: 0.62, slit: 1.5, reeds: 3, kMax: 0.25, roll: { r: 0.26, w: 0.32, turns: 0.5, shrink: 0.7 }, lobes: { n: 3, from: 0.55, to: 0.95, a: 0.13 } },
-  stem: { w: 0.6, reeds: 5, bow: 0.12, lift: 0.3, roll: { r: 0.36, w: 0.42, turns: 0.6, shrink: 0.65 } },
-  foot: { w: 0.58, reeds: 5, roll: { r: 0.42, w: 0.46, turns: 1.1, shrink: 0.5, narrow: 0.75 } },
+  stem: { w: 0.6, reeds: 5, bow: 0, lift: 0.3, roll: { r: 0.36, w: 0.42, turns: 0.6, shrink: 0.65 } },
+  foot: { w: 0.58, reeds: 5, roll: { r: 0.42, w: 0.46, turns: 0.92, shrink: 0.55, narrow: 0.75 } },
   fan: { len: [0.85, 1.1, 0.8], w: 0.5, spread: 28, lobes: 2 },
   sheath: { len: 1.3, w: 0.62, lobes: 3 },
   curl: { len: 0.85, w: 0.36, r0: 0.26 },
@@ -422,7 +422,7 @@ export function formsFor(model, orn, SF) {
     // a cupped fan to 0.78 R, then the LOBES: broad, touching at the rim (each as wide as its share of the rim),
     // rounded at the tip, so the rim is scalloped
     const sector = [base];
-    for (let a = -span; a <= span + 1e-9; a += span / 30) sector.push([base[0] + 0.78 * Rm * FM.sin(a), base[1] + out[1] * 0.78 * Rm * FM.cos(a)]);
+    for (let a = -span; a <= span + 1e-9; a += span / 30) sector.push([base[0] + 0.84 * Rm * FM.sin(a), base[1] + out[1] * 0.84 * Rm * FM.cos(a)]);
     fillOwn(g, R, el, sector);
     // a disc at the base: the fan's two edges leave a wedge against the molding there, too narrow to print open
     { const disc = []; for (let k = 0; k <= 32; k++) { const a = Math.PI * k / 32; disc.push([base[0] + 0.42 * Rm * FM.cos(a), base[1] + out[1] * 0.42 * Rm * FM.sin(a)]); } fillOwn(g, R, el, disc); }
@@ -474,11 +474,12 @@ export function formsFor(model, orn, SF) {
   // curling in under its own arch; its volute just outside the molding, opposed to the crest C's
   const low0 = lows[0];
   if (root && low0) {
-    const chord = Math.min(0.48 * (low0.s - root.s), 2.3 * M);
-    const hT = Math.min(0.9 * M, Math.max(0.55 * M, (eAt(low0.s - chord / 2) - 0.3) * M));
-    const Rr = (hT * hT + (chord / 2) * (chord / 2)) / (2 * hT);
-    const arc = hT <= Rr ? 2 * asin(Math.min(1, chord / 2 / Rr)) : TAU - 2 * asin(Math.min(1, chord / 2 / Rr));
-    cScroll(low0.s, Math.PI - arc / 2, arc, 1, { k: M / Rr, role: 'shoulder C' });
+    // E1's own curvature: a HELD ARC (κ·M 0.7–1.0) rising off the waist toward the crest, ≈ 2.4 M long, then the
+    // volute curling down under its own arch. The F5 critic read the earlier circle-through-a-chord (with a tail
+    // volute inside it) as "a doughnut": a C that closes on itself is not E1
+    const Lb = Math.min(2.4 * M, 0.7 * (low0.s - root.s)), th0 = Math.PI - 58 * DEG;
+    const sBody = walk(low0.s, yOut - emb, th0, [{ len: 0.35 * Lb, k0: 0.7 / M, k1: 0.95 / M }, { len: 0.65 * Lb, k0: 0.95 / M, k1: 1.2 / M }]);
+    cScroll(low0.s, th0, 0, 1, { body: sBody, k: 1.0, tail: false, role: 'shoulder C' });
   }
   // the meeting: a FAN — three broad leaflets from one root just downstream of the waist, spread down and out
   if (low0) {
@@ -514,9 +515,8 @@ export function formsFor(model, orn, SF) {
     const tIn = corner ? (cramped ? h.s - 1.1 * M : Math.max(upTo, h.s - 1.1 * M)) : Math.min(h.s - 1.1 * M, Math.max(upTo, h.s - 4.5 * M)), tOut = h.s - 0.05 * M;
     const fan = [
       { tip: [tIn, 0.3 * M], roll: { ...FORMS.flame.roll, r: 0.24, w: 0.3, turns: 0.36 }, launch: 1.3 },
-      { tip: [Math.max(tIn + 0.6 * M, lerp(tIn, tOut, 0.5)), Math.max(0.6, 0.5 * eH) * M], roll: { ...FORMS.flame.roll, turns: 0.54 }, launch: 1.7 },
       { tip: [Math.max(tIn + 1.0 * M, tOut), Math.max(0.75, 0.78 * eH - 0.3) * M], roll: { ...FORMS.flame.roll, r: 0.27, turns: 0.45 }, launch: 2.0 },
-      { tip: [h.s + (corner ? 0.9 : 0.45) * M, Math.max(0.85, eH - (corner ? 0.8 : 0.55)) * M], roll: { ...FORMS.flame.roll, r: corner ? 0.36 : 0.28, w: corner ? 0.4 : 0.34, turns: 0.63 }, launch: 2.4 },
+      { tip: [h.s + (corner ? 0.9 : 0.45) * M, Math.max(0.85, eH - (corner ? 0.8 : 0.55)) * M], roll: { ...FORMS.flame.roll, r: corner ? 0.36 : 0.3, w: corner ? 0.4 : 0.36, turns: 0.63 }, launch: 2.4, ws: 1.25, lobeA: 0.2 },
     ];
     // the roots are STAGGERED along the frame (the inner flame springs first, the outer last): a bundle that splits,
     // so a slit opens between each pair rather than one wing-shaped mass
@@ -526,7 +526,10 @@ export function formsFor(model, orn, SF) {
       if (dist < 1.0 * M) continue;
       const th0 = Math.PI - Math.min(70 * DEG, FM.atan2(fg.launch * (P3[1] - P0[1]), dist));
       const path = bez(P0, th0, 0.38 * dist, P3, Math.PI, 0.42 * dist);
-      grp.push(reeded('flame', path, reedW(FORMS.flame.w[0], FORMS.flame.w[1], FORMS.flame.peak, FORMS.flame.w[2]), fg.roll, -1, FORMS.flame.reeds, FORMS.flame.lobes));
+      // ONE dominant flame (F5: "one dominant swelling flame with feathered lobes, plus a smaller one" — four alike read
+      // as a comb): the outer swells to 1.25 × the others, its lobes deeper
+      const ws = fg.ws || 0.85;
+      grp.push(reeded('flame', path, reedW(FORMS.flame.w[0], ws * FORMS.flame.w[1], FORMS.flame.peak, FORMS.flame.w[2]), fg.roll, -1, FORMS.flame.reeds, { ...FORMS.flame.lobes, a: fg.lobeA || FORMS.flame.lobes.a }));
     }
     // each flame its OWN body (E5; the F2 critic: "one fused reeded wing"): a pierced SLIT along the midline between
     // each neighbouring pair, from a third of the way up to where they part, wherever both keep ≥ a printable
@@ -575,7 +578,7 @@ export function formsFor(model, orn, SF) {
     const sv = sw.find((q) => q.s > a.s && q.s < b.s); if (!sv) continue;
     const nxt = bnd[i + 2];
     const fr = flameRoots.find((q) => Math.abs(q - a.s) < 0.6 * M) ?? a.s;
-    const tipS = fr + 0.6 * M, yHug = 0.32 * M;
+    const tipS = fr + 0.2 * M, yHug = 0.32 * M;    // its roll under the flames' root, sharing material (F5: fused hand-offs)
     let P0, h0, onFoot = false;
     if (nxt && nxt.b === 'foot' && footBody) {
       const k = Math.round(0.55 * (footBody.P.length - 1)); P0 = footBody.P[k].slice(); h0 = footBody.Hd[k]; onFoot = true;
@@ -597,7 +600,7 @@ export function formsFor(model, orn, SF) {
     // a CURL-UNDER leaf where the stem leaves the foot (or its root), rolled down toward the foot
     const cs = onFoot ? sIn + 0.3 * M : P0[0];
     nodePlaces.push({ place: `stem@${cs.toFixed(1)}`, kind: 'curl' }); nodes.push({ kind: 'curl', place: `stem@${cs.toFixed(1)}`, s: cs });
-    leaf(walk(cs, yOut - emb, 50 * DEG, [{ len: 0.45 * FORMS.curl.len * M, k0: 0, k1: -1.5 / M }, { len: 0.55 * FORMS.curl.len * M, k0: -1.5 / M, k1: -3.2 / M }]), FORMS.curl.len, FORMS.curl.w, 2);
+    leaf(walk(cs, yOut - emb, 50 * DEG, [{ len: 0.45 * FORMS.curl.len * M, k0: 0, k1: -1.5 / M }, { len: 0.55 * FORMS.curl.len * M, k0: -1.5 / M, k1: -2.3 / M }]), FORMS.curl.len, FORMS.curl.w, 2);
   }
   if (end && lastNode.cls === 'bottom') {
     shell(L, -1, Math.min(1.5, Math.max(1.0, end.e)) * M, FORMS.shell.lobes - 1);
@@ -617,7 +620,9 @@ export function formsFor(model, orn, SF) {
   const U = new Uint8Array(N); for (let k = 0; k < N; k++) U[k] = R.A[k] | frame[k];
   const Cl = erode(g, dilate(g, U, FORMS.close), FORMS.close);
   for (let k = 0; k < N; k++) if (frame[k]) Cl[k] = 1;
-  const Op = dilate(g, erode(g, Cl, FORMS.open), FORMS.open);
+  // and a last CLOSE after the open: an open can leave a one-cell notch where it trimmed a lip (FP read 0.93 mm at
+  // two such notches); a close only fills, so it can add no feature under the open's own floor
+  const Op = erode(g, dilate(g, dilate(g, erode(g, Cl, FORMS.open), FORMS.open), FORMS.open), FORMS.open);
   const out = new Uint8Array(N); for (let k = 0; k < N; k++) out[k] = frame[k] ? 0 : Op[k];
   const into = dilate(g, out, emb);
   const Rg = new Uint8Array(N);
@@ -751,5 +756,5 @@ export function formsFor(model, orn, SF) {
   el.kind = 'mass'; el.mass = true; el.forms = true;
   const Wt = [];
   for (let i = 0; i < el.positions.length; i += 3) if (el.positions[i + 2] > 0) Wt.push(el.positions[i], el.positions[i + 1], el.positions[i + 2]);
-  return { element: el, top: Wt, told, stats: { cell, elements: rec, holes: holes.length, nodes, nodePlaces, triangles: el.indices.length / 3 }, debug: { g, Rg, top, base, raw, groove, rib, eyeD, own: R.own } };
+  return { element: el, top: Wt, told, stats: { cell, elements: rec, holes: holes.length, nodes, nodePlaces, triangles: el.indices.length / 3 }, debug: { g, Rg, top, base, raw, groove, rib, eyeD, own: R.own, holes } };
 }
