@@ -1,0 +1,67 @@
+/* ---------------------------------------------------
+   Smart Textiles — Field Notes No. 09 (/smart-textiles.html). Page styles on top of styles.css and
+   textile-101.css (whose .tx-topic / .tx-toc layout this page shares, as /dyeing does).
+
+   MATERIAL COLOURS LIVE HERE AND ONLY HERE (DESIGN.md rule 10: a real material drawn in its real
+   colour is content, not palette). The animation modules stroke var(--st-*) and never name a hex.
+   Abstract states use the site companions: petrol = current / electrons, plum = hot / strained /
+   high, indigo = cool / relaxed / low, mint = a signal. Petrol and plum never carry a difference on
+   their own (rule 6): every pair also differs in shape, dash or label.
+--------------------------------------------------- */
+#smart {
+  --st-silver: #C9CED1;       /* silver plating, silver ribbon */
+  --st-copper: #C08A62;       /* copper and silver-copper alloy wire */
+  --st-steel:  #8E989D;       /* stainless steel fibre */
+  --st-carbon: #2B3133;       /* carbon black, carbon-loaded polymer (drawn with a dim edge) */
+  --st-pedot:  #3E5C9A;       /* PEDOT:PSS, a deep blue film */
+  --st-thermo-cold: #3A3550;  /* thermochromic ink below its switching temperature */
+  --st-thermo-hot:  #D9DCE8;  /* ... and above it (it clears) */
+  --st-magnet: #6C7478;       /* magnet body */
+  --st-skin:   #5E5352;       /* skin, as a muted tissue tone */
+  --st-muscle: #6E4B53;       /* muscle tissue */
+  --st-ceramic:#B9B4AA;       /* Peltier ceramic plate */
+}
+
+.st-lede-sub { font-family: var(--mono); font-size: 0.92rem; line-height: 1.7; color: var(--ink-faint); max-width: 44rem; margin-top: 1rem; }
+.st-lede-sub a { color: var(--ink-dim); }
+
+.st-anim { width: 100%; }
+.st-anim svg { display: block; width: 100%; height: auto; }
+.st-grid { display: grid; gap: 2.4rem 2rem; margin-top: 3rem; }
+.st-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.st-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.st-wide { margin-top: 3rem; }
+.st-cell { margin: 0; }
+.st-cell .st-anim { border: 1px solid var(--line); border-radius: 6px; background: var(--black); padding: 6px; }
+.st-cell figcaption { margin-top: 0.9rem; }
+.st-cell .label { display: block; font-family: var(--serif); font-weight: 500; font-size: 1.2rem; color: var(--ink); }
+.st-cell .state { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--petrol-bright); margin-top: 0.3rem; }
+.st-cell .sub { display: block; margin-top: 0.5rem; font-size: 12.5px; line-height: 1.6; color: var(--ink-dim); max-width: 62ch; }
+.st-facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 0.9rem; margin: 0.8rem 0 0; font-size: 12px; line-height: 1.55; }
+.st-facts dt { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); padding-top: 0.15rem; }
+.st-facts dd { margin: 0; color: var(--ink-dim); }
+.st-sub { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin: 3.6rem 0 0; padding-top: 1.4rem; border-top: 1px solid var(--line); }
+.st-sub + .st-grid, .st-sub + .st-wide { margin-top: 1.6rem; }
+
+.st-toggles { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.7rem; }
+.st-btn {
+  font: 11.5px var(--mono); color: var(--ink-dim); background: transparent; border: 1px solid var(--line-strong);
+  border-radius: 999px; padding: 0.36rem 0.75rem; cursor: pointer; transition: color .15s, border-color .15s;
+}
+.st-btn:hover { color: var(--ink); border-color: var(--ink-dim); }
+.st-btn[aria-pressed="true"] { color: var(--black); background: var(--ink); border-color: var(--ink); }
+.st-btn:focus-visible { outline: 2px solid var(--petrol-bright); outline-offset: 2px; }
+
+.st-key { list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem 1.6rem; margin: 2rem 0 0; padding: 0; font-size: 11.5px; color: var(--ink-dim); }
+.st-key li { display: flex; align-items: center; gap: 0.5rem; }
+.st-key svg { width: 26px; height: 12px; display: block; }
+
+.st-credit { font-size: 12px; line-height: 1.65; color: var(--ink-dim); max-width: 70ch; }
+.st-credit cite { font-style: italic; color: var(--ink); }
+
+@media (max-width: 1000px) {
+  .st-grid--3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .st-grid--2, .st-grid--3 { grid-template-columns: 1fr; }
+}

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Textiles — Field Notes — Eva Maskalenko</title>
+<meta name="description" content="Field Notes: Smart Textiles — how conductive yarns are made, how they go into woven, knitted and embroidered fabric, and how textile sensors, actuators, antennas, energy harvesters and connectors work. Every diagram is animated.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="textile-101.css">
+<link rel="stylesheet" href="smart-textiles.css">
+</head>
+<body id="top">
+
+<nav class="site-nav">
+  <a href="index.html" class="site-nav__link">Work</a>
+  <a href="about.html" class="site-nav__link">About</a>
+  <a href="field-notes.html" class="site-nav__link is-active">Field Notes</a>
+</nav>
+
+<header class="project-header">
+  <a href="field-notes.html" class="project-header__back">&larr; Field Notes</a>
+  <div class="project-header__index">No. 09 / 09</div>
+</header>
+
+<main>
+  <div class="project__hero">
+    <div class="project__tag">
+      <span class="project__year">Field Notes</span>
+    </div>
+    <h1 class="project__title">Smart Textiles</h1>
+    <p class="project__lede">A smart textile senses something, reacts to it, or both. Under every one of them is the same short chain: a yarn that conducts, a fabric that carries it, a mechanism that turns pressure, stretch, heat or a muscle&rsquo;s signal into a change in resistance or charge, and a joint where the soft part meets the hard electronics.</p>
+    <p class="st-lede-sub">Each diagram below runs on a loop and shows the mechanism at the scale where it happens &mdash; the fiber, the stitch, the electron. Petrol dots are current wherever it actually flows. Builds on <a href="textile-101.html">Textile 101</a> and <a href="conductive-trace-resistance.html">Conductive Trace Resistance</a>.</p>
+
+    <ul class="st-key" aria-label="Diagram key">
+      <li><svg viewBox="0 0 26 12" aria-hidden="true"><circle cx="5" cy="6" r="2" fill="var(--petrol-bright)"/><circle cx="13" cy="6" r="2" fill="var(--petrol-bright)"/><circle cx="21" cy="6" r="2" fill="var(--petrol-bright)"/></svg>current, electrons</li>
+      <li><svg viewBox="0 0 26 12" aria-hidden="true"><path d="M2 6H24" stroke="var(--color-plum)" stroke-width="2.4" stroke-linecap="round"/></svg>hot, strained, high</li>
+      <li><svg viewBox="0 0 26 12" aria-hidden="true"><path d="M2 6H24" stroke="var(--color-indigo)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3 3"/></svg>cool, relaxed, low</li>
+      <li><svg viewBox="0 0 26 12" aria-hidden="true"><path d="M2 8L7 3L12 9L17 2L22 7" fill="none" stroke="var(--color-mint)" stroke-width="1.6"/></svg>a signal</li>
+    </ul>
+
+    <nav class="tx-toc" aria-label="On this page">
+      <div class="tx-toc__label">On This Page</div>
+      <ul class="tx-toc__list">
+        <li><a href="#what-smart-means"><span class="n">01</span>What Makes It Smart</a></li>
+        <li><a href="#conductive-yarns"><span class="n">02</span>Making a Yarn Conduct</a></li>
+        <li><a href="#into-fabric"><span class="n">03</span>Into the Fabric</a></li>
+        <li><a href="#sensing"><span class="n">04</span>Sensing</a></li>
+        <li><a href="#acting"><span class="n">05</span>Acting</a></li>
+        <li><a href="#power"><span class="n">06</span>Antennas &amp; Power</a></li>
+        <li><a href="#connecting"><span class="n">07</span>Soft Meets Hard</a></li>
+        <li><a href="#sources"><span class="n">08</span>Sources</a></li>
+      </ul>
+    </nav>
+  </div>
+
+  <div id="smart">
+
+  <!-- ================= 01 · TAO'S TIERS ================= -->
+  <section class="tx-topic" id="what-smart-means">
+    <div class="tx-topic-head">
+      <h2>What Makes It Smart</h2>
+      <div class="tx-topic-copy">
+        <p>Xiaoming Tao sorts smart materials by how they react. <b>Passive smart</b> materials only sense the conditions around them. <b>Active smart</b> materials sense and react. <b>Very smart</b> materials sense, react, and adapt themselves to what they find.</p>
+        <p class="muted">The same cold morning runs through all three below: the air drops and recovers. The first garment reports it, the second switches on a heater at a fixed threshold, and the third changes its own rule to fit the person wearing it.</p>
+      </div>
+    </div>
+    <figure class="st-cell st-wide" data-st="tiers">
+      <div class="st-anim"><svg role="img" aria-label="Three panels. Passive smart: only the sense block is lit and its reading goes out to someone else; the skin temperature falls with the air. Active smart: sense triggers act by a fixed rule; the skin temperature dips, then the heater cycles it back up. Very smart: sense, decide and act are all lit and a loop feeds back into decide; the skin temperature stays level while the air drops."></svg></div>
+      <figcaption><span class="sub">Classification after Tao (2001), <i>Smart Fibres, Fabrics and Clothing</i>. Everything else on this page is one of the parts these three are built from.</span></figcaption>
+    </figure>
+  </section>
+
+  <!-- ================= 02 · CONDUCTIVE YARNS ================= -->
+  <section class="tx-topic" id="conductive-yarns">
+    <div class="tx-topic-head">
+      <h2>Making a Yarn Conduct</h2>
+      <div class="tx-topic-copy">
+        <p>There are only a few ways to get a conductor into a yarn: <b>coat</b> an ordinary fiber with something that conducts, <b>build</b> the fiber from a conductive material, or <b>combine</b> a conductor with ordinary fibers by spinning, twisting, wrapping or braiding. Each one decides how far the current can travel, how much the yarn can stretch, and how long it survives washing.</p>
+        <p class="muted">Every diagram shows the process on the left and the yarn cut across on the right, with current only where the cross-section can carry it.</p>
+      </div>
+    </div>
+
+    <div class="st-sub">Coated &mdash; an ordinary fiber with a conductive skin</div>
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="plated">
+        <div class="st-anim"><svg role="img" aria-label="A nylon multifilament yarn runs down into a bath, along the bottom past rising silver particles, and out the other side silver. Cut across, each nylon filament has a thin silver ring around it."></svg></div>
+        <figcaption><span class="label">Metal plated</span><span class="state">Silver on nylon &middot; electroless</span>
+          <span class="sub">The filament surface is seeded with a catalyst, then run through a bath where silver ions are reduced to metal right on it. Every filament ends up with its own silver skin, so the yarn keeps its textile hand.</span>
+          <dl class="st-facts"><dt>Conducts by</dt><dd>a continuous metal skin on every filament</dd><dt>Stretch</dt><dd>little; hard flexing and abrasion crack and wear the skin</dd><dt>Washing</dt><dd>resistance creeps up as silver wears and tarnishes</dd><dt>Used for</dt><dd>sewn traces, knitted electrodes, sensors; silver is also antimicrobial</dd></dl></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="polymer">
+        <div class="st-anim"><svg role="img" aria-label="A yarn dips into a dispersion, is squeezed between two rollers and passes through a drying oven; cut across, the filaments sit inside a blue polymer film."></svg></div>
+        <figcaption><span class="label">Conductive-polymer coated</span><span class="state">PEDOT:PSS, polypyrrole &middot; dip, squeeze, cure</span>
+          <span class="sub">Dipped in a conductive-polymer dispersion and dried, or soaked in the monomer and polymerised in place by an oxidant. No metal, so the hand stays soft, but it conducts orders of magnitude worse than silver.</span>
+          <dl class="st-facts"><dt>Conducts by</dt><dd>a conjugated polymer film</dd><dt>Stretch</dt><dd>follows the fiber; the film is soft</dd><dt>Washing</dt><dd>sensitive to water, humidity and detergent</dd><dt>Used for</dt><dd>soft electrodes, sensors, research prototypes</dd></dl></figcaption>
+      </figure>
+    </div>
+
+    <div class="st-sub">Extruded and drawn &mdash; the fiber itself conducts</div>
+    <div class="st-grid st-grid--3">
+      <figure class="st-cell" data-st="carbon">
+        <div class="st-anim"><svg role="img" aria-label="Polymer and carbon black go into an extruder screw and come out as a drawn fiber. A close-up shows carbon particles in the polymer; as more carbon is added a touching path forms through them, and the conductivity plot jumps sharply at the percolation threshold."></svg></div>
+        <figcaption><span class="label">Carbon-loaded</span><span class="state">Compounded into the melt</span>
+          <span class="sub">Carbon black or nanotubes are mixed into the molten polymer before it&rsquo;s extruded. Below a certain loading the particles are islands; past it they touch end to end and the fiber suddenly conducts. That jump is <i>percolation</i>.</span>
+          <dl class="st-facts"><dt>Conducts by</dt><dd>a network of touching particles</dd><dt>Stretch</dt><dd>stretching pulls contacts apart, so resistance rises &mdash; useful in a strain sensor</dd><dt>Used for</dt><dd>anti-static, strain sensing, low-power heating</dd></dl></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="bico">
+        <div class="st-anim"><svg role="img" aria-label="A plain melt and a carbon-loaded melt flow down two channels and meet in a spinneret, leaving as one fiber. Cross-sections show a conductive core inside an insulating sheath, then other layouts: a conductive sheath and conductive side stripes."></svg></div>
+        <figcaption><span class="label">Bicomponent</span><span class="state">Two melts, one spinneret</span>
+          <span class="sub">Two polymers are spun through the same hole, so the conductive one can be put exactly where it&rsquo;s wanted: buried as a core and insulated by its own sheath, wrapped outside as a skin, or exposed as stripes along the surface.</span>
+          <dl class="st-facts"><dt>Conducts by</dt><dd>the carbon-loaded part only</dd><dt>Used for</dt><dd>anti-static workwear and carpet, fibers that conduct but don&rsquo;t touch skin</dd></dl></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="bundle">
+        <div class="st-anim"><svg role="img" aria-label="A bundle of steel rods packed in a copper and iron matrix is drawn through successive dies, getting thinner each time; then acid dissolves the matrix away and leaves a free bundle of very fine steel filaments."></svg></div>
+        <figcaption><span class="label">Metal filament</span><span class="state">Stainless steel &middot; bundle drawn</span>
+          <span class="sub">Thousands of steel rods are packed in a sacrificial metal matrix and drawn through die after die until each rod is only microns across; then the matrix is dissolved away. What&rsquo;s left is a bundle of steel filaments fine enough to spin and knit.</span>
+          <dl class="st-facts"><dt>Conducts by</dt><dd>solid metal all the way through</dd><dt>Washing</dt><dd>tough; steel doesn&rsquo;t wear off</dd><dt>Trade-off</dt><dd>stiffer hand, and steel conducts far worse than silver or copper</dd></dl></figcaption>
+      </figure>
+    </div>
+
+    <div class="st-sub">Combined &mdash; a conductor spun, twisted, wrapped or braided with ordinary yarn</div>
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="spun">
+        <div class="st-anim"><svg role="img" aria-label="Loose staple fibers, some steel and some polyester, pass between three pairs of drafting rollers turning faster and faster, then twist into a yarn; cut across, steel fibers are scattered among polyester ones and current hops between those that touch."></svg></div>
+        <figcaption><span class="label">Spun blend</span><span class="state">Steel + polyester staple &middot; drafted and twisted</span>
+          <span class="sub">Short stainless fibers are blended with polyester staple, drawn out by rollers running at increasing speeds, and twisted into a yarn like any other. It feels like ordinary yarn; current hops fiber to fiber wherever steel touches steel.</span>
+          <dl class="st-facts"><dt>Resistance set by</dt><dd>steel share, twist, and how many fibers touch</dd><dt>Used for</dt><dd>touchscreen gloves, anti-static, electrodes</dd></dl></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="plied">
+        <div class="st-anim"><svg role="img" aria-label="A silver-plated multifilament and a white polyester yarn twist around each other with an S twist; cut across, the two plies sit side by side."></svg></div>
+        <figcaption><span class="label">Twisted, plied</span><span class="state">Conductor + carrier ply</span>
+          <span class="sub">A conductive strand and a plain one are twisted together. The plain ply carries the load and protects the conductor; how much of the conductor stays on the surface decides whether the yarn makes good skin contact.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="wrapped">
+        <div class="st-toggles" role="group" aria-label="Cover">
+          <button class="st-btn" data-st-for="wrapped" data-st-key="cover" data-st-value="single" aria-pressed="true">Single cover</button>
+          <button class="st-btn" data-st-for="wrapped" data-st-key="cover" data-st-value="double" aria-pressed="false">Double cover</button>
+        </div>
+        <div class="st-anim"><svg role="img" aria-label="A fine silver-copper wire wound in a helix around an elastane core. The core stretches; the helix opens and its angle to the axis falls, while the wire itself doesn't stretch. The resistance plot stays flat until the wire is pulled straight."></svg></div>
+        <figcaption><span class="label">Wrapped (covered)</span><span class="state">Metal wire around elastane</span>
+          <span class="sub">A fine wire, often a silver&ndash;copper alloy, is wound in a helix around a spandex core. When the core stretches, the helix opens up instead of the wire stretching, so resistance barely moves &mdash; until the helix is pulled straight and the wire takes the load. Double cover winds a second wire the other way so the yarn doesn&rsquo;t twist on itself.</span>
+          <dl class="st-facts"><dt>Stretch</dt><dd>high, set by how tightly the wire is wound</dd><dt>Used for</dt><dd>stretchable wiring across joints, power and data lines</dd></dl></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="tinsel">
+        <div class="st-anim"><svg role="img" aria-label="A flat metal ribbon is fed from a spool and wound like tape around a polyester core, each turn slightly overlapping the last; cut across, a thin metal band circles the core."></svg></div>
+        <figcaption><span class="label">Flat tape (tinsel)</span><span class="state">Metal ribbon wound like tape</span>
+          <span class="sub">Instead of a round wire, a ribbon a few microns thick is wound around a textile core with a slight overlap. Flat metal bends far more easily than round wire of the same cross-section, so tinsel survives millions of flexes &mdash; the reason headphone cords use it.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="corespun">
+        <div class="st-anim"><svg role="img" aria-label="A copper filament runs through the spinning point and staple fibers wrap around it, building a fibrous sheath; cut across, a metal core sits in the middle of the fibers."></svg></div>
+        <figcaption><span class="label">Core-spun</span><span class="state">Fibers spun around a metal core</span>
+          <span class="sub">Staple fibers &mdash; cotton, aramid, polyester &mdash; are spun around a metal filament as it passes through. The sheath insulates the conductor, gives the dye something to take to, and makes it feel like yarn.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="braid">
+        <div class="st-anim"><svg role="img" aria-label="Strands from eight carriers converge onto a core and interlace in a diamond braid, one over and one under. Seen from above, half the carriers go clockwise and half counter-clockwise, weaving in and out of each other."></svg></div>
+        <figcaption><span class="label">Braided</span><span class="state">Two sets of carriers, opposite ways</span>
+          <span class="sub">Carriers circle the core in two sets running in opposite directions, each passing in and out of the other, so the strands interlace into a tube. A conductive braid over an insulated core is a textile cable or shield; a braid on an elastic core stretches by scissoring, like a finger trap.</span></figcaption>
+      </figure>
+    </div>
+
+    <div class="st-sub">How well each one conducts</div>
+    <figure class="st-cell st-wide" data-st="ladder">
+      <div class="st-anim"><svg role="img" aria-label="A horizontal log scale of resistance per metre from 0.1 ohm to 1 gigohm. Wrapped copper wire sits lowest, then stainless filament, silver-plated nylon, spun steel blends, conductive polymers, and carbon-loaded fibers highest. A probe reads along each range in turn."></svg></div>
+      <figcaption><span class="sub">Orders of magnitude only, per metre of yarn. Any one product can sit anywhere in its band, depending on its count, plating weight and construction. Low resistance is for carrying power and data; the middle is for signals and sensing; the top is for bleeding off static.</span></figcaption>
+    </figure>
+  </section>
+
+  <!-- ================= 03 · INTO THE FABRIC ================= -->
+  <section class="tx-topic" id="into-fabric">
+    <div class="tx-topic-head">
+      <h2>Into the Fabric</h2>
+      <div class="tx-topic-copy">
+        <p>Once the yarn conducts, the fabric decides where the current can go. Woven and knitted fabrics build the conductor in as the cloth is made. Embroidery and couching add it afterwards, along any path. Printing puts it on top.</p>
+      </div>
+    </div>
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="woven">
+        <div class="st-anim"><svg role="img" aria-label="A loom lays weft picks one at a time across the warp. Two warp ends and two picks are conductive; where they cross, a node lights. A side view shows the heddles opening the shed and the reed beating the pick in."></svg></div>
+        <figcaption><span class="label">Woven</span><span class="state">Straight lines, set in two directions</span>
+          <span class="sub">Conductive ends in the warp and conductive picks in the weft run as straight, stable lines. Where one crosses the other is a node you can address by row and column &mdash; the basis of the pressure matrix in part 04. Wovens barely stretch, so the lines keep their resistance.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="knit">
+        <div class="st-anim"><svg role="img" aria-label="A weft-knit jersey builds course by course as a needle pulls each new row of loops through the last. Two courses are silver conductive yarn; when the fabric is finished current runs along them."></svg></div>
+        <figcaption><span class="label">Knitted</span><span class="state">Loops that touch their neighbours</span>
+          <span class="sub">One yarn makes a whole course of loops, and each loop touches the loops around it. Stretch the knit and those contacts change, so the resistance changes &mdash; a built-in strain sensor. Knitting machines can also place conductive yarn only in chosen zones, which makes it the usual route to seamless sensing garments.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="embroidery">
+        <div class="st-anim"><svg role="img" aria-label="A section through fabric. The needle pushes the top thread down, the rotary hook catches it and loops it around the bobbin, and the two threads lock inside the cloth. The fabric feeds left, leaving a line of stitches; the conductive bobbin thread runs along the underside."></svg></div>
+        <figcaption><span class="label">Embroidered</span><span class="state">Lockstitch, conductor in the bobbin</span>
+          <span class="sub">Needle thread and bobbin thread lock together inside the cloth on every stitch. Conductive thread usually goes in the bobbin: the needle thread is rubbed through the needle&rsquo;s eye and pulled hard at every stitch, which plated thread doesn&rsquo;t survive. The trace then lies on the back.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="couching">
+        <div class="st-anim"><svg role="img" aria-label="A conductive roving is laid down in a spiral while a zigzag stitch follows it and tacks it to the fabric, ending as a coil."></svg></div>
+        <figcaption><span class="label">Couched</span><span class="state">Tailored fiber placement</span>
+          <span class="sub">The conductive yarn isn&rsquo;t sewn at all &mdash; it&rsquo;s laid on the surface along any curve and held down by a zigzag in ordinary thread. That lets you use yarns too thick, stiff or fragile to go through a needle: wire, roving, fiber optics. Coils for antennas and wireless charging are a natural fit.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="printed">
+        <div class="st-anim"><svg role="img" aria-label="A squeegee pushes conductive ink across a screen; the ink passes through only the open stencil and lands on the fabric as traces, which are then cured."></svg></div>
+        <figcaption><span class="label">Printed</span><span class="state">Conductive ink through a screen</span>
+          <span class="sub">Silver-flake or carbon ink in a flexible binder is pushed through a stencil and cured. Fast and cheap, but it sits on the fabric instead of being part of it, so it cracks when stretched too far &mdash; <a href="conductive-trace-resistance.html">No. 06</a> lets you stretch one.</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ================= 04 · SENSING ================= -->
+  <section class="tx-topic" id="sensing">
+    <div class="tx-topic-head">
+      <h2>Sensing</h2>
+      <div class="tx-topic-copy">
+        <p>Almost every textile sensor works the same way: something physical &mdash; pressure, stretch, temperature, a nearby muscle &mdash; changes a resistance, a capacitance or a voltage, and the electronics read that change. Each diagram shows the mechanism and, beside it, the reading it produces as it happens.</p>
+      </div>
+    </div>
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="resistive">
+        <div class="st-anim"><svg role="img" aria-label="A fingertip presses a stack of two conductive fabrics with carbon-coated fibers between them. As it presses, the fibers are squeezed into contact and more current paths form. The resistance trace drops while pressed and recovers on release; a second plot shows resistance falling steeply with force at first, then levelling off."></svg></div>
+        <figcaption><span class="label">Resistive pressure</span><span class="state">Press &rarr; more contact &rarr; R falls</span>
+          <span class="sub">A layer of carbon-coated fibers sits between two conductive fabrics. Pressing squeezes the fibers into more contact with each other and with the electrodes, so the resistance between the layers drops. It responds most to light touch and flattens out under heavy load.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="capacitive">
+        <div class="st-anim"><svg role="img" aria-label="Two conductive electrode fabrics sit either side of a spacer fabric of pile yarns. A fingertip presses, the pile yarns bend and the gap closes; more charge collects on the facing surfaces and the capacitance trace rises."></svg></div>
+        <figcaption><span class="label">Capacitive pressure</span><span class="state">Press &rarr; gap closes &rarr; C rises</span>
+          <span class="sub">Two conductive layers separated by a spacer fabric form a capacitor. Capacitance is <i>C = &epsilon;A / d</i>: press, the gap <i>d</i> shrinks, and the layers hold more charge. No current flows through the stack, so it drifts less than a resistive sensor and can sense through clothing.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="matrix">
+        <div class="st-anim"><svg role="img" aria-label="Rows and columns of conductive yarn cross in an 8 by 8 grid. The electronics drive one row at a time and read every column; a pressed region lights up, and beside it a heat map of all 64 crossings builds up as the scan runs."></svg></div>
+        <figcaption><span class="label">Pressure mapping</span><span class="state">Rows &times; columns, scanned</span>
+          <span class="sub">Conductive rows on one layer, columns on the other, a pressure-sensitive layer between. The electronics drive one row, read every column, then move to the next row. 16 wires read 64 points; the same trick scales to whole seats and insoles.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="strain">
+        <div class="st-anim"><svg role="img" aria-label="An elastic yarn coated with carbon particles stretches; clusters of particles pull apart and the number of contacts between them drops. The resistance-versus-strain plot rises as it stretches and comes back on a slightly different path as it relaxes."></svg></div>
+        <figcaption><span class="label">Strain</span><span class="state">Stretch &rarr; contacts part &rarr; R rises</span>
+          <span class="sub">An elastic yarn or knit coated with conductive particles. Stretching pulls the particles apart and breaks contacts, so resistance rises. Coming back, it doesn&rsquo;t quite retrace its path (<i>hysteresis</i>) &mdash; the main thing a textile strain sensor has to be designed around.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="angle">
+        <div class="st-anim"><svg role="img" aria-label="An arm bends at the elbow; a strain strip on the sleeve runs around the outside of the joint and lengthens as the arm bends. The joint-angle and strip-resistance plots rise and fall together."></svg></div>
+        <figcaption><span class="label">Joint angle</span><span class="state">A strain strip over the elbow</span>
+          <span class="sub">The same strain yarn laid over a joint. Bending lengthens the outside of the sleeve, so the strip&rsquo;s resistance tracks the angle. Calibrate it once against a few known angles and the garment reads posture.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="temperature">
+        <div class="st-anim"><svg role="img" aria-label="A close-up of a metal wire: as it warms, its atoms vibrate harder and electrons passing through scatter more. The temperature readout and resistance rise together, and the resistance-versus-temperature plot is a straight line."></svg></div>
+        <figcaption><span class="label">Temperature</span><span class="state">Hotter &rarr; atoms shake &rarr; R rises</span>
+          <span class="sub">A fine metal wire knitted or woven into the fabric. Warmer atoms vibrate harder and scatter the electrons moving through them, so resistance rises in a nearly straight line &mdash; platinum by about 0.39 % per degree. Carbon composites do the opposite and drop.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="emg">
+        <div class="st-anim"><svg role="img" aria-label="Two textile electrodes on the skin over a muscle, wired to an amplifier. The muscle fibers fire and contract, and the EMG trace bursts with a fast, noisy signal, then goes quiet at rest."></svg></div>
+        <figcaption><span class="label">Biopotential</span><span class="state">Muscle activity &middot; EMG</span>
+          <span class="sub">The electrodes don&rsquo;t sense movement &mdash; they pick up the electrical activity of muscle fibers firing, microvolts to millivolts at the skin. Two electrodes feed a differential amplifier, which cancels what they both see and keeps the difference. Heart signals (ECG) are read the same way.</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ================= 05 · ACTING ================= -->
+  <section class="tx-topic" id="acting">
+    <div class="tx-topic-head">
+      <h2>Acting</h2>
+      <div class="tx-topic-copy">
+        <p>A textile that reacts needs an actuator: something that turns electrical energy into heat, color, movement or a change of shape. These are what move a garment from passive smart to active smart.</p>
+      </div>
+    </div>
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="heater">
+        <div class="st-anim"><svg role="img" aria-label="A switch closes and current runs through a serpentine resistive yarn, which glows warm; the temperature curve rises toward a plateau while the current is on and falls back when it switches off."></svg></div>
+        <figcaption><span class="label">Heating</span><span class="state">P = I&sup2;R</span>
+          <span class="sub">Current through a resistive yarn turns into heat, in proportion to its resistance and the square of the current. The yarn&rsquo;s resistance per metre and the length of the serpentine set how much heat a given battery delivers.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="peltier">
+        <div class="st-anim"><svg role="img" aria-label="A Peltier element of alternating n and p legs sits under a fabric printed with thermochromic ink. Current through the legs pumps heat up into the fabric, the fabric warms past the ink's switching temperature and the ink clears; reversing the current pumps heat down and the ink darkens again. The fabric temperature follows a dashed setpoint."></svg></div>
+        <figcaption><span class="label">Color change</span><span class="state">Thermochromic ink on a Peltier element</span>
+          <span class="sub">Thermochromic ink switches color at a set temperature. A Peltier element underneath pumps heat into the fabric or out of it depending on which way the current flows, so the ink can be switched both ways and quickly. A temperature sensor closes the loop. More in <a href="color-change.html">No. 07</a>.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="ems">
+        <div class="st-anim"><svg role="img" aria-label="Two textile electrodes on a sleeve pass bursts of biphasic pulses through the skin; the muscle beneath contracts and pulls a finger tendon, lifting the finger, then relaxes when the pulses stop."></svg></div>
+        <figcaption><span class="label">Muscle stimulation</span><span class="state">EMS &middot; biphasic pulses</span>
+          <span class="sub">The reverse of EMG: electrodes in a sleeve pass small pulses through the skin, the motor nerves fire and the muscle contracts. Each pulse goes one way then the other so no net charge builds up. Used for touch feedback and rehabilitation.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="sma">
+        <div class="st-anim"><svg role="img" aria-label="A nickel-titanium wire stitched into fabric is heated; its crystal structure shifts from sheared to ordered and the wire shortens, gathering the fabric. As it cools it lengthens again, on a different temperature than it shortened."></svg></div>
+        <figcaption><span class="label">Shape memory</span><span class="state">NiTi wire &middot; shortens when heated</span>
+          <span class="sub">A nickel&ndash;titanium wire heated past its transition temperature changes crystal structure and shortens by a few percent, pulling hard. Cooled, it relaxes back. It&rsquo;s heated by passing current through the wire itself, so the textile is its own motor.</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ================= 06 · ANTENNAS & POWER ================= -->
+  <section class="tx-topic" id="power">
+    <div class="tx-topic-head">
+      <h2>Antennas &amp; Power</h2>
+      <div class="tx-topic-copy">
+        <p>To be useful, a garment has to send what it senses and run on something. A conductive patch can be an antenna; and a few materials turn movement or body heat straight into electricity &mdash; though only in small amounts.</p>
+      </div>
+    </div>
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="antenna">
+        <div class="st-anim"><svg role="img" aria-label="A conductive ground fabric, a felt layer and a silver patch stack together and the patch radiates. When the felt is pressed thinner, the dip in the return-loss plot slides to a lower frequency."></svg></div>
+        <figcaption><span class="label">Textile antenna</span><span class="state">Patch &middot; felt &middot; ground fabric</span>
+          <span class="sub">A conductive patch over a felt spacer over a conductive ground layer: a microstrip patch antenna made of cloth. Its frequency is set by the patch size and the felt&rsquo;s thickness, so crushing, stretching or wetting the felt detunes it.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="tribo">
+        <div class="st-anim"><svg role="img" aria-label="A nylon layer and a PTFE layer press together and pull apart. On contact, nylon gives up electrons to the PTFE; as they separate, charge flows through a load one way, and back the other way as they touch again."></svg></div>
+        <figcaption><span class="label">Triboelectric</span><span class="state">Touch and part</span>
+          <span class="sub">Two materials that sit far apart on the triboelectric series swap charge when they touch. Pulling them apart pushes that charge through a load; touching again pulls it back. Every step or arm swing gives a pulse each way.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="piezo">
+        <div class="st-anim"><svg role="img" aria-label="A poled PVDF film between two electrodes bends back and forth; its aligned dipoles push charge onto its surfaces and the voltage trace follows the bend."></svg></div>
+        <figcaption><span class="label">Piezoelectric</span><span class="state">PVDF &middot; bend it</span>
+          <span class="sub">PVDF fiber or film is poled so its molecular dipoles line up. Bending strains them, which pushes charge onto the surfaces; the voltage follows the bend. Small currents, so it suits sensing motion as much as harvesting it.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="thermoE">
+        <div class="st-anim"><svg role="img" aria-label="Alternating n-type and p-type legs connected in series stand between warm skin and cooler air. Heat flows up through them, carriers drift from the warm end to the cool end, and the voltage rises with the temperature difference."></svg></div>
+        <figcaption><span class="label">Thermoelectric</span><span class="state">Body heat &rarr; voltage</span>
+          <span class="sub">Legs of p-type and n-type material connected in series, warm skin on one side and cooler air on the other. The temperature difference drives carriers along each leg and adds up to a voltage. Tens of microvolts per degree per leg: many legs, and still microwatts.</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ================= 07 · CONNECTING ================= -->
+  <section class="tx-topic" id="connecting">
+    <div class="tx-topic-head">
+      <h2>Soft Meets Hard</h2>
+      <div class="tx-topic-copy">
+        <p>The batteries and chips are rigid and usually have to come off before washing. The joint between them and the fabric is where most smart textiles fail, so it gets its own engineering: connectors that snap, stick, attract or grip, and joints that are sewn and sealed for good.</p>
+      </div>
+    </div>
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="snap">
+        <div class="st-anim"><svg role="img" aria-label="A snap fastener in section. The stud on the module pushes down into the socket on the garment; its bulb spreads the socket's spring ring, passes it, and the spring closes behind it with a click. Current flows through the metal from the garment trace to the module; the resistance plot drops from open to closed."></svg></div>
+        <figcaption><span class="label">Snap fastener</span><span class="state">Stud, socket, spring ring</span>
+          <span class="sub">An ordinary press stud doubles as a connector. The stud&rsquo;s bulb pushes the socket&rsquo;s spring apart, passes it, and the spring closes behind it &mdash; the click is the spring snapping back. The metal carries the current, and a module can come off to be washed.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="velcro">
+        <div class="st-anim"><svg role="img" aria-label="Conductive hook tape comes down onto loop tape and the hooks catch in the loops. Then the hook tape peels off from one end, the hooks opening slightly and slipping out of the loops one row at a time. The contact resistance is low while many hooks are caught and steps back up as each row lets go."></svg></div>
+        <figcaption><span class="label">Hook and loop</span><span class="state">Silver-plated hooks into loops</span>
+          <span class="sub">Pressed together, stiff hooks catch in soft loops; every caught hook is a separate contact point, so the more that engage, the lower the resistance. Peeling works because the hooks let go one row at a time, which also makes it forgiving of misalignment.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="pogo">
+        <div class="st-anim"><svg role="img" aria-label="A module comes down onto a garment; magnets in each pull it into place and spring-loaded pins compress onto pads in the fabric, then current flows. The module lifts off again."></svg></div>
+        <figcaption><span class="label">Magnetic pogo</span><span class="state">Magnets align, springs press</span>
+          <span class="sub">Magnets pull the module into the right place; spring-loaded pins press on flat pads in the garment with a steady force each. Nothing to thread or snap, so it lifts straight off to wash.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="crimp">
+        <div class="st-anim"><svg role="img" aria-label="A crimp comes down onto the fabric over a conductive yarn; its teeth pierce the cloth either side of the yarn, and the anvil below curls them back up so they clamp it. Current then flows from the yarn into the crimp tab."></svg></div>
+        <figcaption><span class="label">Crimp</span><span class="state">Teeth pierce and fold</span>
+          <span class="sub">A press drives the crimp&rsquo;s teeth through the fabric beside the conductive yarn, and a shaped anvil curls them back so they clamp it. Plated yarn takes solder badly, so the grip is mechanical; the tab then goes to a wire or a board.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="sewn">
+        <div class="st-anim"><svg role="img" aria-label="Conductive thread is stitched in running stitches to a small circuit board and wrapped several times through each of its plated holes. Then a TPU film is laid over the board and a heat press seals it."></svg></div>
+        <figcaption><span class="label">Sewn and sealed</span><span class="state">Thread through plated holes, then laminated</span>
+          <span class="sub">Conductive thread runs to the board and wraps several times through each plated hole. A TPU film is then heat-pressed over the joints, which keeps sweat out, holds the thread still and spreads the strain. Permanent, so the board is washed with the garment.</span></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ================= 08 · SOURCES ================= -->
+  <section class="tx-topic" id="sources">
+    <div class="tx-topic-head">
+      <h2>Sources</h2>
+      <div class="tx-topic-copy">
+        <p class="st-credit">The three tiers in part 01 are Xiaoming Tao&rsquo;s, from <cite>Smart Technology for Textiles and Clothing &mdash; Introduction and Overview</cite>, in X. Tao (ed.), <cite>Smart Fibres, Fabrics and Clothing</cite>, Woodhead Publishing / CRC Press, 2001.</p>
+        <p class="st-credit">The order of parts 02&ndash;07 &mdash; producing the fabric, sensing and actuation, integrating and contacting the electronics, energy and communication &mdash; follows S. Schneegass and O. Amft (eds.), <cite>Smart Textiles: Fundamentals, Design, and Interaction</cite>, Springer (Human&ndash;Computer Interaction Series), 2017.</p>
+        <p class="st-credit muted">Diagrams are drawn for this page and simplified to show the mechanism; scales, particle counts and plotted values are illustrative unless a number is given.</p>
+      </div>
+    </div>
+  </section>
+
+  </div>
+
+  <nav class="project__nav">
+    <a href="field-notes.html" class="project__nav-link">&larr; Back to Field Notes</a>
+  </nav>
+</main>
+
+<footer class="footer">
+  <div class="footer__rule"></div>
+  <div class="footer__grid">
+    <div class="footer__block">
+      <span class="footer__label">Contact</span>
+      <a href="mailto:ewmaskalenko@gmail.com" class="footer__link">ewmaskalenko@gmail.com</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">Elsewhere</span>
+      <a href="https://www.linkedin.com/in/eva-maskalenko-91a99113a/" class="footer__link" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">&nbsp;</span>
+      <span class="footer__link footer__link--muted">&copy; 2026 Eva Maskalenko</span>
+    </div>
+  </div>
+</footer>
+
+<a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
+
+<script type="module" src="smart-textiles.js"></script>
+</body>
+</html>
