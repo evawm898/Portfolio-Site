@@ -1,0 +1,18 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="robots" content="noindex">
+<title>Smart Textiles — scene contact sheet</title>
+<!-- Dev contact sheet for /smart-textiles.html: every scene of one module, frozen at loop position ?t=.
+     ?m=smart-textiles-yarns  ?t=0.55  ?only=<scene>  ?big=1. Rendered by tools/smart-textiles/shoot.mjs. -->
+<link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../../styles.css"><link rel="stylesheet" href="../../smart-textiles.css">
+<style>body{background:#060707;margin:0}#smart{display:grid;grid-template-columns:repeat(var(--cols,2),var(--w,560px));gap:10px;padding:10px}#smart figure{margin:0;border:1px solid #232727}#smart figure.wide{grid-column:span 2}#smart svg{width:100%;display:block}#smart figcaption{color:#8b9494;font:11px monospace}</style></head>
+<body><div id="smart"></div>
+<script type="module">
+const q = new URLSearchParams(location.search), T = +(q.get('t') || 0.55);
+const M = await import('../../' + (q.get('m') || 'smart-textiles-yarns') + '.js');
+const S = Object.assign({}, ...Object.values(M).filter(v => typeof v === 'object'));
+const core = await import('../../smart-textiles-core.js');
+const root = document.getElementById('smart'); if (q.get('big')) root.style.gridTemplateColumns = '1100px';
+const only = q.get('only');
+for (const [k, sc] of Object.entries(S)) { if (only && k !== only) continue; const f = document.createElement('figure'); f.dataset.st = k; if (+sc.vb.split(' ')[2] > 400) f.className = 'wide'; f.innerHTML = '<div class="st-anim"></div><figcaption>' + k + '</figcaption>'; root.appendChild(f); }
+core.mount(S, document, { static: true, at: T });
+document.title = 'done';
+</script></body></html>
