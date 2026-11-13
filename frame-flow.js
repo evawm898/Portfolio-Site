@@ -68,6 +68,7 @@ export const FLOW_MEET = {
 /* the element laws, × the band width M; [band, contour] where they differ */
 export const FLOW = {
   size: { band: [2.2, 1.0], contour: [3.4, 1.6] },   // the source element's length: base + slope × the source's weight
+  cornerTilt: 0.14,     // a corner's weight × (1 + this × its height on the frame, −1 bottom … +1 top)
   decay: 0.42,          // the length falls by this share from the source to the meeting
   maxLen: { band: 5.0, contour: 7.0 },   // × M: no element longer (R2's longest, the flank flame, is 5.8 M of ITS band; ours is the asked band, narrower)
   flatK: 0.3,           // length ∝ (the outline's radius / FLOW.rhoRef)^flatK, clamped
@@ -373,7 +374,11 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
       if (len < 1.2 * M) continue;
       const path = subPath(side, sStart, end === 'a' ? sStart + len : sStart - len);
       const onAxis = src.cls === 'crest' || src.cls === 'bottom';
-      const w0 = ampOf(src.cls), wh = (1 - h) * 0.5 + h * w0;
+      // a source's weight: its class's amplitude, and a corner high on the
+      // frame heavier than one low on it (R4/R5: the upper corners carry the
+      // larger clusters) — so the two corners of a side differ
+      const [, ySrc] = at(side.P, src.s), yN = (ySrc - (model.box.y0 + model.box.y1) / 2 * scale) / ((model.box.y1 - model.box.y0) / 2 * scale);
+      const w0 = ampOf(src.cls) * (src.cls === 'junction' ? 1 + FLOW.cornerTilt * yN : 1), wh = (1 - h) * 0.5 + h * w0;
       const S0 = M * (FLOW.size[mode][0] + FLOW.size[mode][1] * wh);
       const meetGap = (sg.sa && sg.sb ? Fm / 2 + 0.5 : 0);
       const D = len - meetGap - (sg.sa && sg.sb ? 0 : 0.4 * M);
