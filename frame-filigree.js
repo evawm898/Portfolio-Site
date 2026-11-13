@@ -1107,7 +1107,7 @@ export function withOrnament(model, opts = {}) {
   const composed = p.ornLayout !== 'groups' && p.ornFlow === 'composed';   // round 2: the composed contour (frame-compose.js)
   // round 3 (frame-mass.js): the composed spines built as carved MASS — filled regions, unioned, inflated
   const mass = p.ornLayout !== 'groups' && p.ornFlow === 'mass';
-  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : composed ? composeFor(model, opts) : mass ? composeFor({ ...model, params: { ...p, ornLeaves: 'off' } }, { ...opts, rvMul: MASS.rvMul }) : flow ? flowFor(model, opts) : vineFor(model, opts);
+  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : composed ? composeFor(model, opts) : mass ? composeFor({ ...model, params: { ...p, ornLeaves: 'off' } }, { ...opts, rvMul: MASS.rvMul, turnsAdd: MASS.turnsAdd, shellMul: MASS.shellMul }) : flow ? flowFor(model, opts) : vineFor(model, opts);
   let massTop = null;
   if (mass && orn.flow && orn.flow.side) {
     const ms = massFor(model, orn, frameOf(orn.flow.side));

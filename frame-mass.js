@@ -62,19 +62,24 @@ const smooth = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 export const MASS = {
   cell: 0.2,                 // mm at a 180 mm print: the raster (it scales with the print height, so the triangles do not)
   body: [0.2, 2.6, 0.62],    // a comma's widest FULL width: × its body's length, clamped [mm, × M]
-  bodyPeak: 0.32,            // where along the body (from its source) the comma is widest
-  bodyEnds: [0.62, 0.48],    // its width at the source end and at the volute end, × the widest
-  volute: 0.85,              // a volute's coil at the joint, × the body's width there; it narrows to MASS.eye at the eye
+  bodyPeak: 0.18,            // where along the body (from its source) the comma is widest
+  bodyEnds: [0.8, 0.3],      // its width at the source end and at the tail (a hard taper into the tail volute), × the widest
+  volute: 0.42,              // × M: a volute's outer coil (the heaviest part of a scroll — at least the body's own width at its joint); it narrows to MASS.eye at the eye
   eye: 2.0,                  // mm: a volute's coil at its eye
   eyeBoss: 0.36,             // × the volute's radius: the boss at its eye
   coilMin: 2.2,              // mm: a coil is pierced from the next only where it stays at least this wide (else merged, incised)
-  rvMul: 1.3,                // the composed volutes scaled (frame-compose's rvMul): a volute larger than the body it ends
-  ground: { min: 2.4, leafMin: 2.3, maxLeaves: 3, embed: 1.0, over: 0.8, lobe: 6.5 },
+  rvMul: 1.45,               // the composed volutes scaled (frame-compose's rvMul): a volute larger than the body it ends
+  turnsAdd: 0.35,            // and wound further (frame-compose's turnsAdd)
+  shellMul: 1.35,            // and the shells enlarged (frame-compose's shellMul)
+  flute: { off: 0.3, ends: [0.08, 0.82] },   // two flutes down each body, at ± off × its half-width, fading at its ends
+  reach: { short: 0.35, len: 0.25, width: 0.16, maxW: 0.3, lean: 25 },   // an outward flame where the mass falls short of the envelope (× M)
+  ground: { min: 2.4, leafMin: 1.8, embed: 1.0, over: 0.8, open: 0.62, lobes: 5, step: 0.22, twoAt: 45 },
   gap: 1.75,                 // mm: a pierced gap's least width (> the 1 mm plan floor, and > 2·close, so the close never fills it)
   close: 0.7,                // mm: the closing radius (a gap narrower than 1.4 mm is filled — no slit)
   open: 0.55,                // mm: the opening radius (a sliver narrower than 1.1 mm is removed)
   flame: { len: 0.5, width: 0.17, lobes: 4, notch: 0.42, lean: [32, 18], bend: 0.9, maxW: 0.42 },
-  height: { edge: 0.45, plateau: 2.3, round: 1.9, ridge: 0.55, ridgeW: 0.6, rib: 0.35, ribW: 0.45, groove: 0.6, grooveW: 0.38, slope: 0.55, fade: 3.5, under: 0.3 },
+  blur: [3, 10],             // [1 2 1] passes: the outline's signed distance, the heights' (σ ≈ 0.8 / 1.6 cells)
+  height: { edge: 0.45, plateau: 2.3, round: 1.9, ridge: 0.3, ridgeW: 0.6, rib: 0.35, ribW: 0.45, groove: 0.6, grooveW: 0.38, slope: 0.55, fade: 3.5, under: 0.3 },
 };
 
 /* ------------------------------------------------------------------ */
@@ -128,17 +133,25 @@ function stamp(g, mask, pts, r, val = 1) {
     }
   }
 }
-/* a polyline's cells as SITES (for a distance field to the line) */
-function siteLine(g, mask, pts) {
+/* the exact distance (mm) to a polyline, written as a minimum into `field` within `reach` of it (a raster of
+   site cells made the ridges a staircase, read on the relief as a row of beads) */
+function siteLine(g, field, pts, reach = 2.5) {
   const { nx, ny, c, n, y0 } = g;
   for (let k = 0; k + 1 < pts.length; k++) {
-    const a = pts[k], b = pts[k + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]), m = Math.max(1, Math.ceil(L / (0.4 * c)));
-    for (let s = 0; s <= m; s++) {
-      const x = a[0] + (b[0] - a[0]) * s / m, y = a[1] + (b[1] - a[1]) * s / m, i = Math.round(x / c) + n, j = Math.round((y - y0) / c);
-      if (i >= 0 && j >= 0 && i < nx && j < ny) mask[j * nx + i] = 1;
+    const a = pts[k], b = pts[k + 1];
+    const i0 = Math.max(0, Math.floor((Math.min(a[0], b[0]) - reach) / c) + n), i1 = Math.min(nx - 1, Math.ceil((Math.max(a[0], b[0]) + reach) / c) + n);
+    const j0 = Math.max(0, Math.floor((Math.min(a[1], b[1]) - reach - y0) / c)), j1 = Math.min(ny - 1, Math.ceil((Math.max(a[1], b[1]) + reach - y0) / c));
+    const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy || 1e-12;
+    for (let j = j0; j <= j1; j++) {
+      const y = y0 + j * c;
+      for (let i = i0; i <= i1; i++) {
+        const x = (i - n) * c, t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)), ex = x - a[0] - t * dx, ey = y - a[1] - t * dy, d = Math.sqrt(ex * ex + ey * ey), kk = j * nx + i;
+        if (d < field[kk]) field[kk] = d;
+      }
     }
   }
 }
+function mirrorMin(g, a) { const { nx, ny, n } = g; for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i, m = j * nx + 2 * n - i; if (a[m] < a[k]) a[k] = a[m]; } }
 /* a polygon's interior (scanline, even-odd) */
 function fillPoly(g, mask, poly, val = 1) {
   const { nx, ny, c, n, y0 } = g, m = poly.length;
@@ -197,7 +210,7 @@ export function massFor(model, orn, SF) {
   const g = makeGrid({ x0: x0 - pad, x1: x1 + pad, y0: y0 - pad, y1: y1 + pad }, cell);
   const { nx, ny, n } = g, N = nx * ny, X = g.X, Y = g.Y;
   const A = new Uint8Array(N);                  // the material
-  const spine = new Uint8Array(N), rib = new Uint8Array(N), groove = new Uint8Array(N);
+  const spine = new Float64Array(N).fill(1e9), rib = new Float64Array(N).fill(1e9), groove = new Float64Array(N).fill(1e9);
   const widths = [];                            // body full widths, for the record
   const flowSign = (i) => (meet < 0 || i < meet ? 1 : -1);   // +1: the source is the start (s rising downstream)
 
@@ -218,8 +231,9 @@ export function massFor(model, orn, SF) {
     const wJ = { A: bodyW(sA), B: bodyW(sB) };
     const target = (i) => {
       const ui = u[i];
-      if (ui < sA) { const v = LvA > 0 ? (sA - ui) / LvA : 1; return MASS.volute * wJ.A * (1 - v) + MASS.eye * v; }
-      if (ui > sB) { const v = LvB > 0 ? (ui - sB) / LvB : 1; return MASS.volute * wJ.B * (1 - v) + MASS.eye * v; }
+      const wv = (wj) => Math.max(wj, MASS.volute * M);
+      if (ui < sA) { const v = LvA > 0 ? (sA - ui) / LvA : 1; return wv(wJ.A) * (1 - v) + MASS.eye * v; }
+      if (ui > sB) { const v = LvB > 0 ? (ui - sB) / LvB : 1; return wv(wJ.B) * (1 - v) + MASS.eye * v; }
       return bodyW(ui);
     };
     // a volute coil: the spacing to the coil beside it (a point of the same curve more than ¾ of a turn away)
@@ -246,6 +260,17 @@ export function massFor(model, orn, SF) {
     // the EYE: a boss at each volute's end
     for (const [e, rv] of [[0, c.info.rvA], [nP - 1, c.info.rvB]]) if (rv > 0) { const re = Math.max(MASS.eye * 0.75, MASS.eyeBoss * rv); stamp(g, A, [P[e], P[e]], [re, re]); }
     siteLine(g, spine, P);
+    // two FLUTES down the body, following it, fading out before the volutes
+    for (const sg of [1, -1]) {
+      const fl = [];
+      for (let i = 0; i < nP; i++) {
+        const t = (u[i] - sA) / Lb;
+        if (t < MASS.flute.ends[0] || t > MASS.flute.ends[1]) continue;
+        const off = sg * MASS.flute.off * hwArr[i];
+        fl.push([Pc[i][0] + c.nrm[i][0] * off, Pc[i][1] + c.nrm[i][1] * off]);
+      }
+      if (fl.length > 3) siteLine(g, groove, fl);
+    }
     // the incised spiral of a merged volute: midway to the coil inside it
     const gpts = [];
     for (let i = 0; i < nP; i++) {
@@ -259,13 +284,15 @@ export function massFor(model, orn, SF) {
 
   // ---- 1b. an acanthus flame at every hand-off, fused over both volutes ----
   let flames = 0;
+  const kisses = [];   // every hand-off's closest approach of the two volutes' centrelines (measured on the mass below)
   for (let k = 0; k + 1 < prim.length; k++) {
     const a = prim[k], b = prim[k + 1];
     if (b.sc.i !== a.sc.i + 1) continue;
     // the kiss: the closest approach of a's end volute and b's start volute
-    let best = Infinity, q = null;
-    for (let i = 0; i < a.pts.length; i++) { if (a.u[i] <= a.body.sB) continue; for (let j = 0; j < b.pts.length; j++) { if (b.u[j] >= b.body.sA) break; const d = Math.hypot(a.pts[i][0] - b.pts[j][0], a.pts[i][1] - b.pts[j][1]); if (d < best) { best = d; q = [(a.pts[i][0] + b.pts[j][0]) / 2, (a.pts[i][1] + b.pts[j][1]) / 2]; } } }
+    let best = Infinity, q = null, pa = null, pb = null;
+    for (let i = 0; i < a.pts.length; i++) { if (a.u[i] <= a.body.sB) continue; for (let j = 0; j < b.pts.length; j++) { if (b.u[j] >= b.body.sA) break; const d = Math.hypot(a.pts[i][0] - b.pts[j][0], a.pts[i][1] - b.pts[j][1]); if (d < best) { best = d; pa = a.pts[i]; pb = b.pts[j]; q = [(a.pts[i][0] + b.pts[j][0]) / 2, (a.pts[i][1] + b.pts[j][1]) / 2]; } } }
     if (!q) continue;
+    kisses.push({ a: a.sc.i, b: b.sc.i, pa, pb, gap: best });
     const [sq] = SF.local(q), fr = SF.fr(Math.max(0, Math.min(L, sq)));
     const low = scrollsRec[a.sc.i].to === 'low', dir = flowSign(b.sc.i);
     const lean = (low ? MASS.flame.lean[0] : MASS.flame.lean[1]) * DEG;
@@ -278,10 +305,10 @@ export function massFor(model, orn, SF) {
     stamp(g, A, fl.pts, fl.r); siteLine(g, rib, fl.midrib); flames++;
   }
 
-  // ---- 1c. the GROUND: where a body bows off the molding, the lens between them filled with acanthus
-  //      leaves lying along the flow (rooted at the source end, tips downstream), the lowest embedded in the
-  //      molding's edge; neighbouring leaves bulge into each other at their lobes, so what is left between them
-  //      is a row of pierced lozenges, not a slot ----
+  // ---- 1c. the GROUND: where a body bows off the molding, the lens between them is one acanthus leaf lying
+  //      along the molding (rooted at the source end, its tip downstream, its lower edge embedded in the molding),
+  //      its upper edge stepped in lobes; what is left between the leaf and the body is ONE shaped opening — a
+  //      crescent or teardrop, closing at both ends where the leaf meets the body (two on a long lens) ----
   let groundLeaves = 0;
   for (const c of prim) {
     const loc = [];
@@ -289,7 +316,6 @@ export function massFor(model, orn, SF) {
     if (loc.length < 4) continue;
     loc.sort((m1, m2) => m1[0] - m2[0]);
     const at = (sv) => { if (sv < loc[0][0] || sv > loc[loc.length - 1][0]) return null; let k = 0; while (k < loc.length - 2 && loc[k + 1][0] < sv) k++; const t = (sv - loc[k][0]) / Math.max(1e-9, loc[k + 1][0] - loc[k][0]); return [loc[k][1] + t * (loc[k + 1][1] - loc[k][1]), loc[k][2] + t * (loc[k + 1][2] - loc[k][2])]; };
-    // the lens: where the body's inner edge stands more than MASS.ground.min off the molding's edge
     const st = 0.5, runs = []; let cur = null;
     for (let sv = loc[0][0]; sv <= loc[loc.length - 1][0]; sv += st) {
       const q = at(sv); if (!q) continue;
@@ -299,30 +325,50 @@ export function massFor(model, orn, SF) {
     const dir = flowSign(c.sc.i);
     for (const run of runs) {
       if (run.length < 8) continue;
-      const hmax = Math.max(...run.map((r) => r[1] - yOut));
-      const K = Math.max(1, Math.min(MASS.ground.maxLeaves, Math.floor((hmax + MASS.ground.embed + MASS.ground.over + MASS.gap) / (MASS.ground.leafMin + MASS.gap))));
-      const ord = dir > 0 ? run : run.slice().reverse(), nR = ord.length;
-      for (let k = 0; k < K; k++) {
-        const pts = [], r = [], mid = [];
-        // stagger the lobes from leaf to leaf so the bridges alternate
-        const phase = 0;   // every leaf of a lens bulges at the same stations: the bulges meet as bridges
-        for (let q = 0; q < nR; q++) {
-          const [sv, top] = ord[q], t = q / (nR - 1);
-          const ylo = yOut - MASS.ground.embed, yhi = top + MASS.ground.over, bh = (yhi - ylo - (K - 1) * MASS.gap) / K;
-          if (bh <= 0) continue;
-          const yc = ylo + k * (bh + MASS.gap) + bh / 2;
-          const taper = t < 0.1 ? 0.55 + 0.45 * smooth(t / 0.1) : t > 0.72 ? 1 - 0.8 * smooth((t - 0.72) / 0.28) : 1;
-          // a lobe: a periodic bulge across the gap (both neighbours bulge where their lobes meet, a bridge)
-          const arc = q * st, lb = Math.max(0, FM.cos(2 * Math.PI * (arc / MASS.ground.lobe + phase))), lobe = lb * lb * lb;
-          const bulge = K > 1 ? lobe * (MASS.gap / 2 + 0.35) * smooth((t - 0.08) / 0.15) * (1 - smooth((t - 0.7) / 0.2)) : 0;
-          const f0 = SF.fr(Math.max(0, Math.min(L, sv)));
-          pts.push([f0.p[0] + yc * f0.n[0], f0.p[1] + yc * f0.n[1]]);
-          r.push(Math.max(0, (bh / 2) * taper + bulge));
-          if (t > 0.05 && t < 0.85) mid.push(pts[pts.length - 1]);
-        }
-        if (pts.length < 4) continue;
-        stamp(g, A, pts, r); if (mid.length > 2) siteLine(g, rib, mid); groundLeaves++;
+      const ord = dir > 0 ? run : run.slice().reverse(), nR = ord.length, Lr = (nR - 1) * st;
+      const nOpen = Lr > MASS.ground.twoAt ? 2 : 1;
+      const pts = [], r = [], mid = [];
+      for (let q = 0; q < nR; q++) {
+        const [sv, top] = ord[q], t = q / (nR - 1);
+        const ylo = yOut - MASS.ground.embed, full = top + MASS.ground.over - ylo;
+        // the opening: a crescent (or two teardrops) between the leaf's upper edge and the body
+        const ph = nOpen === 1 ? FM.sin(Math.PI * Math.min(1, Math.max(0, (t - 0.06) / 0.86))) : Math.abs(FM.sin(2 * Math.PI * Math.min(1, Math.max(0, (t - 0.06) / 0.86))));
+        let open = Math.min(MASS.ground.open * (full - MASS.ground.over), full - MASS.ground.over - MASS.ground.leafMin) * Math.sqrt(ph);
+        // the leaf's upper edge stepped down the flow in lobes (a saw: each lobe rises then drops, pointing downstream)
+        const saw = (t * MASS.ground.lobes) % 1, lobe = MASS.ground.step * (full - MASS.ground.over) * (saw < 0.75 ? saw / 0.75 : (1 - saw) / 0.25) * ph;
+        open = Math.max(0, open + lobe - MASS.ground.step * (full - MASS.ground.over) * 0.5 * ph);
+        const yL = ylo + full - (open > MASS.gap ? open : 0);
+        const f0 = SF.fr(Math.max(0, Math.min(L, sv)));
+        const yc = (ylo + yL) / 2;
+        pts.push([f0.p[0] + yc * f0.n[0], f0.p[1] + yc * f0.n[1]]);
+        r.push(Math.max(0, (yL - ylo) / 2));
+        if (t > 0.08 && t < 0.88) { const ym = ylo + 0.42 * (yL - ylo); mid.push([f0.p[0] + ym * f0.n[0], f0.p[1] + ym * f0.n[1]]); }
       }
+      if (pts.length < 4) continue;
+      stamp(g, A, pts, r); if (mid.length > 2) siteLine(g, rib, mid); groundLeaves++;
+    }
+  }
+
+  // ---- 1d. REACH: where the mass falls short of the target envelope at a high, a foot or the crest root, an
+  //      acanthus flame from the outermost scroll there, pointing out (the silhouette is the envelope's) ----
+  let reachFlames = 0;
+  {
+    const locAll = [];
+    for (const c of prim) for (let i = 0; i < c.pts.length; i += 2) { const [ls, ly] = SF.local(c.pts[i]); const inBody = c.u[i] >= c.body.sA && c.u[i] <= c.body.sB; locAll.push({ s: ls, y: ly + (inBody ? bodyHalf(c, c.u[i]) : 0.5 * MASS.volute * M), p: c.pts[i], c }); }
+    for (const k of orn.flow.keypoints) {
+      if (!['high', 'foot', 'root', 'swell'].includes(k.b)) continue;
+      const yT = yOut + k.e * M;
+      let best = null; for (const q of locAll) if (Math.abs(q.s - k.s) < 6 && (!best || q.y > best.y)) best = q;
+      if (!best) continue;
+      const short = yT - best.y;
+      if (short < MASS.reach.short * M) continue;
+      const fr = SF.fr(Math.max(0, Math.min(L, k.s))), dir = flowSign(best.c.sc.i), lean = MASS.reach.lean * DEG * (k.b === 'root' ? -1 : 1);
+      const d = [fr.n[0] * FM.cos(lean) + dir * fr.t[0] * FM.sin(lean), fr.n[1] * FM.cos(lean) + dir * fr.t[1] * FM.sin(lean)];
+      const len = short + MASS.reach.len * M, hw = Math.min(MASS.reach.maxW * M, MASS.reach.width * len);
+      const root = [best.p[0] - d[0] * 0.3 * hw, best.p[1] - d[1] * 0.3 * hw];
+      const fl = flame(root, FM.atan2(d[1], d[0]), len, hw, 0.5 * dir, MASS.flame.lobes, MASS.flame.notch);
+      if (!fl.pts.every((q) => q[0] > -hw)) continue;
+      stamp(g, A, fl.pts, fl.r); siteLine(g, rib, fl.midrib); reachFlames++;
     }
   }
   // ---- the union, mirrored; closed and opened ----
@@ -331,13 +377,23 @@ export function massFor(model, orn, SF) {
   const mot = new Uint8Array(N);
   for (const el of orn.elements) for (const l of el.loops) fillPoly(g, mot, l);
   for (let k = 0; k < N; k++) if (mot[k]) A[k] = 1;
-  mirrorUnion(g, A); mirrorUnion(g, spine); mirrorUnion(g, rib); mirrorUnion(g, groove);
-  let R = erode(g, dilate(g, A, MASS.close), MASS.close);
-  R = dilate(g, erode(g, R, MASS.open), MASS.open);
+  mirrorUnion(g, A); mirrorMin(g, spine); mirrorMin(g, rib); mirrorMin(g, groove);
+  // the FRAME takes part in the close and the open as a solid (a hairline between a scroll and the molding is
+  // filled as one between two scrolls is), but gains no mass of its own: inside the silhouette the mass stays
+  // where it was drawn (its embed)
+  const frame = new Uint8Array(N); fillPoly(g, frame, sil); mirrorInto(g, frame);
+  const U = new Uint8Array(N); for (let k = 0; k < N; k++) U[k] = A[k] | frame[k];
+  const Cl = erode(g, dilate(g, U, MASS.close), MASS.close);
+  for (let k = 0; k < N; k++) Cl[k] = frame[k] ? (A[k] ? 1 : 1) : Cl[k];
+  const Op = dilate(g, erode(g, Cl, MASS.open), MASS.open);
+  // where the mass meets the silhouette it runs on INTO the frame by the embed (no hairline along the band's edge)
+  const out = new Uint8Array(N); for (let k = 0; k < N; k++) out[k] = frame[k] ? 0 : Op[k];
+  const into = dilate(g, out, MASS.ground.embed);
+  let R = new Uint8Array(N);
+  for (let k = 0; k < N; k++) R[k] = frame[k] ? (A[k] | into[k]) : out[k];
   mirrorInto(g, R);
 
   // the frame: its silhouette, the molding's height inside it (the band), the motifs' footprints
-  const frame = new Uint8Array(N); fillPoly(g, frame, sil);
   const dSil = edt(nx, ny, (k) => !frame[k]);       // inside: squared cells to the outside
   const Hz = new Float64Array(N).fill(-Infinity);
   const near = (1.4 * M / cell) * (1.4 * M / cell);
@@ -359,16 +415,26 @@ export function massFor(model, orn, SF) {
     if (dropped) told.push(`${dropped} piece${dropped > 1 ? 's' : ''} of the mass held by nothing — left out`);
   }
 
+  // the hand-offs, measured on the MASS: the segment between the two volutes' nearest centreline points is material
+  // its whole length (the two scrolls are one carved piece there, whatever their wires' widths would have been)
+  const inR = (q) => { const i = Math.round(q[0] / cell) + n, j = Math.round((q[1] - g.y0) / cell); return i >= 0 && j >= 0 && i < nx && j < ny && R[j * nx + i] === 1; };
+  const handoffs = kisses.map((h) => { const m = Math.max(2, Math.ceil(h.gap / (0.5 * cell))); let ok = true; for (let t = 0; t <= m; t++) if (!inR([h.pa[0] + (h.pb[0] - h.pa[0]) * t / m, h.pa[1] + (h.pb[1] - h.pa[1]) * t / m])) ok = false; return { a: h.a, b: h.b, centreGap: h.gap, joined: ok }; });
   // ---- 2. the signed distance (smoothed) and the heights ----
   const dIn = edt(nx, ny, (k) => !R[k]), dOut = edt(nx, ny, (k) => R[k]);
   let sd = new Float64Array(N);
   for (let k = 0; k < N; k++) sd[k] = R[k] ? -(Math.sqrt(dIn[k]) - 0.5) * cell : (Math.sqrt(dOut[k]) - 0.5) * cell;
   // two [1 2 1] passes each way: the outline becomes a curve, not a staircase
-  for (let pass = 0; pass < 2; pass++) {
-    const t = new Float64Array(N);
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; t[k] = (2 * sd[k] + sd[j * nx + Math.max(0, i - 1)] + sd[j * nx + Math.min(nx - 1, i + 1)]) / 4; }
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; sd[k] = (2 * t[k] + t[Math.max(0, j - 1) * nx + i] + t[Math.min(ny - 1, j + 1) * nx + i]) / 4; }
-  }
+  const blur = (f, passes) => {
+    for (let pass = 0; pass < passes; pass++) {
+      const t = new Float64Array(N);
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; t[k] = (2 * f[k] + f[j * nx + Math.max(0, i - 1)] + f[j * nx + Math.min(nx - 1, i + 1)]) / 4; }
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; f[k] = (2 * t[k] + t[Math.max(0, j - 1) * nx + i] + t[Math.min(ny - 1, j + 1) * nx + i]) / 4; }
+    }
+  };
+  blur(sd, MASS.blur[0]);
+  // the HEIGHTS read a more smoothed copy: the binary region's staircase rings in its distance field, and the
+  // pillow drew it as a row of beads down every edge
+  const sdh = Float64Array.from(sd); blur(sdh, MASS.blur[1]);
   for (let k = 0; k < N; k++) if (sd[k] === 0) sd[k] = 1e-9;
   mirrorInto(g, sd);
   // the molding's height carried out on a falling cone, so the mass rises out of the frame
@@ -379,15 +445,15 @@ export function massFor(model, orn, SF) {
   for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) { const k = j * nx + i; let v = base[k]; if (i < nx - 1) v = Math.max(v, base[k + 1] - sl); if (j < ny - 1) { v = Math.max(v, base[k + nx] - sl); if (i < nx - 1) v = Math.max(v, base[k + nx + 1] - sd2); if (i > 0) v = Math.max(v, base[k + nx - 1] - sd2); } base[k] = v; }
   for (let k = 0; k < N; k++) base[k] = Math.max(0, base[k]);
   mirrorInto(g, base);
-  const dSp = edt(nx, ny, (k) => spine[k]), dRb = edt(nx, ny, (k) => rib[k]), dGr = edt(nx, ny, (k) => groove[k]), dMt = edt(nx, ny, (k) => mot[k]);
+  const dMt = edt(nx, ny, (k) => mot[k]);
   const Hh = MASS.height, top = new Float64Array(N);
-  const g2 = (d2, w) => FM.exp(-d2 * cell * cell / (w * w));
+  const g2 = (d, w) => (d > 4 * w ? 0 : FM.exp(-d * d / (w * w)));
   for (let k = 0; k < N; k++) {
     if (!(sd[k] < 0)) continue;
-    const a = Math.min(1, -sd[k] / Hh.round), rd = Math.sqrt(1 - (1 - a) * (1 - a));
+    const a = Math.min(1, Math.max(0, -sdh[k]) / Hh.round), rd = Math.sqrt(1 - (1 - a) * (1 - a));
     let h = Hh.edge + (Hh.plateau - Hh.edge) * rd;
-    h += Hh.ridge * g2(dSp[k], Hh.ridgeW) * a + Hh.rib * g2(dRb[k], Hh.ribW) * a;
-    h -= Hh.groove * g2(dGr[k], Hh.grooveW) * a;
+    h += Hh.ridge * g2(spine[k], Hh.ridgeW) * a + Hh.rib * g2(rib[k], Hh.ribW) * a;
+    h -= Hh.groove * g2(groove[k], Hh.grooveW) * a;
     h = Math.max(Hh.edge, h);
     // under and beside a shell the mass stays low: the shell is stood over it (standMotifs)
     const fm = smooth(Math.sqrt(dMt[k]) * cell / Hh.fade);
@@ -403,7 +469,7 @@ export function massFor(model, orn, SF) {
   for (let i = 0; i < el.positions.length; i += 3) if (el.positions[i + 2] > 0) W.push(el.positions[i], el.positions[i + 1], el.positions[i + 2]);
   widths.sort((a, b) => a - b);
   // the creases for the paper: the spines, the ribs, the grooves (only where the region is)
-  return { element: el, top: W, told, stats: { cell, flames, groundLeaves, bodyWidth: widths.length ? { min: widths[0], median: widths[widths.length >> 1], max: widths[widths.length - 1] } : null, triangles: el.indices.length / 3 } };
+  return { element: el, top: W, told, stats: { cell, flames, groundLeaves, reachFlames, handoffs, bodyWidth: widths.length ? { min: widths[0], median: widths[widths.length >> 1], max: widths[widths.length - 1] } : null, triangles: el.indices.length / 3 } };
 }
 
 /* a region's signed distance sd (< 0 inside) on the grid → one closed

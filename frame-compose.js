@@ -293,7 +293,7 @@ function buildScroll(spec) {
 /* the composed ornament                                              */
 /* ------------------------------------------------------------------ */
 
-export function composeFor(model, { triBudget = FRAME_TRI_BUDGET, rvMul = 1 } = {}) {   // rvMul: round 3's mass scales the volutes (1: C2's own, by branch)
+export function composeFor(model, { triBudget = FRAME_TRI_BUDGET, rvMul = 1, turnsAdd = 0, shellMul = 1 } = {}) {   // round 3's mass scales the volutes, winds them further and enlarges the shells (1 / 0 / 1: C2's own, by branch)
   const p = model.params, kind = model.info.kind, E = EMBED_MM, Fm = F + MARGIN;
   const frameH = model.box.y1 - model.box.y0, scale = p.printHeight / frameH;
   const region = bandRegion(model, scale);
@@ -345,8 +345,8 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET, rvMul = 1 } = 
     sc.rvA = kA ? clampR(sc.len, COMPOSE.rv[kA], sc.a.corner ? COMPOSE.corner : 1) : 0;
     sc.rvB = kB ? clampR(sc.len, COMPOSE.rv[kB], sc.b.corner ? COMPOSE.corner : 1) : 0;
     sc.cap = Math.min(COMPOSE.cap[2] * M, Math.max(COMPOSE.cap[1], COMPOSE.cap[0] * sc.len));
-    sc.turnsA = kA ? COMPOSE.turns[kA] + COMPOSE.turnsJitter[(2 * sc.i) % COMPOSE.turnsJitter.length] : 0;
-    sc.turnsB = kB ? COMPOSE.turns[kB] + COMPOSE.turnsJitter[(2 * sc.i + 1) % COMPOSE.turnsJitter.length] : 0;
+    sc.turnsA = kA ? COMPOSE.turns[kA] + COMPOSE.turnsJitter[(2 * sc.i) % COMPOSE.turnsJitter.length] + turnsAdd : 0;
+    sc.turnsB = kB ? COMPOSE.turns[kB] + COMPOSE.turnsJitter[(2 * sc.i + 1) % COMPOSE.turnsJitter.length] + turnsAdd : 0;
   }
 
   // the volute centres and joint headings, in the side's (s, y) frame then the world
@@ -541,7 +541,7 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET, rvMul = 1 } = 
   };
   const crestRoots = kept.filter((c) => c.sc.a.b === 'root');
   if (crestRoot && crestRoots.length) {
-    const r = drapedCrest('shell', { M: COMPOSE.crestScale * M, frame, opening, Hz, fits: (el) => joinsMotif(el, true, crestRoots), why: 'take the crest scrolls\' roots', slopes: kind === 'arch', sil });
+    const r = drapedCrest('shell', { M: (shellMul === 1 ? COMPOSE.crestScale * M : COMPOSE.crestScale * M * shellMul), frame, opening, Hz, fits: (el) => joinsMotif(el, true, crestRoots), why: 'take the crest scrolls\' roots', slopes: kind === 'arch', sil });
     told.push(r.note);
     if (r.el) elements.push({ el: r.el, mirror: null, role: 'motif', kind: 'shell', cls: 'heavy', anchor: side.nodes[0].id, w: 1, onAxis: true, crest: !!r.el.crest });
   }
@@ -551,7 +551,7 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET, rvMul = 1 } = 
     const feet = kept.filter((c) => c.sc.b.b === 'foot'), broots = kept.filter((c) => c.sc.b.b === 'broot');
     let el = null, f = 1;
     for (let q = 0; q < 14; q++, f *= 0.9) {
-      const sz = COMPOSE.bottomScale * M * f, inset = 0.25 * sz;
+      const sz = (shellMul === 1 ? COMPOSE.bottomScale * M * f : COMPOSE.bottomScale * M * f * shellMul), inset = 0.25 * sz;
       const cand = placeMotif('shell', { size: sz, at: [0, y - inset * N[1]], out: N, H, opening, onAxis: true, sunk: false, beyond: null, reach: 0.5 * M });
       if (cand && (joinsMotif(cand, true, broots) || (!broots.length && joinsMotif(cand, true, [])))) { el = cand; break; }
     }

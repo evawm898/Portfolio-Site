@@ -89,7 +89,8 @@ for (const [name, q] of ROWS) {
     const S = o.flow.scrolls, H = o.flow.handoffs.filter((h) => !h.fill);
     rec(S.length > 0 && S.every((x) => x.built), 'FN every planned scroll built', `${S.filter((x) => x.built).length} of ${S.length}`);
     const worstOv = H.length ? Math.min(...H.map((h) => h.overlap)) : NaN, worstT = H.length ? Math.max(...H.map((h) => h.tanDeg)) : NaN;
-    rec(H.length > 0 && worstOv >= F / 2 && worstT <= 6, 'FK hand-offs overlap + tangent', `${H.length} hand-offs, overlap ≥ ${worstOv.toFixed(2)} mm, tangent ≤ ${worstT.toFixed(2)}°`);
+    if (!mass) rec(H.length > 0 && worstOv >= F / 2 && worstT <= 6, 'FK hand-offs overlap + tangent', `${H.length} hand-offs, overlap ≥ ${worstOv.toFixed(2)} mm, tangent ≤ ${worstT.toFixed(2)}°`);
+    else { const MH = o.massStats.handoffs; rec(MH.length === H.length && MH.every((h) => h.joined) && worstT <= 6, 'FK hand-offs joined IN THE MASS + tangent', `${MH.filter((h) => h.joined).length} of ${MH.length} hand-offs solid between the two volutes' centrelines (centre gap ≤ ${Math.max(...MH.map((h) => h.centreGap)).toFixed(2)} mm; the spines' own wire overlap ≥ ${worstOv.toFixed(2)} mm), tangent ≤ ${worstT.toFixed(2)}°`); }
     if (!mass) rec(mt.print.slit >= F, 'FP no near-slit in plan', `narrowest empty neck ${mt.print.slit.toFixed(2)} mm`);
     else {
       // the mass's piercings: the narrowest empty neck OUTSIDE the frame's silhouette (the frame counted solid —

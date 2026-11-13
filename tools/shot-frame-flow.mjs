@@ -163,9 +163,11 @@ ${errors.length ? `<p class="told">page errors: ${errors.map(esc).join('; ')}</p
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 fs.writeFileSync(path.join(OUT, 'metrics.json'), JSON.stringify(metrics, (k, v) => (k === 'told' ? undefined : v), 1));
 try {
-  const p2 = await browser.newPage({ viewport: { width: 1220, height: 900 } });
+  // a FRESH browser (the one that shot the cells refuses a full-page capture, measured)
+  const b1 = await chromium.launch(), p2 = await b1.newPage({ viewport: { width: 1220, height: 900 } });
   await p2.goto(`file://${path.join(OUT, 'index.html')}`);
   await p2.screenshot({ path: PNG, fullPage: true });
+  await b1.close();
 } catch (e) { console.log(`the sheet PNG was not written: ${e.message}`); }
 // every cell as its own file (the critic reads them at full size)
 fs.mkdirSync(path.join(OUT, 'cells'), { recursive: true });
