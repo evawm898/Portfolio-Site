@@ -51,6 +51,7 @@ import { MIN_FEATURE_MM } from './frame-registry.js';
 import { placeElement, relift, drapeElement, mirrorElement, symmetrizeElement, wireElementContact, elementClear, footprintTouches } from './frame-elements.js';
 import { vineFor, silDistance, drapedCrest, edgeFrame, crestLift, standMotifs } from './frame-vine.js';
 import { flowFor } from './frame-flow.js';   // the flow study's prototype (hidden param ornFlow)
+import { composeFor } from './frame-compose.js';   // the flow study's round 2: the composed contour (ornFlow 'composed')
 import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 export const SCROLL_STEP_DEG = 3;
@@ -1102,7 +1103,8 @@ export function withOrnament(model, opts = {}) {
   // 'contour', replaces the rinceau with the flow model; absent, this is the
   // line it always was
   const flow = p.ornLayout !== 'groups' && (p.ornFlow === 'band' || p.ornFlow === 'contour');
-  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : flow ? flowFor(model, opts) : vineFor(model, opts);
+  const composed = p.ornLayout !== 'groups' && p.ornFlow === 'composed';   // round 2: the composed contour (frame-compose.js)
+  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : composed ? composeFor(model, opts) : flow ? flowFor(model, opts) : vineFor(model, opts);
   const s = orn.scale;
   const shape = p.ornShape === 'round' ? 'round' : p.ornShape === 'half-round' ? 'half-round' : 'arris';
   // a tapered wire's local width rides on the spine as widthScale (the one

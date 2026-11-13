@@ -21,6 +21,14 @@
      FR repetition: no two scroll elements on one side share a shape (length
         within 5 %, turns within 0.08, curvature profile RMS within 0.15 —
         tools/frame-flow-measure.mjs's tolerances); the closest pair printed.
+   COMPOSED rows (ornFlow 'composed', frame-compose.js — round 2: silhouette,
+   partition, volutes, sources, leaves): FW FC FT FB FM FR as above, and in
+   place of FH (a composed scroll is double-ended — nothing forks off it):
+     FN every scroll the partition plans is BUILT (none given up).
+     FK every hand-off is two back-to-back volutes whose wires OVERLAP by at
+        least half a feature (F/2) with their tangents within 6° there.
+     FP the narrowest empty neck in plan (measurePrint's slit, cell 0.2 mm,
+        the plan outside included) is ≥ MIN_FEATURE_MM: no near-slit.
      FF0 (with --base <worktree of main>) the param ABSENT is main: the relief
         STL bytes and the SVG string of the default rows (three skeletons,
         filigree off / the rinceau / the groups) identical to that tree's.
@@ -51,6 +59,9 @@ ROWS.push(['rect band, leaves off', { skeleton: 'rect', ornBottom: 'on', ornFlow
 ROWS.push(['oval contour, 300 mm', { skeleton: 'oval', ornBottom: 'on', ornFlow: 'contour', printHeight: 300 }]);
 ROWS.push(['oval band, bottom off', { skeleton: 'oval', ornFlow: 'band' }]);
 ROWS.push(['rect contour, corners off', { skeleton: 'rect', ornBottom: 'on', ornFlow: 'contour', ornCorners: 'off' }]);
+for (const [sk, q] of SK) ROWS.push([`${sk} composed`, { ...q, ornFlow: 'composed' }]);
+ROWS.push(['oval composed, leaves off', { skeleton: 'oval', ornBottom: 'on', ornFlow: 'composed', ornLeaves: 'off' }]);
+ROWS.push(['rect composed, 300 mm', { skeleton: 'rect', ornBottom: 'on', ornFlow: 'composed', printHeight: 300 }]);
 const only = arg('--only') ? new RegExp(arg('--only')) : null;
 
 for (const [name, q] of ROWS) {
@@ -58,7 +69,8 @@ for (const [name, q] of ROWS) {
   const t0 = Date.now();
   const m = T.FL.withOrnament(T.G.buildFrame({ ...T.G.DEFAULTS, filigree: 'scrolls', ...q }));
   const r = T.RL.buildRelief(m);
-  const mt = flowMetrics(m, r, { RL: T.RL, FP: T.FP, print: false });
+  const composed = q.ornFlow === 'composed';
+  const mt = flowMetrics(m, r, { RL: T.RL, FP: T.FP, print: composed });
   const o = m.ornament;
   const g = o.groups[0];
   let mirror = true;
@@ -69,6 +81,13 @@ for (const [name, q] of ROWS) {
   rec(mt.print.regions === 1, 'FC one region', `regions ${mt.print.regions}`);
   rec(mt.thinnest >= F - 1e-9, 'FT thinnest wire', `${mt.thinnest.toFixed(3)} mm`);
   rec(mt.print.tris <= 1500000, 'FB budget', `${(100 * mt.print.tris / 1500000).toFixed(1)} %`);
+  if (composed) {
+    const S = o.flow.scrolls, H = o.flow.handoffs.filter((h) => !h.fill);
+    rec(S.length > 0 && S.every((x) => x.built), 'FN every planned scroll built', `${S.filter((x) => x.built).length} of ${S.length}`);
+    const worstOv = H.length ? Math.min(...H.map((h) => h.overlap)) : NaN, worstT = H.length ? Math.max(...H.map((h) => h.tanDeg)) : NaN;
+    rec(H.length > 0 && worstOv >= F / 2 && worstT <= 6, 'FK hand-offs overlap + tangent', `${H.length} hand-offs, overlap ≥ ${worstOv.toFixed(2)} mm, tangent ≤ ${worstT.toFixed(2)}°`);
+    rec(mt.print.slit >= F, 'FP no near-slit in plan', `narrowest empty neck ${mt.print.slit.toFixed(2)} mm`);
+  } else
   rec(mt.elements > 0 && mt.continuity.n > 0 && mt.continuity.maxTanDeg <= 2 && mt.continuity.maxKap <= 0.05 && mt.continuity.maxOff <= 0.5, 'FH hand-offs G1 + G2', `${mt.continuity.n} hand-offs, tangent ≤ ${mt.continuity.maxTanDeg.toFixed(2)}°, curvature ≤ ${mt.continuity.maxKap.toFixed(4)}/mm, root off ≤ ${mt.continuity.maxOff.toFixed(3)} mm`);
   rec(mirror, 'FM mirror to the bit');
   rec(mt.repetition.share === 0, 'FR no two elements share a shape', `${mt.repetition.share} of ${mt.repetition.pairs} pairs${c ? `; closest d ${c.d.toFixed(2)} (L ${c.La.toFixed(1)} / ${c.Lb.toFixed(1)} mm, turns ${c.Ta.toFixed(2)} / ${c.Tb.toFixed(2)})` : ''}`);

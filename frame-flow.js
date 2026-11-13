@@ -112,7 +112,7 @@ export const FLOW = {
 const sincH = (x) => (Math.abs(x) < 1e-8 ? 1 - x * x / 6 : FM.sin(x) / x);
 /* the volute's arc length for `turns` turns with its radius falling linearly
    from rv to re (frame-filigree's linTurn, inverted) */
-const voluteLen = (turns, rv, re) => (turns <= 0 ? 0 : Math.abs(rv - re) < 1e-12 * rv ? TAU * turns * rv : TAU * turns * (rv - re) / FM.log(rv / re));
+export const voluteLen = (turns, rv, re) => (turns <= 0 ? 0 : Math.abs(rv - re) < 1e-12 * rv ? TAU * turns * rv : TAU * turns * (rv - re) / FM.log(rv / re));
 
 /* ONE ELEMENT, in a flow's local frame (x along the growth, y outward):
    root, heading phi, root curvature k0 (inherited from the parent: G1, G2),
@@ -183,7 +183,7 @@ const resample = (poly, step) => {
   const cum = [0]; for (let k = 1; k < poly.length; k++) cum.push(cum[k - 1] + Math.hypot(poly[k][0] - poly[k - 1][0], poly[k][1] - poly[k - 1][1]));
   return { poly, cum, length: cum[cum.length - 1] };
 };
-const at = (P, s) => {
+export const at = (P, s) => {
   const { poly, cum } = P; let k = 0; const q = Math.min(P.length, Math.max(0, s));
   let lo = 0, hi = cum.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] <= q) lo = m; else hi = m; } k = lo;
   const t = (q - cum[k]) / Math.max(1e-12, cum[k + 1] - cum[k]);
@@ -192,7 +192,7 @@ const at = (P, s) => {
 
 /* the side's runs concatenated, in order from the top: { P (the line), O (the
    outward normals, same sampling), nodes: [{ id, s, cls }], runs } */
-function sidePath(model, scale, depth, enabled) {
+export function sidePath(model, scale, depth, enabled) {
   const kind = model.info.kind, pts = [], out = [], nodes = [], runs = [];
   for (const run of CHAIN_RUNS[kind] || []) {
     if (!enabled(run)) { if (pts.length) break; continue; }

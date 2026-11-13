@@ -71,7 +71,13 @@ export function flowMetrics(m, relief, { RL, FP, print = true } = {}) {
     const kc = circK(child.pts[1], child.pts[3], child.pts[5]), kp = circK(parent.pts[j - 2], parent.pts[j], parent.pts[j + 2]);
     return { tan: Math.abs(wrap(tc - tp)) * 180 / Math.PI, kap: Math.abs(kc - kp), off: nn.d };
   };
-  if (o.layout === 'flow') {
+  let composedHand = null;
+  if (o.mode === 'composed') {
+    // a hand-off is two back-to-back volutes with tangent centrelines: the builder's own measurement of each pair
+    // (its least centreline gap, how far the two wires overlap there, the tangent angle there, and whether they join)
+    const H = o.flow.handoffs.filter((h) => !h.fill);
+    composedHand = { n: H.length, joined: H.filter((h) => h.joins).length, maxTanDeg: H.length ? Math.max(...H.map((h) => h.tanDeg)) : NaN, minOverlap: H.length ? Math.min(...H.map((h) => h.overlap)) : NaN };
+  } else if (o.layout === 'flow') {
     for (const fl of o.flow.flowsRaw) for (let i = 1; i < fl.curves.length; i++) hand.push(jump(fl.curves[i], fl.curves[i - 1]));
   } else if (o.layout === 'rinceau') {
     const stems = right.filter((c) => c.info.role === 'stem' || c.kind === 'stem');
@@ -79,7 +85,9 @@ export function flowMetrics(m, relief, { RL, FP, print = true } = {}) {
   }
   // following: the body's local tangent against the frame's (the local x-axis)
   const ang = [];
-  if (o.layout === 'flow') {
+  if (o.mode === 'composed') {
+    for (const c of els) ang.push(...(c.flow.bodyAngDeg || []));
+  } else if (o.layout === 'flow') {
     for (const fl of o.flow.flowsRaw) for (const c of fl.curves) { const L = c.local || null; const loc = L || c; const Lb1 = c.info.Lb1; loc.u.forEach((u, i) => { if (u <= Lb1) { let a = Math.abs(wrap(loc.tan[i])); if (a > Math.PI / 2) a = Math.PI - a; ang.push(a * 180 / Math.PI); } }); }
   } else if (o.layout === 'rinceau') {
     for (const st of right.filter((c) => c.localX)) { for (let i = 1; i < st.localX.length - 1; i++) { const dx = st.localX[i + 1] - st.localX[i - 1], dy = st.localY[i + 1] - st.localY[i - 1]; if (dx > 0) ang.push(Math.abs(Math.atan2(dy, dx)) * 180 / Math.PI); } }
@@ -89,7 +97,7 @@ export function flowMetrics(m, relief, { RL, FP, print = true } = {}) {
   const out = {
     layout: o.layout, mode: o.mode || null, elements: els.length,
     repetition: { pairs: D.length * (D.length - 1) / 2, share, closest },
-    continuity: { n: hand.length, maxTanDeg: hand.length ? Math.max(...hand.map((h) => h.tan)) : NaN, maxKap: hand.length ? Math.max(...hand.map((h) => h.kap)) : NaN, maxOff: hand.length ? Math.max(...hand.map((h) => h.off)) : NaN },
+    continuity: composedHand ? { ...composedHand, maxKap: NaN, maxOff: NaN, composed: true } : { n: hand.length, maxTanDeg: hand.length ? Math.max(...hand.map((h) => h.tan)) : NaN, maxKap: hand.length ? Math.max(...hand.map((h) => h.kap)) : NaN, maxOff: hand.length ? Math.max(...hand.map((h) => h.off)) : NaN },
     following: { n: ang.length, median: q(0.5), p90: q(0.9) },
     thinnest: Math.min(...o.curves.map((c) => (c.w ? Math.min(...c.w) : c.info.wire))),
     told: o.told,
@@ -97,13 +105,13 @@ export function flowMetrics(m, relief, { RL, FP, print = true } = {}) {
   if (relief && RL) {
     const a = RL.analyzeStl(RL.exportStl(relief)), c = RL.connected(relief);
     out.print = { tris: relief.indices.length / 3, budget: 1500000, boundary: a.boundary, regions: c.comps };
-    if (print && FP) { const mp = FP.measurePrint(relief, { cell: 0.2 }); out.print.feature = mp.feature.mm; out.print.gap = mp.gap.mm; out.print.box = mp.box; }
+    if (print && FP) { const mp = FP.measurePrint(relief, { cell: 0.2, slit: true }); out.print.feature = mp.feature.mm; out.print.gap = mp.gap.mm; out.print.slit = mp.slit.mm; out.print.box = mp.box; }
   }
   return out;
 }
 
 export const CASES = [['oval', { skeleton: 'oval', ornBottom: 'on' }], ['rect', { skeleton: 'rect', ornBottom: 'on' }], ['arch', {}]];
-export const MODES = [['rinceau', {}], ['band', { ornFlow: 'band' }], ['contour', { ornFlow: 'contour' }]];
+export const MODES = [['rinceau', {}], ['band', { ornFlow: 'band' }], ['contour', { ornFlow: 'contour' }], ['composed', { ornFlow: 'composed' }]];
 
 export async function loadTree(root) {
   const imp = (f) => import(pathToFileURL(path.join(root, f)).href);
@@ -118,9 +126,10 @@ export const fmt = (x) => (x == null || Number.isNaN(x) ? '—' : typeof x === '
 export function line(r) {
   const c = r.repetition.closest;
   return `elements ${r.elements} · repetition: ${r.repetition.share} of ${r.repetition.pairs} pairs share a shape${c ? `, closest d ${fmt(c.d)} (L ${fmt(c.La)}/${fmt(c.Lb)} mm, turns ${fmt(c.Ta)}/${fmt(c.Tb)})` : ''}`
-    + ` · hand-offs ${r.continuity.n}: tangent ≤ ${fmt(r.continuity.maxTanDeg)}°, curvature ≤ ${fmt(r.continuity.maxKap)}/mm`
+    + (r.continuity.composed ? ` · hand-offs ${r.continuity.n} (back-to-back volutes): ${r.continuity.joined} joined, tangent ≤ ${fmt(r.continuity.maxTanDeg)}°, wires overlap ≥ ${fmt(r.continuity.minOverlap)} mm`
+      : ` · hand-offs ${r.continuity.n}: tangent ≤ ${fmt(r.continuity.maxTanDeg)}°, curvature ≤ ${fmt(r.continuity.maxKap)}/mm`)
     + ` · following: median ${fmt(r.following.median)}°, p90 ${fmt(r.following.p90)}°`
-    + (r.print ? ` · print: boundary ${r.print.boundary}, regions ${r.print.regions}, thinnest wire ${fmt(r.thinnest)} mm${r.print.feature != null ? `, narrowest feature ${fmt(r.print.feature)} / gap ${fmt(r.print.gap)} mm` : ''}, ${r.print.tris.toLocaleString('en-US')} tris (${(100 * r.print.tris / r.print.budget).toFixed(1)} %)` : '');
+    + (r.print ? ` · print: boundary ${r.print.boundary}, regions ${r.print.regions}, thinnest wire ${fmt(r.thinnest)} mm${r.print.feature != null ? `, narrowest feature ${fmt(r.print.feature)} / gap ${fmt(r.print.gap)} mm${r.print.slit != null ? ` / plan slit ${fmt(r.print.slit)} mm` : ''}` : ''}, ${r.print.tris.toLocaleString('en-US')} tris (${(100 * r.print.tris / r.print.budget).toFixed(1)} %)` : '');
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

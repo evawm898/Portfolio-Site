@@ -1,6 +1,14 @@
 #!/usr/bin/env node
-/* shot-frame-flow.mjs <dir> [--png <file>] [--round <n>] [--only <regex>] —
-   the flow study's sheet (docs/frame-flow-study.md): every default skeleton
+/* shot-frame-flow.mjs <dir> [--png <file>] [--round <n>] [--only <regex>] [--growth] —
+   the flow study's sheet. ROUND 2 (default): every default skeleton front-on in
+   three layouts — the rinceau on `main`, round 1's grown OUTER CONTOUR
+   (ornFlow 'contour') and the COMPOSED contour (ornFlow 'composed',
+   frame-compose.js) — then, per skeleton, the composed frame's shoulder, waist
+   and bottom close-ups and a three-quarter view, and a plan plot of each
+   composed frame with its target ENVELOPE drawn faintly (dashed). --growth
+   shoots round 1's sheet instead (below).
+
+   ROUND 1 (--growth): the flow study's sheet (docs/frame-flow-study.md): every default skeleton
    (oval, rectangle, arch — the oval and rectangle with the bottom run on)
    front-on at the default 180 mm print in three layouts — the RINCEAU as on
    `main` (no ornFlow), the flow ON THE BAND (ornFlow 'band') and the flow as
@@ -76,7 +84,9 @@ async function target(where) {
     return [pt[0] * s.scale, pt[1] * s.scale, s.plateT];
   }, where);
 }
-const MODES = [['the rinceau (main)', {}], ['flow — on the band', { ornFlow: 'band' }], ['flow — outer contour', { ornFlow: 'contour' }]];
+const GROWTH = process.argv.includes('--growth');
+const MODES = GROWTH ? [['the rinceau (main)', {}], ['flow — on the band', { ornFlow: 'band' }], ['flow — outer contour', { ornFlow: 'contour' }]]
+  : [['the rinceau (main)', {}], ['round 1 — grown contour', { ornFlow: 'contour' }], ['round 2 — composed contour', { ornFlow: 'composed' }]];
 const rows = [];
 const want = (l) => !ONLY || ONLY.test(l);
 const cap = (params) => { const r = measureCase(T, params); return { text: line(r), told: r.told, r }; };
@@ -91,7 +101,40 @@ for (const [sk, q] of CASES) {
   }
   rows.push({ head: `the whole ${sk} at the default 180 mm print, front-on`, cells });
 }
-for (const [nm, mq] of MODES.slice(1)) {
+// round 2's close-ups: at the composed frame's own boundaries (its first HIGH — the shoulder swell, its first LOW
+// — the waist — and its FOOT), off the builder's envelope (sampled one print mm apart along the side)
+const plots = [];
+if (!GROWTH) for (const [sk, q] of CASES) {
+  const params = { filigree: 'scrolls', ...q, ornFlow: 'composed' };
+  const m = T.FL.withOrnament(T.G.buildFrame({ ...T.G.DEFAULTS, ...params })), o = m.ornament, f = o.flow;
+  plots.push({ sk, svg: planPlot(m, o) });
+  if (!want(`close ${sk}`)) continue;
+  const at = (b) => { const k = f.keypoints.find((x) => x.b === b); return k ? f.envelope[Math.min(f.envelope.length - 1, Math.round(k.s))] : null; };
+  const plateT = await page.evaluate((p) => { window.__frame.setParams(p); return window.__frame.stl().info.plateT; }, params);
+  const cells = [];
+  for (const [where, b, radius] of [['shoulder', 'high', 70], ['waist', 'low', 70], ['bottom', 'foot', 80]]) {
+    const pt = at(b) || at('swell');
+    // the bottom is framed on the stretch from the foot to the axis (the feet and the bottom shell between them)
+    const end = f.envelope[f.envelope.length - 1], tg = where === 'bottom' ? [pt[0] / 2, (pt[1] + end[1]) / 2] : pt;
+    cells.push({ label: `${sk} · composed · ${where}, front-on`, png: await shoot(params, { dir: [0, 0, 1], radius: where === 'bottom' ? Math.max(radius, 0.75 * Math.hypot(pt[0], pt[1] - end[1]) + 25) : radius, target: [tg[0], tg[1], plateT] }), cap: '', told: [] });
+  }
+  cells.push({ label: `${sk} · composed · three-quarter, whole`, png: await shoot(params, { dir: [0.55, 0.35, 1], radius: 470 }), cap: '', told: [] });
+  rows.push({ head: `the ${sk}, composed: the shoulder swell, the waist, the bottom (foot), and three-quarter`, cells });
+}
+function planPlot(m, o) {
+  const sil = T.RL.plateOutline(m).map(([x, y]) => [x * o.scale, y * o.scale]), reg = T.FL.bandRegion(m, o.scale);
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [x, y] of [...sil, ...o.curves.flatMap((c) => c.pts), ...o.flow.envelope]) { x0 = Math.min(x0, x, -x); x1 = Math.max(x1, x, -x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const pad = 6, W = 380, sc = Math.min(W / (x1 - x0 + 2 * pad), W / (y1 - y0 + 2 * pad));
+  const Tp = ([x, y]) => `${((x - (x0 + x1) / 2) * sc + W / 2).toFixed(1)},${((((y0 + y1) / 2) - y) * sc + W / 2).toFixed(1)}`;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${W}" style="background:#fff">`;
+  for (const e of reg.edges) svg += `<polyline points="${e.map(Tp).join(' ')}" fill="none" stroke="#999" stroke-width="1"/>`;
+  for (const c of o.curves) { const leaf = c.info.role === 'acanthus' || c.kind === 'leaf'; for (let i = 0; i < c.pts.length - 1; i++) { const [a, b] = [Tp(c.pts[i]).split(','), Tp(c.pts[i + 1]).split(',')]; svg += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${leaf ? '#4d7a33' : '#222'}" stroke-width="${Math.max(0.6, T.FL.wAt(c, i) * sc).toFixed(2)}" stroke-linecap="round"/>`; } }
+  for (const el of o.elements || []) for (const l of el.loops) svg += `<polygon points="${l.map(Tp).join(' ')}" fill="#b98a55" fill-opacity="0.45" stroke="#7a5a35" stroke-width="0.6"/>`;
+  for (const sg of [1, -1]) svg += `<polyline points="${o.flow.envelope.map(([x, y]) => Tp([sg * x, y])).join(' ')}" fill="none" stroke="#c33" stroke-opacity="0.55" stroke-dasharray="4 3" stroke-width="1"/>`;
+  return svg + '</svg>';
+}
+for (const [nm, mq] of GROWTH ? MODES.slice(1) : []) {
   if (!want(`oval close ${nm}`)) continue;
   const params = { filigree: 'scrolls', ...CASES[0][1], ...mq }, cells = [];
   await page.evaluate((p) => window.__frame.setParams(p), params);
@@ -106,9 +149,10 @@ server.close();
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const html = `<!doctype html><meta charset="utf-8"><title>frame flow study${ROUND ? ' — round ' + ROUND : ''}</title>
 <style>body{background:#EDEDE8;color:#0A0A0C;font:12px/1.45 monospace;margin:16px} .row{display:flex;gap:10px;margin:6px 0 18px;flex-wrap:wrap} .cell{width:380px} .cell img{width:380px;height:380px;display:block;border:1px solid #bbb;background:#fff} h2{font-size:13px;margin:14px 0 4px} .cap{font-size:10.5px;color:#333} .told{font-size:10px;color:#8a3a2a}</style>
-<h1 style="font-size:15px">/frame — the flow study${ROUND ? `, round ${ROUND}` : ''}: the rinceau on main beside the flow model (ornFlow band / contour)</h1>
+<h1 style="font-size:15px">/frame — the flow study${ROUND ? `, round ${ROUND}` : ''}: ${GROWTH ? 'the rinceau on main beside the flow model (ornFlow band / contour)' : 'the rinceau on main, round 1\'s grown contour, and round 2\'s COMPOSED contour'}</h1>
 <p class="cap">Node builds of the same params give every caption (tools/frame-flow-measure.mjs). Repetition: pairs of scroll elements on one side sharing a shape (length within 5 %, turns within 0.08, curvature profile RMS within 0.15); continuity: tangent / curvature jump at every hand-off; following: the body's angle to the frame's tangent.</p>
 ${rows.map((r) => `<h2>${esc(r.head)}</h2><div class="row">${r.cells.map((c) => `<div class="cell"><img src="data:image/png;base64,${c.png}"><div><b>${esc(c.label)}</b></div><div class="cap">${esc(c.cap)}</div>${c.told.length ? `<div class="told">${c.told.map(esc).join('<br>')}</div>` : ''}</div>`).join('')}</div>`).join('')}
+${plots.length ? `<h2>the composed frames in plan: the band (grey), the scrolls (black), the leaves (green), the motifs (brown), and the target envelope (dashed red, faint)</h2><div class="row">${plots.map((p) => `<div class="cell">${p.svg}<div><b>${esc(p.sk)} · composed · plan with envelope</b></div></div>`).join('')}</div>` : ''}
 ${errors.length ? `<p class="told">page errors: ${errors.map(esc).join('; ')}</p>` : ''}`;
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 fs.writeFileSync(path.join(OUT, 'metrics.json'), JSON.stringify(metrics, (k, v) => (k === 'told' ? undefined : v), 1));
@@ -120,5 +164,15 @@ try {
 // every cell as its own file (the critic reads them at full size)
 fs.mkdirSync(path.join(OUT, 'cells'), { recursive: true });
 let ci = 0; for (const r of rows) for (const c of r.cells) fs.writeFileSync(path.join(OUT, 'cells', `${String(ci++).padStart(2, '0')}-${c.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)}.png`), Buffer.from(c.png, 'base64'));
+// the plan plots as cells too: each SVG written out, then rendered by one page at a fixed viewport
+if (plots.length) {
+  const pg = await browser.newPage({ viewport: { width: 380, height: 380 }, deviceScaleFactor: 1 });
+  for (const p of plots) {
+    const name = `${String(ci++).padStart(2, '0')}-${p.sk}-composed-plan-with-envelope`;
+    fs.writeFileSync(path.join(OUT, 'cells', `${name}.svg`), p.svg);
+    await pg.goto(`file://${path.join(OUT, 'cells', `${name}.svg`)}`); await pg.waitForTimeout(100);
+    fs.writeFileSync(path.join(OUT, 'cells', `${name}.png`), await pg.screenshot({ type: 'png' }));
+  }
+}
 await browser.close();
 console.log(`wrote ${path.join(OUT, 'index.html')} and ${PNG}${errors.length ? ` — ${errors.length} page errors: ${errors.slice(0, 3).join(' | ')}` : ''}`);
