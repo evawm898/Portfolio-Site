@@ -82,12 +82,18 @@ export const FLOW = {
   bowJitter: [0, 0.12, -0.08, 0.1, -0.06, 0.08, -0.1, 0.04, 0.06],
   splitJitter: [0.5, 0.36, 0.62, 0.44, 0.56, 0.4, 0.66, 0.48, 0.38],
   capK: 0.11,          // the carved cap (the body's width), × the element's length
-  capOfRv: 0.8,        // …and at most this × the volute's start radius
+  capOfRv: 0.8,
+  voluteMass: [0.75, 0.4],
+  crownFloor: 0.85,     // the crown never under this share of the body's (a volute's coil reads in relief, round 2)
+  lengthPull: 0.6,      // the fit's pull toward the target element length (round 3)
+  targetLen: 3.3 / 16,  // × the frame's height in print mm
+  bowChild: 0.45,
+  bowChildSign: -1,    // a Y-fork: the child bows away from the parent's line (round 2: a child continuing the parent's line read as a pigtail)
   minBody: 0.32,        // the body is at least this share of the element
   body: 0.45,           // the gentle body (before the ramp) is at least this share
   forkBack: 0.6,       // × the parent's rv: the fork stands this far before the parent's curl begins
   coilRoom: 1.6,        // × rv: how far a volute's coil stands past its body's end
-  leafLen: 0.5, leafAspect: 0.34, leafLobes: 4, leafTilt: 0.3,   // the sheathing acanthus, × the child's length
+  leafLen: 0.5, leafAspect: 0.34, leafLobes: 4, leafTilt: 0.12,   // the sheathing acanthus, × the child's length
   termLen: 0.55,        // the meeting's terminal leaf, × the last element's length
   envelope: [0.9, 1.7],
   contourDip: 0.6,      // × M: contour — the inner volutes dip this far into the band (they ARE the attachment); the bodies ride beyond it
@@ -125,7 +131,7 @@ export function flowElement(spec, bodyOnly = false) {
   // both of its ends (the fork's curvature and the ramp's start are
   // untouched: G2 holds) — turned against the volute so body and volute read
   // as one S; its heading is absorbed by the solve for km
-  const B = (spec.bow ?? 0) * Math.PI / (2 * Math.max(1e-9, Lb1)) * -sgn;
+  const B = (spec.bow ?? 0) * Math.PI / (2 * Math.max(1e-9, Lb1)) * (spec.bowSign ?? -sgn);
   const kmRaw = km - (Lb1 > 0 ? 4 * B * Lb1 / Math.PI / Lb : 0);
   const kOf = (s) => (s <= Lb1 ? k0 + (kmRaw - k0) * s / Lb1 + B * FM.sin(Math.PI * s / Lb1) : s <= Lb ? kmRaw + (k1 - kmRaw) * (s - Lb1) / Lb2 : sgn / (rv + (re - rv) * Math.min(1, (s - Lb) / Lv)));
   const end = bodyOnly ? Lb : S;
@@ -139,8 +145,19 @@ export function flowElement(spec, bodyOnly = false) {
     pts.push([x, y]); tan.push(f); kap.push(kOf(s + ds)); u.push(s + ds);
   }
   const nrm = tan.map((a) => [-FM.sin(a), FM.cos(a)]);
-  const w = kap.map((k) => carvedWidth(1 / Math.max(1e-12, Math.abs(k)), cap));
-  return { kind: 'flow', pts, tan, nrm, kap, u, w, root: 0, info: { kind: 'flow', role: 'scroll', carved: true, wire: cap, tip: F, L: S, rv, re, turns, split, bow: spec.bow ?? 0, turnsAsked: spec.turns, sgn, Lb, Lb1, Lv, k0, km: kmRaw, k1, phi, phiEnd } };
+  // the width: the carved law (0.7 × the local radius, under the cap) on the
+  // body; in the VOLUTE it holds a share of the cap to the eye
+  // (FLOW.voluteMass: 0.75 → 0.4 of it) — on the carved law alone the coil
+  // tapers to the floor and, its crown following its width, reads in relief
+  // as a hook beside a fat body (round 2's own sheet). Kept through the
+  // mapping (carved: false — mapToPath re-derives a carved width from the
+  // mapped curvature and would drop the mass).
+  const w = kap.map((k, i) => { const cw = carvedWidth(1 / Math.max(1e-12, Math.abs(k)), cap); if (u[i] <= Lb || !Lv) return cw; const v = Math.min(1, (u[i] - Lb) / Lv); return Math.max(cw, cap * (FLOW.voluteMass[0] + (FLOW.voluteMass[1] - FLOW.voluteMass[0]) * v)); });
+  // a child's root starts at its PARENT's width at the fork and eases to its
+  // own over two of its caps: a thinner child stepping out of a fatter parent
+  // printed a collar (round 2: "pipe fittings")
+  if (spec.rootW) for (let i = 0; i < w.length; i++) { const f = smooth(u[i] / (2 * cap)); if (f >= 1) break; w[i] = Math.max(w[i], spec.rootW + (w[i] - spec.rootW) * f); }
+  return { kind: 'flow', pts, tan, nrm, kap, u, w, root: 0, info: { kind: 'flow', role: 'scroll', carved: false, flowWidth: true, crownFloor: FLOW.crownFloor, wire: cap, tip: F, L: S, rv, re, turns, split, bow: spec.bow ?? 0, turnsAsked: spec.turns, sgn, Lb, Lb1, Lv, k0, km: kmRaw, k1, phi, phiEnd } };
 }
 
 /* the body's end heading that lands the body's end at height yT (bisection:
@@ -243,6 +260,19 @@ export function flowPlan(side) {
    the growth, y outward from the path line): n elements at one scale k.
    ctx: { M, D, mode, S0, lim(x) → [ylo, yhi] (the wire-centre's limits),
    flat(x), root0 } */
+/* a REVERSED element: built as any other (its root at (0, y)), then mirrored
+   in x and walked backwards, so its VOLUTE comes first and sits at x0 (a
+   corner: R4/R5 put the largest volute ON the corner) and its tail — heading
+   along +x, at the original root's curvature — is where its child forks */
+function reverseElement(e, x0) {
+  const n = e.pts.length, X = Math.max(...e.pts.map((q) => q[0])) + x0;
+  const pts = [], tan = [], kap = [], u = [], w = [];
+  for (let j = n - 1; j >= 0; j--) { pts.push([X - e.pts[j][0], e.pts[j][1]]); tan.push(-e.tan[j]); kap.push(e.kap[j]); u.push(e.info.L - e.u[j]); w.push(e.w[j]); }
+  for (let j = 1; j < n; j++) { while (tan[j] - tan[j - 1] > Math.PI) tan[j] -= TAU; while (tan[j] - tan[j - 1] < -Math.PI) tan[j] += TAU; }
+  const nrm = tan.map((a) => [-FM.sin(a), FM.cos(a)]);
+  return { ...e, pts, tan, kap, u, w, nrm, info: { ...e.info, reversed: true } };
+}
+
 function layChain(ctx, n, k, shrink = [], flip = []) {
   const els = [];
   for (let i = 0; i < n; i++) {
@@ -256,10 +286,15 @@ function layChain(ctx, n, k, shrink = [], flip = []) {
       // from the child's, so the two part within a few widths (a fork mid-body
       // parts at third order and the grandchild lies over its grandparent)
       const pi = parent.info, sF = Math.max(0.3 * pi.Lb1, pi.Lb1 - FLOW.forkBack * pi.rv);
-      const best = Math.max(1, parent.u.findIndex((s) => s >= sF));
+      // (a REVERSED source — its volute at the corner — hands off at its tail's end)
+      const best = pi.reversed ? parent.pts.length - 1 : Math.max(1, parent.u.findIndex((s) => s >= sF));
       root = parent.pts[best].slice(); phi = parent.tan[best]; k0 = parent.kap[best]; parent.info.fork = best;
     }
-    const sgn = (i === 0 ? ctx.firstSgn : -els[i - 1].info.sgn) * (flip[i] ? -1 : 1);
+    let sgn = (i === 0 ? ctx.firstSgn : -els[i - 1].info.sgn) * (flip[i] ? -1 : 1);
+    // a flow that MEETS another ends on an outward volute, so the two flows'
+    // last volutes stand as an opposed pair at the meeting (§2)
+    if (ctx.meets && i > 0 && i === n - 1 && !flip[i]) sgn = 1;
+    const reversed = i === 0 && ctx.reverseFirst;
     const flat = ctx.flat(root[0]);
     const S = Math.min(FLOW.maxLen[ctx.mode] * ctx.M, k * ctx.S0 * (1 - FLOW.decay * t) * flat) * (shrink[i] ?? 1);
     const rk = FLOW.rvK[ctx.mode], rvK = rk[0] + (rk[1] - rk[0]) * t;
@@ -277,7 +312,7 @@ function layChain(ctx, n, k, shrink = [], flip = []) {
     const cap = Math.max(F, Math.min(FLOW.capK * S, FLOW.capOfRv * rv));
     for (let tries = 0; tries < 6; tries++) {
       let tt = turns;
-      const base = { root, phi, k0, S, rv, re: F, sgn, split, turns: tt, cap, bow: ctx.bow(i, t) };
+      const base = { root, phi, k0, S, rv, re: F, sgn, split, turns: tt, cap, bow: i ? FLOW.bowChild + ctx.bow(i, t) - FLOW.bow[0] : ctx.bow(i, t), bowSign: i ? FLOW.bowChildSign * sgn : -sgn, rootW: parent ? parent.w[parent.info.fork] : 0 };
       const Lv = Math.min((1 - FLOW.minBody) * S, voluteLen(turns, Math.max(rv, 1.6 * F), F)), xe = root[0] + 0.85 * (S - Lv);
       const [ylo, yhi] = ctx.lim(xe);
       const yRaw = sgn > 0 ? yhi - FLOW.coilRoom * rv - cap / 2 : ylo + FLOW.coilRoom * rv + cap / 2;
@@ -291,6 +326,7 @@ function layChain(ctx, n, k, shrink = [], flip = []) {
         for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; if (selfGap(mk(m)).gap >= F + MARGIN) lo = m; else hi = m; }
         el = mk(lo); el.info.turnsAsked = turns;
       }
+      if (reversed) el = reverseElement(el, ctx.root0.pt[0]);
       // the whole element inside the limits (its edges), else a smaller volute
       let worst = 0;
       el.pts.forEach(([x, y], j) => { const [a, b] = ctx.lim(x); worst = Math.max(worst, a - (y - el.w[j] / 2), (y + el.w[j] / 2) - b); });
@@ -315,10 +351,13 @@ function fitChain(ctx) {
   // is searched on a grid first, then bisected inside the first bracket
   const evalAt = (n, k) => { const els = layChain(ctx, n, k); return { els, reach: reachOf(els), over: Math.max(...els.map((e) => e.info.over)) }; };
   let best = null;
-  const score = (r) => (r.over > 1e-6 ? 10 + r.over : 0) + Math.abs(Math.log(r.k)) + 2 * Math.abs(r.reach - ctx.D) / ctx.D;
+  // round 3: the references' elements average ~3.3 of R2's molding widths (§3), R2's molding a sixteenth of the
+  // frame's height — so an element's TARGET length is ~3.3/16 of the frame's height, and a long run is several
+  // elements rather than one long rod (the round-2 critique)
+  const score = (r) => (r.over > 1e-6 ? 10 + r.over : 0) + Math.abs(Math.log(r.k)) + FLOW.lengthPull * Math.abs(Math.log(r.reach / r.n / ctx.Lt)) + 2 * Math.abs(r.reach - ctx.D) / ctx.D;
   for (let n = Math.max(1, est - 2); n <= est + 2; n++) {
     let prev = null, hit = null;
-    for (let k = 0.45; k <= 2.0 + 1e-9; k *= 1.12) {
+    for (let k = 0.38; k <= 2.0 + 1e-9; k *= 1.12) {
       const r = { n, k, ...evalAt(n, k) };
       if (r.over > 1e-6) { if (prev && prev.reach < ctx.D) break; prev = null; continue; }
       if (r.reach >= ctx.D) { hit = prev ? [prev, r] : [r, r]; break; }
@@ -402,7 +441,7 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
       };
       const flat = (x) => { const kap = curvatureAt(path, Math.min(path.length, Math.max(0, x)), M); const rho = kap > 1e-9 ? 1 / kap : 1e9; return Math.min(FLOW.flatClamp[1], Math.max(FLOW.flatClamp[0], FM.pow(rho / (FLOW.rhoRef * M), FLOW.flatK))); };
       const root0 = { pt: [x0, mode === 'band' ? (yIn + yOut) / 2 : yOut - FLOW.contourDip * M + cap0 / 2 + 0.3], phi: mode === 'band' ? 0 : 0.25 };
-      const ctx = { M, D, mode, S0, lim, flat, root0, firstSgn: 1, bow: (i, t) => FLOW.bow[0] + (FLOW.bow[1] - FLOW.bow[0]) * t + FLOW.bowJitter[i % FLOW.bowJitter.length] };
+      const ctx = { Lt: FLOW.targetLen * p.printHeight, M, D, mode, S0, lim, flat, root0, firstSgn: 1, meets: !!(sg.sa && sg.sb), reverseFirst: src.cls === 'junction' && len >= Math.max(...segs.filter((q) => q !== sg && (q.a === src || q.b === src)).map((q) => Math.abs(q.meet - src.s)), 0), bow: (i, t) => FLOW.bow[0] + (FLOW.bow[1] - FLOW.bow[0]) * t + FLOW.bowJitter[i % FLOW.bowJitter.length] };
       const fit = fitChain(ctx);
       flows.push({ seg: sg, end, src, path, ctx, fit, onAxis, sStart, dir: end === 'a' ? 1 : -1, local: fit.els });
     }
@@ -448,7 +487,7 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
         const L0 = fl.local[i];
         const remake = (tf) => { const loc = flowElement({ root: L0.pts[0], phi: L0.info.phi, k0: L0.info.k0, S: L0.info.Lb + voluteLen(tf * L0.info.turns, L0.info.rv, L0.info.re), rv: L0.info.rv, re: L0.info.re, sgn: L0.info.sgn, split: L0.info.split, bow: L0.info.bow, turns: tf * L0.info.turns, phiEnd: L0.info.phiEnd, cap: L0.info.wire }); Object.assign(loc.info, { t: L0.info.t, index: i, fork: L0.info.fork, over: L0.info.over }); return mapOne(fl, loc, i); };
         let best = null, lo = 0.2, hi = 1;
-        if (!ok(remake(lo))) { best = remake(lo); for (let it = 0; it < 7; it++) { const m = (lo + hi) / 2, cm = remake(m); if (!ok(cm)) { best = cm; lo = m; } else hi = m; } }
+        if (!L0.info.reversed && !ok(remake(lo))) { best = remake(lo); for (let it = 0; it < 7; it++) { const m = (lo + hi) / 2, cm = remake(m); if (!ok(cm)) { best = cm; lo = m; } else hi = m; } }
         if (best) { c = best; lowered++; }
         else if ((tried[i] = (tried[i] ?? 0) + 1) <= 2 * FLOW.resize.length) {
           // (2) the element re-sized (a ladder: smaller and larger — a graze
@@ -500,7 +539,7 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     const mk = onAxis ? 'shell' : 'rosette';
     const [x, y] = at(side.P, nd.s), [, , ii] = at(side.P, nd.s), N = side.out[Math.min(side.out.length - 1, ii)];
     const P = onAxis ? [0, y] : [x, y], w = ampOf(nd.cls);
-    const size = mk === 'shell' ? (1.4 + 1.0 * w) * M : (1.0 + 0.6 * w) * M;
+    const size = (mk === 'shell' ? (1.4 + 1.0 * w) * M : (1.0 + 0.6 * w) * M) * (mode === 'contour' ? FLOW.crestScale : 1);
     let el = null, f = 1;
     for (let q = 0; q < 16; q++, f *= 0.9) {
       const sz = size * f, inset = mk === 'shell' ? 0.25 * sz : 0;
