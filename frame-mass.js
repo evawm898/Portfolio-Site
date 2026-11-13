@@ -15,20 +15,25 @@
    is changed:
 
    1. FILLED 2D REGIONS around the spines, on a raster in print mm:
-      - a scroll's BODY is a tapered comma: widest a third of the way from
-        its SOURCE (the crest above the meeting, the bottom below it),
-        narrowing into the volute it ends in;
+      - a scroll's BODY is a tapered comma: widest near its SOURCE (the
+        crest above the meeting, the bottom below it; MASS.bodyPeak), tapering
+        hard into its tail volute; its inner edge held at the molding's edge
+        less the embed (the comma swells outward, it does not cover the band);
       - a VOLUTE is a filled spiral: its coil as wide as the coil spacing
         allows less a pierced gap ≥ MASS.gap, or — where that would leave a
         coil thinner than its own body — merged solid with the spiral
         INCISED instead (a groove in the relief, not a hole);
       - an ACANTHUS FLAME, lobed, at every hand-off, fused over both
         scrolls' volutes and pointing with the flow;
-      - GROUND FRONDS: where a body bows off the molding, feathered fronds
-        rooted IN the molding's outer edge run up into the body, leaning
-        downstream, a pierced slit between each (≥ MASS.gap) — so the
-        ornament grows from the frame along most of each run rather than
-        orbiting it.
+      - THE GROUND: where a body bows off the molding, one acanthus leaf lying
+        along the molding in the lens between them (its lower edge embedded
+        in the molding, its upper edge stepped in lobes, veined), and between
+        that leaf and the body ONE shaped opening — a crescent, or two
+        teardrops on a long lens — closing where the leaf meets the body; so
+        the ornament grows from the frame along most of each run;
+      - REACH: where the raster so far falls short of the target envelope at
+        a crest root, a high, a swell or a foot, a flame from the outermost
+        material there, pointing out.
       The regions are UNIONED (a max over the raster: overlapping parts are
       one material, no hairline V where two parts meet), then CLOSED (every
       gap narrower than 2·MASS.close filled — a V between two parts ends in
@@ -39,7 +44,10 @@
    2. INFLATED to relief by a height function of the distance to the
       region's edge: a rounded pillow (a quarter circle of MASS.round, up to
       MASS.plateau), an ARRIS ridge along every scroll spine, a MIDRIB along
-      every flame and frond, a GROOVE along every merged volute's spiral; the
+      every leaf and flame (its veins grooved), a GROOVE along every merged
+      volute's spiral and two FLUTES down each body's tail, a raised boss at
+      every eye; a HIERARCHY by element (eye > volute coil > body > flame >
+      ground leaf > the close's fill, MASS.levels, smoothed); the
       whole raised over the molding where it overlaps it (the molding's own
       height, carried outward on a falling cone, so the mass rises out of
       the frame), and kept low under the shells so the relief order holds

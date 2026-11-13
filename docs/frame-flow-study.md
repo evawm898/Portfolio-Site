@@ -539,3 +539,219 @@ Notes:
   - FN (every planned scroll built);
   - FK (every hand-off overlaps ≥ F/2 within 6°);
   - FP (the plan slit ≥ 1 mm).
+
+## 10. Round 3 — CARVED MASS, not swept wire (`frame-mass.js`, `ornFlow: 'mass'`)
+
+Eva's ruling on round 2 was (c), another round. It kept the composed chain:
+- the silhouette;
+- the head-to-tail C and S scrolls;
+- the volutes.
+
+It changed the element. Every critic of C2 had read *"a wire coat hanger"*: thin loops, big empty gaps between them and
+the molding, attached at a few points. The cause is the construction: a swept wire cannot make carved mass. Round 3
+keeps C2's spines (`composeFor`, with the volutes scaled, wound further and the shells enlarged, by three options
+that are C2's own values when absent) and replaces the wire sweep with filled regions, inflated to relief.
+
+### 10.1 The method, as built (`frame-mass.js`'s header has the details)
+
+1. **Filled 2D regions** on a raster in print mm (0.2 mm at a 180 mm print, scaled with the print so the triangle
+   count does not grow):
+   - each scroll BODY is a comma, widest near its source and tapering hard into its tail volute. Its inner edge is
+     held at the molding's edge less the embed, so it does not cover the band;
+   - each VOLUTE is a filled spiral. A coil is pierced from the next one only where it stays at least 2.2 mm wide.
+     Otherwise the coils merge solid and the spiral is incised instead. A raised boss sits at the eye;
+   - a lobed, veined ACANTHUS FLAME sits at every hand-off, fused over both volutes and pointing with the flow;
+   - **the GROUND**: where a body bows off the molding, one veined acanthus leaf lies along the molding (its lower
+     edge embedded, its upper edge stepped in lobes). It leaves ONE shaped opening between itself and the body: a
+     crescent, or two teardrops on a long lens;
+   - **REACH**: where the material falls short of the target envelope at a crest root, a high, a swell or a foot
+     (read off the raster itself), a flame grows from the outermost material, pointing out.
+2. **Union, close, open.** The regions are unioned on the raster, then closed with a 0.7 mm radius (a V between two
+   parts ends in a rounded notch, never a slit) and opened with a 0.55 mm radius (no sliver under 1.1 mm). The FRAME
+   takes part in the close and the open as a solid, but it gains no mass, so a hairline between a scroll and the
+   molding is filled. Where the mass meets the silhouette it runs on INTO the frame by the embed. The shells'
+   footprints join the union, and the mass runs on under them. Pieces held by nothing are left out and told (none,
+   on the three skeletons).
+3. **Inflated** by the distance to the region's edge:
+   - a rounded pillow;
+   - a HIERARCHY of levels by element (eye 3.6 > volute coil 3.1 > body 2.6 > flame 2.0 > ground leaf 1.4 > the
+     close's fill 1.0 mm over the floor), smoothed;
+   - each leaf and flame a BLADE (its pillow lowered, its midrib raised, its veins grooved);
+   - an arris along every spine;
+   - two flutes down each body's tail;
+   - the incised spiral of a merged volute.
+
+   The floor is the molding's own height, carried outward on a falling cone, so the mass rises out of the frame. The
+   mass stays low under the shells, and `standMotifs` stands the shells over it, reading the mass's own top vertices.
+4. **One watertight element**:
+   - marching squares over the region's signed distance, smoothed so the outline is a curve and not a staircase;
+   - the top a height field, from a separately smoothed copy (a binary region's staircase rang in its distance field,
+     and the pillow drew it as a row of beads down every edge, measured on M1);
+   - the bottom on the back plane, walls between;
+   - built on the right half and mirrored to the bit.
+
+### 10.2 Coverage, the main target (`node tools/frame-mass-coverage.mjs [--refs <dir>]`)
+
+**The zone** is the plan area between the molding's outer edge and the composed TARGET envelope (mirrored). **Fill**
+is the share of the zone's 0.2 mm cells that any triangle of the relief covers in plan. **Attachment** is the share of
+the molding's outer edge (sampled every 0.5 mm) at which the point 0.15 M outward is material.
+
+**The reference.** 2.webp is decoded in Chromium at 600 × 800. The molding's edge is R2's traced ellipse (centre (300,
+413), semi-axes 215 × 287 px, M = 38 px, the trace tool's own). The zone is the same composed target envelope mapped
+onto it by arc fraction and M. BRONZE is a pixel darker than Otsu's threshold over the zone's own luminance (threshold
+107: the wall is near-white plaster). The overlay (not committed: a stock photo) shows bronze where the eye sees
+bronze; light highlights on the bronze are missed, so the figure is if anything LOW.
+
+| | fill | attachment |
+|---|---|---|
+| **2.webp (the reference)** | **59.3 %** | **56.9 %** (the traced ellipse is approximate) |
+| the rinceau on `main` (oval / rect / arch) | 2.1 / 2.9 / 1.3 % | 5.6 / 5.9 / 4.7 % |
+| round 1, grown contour | 30.4 / 16.9 / 15.4 % | 54.6 / 44.2 / 48.4 % |
+| round 2, C2 (wire) | 24.2 / 26.9 / 24.6 % | 15.0 / 14.4 / 23.4 % |
+| round 3, M1 | 59.8 / 68.5 / 61.0 % | 62.1 / 74.7 / 74.9 % |
+| round 3, M2 | 58.5 / 70.1 / 64.6 % | 99.6 / 99.1 / 91.2 % |
+| **round 3, M3 (final)** | **58.2 / 69.3 / 63.4 %** | **99.4 / 97.1 / 89.5 %** |
+
+**Coverage is met: within 10 points of the reference on every skeleton.** The rectangle sits on the band's edge
+(69.34 % against a 69.3 % ceiling), and the gate's FV clause reads it as a FAIL by 0.04 points. It is reported, not
+tuned. The ornament now hugs the frame along most of each run (attached 90–99 % against the reference's 57 %): more
+than the reference, which stands its scrolls off the molding in places.
+
+### 10.3 The rounds (a FRESH critic each, who saw only the sheet, the references and the grammar)
+
+| round | sheet | what changed | C2 | carved mass |
+|---|---|---|---|---|
+| M1 | `docs/img/frame-flow-m1.png` | the construction as first built: comma bodies, filled volutes, flames, and the lens filled with parallel ground leaves bridged at their lobes (rows of lozenge piercings) | 5 | **5.5** |
+| M2 | `docs/img/frame-flow-m2.png` | one ground leaf per lens with ONE shaped opening (crescent / teardrops), hard-tapered commas, larger and further-wound volutes, flutes, the surface smoothed (exact spine distances; the heights' own smoothing), the frame in the close | 5 | **5.5** |
+| M3 | `docs/img/frame-flow-m3.png` | the HIERARCHY by element, leaves as veined blades, raised eye bosses, larger meeting leaves, reach read off the raster | 5 | **5.5** |
+
+**Stopped after M3**: two rounds without improvement, the brief's rule. **The kept state is M3.**
+`docs/img/frame-flow-c2-vs-m3.png` shows C2 and M3 side by side. Every critique is condensed below:
+- **M1:**
+  - the ground reads as a grille (rows of identical punched ovals: a radiator vent, a pea pod);
+  - the elements are pods and sausages with a scroll on each end;
+  - the volutes are tiny stamped buttons;
+  - the silhouette falls short of the envelope;
+  - the shells are undersized;
+  - the flanks are symmetric top to bottom;
+  - corduroy ribbing on the surface.
+
+  It beats C2 **"only marginally"**: it fixes the coat hanger but trades it for perforated, inflated pods.
+- **M2:**
+  - the fill is a featureless ground plate (*"putty"*), and the coverage was bought by back-filling;
+  - there is no height hierarchy;
+  - the back-to-back volutes read as fused beans or spectacles, the same figure at every hand-off;
+  - the rect's openings are a grille of slivers;
+  - the shells are pasted on.
+
+  It beats C2 **"narrowly"**: *"an Art Nouveau plaster mirror, not a cast baroque frame."*
+- **M3:**
+  - *"still the C2 wire with a membrane stretched behind it"* (a thin rod and a bat-wing web);
+  - the volutes are domed buttons, not coils;
+  - the pierced ground still reads as a grille (the incised veins read as slashes);
+  - the shells read as gears;
+  - horns at the crest and corners (the reach flames);
+  - the shoulder swell is a bulb on a stick;
+  - the feet are missing;
+  - one motif (ball pair, swoop, web) repeated about three times a side.
+
+  It beats C2 **"only marginally"**.
+
+### 10.4 Did filled-and-inflated beat swept wire?
+
+**On the brief's measure, yes; on the picture, only marginally (5.5 against 5, three critics running).**
+
+The construction did what it was built to do:
+- the coverage went from 24 % to 58–69 % against the bronze's 59 %;
+- the ornament grows from the frame along 90–99 % of the edge;
+- every hand-off is solid in the mass;
+- every piercing is at least 1.4 mm;
+- the solid is watertight and one region on every row.
+
+The coat hanger is gone, and every critic said so. But no critic saw carved scrollwork. The fault all three name is
+the same, and it is the composition underneath, not the inflation: **C2's spines are thin, nearly straight sweeps
+with small volutes at their ends, and the mass hung on them inherits their shape.** The material arrived as a web
+BEHIND the spine (M3: *"a membrane stretched behind the wire"*) rather than as the scroll's own body. The R2 bronze
+reads the other way round. Its scroll bodies ARE the mass, about 1 M wide at the root, its volutes wind a full turn
+or more into a pierced eye, and its openings are the negative space between bodies. A filled region around a C2
+spine cannot be that, however it is inflated, because the spine says where the body is and the spine is a wire's.
+
+### 10.5 Measurements (Node builds of the sheet's params, M3, 180 mm, EXPORT)
+
+| | oval | rectangle | arch |
+|---|---|---|---|
+| fill / attachment (§10.2) | 58.2 % / 99.4 % | 69.3 % / 97.1 % | 63.4 % / 89.5 % |
+| body full width min / median / max | 1.57 / 4.00 / 5.24 mm | 1.08 / 3.74 / 5.24 mm | 1.03 / 3.37 / 5.09 mm |
+| hand-offs solid in the mass · tangent | 5 of 5 · ≤ 3.4° | 7 of 7 · ≤ 3.4° | 5 of 5 · ≤ 2.8° |
+| repetition (spines) | 0 of 15 | 0 of 28 | 0 of 15 |
+| following: median / p90 | 24.0° / 53.9° | 21.7° / 77.2° | 20.6° / 64.7° |
+| narrowest pierced neck outside the frame | 2.06 mm | 3.00 mm | 1.40 mm |
+| boundary edges · voxel regions | 0 · 1 | 0 · 1 | 0 · 1 |
+| narrowest solid feature (0.2 mm raster) | 2.60 mm | 1.80 mm | 1.80 mm |
+| triangles (of the 1.5 M budget) | 723,724 (48.2 %) | 768,224 (51.2 %) | 502,772 (33.5 %) |
+
+Notes:
+- **The arch's whole-plan slit reads 0.20 mm and it is not the ornament's.** It is the frame's own head/light cusp:
+  measured, the frame alone at the same raster phase reads 0.20 mm. So the mass's plan-gap clause measures the empty
+  necks OUTSIDE the frame's silhouette, with the frame counted solid.
+- **The 300 mm rectangle is clean now** (the gate's `rect mass, 300 mm` row: every clause but FV, 69.3 %). Round 2's
+  wire failed FK and FP there. The raster scales with the print, so the triangle count holds (50.8 %).
+- The non-manifold edges the relief reports (264 / 264 / 96) are the shells' and the frame's, identical with the
+  ornament composed as wire. The mass element itself has 0 boundary and 0 non-manifold edges (counted on it alone).
+- **Build time is 12–24 s a frame in Node** (the raster, three distance transforms and the marching squares), against
+  C2's few seconds. The page rebuilds on every slider move, so this mode is a study, not an interactive layout.
+
+### 10.6 Options for Eva
+
+- **(a) Ship carved mass as a layout choice.** Not recommended. It prints clean and meets coverage, but at 5.5 it reads
+  as a plaster mirror or a web behind a wire, and it costs 12–24 s a rebuild.
+- **(b) Another round — exactly what is wrong.** The inflation is not the problem: the SPINE is. A round that keeps
+  this module (raster, union, close/open, hierarchy, the watertight element, the coverage instrument — all
+  reusable) and replaces C2's spines as its input:
+  1. **A body that IS the mass:** each scroll a comma about 1 M wide at its root, its outline drawn (two offset
+     curves, not a centreline and a width), thinning into the volute. Lens fill and ground leaves would then be
+     unnecessary. The openings are what is left between bodies and the molding.
+  2. **Volutes that wind ≥ 1 full turn into a pierced eye.** C2's volutes wind about 1.1 turns over a radius that
+     falls to 1 mm; the mass merges every coil. They need a larger radius (about 0.3 M at the eye's end) and a
+     pierced eye.
+  3. **Difference in kind at the nodes:** a fan at the meeting, a sheathed fork at the flank node, a curl-under at
+     the foot. Not the same back-to-back pair everywhere.
+  4. **The shells modelled** (rounded scalloped rims, not pleats extruded straight down) and the crest a heavy
+     projection with scrolls pouring from under it. The arch needs a crest of its own.
+- **(c) The construction doesn't work.** Not my reading. Filled-and-inflated did what wire could not: mass, coverage,
+  attachment, and no slits. It failed on the input it was given. If (b) does not lift the score past C2 by more than
+  half a point, then (c).
+
+### 10.7 Decisions made alone (round 3)
+
+- **The coverage zone is the composed TARGET envelope**, the same one for every layout. The reference is measured
+  inside the same envelope, mapped onto R2's traced molding. A different envelope (R2's own traced outline) would
+  read the reference higher.
+- **Otsu over the zone** for the reference's bronze. Light highlights on the bronze are missed, so the figure is if
+  anything low.
+- **The FV clause's band is the reference ± 10 points as a literal** (59.3 %), because the photo is stock and never
+  committed: CI could not re-measure it.
+- **The mass replaces the wires entirely** (no swept solid in this mode). The spines still ride in the record, so
+  repetition, following and hand-off tangents are measured as before.
+- **The mass's hand-offs are measured on the mass** (the segment between the two volutes' nearest centreline points
+  is material its whole length), not on the wires' widths, which no longer exist.
+- **The frame's own cusp is excluded from the plan-gap clause** (§10.5), by measuring outside the silhouette.
+- **Kept M3** over M1 and M2 at an equal score: it carries the hierarchy and the shaped openings, and its critique is
+  the most specific about what to do next.
+- **Stopped at three rounds** (the brief: two without improvement).
+
+### 10.8 Reproduce (round 3)
+
+- `node tools/frame-mass-coverage.mjs [--refs <dir>] [--debug <png>] [--modes composed,mass]`: the reference's and
+  each layout's fill and attachment. `--refs` needs the photographs; `--debug` writes the bronze overlay.
+- `node tools/shot-frame-flow.mjs <dir> --mass --round <n>`: round 3's sheet (C2 beside the mass, the mass's
+  close-ups and plan plots).
+- `node tools/frame-flow-measure.mjs`: the `mass` rows, with coverage and body width.
+- `node tools/verify-frame-flow.mjs --only mass [--base <wt>]`: the gate's mass rows. They carry:
+  - FW, FC, FB and FR;
+  - FT: the narrowest solid feature;
+  - FN;
+  - FK: hand-offs solid in the mass, tangent ≤ 6°;
+  - FP: the narrowest pierced neck outside the frame ≥ 1 mm;
+  - FM: the mass's own vertices mirrored to the bit;
+  - FV: coverage within 10 points of 2.webp.
