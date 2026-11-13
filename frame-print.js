@@ -103,7 +103,7 @@ function verticalRays(X, I, shell, cell) {
 /* the exact squared Euclidean distance transform (Felzenszwalb–Huttenlocher)
    of a binary raster: for every cell, the squared distance in cells to the
    nearest cell where `isSite` holds */
-function edt2(nx, ny, isSite) {
+export function edt2(nx, ny, isSite) {
   const INF = 1e20, n = Math.max(nx, ny), f = new Float64Array(n), d = new Float64Array(nx * ny);
   const v = new Int32Array(n), z = new Float64Array(n + 1), out = new Float64Array(n);
   const pass = (m) => {
@@ -132,7 +132,7 @@ function edt2(nx, ny, isSite) {
    width at a cell is twice the distance to the other side's nearest CELL
    CENTRE less one cell (the boundary lies half a cell short of both). */
 export const CUSP_MM = 1;   // MIN_FEATURE_MM's own length: the last millimetre before a ridge's end
-function narrowest(R, d2, inRegion) {
+export function narrowest(R, d2, inRegion) {
   const { nx, ny, cell } = R;
   const ridge = new Uint8Array(nx * ny);
   for (let i = 1; i < nx - 1; i++) for (let j = 1; j < ny - 1; j++) {

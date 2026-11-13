@@ -62,6 +62,9 @@ ROWS.push(['rect contour, corners off', { skeleton: 'rect', ornBottom: 'on', orn
 for (const [sk, q] of SK) ROWS.push([`${sk} composed`, { ...q, ornFlow: 'composed' }]);
 ROWS.push(['oval composed, leaves off', { skeleton: 'oval', ornBottom: 'on', ornFlow: 'composed', ornLeaves: 'off' }]);
 ROWS.push(['rect composed, 300 mm', { skeleton: 'rect', ornBottom: 'on', ornFlow: 'composed', printHeight: 300 }]);
+// round 3 (frame-mass.js): the composed spines built as carved MASS
+for (const [sk, q] of SK) ROWS.push([`${sk} mass`, { ...q, ornFlow: 'mass' }]);
+ROWS.push(['rect mass, 300 mm', { skeleton: 'rect', ornBottom: 'on', ornFlow: 'mass', printHeight: 300 }]);
 const only = arg('--only') ? new RegExp(arg('--only')) : null;
 
 for (const [name, q] of ROWS) {
@@ -69,7 +72,7 @@ for (const [name, q] of ROWS) {
   const t0 = Date.now();
   const m = T.FL.withOrnament(T.G.buildFrame({ ...T.G.DEFAULTS, filigree: 'scrolls', ...q }));
   const r = T.RL.buildRelief(m);
-  const composed = q.ornFlow === 'composed';
+  const mass = q.ornFlow === 'mass', composed = q.ornFlow === 'composed' || mass;
   const mt = flowMetrics(m, r, { RL: T.RL, FP: T.FP, print: composed });
   const o = m.ornament;
   const g = o.groups[0];
@@ -79,14 +82,25 @@ for (const [name, q] of ROWS) {
   console.log(`\n${name}  (${((Date.now() - t0) / 1000).toFixed(1)} s, ${mt.elements} elements a side, ${mt.print.tris.toLocaleString('en-US')} tris)`);
   rec(mt.print.boundary === 0, 'FW watertight', `boundary ${mt.print.boundary}`);
   rec(mt.print.regions === 1, 'FC one region', `regions ${mt.print.regions}`);
-  rec(mt.thinnest >= F - 1e-9, 'FT thinnest wire', `${mt.thinnest.toFixed(3)} mm`);
+  if (mass) rec(mt.print.feature >= F - 0.1, 'FT narrowest solid feature (no wire: the mass)', `${mt.print.feature.toFixed(3)} mm at the 0.2 mm raster (the open guarantees ${(2 * T.MS.MASS.open).toFixed(2)} mm)`);
+  else rec(mt.thinnest >= F - 1e-9, 'FT thinnest wire', `${mt.thinnest.toFixed(3)} mm`);
   rec(mt.print.tris <= 1500000, 'FB budget', `${(100 * mt.print.tris / 1500000).toFixed(1)} %`);
   if (composed) {
     const S = o.flow.scrolls, H = o.flow.handoffs.filter((h) => !h.fill);
     rec(S.length > 0 && S.every((x) => x.built), 'FN every planned scroll built', `${S.filter((x) => x.built).length} of ${S.length}`);
     const worstOv = H.length ? Math.min(...H.map((h) => h.overlap)) : NaN, worstT = H.length ? Math.max(...H.map((h) => h.tanDeg)) : NaN;
     rec(H.length > 0 && worstOv >= F / 2 && worstT <= 6, 'FK hand-offs overlap + tangent', `${H.length} hand-offs, overlap ≥ ${worstOv.toFixed(2)} mm, tangent ≤ ${worstT.toFixed(2)}°`);
-    rec(mt.print.slit >= F, 'FP no near-slit in plan', `narrowest empty neck ${mt.print.slit.toFixed(2)} mm`);
+    if (!mass) rec(mt.print.slit >= F, 'FP no near-slit in plan', `narrowest empty neck ${mt.print.slit.toFixed(2)} mm`);
+    else {
+      // the mass's piercings: the narrowest empty neck OUTSIDE the frame's silhouette (the frame counted solid —
+      // measurePrint's whole-plan slit also reads the arch's own head/light cusp, 0.20 mm with the ornament absent)
+      rec(mt.coverage.slit >= F, 'FP no near-slit in plan (outside the frame)', `narrowest pierced neck ${mt.coverage.slit.toFixed(2)} mm (whole plan, frame included: ${mt.print.slit.toFixed(2)} mm)`);
+      const el = o.elements.find((e) => e.mass), P = el.positions, key = (x, y, z) => `${x},${y},${z}`, S = new Set();
+      for (let k = 0; k < P.length; k += 3) S.add(key(P[k], P[k + 1], P[k + 2]));
+      let asym = 0; for (let k = 0; k < P.length; k += 3) if (!S.has(key(-P[k] === 0 ? 0 : -P[k], P[k + 1], P[k + 2])) && !S.has(key(-P[k], P[k + 1], P[k + 2]))) asym++;
+      rec(asym === 0, 'FM the mass mirrored to the bit', `${asym} of ${P.length / 3} vertices with no (−x, y, z) twin`);
+      rec(mt.coverage.fill >= 0.493 && mt.coverage.fill <= 0.693, 'FV coverage within 10 points of 2.webp (59.3 %)', `fill ${(100 * mt.coverage.fill).toFixed(1)} % of the zone, attached ${(100 * mt.coverage.attach).toFixed(1)} % of the edge`);
+    }
   } else
   rec(mt.elements > 0 && mt.continuity.n > 0 && mt.continuity.maxTanDeg <= 2 && mt.continuity.maxKap <= 0.05 && mt.continuity.maxOff <= 0.5, 'FH hand-offs G1 + G2', `${mt.continuity.n} hand-offs, tangent ≤ ${mt.continuity.maxTanDeg.toFixed(2)}°, curvature ≤ ${mt.continuity.maxKap.toFixed(4)}/mm, root off ≤ ${mt.continuity.maxOff.toFixed(3)} mm`);
   rec(mirror, 'FM mirror to the bit');

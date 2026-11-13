@@ -85,7 +85,11 @@ async function target(where) {
   }, where);
 }
 const GROWTH = process.argv.includes('--growth');
+// --mass: round 3's sheet (§10): round 2's kept C2 beside the composed contour built as carved MASS (frame-mass.js)
+const MASSR = process.argv.includes('--mass');
+const CLOSE = MASSR ? 'mass' : 'composed';
 const MODES = GROWTH ? [['the rinceau (main)', {}], ['flow — on the band', { ornFlow: 'band' }], ['flow — outer contour', { ornFlow: 'contour' }]]
+  : MASSR ? [['round 2 — composed contour (C2, wire)', { ornFlow: 'composed' }], ['round 3 — carved mass', { ornFlow: 'mass' }]]
   : [['the rinceau (main)', {}], ['round 1 — grown contour', { ornFlow: 'contour' }], ['round 2 — composed contour', { ornFlow: 'composed' }]];
 const rows = [];
 const want = (l) => !ONLY || ONLY.test(l);
@@ -105,7 +109,7 @@ for (const [sk, q] of CASES) {
 // — the waist — and its FOOT), off the builder's envelope (sampled one print mm apart along the side)
 const plots = [];
 if (!GROWTH) for (const [sk, q] of CASES) {
-  const params = { filigree: 'scrolls', ...q, ornFlow: 'composed' };
+  const params = { filigree: 'scrolls', ...q, ornFlow: CLOSE };
   const m = T.FL.withOrnament(T.G.buildFrame({ ...T.G.DEFAULTS, ...params })), o = m.ornament, f = o.flow;
   plots.push({ sk, svg: planPlot(m, o) });
   if (!want(`close ${sk}`)) continue;
@@ -116,10 +120,10 @@ if (!GROWTH) for (const [sk, q] of CASES) {
     const pt = at(b) || at('swell');
     // the bottom is framed on the stretch from the foot to the axis (the feet and the bottom shell between them)
     const end = f.envelope[f.envelope.length - 1], tg = where === 'bottom' ? [pt[0] / 2, (pt[1] + end[1]) / 2] : pt;
-    cells.push({ label: `${sk} · composed · ${where}, front-on`, png: await shoot(params, { dir: [0, 0, 1], radius: where === 'bottom' ? Math.max(radius, 0.75 * Math.hypot(pt[0], pt[1] - end[1]) + 25) : radius, target: [tg[0], tg[1], plateT] }), cap: '', told: [] });
+    cells.push({ label: `${sk} · ${CLOSE} · ${where}, front-on`, png: await shoot(params, { dir: [0, 0, 1], radius: where === 'bottom' ? Math.max(radius, 0.75 * Math.hypot(pt[0], pt[1] - end[1]) + 25) : radius, target: [tg[0], tg[1], plateT] }), cap: '', told: [] });
   }
-  cells.push({ label: `${sk} · composed · three-quarter, whole`, png: await shoot(params, { dir: [0.55, 0.35, 1], radius: 470 }), cap: '', told: [] });
-  rows.push({ head: `the ${sk}, composed: the shoulder swell, the waist, the bottom (foot), and three-quarter`, cells });
+  cells.push({ label: `${sk} · ${CLOSE} · three-quarter, whole`, png: await shoot(params, { dir: [0.55, 0.35, 1], radius: 470 }), cap: '', told: [] });
+  rows.push({ head: `the ${sk}, ${MASSR ? 'round 3 (carved mass)' : 'composed'}: the shoulder swell, the waist, the bottom (foot), and three-quarter`, cells });
 }
 function planPlot(m, o) {
   const sil = T.RL.plateOutline(m).map(([x, y]) => [x * o.scale, y * o.scale]), reg = T.FL.bandRegion(m, o.scale);
@@ -130,7 +134,9 @@ function planPlot(m, o) {
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${W}" style="background:#fff">`;
   for (const e of reg.edges) svg += `<polyline points="${e.map(Tp).join(' ')}" fill="none" stroke="#999" stroke-width="1"/>`;
   for (const c of o.curves) { const leaf = c.info.role === 'acanthus' || c.kind === 'leaf'; for (let i = 0; i < c.pts.length - 1; i++) { const [a, b] = [Tp(c.pts[i]).split(','), Tp(c.pts[i + 1]).split(',')]; svg += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${leaf ? '#4d7a33' : '#222'}" stroke-width="${Math.max(0.6, T.FL.wAt(c, i) * sc).toFixed(2)}" stroke-linecap="round"/>`; } }
-  for (const el of o.elements || []) for (const l of el.loops) svg += `<polygon points="${l.map(Tp).join(' ')}" fill="#b98a55" fill-opacity="0.45" stroke="#7a5a35" stroke-width="0.6"/>`;
+  if (o.spinesKept) for (const c of o.spinesKept) svg += `<polyline points="${c.pts.map(Tp).join(' ')}" fill="none" stroke="#c33" stroke-opacity="0.35" stroke-width="0.6"/>`;
+  for (const el of (o.elements || []).filter((e) => e.mass)) svg = svg.replace('<svg ', '<svg ') + `<path d="${el.loops.map((l) => 'M' + l.map(Tp).join(' L') + ' Z').join(' ')}" fill="#3a3a3a" fill-opacity="0.82" fill-rule="evenodd" stroke="#111" stroke-width="0.4"/>`;
+  for (const el of (o.elements || []).filter((e) => !e.mass)) for (const l of el.loops) svg += `<polygon points="${l.map(Tp).join(' ')}" fill="#b98a55" fill-opacity="0.45" stroke="#7a5a35" stroke-width="0.6"/>`;
   for (const sg of [1, -1]) svg += `<polyline points="${o.flow.envelope.map(([x, y]) => Tp([sg * x, y])).join(' ')}" fill="none" stroke="#c33" stroke-opacity="0.55" stroke-dasharray="4 3" stroke-width="1"/>`;
   return svg + '</svg>';
 }
@@ -149,10 +155,10 @@ server.close();
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const html = `<!doctype html><meta charset="utf-8"><title>frame flow study${ROUND ? ' — round ' + ROUND : ''}</title>
 <style>body{background:#EDEDE8;color:#0A0A0C;font:12px/1.45 monospace;margin:16px} .row{display:flex;gap:10px;margin:6px 0 18px;flex-wrap:wrap} .cell{width:380px} .cell img{width:380px;height:380px;display:block;border:1px solid #bbb;background:#fff} h2{font-size:13px;margin:14px 0 4px} .cap{font-size:10.5px;color:#333} .told{font-size:10px;color:#8a3a2a}</style>
-<h1 style="font-size:15px">/frame — the flow study${ROUND ? `, round ${ROUND}` : ''}: ${GROWTH ? 'the rinceau on main beside the flow model (ornFlow band / contour)' : 'the rinceau on main, round 1\'s grown contour, and round 2\'s COMPOSED contour'}</h1>
+<h1 style="font-size:15px">/frame — the flow study${ROUND ? `, round ${ROUND}` : ''}: ${GROWTH ? 'the rinceau on main beside the flow model (ornFlow band / contour)' : MASSR ? 'round 2\'s composed contour (C2, swept wire) beside round 3\'s CARVED MASS (filled regions, unioned, inflated)' : 'the rinceau on main, round 1\'s grown contour, and round 2\'s COMPOSED contour'}</h1>
 <p class="cap">Node builds of the same params give every caption (tools/frame-flow-measure.mjs). Repetition: pairs of scroll elements on one side sharing a shape (length within 5 %, turns within 0.08, curvature profile RMS within 0.15); continuity: tangent / curvature jump at every hand-off; following: the body's angle to the frame's tangent.</p>
 ${rows.map((r) => `<h2>${esc(r.head)}</h2><div class="row">${r.cells.map((c) => `<div class="cell"><img src="data:image/png;base64,${c.png}"><div><b>${esc(c.label)}</b></div><div class="cap">${esc(c.cap)}</div>${c.told.length ? `<div class="told">${c.told.map(esc).join('<br>')}</div>` : ''}</div>`).join('')}</div>`).join('')}
-${plots.length ? `<h2>the composed frames in plan: the band (grey), the scrolls (black), the leaves (green), the motifs (brown), and the target envelope (dashed red, faint)</h2><div class="row">${plots.map((p) => `<div class="cell">${p.svg}<div><b>${esc(p.sk)} · composed · plan with envelope</b></div></div>`).join('')}</div>` : ''}
+${plots.length ? `<h2>the composed frames in plan: the band (grey), the scrolls (black), the leaves (green), the motifs (brown), and the target envelope (dashed red, faint)</h2><div class="row">${plots.map((p) => `<div class="cell">${p.svg}<div><b>${esc(p.sk)} · ${CLOSE} · plan with envelope</b></div></div>`).join('')}</div>` : ''}
 ${errors.length ? `<p class="told">page errors: ${errors.map(esc).join('; ')}</p>` : ''}`;
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 fs.writeFileSync(path.join(OUT, 'metrics.json'), JSON.stringify(metrics, (k, v) => (k === 'told' ? undefined : v), 1));
@@ -169,7 +175,7 @@ if (plots.length) {
   // a FRESH browser: the one that took the full-page sheet screenshot refuses further captures (measured, twice)
   const b2 = await chromium.launch(), pg = await b2.newPage({ viewport: { width: 380, height: 380 }, deviceScaleFactor: 1 });
   for (const p of plots) {
-    const name = `${String(ci++).padStart(2, '0')}-${p.sk}-composed-plan-with-envelope`;
+    const name = `${String(ci++).padStart(2, '0')}-${p.sk}-${CLOSE}-plan-with-envelope`;
     fs.writeFileSync(path.join(OUT, 'cells', `${name}.svg`), p.svg);
     await pg.goto(`file://${path.join(OUT, 'cells', `${name}.svg`)}`); await pg.waitForTimeout(100);
     fs.writeFileSync(path.join(OUT, 'cells', `${name}.png`), await pg.screenshot({ type: 'png' }));

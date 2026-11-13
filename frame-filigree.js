@@ -51,7 +51,8 @@ import { MIN_FEATURE_MM } from './frame-registry.js';
 import { placeElement, relift, drapeElement, mirrorElement, symmetrizeElement, wireElementContact, elementClear, footprintTouches } from './frame-elements.js';
 import { vineFor, silDistance, drapedCrest, edgeFrame, crestLift, standMotifs } from './frame-vine.js';
 import { flowFor } from './frame-flow.js';   // the flow study's prototype (hidden param ornFlow)
-import { composeFor } from './frame-compose.js';   // the flow study's round 2: the composed contour (ornFlow 'composed')
+import { composeFor, frameOf } from './frame-compose.js';
+import { massFor, MASS } from './frame-mass.js';   // the flow study's round 3: the composed contour as carved mass (ornFlow 'mass')   // the flow study's round 2: the composed contour (ornFlow 'composed')
 import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 export const SCROLL_STEP_DEG = 3;
@@ -1104,7 +1105,17 @@ export function withOrnament(model, opts = {}) {
   // line it always was
   const flow = p.ornLayout !== 'groups' && (p.ornFlow === 'band' || p.ornFlow === 'contour');
   const composed = p.ornLayout !== 'groups' && p.ornFlow === 'composed';   // round 2: the composed contour (frame-compose.js)
-  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : composed ? composeFor(model, opts) : flow ? flowFor(model, opts) : vineFor(model, opts);
+  // round 3 (frame-mass.js): the composed spines built as carved MASS — filled regions, unioned, inflated
+  const mass = p.ornLayout !== 'groups' && p.ornFlow === 'mass';
+  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : composed ? composeFor(model, opts) : mass ? composeFor({ ...model, params: { ...p, ornLeaves: 'off' } }, { ...opts, rvMul: MASS.rvMul }) : flow ? flowFor(model, opts) : vineFor(model, opts);
+  let massTop = null;
+  if (mass && orn.flow && orn.flow.side) {
+    const ms = massFor(model, orn, frameOf(orn.flow.side));
+    orn.told.push(...ms.told); orn.massStats = ms.stats; orn.mode = 'mass';
+    orn.spinesKept = orn.curves; orn.curves = [];
+    orn.elements = [...orn.elements, ms.element]; massTop = ms.top;
+    orn.tris.bound = orn.tris.frame + ms.stats.triangles + orn.motifs.reduce((a, o) => a + (o.onAxis ? 1 : 2) * o.el.indices.length / 3, 0);
+  }
   const s = orn.scale;
   const shape = p.ornShape === 'round' ? 'round' : p.ornShape === 'half-round' ? 'half-round' : 'arris';
   // a tapered wire's local width rides on the spine as widthScale (the one
@@ -1142,6 +1153,6 @@ export function withOrnament(model, opts = {}) {
   });
   // THE FLOWER IS THE FEATURE (Eva, Nov 11): the rinceau's motifs raised
   // over the wires as built, crest highest (frame-vine's standMotifs)
-  if (orn.layout === 'rinceau' || orn.layout === 'flow') standMotifs(orn, solids);
+  if (orn.layout === 'rinceau' || orn.layout === 'flow') standMotifs(orn, solids, massTop);
   return { ...model, bands: [...model.bands, ...bands], frameBox: model.box, box: { x0, y0, x1, y1 }, strokes, ornament: { ...orn, spines, solids, shape } };
 }

@@ -27,6 +27,7 @@
 
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { coverageOf } from './frame-mass-coverage.mjs';
 
 const TOL = { L: 0.05, T: 0.08, P: 0.15 };
 const turnsOf = (c) => Math.abs(c.tan[c.tan.length - 1] - c.tan[0]) / (2 * Math.PI);
@@ -72,7 +73,8 @@ export function flowMetrics(m, relief, { RL, FP, print = true } = {}) {
     return { tan: Math.abs(wrap(tc - tp)) * 180 / Math.PI, kap: Math.abs(kc - kp), off: nn.d };
   };
   let composedHand = null;
-  if (o.mode === 'composed') {
+  const comp = o.mode === 'composed' || o.mode === 'mass';
+  if (comp) {
     // a hand-off is two back-to-back volutes with tangent centrelines: the builder's own measurement of each pair
     // (its least centreline gap, how far the two wires overlap there, the tangent angle there, and whether they join)
     const H = o.flow.handoffs.filter((h) => !h.fill);
@@ -85,7 +87,7 @@ export function flowMetrics(m, relief, { RL, FP, print = true } = {}) {
   }
   // following: the body's local tangent against the frame's (the local x-axis)
   const ang = [];
-  if (o.mode === 'composed') {
+  if (comp) {
     for (const c of els) ang.push(...(c.flow.bodyAngDeg || []));
   } else if (o.layout === 'flow') {
     for (const fl of o.flow.flowsRaw) for (const c of fl.curves) { const L = c.local || null; const loc = L || c; const Lb1 = c.info.Lb1; loc.u.forEach((u, i) => { if (u <= Lb1) { let a = Math.abs(wrap(loc.tan[i])); if (a > Math.PI / 2) a = Math.PI - a; ang.push(a * 180 / Math.PI); } }); }
@@ -99,23 +101,26 @@ export function flowMetrics(m, relief, { RL, FP, print = true } = {}) {
     repetition: { pairs: D.length * (D.length - 1) / 2, share, closest },
     continuity: composedHand ? { ...composedHand, maxKap: NaN, maxOff: NaN, composed: true } : { n: hand.length, maxTanDeg: hand.length ? Math.max(...hand.map((h) => h.tan)) : NaN, maxKap: hand.length ? Math.max(...hand.map((h) => h.kap)) : NaN, maxOff: hand.length ? Math.max(...hand.map((h) => h.off)) : NaN },
     following: { n: ang.length, median: q(0.5), p90: q(0.9) },
-    thinnest: Math.min(...o.curves.map((c) => (c.w ? Math.min(...c.w) : c.info.wire))),
+    thinnest: o.curves.length ? Math.min(...o.curves.map((c) => (c.w ? Math.min(...c.w) : c.info.wire))) : null,
+    // the scroll BODY's full width (the composed wire's emitted width; the mass's comma), min / median / max
+    bodyWidth: o.massStats ? o.massStats.bodyWidth : comp ? (() => { const w = []; for (const c of els) c.u.forEach((u, i) => { if (u >= c.body.sA && u <= c.body.sB) w.push(c.w[i]); }); w.sort((a, b) => a - b); return w.length ? { min: w[0], median: w[w.length >> 1], max: w[w.length - 1] } : null; })() : null,
     told: o.told,
   };
   if (relief && RL) {
     const a = RL.analyzeStl(RL.exportStl(relief)), c = RL.connected(relief);
     out.print = { tris: relief.indices.length / 3, budget: 1500000, boundary: a.boundary, regions: c.comps };
+    if (o.flow && o.flow.envelope) { const cv = coverageOf(m, relief, RL, o, FP); out.coverage = { fill: cv.fill, attach: cv.attach, slit: cv.slit ? cv.slit.mm : null, slitAt: cv.slit ? cv.slit.at : null }; }
     if (print && FP) { const mp = FP.measurePrint(relief, { cell: 0.2, slit: true }); out.print.feature = mp.feature.mm; out.print.gap = mp.gap.mm; out.print.slit = mp.slit.mm; out.print.box = mp.box; }
   }
   return out;
 }
 
 export const CASES = [['oval', { skeleton: 'oval', ornBottom: 'on' }], ['rect', { skeleton: 'rect', ornBottom: 'on' }], ['arch', {}]];
-export const MODES = [['rinceau', {}], ['band', { ornFlow: 'band' }], ['contour', { ornFlow: 'contour' }], ['composed', { ornFlow: 'composed' }]];
+export const MODES = [['rinceau', {}], ['band', { ornFlow: 'band' }], ['contour', { ornFlow: 'contour' }], ['composed', { ornFlow: 'composed' }], ['mass', { ornFlow: 'mass' }]];
 
 export async function loadTree(root) {
   const imp = (f) => import(pathToFileURL(path.join(root, f)).href);
-  return { G: await imp('frame-geometry.js'), FL: await imp('frame-filigree.js'), RL: await imp('frame-relief.js'), FP: await imp('frame-print.js') };
+  return { G: await imp('frame-geometry.js'), FL: await imp('frame-filigree.js'), RL: await imp('frame-relief.js'), FP: await imp('frame-print.js'), MS: await imp('frame-mass.js').catch(() => null) };
 }
 export function measureCase(T, params, opts = {}) {
   const m = T.FL.withOrnament(T.G.buildFrame({ ...T.G.DEFAULTS, filigree: 'scrolls', ...params }));
@@ -129,7 +134,9 @@ export function line(r) {
     + (r.continuity.composed ? ` · hand-offs ${r.continuity.n} (back-to-back volutes): ${r.continuity.joined} joined, tangent ≤ ${fmt(r.continuity.maxTanDeg)}°, wires overlap ≥ ${fmt(r.continuity.minOverlap)} mm`
       : ` · hand-offs ${r.continuity.n}: tangent ≤ ${fmt(r.continuity.maxTanDeg)}°, curvature ≤ ${fmt(r.continuity.maxKap)}/mm`)
     + ` · following: median ${fmt(r.following.median)}°, p90 ${fmt(r.following.p90)}°`
-    + (r.print ? ` · print: boundary ${r.print.boundary}, regions ${r.print.regions}, thinnest wire ${fmt(r.thinnest)} mm${r.print.feature != null ? `, narrowest feature ${fmt(r.print.feature)} / gap ${fmt(r.print.gap)} mm${r.print.slit != null ? ` / plan slit ${fmt(r.print.slit)} mm` : ''}` : ''}, ${r.print.tris.toLocaleString('en-US')} tris (${(100 * r.print.tris / r.print.budget).toFixed(1)} %)` : '');
+    + (r.coverage ? ` · COVERAGE: fill ${(100 * r.coverage.fill).toFixed(1)} % of the zone, attached ${(100 * r.coverage.attach).toFixed(1)} % of the edge${r.coverage.slit != null ? `, narrowest pierced neck outside the frame ${fmt(r.coverage.slit)} mm` : ''}` : '')
+    + (r.bodyWidth ? ` · body width ${fmt(r.bodyWidth.min)} / ${fmt(r.bodyWidth.median)} / ${fmt(r.bodyWidth.max)} mm` : '')
+    + (r.print ? ` · print: boundary ${r.print.boundary}, regions ${r.print.regions}, ${r.thinnest != null ? `thinnest wire ${fmt(r.thinnest)} mm` : 'no wire'}${r.print.feature != null ? `, narrowest feature ${fmt(r.print.feature)} / gap ${fmt(r.print.gap)} mm${r.print.slit != null ? ` / plan slit ${fmt(r.print.slit)} mm` : ''}` : ''}, ${r.print.tris.toLocaleString('en-US')} tris (${(100 * r.print.tris / r.print.budget).toFixed(1)} %)` : '');
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

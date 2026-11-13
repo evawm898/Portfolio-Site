@@ -151,7 +151,7 @@ export const COMPOSE = {
 /* the side's own frame                                               */
 /* ------------------------------------------------------------------ */
 
-function frameOf(side) {
+export function frameOf(side) {
   const { P } = side, poly = P.poly, L = P.length;
   const fr = (s) => {
     const [x, y, k, t] = at(P, s);
@@ -293,7 +293,7 @@ function buildScroll(spec) {
 /* the composed ornament                                              */
 /* ------------------------------------------------------------------ */
 
-export function composeFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
+export function composeFor(model, { triBudget = FRAME_TRI_BUDGET, rvMul = 1 } = {}) {   // rvMul: round 3's mass scales the volutes (1: C2's own, by branch)
   const p = model.params, kind = model.info.kind, E = EMBED_MM, Fm = F + MARGIN;
   const frameH = model.box.y1 - model.box.y0, scale = p.printHeight / frameH;
   const region = bandRegion(model, scale);
@@ -337,7 +337,7 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     const type = b.b === 'broot' ? 'C' : lowA && lowB ? 'C' : 'S';
     scrolls.push({ i, a, b, len, type, rise: lowA && !lowB, fall: !lowA && lowB });
   }
-  const clampR = (len, r, mul = 1) => Math.min(r[2] * M, Math.max(r[1], r[0] * len)) * mul;
+  const clampR = (len, r, mul = 1) => (rvMul === 1 ? Math.min(r[2] * M, Math.max(r[1], r[0] * len)) * mul : Math.min(r[2] * M, Math.max(r[1], r[0] * len)) * mul * rvMul);
   // the volutes at each boundary: the end volute of the scroll before, the
   // start volute of the scroll after (a root has none, a foot has no after)
   for (const sc of scrolls) {
