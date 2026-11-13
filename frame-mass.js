@@ -81,7 +81,7 @@ export const MASS = {
   shellMul: 1.35,            // and the shells enlarged (frame-compose's shellMul)
   flute: { off: 0.3, ends: [0.5, 0.9] },   // two flutes down each body, at ± off × its half-width, fading at its ends
   reach: { short: 0.35, len: 0.25, width: 0.16, maxW: 0.3, lean: 25 },   // an outward flame where the mass falls short of the envelope (× M)
-  ground: { min: 2.4, leafMin: 1.8, embed: 1.0, over: 0.8, open: 0.7, lobes: 5, step: 0.34, twoAt: 45 },
+  ground: { min: 2.4, leafMin: 1.8, embed: 1.0, over: 0.8, open: 0.74, lobes: 5, step: 0.34, twoAt: 45 },
   gap: 1.75,                 // mm: a pierced gap's least width (> the 1 mm plan floor, and > 2·close, so the close never fills it)
   close: 0.7,                // mm: the closing radius (a gap narrower than 1.4 mm is filled — no slit)
   open: 0.55,                // mm: the opening radius (a sliver narrower than 1.1 mm is removed)

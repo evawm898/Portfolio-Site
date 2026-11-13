@@ -610,11 +610,16 @@ bronze; light highlights on the bronze are missed, so the figure is if anything 
 | round 2, C2 (wire) | 24.2 / 26.9 / 24.6 % | 15.0 / 14.4 / 23.4 % |
 | round 3, M1 | 59.8 / 68.5 / 61.0 % | 62.1 / 74.7 / 74.9 % |
 | round 3, M2 | 58.5 / 70.1 / 64.6 % | 99.6 / 99.1 / 91.2 % |
-| **round 3, M3 (final)** | **58.2 / 69.3 / 63.4 %** | **99.4 / 97.1 / 89.5 %** |
+| round 3, M3 (the sheet) | 58.2 / 69.3 / 63.4 % | 99.4 / 97.1 / 89.5 % |
+| **round 3, M3 as merged (the ground's opening 0.70 → 0.74, below)** | **57.5 / 68.7 / 62.2 %** | **99.4 / 95.9 / 89.5 %** |
 
-**Coverage is met: within 10 points of the reference on every skeleton.** The rectangle sits on the band's edge
-(69.34 % against a 69.3 % ceiling), and the gate's FV clause reads it as a FAIL by 0.04 points. It is reported, not
-tuned. The ornament now hugs the frame along most of each run (attached 90–99 % against the reference's 57 %): more
+**Coverage is met: within 10 points of the reference on every skeleton.** On the M3 sheet the rectangle sat on the
+band's edge, 69.34 % against a 69.3 % ceiling, so the gate's FV clause read it as a FAIL by 0.04 points. Eva ruled:
+fix it by tuning or by a justified band, never by loosening it silently. **It was fixed by TUNING, and the band is
+unchanged.** The ground leaf's opening is `MASS.ground.open` 0.70 → 0.74: the crescent between the ground leaf and
+the body is 6 % taller. That takes the rectangle to 68.7 % (68.8 % at 300 mm) and moves the other two the same way, to
+57.5 % (oval) and 62.2 % (arch). Every gate clause passes on every mass row, re-run on the merged tree. It is the one
+change since the M3 sheet. No critic saw it: it moves only the lens openings and is below what the sheet would show. The ornament now hugs the frame along most of each run (attached 90–99 % against the reference's 57 %): more
 than the reference, which stands its scrolls off the molding in places.
 
 ### 10.3 The rounds (a FRESH critic each, who saw only the sheet, the references and the grammar)
@@ -680,21 +685,21 @@ spine cannot be that, however it is inflated, because the spine says where the b
 
 | | oval | rectangle | arch |
 |---|---|---|---|
-| fill / attachment (§10.2) | 58.2 % / 99.4 % | 69.3 % / 97.1 % | 63.4 % / 89.5 % |
+| fill / attachment (§10.2, as merged) | 57.5 % / 99.4 % | 68.7 % / 95.9 % | 62.2 % / 89.5 % |
 | body full width min / median / max | 1.57 / 4.00 / 5.24 mm | 1.08 / 3.74 / 5.24 mm | 1.03 / 3.37 / 5.09 mm |
 | hand-offs solid in the mass · tangent | 5 of 5 · ≤ 3.4° | 7 of 7 · ≤ 3.4° | 5 of 5 · ≤ 2.8° |
 | repetition (spines) | 0 of 15 | 0 of 28 | 0 of 15 |
 | following: median / p90 | 24.0° / 53.9° | 21.7° / 77.2° | 20.6° / 64.7° |
-| narrowest pierced neck outside the frame | 2.06 mm | 3.00 mm | 1.40 mm |
+| narrowest pierced neck outside the frame | 2.06 mm | 2.60 mm | 1.40 mm |
 | boundary edges · voxel regions | 0 · 1 | 0 · 1 | 0 · 1 |
 | narrowest solid feature (0.2 mm raster) | 2.60 mm | 1.80 mm | 1.80 mm |
-| triangles (of the 1.5 M budget) | 723,724 (48.2 %) | 768,224 (51.2 %) | 502,772 (33.5 %) |
+| triangles (of the 1.5 M budget) | 718,140 (47.9 %) | 764,048 (50.9 %) | 496,756 (33.1 %) |
 
 Notes:
 - **The arch's whole-plan slit reads 0.20 mm and it is not the ornament's.** It is the frame's own head/light cusp:
   measured, the frame alone at the same raster phase reads 0.20 mm. So the mass's plan-gap clause measures the empty
   necks OUTSIDE the frame's silhouette, with the frame counted solid.
-- **The 300 mm rectangle is clean now** (the gate's `rect mass, 300 mm` row: every clause but FV, 69.3 %). Round 2's
+- **The 300 mm rectangle is clean now** (the gate's `rect mass, 300 mm` row: every clause, FV 68.8 %). Round 2's
   wire failed FK and FP there. The raster scales with the print, so the triangle count holds (50.8 %).
 - The non-manifold edges the relief reports (264 / 264 / 96) are the shells' and the frame's, identical with the
   ornament composed as wire. The mass element itself has 0 boundary and 0 non-manifold edges (counted on it alone).
