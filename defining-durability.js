@@ -513,79 +513,103 @@
 
   // ============================================================ pilling
 
-  // A knit face. Loose fibres work out of the yarns as fuzz, then tangle into
-  // balls held to the surface by a few anchoring fibres: pills. The face is
-  // graded by eye against a reference card, 5 (no pilling) to 1 (very severe).
+  // A knit face. Loose fibres work out of the yarns as a fine fuzz, then roll
+  // up into small, matted balls of fibre held to the surface by a few
+  // anchoring fibres: pills. Each pill is drawn as what it is, a tangle of
+  // short fibres with a soft edge and a shadow, never a smooth bead. The face
+  // is graded by eye against a reference card: 5 (no pilling) to 1 (very
+  // severe). The test ends at grade 2, which is the card it matches.
   (() => {
-    const SITES = Array.from({ length: 22 }, (_, k) => ({ u: 0.06 + 0.88 * hash(k * 5 + 1), v: 0.08 + 0.84 * hash(k * 9 + 4), r: 0.6 + 0.4 * hash(k * 3 + 2), at: 0.32 + 0.38 * hash(k * 11 + 7) }));
-    const STRANDS = Array.from({ length: 240 }, (_, k) => ({ u: hash(k * 2.7 + 9), v: hash(k * 4.1 + 3), a: hash(k * 1.3) * Math.PI * 2, len: 0.6 + 0.4 * hash(k * 6.1), curl: (hash(k * 8.3) - 0.5) * 3 }));
-    STRANDS.forEach(f => { let best = 0, bd = 9; SITES.forEach((p, i) => { const d = Math.hypot(p.u - f.u, (p.v - f.v) * 0.8); if (d < bd) { bd = d; best = i; } }); f.site = best; f.d = bd; });
-    const grade = t => t < 0.22 ? 5 : t < 0.42 ? 4 : t < 0.62 ? 3 : 2;
-    const pill = (ctx, x, y, r) => {
-      ctx.fillStyle = TEAL.light; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = TEAL.hi; ctx.lineWidth = 0.7;
-      for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x + (k - 1.5) * r * 0.2, y + ((k % 2) - 0.5) * r * 0.3, r * (0.45 + 0.1 * k), k, k + 3.6); ctx.stroke(); }
-      ctx.strokeStyle = TEAL.dark; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
-    };
-    function face(ctx, x, y, w, h, t, p, ps) {
-      ps = ps || p;
+    const N_ALL = 52, N_MAIN = 34;
+    const SITES = Array.from({ length: N_ALL }, (_, k) => ({ u: 0.05 + 0.9 * hash(k * 5 + 1), v: 0.07 + 0.86 * hash(k * 9 + 4), r: 0.55 + 0.6 * hash(k * 3 + 2), at: 0.3 + 0.35 * hash(k * 11 + 7), k }));
+    const STRANDS = Array.from({ length: 300 }, (_, k) => ({ u: hash(k * 2.7 + 9), v: hash(k * 4.1 + 3), a: -Math.PI / 2 + (hash(k * 1.3) - 0.5) * 2.2, len: 0.5 + 0.5 * hash(k * 6.1), curl: (hash(k * 8.3) - 0.5) * 2 }));
+    const FIBRE = ['#9fd0c8', '#86bfb7', '#b7ddd6', '#7aaea7'];
+    const grade = t => t < 0.25 ? 5 : t < 0.48 ? 4 : t < 0.75 ? 3 : 2;
+    // card k shows grade 5 - k; 2 is where the test ends, 1 is worse still
+    const CARDS = [{ t: 0.1, n: N_MAIN, s: 1 }, { t: 0.4, n: N_MAIN, s: 1 }, { t: 0.62, n: N_MAIN, s: 1 }, { t: 1, n: N_MAIN, s: 1 }, { t: 1, n: N_ALL, s: 1.35 }];
+
+    function pill(ctx, x, y, r, seed) {
+      // shadow under the ball
+      ctx.fillStyle = 'rgba(6,20,20,0.55)'; ctx.beginPath(); ctx.ellipse(x + r * 0.18, y + r * 0.32, r * 1.02, r * 0.86, 0, 0, Math.PI * 2); ctx.fill();
+      // anchoring fibres running down into the knit
+      ctx.strokeStyle = '#6fa59e'; ctx.lineWidth = Math.max(0.5, r * 0.12); ctx.lineCap = 'round';
+      for (let k = 0; k < 3; k++) { const a = Math.PI * (0.25 + 0.5 * hash(seed + k * 1.7)), L = r * (1.3 + 0.7 * hash(seed * 3 + k)); ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + Math.cos(a) * L * 0.5 + r * 0.3, y + Math.sin(a) * L * 0.5, x + Math.cos(a) * L, y + Math.sin(a) * L); ctx.stroke(); }
+      // a matted core, then a tangle of short curled fibres, denser in the middle
+      ctx.fillStyle = '#5e958f'; ctx.beginPath(); ctx.arc(x, y, r * 0.78, 0, Math.PI * 2); ctx.fill();
+      const n = Math.round(14 + r * 7);
+      ctx.lineWidth = Math.max(0.45, r * 0.11);
+      for (let k = 0; k < n; k++) {
+        const h1 = hash(seed * 7.3 + k), h2 = hash(seed * 2.1 + k * 3.7), h3 = hash(seed + k * 9.1);
+        const rr = r * 0.75 * Math.sqrt(h1), ang = h2 * Math.PI * 2;
+        const cx = x + Math.cos(ang) * rr, cy = y + Math.sin(ang) * rr - r * 0.08;
+        const cr = r * (0.22 + 0.3 * h3), a0 = h3 * 6.28;
+        ctx.strokeStyle = FIBRE[k % FIBRE.length]; ctx.globalAlpha = 0.75 + 0.25 * (1 - h1);
+        ctx.beginPath(); ctx.arc(cx, cy, cr, a0, a0 + 1.6 + 2.2 * h2); ctx.stroke();
+      }
+      // stray fibres frizzing out of the edge
+      ctx.globalAlpha = 0.7; ctx.strokeStyle = '#b7ddd6'; ctx.lineWidth = Math.max(0.4, r * 0.07);
+      for (let k = 0; k < 7; k++) { const a = hash(seed * 5.5 + k) * 6.28, L = r * (0.35 + 0.45 * hash(seed + k * 2.9)); const sx = x + Math.cos(a) * r * 0.8, sy = y + Math.sin(a) * r * 0.8; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.quadraticCurveTo(sx + Math.cos(a + 0.6) * L * 0.6, sy + Math.sin(a + 0.6) * L * 0.6, sx + Math.cos(a) * L, sy + Math.sin(a) * L); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    }
+    function face(ctx, x, y, w, h, t, p, ps, n, size) {
+      ps = ps || p; n = n || N_MAIN; size = size || 1;
       ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
       knitFace(ctx, x, y, w, h, p);
-      const grow = seg(t, 0.03, 0.32), fl = Math.max(3, ps * 1.3);
-      ctx.lineWidth = ps > 6 ? 1.2 : 0.7; ctx.strokeStyle = TEAL.hi; ctx.lineCap = 'round';
-      for (const f of STRANDS) {
-        const S = SITES[f.site], q = seg(t, S.at, S.at + 0.22) * (f.d < 0.16 ? 1 : 0.55);
-        const L = fl * f.len * grow * (1 - q);
-        if (L < 0.8) continue;
-        const bx = lerp(x + f.u * w, x + S.u * w, q * 0.8), by = lerp(y + f.v * h, y + S.v * h, q * 0.8);
-        ctx.globalAlpha = 0.9;
-        ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(bx + Math.cos(f.a + f.curl) * L * 0.7, by + Math.sin(f.a + f.curl) * L * 0.7, bx + Math.cos(f.a) * L, by + Math.sin(f.a) * L); ctx.stroke();
+      // the fuzz: fine fibre ends lifting off the knit, gathered up again as pills form
+      const grow = seg(t, 0.04, 0.3), fl = Math.max(2.5, ps * 0.9);
+      ctx.lineWidth = ps > 6 ? 0.7 : 0.5; ctx.strokeStyle = '#a9d6cf'; ctx.lineCap = 'round';
+      const roll = seg(t, 0.35, 1);
+      for (let i = 0; i < STRANDS.length; i++) {
+        const f = STRANDS[i], L = fl * f.len * grow * (1 - 0.75 * roll);
+        if (L < 0.7) continue;
+        const bx = x + f.u * w, by = y + f.v * h;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(bx + Math.cos(f.a + f.curl) * L * 0.6, by + Math.sin(f.a + f.curl) * L * 0.6, bx + Math.cos(f.a) * L, by + Math.sin(f.a) * L); ctx.stroke();
       }
       ctx.globalAlpha = 1;
-      for (const S of SITES) {
-        const q = seg(t, S.at, S.at + 0.3); if (q <= 0) continue;
-        const r = Math.max(1.2, ps * 0.85 * S.r) * Math.sqrt(q);
-        const px = x + S.u * w, py = y + S.v * h;
-        ctx.strokeStyle = TEAL.hi; ctx.lineWidth = 0.7;
-        for (let k = 0; k < 3; k++) { const a = hash(px + k) * 6.3; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + Math.cos(a) * r * 1.7, py + Math.sin(a) * r * 1.7); ctx.stroke(); }
-        pill(ctx, px, py, r);
+      for (let i = 0; i < n; i++) {
+        const S = SITES[i], q = seg(t, S.at, S.at + 0.3); if (q <= 0) continue;
+        const r = Math.max(0.9, ps * 0.72 * S.r * size) * Math.sqrt(q);
+        pill(ctx, x + S.u * w, y + S.v * h, r, S.k + 1);
       }
       ctx.restore();
     }
     figure({
       id: 'ddPill', D: 11,
-      layout: w => twoUp(w, { ratio: 0.72, min: 250, max: 280, wideH: 300, split: 0.58 }),
+      layout: w => twoUp(w, { ratio: 0.74, min: 260, max: 290, wideH: 310, split: 0.58 }),
       draw(st) {
         const { ctx, C } = st, s = st.scene, g = grade(st.t);
         counter(st, s.x + 2, s.y + 2, 'PILLING GRADE', String(g));
-        const cardH = Math.round(clamp(s.w * 0.14, 38, 52)), fh = s.h - 40 - cardH - 30;
+        const cardH = Math.round(clamp(s.w * 0.14, 38, 52)), fh = s.h - 40 - cardH - 54;
         const fw = Math.min(s.w - 4, fh * 1.6), fx = s.x + 2, fy = s.y + 38;
         const pMain = Math.max(7, fw / 26);
         face(ctx, fx, fy, fw, fh, st.t, pMain);
         ctx.strokeStyle = MACH.edge; ctx.lineWidth = 1; ctx.strokeRect(fx + 0.5, fy + 0.5, fw - 1, fh - 1);
         label(st, 'fabric face', fx + fw - 2, fy - 8, 'right');
-        // reference card: five swatches, 5 (none) to 1 (very severe)
+        // reference card: five swatches at the same scale as the face, best to worst
         const cy = fy + fh + 20, gap = 6, cw = Math.min(cardH * 1.3, (s.w - 4 - 4 * gap) / 5);
         label(st, 'reference card', s.x + 2, cy - 8, 'left');
         for (let k = 0; k < 5; k++) {
-          const gr = 5 - k, x = s.x + 2 + k * (cw + gap), tEq = [0, 0.32, 0.52, 0.72, 1][k];
-          face(ctx, x, cy, cw, cardH, tEq, Math.max(4, cw / 9), pMain * cw / fw * 2);
+          const gr = 5 - k, x = s.x + 2 + k * (cw + gap), Cd = CARDS[k];
+          face(ctx, x, cy, cw, cardH, Cd.t, Math.max(4, cw / 9), pMain * cw / fw * 1.8, Cd.n, Cd.s);
           const on = gr === g;
           ctx.strokeStyle = on ? C.ink : MACH.edge; ctx.lineWidth = on ? 2 : 1; ctx.strokeRect(x + 0.5, cy + 0.5, cw - 1, cardH - 1);
           label(st, String(gr), x + cw / 2, cy + cardH + 9, 'center', on ? C.ink : C.dim);
+          if (k === 0 || k === 4) label(st, k ? 'severe' : 'none', x + cw / 2, cy + cardH + 21, 'center');
         }
         // chart: the grade a person gives, against test time
-        const ax = axes(st, { title: 'GRADE vs TEST TIME', x0: 0, x1: 1, y0: 0.6, y1: 5.4, yLabel: 'grade · 5 = none', xLabel: 'rubs, tumbles or turns →', yTicks: [[5, '5'], [4, '4'], [3, '3'], [2, '2'], [1, '1']] });
+        const ax = axes(st, { title: 'GRADE vs TEST TIME', x0: 0, x1: 1, y0: 0.6, y1: 5.4, yLabel: 'grade · 5 = no pills', xLabel: 'rubs, tumbles or turns →', yTicks: [[5, '5'], [4, '4'], [3, '3'], [2, '2'], [1, '1']] });
         const pts = [];
         for (let k = 0; k <= 200 * st.t; k++) { const t = k / 200; pts.push([t, grade(t)]); }
         pts.push([st.t, g]);
         plot(ctx, pts, ax.X, ax.Y);
         dot(ctx, ax.X(st.t), ax.Y(g), 2.8);
+        label(st, 'worse ↓', ax.px + 6, ax.Y(1.3), 'left');
       },
       readout(st) {
         const g = grade(st.t);
-        if (st.t >= 1) return 'Graded <strong>2</strong> against the card (illustrative): fuzz rose first, then tangled into pills held on by a few fibres.';
-        return st.t < 0.32 ? 'Fibres working loose · <strong>fuzz</strong> rising. Grade ' + g + '.' : 'Fuzz tangling into <strong>pills</strong>. Grade ' + g + '.';
+        if (st.t >= 1) return 'Graded <strong>2</strong> against the card (illustrative): 5 is no pilling, 1 very severe. Fuzz rose first, then rolled up into pills held on by a few fibres.';
+        return st.t < 0.32 ? 'Fibres working loose · a fine <strong>fuzz</strong>. Grade ' + g + '.' : 'Fuzz rolling up into <strong>pills</strong>. Grade ' + g + '.';
       },
     });
   })();
