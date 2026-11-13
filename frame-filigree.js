@@ -50,6 +50,7 @@ import { bandSolid, Mesh, EMBED_MM, FRAME_TRI_BUDGET, solidTriBound, plateOutlin
 import { MIN_FEATURE_MM } from './frame-registry.js';
 import { placeElement, relift, drapeElement, mirrorElement, symmetrizeElement, wireElementContact, elementClear, footprintTouches } from './frame-elements.js';
 import { vineFor, silDistance, drapedCrest, edgeFrame, crestLift, standMotifs } from './frame-vine.js';
+import { flowFor } from './frame-flow.js';   // the flow study's prototype (hidden param ornFlow)
 import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 export const SCROLL_STEP_DEG = 3;
@@ -1097,7 +1098,11 @@ export function withOrnament(model, opts = {}) {
   // phase 3f step 2: the RINCEAU (frame-vine.js's vineFor, with
   // frame-rinceau.js's laws) along the band, or the phase-3a GROUPS at the
   // anchors. The chains of phase 3d are RETIRED (Eva, Nov 10)
-  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : vineFor(model, opts);
+  // the FLOW STUDY (Nov 13, frame-flow.js): a hidden param, `ornFlow` 'band' or
+  // 'contour', replaces the rinceau with the flow model; absent, this is the
+  // line it always was
+  const flow = p.ornLayout !== 'groups' && (p.ornFlow === 'band' || p.ornFlow === 'contour');
+  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : flow ? flowFor(model, opts) : vineFor(model, opts);
   const s = orn.scale;
   const shape = p.ornShape === 'round' ? 'round' : p.ornShape === 'half-round' ? 'half-round' : 'arris';
   // a tapered wire's local width rides on the spine as widthScale (the one
@@ -1135,6 +1140,6 @@ export function withOrnament(model, opts = {}) {
   });
   // THE FLOWER IS THE FEATURE (Eva, Nov 11): the rinceau's motifs raised
   // over the wires as built, crest highest (frame-vine's standMotifs)
-  if (orn.layout === 'rinceau') standMotifs(orn, solids);
+  if (orn.layout === 'rinceau' || orn.layout === 'flow') standMotifs(orn, solids);
   return { ...model, bands: [...model.bands, ...bands], frameBox: model.box, box: { x0, y0, x1, y1 }, strokes, ornament: { ...orn, spines, solids, shape } };
 }
