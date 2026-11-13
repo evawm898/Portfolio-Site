@@ -112,8 +112,13 @@ ${rows.map((r) => `<h2>${esc(r.head)}</h2><div class="row">${r.cells.map((c) => 
 ${errors.length ? `<p class="told">page errors: ${errors.map(esc).join('; ')}</p>` : ''}`;
 fs.writeFileSync(path.join(OUT, 'index.html'), html);
 fs.writeFileSync(path.join(OUT, 'metrics.json'), JSON.stringify(metrics, (k, v) => (k === 'told' ? undefined : v), 1));
-const p2 = await browser.newPage({ viewport: { width: 1220, height: 900 } });
-await p2.goto(`file://${path.join(OUT, 'index.html')}`);
-await p2.screenshot({ path: PNG, fullPage: true });
+try {
+  const p2 = await browser.newPage({ viewport: { width: 1220, height: 900 } });
+  await p2.goto(`file://${path.join(OUT, 'index.html')}`);
+  await p2.screenshot({ path: PNG, fullPage: true });
+} catch (e) { console.log(`the sheet PNG was not written: ${e.message}`); }
+// every cell as its own file (the critic reads them at full size)
+fs.mkdirSync(path.join(OUT, 'cells'), { recursive: true });
+let ci = 0; for (const r of rows) for (const c of r.cells) fs.writeFileSync(path.join(OUT, 'cells', `${String(ci++).padStart(2, '0')}-${c.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)}.png`), Buffer.from(c.png, 'base64'));
 await browser.close();
 console.log(`wrote ${path.join(OUT, 'index.html')} and ${PNG}${errors.length ? ` — ${errors.length} page errors: ${errors.slice(0, 3).join(' | ')}` : ''}`);

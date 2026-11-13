@@ -67,26 +67,31 @@ export const FLOW_MEET = {
 };
 /* the element laws, × the band width M; [band, contour] where they differ */
 export const FLOW = {
-  size: { band: [2.2, 1.0], contour: [3.4, 1.6] },   // the source element's length: base + slope × the source's weight
+  size: { band: [2.8, 1.2], contour: [4.2, 1.8] },   // the source element's length: base + slope × the source's weight
   cornerTilt: 0.14,     // a corner's weight × (1 + this × its height on the frame, −1 bottom … +1 top)
   decay: 0.42,          // the length falls by this share from the source to the meeting
-  maxLen: { band: 5.0, contour: 7.0 },   // × M: no element longer (R2's longest, the flank flame, is 5.8 M of ITS band; ours is the asked band, narrower)
+  maxLen: { band: 5.0, contour: 7.5 },   // × M: no element longer (R2's longest, the flank flame, is 5.8 M of ITS band; ours is the asked band, narrower)
   flatK: 0.3,           // length ∝ (the outline's radius / FLOW.rhoRef)^flatK, clamped
   flatClamp: [0.72, 1.35],
   rhoRef: 4,            // × M
-  rvK: { band: [0.12, 0.09], contour: [0.13, 0.1] },   // the volute's start radius, × the element's length, at the source → at the meeting
+  rvK: { band: [0.12, 0.1], contour: [0.15, 0.12] },   // the volute's start radius, × the element's length, at the source → at the meeting
   turns: [0.95, 1.35],   // the volute's asked turns, source → meeting (held to the coil gap)
   turnsJitter: [0, 0.14, -0.08, 0.1, -0.12, 0.06, -0.04, 0.12, -0.1],
+  resize: [0.88, 1.12, 0.78, 1.25, 0.68, 0.58],   // the settle's ladder of sizes for an element that grazes
+  bow: [0.55, 0.3],     // rad: the body's swoop (turned against its volute), source → meeting
+  bowJitter: [0, 0.12, -0.08, 0.1, -0.06, 0.08, -0.1, 0.04, 0.06],
   splitJitter: [0.5, 0.36, 0.62, 0.44, 0.56, 0.4, 0.66, 0.48, 0.38],
-  capK: 0.095,          // the carved cap (the body's width), × the element's length
-  capOfRv: 0.62,        // …and at most this × the volute's start radius
+  capK: 0.11,          // the carved cap (the body's width), × the element's length
+  capOfRv: 0.8,        // …and at most this × the volute's start radius
   minBody: 0.32,        // the body is at least this share of the element
-  body: 0.5,           // the gentle body (before the ramp) is at least this share
+  body: 0.45,           // the gentle body (before the ramp) is at least this share
   forkBack: 0.6,       // × the parent's rv: the fork stands this far before the parent's curl begins
   coilRoom: 1.6,        // × rv: how far a volute's coil stands past its body's end
-  leafLen: 0.36, leafAspect: 0.46, leafLobes: 5, leafTilt: 0.22,   // the sheathing acanthus, × the child's length
+  leafLen: 0.5, leafAspect: 0.34, leafLobes: 4, leafTilt: 0.3,   // the sheathing acanthus, × the child's length
   termLen: 0.55,        // the meeting's terminal leaf, × the last element's length
-  envelope: [0.8, 1.6],   // contour: the outer envelope past the band, × M: base + slope × w(s)
+  envelope: [0.9, 1.7],
+  contourDip: 0.6,      // × M: contour — the inner volutes dip this far into the band (they ARE the attachment); the bodies ride beyond it
+  crestScale: 1.7,      // contour: the crest shell built on a band this much wider (it heads the silhouette, R2's 2.5 M)   // contour: the outer envelope past the band, × M: base + slope × w(s)
   limitPad: 0.12,       // × M: band mode keeps every wire edge this far inside the band's edges
 };
 
@@ -116,7 +121,13 @@ export function flowElement(spec, bodyOnly = false) {
   // solve must cancel with a loop)
   const Lb = S - Lv, Lb2 = Math.min(0.5 * Lb, (1.1 + split) * rv), Lb1 = Lb - Lb2, k1 = sgn / rv;
   const km = (2 * (phiEnd - phi) - Lb1 * k0 - Lb2 * k1) / Lb;
-  const kOf = (s) => (s <= Lb1 ? k0 + (km - k0) * s / Lb1 : s <= Lb ? km + (k1 - km) * (s - Lb1) / Lb2 : sgn / (rv + (re - rv) * Math.min(1, (s - Lb) / Lv)));
+  // the BOW: a single swoop over the gentle body, B sin(π s / Lb1) — zero at
+  // both of its ends (the fork's curvature and the ramp's start are
+  // untouched: G2 holds) — turned against the volute so body and volute read
+  // as one S; its heading is absorbed by the solve for km
+  const B = (spec.bow ?? 0) * Math.PI / (2 * Math.max(1e-9, Lb1)) * -sgn;
+  const kmRaw = km - (Lb1 > 0 ? 4 * B * Lb1 / Math.PI / Lb : 0);
+  const kOf = (s) => (s <= Lb1 ? k0 + (kmRaw - k0) * s / Lb1 + B * FM.sin(Math.PI * s / Lb1) : s <= Lb ? kmRaw + (k1 - kmRaw) * (s - Lb1) / Lb2 : sgn / (rv + (re - rv) * Math.min(1, (s - Lb) / Lv)));
   const end = bodyOnly ? Lb : S;
   const n = Math.max(24, Math.ceil(end / Math.min(0.25, S / 240)));
   const ds = end / n;
@@ -129,7 +140,7 @@ export function flowElement(spec, bodyOnly = false) {
   }
   const nrm = tan.map((a) => [-FM.sin(a), FM.cos(a)]);
   const w = kap.map((k) => carvedWidth(1 / Math.max(1e-12, Math.abs(k)), cap));
-  return { kind: 'flow', pts, tan, nrm, kap, u, w, root: 0, info: { kind: 'flow', role: 'scroll', carved: true, wire: cap, tip: F, L: S, rv, re, turns, split, turnsAsked: spec.turns, sgn, Lb, Lb1, Lv, k0, km, k1, phi, phiEnd } };
+  return { kind: 'flow', pts, tan, nrm, kap, u, w, root: 0, info: { kind: 'flow', role: 'scroll', carved: true, wire: cap, tip: F, L: S, rv, re, turns, split, bow: spec.bow ?? 0, turnsAsked: spec.turns, sgn, Lb, Lb1, Lv, k0, km: kmRaw, k1, phi, phiEnd } };
 }
 
 /* the body's end heading that lands the body's end at height yT (bisection:
@@ -232,7 +243,7 @@ export function flowPlan(side) {
    the growth, y outward from the path line): n elements at one scale k.
    ctx: { M, D, mode, S0, lim(x) → [ylo, yhi] (the wire-centre's limits),
    flat(x), root0 } */
-function layChain(ctx, n, k, shrink = []) {
+function layChain(ctx, n, k, shrink = [], flip = []) {
   const els = [];
   for (let i = 0; i < n; i++) {
     const t = n > 1 ? i / (n - 1) : 0;
@@ -248,7 +259,7 @@ function layChain(ctx, n, k, shrink = []) {
       const best = Math.max(1, parent.u.findIndex((s) => s >= sF));
       root = parent.pts[best].slice(); phi = parent.tan[best]; k0 = parent.kap[best]; parent.info.fork = best;
     }
-    const sgn = i === 0 ? ctx.firstSgn : -els[i - 1].info.sgn;
+    const sgn = (i === 0 ? ctx.firstSgn : -els[i - 1].info.sgn) * (flip[i] ? -1 : 1);
     const flat = ctx.flat(root[0]);
     const S = Math.min(FLOW.maxLen[ctx.mode] * ctx.M, k * ctx.S0 * (1 - FLOW.decay * t) * flat) * (shrink[i] ?? 1);
     const rk = FLOW.rvK[ctx.mode], rvK = rk[0] + (rk[1] - rk[0]) * t;
@@ -266,7 +277,7 @@ function layChain(ctx, n, k, shrink = []) {
     const cap = Math.max(F, Math.min(FLOW.capK * S, FLOW.capOfRv * rv));
     for (let tries = 0; tries < 6; tries++) {
       let tt = turns;
-      const base = { root, phi, k0, S, rv, re: F, sgn, split, turns: tt, cap };
+      const base = { root, phi, k0, S, rv, re: F, sgn, split, turns: tt, cap, bow: ctx.bow(i, t) };
       const Lv = Math.min((1 - FLOW.minBody) * S, voluteLen(turns, Math.max(rv, 1.6 * F), F)), xe = root[0] + 0.85 * (S - Lv);
       const [ylo, yhi] = ctx.lim(xe);
       const yRaw = sgn > 0 ? yhi - FLOW.coilRoom * rv - cap / 2 : ylo + FLOW.coilRoom * rv + cap / 2;
@@ -387,11 +398,11 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
       const x0 = onAxis ? (F + cap0) / 2 + 0.1 + 0.4 * M : 0.15 * M;
       const lim = (x) => {
         const s = end === 'a' ? sStart + x : sStart - x;
-        return mode === 'band' ? [yIn + pad, yOut - pad] : [yIn + pad, yOut + envAt(s)];
+        return mode === 'band' ? [yIn + pad, yOut - pad] : [yOut - FLOW.contourDip * M, yOut + envAt(s)];
       };
       const flat = (x) => { const kap = curvatureAt(path, Math.min(path.length, Math.max(0, x)), M); const rho = kap > 1e-9 ? 1 / kap : 1e9; return Math.min(FLOW.flatClamp[1], Math.max(FLOW.flatClamp[0], FM.pow(rho / (FLOW.rhoRef * M), FLOW.flatK))); };
-      const root0 = { pt: [x0, mode === 'band' ? (yIn + yOut) / 2 : yOut - 0.4 * M], phi: mode === 'band' ? 0 : 0.18 };
-      const ctx = { M, D, mode, S0, lim, flat, root0, firstSgn: 1 };
+      const root0 = { pt: [x0, mode === 'band' ? (yIn + yOut) / 2 : yOut - FLOW.contourDip * M + cap0 / 2 + 0.3], phi: mode === 'band' ? 0 : 0.25 };
+      const ctx = { M, D, mode, S0, lim, flat, root0, firstSgn: 1, bow: (i, t) => FLOW.bow[0] + (FLOW.bow[1] - FLOW.bow[0]) * t + FLOW.bowJitter[i % FLOW.bowJitter.length] };
       const fit = fitChain(ctx);
       flows.push({ seg: sg, end, src, path, ctx, fit, onAxis, sStart, dir: end === 'a' ? 1 : -1, local: fit.els });
     }
@@ -411,7 +422,7 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
   const why = [];
   const mapOne = (fl, loc, i) => { const m = mapToPath(loc, fl.path, 0); m.flow = fl; m.k = i; m.localPts = loc.pts; m.local = loc; m.info = { ...loc.info, role: 'scroll' }; return m; };
   for (const fl of flows) {
-    const keptHere = [], shrink = [];
+    const keptHere = [], shrink = [], tried = [], flip = [];
     let i = 0, guard = 0;
     while (i < fl.local.length && guard++ < 200) {
       const ok = (c) => {
@@ -435,15 +446,18 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
       if (r) {
         // (1) fewer turns on the same body — the children are unmoved
         const L0 = fl.local[i];
-        const remake = (tf) => { const loc = flowElement({ root: L0.pts[0], phi: L0.info.phi, k0: L0.info.k0, S: L0.info.Lb + voluteLen(tf * L0.info.turns, L0.info.rv, L0.info.re), rv: L0.info.rv, re: L0.info.re, sgn: L0.info.sgn, split: L0.info.split, turns: tf * L0.info.turns, phiEnd: L0.info.phiEnd, cap: L0.info.wire }); Object.assign(loc.info, { t: L0.info.t, index: i, fork: L0.info.fork, over: L0.info.over }); return mapOne(fl, loc, i); };
+        const remake = (tf) => { const loc = flowElement({ root: L0.pts[0], phi: L0.info.phi, k0: L0.info.k0, S: L0.info.Lb + voluteLen(tf * L0.info.turns, L0.info.rv, L0.info.re), rv: L0.info.rv, re: L0.info.re, sgn: L0.info.sgn, split: L0.info.split, bow: L0.info.bow, turns: tf * L0.info.turns, phiEnd: L0.info.phiEnd, cap: L0.info.wire }); Object.assign(loc.info, { t: L0.info.t, index: i, fork: L0.info.fork, over: L0.info.over }); return mapOne(fl, loc, i); };
         let best = null, lo = 0.2, hi = 1;
         if (!ok(remake(lo))) { best = remake(lo); for (let it = 0; it < 7; it++) { const m = (lo + hi) / 2, cm = remake(m); if (!ok(cm)) { best = cm; lo = m; } else hi = m; } }
         if (best) { c = best; lowered++; }
-        else if ((shrink[i] ?? 1) > 0.55) {
-          // (2) the element made smaller and the chain re-laid from it (every
-          // element before it is the same, so nothing kept moves)
-          shrink[i] = (shrink[i] ?? 1) * 0.85; shrunk++;
-          const els = layChain(fl.ctx, fl.fit.n, fl.fit.k, shrink);
+        else if ((tried[i] = (tried[i] ?? 0) + 1) <= 2 * FLOW.resize.length) {
+          // (2) the element re-sized (a ladder: smaller and larger — a graze
+          // clears by an overlap as well as by a gap) and the chain re-laid
+          // from it (every element before it is the same, so nothing kept moves)
+          // (the second pass of the ladder turns its volute to the other side —
+          // the alternation broken once rather than the flow cut)
+          shrink[i] = FLOW.resize[(tried[i] - 1) % FLOW.resize.length]; flip[i] = tried[i] > FLOW.resize.length; shrunk++;
+          const els = layChain(fl.ctx, fl.fit.n, fl.fit.k, shrink, flip);
           for (let j = 0; j < i; j++) els[j] = fl.local[j];
           fl.local = els;
           continue;
@@ -453,7 +467,7 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     }
     fl.curves = keptHere;
   }
-  if (shrunk) told.push(`${shrunk} element${shrunk > 1 ? 's' : ''} made smaller (the chain re-laid from it) to keep a feature clear`);
+  if (shrunk) told.push(`${shrunk} element re-size${shrunk > 1 ? 's' : ''} (the chain re-laid from each) to keep a feature clear`);
   if (lowered) told.push(`${lowered} volute${lowered > 1 ? 's' : ''} given fewer turns to keep a feature clear`);
   if (cut) told.push(`${cut} flow${cut > 1 ? 's' : ''} end${cut > 1 ? '' : 's'} early — the next element has no room a feature clear (${why.join('; ')})`);
 
@@ -473,9 +487,12 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     const roots = flows.filter((fl) => fl.src === nd && fl.curves.length).map((fl) => fl.curves[0]);
     if (!roots.length) continue;
     const onAxis = nd.cls === 'crest' || nd.cls === 'bottom';
-    if (!onAxis && p.ornCorners !== 'on') continue;
+    // a corner / springing is FORMED by the two C-scrolls that leave it
+    // (R4/R5: the corner is the largest volute), never a rosette laid on it
+    // (round 1's critic: "stuck-on buttons")
+    if (!onAxis) continue;
     if (nd.cls === 'crest') {
-      const r = drapedCrest('shell', { M, frame, opening, Hz, fits: (c) => joinsMotif(c, true, roots), why: 'take the flows\' roots', slopes: kind === 'arch', sil });
+      const r = drapedCrest('shell', { M: mode === 'contour' ? FLOW.crestScale * M : M, frame, opening, Hz, fits: (c) => joinsMotif(c, true, roots), why: 'take the flows\' roots', slopes: kind === 'arch', sil });
       told.push(r.note);
       if (r.el) elements.push({ el: r.el, mirror: null, role: 'motif', kind: 'shell', cls: 'heavy', anchor: nd.id, w: 1, onAxis: true, crest: !!r.el.crest });
       continue;
