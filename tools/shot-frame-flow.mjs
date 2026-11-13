@@ -166,13 +166,15 @@ fs.mkdirSync(path.join(OUT, 'cells'), { recursive: true });
 let ci = 0; for (const r of rows) for (const c of r.cells) fs.writeFileSync(path.join(OUT, 'cells', `${String(ci++).padStart(2, '0')}-${c.label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60)}.png`), Buffer.from(c.png, 'base64'));
 // the plan plots as cells too: each SVG written out, then rendered by one page at a fixed viewport
 if (plots.length) {
-  const pg = await browser.newPage({ viewport: { width: 380, height: 380 }, deviceScaleFactor: 1 });
+  // a FRESH browser: the one that took the full-page sheet screenshot refuses further captures (measured, twice)
+  const b2 = await chromium.launch(), pg = await b2.newPage({ viewport: { width: 380, height: 380 }, deviceScaleFactor: 1 });
   for (const p of plots) {
     const name = `${String(ci++).padStart(2, '0')}-${p.sk}-composed-plan-with-envelope`;
     fs.writeFileSync(path.join(OUT, 'cells', `${name}.svg`), p.svg);
     await pg.goto(`file://${path.join(OUT, 'cells', `${name}.svg`)}`); await pg.waitForTimeout(100);
     fs.writeFileSync(path.join(OUT, 'cells', `${name}.png`), await pg.screenshot({ type: 'png' }));
   }
+  await b2.close();
 }
 await browser.close();
 console.log(`wrote ${path.join(OUT, 'index.html')} and ${PNG}${errors.length ? ` — ${errors.length} page errors: ${errors.slice(0, 3).join(' | ')}` : ''}`);
