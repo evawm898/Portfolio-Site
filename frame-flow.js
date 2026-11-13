@@ -80,7 +80,8 @@ export const FLOW = {
   resize: [0.88, 1.12, 0.78, 1.25, 0.68, 0.58],   // the settle's ladder of sizes for an element that grazes
   bow: [0.55, 0.3],     // rad: the body's swoop (turned against its volute), source → meeting
   bowJitter: [0, 0.12, -0.08, 0.1, -0.06, 0.08, -0.1, 0.04, 0.06],
-  lenJitter: [1, 0.86, 1.12, 0.93, 1.16, 0.89, 1.05, 0.82, 1.2],   // round 3: no two elements one length (the repetition clause)
+  lenJitter: [1, 1, 1, 1, 1, 1, 1, 1, 1],   // round 4's [1, 0.86, 1.12, …] cut the oval band's flank flow (the round-4 regression); kept at 1
+  axisFirst: 0.55,     // round 5: the crest's / bottom's first element is a SHORT heavy C at its shell (§1: the crest pours a C-scroll out and back)   // round 3: no two elements one length (the repetition clause)
   splitJitter: [0.5, 0.36, 0.62, 0.44, 0.56, 0.4, 0.66, 0.48, 0.38],
   capK: 0.11,          // the carved cap (the body's width), × the element's length
   capOfRv: 0.8,
@@ -298,7 +299,7 @@ function layChain(ctx, n, k, shrink = [], flip = []) {
     if (ctx.meets && i > 0 && i === n - 1 && !flip[i]) sgn = 1;
     const reversed = i === 0 && ctx.reverseFirst;
     const flat = ctx.flat(root[0]);
-    const S = Math.min(FLOW.maxLen[ctx.mode] * ctx.M, k * ctx.S0 * (1 - FLOW.decay * t) * flat * FLOW.lenJitter[(i + ctx.jit) % FLOW.lenJitter.length]) * (shrink[i] ?? 1);
+    const S = Math.min(FLOW.maxLen[ctx.mode] * ctx.M, k * ctx.S0 * (1 - FLOW.decay * t) * flat * FLOW.lenJitter[(i + ctx.jit) % FLOW.lenJitter.length] * (i === 0 && ctx.onAxis ? FLOW.axisFirst : 1)) * (shrink[i] ?? 1);
     const rk = FLOW.rvK[ctx.mode], rvK = rk[0] + (rk[1] - rk[0]) * t;
     const turns = Math.max(0.35, FLOW.turns[0] + (FLOW.turns[1] - FLOW.turns[0]) * t + FLOW.turnsJitter[(i + ctx.jit) % FLOW.turnsJitter.length]);
     const split = FLOW.splitJitter[(i + ctx.jit) % FLOW.splitJitter.length];
@@ -446,7 +447,7 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
       // every flow starts at its own place in the jitter sequences (round 3: the same index in two flows on one side
       // drew one shape twice — the repetition clause's closest pairs)
       const jit = 3 * flows.length + (end === 'b' ? 1 : 0);
-      const ctx = { jit, Lt: FLOW.targetLen * p.printHeight, M, D, mode, S0, lim, flat, root0, firstSgn: 1, meets: !!(sg.sa && sg.sb), reverseFirst: src.cls === 'junction' && len >= Math.max(...segs.filter((q) => q !== sg && (q.a === src || q.b === src)).map((q) => Math.abs(q.meet - src.s)), 0), bow: (i, t) => FLOW.bow[0] + (FLOW.bow[1] - FLOW.bow[0]) * t + FLOW.bowJitter[(i + jit) % FLOW.bowJitter.length] };
+      const ctx = { onAxis, jit, Lt: FLOW.targetLen * p.printHeight, M, D, mode, S0, lim, flat, root0, firstSgn: 1, meets: !!(sg.sa && sg.sb), reverseFirst: src.cls === 'junction' && len >= Math.max(...segs.filter((q) => q !== sg && (q.a === src || q.b === src)).map((q) => Math.abs(q.meet - src.s)), 0), bow: (i, t) => FLOW.bow[0] + (FLOW.bow[1] - FLOW.bow[0]) * t + FLOW.bowJitter[(i + jit) % FLOW.bowJitter.length] };
       const fit = fitChain(ctx);
       flows.push({ seg: sg, end, src, path, ctx, fit, onAxis, sStart, dir: end === 'a' ? 1 : -1, local: fit.els });
     }
