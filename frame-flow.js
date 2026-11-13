@@ -80,6 +80,7 @@ export const FLOW = {
   resize: [0.88, 1.12, 0.78, 1.25, 0.68, 0.58],   // the settle's ladder of sizes for an element that grazes
   bow: [0.55, 0.3],     // rad: the body's swoop (turned against its volute), source → meeting
   bowJitter: [0, 0.12, -0.08, 0.1, -0.06, 0.08, -0.1, 0.04, 0.06],
+  lenJitter: [1, 0.86, 1.12, 0.93, 1.16, 0.89, 1.05, 0.82, 1.2],   // round 3: no two elements one length (the repetition clause)
   splitJitter: [0.5, 0.36, 0.62, 0.44, 0.56, 0.4, 0.66, 0.48, 0.38],
   capK: 0.11,          // the carved cap (the body's width), × the element's length
   capOfRv: 0.8,
@@ -91,6 +92,7 @@ export const FLOW = {
   bowChildSign: -1,    // a Y-fork: the child bows away from the parent's line (round 2: a child continuing the parent's line read as a pigtail)
   minBody: 0.32,        // the body is at least this share of the element
   body: 0.45,           // the gentle body (before the ramp) is at least this share
+  forkOnCurl: null,       // round 4: the child leaves from the SHOULDER of the parent's curl (a share of the ramp; 1 = where the volute starts) — C into S
   forkBack: 0.6,       // × the parent's rv: the fork stands this far before the parent's curl begins
   coilRoom: 1.6,        // × rv: how far a volute's coil stands past its body's end
   leafLen: 0.5, leafAspect: 0.34, leafLobes: 4, leafTilt: 0.12,   // the sheathing acanthus, × the child's length
@@ -285,7 +287,7 @@ function layChain(ctx, n, k, shrink = [], flip = []) {
       // the volute, less a little) — there the parent's curvature climbs away
       // from the child's, so the two part within a few widths (a fork mid-body
       // parts at third order and the grandchild lies over its grandparent)
-      const pi = parent.info, sF = Math.max(0.3 * pi.Lb1, pi.Lb1 - FLOW.forkBack * pi.rv);
+      const pi = parent.info, sF = FLOW.forkOnCurl != null ? pi.Lb1 + FLOW.forkOnCurl * (pi.Lb - pi.Lb1) : Math.max(0.3 * pi.Lb1, pi.Lb1 - FLOW.forkBack * pi.rv);
       // (a REVERSED source — its volute at the corner — hands off at its tail's end)
       const best = pi.reversed ? parent.pts.length - 1 : Math.max(1, parent.u.findIndex((s) => s >= sF));
       root = parent.pts[best].slice(); phi = parent.tan[best]; k0 = parent.kap[best]; parent.info.fork = best;
@@ -296,10 +298,10 @@ function layChain(ctx, n, k, shrink = [], flip = []) {
     if (ctx.meets && i > 0 && i === n - 1 && !flip[i]) sgn = 1;
     const reversed = i === 0 && ctx.reverseFirst;
     const flat = ctx.flat(root[0]);
-    const S = Math.min(FLOW.maxLen[ctx.mode] * ctx.M, k * ctx.S0 * (1 - FLOW.decay * t) * flat) * (shrink[i] ?? 1);
+    const S = Math.min(FLOW.maxLen[ctx.mode] * ctx.M, k * ctx.S0 * (1 - FLOW.decay * t) * flat * FLOW.lenJitter[(i + ctx.jit) % FLOW.lenJitter.length]) * (shrink[i] ?? 1);
     const rk = FLOW.rvK[ctx.mode], rvK = rk[0] + (rk[1] - rk[0]) * t;
-    const turns = Math.max(0.35, FLOW.turns[0] + (FLOW.turns[1] - FLOW.turns[0]) * t + FLOW.turnsJitter[i % FLOW.turnsJitter.length]);
-    const split = FLOW.splitJitter[i % FLOW.splitJitter.length];
+    const turns = Math.max(0.35, FLOW.turns[0] + (FLOW.turns[1] - FLOW.turns[0]) * t + FLOW.turnsJitter[(i + ctx.jit) % FLOW.turnsJitter.length]);
+    const split = FLOW.splitJitter[(i + ctx.jit) % FLOW.splitJitter.length];
     // the volute sized to its room (its coil stands ~coilRoom rv past the
     // body's end, inside the limits), and the body's width to the volute: a
     // body wider than ~0.6 rv meets its own coil (the self gap)
@@ -354,7 +356,7 @@ function fitChain(ctx) {
   // round 3: the references' elements average ~3.3 of R2's molding widths (§3), R2's molding a sixteenth of the
   // frame's height — so an element's TARGET length is ~3.3/16 of the frame's height, and a long run is several
   // elements rather than one long rod (the round-2 critique)
-  const score = (r) => (r.over > 1e-6 ? 10 + r.over : 0) + Math.abs(Math.log(r.k)) + FLOW.lengthPull * Math.abs(Math.log(r.reach / r.n / ctx.Lt)) + 2 * Math.abs(r.reach - ctx.D) / ctx.D;
+  const score = (r) => (r.over > 1e-6 ? 10 + r.over : 0) + Math.abs(FM.log(r.k)) + FLOW.lengthPull * Math.abs(FM.log(r.reach / r.n / ctx.Lt)) + 2 * Math.abs(r.reach - ctx.D) / ctx.D;
   for (let n = Math.max(1, est - 2); n <= est + 2; n++) {
     let prev = null, hit = null;
     for (let k = 0.38; k <= 2.0 + 1e-9; k *= 1.12) {
@@ -441,7 +443,10 @@ export function flowFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
       };
       const flat = (x) => { const kap = curvatureAt(path, Math.min(path.length, Math.max(0, x)), M); const rho = kap > 1e-9 ? 1 / kap : 1e9; return Math.min(FLOW.flatClamp[1], Math.max(FLOW.flatClamp[0], FM.pow(rho / (FLOW.rhoRef * M), FLOW.flatK))); };
       const root0 = { pt: [x0, mode === 'band' ? (yIn + yOut) / 2 : yOut - FLOW.contourDip * M + cap0 / 2 + 0.3], phi: mode === 'band' ? 0 : 0.25 };
-      const ctx = { Lt: FLOW.targetLen * p.printHeight, M, D, mode, S0, lim, flat, root0, firstSgn: 1, meets: !!(sg.sa && sg.sb), reverseFirst: src.cls === 'junction' && len >= Math.max(...segs.filter((q) => q !== sg && (q.a === src || q.b === src)).map((q) => Math.abs(q.meet - src.s)), 0), bow: (i, t) => FLOW.bow[0] + (FLOW.bow[1] - FLOW.bow[0]) * t + FLOW.bowJitter[i % FLOW.bowJitter.length] };
+      // every flow starts at its own place in the jitter sequences (round 3: the same index in two flows on one side
+      // drew one shape twice — the repetition clause's closest pairs)
+      const jit = 3 * flows.length + (end === 'b' ? 1 : 0);
+      const ctx = { jit, Lt: FLOW.targetLen * p.printHeight, M, D, mode, S0, lim, flat, root0, firstSgn: 1, meets: !!(sg.sa && sg.sb), reverseFirst: src.cls === 'junction' && len >= Math.max(...segs.filter((q) => q !== sg && (q.a === src || q.b === src)).map((q) => Math.abs(q.meet - src.s)), 0), bow: (i, t) => FLOW.bow[0] + (FLOW.bow[1] - FLOW.bow[0]) * t + FLOW.bowJitter[(i + jit) % FLOW.bowJitter.length] };
       const fit = fitChain(ctx);
       flows.push({ seg: sg, end, src, path, ctx, fit, onAxis, sStart, dir: end === 'a' ? 1 : -1, local: fit.els });
     }
