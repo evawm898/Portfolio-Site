@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Textiles: Study Session — Field Notes — Eva Maskalenko</title>
+<meta name="description" content="A study session for Field Notes No. 09, Smart Textiles: how electrons flow, why yarns resist, which metal to use and why, resistive versus capacitive sensing, and how sensor and heater stack-ups are built. Animated diagrams, labs, mnemonics and games.">
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="textile-101.css">
+<link rel="stylesheet" href="smart-textiles.css">
+<link rel="stylesheet" href="smart-textiles-study.css">
+</head>
+<body id="top">
+
+<nav class="site-nav">
+  <a href="index.html" class="site-nav__link">Work</a>
+  <a href="about.html" class="site-nav__link">About</a>
+  <a href="field-notes.html" class="site-nav__link is-active">Field Notes</a>
+</nav>
+
+<header class="project-header">
+  <a href="smart-textiles.html" class="project-header__back">&larr; Smart Textiles</a>
+  <div class="project-header__index">No. 09 &middot; Study</div>
+</header>
+
+<main>
+  <div class="project__hero">
+    <div class="project__tag"><span class="project__year">Field Notes &middot; Study Session</span></div>
+    <h1 class="project__title">Smart Textiles, Studied</h1>
+    <p class="project__lede">The note shows how each part works. This page is for making it stick: the electricity under all of it, why one metal beats another for a given job, and the difference between resistive and capacitive sensing, until you can explain each one without looking.</p>
+    <p class="st-lede-sub">Each chapter runs the same way: <b>watch</b> it move, <b>play</b> with a lab, learn the <b>line to remember</b>, then <b>check</b> yourself. Your progress stays in this browser. When the chapters are done, run a mixed round: it pulls from everything and comes back to what you missed.</p>
+
+    <section class="sx-progress" id="progress" aria-label="Your progress">
+      <div class="sx-progress__head">
+        <span class="sx-eyebrow">Your progress</span>
+        <span class="sx-progress__total" data-sx-total>0%</span>
+      </div>
+      <div class="sx-bar" aria-hidden="true"><span data-sx-totalbar></span></div>
+      <ol class="sx-chapters" data-sx-chapters></ol>
+      <div class="sx-progress__actions">
+        <a class="sx-cta" href="#round">Start a mixed round &rarr;</a>
+        <button type="button" class="st-btn" data-sx-reset>Reset progress</button>
+      </div>
+    </section>
+
+    <ul class="st-key" aria-label="Diagram key">
+      <li><svg viewBox="0 0 26 12" aria-hidden="true"><circle cx="5" cy="6" r="2" fill="var(--petrol-bright)"/><circle cx="13" cy="6" r="2" fill="var(--petrol-bright)"/><circle cx="21" cy="6" r="2" fill="var(--petrol-bright)"/></svg>electrons, current</li>
+      <li><svg viewBox="0 0 26 12" aria-hidden="true"><path d="M2 6H24" stroke="var(--color-plum)" stroke-width="2.4" stroke-linecap="round"/></svg>hot, strained, high</li>
+      <li><svg viewBox="0 0 26 12" aria-hidden="true"><path d="M2 6H24" stroke="var(--color-indigo)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="3 3"/></svg>cool, low, electric field</li>
+      <li><svg viewBox="0 0 26 12" aria-hidden="true"><path d="M2 8L7 3L12 9L17 2L22 7" fill="none" stroke="var(--color-mint)" stroke-width="1.6"/></svg>a signal, a threshold</li>
+    </ul>
+  </div>
+
+  <div id="smart">
+
+  <!-- ================= 01 · FLOW ================= -->
+  <section class="tx-topic" id="flow" data-sx-chapter="flow">
+    <div class="tx-topic-head">
+      <h2><span class="sx-n">01</span>Electrons and the Push</h2>
+      <div class="tx-topic-copy">
+        <p>Everything on the note runs on one idea: a voltage pushes charge round a closed loop, and whatever is in the way decides how much gets through. Three numbers carry it: <b>voltage</b> is the push (volts), <b>current</b> is the flow (amps), <b>resistance</b> is the fight (ohms).</p>
+        <p class="muted">Two things trip everyone up, and both stop being confusing once you&rsquo;ve watched them. The electrons themselves crawl, while the push arrives almost instantly. And the current arrow on every diagram points the opposite way to the electrons.</p>
+      </div>
+    </div>
+
+    <h3 class="st-sub">Watch</h3>
+    <figure class="st-cell sx-wide" data-st="circuit">
+      <div class="st-toggles" role="group" aria-label="Show">
+        <button type="button" class="st-btn" data-st-for="circuit" data-st-key="view" data-st-value="both" aria-pressed="true">Both</button>
+        <button type="button" class="st-btn" data-st-for="circuit" data-st-key="view" data-st-value="electrons" aria-pressed="false">Electrons only</button>
+        <button type="button" class="st-btn" data-st-for="circuit" data-st-key="view" data-st-value="current" aria-pressed="false">Current arrow only</button>
+      </div>
+      <div class="st-anim"><svg role="img" aria-label="A battery, a loop of conductive thread, an LED and a switch. Electrons flow out of the minus terminal, through the LED and back into the plus terminal while the conventional current arrows run the other way. When the switch opens the loop breaks: the electrons stop drifting and only jiggle in place, and the LED goes out."></svg></div>
+      <figcaption><span class="label">A closed loop</span><span class="state">No loop, no flow</span><span class="sub">The switch opens partway through. Nothing is used up while the circuit is open: the electrons are still in the thread, jiggling with heat, but nothing pushes them along.</span></figcaption>
+    </figure>
+
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="marbles">
+        <div class="st-anim"><svg role="img" aria-label="A tube packed with marbles. A plunger pushes one marble in at the left; every marble shifts one place and the last one drops out of the right end at the same moment. Below, a single electron barely creeps along a line while the push travels the whole wire."></svg></div>
+        <figcaption><span class="label">Slow electrons, fast push</span><span class="state">Marbles in a full tube</span><span class="sub">The wire is already full of free electrons. Push at one end and every one along the path shifts at nearly the same moment, which is why the LED lights instantly.</span></figcaption>
+      </figure>
+      <div class="sx-panel">
+        <span class="sx-eyebrow">The units, as a cheat sheet</span>
+        <dl class="sx-units">
+          <dt>V &middot; volt</dt><dd><b>The push.</b> How hard charge is driven. A coin cell is 3 V, a phone battery 3.7 V, USB 5 V.</dd>
+          <dt>I &middot; amp</dt><dd><b>The flow.</b> How much charge passes a point per second. An LED wants about 0.02 A; a heated glove about 1 A.</dd>
+          <dt>R &middot; ohm</dt><dd><b>The fight.</b> How hard the path resists. A metre of conductive thread is anywhere from about 1 to 1,000 &Omega;.</dd>
+          <dt>P &middot; watt</dt><dd><b>The work.</b> Power turned into heat or light each second: P = V &times; I.</dd>
+          <dt>Q &middot; coulomb</dt><dd><b>An amount of charge</b>, the thing a capacitor stores. You&rsquo;ll meet it again in chapter 04.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <h3 class="st-sub">Play</h3>
+    <figure class="st-cell sx-wide sx-lab" data-st="ohm">
+      <div class="st-anim"><svg role="img" aria-label="Ohm's law as a hallway. A gauge on the left shows the push in volts. A crowd of electrons flows through a hall that narrows and fills with posts as resistance rises, faster as the current rises. The read-out shows I equals V divided by R."></svg></div>
+      <div class="sx-controls">
+        <label class="sx-slider"><span>Push, V</span><input type="range" min="0.5" max="12" step="0.5" value="3" data-sx-for="ohm" data-sx-key="V"><output data-sx-out="ohm.V">3 V</output></label>
+        <label class="sx-slider"><span>Fight, R</span><input type="range" min="10" max="500" step="5" value="100" data-sx-for="ohm" data-sx-key="R"><output data-sx-out="ohm.R">100 &Omega;</output></label>
+      </div>
+      <figcaption><span class="label">Ohm&rsquo;s law lab</span><span class="state">Predict first, then move it</span><span class="sub">Before you drag: if you double the push, what happens to the flow? If you double the fight? Then check.</span></figcaption>
+    </figure>
+
+    <h3 class="st-sub">Remember</h3>
+    <div class="sx-cards" data-sx-cards="flow"></div>
+    <h3 class="st-sub">Check</h3>
+    <div class="sx-quiz" data-sx-quiz="flow"></div>
+  </section>
+
+  <!-- ================= 02 · RESISTANCE ================= -->
+  <section class="tx-topic" id="resist" data-sx-chapter="resist">
+    <div class="tx-topic-head">
+      <h2><span class="sx-n">02</span>Why a Yarn Resists</h2>
+      <div class="tx-topic-copy">
+        <p>A yarn&rsquo;s resistance comes from three things: what it&rsquo;s made of (resistivity, &rho;), how long it is, and how much conductor is in its cross-section. That&rsquo;s R = &rho;L/A. Textiles add a fourth that a wire doesn&rsquo;t have: <b>contacts</b>, every place the current hops from filament to filament or loop to loop.</p>
+        <p class="muted">If you think in textiles: &rho; is like fibre density, a property of the material. A yarn&rsquo;s &Omega;/m is like its tex, because it bakes in how much material is in the cross-section. Compare materials by &rho;, compare yarns by &Omega;/m.</p>
+      </div>
+    </div>
+
+    <h3 class="st-sub">Play</h3>
+    <figure class="st-cell sx-wide sx-lab" data-st="yarnR">
+      <div class="st-toggles" role="group" aria-label="Material">
+        <button type="button" class="st-btn" data-st-for="yarnR" data-st-key="mat" data-st-value="silver" aria-pressed="false">Silver</button>
+        <button type="button" class="st-btn" data-st-for="yarnR" data-st-key="mat" data-st-value="copper" aria-pressed="false">Copper</button>
+        <button type="button" class="st-btn" data-st-for="yarnR" data-st-key="mat" data-st-value="steel" aria-pressed="true">Stainless steel</button>
+        <button type="button" class="st-btn" data-st-for="yarnR" data-st-key="mat" data-st-value="nichrome" aria-pressed="false">Nichrome</button>
+        <button type="button" class="st-btn" data-st-for="yarnR" data-st-key="mat" data-st-value="carbon" aria-pressed="false">Carbon fibre</button>
+      </div>
+      <div class="st-anim"><svg role="img" aria-label="A yarn of parallel filaments drawn to its chosen length, electrons running along it, with its cross-section beside it. The read-out gives the material's resistivity, the resistance per metre of one filament and of the whole bundle, and the total resistance, marked on a log scale."></svg></div>
+      <div class="sx-controls">
+        <label class="sx-slider"><span>Length</span><input type="range" min="0.1" max="2" step="0.05" value="1" data-sx-for="yarnR" data-sx-key="len"><output data-sx-out="yarnR.len">1.00 m</output></label>
+        <label class="sx-slider"><span>Filaments</span><input type="range" min="0" max="7" step="1" value="3" data-sx-for="yarnR" data-sx-key="fil"><output data-sx-out="yarnR.fil">8</output></label>
+      </div>
+      <figcaption><span class="label">Yarn resistance lab</span><span class="state">Long and thin, resistance wins</span><span class="sub">Every material here is drawn as 20 &micro;m filaments so the comparison is fair. Swap silver for stainless at the same length: about 45 times the resistance. Double the filaments: half.</span></figcaption>
+    </figure>
+
+    <h3 class="st-sub">Watch</h3>
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="lanes">
+        <div class="st-anim"><svg role="img" aria-label="Top: three yarn segments end to end with two contact boxes between them; electrons slow at each contact. Bottom: three yarns side by side between two bus bars, electrons flowing along all three."></svg></div>
+        <figcaption><span class="label">Series and parallel</span><span class="state">More lanes, less jam</span><span class="sub">End to end, resistances add, and every joint adds its own. Side by side, the current splits between the lanes, so n equal paths give R &divide; n. A multifilament yarn is many lanes.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="contacts">
+        <div class="st-anim"><svg role="img" aria-label="A conductive weft knit is stretched sideways. Its loops widen, the points where neighbouring loops touch light up less and less, and a plot of resistance rises while it's stretched and falls when it relaxes."></svg></div>
+        <figcaption><span class="label">Why a knit senses stretch</span><span class="state">Every contact is a toll booth</span><span class="sub">The metal barely strains. What changes is how many loops touch and how hard. This knit loses contacts as it stretches, so its resistance rises; some structures do the opposite at first. The direction depends on the knit.</span></figcaption>
+      </figure>
+    </div>
+
+    <h3 class="st-sub">Play: design a heater</h3>
+    <figure class="st-cell sx-wide sx-lab" data-st="heater">
+      <div class="st-toggles" role="group" aria-label="Heater yarn">
+        <button type="button" class="st-btn" data-st-for="heater" data-st-key="yarn" data-st-value="10" aria-pressed="false">Silver-plated, 10 &Omega;/m</button>
+        <button type="button" class="st-btn" data-st-for="heater" data-st-key="yarn" data-st-value="30" aria-pressed="true">Stainless, 30 &Omega;/m</button>
+        <button type="button" class="st-btn" data-st-for="heater" data-st-key="yarn" data-st-value="100" aria-pressed="false">Carbon, 100 &Omega;/m</button>
+      </div>
+      <div class="st-anim"><svg role="img" aria-label="A heated panel run from a 5 volt battery: one or more serpentine lines of heater yarn connected in parallel between a plus bus and a return bus. The lines glow from cool to hot with the watts per metre. A checklist shows resistance, current, power and how much yarn is laid, with a hint when it isn't workable."></svg></div>
+      <div class="sx-controls">
+        <label class="sx-slider"><span>Lines in parallel</span><input type="range" min="1" max="8" step="1" value="1" data-sx-for="heater" data-sx-key="n"><output data-sx-out="heater.n">1</output></label>
+        <label class="sx-slider"><span>Length of each</span><input type="range" min="0.1" max="2" step="0.05" value="1.5" data-sx-for="heater" data-sx-key="len"><output data-sx-out="heater.len">1.50 m</output></label>
+      </div>
+      <figcaption><span class="label">The brief</span><span class="state">3&ndash;6 W from 5 V, at most 2 A, at least 1.2 m of yarn</span><span class="sub">It starts too cold on purpose. The instinct is to add more yarn, which makes it colder: P = V&sup2;/R, so at a fixed voltage, longer is colder. Find a working answer for each of the three yarns. (A design exercise with round numbers, not a spec.)</span></figcaption>
+    </figure>
+
+    <h3 class="st-sub">Remember</h3>
+    <div class="sx-cards" data-sx-cards="resist"></div>
+    <h3 class="st-sub">Check</h3>
+    <div class="sx-quiz" data-sx-quiz="resist"></div>
+  </section>
+
+  <!-- ================= 03 · METALS ================= -->
+  <section class="tx-topic" id="metals" data-sx-chapter="metals">
+    <div class="tx-topic-head">
+      <h2><span class="sx-n">03</span>Choosing the Metal</h2>
+      <div class="tx-topic-copy">
+        <p>Conductivity is the first number people quote and rarely the one that decides. In a garment the metal also has to survive sweat and washing, sit against skin, flex millions of times, and be joined to a board. Each metal wins a different subset of those.</p>
+        <p class="muted">Rule of thumb, to argue with once you&rsquo;ve read the cards: silver for skin, copper (always dressed) for wiring, gold where things touch, stainless where it has to survive, carbon where it has to sense.</p>
+      </div>
+    </div>
+
+    <h3 class="st-sub">Watch</h3>
+    <figure class="st-cell sx-wide" data-st="ladder">
+      <div class="st-anim"><svg role="img" aria-label="Horizontal bars of resistivity on a log scale, growing in one after another: silver, copper, gold, aluminium, nickel, stainless steel, nichrome, carbon fibre and PEDOT:PSS. The first four are picked out with the words Some Cats Get Angry."></svg></div>
+      <figcaption><span class="label">The conductivity ladder</span><span class="state">Some Cats Get Angry: Ag, Cu, Au, Al</span><span class="sub">Silver and copper are within 6% of each other. Stainless steel is about 43 times worse than copper, carbon fibre about 900 times. It&rsquo;s a log scale, so each gridline is ten times worse.</span></figcaption>
+    </figure>
+
+    <h3 class="st-sub">The cards</h3>
+    <div class="sx-sort" role="group" aria-label="Sort the metals by" data-sx-sort></div>
+    <div class="sx-metals" data-sx-metals></div>
+
+    <h3 class="st-sub">Watch: how metals fail</h3>
+    <div class="st-grid st-grid--3">
+      <figure class="st-cell" data-st="galvanic">
+        <div class="st-anim"><svg role="img" aria-label="A copper trace joined to a silver snap under a sweat droplet. Electrons flow from the copper into the silver while copper ions leave into the sweat, and the copper surface pits over ninety days."></svg></div>
+        <figcaption><span class="label">Galvanic corrosion</span><span class="state">The less noble one pays</span><span class="sub">Sweat is an electrolyte, so two different metals in it make a small battery. The more active metal dissolves.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="tcr">
+        <div class="st-anim"><svg role="img" aria-label="A thermometer warms from 20 to 80 degrees Celsius and back. A plot of resistance relative to room temperature: nickel rises steeply, copper a little less, nichrome stays almost flat."></svg></div>
+        <figcaption><span class="label">Temperature and resistance</span><span class="state">Heaters want steady; thermometers want swingy</span><span class="sub">Nichrome holds its resistance as it heats, so a heater&rsquo;s power stays predictable. Nickel and copper change a lot and predictably, which is what a temperature-sensing yarn needs.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="migration">
+        <div class="st-anim"><svg role="img" aria-label="Two silver traces with a voltage between them under humid air. Silver ions drift across the gap and silver dendrites grow from the negative trace toward the positive one until they bridge it and short."></svg></div>
+        <figcaption><span class="label">Silver migration</span><span class="state">Silver walks in the wet</span><span class="sub">With a DC voltage and moisture, silver dissolves at the positive trace and regrows as needles from the negative one. Spacing and encapsulation prevent it.</span></figcaption>
+      </figure>
+    </div>
+
+    <h3 class="st-sub">Play: pick the metal</h3>
+    <div class="sx-game" data-sx-pickmetal></div>
+
+    <h3 class="st-sub">Remember</h3>
+    <div class="sx-cards" data-sx-cards="metals"></div>
+    <h3 class="st-sub">Check</h3>
+    <div class="sx-quiz" data-sx-quiz="metals"></div>
+  </section>
+
+  <!-- ================= 04 · SENSE ================= -->
+  <section class="tx-topic" id="sense" data-sx-chapter="sense">
+    <div class="tx-topic-head">
+      <h2><span class="sx-n">04</span>Resistive vs Capacitive</h2>
+      <div class="tx-topic-copy">
+        <p>Both kinds of sensor turn a press, a stretch or a touch into an electrical number, by different routes. A <b>resistive</b> sensor lets current through, and the press changes how easily it passes. A <b>capacitive</b> sensor has an insulator in the middle that current can&rsquo;t cross. It stores charge on either side, and the press changes how much it can store.</p>
+        <p class="muted">That one difference decides almost everything else: whether it needs force or only presence, what sweat does to it, whether it drifts, and how the chip reads it.</p>
+      </div>
+    </div>
+
+    <h3 class="st-sub">Watch</h3>
+    <figure class="st-cell sx-wide" data-st="roadcanyon">
+      <div class="st-anim"><svg role="img" aria-label="Left, resistive: a finger presses two electrodes together through a carbon layer; more paths connect and electrons flow through from top to bottom, and the resistance falls. Right, capacitive: a finger presses two electrodes closer across a spacer; no electrons cross the gap, plus and minus charges gather on the two plates, more of them as the gap closes, and the capacitance rises."></svg></div>
+      <figcaption><span class="label">The one difference</span><span class="state">R is a Road, C is a Canyon</span><span class="sub">Watch the leads on the capacitive side. Charge flows in and out of the plates through the wires while the gap changes, and never across the gap.</span></figcaption>
+    </figure>
+
+    <div class="sx-table-wrap">
+      <table class="sx-table">
+        <caption>Side by side</caption>
+        <thead><tr><th scope="col"></th><th scope="col">Resistive</th><th scope="col">Capacitive</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">What changes</th><td>Resistance: how easily current passes through</td><td>Capacitance: how much charge the plates hold (C = &epsilon;A/d)</td></tr>
+          <tr><th scope="row">Pressing does</th><td>More conductive paths touch, so R falls</td><td>The gap closes, so C rises</td></tr>
+          <tr><th scope="row">Needs force?</th><td>Yes, contact and pressure</td><td>No. It can sense a hand that only comes near</td></tr>
+          <tr><th scope="row">Read by</th><td>A voltage divider: measure a voltage</td><td>Timing a charge, or an oscillator&rsquo;s frequency</td></tr>
+          <tr><th scope="row">Water and sweat</th><td>Conducts: can short the electrodes</td><td>Permittivity about 80: reads as a big touch</td></tr>
+          <tr><th scope="row">Drift</th><td>Polymer layers creep and show hysteresis</td><td>Stable if the spacer springs back</td></tr>
+          <tr><th scope="row">Body nearby</th><td>Ignores it</td><td>Feels it unless a grounded shield blocks it</td></tr>
+          <tr><th scope="row">Textile build</th><td>Two conductive fabrics with a carbon-loaded layer between</td><td>Two conductive fabrics with a spacer fabric between, plus a shield</td></tr>
+          <tr><th scope="row">Good for</th><td>Cheap pressure maps, grip force, strain yarns</td><td>Touch and swipe, presence, stable pressure, proximity</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="st-sub">Play: how a chip reads each one</h3>
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell sx-lab" data-st="divider">
+        <div class="st-anim"><svg role="img" aria-label="A voltage divider: 3.3 volts across a resistive sensor and a fixed 10 kilohm resistor in series. A bar splits the 3.3 volts between them in proportion to their resistances, and the output voltage across the fixed resistor is read out."></svg></div>
+        <div class="sx-controls">
+          <label class="sx-slider"><span>Press</span><input type="range" min="0" max="1" step="0.02" value="0.2" data-sx-for="divider" data-sx-key="press"><output data-sx-out="divider.press">20%</output></label>
+        </div>
+        <figcaption><span class="label">Reading R: a voltage divider</span><span class="state">Two resistors share the push in proportion</span><span class="sub">Press harder: the sensor&rsquo;s resistance falls, its share of the 3.3 V shrinks, and the fixed resistor&rsquo;s share, the voltage the chip reads, grows.</span></figcaption>
+      </figure>
+      <figure class="st-cell sx-lab" data-st="bucket">
+        <div class="st-toggles" role="group" aria-label="What fills the gap">
+          <button type="button" class="st-btn" data-st-for="bucket" data-st-key="eps" data-st-value="1" aria-pressed="true">Air</button>
+          <button type="button" class="st-btn" data-st-for="bucket" data-st-key="eps" data-st-value="3" aria-pressed="false">Polyester</button>
+          <button type="button" class="st-btn" data-st-for="bucket" data-st-key="eps" data-st-value="80" aria-pressed="false">Water</button>
+        </div>
+        <div class="st-anim"><svg role="img" aria-label="Two 2 by 2 centimetre plates with an adjustable gap and filling. A bucket whose width grows with the capacitance fills from the same tap, slower the bigger it is, and a charging curve shows the time to reach a threshold."></svg></div>
+        <div class="sx-controls">
+          <label class="sx-slider"><span>Gap</span><input type="range" min="0.5" max="6" step="0.1" value="3" data-sx-for="bucket" data-sx-key="gap"><output data-sx-out="bucket.gap">3.0 mm</output></label>
+        </div>
+        <figcaption><span class="label">Reading C: timing a charge</span><span class="state">C is a bucket: bigger bucket, longer to fill</span><span class="sub">The chip charges the electrode through a resistor and times how long it takes to reach a threshold. Halve the gap: double the C, double the time. Try water.</span></figcaption>
+      </figure>
+    </div>
+
+    <h3 class="st-sub">Watch: a finger, two ways</h3>
+    <figure class="st-cell sx-wide" data-st="selfmutual">
+      <div class="st-anim"><svg role="img" aria-label="Left, self-capacitance: a finger approaches a single electrode, field lines from the electrode bend to the finger, and a bar of capacitance to ground rises. Right, mutual capacitance: field lines arc from a transmit electrode to a receive electrode; as the finger approaches it intercepts the arcs and the bar of capacitance between the electrodes falls."></svg></div>
+      <figcaption><span class="label">Self and mutual capacitance</span><span class="state">Self: you add. Mutual: you steal.</span><span class="sub">Your body is a conductor connected loosely to ground. Measured to ground, you are extra plate, so C goes up. Measured between two electrodes, you divert field that would have reached the second one, so C goes down. Phone screens use mutual.</span></figcaption>
+    </figure>
+
+    <div class="st-grid st-grid--2">
+      <figure class="st-cell" data-st="water">
+        <div class="st-anim"><svg role="img" aria-label="Left: a droplet lands on a capacitive electrode; the field concentrates into it and the reading jumps as if touched. Right: a droplet lands beside a resistive sensor and bridges its two traces; current shortcuts through the water and the reading drops."></svg></div>
+        <figcaption><span class="label">What water does</span><span class="state">Water fools C and shorts R</span><span class="sub">Neither sensor type is safe from sweat or rain. They fail differently, which decides how each is sealed and shielded.</span></figcaption>
+      </figure>
+      <figure class="st-cell" data-st="crossing">
+        <div class="st-anim"><svg role="img" aria-label="Cross-section of a woven crossing: an enamelled silver-copper weft wire passes over an enamelled warp wire. The two enamel layers form the gap of a small capacitor. A finger approaching steals some of the field and the node capacitance falls."></svg></div>
+        <figcaption><span class="label">Enamelled wire: every crossing is a sensor</span><span class="state">The enamel is the gap</span><span class="sub">Where two insulated Ag&ndash;Cu wires cross, the two enamel layers are a dielectric microns thick. Scan rows and columns and each crossing becomes a mutual-capacitance touch point, with no extra layer.</span></figcaption>
+      </figure>
+    </div>
+
+    <h3 class="st-sub">Play: which sensor?</h3>
+    <div class="sx-game" data-sx-which></div>
+
+    <h3 class="st-sub">Remember</h3>
+    <div class="sx-cards" data-sx-cards="sense"></div>
+    <h3 class="st-sub">Check</h3>
+    <div class="sx-quiz" data-sx-quiz="sense"></div>
+  </section>
+
+  <!-- ================= 05 · STACK ================= -->
+  <section class="tx-topic" id="stack" data-sx-chapter="stack">
+    <div class="tx-topic-head">
+      <h2><span class="sx-n">05</span>Stack-Ups</h2>
+      <div class="tx-topic-copy">
+        <p>A textile sensor or heater is a stack of layers, and most failures come from a layer that&rsquo;s missing or in the wrong place, more often than from the wrong material. Pick a stack to watch it come apart and go back together. Tap a layer to see what it&rsquo;s for and what happens without it.</p>
+        <p class="muted">Then rebuild them from a shuffled pile. Get the order wrong and it tells you what that mistake would do to the real thing.</p>
+      </div>
+    </div>
+
+    <h3 class="st-sub">Watch</h3>
+    <figure class="st-cell sx-wide" data-st="stack">
+      <div class="st-toggles" role="group" aria-label="Stack" data-sx-stackpick></div>
+      <div class="st-anim"><svg role="img" aria-label="An exploded view of the chosen stack-up. The layers separate and are named, then come back together and show where the current flows: through the layers, across a gap as a field, or along a heater or trace."></svg></div>
+      <div class="sx-layers" data-sx-layers></div>
+      <div class="sx-layer-detail" data-sx-layerdetail aria-live="polite"></div>
+    </figure>
+
+    <h3 class="st-sub">Play: build the stack</h3>
+    <div class="sx-game" data-sx-build></div>
+
+    <h3 class="st-sub">Remember</h3>
+    <div class="sx-cards" data-sx-cards="stack"></div>
+    <h3 class="st-sub">Check</h3>
+    <div class="sx-quiz" data-sx-quiz="stack"></div>
+  </section>
+
+  <!-- ================= MIXED ROUND ================= -->
+  <section class="tx-topic" id="round">
+    <div class="tx-topic-head">
+      <h2><span class="sx-n">&#9654;</span>Mixed Round</h2>
+      <div class="tx-topic-copy">
+        <p>Ten questions from every chapter, shuffled together, because remembering under mixed conditions is the test that counts. Questions you&rsquo;ve missed before come back first. Keep a streak going.</p>
+        <p class="muted">Then review the cards you haven&rsquo;t got yet, all chapters at once.</p>
+      </div>
+    </div>
+    <div class="sx-round" data-sx-round></div>
+    <h3 class="st-sub">Review the cards you haven&rsquo;t got yet</h3>
+    <div class="sx-cards" data-sx-cards="review"></div>
+  </section>
+
+  <section class="tx-topic" id="sources">
+    <div class="tx-topic-head">
+      <h2>Notes</h2>
+      <div class="tx-topic-copy">
+        <p class="st-credit">Companion to <a href="smart-textiles.html">Field Notes No. 09, Smart Textiles</a>, which credits Xiaoming Tao (ed.), <cite>Smart Fibres, Fabrics and Clothing</cite> (2001) and Schneegass &amp; Amft (eds.), <cite>Smart Textiles</cite> (Springer, 2017). Resistivities and temperature coefficients are room-temperature handbook values, rounded. Yarn figures (&Omega;/m) vary by product and are given as typical orders of magnitude. The heater and capacitance labs use round numbers to show the relationships; they aren&rsquo;t design data.</p>
+      </div>
+    </div>
+  </section>
+
+  </div>
+</main>
+
+<script type="module" src="smart-textiles-study.js"></script>
+</body>
+</html>

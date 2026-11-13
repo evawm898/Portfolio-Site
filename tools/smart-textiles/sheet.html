@@ -8,11 +8,11 @@
 <script type="module">
 const q = new URLSearchParams(location.search), T = +(q.get('t') || 0.55);
 const M = await import('../../' + (q.get('m') || 'smart-textiles-yarns') + '.js');
-const S = Object.assign({}, ...Object.values(M).filter(v => typeof v === 'object'));
+const S = Object.assign({}, ...Object.values(M).filter(v => v && typeof v === 'object'));
 const core = await import('../../smart-textiles-core.js');
 const root = document.getElementById('smart'); if (q.get('big')) root.style.gridTemplateColumns = '1100px';
 const only = q.get('only');
-for (const [k, sc] of Object.entries(S)) { if (only && k !== only) continue; const f = document.createElement('figure'); f.dataset.st = k; if (+sc.vb.split(' ')[2] > 400) f.className = 'wide'; f.innerHTML = '<div class="st-anim"></div><figcaption>' + k + '</figcaption>'; root.appendChild(f); }
+for (const [k, sc] of Object.entries(S)) { if (!sc || typeof sc.draw !== 'function') continue; if (only && k !== only) continue; const f = document.createElement('figure'); f.dataset.st = k; if (+sc.vb.split(' ')[2] > 400) f.className = 'wide'; f.innerHTML = '<div class="st-anim"></div><figcaption>' + k + '</figcaption>'; root.appendChild(f); }
 core.mount(S, document, { static: true, at: T });
 document.title = 'done';
 </script></body></html>
