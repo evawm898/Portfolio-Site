@@ -102,8 +102,8 @@ export const ENVELOPES = {
   rect: [
     { n: 0, f: 0.10, e: 1.8, b: 'root' }, { n: 0, f: 0.35, e: 1.3, b: 'swell' }, { n: 0, f: 0.66, e: 0.6, b: 'low' },
     { n: 1, f: 0, e: 2.0, b: 'high' }, { n: 1, f: 0.26, e: 0.6, b: 'low' }, { n: 1, f: 0.50, e: 1.3, b: 'swell' },
-    { n: 1, f: 0.74, e: 0.7, b: 'low' }, { n: 2, f: 0, e: 1.7, b: 'high' }, { n: 2, f: 0.22, e: 1.0, b: 'swell' },
-    { n: 2, f: 0.5, e: 1.9, b: 'foot' }, { n: 2, f: 1, e: 1.6, b: 'end' },
+    { n: 1, f: 0.74, e: 0.7, b: 'low' }, { n: 2, f: 0, e: 1.7, b: 'high' }, { n: 2, f: 0.28, e: 0.6, b: 'low' },
+    { n: 2, f: 0.58, e: 1.9, b: 'foot' }, { n: 2, f: 1, e: 1.6, b: 'end' },
   ],
   arch: [
     { n: 0, f: 0.05, e: 2.0, b: 'root' }, { n: 0, f: 0.25, e: 1.4, b: 'swell' }, { n: 0, f: 0.58, e: 0.7, b: 'low' },
@@ -123,7 +123,7 @@ export const COMPOSE = {
                          // inner coil embedded (round 2's first sheet: an eye ending 0.2 mm off the edge was a slit)
   kiss: 0,               // × the thinner cap: a back-to-back pair's centrelines are TANGENT (G1 at the hand-off); the wires
                          // overlap by their half-widths there, which is the join (one solid)
-  alpha: [40, 80],       // the bisected departure angle of a C at a low volute (degrees)
+  alpha: [25, 80],       // the bisected departure angle of a C at a low volute (degrees)
   beta: 38,              // an S's angle at its high end (degrees)
   sAlpha: 58,            // an S's angle at its low end (degrees)
   handJoin: 0.5,         // mm: two NEIGHBOURING scrolls join where they overlap at least this deep (their volutes'
@@ -138,15 +138,11 @@ export const COMPOSE = {
   fillAt: 1.25,          // × M: a C whose crown stands further out than this gets a secondary fill scroll under it
   fillLen: 0.42,         // the fill scroll's chord, × its primary's
   leafLen: 0.42, leafAspect: 0.32, leafLobes: 4,
-  nodeR: 1.2,            // a node's volute × this (it carries the spring)
-  nodeLean: 12,
-  sheathAt: 2.5,         // mm along the spring: the second root a node's sheathing leaf is tried at          // degrees: the spring's lean onward off the node coil's tangent line
   bandWedge: 3.2,        // mm: the same against the band's edge (a volute's coil crossing it at ~25° runs 2.5 mm and prints)
-  motifWedge: 1.0,       // mm: the same against a motif's (the crest shell's) lobed edge — a lobe's bump puts a neck in it
   wedge: 1.5,            // mm: the most either of two wires may run beside the other closer than a feature (a V's own tip)
   flameLean: [35, 50],   // degrees: a flame's lean off the stem's tangent, outward (low hand-off, high)
   leafRootUp: 0.35,      // × the pair's radius: a leaf's root above the pair's centres (inside the kiss)
-  crestScale: 2.3,      // × M: the crest shell (C3: the crest must stand highest — §5)
+  crestScale: 1.7,
   bottomScale: 2.2,      // × M: the bottom shell's size (shrunk until it takes the bottom roots clear)
   pad: 0.15,             // × M: the envelope's inner margin for a wire's crown
 };
@@ -290,7 +286,7 @@ function buildScroll(spec) {
     return Math.max(F, Math.min(cw, cap * (COMPOSE.voluteMass[0] + (1 - COMPOSE.voluteMass[0]) * FM.sin(Math.PI * t))));
   });
   return { kind: 'flow', pts: rs.pts, tan: rs.tan, nrm, kap, u, w, root: 0, body: { sA, sB, PA, PB, raw: bodyRaw },
-    info: { kind: 'flow', role: 'scroll', carved: false, flowWidth: true, crownFloor: COMPOSE.crownFloor, wire: cap, tip: F, L: rs.L, Lb: sB - sA, rvA: A.rv, rvB: B.rv, turnsA: spec.turnsA, turnsB: spec.turnsB, sgnA: A.sgn, sgnB: B.sgn, cB: B.c || null } };
+    info: { kind: 'flow', role: 'scroll', carved: false, flowWidth: true, crownFloor: COMPOSE.crownFloor, wire: cap, tip: F, L: rs.L, Lb: sB - sA, rvA: A.rv, rvB: B.rv, turnsA: spec.turnsA, turnsB: spec.turnsB, sgnA: A.sgn, sgnB: B.sgn } };
 }
 
 /* ------------------------------------------------------------------ */
@@ -353,18 +349,6 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     sc.turnsB = kB ? COMPOSE.turns[kB] + COMPOSE.turnsJitter[(2 * sc.i + 1) % COMPOSE.turnsJitter.length] : 0;
   }
 
-  // ROUND 2, C3: ONE opposed-volute MEETING per side (§2: "a meeting is marked") — the first high pair, where the
-  // crest's flow meets the bottom's. Every other boundary is a NODE: the scroll before it ends in a volute (a size
-  // larger), and the scroll after it SPRINGS off that volute's front, tangent to its coil (R2's flank stem leaving
-  // the lower node along the node's own tangent), with a leaf sheathing the spring — not a second volute
-  const meetB = bnd.findIndex((k) => k.b === 'high');
-  for (const sc of scrolls) {
-    // a CORNER keeps its opposed pair too: on a rectangle the corner is a source and its pair the largest volutes
-    // on the side (R4/R5) — a spring off a diagonal corner volute runs straight into the next run's band
-    sc.nodeA = sc.a.b !== 'root' && bnd.indexOf(sc.a) !== meetB && !sc.a.corner && sc.i > 0;
-    sc.nodeB = sc.b.b !== 'broot' && bnd.indexOf(sc.b) !== meetB && !sc.b.corner;
-    if (sc.nodeB) sc.rvB *= COMPOSE.nodeR;
-  }
   // the volute centres and joint headings, in the side's (s, y) frame then the world
   const tangentAngle = (s) => headingOf(SF.fr(s).t);
   const bFrame = (s) => {
@@ -393,15 +377,7 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     };
     const t = sc.type === 'C' ? (alpha ?? 55) * DEG : COMPOSE.sAlpha * DEG, beta = COMPOSE.beta * DEG;
     let A, B;
-    const prevKept = sc.nodeA ? kept.find((c) => c.sc.i === sc.i - 1 && !c.fill) : null;
-    if (prevKept && prevKept.info.cB) {
-      // a NODE: spring off the front of the previous scroll's end volute, along its coil's tangent line there (the
-      // front point K = centre + r·t; a low node's coil turns down there, so the spring rises; a high one's turns up,
-      // so it falls), leaning COMPOSE.nodeLean onward
-      const bf = bFrame(sc.a.s), r0 = prevKept.info.rvB, cB = prevKept.info.cB;
-      const K = [cB[0] + r0 * bf.t[0], cB[1] + r0 * bf.t[1]], low = sc.a.b === 'low', ang = headingOf(bf.t);
-      A = { root: K, phi: low ? ang + Math.PI / 2 - COMPOSE.nodeLean * DEG : ang - Math.PI / 2 + COMPOSE.nodeLean * DEG, sgn: low ? -1 : 1, rv: 0 };
-    } else if (sc.a.b === 'root') {
+    if (sc.a.b === 'root') {
       // the crest scroll leaves from under the shell, rising out of it
       const x0 = (F + sc.cap) / 2 + 0.1 + 0.4 * M;
       const s0 = Math.max(sc.a.s, x0), root = SF.W(s0, yOut - 0.35 * M);
@@ -471,7 +447,6 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     });
     const strokes = [c, ...others].filter(hit).map((o) => ({ pts: o.pts, w: effW(o) }));
     const res = planSlit2D(strokes, box, { cell: 0.2, solid: (q) => region.inside(q) });
-    if (globalThis.__CDBG && res.mm < Fm) console.log('plan slit', res.mm.toFixed(2), res.at.map((v) => v.toFixed(1)).join(','), 'local', SF.local(res.at).map((v) => v.toFixed(1)).join(','));
     return res.mm;
   };
   // ... and a WEDGE against the band has no neck either: a wire easing onto the molding at a shallow angle runs
@@ -489,13 +464,13 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     if (selfGap(c).gap < Fm) return `self gap ${selfGap(c).gap.toFixed(2)}`;
     { const oi = c.pts.findIndex((q) => opening(q)); if (oi >= 0) { const [ls, ly] = SF.local(c.pts[oi]); return `over the opening (at u ${c.u[oi].toFixed(1)} of ${c.info.L.toFixed(1)}, body ${c.body.sA.toFixed(1)}–${c.body.sB.toFixed(1)}, local y ${ly.toFixed(1)})`; } }
     if (c.pts.some((q) => q[0] < -1e-9)) return 'over the axis';
-    if (slitWorst(c, near(c)) > -Infinity) { if (globalThis.__CDBG) (globalThis.__BAD ||= []).push({ c, kept: kept.slice(), region, why: 'slitband', i: sc.i }); return 'a slit against the band'; }
+    if (slitWorst(c, near(c)) > -Infinity) return 'a slit against the band';
     if (clearOf(c, mirrorCurve(c)) < Fm && !(sc.a.b === 'root' || sc.b.b === 'broot')) return 'its own mirror';
     if (bandWedge(c) > COMPOSE.bandWedge) return `a ${bandWedge(c).toFixed(1)} mm wedge against the band`;
-    { const sl = planSlitAround(c, kept); if (sl < Fm) { if (globalThis.__CDBG) (globalThis.__BAD ||= []).push({ c, kept: kept.slice(), region }); return `a ${sl.toFixed(2)} mm slit in plan`; } }
+    { const sl = planSlitAround(c, kept); if (sl < Fm) { return `a ${sl.toFixed(2)} mm slit in plan`; } }
     for (const o of kept) {
       const adj = o.sc.i === sc.i - 1 || o.sc.i === sc.i + 1;
-      if (adj) { if (clearOf(c, o) < Fm && !joinsCleanly(c, o, COMPOSE.handJoin)) { if (globalThis.__CDBG) { for (const [X, Y, nm] of [[c, o, 'c→o'], [o, c, 'o→c']]) { const runs = []; let run = null; X.pts.forEach((q, ii) => { let d = Infinity; for (let k = 0; k < Y.pts.length; k++) d = Math.min(d, Math.hypot(q[0] - Y.pts[k][0], q[1] - Y.pts[k][1]) - (X.w[ii] + Y.w[k]) / 2); if (d < F) { if (!run) run = { a: X.u[ii], min: d }; run.min = Math.min(run.min, d); run.b = X.u[ii]; } else if (run) { runs.push(run); run = null; } }); if (run) runs.push(run); console.log('graze', sc.i, o.sc.i, nm, 'L', X.info.L.toFixed(1), runs.map((r) => `${r.a.toFixed(1)}–${r.b.toFixed(1)}:${r.min.toFixed(2)}`).join(' ')); } } return `grazes scroll ${o.sc.i}`; } continue; }
+      if (adj) { if (clearOf(c, o) < Fm && !joinsCleanly(c, o, COMPOSE.handJoin)) { return `grazes scroll ${o.sc.i}`; } continue; }
       if (clearOf(c, o) < Fm) return `${clearOf(c, o).toFixed(2)} mm from scroll ${o.sc.i}`;
       if (clearOf(c, mirrorCurve(o)) < Fm) return `the mirror of scroll ${o.sc.i}`;
     }
@@ -539,7 +514,6 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     const sc = c.sc;
     if (sc.type !== 'C' || sc.a.b === 'root') continue;
     const peak = Math.max(...c.body.raw.map((q) => SF.local(q)[1])) - yOut;
-    if (globalThis.__CDBG) console.log('fill?', sc.i, (peak / M).toFixed(2));
     if (peak < COMPOSE.fillAt * M) continue;
     const len = COMPOSE.fillLen * sc.len, s0 = sc.a.s + sc.rvA * 2 - COMPOSE.kiss * sc.cap, s1 = s0 + len;
     const cap = Math.max(F, 0.7 * sc.cap), rA = Math.max(1.6, 0.6 * sc.rvA), rB = Math.max(1.6, 0.11 * len);
@@ -552,7 +526,6 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
     let ok = selfGap(f).gap >= Fm && !f.pts.some((q) => opening(q)) && slitWorst(f, near(f)) === -Infinity;
     if (ok && !joinsCleanly(f, c) && clearOf(f, c) < Fm) ok = false;
     if (ok) for (const o of kept) { if (o === c) continue; if (clearOf(f, o) < Fm || clearOf(f, mirrorCurve(o)) < Fm) { ok = false; break; } }
-    if (globalThis.__CDBG) console.log('fill', sc.i, ok, selfGap(f).gap.toFixed(2), f.pts.some((q) => opening(q)), slitWorst(f, near(f)), joinsCleanly(f, c), clearOf(f, c).toFixed(2));
     if (ok) { fills.push(f); }
   }
   kept.push(...fills);
@@ -568,32 +541,7 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
   };
   const crestRoots = kept.filter((c) => c.sc.a.b === 'root');
   if (crestRoot && crestRoots.length) {
-    // the largest crest that takes the roots (C3: 2.3 M where it fits, down to round 2's first 1.7 M)
-    let r = null;
-    // ... and leaves no slit in plan against the scrolls it takes (a large shell's lower lobes lie along the roots)
-    const motifSlit = (el) => {
-      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-      for (const l of el.loops) for (const [x, y] of l) { x0 = Math.min(x0, x, -x); y0 = Math.min(y0, y); x1 = Math.max(x1, x, -x); y1 = Math.max(y1, y); }
-      const box = [x0 - 4, y0 - 4, x1 + 4, y1 + 4], cs = kept.flatMap((c) => [c, mirrorCurve(c)]).filter((c) => c.pts.some(([x, y]) => x > box[0] - 6 && x < box[2] + 6 && y > box[1] - 6 && y < box[3] + 6));
-      const sl = planSlit2D(cs.map((c) => ({ pts: c.pts, w: c.w || c.pts.map(() => c.info.wire) })), box, { cell: 0.2, solid: (q) => region.inside(q) || el.loops.some((l) => pip(q, l)) }).mm;
-      if (globalThis.__CDBG) console.log('motif slit', sl);
-      if (sl < Fm) return sl;
-      // a wire crossing the shell's lobe at a shallow angle leaves a wedge (no neck): its run beside the lobe's edge
-      for (const c of cs) {
-        let run = 0, worst = 0;
-        for (let i = 0; i < c.pts.length; i++) {
-          const q = c.pts[i]; let g;
-          if (el.loops.some((l) => pip(q, l))) g = -1;
-          else { g = Infinity; for (const l of el.loops) for (let k = 0; k < l.length; k++) g = Math.min(g, segD(q, l[k], l[(k + 1) % l.length])); g -= wAtC(c, i) / 2; }
-          if (g > 0.05 && g < Fm) { run += i ? Math.hypot(q[0] - c.pts[i - 1][0], q[1] - c.pts[i - 1][1]) : 0; worst = Math.max(worst, run); } else run = 0;
-        }
-        if (globalThis.__CDBG && worst > 0) console.log('motif wedge', c.k, worst.toFixed(2));
-        if (worst > COMPOSE.motifWedge) return 0;
-      }
-      return Infinity;
-    };
-    // (the last rung, round 2's own 1.7 M shell with the join alone, is what C1/C2 printed with no slit)
-    for (const [k, strict] of [[COMPOSE.crestScale, true], [2.0, true], [1.7, true], [1.7, false]]) { r = drapedCrest('shell', { M: k * M, frame, opening, Hz, fits: (el) => joinsMotif(el, true, crestRoots) && (!strict || motifSlit(el) >= Fm), why: 'take the crest scrolls\' roots', slopes: kind === 'arch', sil }); if (r.el) break; }
+    const r = drapedCrest('shell', { M: COMPOSE.crestScale * M, frame, opening, Hz, fits: (el) => joinsMotif(el, true, crestRoots), why: 'take the crest scrolls\' roots', slopes: kind === 'arch', sil });
     told.push(r.note);
     if (r.el) elements.push({ el: r.el, mirror: null, role: 'motif', kind: 'shell', cls: 'heavy', anchor: side.nodes[0].id, w: 1, onAxis: true, crest: !!r.el.crest });
   }
@@ -670,26 +618,14 @@ export function composeFor(model, { triBudget = FRAME_TRI_BUDGET } = {}) {
       const dir = i < meet ? 1 : -1, lean = (low ? COMPOSE.flameLean[0] : COMPOSE.flameLean[1]) * DEG;
       const ang = i === meet ? headingOf(bf.n) - 0.6 : headingOf([dir * bf.t[0] * FM.cos(lean) + bf.n[0] * FM.sin(lean), dir * bf.t[1] * FM.cos(lean) + bf.n[1] * FM.sin(lean)]);
       let lf = null;
-      // a NODE's leaf SHEATHES the spring: rooted where the spring leaves the node's coil, lying along the spring's
-      // own heading (either curl, a little either side), so it wraps the fork rather than jutting out of it (§6)
-      if (scrolls[i].nodeB && b.sc.nodeA) {
-        const k0 = Math.min(b.pts.length - 1, Math.round(COMPOSE.sheathAt / 0.25));
-        for (const at of [0, k0]) for (const da of [0, 0.25, -0.25, 0.5, -0.5]) for (const side of [1, -1]) for (let g = 1; g > 0.45 && !lf; g *= 0.85) {
-          const raw = acanthusLeaf(len * g, { aspect: COMPOSE.leafAspect, lobes: COMPOSE.leafLobes }, side);
-          const cand = rigid(raw, { at: b.pts[at], angle: b.tan[at] + da }); cand.info = { ...cand.info, role: 'acanthus' };
-          if (leafOK(cand, [a, b])) lf = cand;
-        }
-      }
       // straight out of the V first; then leaning with the growth (onward, +) or back toward the source (−) — a
       // flame that lies across the kiss sheathes it
       for (const da of i === meet ? [0, 0.35, -0.35, 0.7, -0.7] : [0, -0.2 * dir, 0.2 * dir, -0.45 * dir, 0.45 * dir]) for (let g = 1; g > 0.45 && !lf; g *= 0.85) {
-        if (scrolls[i].nodeB && b.sc.nodeA && lf === null && g === 1 && da === 0 && globalThis.__CDBG) console.log('node leaf fell back', i);
         const raw = acanthusLeaf(len * g, { aspect: COMPOSE.leafAspect, lobes: COMPOSE.leafLobes }, 1);
         const cand = rigid(raw, { at: root, angle: ang - da }); cand.info = { ...cand.info, role: 'acanthus' };
         if (leafOK(cand, [a, b])) lf = cand;
       }
-      if (lf && globalThis.__CDBG) console.log("leaf kept", i, leafSlit(lf).toFixed(2), lf.w ? "w" : "now");
-      if (lf) { lf.k = -1; lf.host = a; leavesKept.push(lf); } else { leafDropped++; if (globalThis.__CDBG) { const raw = acanthusLeaf(len * 0.6, { aspect: COMPOSE.leafAspect, lobes: COMPOSE.leafLobes }, 1); const cand = rigid(raw, { at: root, angle: ang }); console.log('leaf', i, bd.b, len.toFixed(1), leafWhy(cand, [a, b])); } }
+      if (lf) { lf.k = -1; lf.host = a; leavesKept.push(lf); } else { leafDropped++; }
     }
   }
   if (leafDropped) told.push(`${leafDropped} acanthus lea${leafDropped > 1 ? 'ves' : 'f'} not built — no room a feature clear`);

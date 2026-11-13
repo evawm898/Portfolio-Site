@@ -9,6 +9,10 @@ This session did three things:
 - iterated it for five rounds against a FRESH outside critic each round. Each critic saw only the sheet, the
   references and the grammar.
 
+**Round 2 (the same night, §9): composition instead of growth** — `frame-compose.js`, `ornFlow: 'composed'`. It is
+the round-1 brief's option (d) "not ready" answered with a different construction rather than a tuned one. Read §9
+first if you are picking this up.
+
 **Nothing ships.** The shipped default is untouched: no control writes `ornFlow`. With it absent every row is
 byte-identical to `main` (§6, FF0).
 
@@ -344,3 +348,194 @@ for it (the plan gap ≥ 1 mm, or fused on purpose) is owed before any contour s
   The full-sheet PNG screenshot fails on a sheet this tall, and the rounds' PNGs were assembled from the cells.
 - `node tools/frame-flow-measure.mjs [--json] [--fast]` prints the measurements.
 - `node tools/verify-frame-flow.mjs [--base <wt>]` runs the gate.
+
+## 9. Round 2 — COMPOSED, not grown (`frame-compose.js`, `ornFlow: 'composed'`)
+
+Eva's ruling on round 1 was (d), not ready. The diagnosis in her brief: round 1 GREW ornament (a scroll, children
+forking off it, placed until collision), and every critic read *"a wire with hooks hanging off it"*. Baroque
+scrollwork is COMPOSED: the silhouette first, then a head-to-tail sequence of C and S curves along it, then the
+volutes at their ends, then the leaves. The growth model was not tuned further. The composition step replaced it, in
+the OUTER CONTOUR mode only. On-band was not attempted (the brief: only if time remained).
+
+### 9.1 The method, as built (`frame-compose.js`'s header has the details)
+
+1. **The silhouette.** `ENVELOPES[kind]` is a list of keypoints along the side (a run index and a fraction of that
+   run, an offset beyond the molding in M, and a boundary role: root, low, high, swell, foot, end). The envelope is
+   eased between them with a smoothstep and mirrored. On the oval it is read off R2's trace:
+   - a high crest;
+   - a waist at the shoulder;
+   - an upper-flank swell above the widest point;
+   - feet at the bottom.
+
+   **Plotted over the reference** (`node tools/frame-flow-envelope.mjs <png> --refs <dir>`; the photo overlay is not
+   committed), the target follows R2's own outline by eye: crest, waist, swell and feet.
+   `docs/img/frame-flow-envelope.png` is the line-art chart:
+
+   | arc fraction (crest → bottom) | 0 | 0.1 | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 | 1 |
+   |---|---|---|---|---|---|---|---|---|---|---|---|
+   | R2 traced envelope (M) | 2.47 | 0.70 | 0.83 | 1.83 | 1.73 | 1.32 | 1.18 | 1.27 | 1.09 | 1.43 | 1.58 |
+   | composed TARGET (M) | 2.00 | 1.43 | 0.70 | 1.32 | 1.77 | 1.10 | 1.49 | 1.25 | 1.45 | 2.32 | 1.80 |
+   | composed BUILT, the farthest wire (M) | 0.73 | 0.99 | 0.40 | 0.63 | 1.43 | 0.56 | 1.28 | 1.15 | 1.26 | 1.40 | 0.24 |
+
+   **The built ornament falls SHORT of its own target at the crest and the feet.** At the crest that is the shell,
+   0.77 M proud against a target of 2 M. That is the critics' "no dominant crest" (§9.3). The target is right. The
+   composer does not yet fill it.
+2. **The partition.** The keypoints' boundaries cut the half outline into a chain of scrolls: C between two LOW
+   boundaries, S between a low and a high one. Lengths vary with the spacing, longest at the shoulder swell. The chain
+   runs from a crest ROOT under the shell to a bottom root under the bottom shell (or into the sill on the arch).
+3. **The volutes.** Every scroll is double-ended, ONE curve:
+   - a start volute (a log spiral, reversed);
+   - a clothoid ramp out of it;
+   - a zero-curvature quintic Hermite body;
+   - a ramp into the end volute.
+
+   It is G2 throughout. Low volutes curl toward the frame and sink into the molding's edge, by a fraction of the
+   pair's radius (`lowSinkK`). High volutes curl outward at the envelope. At a boundary the two scrolls' volutes stand
+   BACK TO BACK with tangent centrelines: the hand-off, measured G1 at ≤ 4.9°, the two wires overlapping ≥ 0.54 mm (§9.4).
+   - Each volute's turns are bisected to the most that keep every coil a feature apart.
+   - A neighbour's end volute is trimmed when its eye curls toward the next scroll.
+   - A C's departure angle is bisected so its crown meets the envelope's peak over its span.
+4. **The sources.**
+   - The crest shell takes the crest C pair's roots.
+   - From C2 on, the bottom is a source too: the last scroll runs from the FOOT volute back in under the bottom
+     shell. The feet are planted between two scrolls, not dangling. The shell is sized down until it takes those
+     roots.
+   - On the rectangle the corner pair is ×1.25.
+5. **The leaves.** Acanthus at every hand-off, rooted IN the hand-off and required to JOIN a host.
+   - From C2 on they are flames pointing WITH their flow: down from the crest above the meeting, up from the bottom
+     below it, leaning out off the molding.
+   - The meeting (the first high pair) carries a fan pointing out.
+6. **The fill.** A small C is built under a primary only where the envelope leaves a gap (the primary's crown past
+   1.25 M). It was never built: the one candidate (the oval's long C) fails its self-gap. Recorded, not tuned.
+
+**The plan-gap check (the brief: "add the 1 mm PLAN-gap check now").** Every wire and every leaf is checked, before it
+is kept, for:
+- a slit in plan: `planSlit2D` in `frame-print.js`, measurePrint's own neck rule on a 0.2 mm raster of the wire, every
+  wire laid near it, and the band;
+- a WEDGE: a V has no neck, so a wire's run beside the band's edge, a motif's lobed edge or another wire, closer than a
+  feature, is held to a length.
+
+On the final relief, the narrowest empty neck in plan (measurePrint's `slit`, cell 0.2 mm, the plan's outside
+included) is **5.4 / 3.8 / 6.2 mm** on the oval / rectangle / arch. Round 1's contour read **0.20 / 0.60 / 0.20 mm**.
+
+### 9.2 The rounds (a FRESH critic each, who saw only the sheet, the references and the grammar)
+
+| round | sheet | what changed | rinceau | round 1 (grown) | composed |
+|---|---|---|---|---|---|
+| C1 | `docs/img/frame-flow-c1.png` | the method as above, uniform-gauge wire | 3 | 4.5 | **5** |
+| C2 | `docs/img/frame-flow-c2.png` | swelling bodies (cap 0.42 M), the bottom a source (feet planted), a higher crest envelope, flames along the flow, the plan-slit and wedge checks | 3 | 4.5 | **5** |
+| C3 | `docs/img/frame-flow-c3.png` | ONE opposed-volute meeting per side; every other hand-off a NODE (the next scroll springing off the volute's front, a leaf sheathing the spring); a larger crest shell where it fits | 3 | 4.5 | **4.5** (oval 5, rect 4, arch 4) |
+
+**Stopped after C3** (the brief: two rounds without improvement). **The kept state is C2.** `frame-compose.js` is
+C2's (commit `b150b03`), and C3 is in the branch history as tried and withdrawn. C3's nodes read *"joints with a
+leaf stuck through them"*, with a visible collar where the tubes butt.
+
+What every critic said, in their own words, condensed:
+- **C1:** *"Bent wire, not carved scrollwork"*; the bottom is not a source, and the feet dangle; the crest has no
+  weight; the knots read as beads on a string. **Beats round 1, "yes, narrowly": the scrolls continue into each
+  other, and the outline is planned.**
+- **C2:** *"a wrought-iron cage"*; the bodies are slack rods with tiny end coils; the cartouche is wrong (no dominant
+  crest, the swell misplaced); every hand-off is one repeated bow-tie; the leaves are stuck-on pea pods. **Beats round
+  1 "narrowly": "for the first time the ornament reads as one continuous chain".**
+- **C3:** *"Bare wire where the mass should be"*; the silhouette is a lumpy oval inside its own envelope; repetition
+  by kind. **Against round 1: "a wash"**: the chain is right, but it traded round 1's clutter for emptiness.
+
+### 9.3 Did composition beat growth?
+
+**On the thing the brief diagnosed, yes.** Every critic said so unprompted. The ornament now runs head to tail round
+the frame, ends meeting ends, instead of hooks hanging off a wire:
+- the hand-offs are G1 by construction (≤ 4.9°);
+- there are no forks;
+- the outline is planned from the reference.
+
+**On the picture as a whole, only narrowly: 5 against round 1's 4.5.** All three critics named the same remaining
+gap, and it is NOT the method: **MASS**. The chain is a skeleton of 1–4 mm wires. R2's elements are fluted stems
+carrying long feathered flames and volutes that are almost solid, with small piercings between. Two measured facts
+sit behind that:
+- **The built ornament does not reach its own target envelope** (§9.1's table: the crest 0.73 M against 2.0, the feet
+  0.24 at the axis);
+- **the leaves that survive the print checks are small.** At C2 the wedge and slit checks dropped most of them
+  (5 hand-offs: the oval 2 not built; 7: the rectangle 5 not built; 5: the arch 2 not built), because a flame lying along a stem leaves a hairline V. That is a real
+  print hazard, not a false positive: measured on the relief at 0.2–0.6 mm before the checks.
+
+### 9.4 Measurements (Node builds of the sheet's params, the kept C2 state, 180 mm, EXPORT)
+
+| | oval | rectangle | arch |
+|---|---|---|---|
+| scrolls a side (all built) | 6 | 8 | 6 |
+| repetition: pairs sharing a shape | 0 of 15 (closest d 2.07) | 0 of 28 (d 1.82) | 0 of 15 (d 4.63) |
+| hand-offs: joined · tangent · wire overlap | 5 of 5 · ≤ 4.4° · ≥ 2.02 mm | 6 of 7 · ≤ 4.9° · ≥ 0.54 mm | 5 of 5 · ≤ 3.3° · ≥ 1.37 mm |
+| following (body vs the frame's tangent): median / p90 | 19.9° / 54.1° | 21.4° / 77.3° | 21.4° / 63.7° |
+| plan slit (narrowest empty neck, 0.2 mm cell) | **5.40 mm** | **3.80 mm** | **6.20 mm** |
+| round 1's contour, same measure | 0.20 mm | 0.60 mm | 0.20 mm |
+| boundary edges · voxel regions · thinnest wire | 0 · 1 · 1.00 mm | 0 · 1 · 1.00 mm | 0 · 1 · 1.00 mm |
+| narrowest solid feature (0.2 mm cell) | 1.40 mm | 0.93 mm | 0.93 mm |
+| triangles (of the 1.5 M budget) | 319,816 (21.3 %) | 312,688 (20.8 %) | 271,436 (18.1 %) |
+
+Notes:
+- **Repetition** is the round-1 metric (length / turns / profile). It cannot see the critics' repetition, which is by
+  KIND (§9.2).
+- A double-ended scroll's "turns" (end tangent less start) are near 0 by construction: its two curls cancel.
+- **Following got WORSE than round 1's contour** (a median of 10.5°). A composed C bows out to the envelope and back to
+  the molding at every low hand-off, which is the critics' *"swings in and out"*.
+- The one rectangle hand-off that does not join is the top run's short S into the corner pair. The two wires still
+  overlap 0.54 mm, and the solid is one region.
+- The **0.93 mm "feature"** is the 0.2 mm raster's quantisation of a 1.00 mm wire (the thinnest emitted wire is
+  1.00 mm on all three).
+
+### 9.5 Options for Eva
+
+- **(a) Ship OUTER CONTOUR (composed) as a layout choice.** Not recommended yet. It prints clean:
+  - one region;
+  - 0 boundary edges;
+  - every plan gap ≥ 3.8 mm;
+  - 18–21 % of the triangle budget.
+
+  It reads better than anything before it, but at 5 / 10 it is a wire cage beside the references.
+- **(b) Ship it as the default.** No.
+- **(c) Another round — RECOMMENDED, on a narrower brief than this one.** Keep the composition: the envelope, the
+  partition, the back-to-back G1 hand-offs and the two sources. Change the ELEMENT:
+  1. **Mass per element:** each chain segment a full element, a fluted stem that swells from its source and carries a
+     feathered flame along it. The flame is rooted on the stem's back, and its length is budgeted with the stem's so
+     the pair leaves no V: a flame FUSED along its stem for its first third, not a separate leaf. That is the one
+     construction that answers both the critics' *"mass"* and the print check's hairline V.
+  2. **Reach the target:** the crest group and the feet are built to the envelope (crest 2 M, feet 2.3 M), not capped
+     by a 1.7 M shell. Make the crest a scroll group, not a shell alone.
+  3. **Volutes ≈ a quarter of the element** (radius ∝ element length, with a thicker coil). C2's are 0.11 × the chord.
+  4. **Variation by kind** (open C, tight C, fan, flame, closed cap) rather than by size alone.
+- **(d) The method itself doesn't work.** Not my reading. Every critic credited the chain. What failed is the
+  element's mass and the reach, not composition.
+
+### 9.6 Decisions made alone (round 2)
+
+- **On-band not attempted.** The contour took the night (the brief's order).
+- **The meeting is the FIRST HIGH boundary** on each side (the shoulder swell). In C3 it was the only opposed pair
+  (with the rectangle's corners), and that was withdrawn with C3.
+- **The bottom ends in a ROOT** under the bottom shell (or into the sill), not in a free foot. The foot volute is a
+  hand-off between the last two scrolls, so the feet are planted (C1's critic: *"they hang like legs"*).
+- **Plan checks are conservative.** Measured, the 2-D raster cannot see a pure wedge (it has no neck), so a separate
+  run-length rule holds wedges, at:
+  - 1.5 mm between wires;
+  - 3.2 mm against the band's edge (a volute's coil crosses it at ~25° and prints);
+  - 1.0 mm against a motif's lobed edge.
+
+  These are calibrated against the relief's own `measurePrint` slit on the three skeletons, not derived. They cost
+  leaves (§9.3).
+- **A 300 mm print is NOT clean.** The rectangle at 300 mm reads a 0.60 mm plan slit (a leaf lobe beside a volute)
+  where 180 mm reads 3.8, and one of its hand-offs opens to a 1.77 mm gap. The gate's `rect composed, 300 mm` row fails FK and FP. Not fixed: it needs the
+  mass-per-element rework anyway.
+- **Kept C2 over C3** on the critic's scores, though C3 also fixed robustness (a motif slit check, steeper C arrival
+  angles). Those fixes are in C3's commit and can be carried forward.
+
+### 9.7 Reproduce (round 2)
+
+- `node tools/shot-frame-flow.mjs <dir> --round <n>` (round 2 is the default; `--growth` shoots round 1's sheet).
+  It writes the three skeletons in three layouts, then each composed frame's shoulder, waist, bottom and
+  three-quarter close-ups, and the plan plots with the target envelope dashed.
+- `node tools/frame-flow-envelope.mjs <png> [--refs <dir>]` draws the target envelope against R2.
+- `node tools/frame-flow-measure.mjs` measures the composed rows too.
+- `node tools/verify-frame-flow.mjs [--base <wt>]` runs the gate. The composed rows carry:
+  - FW, FC, FT, FB, FM and FR;
+  - FN (every planned scroll built);
+  - FK (every hand-off overlaps ≥ F/2 within 6°);
+  - FP (the plan slit ≥ 1 mm).
