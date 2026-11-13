@@ -36,7 +36,7 @@
     <div class="project__tag"><span class="project__year">Field Notes &middot; Study Session</span></div>
     <h1 class="project__title">Smart Textiles, Studied</h1>
     <p class="project__lede">The note shows how each part works. This page is for making it stick: the electricity under all of it, why one metal beats another for a given job, and the difference between resistive and capacitive sensing, until you can explain each one without looking.</p>
-    <p class="st-lede-sub">Each chapter runs the same way: <b>watch</b> it move, <b>play</b> with a lab, learn the <b>line to remember</b>, then <b>check</b> yourself. Your progress stays in this browser. When the chapters are done, run a mixed round: it pulls from everything and comes back to what you missed.</p>
+    <p class="st-lede-sub">Each chapter runs the same way: <b>watch</b> it move, <b>play</b> with a lab, learn the <b>line to remember</b>, then <b>check</b> yourself, first with options and then without them. Your progress stays in this browser. When the chapters are done, run a mixed round: it pulls from everything and comes back to what you missed.</p>
 
     <section class="sx-progress" id="progress" aria-label="Your progress">
       <div class="sx-progress__head">
@@ -47,6 +47,7 @@
       <ol class="sx-chapters" data-sx-chapters></ol>
       <div class="sx-progress__actions">
         <a class="sx-cta" href="#round">Start a mixed round &rarr;</a>
+        <a class="sx-cta" href="#hard-round">Or the hard round &rarr;</a>
         <button type="button" class="st-btn" data-sx-reset>Reset progress</button>
       </div>
     </section>
@@ -108,11 +109,15 @@
       </div>
       <figcaption><span class="label">Ohm&rsquo;s law lab</span><span class="state">Predict first, then move it</span><span class="sub">Before you drag: if you double the push, what happens to the flow? If you double the fight? Then check.</span></figcaption>
     </figure>
+    <div class="sx-chal" data-sx-chal="ohm"></div>
 
     <h3 class="st-sub">Remember</h3>
     <div class="sx-cards" data-sx-cards="flow"></div>
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="flow"></div>
+    <h3 class="st-sub">Harder: no options to pick from</h3>
+    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
+    <div class="sx-hard" data-sx-hard="flow"></div>
   </section>
 
   <!-- ================= 02 · RESISTANCE ================= -->
@@ -141,6 +146,7 @@
       </div>
       <figcaption><span class="label">Yarn resistance lab</span><span class="state">Long and thin, resistance wins</span><span class="sub">Every material here is drawn as 20 &micro;m filaments so the comparison is fair. Swap silver for stainless at the same length: about 45 times the resistance. Double the filaments: half.</span></figcaption>
     </figure>
+    <div class="sx-chal" data-sx-chal="yarnR"></div>
 
     <h3 class="st-sub">Watch</h3>
     <div class="st-grid st-grid--2">
@@ -168,11 +174,15 @@
       </div>
       <figcaption><span class="label">The brief</span><span class="state">3&ndash;6 W from 5 V, at most 2 A, at least 1.2 m of yarn</span><span class="sub">It starts too cold on purpose. The instinct is to add more yarn, which makes it colder: P = V&sup2;/R, so at a fixed voltage, longer is colder. Find a working answer for each of the three yarns. (A design exercise with round numbers, not a spec.)</span></figcaption>
     </figure>
+    <div class="sx-chal" data-sx-chal="heater"></div>
 
     <h3 class="st-sub">Remember</h3>
     <div class="sx-cards" data-sx-cards="resist"></div>
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="resist"></div>
+    <h3 class="st-sub">Harder: no options to pick from</h3>
+    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
+    <div class="sx-hard" data-sx-hard="resist"></div>
   </section>
 
   <!-- ================= 03 · METALS ================= -->
@@ -218,6 +228,9 @@
     <div class="sx-cards" data-sx-cards="metals"></div>
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="metals"></div>
+    <h3 class="st-sub">Harder: no options to pick from</h3>
+    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
+    <div class="sx-hard" data-sx-hard="metals"></div>
   </section>
 
   <!-- ================= 04 · SENSE ================= -->
@@ -256,6 +269,7 @@
 
     <h3 class="st-sub">Play: how a chip reads each one</h3>
     <div class="st-grid st-grid--2">
+      <div class="sx-labcol">
       <figure class="st-cell sx-lab" data-st="divider">
         <div class="st-anim"><svg role="img" aria-label="A voltage divider: 3.3 volts across a resistive sensor and a fixed 10 kilohm resistor in series. A bar splits the 3.3 volts between them in proportion to their resistances, and the output voltage across the fixed resistor is read out."></svg></div>
         <div class="sx-controls">
@@ -263,6 +277,9 @@
         </div>
         <figcaption><span class="label">Reading R: a voltage divider</span><span class="state">Two resistors share the push in proportion</span><span class="sub">Press harder: the sensor&rsquo;s resistance falls, its share of the 3.3 V shrinks, and the fixed resistor&rsquo;s share, the voltage the chip reads, grows.</span></figcaption>
       </figure>
+      <div class="sx-chal" data-sx-chal="divider"></div>
+      </div>
+      <div class="sx-labcol">
       <figure class="st-cell sx-lab" data-st="bucket">
         <div class="st-toggles" role="group" aria-label="What fills the gap">
           <button type="button" class="st-btn" data-st-for="bucket" data-st-key="eps" data-st-value="1" aria-pressed="true">Air</button>
@@ -275,6 +292,8 @@
         </div>
         <figcaption><span class="label">Reading C: timing a charge</span><span class="state">C is a bucket: bigger bucket, longer to fill</span><span class="sub">The chip charges the electrode through a resistor and times how long it takes to reach a threshold. Halve the gap: double the C, double the time. Try water.</span></figcaption>
       </figure>
+      <div class="sx-chal" data-sx-chal="bucket"></div>
+      </div>
     </div>
 
     <h3 class="st-sub">Watch: a finger, two ways</h3>
@@ -301,6 +320,9 @@
     <div class="sx-cards" data-sx-cards="sense"></div>
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="sense"></div>
+    <h3 class="st-sub">Harder: no options to pick from</h3>
+    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
+    <div class="sx-hard" data-sx-hard="sense"></div>
   </section>
 
   <!-- ================= 05 · STACK ================= -->
@@ -328,6 +350,9 @@
     <div class="sx-cards" data-sx-cards="stack"></div>
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="stack"></div>
+    <h3 class="st-sub">Harder: no options to pick from</h3>
+    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
+    <div class="sx-hard" data-sx-hard="stack"></div>
   </section>
 
   <!-- ================= MIXED ROUND ================= -->
@@ -342,6 +367,18 @@
     <div class="sx-round" data-sx-round></div>
     <h3 class="st-sub">Review the cards you haven&rsquo;t got yet</h3>
     <div class="sx-cards" data-sx-cards="review"></div>
+  </section>
+
+  <!-- ================= HARD ROUND ================= -->
+  <section class="tx-topic" id="hard-round">
+    <div class="tx-topic-head">
+      <h2><span class="sx-n">&#9654;&#9654;</span>Hard Round</h2>
+      <div class="tx-topic-copy">
+        <p>Eight items, none of them multiple choice: which way each quantity moves, a number to work out, a line to type from memory. Three rows of arrows have 27 possible answers, and a typed number has no options at all, so this one can&rsquo;t be guessed through.</p>
+        <p class="muted">What you got wrong last time comes back first, here and in the chapters.</p>
+      </div>
+    </div>
+    <div class="sx-round" data-sx-hardround></div>
   </section>
 
   <section class="tx-topic" id="sources">

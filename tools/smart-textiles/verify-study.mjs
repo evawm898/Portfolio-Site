@@ -19,15 +19,27 @@
 //   V10 the mixed round is 10 questions and a question missed last time comes first
 //   V11 progress survives a reload
 //   V12 no page errors, no horizontal page scroll
-// --negative-control re-serves the page with a defect planted, one at a time, and requires the named check
+//   V13 every card has its explanation, two other mnemonics and words to blank; Flip shows them only after
+//       "Show the line"; Type the line refuses wrong words and accepts the right ones (and records them)
+//   V14 Up, down or same: Check waits for every row; the right arrows score every row, a wrong one is marked
+//   V15 Work it out: every generator gives a finite positive answer and hints (Node, 300 draws each); the
+//       renderer says too high / too low, accepts within 3% and refuses 3.3% off
+//   V16 Put it in order: a check locks exactly the items in place; swaps then solve it and the best is stored
+//   V17 Spot the fault: the right tap reads right and is stored; a wrong layer tap and a wrong gap tap read wrong
+//   V18 lab challenges advance when the lab's own state meets the target, and the progress is stored
+//   V19 the Hard round is 8 items, interleaved, and an arrow grid missed last time comes first
+// --negative-control [--mutant=a,b] re-serves the page with a defect planted, one at a time, and requires the named check
 // to fail: storage never written (V6, V11), the Next button shown early (V7), Build the Stack accepting any
-// layer (V9), a slider that writes nothing (V5), the mixed round unranked (V10).
+// layer (V9), a slider that writes nothing (V5), the mixed round unranked (V10), Type the line accepting
+// anything (V13), arrows ungraded (V14), a 30% tolerance (V15), an order check that locks everything (V16),
+// any layer tap or any gap tap counted right (V17), challenges that never advance (V18), the Hard round unranked (V19).
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const { chromium } = createRequire('/opt/node22/lib/node_modules/')('playwright');
 const DATA = await import(pathToFileURL(path.join(REPO, 'smart-textiles-study-data.js')).href);
+const HARD = await import(pathToFileURL(path.join(REPO, 'smart-textiles-study-hard.js')).href);
 const N_SCENES = 18;
 
 function serve(patch = {}) {
@@ -184,6 +196,145 @@ async function run(patch = {}, quiet = false) {
         const kept = await page.evaluate(id => (JSON.parse(localStorage.getItem('st-study.v1') || '{}').cards || {})[id], id);
         const pctAfter = await page.$eval('[data-sx-total]', e => e.textContent);
         ok('V11', kept === 1 && pctAfter !== '0%', `after reload card box ${kept}, progress ${pctAfter} (before reload ${pctBefore})`);
+
+        const store = () => page.evaluate(() => JSON.parse(localStorage.getItem('st-study.v1') || '{}'));
+        const fill = (sel, v) => page.fill(sel, String(v), { timeout: 2000 }).then(() => true, () => false);
+        page.setDefaultTimeout(5000);
+        try {
+          // V13 card extras: data, flip, type the line
+          const missingMore = DATA.CARDS.filter(c => { const m = DATA.CARD_MORE[c.id]; return !m || !m.explain || m.alts.length < 2 || !m.cloze.length; }).map(c => c.id);
+          await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(400);
+          const D = '[data-sx-cards="flow"]';
+          const moreHidden = await page.$eval(`${D} .sx-card__more`, e => getComputedStyle(e).display === 'none');
+          await tap(`${D} [data-a="show"]`);
+          const moreShown = await page.$eval(`${D} .sx-card__more`, e => getComputedStyle(e).display !== 'none' && e.querySelectorAll('.sx-alts li').length >= 2);
+          await tap(`${D} [data-mode="type"]`);
+          const cid = await page.$eval(`${D} [data-card]`, e => e.dataset.card), words = DATA.CARD_MORE[cid]?.cloze || [];
+          const ngaps = await page.$$eval(`${D} .sx-gap`, e => e.length);
+          for (let i = 0; i < ngaps; i++) await fill(`${D} .sx-gap[data-gap="${i}"]`, 'qqqq');
+          await tap(`${D} [data-a="check"]`);
+          const refused = await page.$eval(`${D} .sx-reveal`, e => e.hidden);
+          for (let i = 0; i < ngaps; i++) await fill(`${D} .sx-gap[data-gap="${i}"]`, words[i].toUpperCase());
+          await tap(`${D} [data-a="check"]`);
+          const revealed = await page.$eval(`${D} .sx-reveal`, e => !e.hidden && /Got it/.test(e.textContent)).catch(() => false);
+          const clozeRec = ((await store()).hard?.cloze || {})[cid];
+          ok('V13', !missingMore.length && moreHidden && moreShown && ngaps === words.length && refused && revealed && clozeRec?.last === true,
+            `cards missing extras ${missingMore.length}; more hidden ${moreHidden}, shown ${moreShown}; ${cid} gaps ${ngaps}/${words.length}; wrong words refused ${refused}; right words revealed ${revealed}; recorded ${clozeRec?.last}`);
+          await tap(`${D} [data-mode="flip"]`);
+        } catch (e) { ok('V13', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V14 arrows (the flow widget opens on Up, down or same?)
+          const A = '[data-sx-hard="flow"]';
+          const aq = await page.$eval(`${A} .sx-prompt`, e => e.textContent), arr = HARD.ARROWS.find(x => x.q === aq);
+          const checkOff = await page.$eval(`${A} [data-a="check"]`, e => e.disabled);
+          for (let r = 0; r < arr.rows.length - 1; r++) await tap(`${A} [data-row="${r}"] [data-dir="${arr.rows[r][1]}"]`);
+          const checkStillOff = await page.$eval(`${A} [data-a="check"]`, e => e.disabled);
+          const lastWant = arr.rows.at(-1)[1], lastWrong = lastWant === 'up' ? 'down' : 'up';
+          await tap(`${A} [data-row="${arr.rows.length - 1}"] [data-dir="${lastWrong}"]`);
+          await tap(`${A} [data-a="check"]`);
+          const marks = await page.$$eval(`${A} .sx-arrow-row`, e => e.map(r => r.dataset.r));
+          const aRec1 = ((await store()).hard?.arrows || {})[arr.id];
+          await tap(`${A} [data-a="more"]`);
+          const aq2 = await page.$eval(`${A} .sx-prompt`, e => e.textContent), arr2 = HARD.ARROWS.find(x => x.q === aq2);
+          for (let r = 0; r < arr2.rows.length; r++) await tap(`${A} [data-row="${r}"] [data-dir="${arr2.rows[r][1]}"]`);
+          await tap(`${A} [data-a="check"]`);
+          const marks2 = await page.$$eval(`${A} .sx-arrow-row`, e => e.map(r => r.dataset.r));
+          const wantMarks = arr.rows.map((_, r) => r < arr.rows.length - 1 ? 'right' : 'wrong');
+          ok('V14', checkOff && checkStillOff && JSON.stringify(marks) === JSON.stringify(wantMarks) && aRec1?.last === false && marks2.every(m => m === 'right'),
+            `check disabled at start ${checkOff}, with a row unpicked ${checkStillOff}; one wrong row marks ${marks.join('/')}; recorded ${aRec1?.last}; all right marks ${marks2.join('/')}`);
+        } catch (e) { ok('V14', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V15 numbers: generators in Node, the renderer in the page on a fixed problem
+          const genBad = [];
+          for (const [k, g] of Object.entries(HARD.PROBLEMS)) for (let i = 0; i < 300; i++) { const pr = g.make(); if (!(isFinite(pr.ans) && pr.ans > 0 && pr.hints.length >= 2 && !/NaN|undefined/.test(pr.q + pr.work + pr.hints.join('')))) { genBad.push(k); break; } }
+          await page.evaluate(async () => {
+            const H = await import('/smart-textiles-study-hard.js');
+            const d = document.createElement('div'); d.id = 'v15'; d.style.cssText = 'padding:20px'; document.body.append(d);
+            window.__v15 = null; H.renderProblem(d, { q: 'Fixed', ans: 30, unit: 'mA', hints: ['h1', 'h2'], work: 'w' }, (ok, clean) => { window.__v15 = { ok, clean }; });
+          });
+          // a renderer check, not a layout check: drive it through the DOM so nothing on the page can sit over it
+          const say = v => page.evaluate(v => { const r = document.getElementById('v15'); r.querySelector('.sx-input').value = v; r.querySelector('[data-a="check"]').click(); return r.querySelector('.sx-why').textContent; }, String(v));
+          const hi = await say(500), lo = await say(1), far = await say(31);
+          await page.evaluate(() => { const h = document.querySelector('#v15 [data-a="hint"]'); h.click(); h.click(); });
+          const nh = await page.$$eval('#v15 .sx-hintline', e => e.length);
+          const near = await say('30.8');
+          const res15 = await page.evaluate(() => window.__v15);
+          ok('V15', !genBad.length && /Too high/.test(hi) && /Too low/.test(lo) && /Too high/.test(far) && nh === 2 && /✓/.test(near) && res15?.ok === true && res15.clean === false,
+            `${Object.keys(HARD.PROBLEMS).length} generators, bad ${genBad.join(',') || 'none'}; 500 "${hi.slice(0, 12)}", 1 "${lo.slice(0, 11)}", 31 (3.3% off) "${far.slice(0, 12)}"; hints ${nh}; 30.8 accepted ${/✓/.test(near)}; done ${JSON.stringify(res15)}`);
+          await page.evaluate(() => document.getElementById('v15').remove());
+        } catch (e) { ok('V15', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V16 order (resist chapter)
+          const O = '[data-sx-hard="resist"]';
+          await tap(`${O} [data-hmode="order"]`);
+          const oq = await page.$eval(`${O} .sx-prompt`, e => e.textContent), ord = HARD.ORDERS.find(x => x.q === oq);
+          const texts = () => page.$$eval(`${O} .sx-order-item`, e => e.map(b => b.childNodes[1].textContent));
+          const t0 = await texts(), inPlace = t0.filter((t, i) => t === ord.items[i]).length;
+          await tap(`${O} [data-a="check"]`);
+          const lockedNow = await page.$$eval(`${O} .sx-order-item[data-lock="true"]`, e => e.length);
+          let guard = 0;
+          while (guard++ < 20) {
+            const t = await texts(), i = t.findIndex((x, k) => x !== ord.items[k]);
+            if (i < 0) break;
+            const j = t.indexOf(ord.items[i]);
+            await tap(`${O} .sx-order-item[data-i="${i}"]`); await tap(`${O} .sx-order-item[data-i="${j}"]`);
+          }
+          await tap(`${O} [data-a="check"]`);
+          const solved = await page.$eval(O, e => /Solved in 2 checks/.test(e.textContent));
+          const oRec = ((await store()).hard?.order || {})[ord.id];
+          ok('V16', lockedNow === inPlace && lockedNow < ord.items.length && solved && oRec === 2, `${ord.id}: ${inPlace} in place, ${lockedNow} locked after the first check; solved in 2 ${solved}; stored best ${oRec}`);
+        } catch (e) { ok('V16', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V17 spot the fault
+          const F = '[data-sx-hard="stack"]';
+          const findFault = async () => {
+            const head = (await page.$eval(`${F} .sx-prompt`, e => e.textContent)).split(':')[0];
+            const st = DATA.STACKS.find(x => x.name === head);
+            const names = await page.$$eval(`${F} .sx-fault-layer`, e => e.map(b => b.textContent));
+            const i = names.findIndex((n, k) => n !== st.layers[k].name);
+            return names.length < st.layers.length ? { gap: i < 0 ? names.length : i } : { pos: i };
+          };
+          await tap(`${F} [data-hmode="fault"]`);
+          const f1 = await findFault();
+          await tap(f1.gap != null ? `${F} .sx-gap-btn[data-gap="${f1.gap}"]` : `${F} .sx-fault-layer[data-pos="${f1.pos}"]`);
+          const why1 = await page.$eval(`${F} .sx-why`, e => e.textContent);
+          // a wrong tap of each kind: a layer tapped when one is missing, a gap tapped when two are swapped
+          const wrongs = [];
+          for (const kind of ['gap', 'pos']) {
+            let f2 = null;
+            for (let k = 0; k < 40; k++) { await tap(`${F} [data-a="more"]`); f2 = await findFault(); if (f2[kind] != null) break; }
+            await tap(kind === 'gap' ? `${F} .sx-fault-layer[data-pos="0"]` : `${F} .sx-gap-btn[data-gap="0"]`);
+            wrongs.push(await page.$eval(`${F} .sx-why`, e => e.textContent));
+          }
+          const fRec = (await store()).hard?.fault?.all;
+          ok('V17', /^✓ Right/.test(why1) && wrongs.every(w => /^✕/.test(w)) && fRec?.right === 1 && fRec?.wrong === 2, `right tap "${why1.slice(0, 7)}"; wrong layer tap "${wrongs[0].slice(0, 26)}", wrong gap tap "${wrongs[1].slice(0, 26)}"; stored ${JSON.stringify(fRec)}`);
+        } catch (e) { ok('V17', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V18 lab challenges
+          const setSlider = (scene, key, v) => page.evaluate(([scene, key, v]) => { const i = document.querySelector(`[data-sx-for="${scene}"][data-sx-key="${key}"]`); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); }, [scene, key, v]);
+          await setSlider('ohm', 'V', 5); await setSlider('ohm', 'R', 100); await page.waitForTimeout(60);
+          await setSlider('divider', 'press', 0.18); await page.waitForTimeout(60);
+          await tap('[data-st-for="heater"][data-st-value="10"]'); await setSlider('heater', 'n', 2); await setSlider('heater', 'len', 1.2); await page.waitForTimeout(60);
+          const doneCount = async n => page.$$eval(`[data-sx-chal="${n}"] li[data-state="done"]`, e => e.length);
+          const c18 = { ohm: await doneCount('ohm'), divider: await doneCount('divider'), heater: await doneCount('heater'), bucket: await doneCount('bucket') };
+          const chalRec = (await store()).hard?.chal || {};
+          ok('V18', c18.ohm === 1 && c18.divider === 1 && c18.heater === 1 && c18.bucket === 0 && chalRec.ohm === 1 && chalRec.heater === 1, `targets met: ${JSON.stringify(c18)} (bucket untouched); stored ${JSON.stringify(chalRec)}`);
+        } catch (e) { ok('V18', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V19 hard round
+          const miss = HARD.ARROWS.find(x => x.ch === 'stack');
+          await page.evaluate(([miss, ids]) => { const s = JSON.parse(localStorage.getItem('st-study.v1') || '{}'); s.hard = s.hard || {}; s.hard.arrows = {}; for (const id of ids) s.hard.arrows[id] = { right: 1, wrong: 0, last: true }; s.hard.arrows[miss] = { right: 0, wrong: 1, last: false }; localStorage.setItem('st-study.v1', JSON.stringify(s)); }, [miss.id, HARD.ARROWS.map(x => x.id)]);
+          // three fresh rounds, so an unranked round (1 in 27 to lead with it by chance) cannot pass by luck
+          const R = '[data-sx-hardround]', firsts = [];
+          let bar = '';
+          for (let k = 0; k < 3; k++) {
+            await page.reload(); await page.waitForTimeout(400);
+            firsts.push(await page.$eval(`${R} .sx-prompt`, e => e.textContent));
+            bar = await page.$eval(`${R} .sx-game__bar span`, e => e.textContent);
+          }
+          const led = firsts.filter(f => f === miss.q).length;
+          ok('V19', led === 3 && /^1 of 8 · Up, down or same\?/.test(bar), `missed arrow grid (${miss.id}) led ${led} of 3 fresh rounds; "${bar}"`);
+        } catch (e) { ok('V19', false, 'threw: ' + String(e.message).split('\n')[0]); }
       }
 
       const sw = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -201,10 +352,20 @@ if (process.argv.includes('--negative-control')) {
     ['build-accepts-anything', { 'smart-textiles-study.js': ['if (ok(i, k)) {', 'if (true) {'] }, ['V9']],
     ['slider-writes-nothing', { 'smart-textiles-study.js': ['if (p) { p.state[key] = +input.value;', 'if (p) { void key;'] }, ['V5']],
     ['round-unranked', { 'smart-textiles-study.js': ['.sort((a, b) => rank(a) - rank(b))', ''] }, ['V10']],
+    ['cloze-accepts-anything', { 'smart-textiles-study-hard.js': ['const all = gaps.every((g, i) => wordMatch(g.value, words[i]));', 'const all = true;'] }, ['V13']],
+    ['arrows-ungraded', { 'smart-textiles-study-hard.js': ['const ok = picks[r] === want;', 'const ok = true;'] }, ['V14']],
+    ['tolerance-thirty-percent', { 'smart-textiles-study-hard.js': ['Math.abs(ans) * 0.03', 'Math.abs(ans) * 0.3'] }, ['V15']],
+    ['order-locks-everything', { 'smart-textiles-study-hard.js': ['order.forEach((v, i) => { if (v === i) locked.add(i); });', 'order.forEach((v, i) => locked.add(i));'] }, ['V16']],
+    ['fault-any-layer-right', { 'smart-textiles-study-hard.js': ["answer(f.type === 'swap' &&", 'answer(true ||'] }, ['V17']],
+    ['fault-any-gap-right', { 'smart-textiles-study-hard.js': ["answer(f.type === 'missing' &&", 'answer(true ||'] }, ['V17']],
+    ['challenge-never-advances', { 'smart-textiles-study-hard.js': ['if (at < spec.targets.length && spec.targets[at][1](v))', 'if (false)'] }, ['V18']],
+    ['hard-round-unranked', { 'smart-textiles-study.js': ["ranked('arrows', ARROWS).slice(0, 3)", 'shuffle(ARROWS).slice(0, 3)'] }, ['V19']],
   ];
   let failed = 0;
+  const only = (process.argv.find(a => a.startsWith('--mutant=')) || '').slice(9).split(',').filter(Boolean);
   for (const [id, patch, want] of MUTANTS) {
-    const { fails } = await run(patch, true);
+    if (only.length && !only.includes(id)) continue;
+    const { fails } = await run(patch, !only.length);
     const missed = want.filter(v => !fails.has(v));
     console.log(`${missed.length ? 'MISSED' : 'caught'} ${id}: fired ${[...fails].join(', ') || 'nothing'} (wants ${want.join(', ')})`);
     if (missed.length) failed++;

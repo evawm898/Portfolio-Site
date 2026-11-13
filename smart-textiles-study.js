@@ -2,12 +2,16 @@
 //
 // Mounts the study scenes with the note's own player, wires the lab sliders to the scenes' state,
 // and runs the games: mnemonic cards (Leitner boxes), the chapter checks, the metal cards, Pick the
-// Metal, Which Sensor, Build the Stack and the mixed round. Progress lives in localStorage under
-// st-study.v1, guarded so a blocked storage simply means a session with no memory.
+// Metal, Which Sensor, Build the Stack and the mixed round. Then the games with no options to pick from
+// (smart-textiles-study-hard.js): Type the line on the cards, Up/down/same, Work it out, Put it in order,
+// Spot the fault, the lab challenges and the Hard round. Progress lives in localStorage under
+// st-study.v1 (the harder games under S.hard), guarded so a blocked storage simply means a session with
+// no memory.
 
 import { mount } from './smart-textiles-core.js';
 import { STUDY_SCENES, FILS } from './smart-textiles-study-scenes.js';
-import { CHAPTERS, CARDS, QUIZ, STATS, METALS, PICK_METAL, WHICH_SENSOR, STACKS } from './smart-textiles-study-data.js';
+import { CHAPTERS, CARDS, CARD_MORE, QUIZ, STATS, METALS, PICK_METAL, WHICH_SENSOR, STACKS } from './smart-textiles-study-data.js';
+import { ARROWS, PROBLEMS, ORDERS, CHALLENGES, renderArrow, renderProblem, renderOrder, renderFault, renderCloze, altsHTML, mountChallenge } from './smart-textiles-study-hard.js';
 
 const KEY = 'st-study.v1';
 const $ = (s, r = document) => r.querySelector(s);
@@ -21,11 +25,14 @@ const DARK = new Set(['carbon', 'pedot']);   // swatches that need light letteri
 // ---------------------------------------------------------------------------------------------
 // storage
 // ---------------------------------------------------------------------------------------------
-const blank = () => ({ cards: {}, quiz: {}, games: {} });
+const blank = () => ({ cards: {}, quiz: {}, games: {}, hard: {} });
 let S = blank();
 try { const raw = localStorage.getItem(KEY); if (raw) S = { ...blank(), ...JSON.parse(raw) }; } catch { S = blank(); }
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* private mode: no memory */ } paintProgress(); };
 
+const H = k => (S.hard ||= {})[k] ||= {};       // the harder games' records: arrows, prob, order, fault, cloze, chal
+const record = (k, id, ok) => { const r = H(k)[id] || { right: 0, wrong: 0, last: false }; r[ok ? 'right' : 'wrong']++; r.last = ok; H(k)[id] = r; save(); };
+const rankOf = (k, id) => { const r = H(k)[id]; return !r ? 1 : r.last ? 2 : 0; };   // 0 missed, 1 new, 2 right
 const box = id => S.cards[id] || 0;              // 0 new/missed, 1 once, 2 twice, 3 solid
 const quizRight = id => !!(S.quiz[id] && S.quiz[id].last);
 
@@ -33,8 +40,8 @@ const quizRight = id => !!(S.quiz[id] && S.quiz[id].last);
 // progress: a card counts as known at box 2, a check question once its last answer was right
 // ---------------------------------------------------------------------------------------------
 function chapterScore(ch) {
-  const cards = CARDS.filter(c => c.ch === ch), qs = QUIZ.filter(q => q.ch === ch);
-  const items = cards.map(c => Math.min(box(c.id), 2) / 2).concat(qs.map(q => quizRight(q.id) ? 1 : 0));
+  const cards = CARDS.filter(c => c.ch === ch), qs = QUIZ.filter(q => q.ch === ch), ar = ARROWS.filter(a => a.ch === ch);
+  const items = cards.map(c => Math.min(box(c.id), 2) / 2).concat(qs.map(q => quizRight(q.id) ? 1 : 0), ar.map(a => rankOf('arrows', a.id) === 2 ? 1 : 0));
   return items.length ? items.reduce((a, b) => a + b, 0) / items.length : 0;
 }
 function paintProgress() {
@@ -105,13 +112,14 @@ function makeDeck(host) {
   const ch = host.dataset.sxCards;
   const pool = () => (ch === 'review' ? CARDS.filter(c => box(c.id) < 2) : CARDS.filter(c => c.ch === ch));
   let order = [], at = 0, shown = false, listView = false;
+  const modeOf = () => ((S.games.mode || {})[ch] || 'flip');
   const reorder = () => { order = pool().slice().sort((a, b) => box(a.id) - box(b.id)); at = 0; shown = false; };
   reorder();
   const paint = () => {
     const all = ch === 'review' ? CARDS : CARDS.filter(c => c.ch === ch);
     if (listView) {
       host.innerHTML = `<div class="sx-deck"><div class="sx-deck__bar"><span>All ${all.length} lines</span><button type="button" class="sx-btn" data-a="deck">Back to the deck</button></div>
-        <div class="sx-list">${all.map(c => `<div class="sx-mini"><div class="q">${esc(c.front)}</div><div class="h">${esc(c.hook)}</div><div class="box">${['new', 'seen once', 'got it', 'solid'][box(c.id)]}</div></div>`).join('')}</div></div>`;
+        <div class="sx-list">${all.map(c => `<div class="sx-mini"><div class="q">${esc(c.front)}</div><div class="h">${esc(c.hook)}</div>${CARD_MORE[c.id] ? `<div class="alts">${CARD_MORE[c.id].alts.map(a => `${esc(a[0])}: ${esc(a[1])}`).join('<br>')}</div>` : ''}<div class="box">${['new', 'seen once', 'got it', 'solid'][box(c.id)]}</div></div>`).join('')}</div></div>`;
       $('[data-a="deck"]', host).addEventListener('click', () => { listView = false; reorder(); paint(); });
       return;
     }
@@ -123,24 +131,46 @@ function makeDeck(host) {
       $('[data-a="list"]', host).addEventListener('click', () => { listView = true; paint(); });
       return;
     }
-    const c = order[at], ci = chName(c.ch);
+    const c = order[at], ci = chName(c.ch), more = CARD_MORE[c.id], mode = modeOf();
+    const bar = `<div class="sx-deck__bar"><span>Card ${at + 1} of ${order.length}</span><span class="sx-mode" role="group" aria-label="How to practise">${[['flip', 'Flip'], ['type', 'Type the line']].map(([k, n]) => `<button type="button" class="st-btn" data-mode="${k}" aria-pressed="${mode === k}">${n}</button>`).join('')}</span><span class="sx-dots" aria-hidden="true">${order.map((d, i) => `<i data-box="${box(d.id)}" class="${i === at ? 'is-on' : ''}"></i>`).join('')}</span></div>`;
+    const wireModes = () => { for (const b of $$('[data-mode]', host)) b.addEventListener('click', () => { (S.games.mode ||= {})[ch] = b.dataset.mode; save(); shown = false; paint(); }); };
+    const grade = () => {
+      const act = (a, f) => { const b = $(`[data-a="${a}"]`, host); if (b) b.addEventListener('click', f); };
+      act('got', () => { S.cards[c.id] = Math.min(3, box(c.id) + 1); save(); next(); });
+      act('miss', () => { S.cards[c.id] = 0; save(); order.push(c); next(); });   // a miss comes back at the end of this pass
+      act('list', () => { listView = true; paint(); });
+    };
+    if (mode === 'type' && more && !shown) {
+      // Type the line: the hook with its key words blanked. Close spelling counts.
+      host.innerHTML = `<div class="sx-deck">${bar}<div class="sx-card sx-card--type" data-shown="true" data-card="${c.id}"><div data-cloze></div>
+        <div class="sx-card__actions"><span class="sx-hint">Type the missing words. Close spelling counts.</span><button type="button" class="sx-btn" data-a="list" style="margin-left:auto">All lines</button></div></div></div>`;
+      wireModes();
+      $('[data-a="list"]', host).addEventListener('click', () => { listView = true; paint(); });
+      renderCloze($('[data-cloze]', host), c, ok => {
+        record('cloze', c.id, ok);
+        $('.sx-reveal', host).insertAdjacentHTML('afterbegin', `<p class="sx-card__back">${esc(c.back)}</p>`);
+        $('.sx-card__actions', host).innerHTML = `<button type="button" class="sx-btn sx-btn--go" data-a="got">Got it</button><button type="button" class="sx-btn" data-a="miss">Not yet</button>${ok ? '' : '<span class="sx-hint">Missed words count as not yet.</span>'}<button type="button" class="sx-btn" data-a="list" style="margin-left:auto">All lines</button>`;
+        grade();
+        $(`[data-a="${ok ? 'got' : 'miss'}"]`, host)?.focus({ preventScroll: true });
+      });
+      return;
+    }
     host.innerHTML = `<div class="sx-deck">
-      <div class="sx-deck__bar"><span>Card ${at + 1} of ${order.length}</span><span class="sx-dots" aria-hidden="true">${order.map((d, i) => `<i data-box="${box(d.id)}" class="${i === at ? 'is-on' : ''}"></i>`).join('')}</span></div>
+      ${bar}
       <div class="sx-card" data-shown="${shown}" data-card="${c.id}">
         <span class="sx-card__ch">${ci ? `${ci.n} · ${esc(ci.name)}` : ''}</span>
         <p class="sx-card__front">${esc(c.front)}</p>
         <p class="sx-card__hook">${esc(c.hook)}</p>
         <p class="sx-card__back">${esc(c.back)}</p>
+        ${more ? `<div class="sx-card__more"><span class="sx-eyebrow">How the line works</span><p class="sx-why">${esc(more.explain)}</p>${altsHTML(more)}</div>` : ''}
         <div class="sx-card__actions">${shown
           ? `<button type="button" class="sx-btn sx-btn--go" data-a="got">Got it</button><button type="button" class="sx-btn" data-a="miss">Not yet</button>`
           : `<button type="button" class="sx-btn sx-btn--go" data-a="show">Show the line</button><span class="sx-hint">Say your answer first, then check.</span>`}
           <button type="button" class="sx-btn" data-a="list" style="margin-left:auto">All lines</button></div>
       </div></div>`;
-    const act = (a, f) => { const b = $(`[data-a="${a}"]`, host); if (b) b.addEventListener('click', f); };
-    act('show', () => { shown = true; paint(); $('[data-a="got"]', host)?.focus(); });
-    act('got', () => { S.cards[c.id] = Math.min(3, box(c.id) + 1); save(); next(); });
-    act('miss', () => { S.cards[c.id] = 0; save(); order.push(c); next(); });   // a miss comes back at the end of this pass
-    act('list', () => { listView = true; paint(); });
+    wireModes();
+    $('[data-a="show"]', host)?.addEventListener('click', () => { shown = true; paint(); $('[data-a="got"]', host)?.focus({ preventScroll: true }); });
+    grade();
   };
   const next = () => { at++; shown = false; if (at >= order.length) { order = []; } paint(); refreshDecks(host); };
   host._repaint = () => { if (!order.length || listView) { reorder(); } paint(); };
@@ -375,12 +405,136 @@ function pickRound(n = 10) {
 })();
 
 // ---------------------------------------------------------------------------------------------
+// Harder, per chapter: up/down/same, work it out, put it in order, spot the fault. No options.
+// ---------------------------------------------------------------------------------------------
+const PROB_BY_CH = ch => Object.entries(PROBLEMS).filter(([, g]) => g.ch === ch).map(([k]) => k);
+const ranked = (k, items) => shuffle(items).sort((a, b) => rankOf(k, a.id) - rankOf(k, b.id));
+function nextProblem(types) {
+  // a type you got wrong last time comes first; otherwise any, avoiding the one you just did
+  const wrong = types.filter(t => rankOf('prob', t) === 0);
+  return pick(wrong.length ? wrong : types);
+}
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const MODES = [['arrows', 'Up, down or same?'], ['numbers', 'Work it out'], ['order', 'Put it in order'], ['fault', 'Spot the fault']];
+for (const host of $$('[data-sx-hard]')) {
+  const ch = host.dataset.sxHard;
+  const arrows = ARROWS.filter(a => a.ch === ch), probs = PROB_BY_CH(ch), orders = ORDERS.filter(o => o.ch === ch);
+  const have = { arrows: arrows.length > 0, numbers: probs.length > 0, order: orders.length > 0, fault: ch === 'stack' };
+  const modes = MODES.filter(([k]) => have[k]);
+  let mode = modes[0][0], queue = [], lastType = null, faultStack = 0;
+  const tally = () => {
+    if (mode === 'arrows') return `right last time <b>${arrows.filter(a => rankOf('arrows', a.id) === 2).length}</b> / ${arrows.length}`;
+    if (mode === 'numbers') { const r = probs.map(t => H('prob')[t]).filter(Boolean); return `solved <b>${r.reduce((a, x) => a + x.right, 0)}</b> · first try <b>${probs.reduce((a, t) => a + ((H('prob')[`${t}:clean`] || {}).right || 0), 0)}</b>`; }
+    if (mode === 'order') return orders.map(o => `${H('order')[o.id] ? `best <b>${H('order')[o.id]}</b> checks` : 'not solved yet'}`).join(' · ');
+    const f = H('fault').all || { right: 0, wrong: 0 }; return `found <b>${f.right}</b> of ${f.right + f.wrong}`;
+  };
+  const load = () => {
+    const stage = $('.sx-hard__stage', host), nx = $('.sx-next', host);
+    nx.hidden = true;
+    const finish = () => { $('.sx-tally', host).innerHTML = tally(); nx.hidden = false; $('[data-a="more"]', nx).focus({ preventScroll: true }); };
+    if (mode === 'arrows') {
+      if (!queue.length) queue = ranked('arrows', arrows);
+      const item = queue.shift();
+      renderArrow(stage, item, ok => { record('arrows', item.id, ok); finish(); });
+    } else if (mode === 'numbers') {
+      let t = nextProblem(probs); if (probs.length > 1) while (t === lastType) t = pick(probs); lastType = t;
+      renderProblem(stage, PROBLEMS[t].make(), (ok, clean) => { record('prob', t, ok); if (ok) record('prob', `${t}:clean`, clean); finish(); });
+    } else if (mode === 'order') {
+      if (!queue.length) queue = shuffle(orders);
+      const item = queue.shift();
+      renderOrder(stage, item, tries => { const o = H('order'); o[item.id] = Math.min(o[item.id] ?? 99, tries); save(); finish(); });
+    } else {
+      const st = STACKS[faultStack++ % STACKS.length];
+      renderFault(stage, st, ok => { record('fault', 'all', ok); finish(); });
+    }
+  };
+  const paint = () => {
+    host.innerHTML = `<div class="sx-game"><div class="sx-game__bar"><span>Harder · ${esc(chName(ch).name)}</span><span class="sx-tally"></span></div>
+      ${modes.length > 1 ? `<div class="sx-hard__modes" role="group" aria-label="Kind of question">${modes.map(([k, n]) => `<button type="button" class="st-btn" data-hmode="${k}" aria-pressed="${k === mode}">${n}</button>`).join('')}</div>` : ''}
+      <div class="sx-hard__stage"></div>
+      <div class="sx-next" hidden><button type="button" class="sx-btn sx-btn--go" data-a="more">Another one</button></div></div>`;
+    $('.sx-tally', host).innerHTML = tally();
+    for (const b of $$('[data-hmode]', host)) b.addEventListener('click', () => { mode = b.dataset.hmode; queue = []; paint(); });
+    $('[data-a="more"]', host).addEventListener('click', load);
+    load();
+  };
+  host._repaint = () => { queue = []; paint(); };
+  paint();
+}
+const ALL_PROBS = Object.keys(PROBLEMS);
+
+// ---------------------------------------------------------------------------------------------
+// lab challenges: targets under each lab, checked live against the lab's own state
+// ---------------------------------------------------------------------------------------------
+for (const host of $$('[data-sx-chal]')) {
+  const name = host.dataset.sxChal, p = player(name), spec = CHALLENGES[name], fig = $(`[data-st="${name}"]`);
+  if (!p || !spec || !fig) continue;
+  const tick = mountChallenge(host, p, spec, at => { H('chal')[name] = at; save(); }, H('chal')[name] || 0);
+  const later = () => setTimeout(tick, 0);
+  fig.addEventListener('input', later);
+  fig.addEventListener('click', later);
+  host._tick = tick;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Hard round: eight items across the chapters: three arrow grids, three numbers, two typed lines.
+// Missed-last-time first. A number counts only if it's right first time with no hints.
+// ---------------------------------------------------------------------------------------------
+const CLOZE_CARDS = CARDS.filter(c => CARD_MORE[c.id]);
+function pickHardRound() {
+  const ar = ranked('arrows', ARROWS).slice(0, 3).map(a => ({ kind: 'arrows', ch: a.ch, item: a }));
+  const pt = shuffle(ALL_PROBS).sort((a, b) => rankOf('prob', `${a}:clean`) - rankOf('prob', `${b}:clean`)).slice(0, 3).map(t => ({ kind: 'numbers', ch: PROBLEMS[t].ch, t }));
+  const cz = ranked('cloze', CLOZE_CARDS).slice(0, 2).map(c => ({ kind: 'cloze', ch: c.ch, item: c }));
+  // interleave the kinds: a, n, c, a, n, c, a, n
+  const out = []; for (let i = 0; i < 3; i++) for (const L of [ar, pt, cz]) if (L[i]) out.push(L[i]);
+  return out;
+}
+const KIND = { arrows: 'Up, down or same?', numbers: 'Work it out', cloze: 'Type the line' };
+(function hardRound() {
+  const host = $('[data-sx-hardround]'); if (!host) return;
+  let round, at, right, streak, bestStreak, misses, busy = false;
+  const start = () => { round = pickHardRound(); at = 0; right = 0; streak = 0; bestStreak = 0; misses = {}; paint(); };
+  const paint = () => {
+    if (at >= round.length) {
+      S.games.hard = Math.max(S.games.hard || 0, right); save();
+      const weak = Object.entries(misses).sort((a, b) => b[1] - a[1]);
+      host.innerHTML = `<div class="sx-game sx-round-card"><div class="sx-game__bar"><span>Hard round</span><span>best <b>${S.games.hard}</b> / ${round.length}</span></div>
+        <p class="sx-done">${right} of ${round.length}, longest streak ${bestStreak}.</p>
+        ${weak.length ? `<p class="sx-done-sub">Worth another look:</p><ul class="sx-weak">${weak.map(([ch, n]) => `<li><a href="${chName(ch).anchor}">${chName(ch).n} · ${esc(chName(ch).name)}</a> (${n} missed)</li>`).join('')}</ul>` : '<p class="sx-done-sub">Clean. The next round leads with whatever you haven’t answered yet.</p>'}
+        <div class="sx-next"><button type="button" class="sx-btn sx-btn--go" data-a="again">Another round</button></div></div>`;
+      $('[data-a="again"]', host).addEventListener('click', start);
+      return;
+    }
+    const it = round[at];
+    host.innerHTML = `<div class="sx-game"><div class="sx-game__bar"><span>${at + 1} of ${round.length} · ${KIND[it.kind]} · ${esc(chName(it.ch).name)}</span><span class="sx-streak">right <b>${right}</b> · streak <b>${streak}</b></span></div>
+      <div class="sx-hard__stage" data-kind="${it.kind}"></div>
+      <div class="sx-next" hidden><button type="button" class="sx-btn sx-btn--go" data-a="next">${at + 1 < round.length ? 'Next' : 'See the score'}</button></div></div>`;
+    const stage = $('.sx-hard__stage', host);
+    busy = true;
+    const done = ok => {
+      busy = false;
+      if (ok) { right++; streak++; bestStreak = Math.max(bestStreak, streak); } else { streak = 0; misses[it.ch] = (misses[it.ch] || 0) + 1; }
+      $('.sx-streak', host).innerHTML = `right <b>${right}</b> · streak <b>${streak}</b>`;
+      const nx = $('.sx-next', host); nx.hidden = false;
+      $('[data-a="next"]', nx).addEventListener('click', () => { at++; paint(); });
+      $('[data-a="next"]', nx).focus({ preventScroll: true });
+    };
+    if (it.kind === 'arrows') renderArrow(stage, it.item, ok => { record('arrows', it.item.id, ok); done(ok); });
+    else if (it.kind === 'numbers') renderProblem(stage, PROBLEMS[it.t].make(), (ok, clean) => { record('prob', it.t, ok); record('prob', `${it.t}:clean`, ok && clean); done(ok && clean); });
+    else { stage.classList.add('sx-card', 'sx-card--type'); stage.dataset.shown = 'true'; renderCloze(stage, it.item, ok => { record('cloze', it.item.id, ok); if (!ok) { S.cards[it.item.id] = 0; save(); refreshDecks(); } done(ok); }); }
+  };
+  start();
+})();
+
+// ---------------------------------------------------------------------------------------------
 // reset
 // ---------------------------------------------------------------------------------------------
 $('[data-sx-reset]').addEventListener('click', () => {
   if (!confirm('Clear every card box, answer and best score on this page?')) return;
   S = blank(); save();
   decks.forEach(d => d._repaint?.());
+  $$('[data-sx-hard]').forEach(h => h._repaint?.());
+  $$('[data-sx-chal]').forEach(h => h.dispatchEvent(new CustomEvent('sx-reset')));
 });
 
 paintProgress();
