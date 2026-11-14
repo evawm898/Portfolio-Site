@@ -45,6 +45,14 @@
 //       drawings or the three study modules; permittivity written εᵣ; the contact line read from one place (card,
 //       caption, drawing, cloze); one explanation of the harder games, in chapter 01; PEDOT:PSS's best figure and the
 //       heater yarns' labels
+//   V26 wrong-answer feedback, as served: every wrong option of every check question and Which Sensor item has its
+//       own why-not (one or two sentences), none repeats the right answer's reason, another option's why-not or a
+//       line to remember, none scolds; the 21 explanations that only restated the line now say why (the line kept
+//       as a second line); every arrow row has its own one-line reason
+//   V27 the feedback on screen, after the shuffle: a wrong pick shows that option's why-not (by the option, not its
+//       position), then the right answer, its reason and the line; the other why-nots stay hidden until "Why not
+//       the other two?"; a right answer shows them all. Every chapter check, the mixed round and Which Sensor
+//   V28 arrow grids: each row answered wrong shows its own reason, a row answered right shows none (every chapter)
 // --negative-control [--mutant=a,b] re-serves the page with a defect planted, one at a time, and requires the named check
 // to fail: storage never written (V6, V11), the Next button shown early (V7), Build the Stack accepting any
 // layer (V9), a slider that writes nothing (V5), the mixed round unranked (V10), Type the line accepting
@@ -409,7 +417,7 @@ async function run(patch = {}, quiet = false) {
             const qid = await page.$eval(`${Q} .sx-q`, e => e.dataset.q).catch(() => null); if (!qid) break;
             const it = DATA.QUIZ.find(x => x.id === qid);
             await tap(`${Q} .sx-opt[data-i="${it.a === 0 ? 1 : 0}"]`);
-            const fb = await page.$eval(Q, (e, a) => ({ said: ((e.querySelector('.sx-why b')?.textContent || '').match(/It’s ([A-D])/) || [])[1], key: e.querySelector(`.sx-opt[data-i="${a}"]`).dataset.key, mark: e.querySelector(`.sx-opt[data-i="${a}"]`).dataset.r }), it.a);
+            const fb = await page.$eval(Q, (e, a) => ({ said: ((e.querySelector('.sx-why__lead b')?.textContent || '').match(/It’s ([A-D])/) || [])[1], key: e.querySelector(`.sx-opt[data-i="${a}"]`).dataset.key, mark: e.querySelector(`.sx-opt[data-i="${a}"]`).dataset.r }), it.a);
             if (fb.said !== fb.key) letterBad.push(`${qid} said ${fb.said}, shown ${fb.key}`);
             if (fb.mark !== 'right') letterBad.push(`${qid} right answer marked ${fb.mark}`);
             if (!await tap(`${Q} [data-a="next"]`)) break;
@@ -467,6 +475,113 @@ async function run(patch = {}, quiet = false) {
           ok('V25', !r25.hits.length && r25.contact && r25.harder && r25.pedot <= 3e-6 && !/silver/i.test(r25.yarn),
             `wrong statements found: ${r25.hits.join(' ') || 'none'}; contact line "${r25.cap}" in card, caption, drawing and blanks ${r25.contact}; harder-games help ${r25.nHelp}, notes ${r25.nNotes}, in chapter 01 ${r25.harder}; PEDOT best ρ ${r25.pedot}; 10 Ω/m yarn "${r25.yarn}"`);
         } catch (e) { ok('V25', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V26 the why-nots and reasons, as served
+          const r26 = await page.evaluate(async () => {
+            const D = await import('/smart-textiles-study-data.js'), H = await import('/smart-textiles-study-hard.js');
+            const norm = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+            const hooks = new Set([...D.CARDS.map(c => c.hook), ...D.CONTACT_LINES.map(c => c.hook), ...D.QUIZ.map(q => q.hook).filter(Boolean), ...D.METALS.map(m => m.hook)].map(norm));
+            const SCOLD = /\b(obviously|of course|clearly|oops|nope|silly|easy|careful|wrong!)\b/i, K = ['R', 'C', 'E'];
+            const items = D.QUIZ.map(q => ({ id: q.id, o: q.o, a: q.a, why: q.why, hook: q.hook, no: q.no }))
+              .concat(D.WHICH_SENSOR.map(w => ({ id: `w-${w.id}`, o: K, a: K.indexOf(w.a), why: w.why, no: K.map(k => w.no?.[k] ?? null) })));
+            const bad = [], seen = new Map(); let n = 0;
+            for (const q of items) {
+              if (!Array.isArray(q.no) || q.no.length !== q.o.length) { bad.push(`${q.id}: no why-not list`); continue; }
+              if (q.no[q.a] != null) bad.push(`${q.id}: a why-not on the right answer`);
+              q.no.forEach((t, i) => {
+                if (i === q.a) return; n++;
+                if (typeof t !== 'string' || t.length < 40) { bad.push(`${q.id}[${i}]: missing or too short`); return; }
+                const sent = (t.match(/[.?!](?=\s|$)/g) || []).length;
+                if (sent > 2 || t.length > 240) bad.push(`${q.id}[${i}]: ${sent} sentences, ${t.length} chars`);
+                const nt = norm(t), nw = norm(q.why);
+                if (nt === nw || nt.includes(nw) || nw.includes(nt)) bad.push(`${q.id}[${i}]: repeats the right answer's reason`);
+                if (hooks.has(nt) || (q.hook && nt.includes(norm(q.hook))) || nt.includes(norm(D.CONTACT.hook))) bad.push(`${q.id}[${i}]: is the line to remember`);
+                if (SCOLD.test(t)) bad.push(`${q.id}[${i}]: scolds`);
+                if (seen.has(nt)) bad.push(`${q.id}[${i}]: same as ${seen.get(nt)}`); else seen.set(nt, `${q.id}[${i}]`);
+              });
+            }
+            // the 21 explanations the audit found restating the line (1 = it had a line to keep)
+            const SHORT = { 'q-doubleR': 1, 'q-square': 1, 'q-rank': 1, 'q-core': 1, 'q-halfgap': 1, 'q-area': 1, 'q-eps': 1, 'q-water': 1, 'q-creep': 1, 'q-switch': 1, 'q-tpubase': 1, 'q-baretrace': 1, 'q-heaterins': 1, 'q-young': 1, 'q-auxetic': 1, 'q-island': 1, 'q-serp': 1, 'q-compress': 1, 'q-poisson': 0, 'q-rubber': 0, 'q-cap': 0 };
+            for (const [id, line] of Object.entries(SHORT)) {
+              const q = D.QUIZ.find(x => x.id === id); if (!q) { bad.push(`${id}: gone`); continue; }
+              if (q.why.length < 70 || hooks.has(norm(q.why)) || (q.hook && norm(q.why).includes(norm(q.hook)))) bad.push(`${id}: the reason restates the line`);
+              if (line && !q.hook) bad.push(`${id}: the line to remember was dropped`);
+            }
+            for (const a of H.ARROWS) {
+              const rs = a.rows.map(r => r[2]);
+              if (rs.some(r => typeof r !== 'string' || r.length < 15 || r.length > 160)) bad.push(`${a.id}: a row without a one-line reason`);
+              if (new Set(rs.map(norm)).size !== rs.length) bad.push(`${a.id}: two rows share a reason`);
+            }
+            return { bad, n, rows: H.ARROWS.reduce((t, a) => t + a.rows.length, 0) };
+          });
+          ok('V26', !r26.bad.length && r26.n === 188 && r26.rows === 108, `${r26.n} why-nots, ${r26.rows} arrow-row reasons; ${r26.bad.length ? r26.bad.slice(0, 4).join(' | ') : 'each its own, none the reason, the line or another option’s; the 21 short explanations say why'}`);
+        } catch (e) { ok('V26', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V27 the feedback on screen, after the shuffle
+          await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(400);
+          const K = ['R', 'C', 'E'], LABEL = { R: 'Resistive', C: 'Capacitive', E: 'Either works' };
+          const ALLQ = DATA.QUIZ.concat(DATA.WHICH_SENSOR.map(w => ({ id: `w-${w.id}`, o: K.map(k => LABEL[k]), a: K.indexOf(w.a), why: w.why, no: K.map(k => w.no[k] ?? null) })));
+          const norm = t => String(t).replace(/\s+/g, ' ').trim(), has = (t, x) => norm(t).includes(norm(x));
+          const bad27 = []; let nWrong = 0, nRight = 0;
+          const answer = async (host, mode) => {
+            const st = await page.$eval(`${host} .sx-q`, e => ({ id: e.dataset.q, opts: [...e.querySelectorAll('.sx-opt')].map((o, k) => ({ k, key: o.dataset.key, i: +o.dataset.i })) }));
+            const q = ALLQ.find(x => x.id === st.id), keyOf = i => st.opts.find(o => o.i === i).key;
+            const wrong = st.opts.filter(o => o.i !== q.a);
+            const pick = mode === 'right' ? st.opts.find(o => o.i === q.a) : (wrong.find(o => o.k !== o.i) || wrong[0]);
+            await tap(`${host} .sx-opt[data-i="${pick.i}"]`);
+            const fb = await page.$eval(`${host} .sx-why`, e => ({ text: e.innerText, picked: e.querySelector('.sx-whynot--picked')?.innerText || '', lead: e.querySelector('.sx-why__lead')?.innerText || '', btn: !!e.querySelector('[data-a="others"]') }));
+            const others = wrong.filter(o => o.i !== pick.i);
+            if (!has(fb.text, q.why)) bad27.push(`${q.id}: reason not shown`);
+            if (q.hook && !has(fb.text, q.hook)) bad27.push(`${q.id}: line to remember not shown`);
+            if (mode === 'wrong') {
+              nWrong++;
+              if (!has(fb.picked, `Not ${pick.key}.`) || !has(fb.picked, q.no[pick.i])) bad27.push(`${q.id}: picked ${pick.key}, shows "${norm(fb.picked).slice(0, 48)}"`);
+              if (!has(fb.lead, `It’s ${keyOf(q.a)}`) || !has(fb.lead, q.o[q.a])) bad27.push(`${q.id}: right answer line "${norm(fb.lead).slice(0, 40)}"`);
+              for (const o of others) if (has(fb.text, q.no[o.i])) bad27.push(`${q.id}: ${o.key}'s why-not shown before giving up`);
+              if (!fb.btn) bad27.push(`${q.id}: no "why not the others"`);
+              else {
+                await tap(`${host} [data-a="others"]`);
+                const t2 = await page.$eval(`${host} .sx-why`, e => e.innerText);
+                for (const o of others) if (!has(t2, `Not ${o.key}. ${q.no[o.i]}`)) bad27.push(`${q.id}: ${o.key}'s why-not missing after giving up`);
+              }
+            } else {
+              nRight++;
+              for (const o of others) if (!has(fb.text, `Not ${o.key}. ${q.no[o.i]}`)) bad27.push(`${q.id}: ${o.key}'s why-not not shown after a right answer`);
+              if (fb.btn) bad27.push(`${q.id}: a give-up button on a right answer`);
+            }
+          };
+          for (const ch of DATA.CHAPTERS.map(c => c.id).filter(id => DATA.QUIZ.some(q => q.ch === id))) {
+            const Q = `[data-sx-quiz="${ch}"]`;
+            await answer(Q, 'wrong'); await tap(`${Q} [data-a="next"]`); await answer(Q, 'right');
+          }
+          for (let k = 0; k < 4; k++) { await answer('[data-sx-round]', k % 2 ? 'right' : 'wrong'); await tap('[data-sx-round] [data-a="next"]'); }
+          // Which Sensor, the standalone game: labels for keys
+          const W = '[data-sx-which]', prompt = await page.$eval(`${W} .sx-prompt`, e => e.textContent);
+          const ws = DATA.WHICH_SENSOR.find(x => x.prompt === prompt), wk = K.find(k => k !== ws.a), rest = K.filter(k => k !== ws.a && k !== wk);
+          await tap(`${W} .sx-chip[data-k="${wk}"]`);
+          const wt = await page.$eval(`${W} .sx-why`, e => e.innerText);
+          if (!has(wt, `Not ${LABEL[wk]}. ${ws.no[wk]}`) || !has(wt, `It’s ${LABEL[ws.a]}.`) || !has(wt, ws.why)) bad27.push(`${ws.id}: picked ${wk}, shows "${norm(wt).slice(0, 48)}"`);
+          if (rest.some(k => has(wt, ws.no[k]))) bad27.push(`${ws.id}: the other why-not shown before giving up`);
+          await tap(`${W} [data-a="others"]`);
+          const wt2 = await page.$eval(`${W} .sx-why`, e => e.innerText);
+          if (!rest.every(k => has(wt2, `Not ${LABEL[k]}. ${ws.no[k]}`))) bad27.push(`${ws.id}: the other why-not missing after giving up`);
+          ok('V27', !bad27.length && nWrong >= 8 && nRight >= 8, `${nWrong} wrong and ${nRight} right answers across 6 chapter checks, the mixed round and Which Sensor; ${bad27.length ? bad27.slice(0, 3).join(' | ') : 'the picked option’s own why-not, then the right answer, its reason and the line; the others only once given up on or answered right'}`);
+        } catch (e) { ok('V27', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V28 arrow grids: a reason under each row answered wrong, none under a row answered right
+          await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(400);
+          const bad28 = []; let nRows = 0;
+          for (const ch of [...new Set(HARD.ARROWS.map(a => a.ch))]) {
+            const Hh = `[data-sx-hard="${ch}"]`, prompt = await page.$eval(`${Hh} .sx-prompt`, e => e.textContent);
+            const item = HARD.ARROWS.find(a => a.q === prompt);
+            if (!item) { bad28.push(`${ch}: no arrow grid showing`); continue; }
+            for (let r = 0; r < item.rows.length; r++) { const want = item.rows[r][1]; await tap(`${Hh} [data-row="${r}"] .sx-dir[data-dir="${r === 0 ? want : ['up', 'down', 'same'].find(d => d !== want)}"]`); }
+            await tap(`${Hh} [data-a="check"]`);
+            const got = await page.$$eval(`${Hh} .sx-arrow-row`, rs => rs.map(r => r.querySelector('.sx-arrow-why')?.innerText.trim() || ''));
+            got.forEach((g, r) => { nRows++; const want = r === 0 ? '' : item.rows[r][2]; if (g !== want) bad28.push(`${item.id} row ${r + 1}: "${g.slice(0, 40)}"`); });
+          }
+          ok('V28', !bad28.length && nRows >= 18, `${nRows} rows over every chapter's grid; ${bad28.length ? bad28.slice(0, 3).join(' | ') : 'each wrong row shows its own reason, the right rows none'}`);
+        } catch (e) { ok('V28', false, 'threw: ' + String(e.message).split('\n')[0]); }
       }
 
       // V24 tap targets: every control in the progress panel and the chapters, prose links excepted
@@ -511,7 +626,7 @@ if (process.argv.includes('--negative-control')) {
     ['options-not-shuffled', { 'smart-textiles-study.js': ['OPT_ORDER.set(q.id, shuffle(q.o.map((_, i) => i)))', 'OPT_ORDER.set(q.id, q.o.map((_, i) => i))'] }, ['V21']],
     ['options-reshuffled-every-render', { 'smart-textiles-study.js': ['if (!OPT_ORDER.has(q.id)) OPT_ORDER.set(', 'if (true) OPT_ORDER.set('] }, ['V21']],
     ['marking-by-shown-position', { 'smart-textiles-study.js': ["opts.forEach(o => { const k = +o.dataset.i; o.disabled = true;", "opts.forEach((o, k) => { o.disabled = true;"] }, ['V21']],
-    ['feedback-letter-from-data-order', { 'smart-textiles-study.js': ['`✕ It’s ${rightKey}.`', "`✕ It’s ${'ABCD'[q.a]}.`"] }, ['V21']],
+    ['feedback-letter-from-data-order', { 'smart-textiles-study.js': ['<b>It’s ${keyOf(q.a)}${', "<b>It’s ${'ABCD'[q.a]}${"] }, ['V21', 'V27']],
     ['throwaway-option', { 'smart-textiles-study-data.js': ["o: ['Silver', 'Gold', 'Nickel', 'Copper']", "o: ['Silver', 'Gold', 'Nickel', 'Copper, because it’s magnetic']"] }, ['V22']],
     ['right-answer-longest', { 'smart-textiles-study-data.js': ['export const STATS = [', "QUIZ.forEach(q => { q.o[q.a] += ', which is the fully worked-out answer'; });\nexport const STATS = ["] }, ['V22']],
     ['duplicate-question-id', { 'smart-textiles-study-data.js': ["{ id: 'q-creep',", "{ id: 'q-drift',"] }, ['V22']],
@@ -522,6 +637,25 @@ if (process.argv.includes('--negative-control')) {
     ['contact-caption-not-read', { 'smart-textiles-study.js': ["for (const el of $$('[data-sx-line=\"contact\"]')) el.textContent = CONTACT.hook;", ''] }, ['V25']],
     ['permittivity-without-r', { 'smart-textiles-study-hard.js': ['fill the gap with polyester (εᵣ ≈ 3)', 'fill the gap with polyester (ε ≈ 3)'] }, ['V25']],
     ['harder-help-repeated', { 'smart-textiles-study.html': ['<div class="sx-hard" data-sx-hard="resist"></div>', '<p class="sx-sub-note" data-sx-harder-help>Again.</p>\n    <div class="sx-hard" data-sx-hard="resist"></div>'] }, ['V25']],
+    // PR 2: wrong-answer feedback
+    ['whynot-by-shown-position', { 'smart-textiles-study.js': ['opts.map(o => +o.dataset.i), i)', 'opts.map(o => +o.dataset.i), opts.indexOf(b))'] }, ['V27']],
+    ['whynot-not-shown', { 'smart-textiles-study.js': ['<b>✕ Not ${keyOf(i)}.</b> ${esc(q.no?.[i] || \'\')}</p>', '<b>✕ Not ${keyOf(i)}.</b></p>'] }, ['V27']],
+    ['others-shown-on-a-wrong-answer', { 'smart-textiles-study.js': ['${list(true)}', '${list(false)}'] }, ['V27']],
+    ['others-hidden-on-a-right-answer', { 'smart-textiles-study.js': ['<p class="sx-why__sub">Why not the others</p>${list(false)}', '<p class="sx-why__sub">Why not the others</p>${list(true)}'] }, ['V27']],
+    ['giving-up-reveals-nothing', { 'smart-textiles-study.js': ["$('[data-others]', why).hidden = false; ", ''] }, ['V27']],
+    ['right-answer-hidden-on-a-wrong-answer', { 'smart-textiles-study.js': ['<p class="sx-why__lead"><b>It’s', '<p class="sx-why__lead" hidden><b>It’s'] }, ['V27']],
+    ['line-to-remember-dropped', { 'smart-textiles-study.js': ["${q.hook ? `<p class=\"sx-hook\">${esc(q.hook)}</p>` : ''}", ''] }, ['V27']],
+    ['sensor-whynot-for-the-wrong-key', { 'smart-textiles-study.js': ['no: KEYS.map(k => sc.no[k] ?? null) }', 'no: KEYS.map(k => sc.no[KEYS[(KEYS.indexOf(k) + 1) % 3]] ?? null) }'] }, ['V27']],
+    ['arrow-reason-not-shown', { 'smart-textiles-study-hard.js': ["if (!ok) row.insertAdjacentHTML('beforeend'", "if (false) row.insertAdjacentHTML('beforeend'"] }, ['V28']],
+    ['arrow-reason-on-every-row', { 'smart-textiles-study-hard.js': ["if (!ok) row.insertAdjacentHTML('beforeend'", "row.insertAdjacentHTML('beforeend'"] }, ['V28']],
+    ['whynot-repeats-the-reason', { 'smart-textiles-study-data.js': ["'Halving would follow if the resistance had doubled. Here only the push changed, and more push drives more flow.'", "'I = V / R. Same fight, twice the push, twice the flow.'"] }, ['V26']],
+    ['whynot-is-the-line', { 'smart-textiles-study-data.js': ["'Either kind can be made with metal or carbon; the difference is how the electricity behaves, not the material.'", "'R is a Road, C is a Canyon: remember the line.'"] }, ['V26']],
+    ['whynot-copies-a-sibling', { 'smart-textiles-study-data.js': ["'A quarter would need four equal yarns side by side. Two of them give half.'", "'Doubling would follow if the two yarns were joined end to end. Plied together they sit side by side and share the current.'"] }, ['V26']],
+    ['whynot-missing', { 'smart-textiles-study-data.js': ["'Silver allergy is rare; silver is even used in wound dressings against the skin.'", 'null'] }, ['V26']],
+    ['whynot-scolds', { 'smart-textiles-study-data.js': ["'Silicone is the softest here, around 1 MPa or less.'", "'Obviously not: silicone is the softest here, around 1 MPa or less.'"] }, ['V26']],
+    ['reason-back-to-the-line', { 'smart-textiles-study-data.js': ["why: 'A resistive sensor is a conducting path:", "why: 'R is a Road, C is a Canyon.', was: 'A resistive sensor is a conducting path:"] }, ['V26']],
+    ['arrow-row-without-a-reason', { 'smart-textiles-study-hard.js': [", 'The battery sets the voltage; a longer thread doesn’t change it.'", ''] }, ['V26']],
+    ['sensor-whynot-missing', { 'smart-textiles-study-data.js': ["E: 'Resistive needs contact, so it can’t see a hand 2 cm away; only one of the two works here.'", "E: ''"] }, ['V26']],
     ['pedot-figure-back', { 'smart-textiles-study-data.js': ["rho: 2.3e-6, rhoNote: '≈ 2 × 10⁻⁶ at best (acid-treated film); 10⁻³–10⁻² untreated',", "rho: 1e-5, rhoNote: '≈ 10⁻⁵ at best; often 100× higher',"] }, ['V25']],
   ];
   let failed = 0;
