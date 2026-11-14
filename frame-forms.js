@@ -479,7 +479,7 @@ export function formsFor(model, orn, SF) {
     // volute inside it) as "a doughnut": a C that closes on itself is not E1
     const Lb = Math.min(2.4 * M, 0.7 * (low0.s - root.s)), th0 = Math.PI - 58 * DEG;
     const sBody = walk(low0.s, yOut - emb, th0, [{ len: 0.35 * Lb, k0: 0.7 / M, k1: 0.95 / M }, { len: 0.65 * Lb, k0: 0.95 / M, k1: 1.2 / M }]);
-    cScroll(low0.s, th0, 0, 1, { body: sBody, k: 1.0, tail: false, role: 'shoulder C' });
+    cScroll(low0.s, th0, 0, 1, { body: sBody, k: 1.0, tail: false, turns: 1.25, role: 'shoulder C' });
   }
   // the meeting: a FAN — three broad leaflets from one root just downstream of the waist, spread down and out
   if (low0) {
