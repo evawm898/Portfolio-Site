@@ -641,6 +641,14 @@ async function run(patch = {}, quiet = false) {
 
       // V30 the jump bar and back-to-top
       try {
+        // seed a different progress for each chapter (chapter i has i check questions answered right), so a bar
+        // that shows another chapter's progress cannot match the panel by accident
+        await page.evaluate(async () => {
+          const { QUIZ, CHAPTERS } = await import('/smart-textiles-study-data.js'), quiz = {};
+          CHAPTERS.forEach((c, i) => QUIZ.filter(q => q.ch === c.id).slice(0, i).forEach(q => { quiz[q.id] = { right: 1, wrong: 0, last: true }; }));
+          localStorage.setItem('st-study.v1', JSON.stringify({ cards: {}, quiz, games: {}, hard: {} }));
+        });
+        await page.reload(); await page.waitForTimeout(900);
         await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(150);
         const r30a = await page.evaluate(() => {
           const bar = document.querySelector('[data-sx-jump]');
@@ -649,7 +657,7 @@ async function run(patch = {}, quiet = false) {
           const panel = [...document.querySelectorAll('[data-sx-chapters] a')].map(a => +a.querySelector('.pct').textContent.replace('%', ''));
           const pcts = links.slice(0, 6).map(a => +a.querySelector('[data-pct]')?.dataset.pct);
           const widths = links.slice(0, 6).map(a => parseFloat(a.querySelector('.sx-jump__bar > span')?.style.width));
-          return { n: links.length, targets: links.every(a => document.querySelector(a.getAttribute('href'))), pctOk: panel.length === 6 && pcts.every((v, i) => v === panel[i] && widths[i] === v), h: Math.min(...links.map(a => a.getBoundingClientRect().height)), pos: getComputedStyle(bar).position };
+          return { n: links.length, panel, targets: links.every(a => document.querySelector(a.getAttribute('href'))), distinct: new Set(panel).size === 6, pctOk: panel.length === 6 && pcts.every((v, i) => v === panel[i] && widths[i] === v), h: Math.min(...links.map(a => a.getBoundingClientRect().height)), pos: getComputedStyle(bar).position };
         });
         const tapj = sel => page.click(sel, { timeout: 2000 }).then(() => true, () => false);
         // the page scrolls smoothly: wait until it has stopped, not a fixed time
@@ -668,8 +676,8 @@ async function run(patch = {}, quiet = false) {
         const top = await page.evaluate(() => { const a = document.querySelector('a.back-to-top[href="#top"]'); if (!a) return null; const r = a.getBoundingClientRect(); return { vis: r.height > 0 && r.bottom <= innerHeight }; });
         await tapj('a.back-to-top'); await settled();
         const y = await page.evaluate(() => scrollY);
-        ok('V30', !r30a.missing && r30a.n === 8 && r30a.targets && r30a.pctOk && r30a.pos === 'sticky' && r30a.h >= minH30 - 0.5 && landed && top?.vis && y < 20,
-          `${w}px ${r30a.n} links, every target exists ${r30a.targets}, bars match the panel ${r30a.pctOk}, ${r30a.pos}, shortest link ${Math.round(r30a.h)} px; jumps ${jumps.map(j => `${j.ch}: bar ${j.barTop}..${j.barBottom}, section at ${j.secTop}, current ${j.cur}`).join('; ')}; back to top visible ${top?.vis}, lands at ${y}`);
+        ok('V30', !r30a.missing && r30a.n === 8 && r30a.targets && r30a.distinct && r30a.pctOk && r30a.pos === 'sticky' && r30a.h >= minH30 - 0.5 && landed && top?.vis && y < 20,
+          `${w}px ${r30a.n} links, every target exists ${r30a.targets}, bars match the panel ${r30a.pctOk} (seeded ${r30a.panel?.join('/')}%, all different ${r30a.distinct}), ${r30a.pos}, shortest link ${Math.round(r30a.h)} px; jumps ${jumps.map(j => `${j.ch}: bar ${j.barTop}..${j.barBottom}, section at ${j.secTop}, current ${j.cur}`).join('; ')}; back to top visible ${top?.vis}, lands at ${y}`);
       } catch (e) { ok('V30', false, 'threw: ' + String(e.message).split('\n')[0]); }
 
       // V24 tap targets: every control in the progress panel and the chapters, prose links excepted

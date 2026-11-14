@@ -21,7 +21,11 @@ zoom.setAttribute('aria-label', 'Enlarged diagram');
 zoom.innerHTML = '<div class="st-zoom__bar"><span class="st-zoom__title"></span><button type="button" class="st-btn" data-zoom-close>Close</button></div><div class="st-zoom__body"></div>';
 document.body.append(zoom);
 let zoomed = null;
-const figName = p => (p.host.querySelector('.label') || p.host.querySelector('figcaption') || p.host.closest('figure')?.querySelector('figcaption'))?.textContent.trim().split(/\n/)[0].slice(0, 70) || 'Diagram';
+// the figure's own label, else the sub-heading just above it, else its section's heading (never a cut caption)
+const figName = p => {
+  const own = p.host.querySelector('.label'), prev = p.host.previousElementSibling, h2 = p.host.closest('section')?.querySelector('h2');
+  return (own || (prev?.classList.contains('st-sub') ? prev : null) || h2)?.textContent.trim() || 'Diagram';
+};
 const minUnits = p => Math.min(...[...p.svg.querySelectorAll('text')].map(t => +t.getAttribute('font-size') || Infinity));
 const minPx = p => { const m = p.svg.getScreenCTM(); return m ? minUnits(p) * m.a : Infinity; };
 function closeZoom() { if (!zoomed) return; zoomed.mirror = null; const b = zoomed.zoomBtn; zoomed = null; zoom.querySelector('.st-zoom__body').innerHTML = ''; if (zoom.open) zoom.close(); b?.focus({ preventScroll: true }); }

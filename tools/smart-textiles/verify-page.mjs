@@ -19,7 +19,8 @@
 //   S10 every toggle button is at least 32 px tall at 1280 and 44 px at 390
 //   S11 diagram text: a diagram whose smallest label renders under 10 px has an Enlarge button (at 390 that is
 //       every one, the tiers and the conductivity ladder included); the enlarged view is the same live drawing
-//       with every label at 10 px or more, pans to all of it, and closes back to its button
+//       with every label at 10 px or more, titled by the figure's heading (never a cut caption), pans to all of it,
+//       and closes back to its button
 // --negative-control re-serves the page with the player's draw loop removed (a page of still frames) and
 // requires S2 to fail; then with one scene's label pushed outside its frame and requires S4 to fail.
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
@@ -142,14 +143,16 @@ async function run(patch = {}, quiet = false) {
         const pans = !!big && (big.getBoundingClientRect().width <= body.clientWidth + 1 || ov === 'auto' || ov === 'scroll');
         const t0 = big?.innerHTML; await wait(250);
         const live = !!big && big.innerHTML !== t0;
+        const title = dlg?.querySelector('.st-zoom__title')?.textContent.trim() || '', heads = new Set([...document.querySelectorAll('.st-cell .label, .st-sub, section h2')].map(e => e.textContent.trim()));
         if (!dlg?.open || mm < 9.95 || !pans || !live) out.bad.push(`${p.name}: open ${!!dlg?.open}, smallest ${mm.toFixed(1)} px, pans ${pans}, live ${live}`);
+        if (!heads.has(title)) out.bad.push(`${p.name}: titled "${title.slice(0, 40)}", not a heading on the page`);
         dlg?.querySelector('[data-zoom-close]')?.click(); await wait(60);
         if (dlg?.open || document.activeElement !== btn) out.bad.push(`${p.name}: did not close back to its button`);
       }
       return out;
     });
     const s11need = w < 600 ? ['tiers', 'ladder'].filter(n => !s11.names.includes(n)) : [];
-    ok('S11', !s11.noBtn.length && !s11.bad.length && !s11need.length, `${w}px ${s11.small} diagrams with a label under 10 px, ${s11.btns} with Enlarge${s11.noBtn.length ? '; no button: ' + s11.noBtn.join(', ') : ''}${s11need.length ? '; missing: ' + s11need.join(', ') : ''}; ${s11.bad.length ? s11.bad.slice(0, 3).join(' | ') : 'each opens live, every label at 10 px or more, pans, closes to its button'}`);
+    ok('S11', !s11.noBtn.length && !s11.bad.length && !s11need.length, `${w}px ${s11.small} diagrams with a label under 10 px, ${s11.btns} with Enlarge${s11.noBtn.length ? '; no button: ' + s11.noBtn.join(', ') : ''}${s11need.length ? '; missing: ' + s11need.join(', ') : ''}; ${s11.bad.length ? s11.bad.slice(0, 3).join(' | ') : 'each opens live, titled by its heading, every label at 10 px or more, pans, closes to its button'}`);
     // S8
     const sw = await page.evaluate(() => document.documentElement.scrollWidth);
     ok('S8', sw <= w, `${w}px no horizontal scroll (scrollWidth ${sw})`);
@@ -182,6 +185,7 @@ if (process.argv.includes('--negative-control')) {
     ['the heater copy goes back to "in proportion to its resistance"', { 'smart-textiles.html': ['Current through a resistive yarn turns into heat: P = I&sup2;R.', 'Current through a resistive yarn turns into heat, in proportion to its resistance and the square of the current.'] }, 'S9'],
     ['the Enlarge button is never shown', { 'smart-textiles.js': ['const fit = () => { btn.hidden = !(minPx(p) < MIN_TEXT_PX); };', 'const fit = () => { btn.hidden = true; };'] }, 'S11'],
     ['the enlarged view is drawn at the fitted size', { 'smart-textiles.js': ['k = MIN_TEXT_PX * 1.02 / minUnits(p);', 'k = p.svg.getBoundingClientRect().width / vw;'] }, 'S11'],
+    ['the enlarged view is titled by a cut caption', { 'smart-textiles.js': ["return (own || (prev?.classList.contains('st-sub') ? prev : null) || h2)?.textContent.trim() || 'Diagram';", "return p.host.querySelector('figcaption')?.textContent.trim().slice(0, 70) || 'Diagram';"] }, 'S11'],
     ['the enlarged view does not pan', { 'smart-textiles.css': ['.st-zoom__body { overflow: auto;', '.st-zoom__body { overflow: hidden;'] }, 'S11'],
     ['the enlarged view is a still copy', { 'smart-textiles-core.js': ['        if (p.mirror) p.mirror.innerHTML = svg.innerHTML;\n', ''] }, 'S11'],
     ['the toggles lose their touch size', { 'smart-textiles.css': ['  .st-btn { min-height: 44px; padding-top: 0.5rem; padding-bottom: 0.5rem; }\n', ''] }, 'S10'],
