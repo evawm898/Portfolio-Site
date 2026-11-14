@@ -52,7 +52,8 @@ import { placeElement, relift, drapeElement, mirrorElement, symmetrizeElement, w
 import { vineFor, silDistance, drapedCrest, edgeFrame, crestLift, standMotifs } from './frame-vine.js';
 import { flowFor } from './frame-flow.js';   // the flow study's prototype (hidden param ornFlow)
 import { composeFor, frameOf } from './frame-compose.js';
-import { massFor, MASS } from './frame-mass.js';   // the flow study's round 3: the composed contour as carved mass (ornFlow 'mass')   // the flow study's round 2: the composed contour (ornFlow 'composed')
+import { massFor, MASS } from './frame-mass.js';
+import { formsFor } from './frame-forms.js';   // the flow study's round 4: the composed placements built from the MEASURED forms (ornFlow 'forms')   // the flow study's round 3: the composed contour as carved mass (ornFlow 'mass')   // the flow study's round 2: the composed contour (ornFlow 'composed')
 import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 export const SCROLL_STEP_DEG = 3;
@@ -1107,7 +1108,9 @@ export function withOrnament(model, opts = {}) {
   const composed = p.ornLayout !== 'groups' && p.ornFlow === 'composed';   // round 2: the composed contour (frame-compose.js)
   // round 3 (frame-mass.js): the composed spines built as carved MASS — filled regions, unioned, inflated
   const mass = p.ornLayout !== 'groups' && p.ornFlow === 'mass';
-  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : composed ? composeFor(model, opts) : mass ? composeFor({ ...model, params: { ...p, ornLeaves: 'off' } }, { ...opts, rvMul: MASS.rvMul, turnsAdd: MASS.turnsAdd, shellMul: MASS.shellMul }) : flow ? flowFor(model, opts) : vineFor(model, opts);
+  // round 4 (frame-forms.js): the composed PLACEMENTS, each element's outline built from the bronze's measured profiles
+  const forms = p.ornLayout !== 'groups' && p.ornFlow === 'forms';
+  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : composed ? composeFor(model, opts) : mass ? composeFor({ ...model, params: { ...p, ornLeaves: 'off' } }, { ...opts, rvMul: MASS.rvMul, turnsAdd: MASS.turnsAdd, shellMul: MASS.shellMul }) : forms ? composeFor({ ...model, params: { ...p, ornLeaves: 'off' } }, opts) : flow ? flowFor(model, opts) : vineFor(model, opts);
   let massTop = null;
   if (mass && orn.flow && orn.flow.side) {
     const ms = massFor(model, orn, frameOf(orn.flow.side));
@@ -1115,6 +1118,15 @@ export function withOrnament(model, opts = {}) {
     orn.spinesKept = orn.curves; orn.curves = [];
     orn.elements = [...orn.elements, ms.element]; massTop = ms.top;
     orn.tris.bound = orn.tris.frame + ms.stats.triangles + orn.motifs.reduce((a, o) => a + (o.onAxis ? 1 : 2) * o.el.indices.length / 3, 0);
+  }
+  if (forms && orn.flow && orn.flow.side) {
+    // the forms carry their own shells (modelled into the mass), so the composition's draped shells are dropped
+    const fs = formsFor(model, orn, frameOf(orn.flow.side));
+    // the composition's own notes (its wires, its draped shells) describe what is not built here
+    orn.told = [...fs.told]; orn.formsStats = fs.stats; orn.massStats = { cell: fs.stats.cell, triangles: fs.stats.triangles, handoffs: [], bodyWidth: null }; orn.mode = 'forms';
+    orn.spinesKept = orn.curves; orn.curves = []; orn.motifs = [];
+    orn.elements = [fs.element]; massTop = fs.top;
+    orn.tris.bound = orn.tris.frame + fs.stats.triangles;
   }
   const s = orn.scale;
   const shape = p.ornShape === 'round' ? 'round' : p.ornShape === 'half-round' ? 'half-round' : 'arris';

@@ -65,6 +65,9 @@ ROWS.push(['rect composed, 300 mm', { skeleton: 'rect', ornBottom: 'on', ornFlow
 // round 3 (frame-mass.js): the composed spines built as carved MASS
 for (const [sk, q] of SK) ROWS.push([`${sk} mass`, { ...q, ornFlow: 'mass' }]);
 ROWS.push(['rect mass, 300 mm', { skeleton: 'rect', ornBottom: 'on', ornFlow: 'mass', printHeight: 300 }]);
+// round 4 (frame-forms.js): the composed placements, each element's outline built from the measured profiles
+for (const [sk, q] of SK) ROWS.push([`${sk} forms`, { ...q, ornFlow: 'forms' }]);
+ROWS.push(['rect forms, 300 mm', { skeleton: 'rect', ornBottom: 'on', ornFlow: 'forms', printHeight: 300 }]);
 const only = arg('--only') ? new RegExp(arg('--only')) : null;
 
 for (const [name, q] of ROWS) {
@@ -72,8 +75,9 @@ for (const [name, q] of ROWS) {
   const t0 = Date.now();
   const m = T.FL.withOrnament(T.G.buildFrame({ ...T.G.DEFAULTS, filigree: 'scrolls', ...q }));
   const r = T.RL.buildRelief(m);
+  const forms = q.ornFlow === 'forms';
   const mass = q.ornFlow === 'mass', composed = q.ornFlow === 'composed' || mass;
-  const mt = flowMetrics(m, r, { RL: T.RL, FP: T.FP, print: composed });
+  const mt = flowMetrics(m, r, { RL: T.RL, FP: T.FP, print: composed || forms });
   const o = m.ornament;
   const g = o.groups[0];
   let mirror = true;
@@ -81,6 +85,7 @@ for (const [name, q] of ROWS) {
   const c = mt.repetition.closest;
   console.log(`\n${name}  (${((Date.now() - t0) / 1000).toFixed(1)} s, ${mt.elements} elements a side, ${mt.print.tris.toLocaleString('en-US')} tris)`);
   rec(mt.print.boundary === 0, 'FW watertight', `boundary ${mt.print.boundary}`);
+  if (forms) { formsClauses(o, mt); continue; }
   rec(mt.print.regions === 1, 'FC one region', `regions ${mt.print.regions}`);
   if (mass) rec(mt.print.feature >= F - 0.1, 'FT narrowest solid feature (no wire: the mass)', `${mt.print.feature.toFixed(3)} mm at the 0.2 mm raster (the open guarantees ${(2 * T.MS.MASS.open).toFixed(2)} mm)`);
   else rec(mt.thinnest >= F - 1e-9, 'FT thinnest wire', `${mt.thinnest.toFixed(3)} mm`);
@@ -106,6 +111,39 @@ for (const [name, q] of ROWS) {
   rec(mt.elements > 0 && mt.continuity.n > 0 && mt.continuity.maxTanDeg <= 2 && mt.continuity.maxKap <= 0.05 && mt.continuity.maxOff <= 0.5, 'FH hand-offs G1 + G2', `${mt.continuity.n} hand-offs, tangent ≤ ${mt.continuity.maxTanDeg.toFixed(2)}°, curvature ≤ ${mt.continuity.maxKap.toFixed(4)}/mm, root off ≤ ${mt.continuity.maxOff.toFixed(3)} mm`);
   rec(mirror, 'FM mirror to the bit');
   rec(mt.repetition.share === 0, 'FR no two elements share a shape', `${mt.repetition.share} of ${mt.repetition.pairs} pairs${c ? `; closest d ${c.d.toFixed(2)} (L ${c.La.toFixed(1)} / ${c.Lb.toFixed(1)} mm, turns ${c.Ta.toFixed(2)} / ${c.Tb.toFixed(2)})` : ''}`);
+}
+
+/* round 4's clauses: the mass's own (FC FT FB FP FM FV) and the FORMS':
+     FE every C-scroll's volute winds ≥ 1.1 turns round a pierced eye ≥ FORMS.eyeHole across, and every closed
+        curl (the foot) has a pierced hollow ≥ FORMS.eyeHole;
+     FD the node motifs differ in kind: a fan at the meeting, a sheath at the flames' root, a curl-under at the
+        stem's root — each present wherever the skeleton has its place, and no place with two of one kind;
+     FR no two elements of one kind on a side share a shape (length within 5 %, turns within 0.08). */
+function formsClauses(o, mt) {
+  const FS = o.formsStats, E = FS.elements, FORMS = T.FF.FORMS;
+  rec(mt.print.regions === 1, 'FC one region', `regions ${mt.print.regions}`);
+  rec(mt.print.feature >= F - 0.1, 'FT narrowest solid feature', `${mt.print.feature.toFixed(3)} mm at the 0.2 mm raster (the open guarantees ${(2 * FORMS.open).toFixed(2)} mm)`);
+  rec(mt.print.tris <= 1500000, 'FB budget', `${(100 * mt.print.tris / 1500000).toFixed(1)} %`);
+  rec(mt.coverage.slit >= F, 'FP no near-slit in plan (outside the frame)', `narrowest pierced neck ${mt.coverage.slit.toFixed(2)} mm (whole plan: ${mt.print.slit.toFixed(2)} mm)`);
+  const el = o.elements.find((e) => e.mass), P = el.positions, key = (x, y, z) => `${x},${y},${z}`, S = new Set();
+  for (let k = 0; k < P.length; k += 3) S.add(key(P[k], P[k + 1], P[k + 2]));
+  let asym = 0; for (let k = 0; k < P.length; k += 3) if (!S.has(key(-P[k] === 0 ? 0 : -P[k], P[k + 1], P[k + 2])) && !S.has(key(-P[k], P[k + 1], P[k + 2]))) asym++;
+  rec(asym === 0, 'FM the forms mirrored to the bit', `${asym} of ${P.length / 3} vertices with no (−x, y, z) twin`);
+  rec(mt.coverage.fill >= 0.493 && mt.coverage.fill <= 0.693, 'FV coverage within 10 points of 2.webp (59.3 %)', `fill ${(100 * mt.coverage.fill).toFixed(1)} % of the zone, attached ${(100 * mt.coverage.attach).toFixed(1)} % of the edge`);
+  const Cs = E.filter((e) => e.kind === 'C'), curls = E.filter((e) => e.closed);
+  const badC = Cs.filter((c) => !(c.turns >= 1.1 - 1e-9 && c.eye >= FORMS.eyeHole - 1e-9 && c.pierced));
+  rec(Cs.length > 0 && !badC.length && curls.every((c) => c.hollow * o.length >= FORMS.eyeHole - 1e-9), 'FE every C volute ≥ 1.1 turns round a pierced eye; every closed curl pierced', `${Cs.length} C's (eyes ${Cs.map((c) => c.eye.toFixed(2)).join(' / ')} mm, turns ${Cs.map((c) => c.turns.toFixed(2)).join(' / ')})${curls.length ? `, ${curls.length} closed curl${curls.length > 1 ? 's' : ''} (hollow ${curls.map((c) => (c.hollow * o.length).toFixed(2)).join(' / ')} mm)` : ''}`);
+  const kinds = FS.nodes || [];
+  const want = FS.nodePlaces || [];
+  const dup = want.some((pl) => kinds.filter((k) => k.place === pl.place).length !== 1);
+  const distinct = new Set(kinds.map((k) => k.kind)).size;
+  rec(kinds.length > 0 && !dup && distinct === Math.min(3, new Set(want.map((w) => w.kind)).size), 'FD node motifs differ in kind by place', kinds.map((k) => `${k.kind} at ${k.place}`).join(', '));
+  let share = 0, pairs = 0;
+  for (let i = 0; i < E.length; i++) for (let j = i + 1; j < E.length; j++) {
+    if (E[i].kind !== E[j].kind || E[i].L == null) continue; pairs++;
+    if (Math.abs(E[i].L - E[j].L) / ((E[i].L + E[j].L) / 2) < 0.05 && Math.abs(E[i].turns - E[j].turns) < 0.08) share++;
+  }
+  rec(share === 0, 'FR no two elements of one kind share a shape', `${share} of ${pairs} same-kind pairs`);
 }
 
 const base = arg('--base');

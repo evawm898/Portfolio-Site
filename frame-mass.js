@@ -98,7 +98,7 @@ export const MASS = {
 
 /* the exact squared Euclidean distance transform (Felzenszwalb), in cells,
    to the nearest SITE; rows j, columns i, index j·nx + i */
-function edt(nx, ny, site) {
+export function edt(nx, ny, site) {
   const INF = 1e20, n = Math.max(nx, ny), f = new Float64Array(n), d = new Float64Array(nx * ny);
   const v = new Int32Array(n), z = new Float64Array(n + 1), out = new Float64Array(n);
   const pass = (m) => {
@@ -115,7 +115,7 @@ function edt(nx, ny, site) {
   return d;
 }
 
-function makeGrid(box, c) {
+export function makeGrid(box, c) {
   // x symmetric about the axis: column n is x = 0 exactly, x_i = (i − n)·c
   const n = Math.ceil(Math.max(Math.abs(box.x0), Math.abs(box.x1)) / c) + 4;
   const nx = 2 * n + 1, y0 = box.y0 - 4 * c, ny = Math.ceil((box.y1 - y0) / c) + 5;
@@ -124,7 +124,7 @@ function makeGrid(box, c) {
 
 /* a variable-width stroke into a mask: the union of tapered capsules
    between consecutive centreline points (half-widths r) */
-function stamp(g, mask, pts, r, val = 1, cls = null, cv = 0) {
+export function stamp(g, mask, pts, r, val = 1, cls = null, cv = 0) {
   const { nx, ny, c, n, y0 } = g;
   for (let k = 0; k + 1 < pts.length; k++) {
     const a = pts[k], b = pts[k + 1], ra = r[k], rb = r[k + 1];
@@ -145,7 +145,7 @@ function stamp(g, mask, pts, r, val = 1, cls = null, cv = 0) {
 }
 /* the exact distance (mm) to a polyline, written as a minimum into `field` within `reach` of it (a raster of
    site cells made the ridges a staircase, read on the relief as a row of beads) */
-function siteLine(g, field, pts, reach = 2.5) {
+export function siteLine(g, field, pts, reach = 2.5) {
   const { nx, ny, c, n, y0 } = g;
   for (let k = 0; k + 1 < pts.length; k++) {
     const a = pts[k], b = pts[k + 1];
@@ -161,9 +161,9 @@ function siteLine(g, field, pts, reach = 2.5) {
     }
   }
 }
-function mirrorMin(g, a) { const { nx, ny, n } = g; for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i, m = j * nx + 2 * n - i; if (a[m] < a[k]) a[k] = a[m]; } }
+export function mirrorMin(g, a) { const { nx, ny, n } = g; for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i, m = j * nx + 2 * n - i; if (a[m] < a[k]) a[k] = a[m]; } }
 /* a polygon's interior (scanline, even-odd) */
-function fillPoly(g, mask, poly, val = 1) {
+export function fillPoly(g, mask, poly, val = 1) {
   const { nx, ny, c, n, y0 } = g, m = poly.length;
   for (let j = 0; j < ny; j++) {
     const y = y0 + j * c, xs = [];
@@ -173,11 +173,11 @@ function fillPoly(g, mask, poly, val = 1) {
   }
 }
 /* the left half made the mirror of the right, to the bit */
-function mirrorInto(g, a) { const { nx, ny, n } = g; for (let j = 0; j < ny; j++) for (let i = 0; i < n; i++) a[j * nx + i] = a[j * nx + 2 * n - i]; }
-function mirrorUnion(g, a) { const { nx, ny, n } = g; for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i, m = j * nx + 2 * n - i; if (a[m]) a[k] = 1; } }
+export function mirrorInto(g, a) { const { nx, ny, n } = g; for (let j = 0; j < ny; j++) for (let i = 0; i < n; i++) a[j * nx + i] = a[j * nx + 2 * n - i]; }
+export function mirrorUnion(g, a) { const { nx, ny, n } = g; for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i, m = j * nx + 2 * n - i; if (a[m]) a[k] = 1; } }
 
-const dilate = (g, A, r) => { const d = edt(g.nx, g.ny, (k) => A[k]), R2 = (r / g.c) * (r / g.c), out = new Uint8Array(A.length); for (let k = 0; k < A.length; k++) out[k] = d[k] <= R2 ? 1 : 0; return out; };
-const erode = (g, A, r) => { const d = edt(g.nx, g.ny, (k) => !A[k]), R2 = (r / g.c) * (r / g.c), out = new Uint8Array(A.length); for (let k = 0; k < A.length; k++) out[k] = d[k] > R2 ? 1 : 0; return out; };
+export const dilate = (g, A, r) => { const d = edt(g.nx, g.ny, (k) => A[k]), R2 = (r / g.c) * (r / g.c), out = new Uint8Array(A.length); for (let k = 0; k < A.length; k++) out[k] = d[k] <= R2 ? 1 : 0; return out; };
+export const erode = (g, A, r) => { const d = edt(g.nx, g.ny, (k) => !A[k]), R2 = (r / g.c) * (r / g.c), out = new Uint8Array(A.length); for (let k = 0; k < A.length; k++) out[k] = d[k] > R2 ? 1 : 0; return out; };
 
 /* ------------------------------------------------------------------ */
 /* the shapes                                                          */
@@ -515,7 +515,7 @@ export function massFor(model, orn, SF) {
    solid: the top at `top` (inside nodes) and base + edge on the outline, the
    bottom on z = 0, walls between. Marching squares, the saddle split by the
    cell's mean; cells on the right half only, the left their mirror */
-function meshRegion(g, sd, top, base, edgeH) {
+export function meshRegion(g, sd, top, base, edgeH) {
   const { nx, ny, n, c } = g, X = g.X, Y = g.Y;
   const pos = [], idx = [];
   const vmap = new Map();
