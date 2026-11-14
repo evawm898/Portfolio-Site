@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Textile 101 figures — scratch</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../styles.css">
+<link rel="stylesheet" href="../../textile-101.css">
+<style>body{padding:2rem} .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem} .w{display:grid;gap:1rem;max-width:760px} figure{margin:0;border:1px solid var(--line);padding:1rem} h2{font-family:var(--mono);font-size:12px;color:var(--ink-dim);margin:2rem 0 1rem}</style>
+</head>
+<body>
+<h2>regain</h2>
+<figure data-tx-fig="regain" style="max-width:420px"><div class="tx-anim tx-anim--regain"><svg></svg></div></figure>
+<h2>cross-sections</h2>
+<div class="grid" id="xs"></div>
+<h2>weaves</h2>
+<div class="w" id="wv"></div>
+<script type="module">
+  import { FIGURES, mountFigures } from '../../textile-101-figures.js';
+  for (const k of Object.keys(FIGURES)) {
+    if (k === 'regain') continue;
+    const f = document.createElement('figure'); f.dataset.txFig = k;
+    f.innerHTML = `<div class="tx-anim ${k.startsWith('xs') ? 'tx-anim--xs' : 'tx-anim--weave'}"><svg></svg></div><figcaption>${k}</figcaption>`;
+    document.getElementById(k.startsWith('xs') ? 'xs' : 'wv').appendChild(f);
+  }
+  const q = new URLSearchParams(location.search);
+  window.__tf = mountFigures(document, { autoplay: !q.has('still'), reducedMotion: q.has('reduce') ? true : undefined });
+</script>
+</body>
+</html>

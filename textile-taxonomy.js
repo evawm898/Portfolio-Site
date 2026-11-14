@@ -554,13 +554,19 @@ export const SCENES = {
   woven: wovenScene, braid: braidScene, knit: BASIC.knit, nonwoven: BASIC.nonwoven,
 };
 
+// the structure row's tube kit (7-unit tubes on a 2-unit halo, a notch at every crossing), for
+// /textile-101-figures.js, whose weave diagrams draw with the same strokes and occlusion rule
+export const TUBE_KIT = { tubes, KP, TV, TVB };
+
 // ---------- playback: once when it scrolls into view, hold the end frame, replay on hover / tap.
 // Only what is on screen animates: a scene that leaves the viewport mid-play jumps to its end.
-export function mountTaxonomy(root = document, opts = {}) {
+// mountScenes is the one player: the taxonomy panel ([data-tx-scene]) and the section figures
+// ([data-tx-fig], /textile-101-figures.js) both go through it.
+export function mountScenes(scenes, attr, root = document, opts = {}) {
   const reduce = opts.reducedMotion ?? (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const players = [];
-  for (const host of root.querySelectorAll('[data-tx-scene]')) {
-    const scene = SCENES[host.dataset.txScene]; if (!scene) continue;
+  for (const host of root.querySelectorAll(`[${attr}]`)) {
+    const scene = scenes[host.getAttribute(attr)]; if (!scene) continue;
     const svg = host.querySelector('svg') || host.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'));
     svg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
     const p = { host, svg, scene, raf: 0, t: reduce ? 1 : 0, played: false, playing: false, visible: false };
@@ -596,3 +602,4 @@ export function mountTaxonomy(root = document, opts = {}) {
   }
   return players;
 }
+export function mountTaxonomy(root = document, opts = {}) { return mountScenes(SCENES, 'data-tx-scene', root, opts); }
