@@ -227,8 +227,14 @@ Cost: S is under half a day, M about a day, L several days. "Removes or restruct
   - **Arrow grids.** Every item has three rows, split 36 up / 36 down / 36 same. Answering "up" everywhere scores 33.3% of rows and 0 of 36 items.
   - **Layout.** Tap targets are 44 px on touch or narrow screens, with taller slider hit areas. The five repeated "Harder" paragraphs are one explanation at chapter 01.
   - **Gates.** V21–V25 in `verify-study.mjs` and S9–S10 in `verify-page.mjs`, each with mutants. A pre-existing V17 flake is fixed.
+- **PR 1 merged** (#561); "Touch more, resist less." stays as the contact line.
+- **PR 2, wrong-answer feedback**, built:
+  - **Why-nots.** Every wrong option has its own why-not (`no`, aligned with `o`): 168 in the chapter checks and 20 in Which Sensor.
+  - **On a wrong pick.** The page shows that option's why-not, then the right answer, its reason and the line to remember. The other options' why-nots stay hidden until the question is answered right or "Why not the other two?" is pressed.
+  - **The 21 short explanations** now say why the right answer is right, with the line kept as a second line (`hook`).
+  - **Arrow grids.** Each of the 108 rows has a one-line reason, shown under a row answered wrong.
+  - **Gates.** V26–V28, with 18 new mutants.
 - **Queued, not started:**
-  - PR 2: wrong-answer feedback (§1 P2, §6 rank 4).
   - PR 3: mobile lab layouts, the diagram text floor, chapter navigation and back-to-top (§3, §4; §6 ranks 6–8).
   - PR 4: a study chapter for the note's parts 05–07 (§1 P7, §6 rank 16).
 - **Not ruled yet:** the weaker hooks (§1 P6, §6 rank 14), the forward references (rank 15), aligning the diagram keys (rank 17) and the Leitner / progress explainer (§1 P8).

@@ -93,6 +93,18 @@
 .sx-opt[data-r="dim"] { color: var(--color-faint); border-color: var(--line); }
 .sx-why { margin: 0.8rem 0 0; font-size: 12.5px; line-height: 1.7; color: var(--ink-dim); }
 .sx-why b { color: var(--ink); font-weight: 500; }
+/* wrong-answer feedback: the pick's why-not, then the right answer, its reason and the line to remember */
+div.sx-why > p { margin: 0.45rem 0 0; }
+div.sx-why > p:first-child { margin-top: 0; }
+.sx-whynot--picked { color: var(--ink-2, var(--color-ink-2)); border-left: 2px solid var(--ink-dim); padding-left: 0.7rem; }
+.sx-why__reason { color: var(--ink-2, var(--color-ink-2)); }
+.sx-hook { font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--petrol-bright); }
+.sx-why__sub { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); margin-top: 0.8rem !important; }
+.sx-whynots { list-style: none; margin: 0.35rem 0 0; padding: 0; display: grid; gap: 0.35rem; }
+.sx-whynots[hidden] { display: none; }
+.sx-whynots .sx-whynot { border-left: 2px solid var(--line); padding-left: 0.7rem; }
+.sx-btn--quiet { margin-top: 0.7rem; }
+.sx-arrow-why { grid-column: 1 / -1; margin: 0; font-size: 12px; line-height: 1.6; color: var(--ink-2, var(--color-ink-2)); }
 .sx-score { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); display: flex; flex-wrap: wrap; gap: 0.6rem 1.2rem; align-items: center; }
 .sx-score b { color: var(--ink); font-weight: 500; }
 

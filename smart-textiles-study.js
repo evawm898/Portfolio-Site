@@ -205,15 +205,33 @@ function questionHTML(q, n, total) {
     <div class="sx-opts">${optOrder(q).map((i, k) => `<button type="button" class="sx-opt" data-key="${'ABCD'[k]}" data-i="${i}">${esc(q.o[i])}</button>`).join('')}</div>
     <div class="sx-why" hidden></div></div>`;
 }
+// feedback: a wrong pick gets its own "why not" first, then the right answer and why it's right (and the line
+// to remember, if the question has one). The other wrong options' why-nots stay hidden until the question is
+// answered right, or until "Why not the other two?" is pressed, which is giving up on working them out.
+const OTHERS = ['', 'one', 'two', 'three'];
+function feedbackHTML(q, keyOf, shown, i) {
+  const ok = i === q.a, others = shown.filter(k => k !== q.a && k !== i);
+  const whyNot = k => `<li class="sx-whynot" data-no="${k}"><b>Not ${keyOf(k)}.</b> ${esc(q.no?.[k] || '')}</li>`;
+  const reason = `<p class="sx-why__reason">${esc(q.why)}</p>${q.hook ? `<p class="sx-hook">${esc(q.hook)}</p>` : ''}`;
+  const list = hide => others.length ? `<ul class="sx-whynots" data-others ${hide ? 'hidden' : ''}>${others.map(whyNot).join('')}</ul>` : '';
+  if (ok) return `<p class="sx-why__lead"><b>✓ Right.</b></p>${reason}${others.length ? `<p class="sx-why__sub">Why not the others</p>${list(false)}` : ''}`;
+  return `<p class="sx-whynot sx-whynot--picked" data-no="${i}"><b>✕ Not ${keyOf(i)}.</b> ${esc(q.no?.[i] || '')}</p>
+    <p class="sx-why__lead"><b>It’s ${keyOf(q.a)}${keyOf(q.a) === q.o[q.a] ? '.' : ':'}</b>${keyOf(q.a) === q.o[q.a] ? '' : ` ${esc(q.o[q.a])}`}</p>${reason}
+    ${others.length ? `<button type="button" class="sx-btn sx-btn--quiet" data-a="others">Why not the other ${OTHERS[others.length]}?</button>${list(true)}` : ''}`;
+}
+function wireOthers(why) {
+  $('[data-a="others"]', why)?.addEventListener('click', e => { $('[data-others]', why).hidden = false; e.currentTarget.remove(); });
+}
 function wireQuestion(el, q, onAnswer, link = false) {
   const opts = $$('.sx-opt', el);
+  const keyOf = i => opts.find(o => +o.dataset.i === i)?.dataset.key;
   for (const b of opts) b.addEventListener('click', () => {
     const i = +b.dataset.i, ok = i === q.a;
     opts.forEach(o => { const k = +o.dataset.i; o.disabled = true; o.dataset.r = k === q.a ? 'right' : k === i ? 'wrong' : 'dim'; });
     const why = $('.sx-why', el);
     why.hidden = false;
-    const rightKey = opts.find(o => +o.dataset.i === q.a)?.dataset.key;
-    why.innerHTML = `<b>${ok ? '✓ Right.' : `✕ It’s ${rightKey}.`}</b> ${esc(q.why)}${link && q.ch ? ` <a href="${chName(q.ch)?.anchor}">Back to chapter ${chName(q.ch)?.n} &rarr;</a>` : ''}`;
+    why.innerHTML = feedbackHTML(q, keyOf, opts.map(o => +o.dataset.i), i) + (link && q.ch ? `<p><a href="${chName(q.ch)?.anchor}">Back to chapter ${chName(q.ch)?.n} &rarr;</a></p>` : '');
+    wireOthers(why);
     const rec = S.quiz[q.id] || { right: 0, wrong: 0, last: false };
     rec[ok ? 'right' : 'wrong']++; rec.last = ok; S.quiz[q.id] = rec; save();
     onAnswer?.(ok);
@@ -303,7 +321,7 @@ paintMetals();
 // ---------------------------------------------------------------------------------------------
 // Which Sensor: resistive, capacitive, or either
 // ---------------------------------------------------------------------------------------------
-const SENSOR_LABEL = { R: 'Resistive', C: 'Capacitive', E: 'Either works' };
+const SENSOR_LABEL = { R: 'Resistive', C: 'Capacitive', E: 'Either works' }, KEYS = ['R', 'C', 'E'];
 (function whichSensor() {
   const host = $('[data-sx-which]');
   let round, at, right;
@@ -322,10 +340,10 @@ const SENSOR_LABEL = { R: 'Resistive', C: 'Capacitive', E: 'Either works' };
     host.innerHTML = `<div class="sx-game__bar"><span>${at + 1} of ${round.length}</span><span>right <b>${right}</b></span></div>
       <p class="sx-prompt">${esc(sc.prompt)}</p>
       <div class="sx-choices">${['R', 'C', 'E'].map(k => `<button type="button" class="sx-chip sx-chip--wide" data-k="${k}" ${picked ? `disabled data-pick="${k === picked}"` : ''}>${SENSOR_LABEL[k]}</button>`).join('')}</div>
-      ${picked ? `<p class="sx-why"><b>${picked === sc.a ? '✓ Right.' : `✕ ${SENSOR_LABEL[sc.a]}.`}</b> ${esc(sc.why)}</p>
+      ${picked ? `<div class="sx-why">${feedbackHTML({ o: KEYS.map(k => SENSOR_LABEL[k]), a: KEYS.indexOf(sc.a), why: sc.why, no: KEYS.map(k => sc.no[k] ?? null) }, i => SENSOR_LABEL[KEYS[i]], [0, 1, 2], KEYS.indexOf(picked))}</div>
         <div class="sx-next"><button type="button" class="sx-btn sx-btn--go" data-a="next">${at + 1 < round.length ? 'Next' : 'See the score'}</button></div>` : ''}`;
     if (!picked) for (const b of $$('.sx-chip', host)) b.addEventListener('click', () => { if (b.dataset.k === sc.a) right++; paint(b.dataset.k); });
-    else $('[data-a="next"]', host).addEventListener('click', () => { at++; paint(); });
+    else { wireOthers($('.sx-why', host)); $('[data-a="next"]', host).addEventListener('click', () => { at++; paint(); }); }
   };
   start();
 })();
@@ -378,7 +396,7 @@ function lower(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1).replace(/\
 // mixed round: ten questions across every chapter and the sensor game. Missed-last-time first,
 // then never-seen, then the rest; interleaved so two in a row rarely share a chapter.
 // ---------------------------------------------------------------------------------------------
-const SENSOR_Q = WHICH_SENSOR.map(w => ({ id: `w-${w.id}`, ch: 'sense', q: `Which sensor? ${w.prompt}`, o: ['Resistive', 'Capacitive', 'Either works'], a: { R: 0, C: 1, E: 2 }[w.a], why: w.why, fixed: true }));
+const SENSOR_Q = WHICH_SENSOR.map(w => ({ id: `w-${w.id}`, ch: 'sense', q: `Which sensor? ${w.prompt}`, o: ['Resistive', 'Capacitive', 'Either works'], a: { R: 0, C: 1, E: 2 }[w.a], why: w.why, no: ['R', 'C', 'E'].map(k => w.no[k] ?? null), fixed: true }));
 const ALL_Q = QUIZ.concat(SENSOR_Q);
 function pickRound(n = 10) {
   const rank = q => { const r = S.quiz[q.id]; return !r ? 1 : r.last ? 2 : 0; };   // 0 missed, 1 new, 2 right
