@@ -211,3 +211,7 @@ but it reads the bronze's highlights as gaps and its shadows as metal: it gave 0
 0.75 M volute is 7 mm across. A coil of ≥ 1 turn with a pierced gap of 1.3 mm and a pierced eye of 1.3 mm does not
 fit in 7 mm. Round 4's C volutes are therefore 1.2–1.4 M across, grown until the coil keeps its gap, and stated as
 a consequence of the floor, not as the bronze's proportion.
+
+**[Nov 14: the forms above are now drawn by hand.** Eva ruled the hand-drawn route (study §11.6 (b)). The
+placeholders in `docs/frame-drawing-template.svg` are these profiles laid out straight, one artboard per element, and
+`docs/frame-drawing-guide.md` is the contract for drawing them. Study §12 has the pipeline.]

@@ -12706,7 +12706,28 @@ read `docs/frame-flow-study.md` and `docs/frame-flow-grammar.md` before touching
   read islands and an extrusion; a height field cannot roll an end over itself or lay a child over its parent.
   **Recommended next: the hand-drawn route** (Eva draws SVG outlines; the generator bends and places them along the
   composed flow) — §11.6. FF0 still holds (the option absent is `main`); every forms clause passes on four rows.
-- **None of it is in CI.** Run `node tools/verify-frame-flow.mjs [--only mass|forms] [--base <main worktree>]` by hand.
+  **[Nov 14: RULED (b), the hand-drawn route — built, see the next bullet.]**
+- **[Nov 14] THE HAND-DRAWN FILIGREE** (`ornFlow: 'drawn'`, §12 of the study doc). Eva draws into
+  **`docs/frame-drawing-template.svg`** (one artboard per element) following **`docs/frame-drawing-guide.md`** (the
+  contract). Read both before touching `frame-svg-import.js`, `frame-drawn.js`, `frame-drawn-placeholders.js`,
+  `formsFor`'s `slots` / `slotsOnly`, `ownersGrid`, `reliefFromOwners` or the D / I / W families.
+  - **One placement set, one relief.** The slots are `formsFor`'s own (recorded, never read there). The back end is
+    `reliefFromOwners`, extracted from the forms round with its STL bytes unchanged (hashes before and after, four
+    rows).
+  - **Bodies are drawn STRAIGHTENED and BENT** by the skeletal map S(sx·x) + sy·y·N. Volutes and shells are placed
+    WHOLE. A slot takes the variant needing the least scaling.
+  - **Where the bend distorts** (the inside of a turn, compressed by 1 − κy), the spine is relaxed locally, an offset
+    past 0.9 of the radius is held and counted, and a spine the side map jumps across at a convex corner is cut.
+  - **Depth** back / mid / front sets level and priority. A covering part stands ≥ 0.4 mm above what it covers. A
+    hole cuts its element and what is beneath it.
+  - **Placeholders.** These are the forms round's profiles laid out straight, made by
+    `node tools/frame-drawing-template.mjs` (`--check`); `frame-drawn-placeholders.js` is the SVG as a string, and DI
+    holds the two equal. **Nothing has been drawn yet.** The proof sheet (`docs/img/frame-drawn-proof.png`) shows
+    the placeholders reproducing F6.
+  - **Try a drawing:** `node tools/frame-drawn-check.mjs <svg> [--stl <dir>]`; on the page,
+    `__frame.setDrawing(svg)`.
+- **None of it is in CI.** Run `node tools/verify-frame-flow.mjs [--only mass|forms|drawn] [--base <main worktree>]`
+  and `node tools/verify-frame-drawn.mjs [--negative-control]` by hand.
 - **The stock reference photos are never committed.**
 
 ## `/marble` — the paper-marbling simulator (pointer only)

@@ -75,8 +75,8 @@ export const FORMS = {
   levels: { fill: 1.0, leaf: 2.0, stem: 2.2, flame: 2.8, foot: 2.5, c: 2.7, coil: 3.2, shell: 3.8 },
   height: { edge: 0.45, round: 1.2, slope: 0.55, bead: 0.34, channel: 0.32, reed: 0.2, rib: 0.35, groove: 0.45, grooveW: 0.3, flute: 0.5, eyeRise: 0.45, footEase: 0.8, baseBlur: 1.6 },
 };
-const RISE = { c: [0.72, 1.18], flame: [0.62, 1.15], stem: [0.75, 1.2], foot: [0.8, 1.15], leaf: [0.8, 1.05] };
-const KIND = { fill: 0, leaf: 1, stem: 2, flame: 3, foot: 4, c: 5, coil: 6, shell: 7 };   // flames OVER the stem they spring from (F4)
+export const RISE = { c: [0.72, 1.18], flame: [0.62, 1.15], stem: [0.75, 1.2], foot: [0.8, 1.15], leaf: [0.8, 1.05] };
+export const KIND = { fill: 0, leaf: 1, stem: 2, flame: 3, foot: 4, c: 5, coil: 6, shell: 7 };   // flames OVER the stem they spring from (F4)
 
 /* ------------------------------------------------------------------ */
 /* paths in the side's LOCAL frame (s along, y out), mapped to the world */
@@ -174,11 +174,26 @@ function fillOwn(g, R, el, poly) {
   }
 }
 
+/* the owners' raster over the frame's silhouette and the composition's envelope (both halves), padded by 3 M;
+   shared by the forms and the drawn elements so both stand on the same cells */
+export function ownersGrid(model, orn, cell, M) {
+  const s = orn.scale;
+  const sil = plateOutline(model).map(([x, y]) => [x * s, y * s]);
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [x, y] of [...orn.flow.envelope, ...sil]) { x0 = Math.min(x0, x, -x); x1 = Math.max(x1, x, -x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const pad = 3 * M;
+  const g = makeGrid({ x0: x0 - pad, x1: x1 + pad, y0: y0 - pad, y1: y1 + pad }, cell);
+  const N = g.nx * g.ny;
+  const R = { A: new Uint8Array(N), own: new Int16Array(N).fill(-1), pri: new Uint8Array(N), acr: new Float32Array(N), alu: new Float32Array(N) };
+  const groove = new Float64Array(N).fill(1e9), rib = new Float64Array(N).fill(1e9), eyeD = new Float64Array(N).fill(1e9);
+  return { sil, g, R, groove, rib, eyeD };
+}
+
 /* ------------------------------------------------------------------ */
 /* the forms                                                           */
 /* ------------------------------------------------------------------ */
 
-export function formsFor(model, orn, SF) {
+export function formsFor(model, orn, SF, opts = {}) {
   const p = model.params, s = orn.scale, M = orn.length, told = [];
   const cell = FORMS.cell * Math.max(1, p.printHeight / 180);
   const yOut = orn.flow.yOut, side = orn.flow.side, L = SF.L, emb = FORMS.embed;
@@ -191,15 +206,13 @@ export function formsFor(model, orn, SF) {
   const W = (q) => SF.W(Math.max(0, Math.min(L, q[0])), q[1]) ;
   // a local point past the side's ends is carried along the end's own tangent
   const Wx = (q) => { if (q[0] >= 0 && q[0] <= L) return SF.W(q[0], q[1]); const e = q[0] < 0 ? 0 : L, f = SF.fr(e), ds = q[0] - e; return [f.p[0] + ds * f.t[0] + q[1] * f.n[0], f.p[1] + ds * f.t[1] + q[1] * f.n[1]]; };
-  const sil = plateOutline(model).map(([x, y]) => [x * s, y * s]);
-  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-  for (const [x, y] of [...orn.flow.envelope, ...sil]) { x0 = Math.min(x0, x, -x); x1 = Math.max(x1, x, -x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-  const pad = 3 * M;
-  const g = makeGrid({ x0: x0 - pad, x1: x1 + pad, y0: y0 - pad, y1: y1 + pad }, cell);
+  const { sil, g, R, groove, rib, eyeD } = ownersGrid(model, orn, cell, M);
   const { nx, ny, n } = g, N = nx * ny, X = g.X, Y = g.Y;
-  const R = { A: new Uint8Array(N), own: new Int16Array(N).fill(-1), pri: new Uint8Array(N), acr: new Float32Array(N), alu: new Float32Array(N) };
-  const groove = new Float64Array(N).fill(1e9), rib = new Float64Array(N).fill(1e9), eyeD = new Float64Array(N).fill(1e9);
   const els = [], holes = [], rec = [], nodes = [], nodePlaces = [];
+  // the SLOTS (frame-drawn.js reads them): each placement's own spine in the side's local frame, its width and the
+  // centre its end curls round — recorded, never read here
+  const slots = [];
+  const loc = (path, n = path.P.length) => ({ P: path.P.slice(0, n).map((q) => q.slice()), Hd: path.Hd.slice(0, n) });
   const add = (kind, extra = {}) => { const el = { id: els.length, kind, pri: KIND[kind] + 1, lvl: FORMS.levels[kind], ...extra }; els.push(el); return el; };
 
   /* one strap: a local path, half-widths per point; the world points stamped and recorded */
@@ -331,6 +344,7 @@ export function formsFor(model, orn, SF) {
       const lf = add('leaf');
       strap(lf, tp, tp.P.map((_, i, a) => { const t = i / (a.length - 1); return M * tw * FM.pow(Math.max(0, FM.sin(Math.PI * Math.min(1, 0.15 + 0.85 * t))), 0.7) * FM.pow(Math.max(0, 1 - t), 0.4); }), { rib: [0.05, 0.85] });
     }
+    slots.push({ slot: 'c', role: opts.role || 'C', path: loc(body), w: FORMS.c.w * M, wEnd: FORMS.c.wEntry * M, cen, vol: { rv, turns: sp.turns } });
     rec.push({ kind: 'C', role: opts.role || 'C', ...boxOf(Pw), L: arcLen(Pw).pop() / M, turns: sp.turns, voluteR: rv / M, eye: eye.r * 2, eyeSqueezed: eye.squeezed, pierced: path.cw.merged.reduce((a, b) => a + b, 0) / path.cw.merged.length < 0.5 });
     return { el, cen, Pw };
   };
@@ -340,7 +354,7 @@ export function formsFor(model, orn, SF) {
   //      so the curl's outer diameter is about the strap's own width twice over (E4: 0.95 M round a 0.18 M hollow)
   const reeded = (kind, path, wProf, roll, rollSense, reeds, lobes = null) => {
     const el = add(kind, { reeds });
-    const nPath = path.P.length, wR = roll.w * M;
+    const nPath = path.P.length, wR = roll.w * M, body = loc(path);
     const rc = Math.max(roll.r * M, wR / 2 + FORMS.eyeHole / 2 + 0.15);
     const [sE, yE] = path.P[nPath - 1], thE = path.Hd[nPath - 1];
     const ramp = 0.6 * rc;
@@ -391,6 +405,7 @@ export function formsFor(model, orn, SF) {
     let hr = 0;
     // a CLOSED curl (the foot) is pierced: its hollow a hole; an open hook leaves its hollow open
     if (roll.closed) { hr = Math.max(FORMS.eyeHole / 2, rcE - wR * (roll.narrow || 1) / 2 - 0.05); holes.push({ c: cen, r: hr }); }
+    { let wMax = 0; for (let i = 0; i <= 40; i++) wMax = Math.max(wMax, wProf(i / 40)); slots.push({ slot: kind, role: kind, path: body, w: M * wMax, wEnd: M * wProf(1), cen, roll: { ...roll }, lobes: !!lobes }); }
     rec.push({ kind, ...boxOf(Pw), rollAt: W(path.P[Math.round(iR + 0.5 * (nAll - 1 - iR))]), L: Lw / M, turns: roll.turns, rollD: 2 * (rc + wR / 2) / M, hollow: roll.closed ? 2 * hr / M : 2 * (rc - wR / 2) / M, closed: !!roll.closed });
     return { el, Pw, cen, nPath, half, iR };
   };
@@ -409,6 +424,7 @@ export function formsFor(model, orn, SF) {
     stampOwn(g, R, el, Pw, half, u.map((v) => v / Lw));
     siteLine(g, rib, Pw.slice(Math.floor(0.05 * nP), Math.ceil(0.85 * nP)));
     el.pts = Pw;
+    slots.push({ slot: 'leaf', role: opts.role || 'leaf', path: loc(path), w: wM * M });
     return el;
   };
 
@@ -440,6 +456,7 @@ export function formsFor(model, orn, SF) {
       stampOwn(g, R, el, pts, half, pts.map((_, i) => i / 24));
     }
     shells.push(el);
+    slots.push({ slot: 'shell', role: sBase === 0 ? 'crest shell' : 'bottom shell', base, out, R: Rm, lobes: nL });
     rec.push({ kind: 'shell', at: [base[0], base[1] + out[1] * 0.5 * Rm], size: 2 * Rm, R: Rm / M, lobes: nL });
     return el;
   };
@@ -487,7 +504,7 @@ export function formsFor(model, orn, SF) {
     const s0 = low0.s + 0.25 * M;
     FORMS.fan.len.forEach((ln, q) => {
       const a = (-FORMS.fan.spread + q * FORMS.fan.spread) * DEG + 32 * DEG;
-      leaf(walk(s0, yOut - emb, a, [{ len: ln * M, k0: 0, k1: -0.7 / M }]), ln, FORMS.fan.w, 2, { tipRound: true });
+      leaf(walk(s0, yOut - emb, a, [{ len: ln * M, k0: 0, k1: -0.7 / M }]), ln, FORMS.fan.w, 2, { tipRound: true, role: `fan ${q}` });
     });
   }
   // the FLAMES: round every HIGH between two lows, a group rooted together at the downstream low (just above the
@@ -530,6 +547,7 @@ export function formsFor(model, orn, SF) {
       // as a comb): the outer swells to 1.25 × the others, its lobes deeper
       const ws = fg.ws || 0.85;
       grp.push(reeded('flame', path, reedW(FORMS.flame.w[0], ws * FORMS.flame.w[1], FORMS.flame.peak, FORMS.flame.w[2]), fg.roll, -1, FORMS.flame.reeds, { ...FORMS.flame.lobes, a: fg.lobeA || FORMS.flame.lobes.a }));
+      Object.assign(slots[slots.length - 1], { role: `flame ${fi}`, index: fi, group: flameRoots.length - 1, corner, ws });
     }
     // each flame its OWN body (E5; the F2 critic: "one fused reeded wing"): a pierced SLIT along the midline between
     // each neighbouring pair, from a third of the way up to where they part, wherever both keep ≥ a printable
@@ -554,7 +572,7 @@ export function formsFor(model, orn, SF) {
       cScroll(P0[0], 0, 0, -1, { body, k: 0.9, r0: corners === 0 ? 0.52 : 0.46, tail: false, tongue: false, turns: corners === 0 ? 1.3 : 1.42, role: 'corner C' }); corners++;
     }
     nodePlaces.push({ place: `flames@${sRoot.toFixed(1)}`, kind: 'sheath' }); nodes.push({ kind: 'sheath', place: `flames@${sRoot.toFixed(1)}`, s: sRoot });
-    leaf(walk(sRoot + 0.45 * M, yOut - emb, Math.PI - 30 * DEG, [{ len: FORMS.sheath.len * M, k0: 0, k1: 0.6 / M }]), FORMS.sheath.len, FORMS.sheath.w, FORMS.sheath.lobes);
+    leaf(walk(sRoot + 0.45 * M, yOut - emb, Math.PI - 30 * DEG, [{ len: FORMS.sheath.len * M, k0: 0, k1: 0.6 / M }]), FORMS.sheath.len, FORMS.sheath.w, FORMS.sheath.lobes, { role: 'sheath' });
   }
   // the FOOT (E3): from under the bottom shell (or the sill's end) running out upstream to the foot, curling UNDER.
   // Built FIRST: the stem springs from it (the bottom flow is ONE chain — grammar §2, the critic's round-4 F1 note)
@@ -597,10 +615,11 @@ export function formsFor(model, orn, SF) {
     const along2 = bez([sMid, bowY], Math.PI, 0.35 * (sMid - tipS), [tipS, yOut + yHug + FORMS.stem.lift * M], Math.PI - 22 * DEG, 0.35 * (sMid - tipS));
     const path = { P: [...inPath.P, ...along1.P.slice(1), ...along2.P.slice(1)], Hd: [...inPath.Hd, ...along1.Hd.slice(1), ...along2.Hd.slice(1)] };
     reeded('stem', path, onFoot ? reedW(0.46, FORMS.stem.w, 0.25, 0.55) : reedW(0.44, FORMS.stem.w, 0.3, 0.55), FORMS.stem.roll, -1, FORMS.stem.reeds, { n: 2, from: 0.6, to: 0.95, a: 0.14 });
+    Object.assign(slots[slots.length - 1], { role: onFoot ? 'stem from the foot' : 'stem from the molding', onFoot });
     // a CURL-UNDER leaf where the stem leaves the foot (or its root), rolled down toward the foot
     const cs = onFoot ? sIn + 0.3 * M : P0[0];
     nodePlaces.push({ place: `stem@${cs.toFixed(1)}`, kind: 'curl' }); nodes.push({ kind: 'curl', place: `stem@${cs.toFixed(1)}`, s: cs });
-    leaf(walk(cs, yOut - emb, 50 * DEG, [{ len: 0.45 * FORMS.curl.len * M, k0: 0, k1: -1.5 / M }, { len: 0.55 * FORMS.curl.len * M, k0: -1.5 / M, k1: -2.3 / M }]), FORMS.curl.len, FORMS.curl.w, 2);
+    leaf(walk(cs, yOut - emb, 50 * DEG, [{ len: 0.45 * FORMS.curl.len * M, k0: 0, k1: -1.5 / M }, { len: 0.55 * FORMS.curl.len * M, k0: -1.5 / M, k1: -2.3 / M }]), FORMS.curl.len, FORMS.curl.w, 2, { role: 'curl' });
   }
   if (end && lastNode.cls === 'bottom') {
     shell(L, -1, Math.min(1.5, Math.max(1.0, end.e)) * M, FORMS.shell.lobes - 1);
@@ -610,6 +629,19 @@ export function formsFor(model, orn, SF) {
     // with the foot's curl (F2: "a pad with two drill holes"; run out along the frame, a clot of holes)
   }
 
+  if (opts.slotsOnly) return { slots, told, M, cell };
+  return reliefFromOwners({ g, R, els, holes, groove, rib, eyeD, sil, orn, told, cell, emb, stats: { cell, elements: rec, holes: holes.length, nodes, nodePlaces, slots } });
+}
+
+
+/* ------------------------------------------------------------------ */
+/* the RELIEF from the owners' raster: the union, mirrored; closed and   */
+/* opened; the holes cut; the heights; the watertight element. Shared by */
+/* the forms (formsFor) and the drawn elements (frame-drawn.js).         */
+/* ------------------------------------------------------------------ */
+
+export function reliefFromOwners({ g, R, els, holes, groove, rib, eyeD, sil, orn, told, cell, emb, stats }) {
+  const { nx, ny, n } = g, N = nx * ny, X = g.X, Y = g.Y;
   // ---- the union, mirrored; closed and opened; the holes cut ----
   // the owners' fields are mirrored (the left half the right's)
   mirrorUnion(g, R.A);
@@ -641,7 +673,14 @@ export function formsFor(model, orn, SF) {
       if (dx * dx + dy * dy <= rr * rr && !frame[j * nx + i] && R.pri[j * nx + i] !== KIND.shell + 1) Rg[j * nx + i] = 0;
     }
   };
-  for (const h of holes) { cutHole(h.c, h.r, h.keep); cutHole([-h.c[0], h.c[1]], h.r, h.keep && { c: [-h.keep.c[0], h.keep.c[1]], r: h.keep.r, to: h.keep.to && [-h.keep.to[0], h.keep.to[1]], w: h.keep.w }); }
+  // a DRAWN hole (frame-drawn.js) is a polygon, cut wherever its own element or one beneath it owns the cell (a
+  // piece drawn in front of it covers it)
+  const cutPoly = (poly, pri) => {
+    const m = new Uint8Array(N); fillPoly(g, m, poly);
+    for (let k = 0; k < N; k++) if (m[k] && !frame[k] && !(R.pri[k] > pri)) Rg[k] = 0;
+  };
+  for (const h of holes) if (h.poly) { cutPoly(h.poly, h.pri); cutPoly(h.poly.map(([x, y]) => [-x, y]), h.pri); }
+  for (const h of holes) if (!h.poly) { cutHole(h.c, h.r, h.keep); cutHole([-h.c[0], h.c[1]], h.r, h.keep && { c: [-h.keep.c[0], h.keep.c[1]], r: h.keep.r, to: h.keep.to && [-h.keep.to[0], h.keep.to[1]], w: h.keep.w }); }
   mirrorInto(g, Rg);
 
   // the frame's height inside it, carried out on a falling cone
@@ -730,13 +769,19 @@ export function formsFor(model, orn, SF) {
           f = (1 - FORMS.shell.cup) + FORMS.shell.cup * FM.pow(Math.min(1, rho), 1.3) - Hh.flute / lvl * fl * smooth((rho - 0.15) / 0.25) * (1 - smooth((rho - 0.9) / 0.1)) + FORMS.shell.bead / lvl * smooth((rho - 0.82) / 0.12);
           break;
         }
+        // a DRAWN element (frame-drawn.js): a dome off its own outline (acr 0 at its crown, 1 at its edge); its
+        // surface detail is the drawing's own detail lines (the ridge and groove fields)
+        case 'drawn': f = 0.8 + 0.2 * Math.sqrt(Math.max(0, 1 - aa * aa)); break;
         default: f = 1;
       }
     }
     // DEPTH along the element (the F4 critic: "every element one plateau"): low where it leaves its parent, rising
     // to its crown, the end (a volute, a roll, a hook) climbing highest — so overlapping parts stand at different heights
-    if (el && RISE[el.kind]) { const [r0, r1] = RISE[el.kind], u = R.alu[k]; f *= r0 + (r1 - r0) * smooth(u); }
+    const rs = el && (el.rise || RISE[el.kind]);
+    if (rs) { const [r0, r1] = rs, u = R.alu[k]; f *= r0 + (r1 - r0) * smooth(u); }
     raw[k] = lvl * f;
+    // a DRAWN part over a lower one (frame-drawn.js's stacking): at least R.stack above that part's own height there
+    if (R.under && R.under[k] > 0) raw[k] = Math.max(raw[k], R.under[k] + R.stack);
   }
   // the levels step between elements, they do not cliff: a light blur of the raw height (the reeds survive)
   mirrorInto(g, raw);
@@ -756,5 +801,5 @@ export function formsFor(model, orn, SF) {
   el.kind = 'mass'; el.mass = true; el.forms = true;
   const Wt = [];
   for (let i = 0; i < el.positions.length; i += 3) if (el.positions[i + 2] > 0) Wt.push(el.positions[i], el.positions[i + 1], el.positions[i + 2]);
-  return { element: el, top: Wt, told, stats: { cell, elements: rec, holes: holes.length, nodes, nodePlaces, triangles: el.indices.length / 3 }, debug: { g, Rg, top, base, raw, groove, rib, eyeD, own: R.own, holes } };
+  return { element: el, top: Wt, told, stats: { ...stats, holes: holes.length, triangles: el.indices.length / 3 }, debug: { g, Rg, top, base, raw, groove, rib, eyeD, own: R.own, pri: R.pri, holes } };
 }

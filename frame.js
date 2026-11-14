@@ -101,10 +101,12 @@ function loadParams(p, prof) {
 /* ---------------- build ---------------- */
 let pending = 0;
 const stats = { buildMs: 0 };
+// the hand-drawn filigree's drawing (ornFlow 'drawn'): null is the template's placeholders; set by the test hook
+let drawing = null;
 function scheduleBuild() { if (!pending) pending = requestAnimationFrame(() => { pending = 0; buildNow(); }); }
 function buildNow() {
   const t = performance.now();
-  model = withPattern(withOrnament(buildFrame(params, profile)));
+  model = withPattern(withOrnament(buildFrame(params, profile), drawing ? { drawing } : {}));
   stats.buildMs = performance.now() - t;
   const t2 = performance.now();
   relief = buildRelief(model);
@@ -231,7 +233,10 @@ function writeReadout() {
     + `band <b>${r.bandW.toFixed(2)} mm</b>${info.kind === 'arch' && p.mullions > 0 ? `, mullion <b>${r.mullW.toFixed(2)} mm</b>` : ''}, plate <b>${r.plateT.toFixed(2)} mm</b>, relief depth <b>${r.reliefDepth.toFixed(2)} mm</b> · interior <b>${p.lights}</b>${r.panelT != null ? ` (${r.panelT.toFixed(2)} mm plate)` : ''}\n`
     + `floor: ${r.floorNote}${floorWarn ? '\n' + floorWarn : ''}`;
   const o = model.ornament;
-  const ornLine = o && o.layout === 'flow' && o.mode === 'forms'
+  const ornLine = o && o.layout === 'flow' && o.mode === 'drawn'
+    ? `ornament <b>the hand-drawn filigree (study)</b> — ${o.drawnStats.placed.length} drawn pieces a side (mirrored), each a drawing bent along its placement (${[...new Set(o.drawnStats.placed.map((q) => q.drawing))].join(', ')}) · ${o.drawnStats.holes} holes · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> triangles`
+      + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
+    : o && o.layout === 'flow' && o.mode === 'forms'
     ? `ornament <b>the measured forms (study, round 4)</b> — ${o.formsStats.elements.map((e) => e.role || e.kind).join(', ')} a side (mirrored), each outline built from the bronze's measured profiles · ${o.formsStats.holes} pierced eyes and hollows · relief ≤ <b>${o.tris.bound.toLocaleString('en-US')}</b> triangles`
       + o.told.map((t) => `\n<span class="warn">ORNAMENT — ${t}</span>`).join('')
     : o && o.layout === 'flow' && o.mode === 'mass'
@@ -283,6 +288,8 @@ window.__frame = {
   getParams: () => ({ ...params }),
   getProfile: () => profile.map((q) => [...q]),
   setFixedView: (v) => { fixedView = v; if (model) buildNow(); },
+  // the hand-drawn filigree: build ornFlow 'drawn' from this SVG's drawings (null: the template's placeholders)
+  setDrawing: (svg) => { drawing = svg || null; if (model) buildNow(); },
   svg: () => exportSvg(model).svg,
   // the STL as the button writes it, plus a digest the gate compares across
   // control writes (the print controls move this and never the paper)
