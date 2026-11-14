@@ -17,6 +17,9 @@
 //       drawing (heater power at a fixed voltage, carbon composites, capacitive drift, the antenna's frequency,
 //       thermoelectric µV per leg, C written without εᵣ), and the corrections present
 //   S10 every toggle button is at least 32 px tall at 1280 and 44 px at 390
+//   S11 diagram text: a diagram whose smallest label renders under 10 px has an Enlarge button (at 390 that is
+//       every one, the tiers and the conductivity ladder included); the enlarged view is the same live drawing
+//       with every label at 10 px or more, pans to all of it, and closes back to its button
 // --negative-control re-serves the page with the player's draw loop removed (a page of still frames) and
 // requires S2 to fail; then with one scene's label pushed outside its frame and requires S4 to fail.
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
@@ -121,6 +124,32 @@ async function run(patch = {}, quiet = false) {
     const minH = w < 700 ? 44 : 32;
     const s10 = await page.$$eval('.st-btn', (bs, min) => bs.filter(b => b.getBoundingClientRect().height && b.getBoundingClientRect().height < min - 0.5).map(b => `${b.textContent.trim()} ${Math.round(b.getBoundingClientRect().height)}px`), minH);
     ok('S10', !s10.length, `${w}px toggle buttons under ${minH} px: ${s10.join(', ') || 'none'}`);
+    // S11 the enlarge view
+    const s11 = await page.evaluate(async () => {
+      const out = { small: 0, btns: 0, noBtn: [], bad: [], names: [] };
+      const px = svg => [...svg.querySelectorAll('text')].reduce((m, t) => Math.min(m, +t.getAttribute('font-size') * (t.getScreenCTM()?.a || 0)), Infinity);
+      const wait = ms => new Promise(r => setTimeout(r, ms));
+      for (const p of window.__st) {
+        p.host.scrollIntoView({ block: 'center' }); await wait(30);
+        const m = px(p.svg), btn = document.querySelector(`.st-zoom-btn[data-zoom-for="${p.name}"]`);
+        if (m >= 9.95) continue;
+        out.small++;
+        if (!btn || btn.hidden || !btn.getBoundingClientRect().height) { out.noBtn.push(p.name); continue; }
+        out.btns++; out.names.push(p.name);
+        btn.click(); await wait(150);
+        const dlg = document.querySelector('dialog.st-zoom'), body = dlg?.querySelector('.st-zoom__body'), big = body?.querySelector('svg');
+        const mm = big ? px(big) : 0, ov = body ? getComputedStyle(body).overflowX : '';
+        const pans = !!big && (big.getBoundingClientRect().width <= body.clientWidth + 1 || ov === 'auto' || ov === 'scroll');
+        const t0 = big?.innerHTML; await wait(250);
+        const live = !!big && big.innerHTML !== t0;
+        if (!dlg?.open || mm < 9.95 || !pans || !live) out.bad.push(`${p.name}: open ${!!dlg?.open}, smallest ${mm.toFixed(1)} px, pans ${pans}, live ${live}`);
+        dlg?.querySelector('[data-zoom-close]')?.click(); await wait(60);
+        if (dlg?.open || document.activeElement !== btn) out.bad.push(`${p.name}: did not close back to its button`);
+      }
+      return out;
+    });
+    const s11need = w < 600 ? ['tiers', 'ladder'].filter(n => !s11.names.includes(n)) : [];
+    ok('S11', !s11.noBtn.length && !s11.bad.length && !s11need.length, `${w}px ${s11.small} diagrams with a label under 10 px, ${s11.btns} with Enlarge${s11.noBtn.length ? '; no button: ' + s11.noBtn.join(', ') : ''}${s11need.length ? '; missing: ' + s11need.join(', ') : ''}; ${s11.bad.length ? s11.bad.slice(0, 3).join(' | ') : 'each opens live, every label at 10 px or more, pans, closes to its button'}`);
     // S8
     const sw = await page.evaluate(() => document.documentElement.scrollWidth);
     ok('S8', sw <= w, `${w}px no horizontal scroll (scrollWidth ${sw})`);
@@ -151,6 +180,10 @@ if (process.argv.includes('--negative-control')) {
     ['the capacitance formula loses εᵣ in a drawing', { 'smart-textiles-sense.js': ["'C = ε₀εᵣA / d'", "'C = εA / d'"] }, 'S9'],
     ['the antenna caption goes back to the felt thickness', { 'smart-textiles-act.js': ["['Frequency: patch length and', 'the felt’s permittivity (εᵣ).',", "['Its frequency is set by the', 'patch size and felt thickness.',"] }, 'S9'],
     ['the heater copy goes back to "in proportion to its resistance"', { 'smart-textiles.html': ['Current through a resistive yarn turns into heat: P = I&sup2;R.', 'Current through a resistive yarn turns into heat, in proportion to its resistance and the square of the current.'] }, 'S9'],
+    ['the Enlarge button is never shown', { 'smart-textiles.js': ['const fit = () => { btn.hidden = !(minPx(p) < MIN_TEXT_PX); };', 'const fit = () => { btn.hidden = true; };'] }, 'S11'],
+    ['the enlarged view is drawn at the fitted size', { 'smart-textiles.js': ['k = MIN_TEXT_PX * 1.02 / minUnits(p);', 'k = p.svg.getBoundingClientRect().width / vw;'] }, 'S11'],
+    ['the enlarged view does not pan', { 'smart-textiles.css': ['.st-zoom__body { overflow: auto;', '.st-zoom__body { overflow: hidden;'] }, 'S11'],
+    ['the enlarged view is a still copy', { 'smart-textiles-core.js': ['        if (p.mirror) p.mirror.innerHTML = svg.innerHTML;\n', ''] }, 'S11'],
     ['the toggles lose their touch size', { 'smart-textiles.css': ['  .st-btn { min-height: 44px; padding-top: 0.5rem; padding-bottom: 0.5rem; }\n', ''] }, 'S10'],
   ];
   for (const [name, patch, want] of legs) {

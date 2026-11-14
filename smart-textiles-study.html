@@ -63,6 +63,8 @@
   <div id="smart">
 
   <!-- ================= 01 · FLOW ================= -->
+  <nav class="sx-jump" aria-label="Jump to a chapter" data-sx-jump></nav>
+
   <section class="tx-topic" id="flow" data-sx-chapter="flow">
     <div class="tx-topic-head">
       <h2><span class="sx-n">01</span>Electrons and the Push</h2>
@@ -252,15 +254,15 @@
         <caption>Side by side</caption>
         <thead><tr><th scope="col"></th><th scope="col">Resistive</th><th scope="col">Capacitive</th></tr></thead>
         <tbody>
-          <tr><th scope="row">What changes</th><td>Resistance: how easily current passes through</td><td>Capacitance: how much charge the plates hold (C = &epsilon;<sub>0</sub>&epsilon;<sub>r</sub>A/d)</td></tr>
-          <tr><th scope="row">Pressing does</th><td>More conductive paths touch, so R falls</td><td>The gap closes, so C rises</td></tr>
-          <tr><th scope="row">Needs force?</th><td>Yes, contact and pressure</td><td>No. It can sense a hand that only comes near</td></tr>
-          <tr><th scope="row">Read by</th><td>A voltage divider: measure a voltage</td><td>Timing a charge, or an oscillator&rsquo;s frequency</td></tr>
-          <tr><th scope="row">Water and sweat</th><td>Conducts: can short the electrodes</td><td>Relative permittivity &epsilon;<sub>r</sub> about 80: reads as a big touch</td></tr>
-          <tr><th scope="row">Drift</th><td>Polymer layers creep and show hysteresis</td><td>Stable if the spacer springs back</td></tr>
-          <tr><th scope="row">Body nearby</th><td>Ignores it</td><td>Feels it unless a grounded shield blocks it</td></tr>
-          <tr><th scope="row">Textile build</th><td>Two conductive fabrics with a carbon-loaded layer between</td><td>Two conductive fabrics with a spacer fabric between, plus a shield</td></tr>
-          <tr><th scope="row">Good for</th><td>Cheap pressure maps, grip force, strain yarns</td><td>Touch and swipe, presence, stable pressure, proximity</td></tr>
+          <tr><th scope="row">What changes</th><td data-label="Resistive">Resistance: how easily current passes through</td><td data-label="Capacitive">Capacitance: how much charge the plates hold (C = &epsilon;<sub>0</sub>&epsilon;<sub>r</sub>A/d)</td></tr>
+          <tr><th scope="row">Pressing does</th><td data-label="Resistive">More conductive paths touch, so R falls</td><td data-label="Capacitive">The gap closes, so C rises</td></tr>
+          <tr><th scope="row">Needs force?</th><td data-label="Resistive">Yes, contact and pressure</td><td data-label="Capacitive">No. It can sense a hand that only comes near</td></tr>
+          <tr><th scope="row">Read by</th><td data-label="Resistive">A voltage divider: measure a voltage</td><td data-label="Capacitive">Timing a charge, or an oscillator&rsquo;s frequency</td></tr>
+          <tr><th scope="row">Water and sweat</th><td data-label="Resistive">Conducts: can short the electrodes</td><td data-label="Capacitive">Relative permittivity &epsilon;<sub>r</sub> about 80: reads as a big touch</td></tr>
+          <tr><th scope="row">Drift</th><td data-label="Resistive">Polymer layers creep and show hysteresis</td><td data-label="Capacitive">Stable if the spacer springs back</td></tr>
+          <tr><th scope="row">Body nearby</th><td data-label="Resistive">Ignores it</td><td data-label="Capacitive">Feels it unless a grounded shield blocks it</td></tr>
+          <tr><th scope="row">Textile build</th><td data-label="Resistive">Two conductive fabrics with a carbon-loaded layer between</td><td data-label="Capacitive">Two conductive fabrics with a spacer fabric between, plus a shield</td></tr>
+          <tr><th scope="row">Good for</th><td data-label="Resistive">Cheap pressure maps, grip force, strain yarns</td><td data-label="Capacitive">Touch and swipe, presence, stable pressure, proximity</td></tr>
         </tbody>
       </table>
     </div>
@@ -481,6 +483,7 @@
   </div>
 </main>
 
+<a href="#top" class="back-to-top" data-sx-top><span class="back-to-top__arrow">&uarr;</span>Top</a>
 <script type="module" src="smart-textiles-study.js"></script>
 </body>
 </html>

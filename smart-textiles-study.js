@@ -51,6 +51,23 @@ function paintProgress() {
   const total = scores.reduce((a, b) => a + b, 0) / scores.length;
   $('[data-sx-total]').textContent = `${Math.round(total * 100)}%`;
   $('[data-sx-totalbar]').style.width = `${Math.round(total * 100)}%`;
+  paintJump(scores);
+}
+
+// the jump bar: one link per chapter with its progress, then the two rounds. It sticks to the top of the
+// screen while the chapters scroll past, and marks the chapter on screen (aria-current).
+const jump = $('[data-sx-jump]'), JUMP_EXTRA = [['round', 'Mix', 'The mixed round'], ['hard-round', 'Hard', 'The hard round']];
+let jumpAt = null;
+function paintJump(scores) {
+  if (!jump) return;
+  jump.innerHTML = `<ol>${CHAPTERS.map((c, i) => { const pc = Math.round(scores[i] * 100); return `<li><a href="${c.anchor}" data-ch="${c.id}" aria-label="${c.n} ${esc(c.name)}, ${pc}% done"><span class="n">${c.n}</span><span class="nm">${esc(c.short)}</span><span class="sx-jump__bar" aria-hidden="true"><span style="width:${pc}%" data-pct="${pc}"></span></span></a></li>`; }).join('')}`
+    + JUMP_EXTRA.map(([id, label, full]) => `<li><a href="#${id}" data-ch="${id}" aria-label="${full}"><span class="n">${label}</span></a></li>`).join('') + '</ol>';
+  markJump();
+}
+function markJump() { for (const a of $$('a[data-ch]', jump || document.createElement('i'))) a.setAttribute('aria-current', String(a.dataset.ch === jumpAt)); }
+if (jump && typeof IntersectionObserver === 'function') {
+  const io = new IntersectionObserver(es => { for (const e of es) if (e.isIntersecting) { jumpAt = e.target.dataset.sxChapter || e.target.id; markJump(); } }, { rootMargin: '-40% 0px -55% 0px' });
+  for (const sec of $$('[data-sx-chapter], #round, #hard-round')) io.observe(sec);
 }
 
 // the contact line is data (CONTACT in the data file), so the figure caption reads it too
@@ -63,7 +80,7 @@ for (const el of $$('[data-sx-line="contact"]')) el.textContent = CONTACT.hook;
 const stackPick = $('[data-sx-stackpick]');
 stackPick.innerHTML = STACKS.map((s, i) => `<button type="button" class="st-btn" data-st-for="stack" data-st-key="id" data-st-value="${s.id}" aria-pressed="${i === 0}">${esc(s.name)}</button>`).join('');
 
-const players = mount(STUDY_SCENES, document, { onState: p => { if (p.name === 'stack') { p.state.sel = -1; paintStackLayers(); } } });
+const players = mount(STUDY_SCENES, document, { textFloor: true, onState: p => { if (p.name === 'stack') { p.state.sel = -1; paintStackLayers(); } } });
 const player = name => players.find(p => p.name === name);
 window.__sxPlayers = players;   // test hook, read by tools/smart-textiles/verify-study.mjs
 

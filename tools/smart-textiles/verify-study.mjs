@@ -53,6 +53,13 @@
 //       position), then the right answer, its reason and the line; the other why-nots stay hidden until "Why not
 //       the other two?"; a right answer shows them all. Every chapter check, the mixed round and Which Sensor
 //   V28 arrow grids: each row answered wrong shows its own reason, a row answered right shows none (every chapter)
+//   V29 the labs on a narrow screen: nothing scrolls sideways inside a lab or the table; every label in every
+//       scene renders at 10 px or more (1280 and 390); at 390 a wide scene is its panels stacked, no label is
+//       cut by its panel's edge or overlaps another, and every label the scene draws is shown whole in a panel
+//       or set in the read-out under it
+//   V30 the jump bar: sticks to the top while the chapters scroll, one link per chapter whose bar is that
+//       chapter's progress as the panel reports it, plus the two rounds; a link lands its chapter just below the
+//       bar and marks it current; links 44 px tall at 390; and a back-to-top link that returns to the top
 // --negative-control [--mutant=a,b] re-serves the page with a defect planted, one at a time, and requires the named check
 // to fail: storage never written (V6, V11), the Next button shown early (V7), Build the Stack accepting any
 // layer (V9), a slider that writes nothing (V5), the mixed round unranked (V10), Type the line accepting
@@ -139,8 +146,12 @@ async function run(patch = {}, quiet = false) {
               for (const tx of p.svg.querySelectorAll('text')) {
                 if (!tx.textContent.trim()) continue;
                 if (+(tx.getAttribute('fill-opacity') ?? 1) < 0.05 || +(tx.getAttribute('opacity') ?? 1) < 0.05) continue;
-                const r = tx.getBBox();
-                if (r.x < x0 - 1 || r.y < y0 - 1 || r.x + r.width > x0 + vw + 1 || r.y + r.height > y0 + vh + 1) out.push(`${p.name} ${JSON.stringify(v)} t=${t.toFixed(2)} "${tx.textContent.trim().slice(0, 30)}"`);
+                const r = tx.getBBox(), win = tx.closest('svg[data-panel]');
+                // on a narrow screen a label is judged against its own panel's window; a copy wholly outside it is
+                // that panel not showing it (another panel or the read-out does, which V29 checks)
+                const [wx, wy, ww, wh] = win ? win.dataset.panel.split(' ').map(Number) : [x0, y0, vw, vh];
+                if (win && (r.x + r.width <= wx || r.x >= wx + ww || r.y + r.height <= wy || r.y >= wy + wh)) continue;
+                if (r.x < wx - 1 || r.y < wy - 1 || r.x + r.width > wx + ww + 1 || r.y + r.height > wy + wh + 1) out.push(`${p.name} ${JSON.stringify(v)} t=${t.toFixed(2)} "${tx.textContent.trim().slice(0, 30)}"`);
               }
             }
           }
@@ -584,6 +595,83 @@ async function run(patch = {}, quiet = false) {
         } catch (e) { ok('V28', false, 'threw: ' + String(e.message).split('\n')[0]); }
       }
 
+      // V29 the labs on a narrow screen
+      try {
+        await page.evaluate(() => window.scrollTo(0, 0));
+        const r29 = await page.evaluate(async narrowW => {
+          const wait = ms => new Promise(r => setTimeout(r, ms));
+          const out = { over: [], small: [], cut: [], ovl: [], lost: [], unpaneled: [], panels: 0, scenes: 0, readout: 0, n: 0 };
+          const norm = x => String(x).replace(/\s+/g, ' ').trim();
+          for (const el of document.querySelectorAll('.st-anim, .sx-table-wrap')) if (el.scrollWidth > el.clientWidth + 1) out.over.push(el.closest('[data-st]')?.dataset.st || 'table');
+          for (const p of window.__sxPlayers) {
+            const svg = p.svg, texts = [...svg.querySelectorAll('text')].filter(t => t.textContent.trim());
+            for (const t of texts) { const f = +t.getAttribute('font-size') * (t.getScreenCTM()?.a || 0); out.n++; if (f < 9.95) out.small.push(`${p.name} "${t.textContent.slice(0, 16)}" ${f.toFixed(1)}px`); }
+            if (!narrowW) continue;
+            const wins = [...svg.querySelectorAll('svg[data-panel]')];
+            out.panels += wins.length;
+            if (p.scene.narrow) { out.scenes++; const want = p.scene.narrow.panels?.length || 1; if (wins.length !== want) out.unpaneled.push(`${p.name} ${wins.length}/${want}`); }
+            const shown = new Set();
+            for (const win of wins) {
+              const [x0, y0, w, h] = win.dataset.panel.split(' ').map(Number), boxes = [];
+              for (const t of win.querySelectorAll('text')) {
+                if (!t.textContent.trim()) continue;
+                const b = t.getBBox(), inX = b.x >= x0 - 0.5 && b.x + b.width <= x0 + w + 0.5, inY = b.y >= y0 - 0.5 && b.y + b.height <= y0 + h + 0.5;
+                const outside = b.x + b.width <= x0 || b.x >= x0 + w || b.y + b.height <= y0 || b.y >= y0 + h;
+                if (inX && inY) { shown.add(norm(t.textContent)); boxes.push({ b, s: t.textContent.slice(0, 16) }); }
+                else if (!outside) out.cut.push(`${p.name} "${t.textContent.slice(0, 18)}"`);
+              }
+              for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+                const A = boxes[i].b, B = boxes[j].b, ix = Math.min(A.x + A.width, B.x + B.width) - Math.max(A.x, B.x), iy = Math.min(A.y + A.height, B.y + B.height) - Math.max(A.y, B.y);
+                if (ix > 0.5 && iy > Math.min(A.height, B.height) * 0.3) out.ovl.push(`${p.name} "${boxes[i].s}" / "${boxes[j].s}"`);
+              }
+            }
+            if (!wins.length) continue;
+            // every label the scene draws for this frame: whole in a panel, or in the read-out
+            const ro = p.host.querySelector('.st-readout'), roText = ro && !ro.hidden ? norm(ro.textContent) : '';
+            if (ro && !ro.hidden && ro.textContent.trim()) out.readout++;
+            const ref = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            ref.innerHTML = p.scene.draw(p.lastT ?? 0.55, { ...p.state, _narrow: true });
+            for (const t of ref.querySelectorAll('text')) { const x = norm(t.textContent); if (x && !shown.has(x) && !roText.includes(x)) out.lost.push(`${p.name} "${x.slice(0, 20)}"`); }
+          }
+          return out;
+        }, w < 700);
+        ok('V29', !r29.over.length && !r29.small.length && !r29.cut.length && !r29.ovl.length && !r29.lost.length && (w >= 700 || (r29.scenes >= 16 && !r29.unpaneled.length && r29.readout >= 10)),
+          `${w}px ${r29.n} labels; sideways scroll inside: ${r29.over.join(', ') || 'none'}; under 10 px: ${r29.small.slice(0, 3).join(' | ') || 'none'}${w < 700 ? `; ${r29.scenes} narrow scenes, ${r29.panels} panels${r29.unpaneled.length ? ' (wrong count: ' + r29.unpaneled.join(', ') + ')' : ''}, ${r29.readout} read-outs; cut: ${r29.cut.slice(0, 3).join(' | ') || 'none'}; overlapping: ${r29.ovl.slice(0, 3).join(' | ') || 'none'}; lost: ${r29.lost.slice(0, 3).join(' | ') || 'none'}` : ''}`);
+      } catch (e) { ok('V29', false, 'threw: ' + String(e.message).split('\n')[0]); }
+
+      // V30 the jump bar and back-to-top
+      try {
+        await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(150);
+        const r30a = await page.evaluate(() => {
+          const bar = document.querySelector('[data-sx-jump]');
+          if (!bar) return { missing: true };
+          const links = [...bar.querySelectorAll('a[data-ch]')];
+          const panel = [...document.querySelectorAll('[data-sx-chapters] a')].map(a => +a.querySelector('.pct').textContent.replace('%', ''));
+          const pcts = links.slice(0, 6).map(a => +a.querySelector('[data-pct]')?.dataset.pct);
+          const widths = links.slice(0, 6).map(a => parseFloat(a.querySelector('.sx-jump__bar > span')?.style.width));
+          return { n: links.length, targets: links.every(a => document.querySelector(a.getAttribute('href'))), pctOk: panel.length === 6 && pcts.every((v, i) => v === panel[i] && widths[i] === v), h: Math.min(...links.map(a => a.getBoundingClientRect().height)), pos: getComputedStyle(bar).position };
+        });
+        const tapj = sel => page.click(sel, { timeout: 2000 }).then(() => true, () => false);
+        // the page scrolls smoothly: wait until it has stopped, not a fixed time
+        const settled = async () => { let last = -1; for (let k = 0; k < 40; k++) { await page.waitForTimeout(120); const y = await page.evaluate(() => scrollY); if (y === last) break; last = y; } await page.waitForTimeout(150); };
+        const minH30 = w < 700 ? 44 : 36;
+        const jumps = [];
+        for (const ch of ['sense', 'stretch', 'flow']) {
+          await tapj(`[data-sx-jump] a[data-ch="${ch}"]`); await settled();
+          jumps.push(await page.evaluate(ch => {
+            const bar = document.querySelector('[data-sx-jump]').getBoundingClientRect(), sec = document.getElementById(ch).getBoundingClientRect();
+            return { ch, barTop: Math.round(bar.top), secTop: Math.round(sec.top), barBottom: Math.round(bar.bottom), cur: document.querySelector('[data-sx-jump] a[aria-current="true"]')?.dataset.ch };
+          }, ch));
+        }
+        // the bar sits in the page above chapter 01 and sticks once that has scrolled past, so it is at the top or above
+        const landed = jumps.every(j => j.barTop >= -1 && j.barTop <= 16 && j.secTop >= j.barBottom - 1 && j.secTop < j.barBottom + 120 && j.cur === j.ch) && jumps.some(j => j.barTop <= 1);
+        const top = await page.evaluate(() => { const a = document.querySelector('a.back-to-top[href="#top"]'); if (!a) return null; const r = a.getBoundingClientRect(); return { vis: r.height > 0 && r.bottom <= innerHeight }; });
+        await tapj('a.back-to-top'); await settled();
+        const y = await page.evaluate(() => scrollY);
+        ok('V30', !r30a.missing && r30a.n === 8 && r30a.targets && r30a.pctOk && r30a.pos === 'sticky' && r30a.h >= minH30 - 0.5 && landed && top?.vis && y < 20,
+          `${w}px ${r30a.n} links, every target exists ${r30a.targets}, bars match the panel ${r30a.pctOk}, ${r30a.pos}, shortest link ${Math.round(r30a.h)} px; jumps ${jumps.map(j => `${j.ch}: bar ${j.barTop}..${j.barBottom}, section at ${j.secTop}, current ${j.cur}`).join('; ')}; back to top visible ${top?.vis}, lands at ${y}`);
+      } catch (e) { ok('V30', false, 'threw: ' + String(e.message).split('\n')[0]); }
+
       // V24 tap targets: every control in the progress panel and the chapters, prose links excepted
       const minH = w < 700 ? 44 : 32;
       await page.evaluate(() => window.scrollTo(0, 0));
@@ -656,6 +744,18 @@ if (process.argv.includes('--negative-control')) {
     ['reason-back-to-the-line', { 'smart-textiles-study-data.js': ["why: 'A resistive sensor is a conducting path:", "why: 'R is a Road, C is a Canyon.', was: 'A resistive sensor is a conducting path:"] }, ['V26']],
     ['arrow-row-without-a-reason', { 'smart-textiles-study-hard.js': [", 'The battery sets the voltage; a longer thread doesn’t change it.'", ''] }, ['V26']],
     ['sensor-whynot-missing', { 'smart-textiles-study-data.js': ["E: 'Resistive needs contact, so it can’t see a hand 2 cm away; only one of the two works here.'", "E: ''"] }, ['V26']],
+    // PR 3: narrow labs, text floor, jump bar
+    ['the narrow layout is switched off', { 'smart-textiles-core.js': ['const narrow = !!scene.narrow && px > 0 && px < (scene.narrow.below ?? 560);', 'const narrow = false;'] }, ['V29']],
+    ['the text floor is removed', { 'smart-textiles-core.js': ['  const floor = floorPx * 1.02 * w / px;   // units per rendered px is w / px', '  const floor = 0;'] }, ['V29']],
+    ['the read-out is dropped', { 'smart-textiles-core.js': ['if (p.readout && p.readout.innerHTML !== html) p.readout.innerHTML = html;', 'void html;'] }, ['V29']],
+    ['a panel cuts a label', { 'smart-textiles-study-scenes.js': ['ohm.narrow = { panels: [[4, 22, 628, 194]]', 'ohm.narrow = { panels: [[60, 22, 572, 194]]'] }, ['V29']],
+    ['the wide labs scroll sideways again', { 'smart-textiles-study.css': ['/* a narrow lab', '@media (max-width: 680px) { .sx-wide .st-anim { overflow-x: auto; } .sx-wide .st-anim svg { min-width: 640px; } }\n/* a narrow lab'] }, ['V29']],
+    ['the table scrolls sideways', { 'smart-textiles-study.css': ['.sx-table { border-collapse: collapse; width: 100%; min-width: 0;', '.sx-table { border-collapse: collapse; width: 100%; min-width: 34rem;'] }, ['V29']],
+    ['the jump bar does not stick', { 'smart-textiles-study.css': ['.sx-jump { position: sticky;', '.sx-jump { position: static;'] }, ['V30']],
+    ['every jump bar shows chapter 01', { 'smart-textiles-study.js': ['const pc = Math.round(scores[i] * 100);', 'const pc = Math.round(scores[0] * 100);'] }, ['V30']],
+    ['the chapter on screen is not marked', { 'smart-textiles-study.js': ["a.setAttribute('aria-current', String(a.dataset.ch === jumpAt));", "a.setAttribute('aria-current', 'false');"] }, ['V30']],
+    ['a chapter lands under the bar', { 'smart-textiles-study.css': ['[data-sx-chapter], #round, #hard-round { scroll-margin-top: 64px; }', ''] }, ['V30']],
+    ['no back-to-top link', { 'smart-textiles-study.html': ['<a href="#top" class="back-to-top" data-sx-top>', '<a href="#nowhere" class="sx-gone" data-sx-top>'] }, ['V30']],
     ['pedot-figure-back', { 'smart-textiles-study-data.js': ["rho: 2.3e-6, rhoNote: '≈ 2 × 10⁻⁶ at best (acid-treated film); 10⁻³–10⁻² untreated',", "rho: 1e-5, rhoNote: '≈ 10⁻⁵ at best; often 100× higher',"] }, ['V25']],
   ];
   let failed = 0;

@@ -82,7 +82,7 @@ const circuit = {
       const a = (k - 2) * 0.42, r0 = 20, r1 = 20 + 9 * glow * (0.75 + 0.25 * Math.sin(t * TAU * 6 + k));
       s += line(560 - Math.cos(a) * r0, 106 + Math.sin(a) * r0, 560 - Math.cos(a) * r1, 106 + Math.sin(a) * r1, { stroke: C.mint, 'stroke-width': 1.3, 'stroke-opacity': f2(glow) });
     }
-    s += L(580, 110, 'LED');
+    s += st._narrow ? L(540, 112, 'LED', { anchor: 'end' }) : L(580, 110, 'LED');
     s += L(325, 30, 'conductive thread', { anchor: 'middle' });
     // electrons: - terminal round the outside loop to +; they jiggle in place while the loop is open
     const view = st.view || 'both';
@@ -105,8 +105,8 @@ const circuit = {
       }
     }
     // key + the state in words
-    s += circ(608, 156, 2.6, { fill: C.petrol }) + T(618, 160, 'electrons') + T(618, 174, '− to +');
-    s += path('M605,192 L610,196 L605,200', { stroke: C.ink, 'stroke-width': 1.3 }) + T(618, 200, 'current arrow') + T(618, 214, '+ to −');
+    s += circ(608, 156, 2.6, { fill: C.petrol }) + (st._narrow ? T(618, 160, 'dots: electrons, going − to +') : T(618, 160, 'electrons') + T(618, 174, '− to +'));
+    s += path('M605,192 L610,196 L605,200', { stroke: C.ink, 'stroke-width': 1.3 }) + (st._narrow ? T(618, 200, 'chevrons: the current arrow, + to −') : T(618, 200, 'current arrow') + T(618, 214, '+ to −'));
     s += H(325, 125, open > 0.5 ? 'no loop, no flow' : 'a closed loop', { anchor: 'middle', 'fill-opacity': null, size: 13 });
     if (open > 0.5) s += T(325, 143, 'the electrons only jiggle in place', { anchor: 'middle' });
     return s;
@@ -161,7 +161,7 @@ const ohm = {
     const gh = 120, gk = V / 12;
     s += rect(36, 40, 26, gh, { fill: C.raised, stroke: C.line });
     s += rect(36, 40 + gh * (1 - gk), 26, gh * gk, { fill: C.petrol, 'fill-opacity': 0.35 });
-    s += H(49, 180, `${fmt(V, 1)} V`, { anchor: 'middle', size: 12 }) + L(49, 196, 'push', { anchor: 'middle' });
+    s += H(49, 180, `${fmt(V, 1)} V`, { anchor: 'middle', size: 12 }) + L(49, st._narrow ? 206 : 196, 'push', { anchor: 'middle' });
     // hallway: narrower and more cluttered with R
     const rk = Math.log10(R / 10) / Math.log10(50);   // 0 at 10 ohm .. 1 at 500 ohm
     const hw = lerp(46, 12, rk), yc = 100, xa = 120, xb = 560;
@@ -219,7 +219,8 @@ const yarnR = {
       s += electrons(pts, ph + j * 0.37, { n: Math.max(2, Math.round((x1 - x0) / 60)), r: 1.4 });
     }
     s += line(x0, yc + 20, x1, yc + 20, { stroke: C.faint, 'stroke-width': 0.8 }) + line(x0, yc + 16, x0, yc + 24, { stroke: C.faint }) + line(x1, yc + 16, x1, yc + 24, { stroke: C.faint });
-    s += L((x0 + x1) / 2, yc + 34, `L = ${fmt(len)} m`, { anchor: 'middle' });
+    // on a phone the label is set larger than a short yarn is long, so it starts at the yarn's left end
+    s += st._narrow && x1 - x0 < 90 ? L(x0, yc + 34, `L = ${fmt(len)} m`) : L((x0 + x1) / 2, yc + 34, `L = ${fmt(len)} m`, { anchor: 'middle' });
     if (n > 9) s += L(x0, yc - 22, `${n} filaments (9 drawn)`); else s += L(x0, yc - 22, `${n} filament${n > 1 ? 's' : ''}`);
     // cross-section: n filaments packed
     const cx = 110, cy = 170, rr = 3;
@@ -360,9 +361,34 @@ const RHO_BARS = [
   ['silver', 1.59e-8, C.silver, 'Ag'], ['copper', 1.68e-8, C.copper, 'Cu'], ['gold', 2.44e-8, 'var(--st-gold)', 'Au'], ['aluminium', 2.65e-8, C.steel, 'Al'],
   ['nickel', 6.99e-8, 'var(--st-nickel)'], ['stainless steel', 7.2e-7, C.steel], ['nichrome', 1.10e-6, C.steel], ['PEDOT:PSS, best film', 2.3e-6, C.pedot], ['carbon fibre', 1.5e-5, C.carbon],
 ];
+// On a phone the ladder is drawn as a column: each metal's name above its bar, the value beside the name.
+const LADDER_N = { w: 340, h: 386 };
+function ladderNarrow(t) {
+  let s = '';
+  const x0 = 10, x1 = 330, lo = -8.2, hi = -4.4, X = v => x0 + (Math.log10(v) - lo) / (hi - lo) * (x1 - x0);
+  s += T(x0, 14, 'resistivity ρ, log scale:') + T(x0, 28, 'a longer bar is a worse conductor');
+  for (const e of [-8, -7, -6, -5]) s += line(X(10 ** e), 50, X(10 ** e), 314, { stroke: C.hair, 'stroke-width': 0.8 }) + txt(X(10 ** e), 46, `10${sup('⁻' + -e)}`, { size: 10, anchor: 'middle', fill: C.dim });
+  const top4 = eseg(t, 0.55, 0.62) * (1 - eseg(t, 0.92, 0.98));
+  RHO_BARS.forEach(([name, rho, col, sym], i) => {
+    const y = 66 + i * 29, grow = eseg(t, 0.02 + i * 0.05, 0.12 + i * 0.05) * (1 - eseg(t, 0.95, 1));
+    const xe = lerp(x0, X(rho), grow), hl = i < 4 ? top4 : 0;
+    s += T(x0, y, `${name}${grow > 0.9 ? `   ${sci(rho)}` : ''}`, { fill: hl > 0.5 ? C.ink : C.dim });
+    s += rect(x0, y + 4, Math.max(0.1, xe - x0), 11, { fill: col, stroke: name.startsWith('carbon') ? C.dim : null, 'stroke-width': 0.6 });
+    if (hl > 0.02 && sym) s += H(x1, y, sym, { size: 12, anchor: 'end', 'fill-opacity': null });
+  });
+  const words = ['Some', 'Cats', 'Get', 'Angry'];
+  let wx = x0;
+  words.forEach((w, i) => { const k = eseg(t, 0.62 + i * 0.05, 0.66 + i * 0.05) * (1 - eseg(t, 0.92, 0.98)); if (k > 0.05) s += H(wx, 340, w, { size: 13 }); wx += w.length * 8.5 + 10; });
+  const k2 = eseg(t, 0.8, 0.84) * (1 - eseg(t, 0.92, 0.98));
+  if (k2 > 0.05) s += T(x0, 362, 'stainless ≈ 43× copper') + T(x0, 378, 'carbon fibre ≈ 900×');
+  const cx = lerp(x0, x1, fr(t * 3));
+  s += line(cx, 52, cx, 316, { stroke: C.faint, 'stroke-width': 0.6, 'stroke-dasharray': '2 4' });
+  return s;
+}
 const ladder = {
   vb: '0 0 720 270', dur: 9000,
-  draw(t) {
+  draw(t, st = {}) {
+    if (st._narrow) return ladderNarrow(t);
     let s = '';
     const x0 = 160, x1 = 600, lo = -8.2, hi = -4.4, X = v => x0 + (Math.log10(v) - lo) / (hi - lo) * (x1 - x0);
     s += T(x0, 18, 'resistivity ρ — a longer bar is a worse conductor (log scale)', { size: 9.5 });
@@ -392,7 +418,7 @@ const ladder = {
 // Galvanic corrosion: copper meets silver in sweat; copper gives up electrons and dissolves.
 const galvanic = {
   vb: '0 0 360 230', dur: 8000,
-  draw(t) {
+  draw(t, st = {}) {
     let s = '';
     const days = Math.round(lerp(0, 90, seg(t, 0.05, 0.85))), bite = eseg(t, 0.05, 0.85) * (1 - eseg(t, 0.92, 1));
     // copper trace with a corroding top edge near the junction
@@ -414,7 +440,7 @@ const galvanic = {
       if (i % 3 === 0) s += txt(x + 5, y - 3, '+', { size: 8, fill: C.ink, op: f2(1 - u) });
     }
     s += L(30, 152, 'copper: less noble, dissolves');
-    s += L(jx + 30, 168, 'silver: more noble');
+    s += st._narrow ? L(352, 168, 'silver: more noble', { anchor: 'end' }) : L(jx + 30, 168, 'silver: more noble');
     s += L(jx, cy - 64, 'sweat: an electrolyte', { anchor: 'middle' });
     s += T(16, 24, `day ${days}`, { fill: C.ink });
     s += H(180, 194, 'Two metals + sweat = a battery;', { anchor: 'middle', size: 12 });
@@ -426,7 +452,7 @@ const galvanic = {
 // Temperature coefficient: heaters want steady, thermometers want swingy.
 const tcr = {
   vb: '0 0 360 230', dur: 8000,
-  draw(t) {
+  draw(t, st = {}) {
     let s = '';
     const T0 = 20, Tc = lerp(20, 80, 0.5 - 0.5 * Math.cos(t * TAU)), u = (Tc - 20) / 60;
     // thermometer
@@ -442,8 +468,8 @@ const tcr = {
       series: curves.map(([, a, col, dash]) => ({ curve: v => ({ x: v, y: (a * 60 * v) / 0.4 }), color: col, dash, ghost: true })),
       title: 'R / R₀ as it warms', xl: '80 °C', xl0: '20 °C', yl: '1.4', yl0: '1.0' });
     curves.forEach(([name, a]) => { const y = 30 + 130 - (a * 60) / 0.4 * 130; s += T(324, y - 6, name, { anchor: 'end', size: 9 }); });
-    s += T(80, 186, curves.map(c => `${c[0].split(' ')[0]} ${fmt(1 + c[1] * (Tc - T0), 3)}×`).join('   '), { size: 9 });
-    s += H(180, 212, 'Heaters want steady; thermometers want swingy.', { anchor: 'middle', size: 11 });
+    s += T(st._narrow ? 10 : 80, st._narrow ? 205 : 186, curves.map(c => `${c[0].split(' ')[0]} ${fmt(1 + c[1] * (Tc - T0), 3)}×`).join('   '), { size: 9 });
+    s += H(180, st._narrow ? 225 : 212, 'Heaters want steady; thermometers want swingy.', { anchor: 'middle', size: 11 });
     return s;
   },
 };
@@ -478,7 +504,7 @@ const migration = {
 const RPART = (() => { const g = rng(21), a = []; for (let i = 0; i < 70; i++) a.push({ x: g(), y: g(), th: g() }); return a; })();
 const roadcanyon = {
   vb: '0 0 720 275', dur: 7000,
-  draw(t) {
+  draw(t, st = {}) {
     let s = '';
     const F = press(t);
     // ---- resistive (left)
@@ -493,7 +519,7 @@ const roadcanyon = {
     for (let k = 0; k < nP; k++) { const x = cx + (k - (nP - 1) / 2) * 16; s += electrons([{ x, y: top + 4 + dip(x) }, { x: x + 4, y: (top + bot) / 2 + dip(x) / 2 }, { x: x - 2, y: bot }], t * 4 + k * 0.27, { n: 3, r: 2 }); }
     s += L(lx + lw + 6, top + 4, 'electrode') + L(lx + lw + 6, (top + bot) / 2 + 4, 'carbon') + L(lx + lw + 6, bot + 6, 'electrode');
     const Rk = 1 / (1 + 6 * F);
-    s += plot({ x: lx, y: 198, w: lw, h: 40, u: fr(t), f: v => 0.05 + 0.9 / (1 + 6 * press(v)), title: 'resistance falls as you press', readout: `${Math.round(Rk * 50)} kΩ`, grid: [], color: C.petrol });
+    s += plot({ x: lx, y: 198, w: lw, h: 40, u: fr(t), f: v => 0.05 + 0.9 / (1 + 6 * press(v)), title: st._narrow ? 'R falls as you press' : 'resistance falls as you press', readout: `${Math.round(Rk * 50)} kΩ`, grid: [], color: C.petrol });
     // ---- capacitive (right)
     const rx = 400, rw = 260, rcx = rx + rw / 2, d0 = 64, ctop = 96, cbot = ctop + d0;
     const dipC = x => F * 34 * Math.exp(-(((x - rcx) / 70) ** 2));
@@ -512,7 +538,7 @@ const roadcanyon = {
     }
     s += line(rx + rw, ctop, rx + rw + 50, ctop, { stroke: C.silver, 'stroke-width': 1.5 }) + line(rx + rw, cbot + 3, rx + rw + 50, cbot + 3, { stroke: C.silver, 'stroke-width': 1.5 });
     const Ck = 1 / (1 - F * 0.48);
-    s += plot({ x: rx, y: 198, w: rw, h: 40, u: fr(t), f: v => 0.15 + 0.8 * (1 / (1 - press(v) * 0.48) - 1) / 0.92, title: 'capacitance rises as the gap closes', readout: `${fmt(1.2 * Ck)} pF`, grid: [], color: C.indigo });
+    s += plot({ x: rx, y: 198, w: rw, h: 40, u: fr(t), f: v => 0.15 + 0.8 * (1 / (1 - press(v) * 0.48) - 1) / 0.92, title: st._narrow ? 'C rises as the gap closes' : 'capacitance rises as the gap closes', readout: `${fmt(1.2 * Ck)} pF`, grid: [], color: C.indigo });
     s += T(360, 264, 'R is a Road, C is a Canyon.', { anchor: 'middle', fill: C.ink, size: 11 });
     return s;
   },
@@ -575,7 +601,7 @@ const bucket = {
     s += plot({ x: 240, y: 40, w: 106, h: 90, u: clamp(fr(t)), grid: [0.63],
       series: [{ f: v => 1 - Math.exp(-v / tau), color: C.petrol }, { f: v => 1 - Math.exp(-v / 0.16), color: C.faint, dash: '3 3', noDot: true }],
       title: 'charging', xl: 'time', ref: [{ v: 0.63, label: 'threshold', color: C.mint }] });
-    s += T(240, 154, `time to threshold`, { size: 9 }) + T(240, 168, `≈ ${fmt(us)} µs (via 1 MΩ)`, { fill: C.ink, size: 9.5 });
+    { const bx = st._narrow ? 218 : 240; s += T(bx, 154, `time to threshold`, { size: 9 }) + T(bx, 168, `≈ ${fmt(us)} µs (via 1 MΩ)`, { fill: C.ink, size: 9.5 }); }
     s += T(352, 184, eps > 10 ? '! water: a giant "touch"' : `dashed: air at 3 mm`, { size: 9, anchor: 'end' });
     return s;
   },
@@ -659,7 +685,7 @@ const water = {
 // An enamelled-wire crossing in a woven grid: the enamel is the capacitor's gap; a finger steals field.
 const crossing = {
   vb: '0 0 360 250', dur: 7000,
-  draw(t) {
+  draw(t, st = {}) {
     let s = '';
     const near = pulse(t, 0.1, 0.4, 0.6, 0.9);
     const cx = 180, cy = 150;
@@ -676,12 +702,12 @@ const crossing = {
     const fy = lerp(30, 106, near);
     for (let k = 0; k < Math.round(near * 4); k++) s += path(`M${cx - 30 + k * 18},${wt - 6} Q${cx - 20 + k * 12},${fy + 20} ${cx - 6 + k * 4},${fy + 2}`, { stroke: C.indigo, 'stroke-width': 1, 'stroke-dasharray': '3 2' });
     s += finger(cx, fy, 28);
-    s += L(28, wt - 12, 'weft: Ag–Cu in enamel') + L(cx + 26, cy + 50, 'warp: Ag–Cu in enamel');
+    s += L(28, wt - 12, 'weft: Ag–Cu in enamel') + (st._narrow ? L(352, cy + 50, 'warp: Ag–Cu in enamel', { anchor: 'end' }) : L(cx + 26, cy + 50, 'warp: Ag–Cu in enamel'));
     s += L(212, 96, 'enamel + enamel');
     s += L(212, 106, '= the capacitor gap');
     const C0 = 2.0 - 0.6 * near;
     s += T(28, 228, `node capacitance ≈ ${fmt(C0)} (relative)`, { fill: C.ink });
-    s += T(28, 244, 'Insulated lines cross; every crossing is a sensor.', { size: 9.5 });
+    s += T(st._narrow ? 8 : 28, 244, 'Insulated lines cross; every crossing is a sensor.', { size: 9.5 });
     return s;
   },
 };
@@ -837,7 +863,7 @@ const curves = {
     const px = 380, py = 40, pw = 300, ph = 150;
     s += plot({ x: px, y: py, w: pw, h: ph, u, mode: 'xy', grid: [0.5],
       series: [{ curve: v => { const q = curvePath(k, v); return { x: q.e / m.xr, y: q.s / m.yr }; }, color: k === 'metal' ? C.copper : C.petrol, ghost: true }],
-      title: k === 'knit' ? 'force per width vs stretch' : 'stress vs strain', xl: m.xl, xl0: '0', yl: m.yl, yl0: '0' });
+      title: (k === 'knit' ? 'force per width vs stretch' : 'stress vs strain') + (st._narrow ? `, top ${m.yl}` : ''), xl: m.xl, xl0: '0', yl: st._narrow ? '' : m.yl, yl0: st._narrow ? '' : '0' });
     s += T(px, 222, m.eLabel, { fill: C.ink });
     s += T(px, 240, m.note[0]) + T(px, 256, m.note[1]);
     if (k === 'metal' && p.e > m.sy / m.E) s += L(px + 6, py + 14, 'past yield: plastic, permanent', { fill: C.plum });
@@ -878,7 +904,7 @@ const poisson = {
     s += lattice(k, X, Y, W, Hh, sx, sy);
     s += arrow(X - 6, cy, X - 36, cy, { color: C.plum, sw: 1.5, head: 6 }) + arrow(X + W + 6, cy, X + W + 36, cy, { color: C.plum, sw: 1.5, head: 6 });
     if (Math.abs(c.nu) > 0.01) { const dir = c.nu > 0 ? 1 : -1; s += arrow(cx, Y - 26 + (dir > 0 ? 0 : 14), cx, Y - 26 + (dir > 0 ? 14 : 0), { color: C.indigo, sw: 1.2 }) + arrow(cx, Y + Hh + 26 - (dir > 0 ? 0 : 14), cx, Y + Hh + 26 - (dir > 0 ? 14 : 0), { color: C.indigo, sw: 1.2 }); }
-    s += L(cx - W0 / 2, 26, `${POISSON[k].name}, stretch drawn 2.5× larger`);
+    s += L(st._narrow ? 24 : cx - W0 / 2, 26, `${POISSON[k].name}, stretch drawn 2.5× larger`);   // a phone sets it larger: start at the panel's edge
     // read-outs, for the stretch the slider sets
     const X2 = 440;
     s += H(X2, 52, `ν = ${c.nu < 0 ? '−' + Math.abs(c.nu) : c.nu}`, { size: 15 });
@@ -937,7 +963,7 @@ function serpAmp(lam, a0, wl) {
 }
 const serpentine = {
   vb: '0 0 720 300', dur: 7000,
-  draw(t) {
+  draw(t, st = {}) {
     const e = 0.3 * (0.5 - 0.5 * Math.cos(fr(t) * TAU)), lam = 1 + e;
     let s = '';
     const x0 = 30, W0 = 360, W = W0 * lam;
@@ -959,7 +985,7 @@ const serpentine = {
     s += T(512, y + 42, `wave height ${Math.round(a0)} → ${Math.round(a)}: it unbends`, { size: 9 });
     // 3 · stiff island
     y = 216;
-    s += sub(y, 50) + L(x0, y - 8, 'a stiff island (a pod, a printed patch) on the base');
+    s += sub(y, 50) + L(x0, y - 8, st._narrow ? 'a stiff island on the base' : 'a stiff island (a pod, a printed patch) on the base');
     const isl = 110, soft = W0 - isl, softW = soft + (W - W0), ix = x0 + softW / 2;
     s += rect(ix, y + 6, isl, 38, { fill: C.raised, stroke: C.ink2 });
     for (let i = 0; i <= 6; i++) { const xl = x0 + i * (softW / 2) / 6, xr = ix + isl + i * (softW / 2) / 6; s += line(xl, y + 2, xl, y + 48, { stroke: C.faint, 'stroke-width': 0.7 }) + line(xr, y + 2, xr, y + 48, { stroke: C.faint, 'stroke-width': 0.7 }); }
@@ -998,8 +1024,24 @@ const capstretch = {
   },
 };
 
+// Narrow layouts (smart-textiles-core.js): windows onto each wide drawing, and the read-out boxes whose text
+// is set under the drawing as lines of HTML on a phone. Coordinates are the scene's own vb units.
+ladder.narrow = { panels: [[0, 0, LADDER_N.w, LADDER_N.h]] };
+galvanic.narrow = {}; tcr.narrow = {}; bucket.narrow = {}; crossing.narrow = {};
+circuit.narrow = { panels: [[-6, 12, 604, 220]], readout: [[598, 145, 122, 80]] };
+ohm.narrow = { panels: [[4, 22, 628, 194]], readout: [[598, 55, 122, 90], [100, 186, 620, 40]] };
+yarnR.narrow = { panels: [[18, 28, 433, 218], [448, 222, 268, 38]], readout: [[245, 115, 475, 110]] };
+heater.narrow = { panels: [[16, 0, 396, 260]], readout: [[420, 30, 300, 245]] };
+roadcanyon.narrow = { panels: [[18, 6, 374, 248], [392, 6, 328, 248]], readout: [[200, 255, 320, 20]] };
+selfmutual.narrow = { panels: [[10, 6, 355, 230], [365, 6, 355, 230]], readout: [[100, 238, 520, 22]] };
+curves.narrow = { panels: [[15, 15, 345, 222], [372, 22, 348, 185]], readout: [[372, 210, 348, 56]] };
+poisson.narrow = { panels: [[20, 15, 400, 240]], readout: [[430, 30, 290, 230]] };
+gauge.narrow = { panels: [[20, 15, 490, 150], [500, 20, 215, 148]], readout: [[30, 176, 690, 80]] };
+serpentine.narrow = { panels: [[22, 8, 482, 264]], readout: [[505, 10, 215, 250], [0, 280, 720, 20]] };
+const stackScene = makeStackScene(STACKS);
+stackScene.narrow = { panels: [[20, 20, 440, 300]], readout: [[455, 30, 265, 215], [430, 285, 290, 35]] };
 export const STUDY_SCENES = {
   circuit, marbles, ohm, yarnR, lanes, contacts, heater, ladder, galvanic, tcr, migration,
-  roadcanyon, divider, bucket, selfmutual, water, crossing, stack: makeStackScene(STACKS),
+  roadcanyon, divider, bucket, selfmutual, water, crossing, stack: stackScene,
   curves, poisson, gauge, serpentine, capstretch,
 };

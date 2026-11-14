@@ -6,12 +6,12 @@
 // magnitude rather than a spec. Chapters: flow, resist, metals, sense, stack.
 
 export const CHAPTERS = [
-  { id: 'flow', n: '01', name: 'Electrons and the Push', anchor: '#flow' },
-  { id: 'resist', n: '02', name: 'Why a Yarn Resists', anchor: '#resist' },
-  { id: 'metals', n: '03', name: 'Choosing the Metal', anchor: '#metals' },
-  { id: 'sense', n: '04', name: 'Resistive vs Capacitive', anchor: '#sense' },
-  { id: 'stack', n: '05', name: 'Stack-Ups', anchor: '#stack' },
-  { id: 'stretch', n: '06', name: 'Stretch and Stiffness', anchor: '#stretch' },
+  { id: 'flow', n: '01', name: 'Electrons and the Push', short: 'Push', anchor: '#flow' },
+  { id: 'resist', n: '02', name: 'Why a Yarn Resists', short: 'Resist', anchor: '#resist' },
+  { id: 'metals', n: '03', name: 'Choosing the Metal', short: 'Metals', anchor: '#metals' },
+  { id: 'sense', n: '04', name: 'Resistive vs Capacitive', short: 'R vs C', anchor: '#sense' },
+  { id: 'stack', n: '05', name: 'Stack-Ups', short: 'Stacks', anchor: '#stack' },
+  { id: 'stretch', n: '06', name: 'Stretch and Stiffness', short: 'Stretch', anchor: '#stretch' },
 ];
 
 // ---------------------------------------------------------------------------------------------
