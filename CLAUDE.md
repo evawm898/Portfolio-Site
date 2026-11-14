@@ -12681,7 +12681,7 @@ tools/shot-frame-filigree.mjs <dir>`; gates SC1–SC7, OR1–OR6 and K5.
 **THE FILIGREE FLOW STUDY IS MERGED AS A PROTOTYPE BEHIND A HIDDEN OPTION; NOTHING SHIPS** (Nov 13–14, #555 —
 read `docs/frame-flow-study.md` and `docs/frame-flow-grammar.md` before touching `frame-flow.js`,
 `frame-compose.js`, `frame-mass.js`, `ornFlow` or the F family of `tools/verify-frame-flow.mjs`).
-- **The option.** `ornFlow` is `'band' | 'contour' | 'composed' | 'mass'` and no control writes it. Absent, every
+- **The option.** `ornFlow` is `'band' | 'contour' | 'composed' | 'mass' | 'forms'` and no control writes it. Absent, every
   frame is `main`'s, by branch: FF0 checks the STL bytes and the SVG, 9 of 9.
 - **The three rounds:**
   - **Round 1 GREW the ornament** (`frame-flow.js`). Best critic score 4.5: "a wire with hooks".
@@ -12698,7 +12698,36 @@ read `docs/frame-flow-study.md` and `docs/frame-flow-grammar.md` before touching
   their shape. Each body should be its own outline, about 1 M wide. Volutes should wind ≥ 1 turn into a pierced eye.
   Nodes should differ in kind. The raster, the union, the inflation, the element and the coverage instrument all
   carry over (§10.6).
-- **None of it is in CI.** Run `node tools/verify-frame-flow.mjs [--only mass] [--base <main worktree>]` by hand.
+- **[Nov 14] Round 4 built THE FORMS** (`frame-forms.js`, `ornFlow: 'forms'`, §11 of the study doc; read §9 of the
+  grammar first — six bronze elements TRACED and measured, `tools/frame-forms-trace.mjs`). Each element is its own
+  outline from the measured profile: channelled C straps with ball-eyed volutes, separated reeded flames with open
+  hooks, a stem rolling under the flames' root, a foot spiral, node motifs by place, cupped shells, depth by element.
+  Six rounds, a fresh critic each: **5.0 / 5.5 / 5.5 / 5.8 / 6.0 / 6.0 — the bar was 6.5, NOT met.** Every critic
+  read islands and an extrusion; a height field cannot roll an end over itself or lay a child over its parent.
+  **Recommended next: the hand-drawn route** (Eva draws SVG outlines; the generator bends and places them along the
+  composed flow) — §11.6. FF0 still holds (the option absent is `main`); every forms clause passes on four rows.
+  **[Nov 14: RULED (b), the hand-drawn route — built, see the next bullet.]**
+- **[Nov 14] THE HAND-DRAWN FILIGREE** (`ornFlow: 'drawn'`, §12 of the study doc). Eva draws into
+  **`docs/frame-drawing-template.svg`** (one artboard per element) following **`docs/frame-drawing-guide.md`** (the
+  contract). Read both before touching `frame-svg-import.js`, `frame-drawn.js`, `frame-drawn-placeholders.js`,
+  `formsFor`'s `slots` / `slotsOnly`, `ownersGrid`, `reliefFromOwners` or the D / I / W families.
+  - **One placement set, one relief.** The slots are `formsFor`'s own (recorded, never read there). The back end is
+    `reliefFromOwners`, extracted from the forms round with its STL bytes unchanged (hashes before and after, four
+    rows).
+  - **Bodies are drawn STRAIGHTENED and BENT** by the skeletal map S(sx·x) + sy·y·N. Volutes and shells are placed
+    WHOLE. A slot takes the variant needing the least scaling.
+  - **Where the bend distorts** (the inside of a turn, compressed by 1 − κy), the spine is relaxed locally, an offset
+    past 0.9 of the radius is held and counted, and a spine the side map jumps across at a convex corner is cut.
+  - **Depth** back / mid / front sets level and priority. A covering part stands ≥ 0.4 mm above what it covers. A
+    hole cuts its element and what is beneath it.
+  - **Placeholders.** These are the forms round's profiles laid out straight, made by
+    `node tools/frame-drawing-template.mjs` (`--check`); `frame-drawn-placeholders.js` is the SVG as a string, and DI
+    holds the two equal. **Nothing has been drawn yet.** The proof sheet (`docs/img/frame-drawn-proof.png`) shows
+    the placeholders reproducing F6.
+  - **Try a drawing:** `node tools/frame-drawn-check.mjs <svg> [--stl <dir>]`; on the page,
+    `__frame.setDrawing(svg)`.
+- **None of it is in CI.** Run `node tools/verify-frame-flow.mjs [--only mass|forms|drawn] [--base <main worktree>]`
+  and `node tools/verify-frame-drawn.mjs [--negative-control]` by hand.
 - **The stock reference photos are never committed.**
 
 ## `/marble` — the paper-marbling simulator (pointer only)

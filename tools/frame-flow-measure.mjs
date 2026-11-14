@@ -73,7 +73,7 @@ export function flowMetrics(m, relief, { RL, FP, print = true } = {}) {
     return { tan: Math.abs(wrap(tc - tp)) * 180 / Math.PI, kap: Math.abs(kc - kp), off: nn.d };
   };
   let composedHand = null;
-  const comp = o.mode === 'composed' || o.mode === 'mass';
+  const comp = o.mode === 'composed' || o.mode === 'mass' || o.mode === 'forms' || o.mode === 'drawn';
   if (comp) {
     // a hand-off is two back-to-back volutes with tangent centrelines: the builder's own measurement of each pair
     // (its least centreline gap, how far the two wires overlap there, the tangent angle there, and whether they join)
@@ -120,7 +120,7 @@ export const MODES = [['rinceau', {}], ['band', { ornFlow: 'band' }], ['contour'
 
 export async function loadTree(root) {
   const imp = (f) => import(pathToFileURL(path.join(root, f)).href);
-  return { G: await imp('frame-geometry.js'), FL: await imp('frame-filigree.js'), RL: await imp('frame-relief.js'), FP: await imp('frame-print.js'), MS: await imp('frame-mass.js').catch(() => null) };
+  return { G: await imp('frame-geometry.js'), FL: await imp('frame-filigree.js'), RL: await imp('frame-relief.js'), FP: await imp('frame-print.js'), MS: await imp('frame-mass.js').catch(() => null), FF: await imp('frame-forms.js').catch(() => null) };
 }
 export function measureCase(T, params, opts = {}) {
   const m = T.FL.withOrnament(T.G.buildFrame({ ...T.G.DEFAULTS, filigree: 'scrolls', ...params }));

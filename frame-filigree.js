@@ -52,7 +52,9 @@ import { placeElement, relift, drapeElement, mirrorElement, symmetrizeElement, w
 import { vineFor, silDistance, drapedCrest, edgeFrame, crestLift, standMotifs } from './frame-vine.js';
 import { flowFor } from './frame-flow.js';   // the flow study's prototype (hidden param ornFlow)
 import { composeFor, frameOf } from './frame-compose.js';
-import { massFor, MASS } from './frame-mass.js';   // the flow study's round 3: the composed contour as carved mass (ornFlow 'mass')   // the flow study's round 2: the composed contour (ornFlow 'composed')
+import { massFor, MASS } from './frame-mass.js';
+import { formsFor } from './frame-forms.js';
+import { drawnFor } from './frame-drawn.js';   // the hand-drawn filigree (ornFlow 'drawn'): drawn SVG elements bent along the composed placements   // the flow study's round 4: the composed placements built from the MEASURED forms (ornFlow 'forms')   // the flow study's round 3: the composed contour as carved mass (ornFlow 'mass')   // the flow study's round 2: the composed contour (ornFlow 'composed')
 import * as FM from './frame-math.js';   // engine-agreed sin/cos/atan/atan2/exp/log/pow (the page builds Node's bytes)
 
 export const SCROLL_STEP_DEG = 3;
@@ -1107,7 +1109,11 @@ export function withOrnament(model, opts = {}) {
   const composed = p.ornLayout !== 'groups' && p.ornFlow === 'composed';   // round 2: the composed contour (frame-compose.js)
   // round 3 (frame-mass.js): the composed spines built as carved MASS — filled regions, unioned, inflated
   const mass = p.ornLayout !== 'groups' && p.ornFlow === 'mass';
-  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : composed ? composeFor(model, opts) : mass ? composeFor({ ...model, params: { ...p, ornLeaves: 'off' } }, { ...opts, rvMul: MASS.rvMul, turnsAdd: MASS.turnsAdd, shellMul: MASS.shellMul }) : flow ? flowFor(model, opts) : vineFor(model, opts);
+  // round 4 (frame-forms.js): the composed PLACEMENTS, each element's outline built from the bronze's measured profiles
+  const forms = p.ornLayout !== 'groups' && p.ornFlow === 'forms';
+  // the hand-drawn filigree (frame-drawn.js): the forms round's placements and relief, each outline a DRAWN one
+  const drawn = p.ornLayout !== 'groups' && p.ornFlow === 'drawn';
+  const orn = p.ornLayout === 'groups' ? ornamentFor(model, opts) : composed ? composeFor(model, opts) : mass ? composeFor({ ...model, params: { ...p, ornLeaves: 'off' } }, { ...opts, rvMul: MASS.rvMul, turnsAdd: MASS.turnsAdd, shellMul: MASS.shellMul }) : forms || drawn ? composeFor({ ...model, params: { ...p, ornLeaves: 'off' } }, opts) : flow ? flowFor(model, opts) : vineFor(model, opts);
   let massTop = null;
   if (mass && orn.flow && orn.flow.side) {
     const ms = massFor(model, orn, frameOf(orn.flow.side));
@@ -1115,6 +1121,23 @@ export function withOrnament(model, opts = {}) {
     orn.spinesKept = orn.curves; orn.curves = [];
     orn.elements = [...orn.elements, ms.element]; massTop = ms.top;
     orn.tris.bound = orn.tris.frame + ms.stats.triangles + orn.motifs.reduce((a, o) => a + (o.onAxis ? 1 : 2) * o.el.indices.length / 3, 0);
+  }
+  if (forms && orn.flow && orn.flow.side) {
+    // the forms carry their own shells (modelled into the mass), so the composition's draped shells are dropped
+    const fs = formsFor(model, orn, frameOf(orn.flow.side));
+    // the composition's own notes (its wires, its draped shells) describe what is not built here
+    orn.told = [...fs.told]; orn.formsStats = fs.stats; orn.massStats = { cell: fs.stats.cell, triangles: fs.stats.triangles, handoffs: [], bodyWidth: null }; orn.mode = 'forms';
+    orn.spinesKept = orn.curves; orn.curves = []; orn.motifs = [];
+    orn.elements = [fs.element]; massTop = fs.top;
+    orn.tris.bound = orn.tris.frame + fs.stats.triangles;
+  }
+  if (drawn && orn.flow && orn.flow.side) {
+    const ds = drawnFor(model, orn, frameOf(orn.flow.side), { drawing: opts.drawing });
+    Object.defineProperty(orn, 'drawnDebug', { value: ds.debug, enumerable: false });   // the gate's (verify-frame-flow.mjs): the parts' cells, the priorities, the heights
+    orn.told = [...ds.told]; orn.drawnStats = ds.stats; orn.massStats = { cell: ds.stats.cell, triangles: ds.stats.triangles, handoffs: [], bodyWidth: null }; orn.mode = 'drawn';
+    orn.spinesKept = orn.curves; orn.curves = []; orn.motifs = [];
+    orn.elements = [ds.element]; massTop = ds.top;
+    orn.tris.bound = orn.tris.frame + ds.stats.triangles;
   }
   const s = orn.scale;
   const shape = p.ornShape === 'round' ? 'round' : p.ornShape === 'half-round' ? 'half-round' : 'arris';
@@ -1154,5 +1177,5 @@ export function withOrnament(model, opts = {}) {
   // THE FLOWER IS THE FEATURE (Eva, Nov 11): the rinceau's motifs raised
   // over the wires as built, crest highest (frame-vine's standMotifs)
   if (orn.layout === 'rinceau' || orn.layout === 'flow') standMotifs(orn, solids, massTop);
-  return { ...model, bands: [...model.bands, ...bands], frameBox: model.box, box: { x0, y0, x1, y1 }, strokes, ornament: { ...orn, spines, solids, shape } };
+  return { ...model, bands: [...model.bands, ...bands], frameBox: model.box, box: { x0, y0, x1, y1 }, strokes, ornament: Object.defineProperty({ ...orn, spines, solids, shape }, 'drawnDebug', { value: orn.drawnDebug, enumerable: false }) };
 }

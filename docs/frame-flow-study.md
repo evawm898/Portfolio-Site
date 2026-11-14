@@ -760,3 +760,314 @@ Notes:
   - FP: the narrowest pierced neck outside the frame ≥ 1 mm;
   - FM: the mass's own vertices mirrored to the bit;
   - FV: coverage within 10 points of 2.webp.
+
+## 11. Round 4 — THE FORMS, built from measured profiles (`frame-forms.js`, `ornFlow: 'forms'`)
+
+Round 3's critics agreed the remaining problem was the FORMS. Bodies built round thin, nearly straight spines read
+as a membrane behind a wire, and volutes read as buttons. Round 4 keeps the composition (`composeFor`'s keypoints:
+the crest, the waist, the high, the swell, the foot), round 3's raster, union, close/open, hierarchy and watertight
+element, and the coverage tool. It replaces how each element's outline is made. **This was the last algorithmic
+round; the bar was a fresh critic's 6.5 (M3's 5.5 plus 1.0).**
+
+### 11.1 The forms were measured first (grammar §9)
+
+Six elements of the bronze oval were traced by eye (`node tools/frame-forms-trace.mjs`, the line art at
+`docs/img/frame-forms-trace.png`). The measurements corrected the brief in three places:
+- **Nothing is a comma ~1 M wide.** The C's are near-constant-width STRAPS (0.45–0.47 M on the shoulder C, 0.3 M on
+  the crest C). Only the flame swells (0.35 → 0.75 M at 60–70 % of its length).
+- **Two curvature laws.** A C is a held ARC (κ·M 0.7–1.0) ramping into its volute (3–8). The straps and flames run
+  nearly STRAIGHT (κ·M ≤ 0.3), then turn all at once.
+- **Three kinds of end.** A VOLUTE (≥ 1 turn, ball eye), a ROLL (near-constant radius round a small hollow) and an
+  open HOOK (≈ 0.6 turn).
+
+And one consequence for print: a ≥ 1-turn volute with a pierced eye and ≥ 1 mm gaps between its coils needs
+1.2–1.4 M of diameter at a 180 mm print. That is about twice the bronze's crest volute (0.55 M), so a small volute
+either merges its coils or is drawn larger than its reference.
+
+### 11.2 The method, as built (`frame-forms.js`'s header has the details)
+
+Each element is drawn as its own outline on the raster, from the profiles:
+- **C-scrolls** (shoulder, crest, corner): a channelled strap (a bead along each edge, a hollow between) on a held
+  arc or E2's run-then-curl, then a log-spiral volute of ≥ 1.1 turns. The coil is pierced from the next turn where
+  both keep ≥ 1 mm; otherwise it merges and is incised. The eye is a BALL concentric in a 1.3 mm ring, held to the
+  coil's end by a 1.1 mm bridge. The shoulder C carries a tail volute and a tongue.
+- **Flames**: four reeded straps from one root, each swelling to its belly, lobed down the outer edge only, their
+  tips rolled outward in open, tightening hooks of different turns. A pierced SLIT along the midline between each
+  pair makes each flame its own body.
+- **The stem and the foot**: reeded straps. The stem springs from the foot, follows the molding with a slight bow,
+  and rolls outward at the node, just under the flames' root. The foot pours from under the bottom shell and curls
+  into a tightening spiral with a tapered lip.
+- **Node motifs by place**: a fan of leaflets at the meeting, a lobed sheath at the flames' root, a curl-under leaf
+  where the stem leaves the foot.
+- **Shells**: a cupped fan with broad lobes touching at a scalloped rim, deep flutes and a rim bead.
+- **Depth**: each element rises along its length, low where it leaves its parent and highest at its end. A level per
+  kind puts the flames over the stem, the C's over the flames, and the coils and the shells highest.
+
+The base the forms stand on is the molding's own height carried out on a cone, eased at its foot and blurred. Round
+4's first renders showed a straight scratch across every element that crossed the molding's outer edge, and that
+was where it came from.
+
+### 11.3 The rounds (a FRESH critic each, who saw only the sheet, the references and the grammar)
+
+| round | what changed | oval | rect | arch | overall | E1 | E2 | E3 | E4 | E5 | E6 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| F1 | the forms as first built (each element from its profile) | 5.5 | 4 | 5 | **5.0** | 4 | 3 | 3 | 3 | 3 | 5 |
+| F2 | one chain per side (foot → stem → node → flames), rolls in depth, reeds dying out before the curl, ball eyes; the base's scratch removed | 6.5 | 5 | 4.5 | **5.5** | 6 | 3 | 2 | 4 | 4 | 4 |
+| F3 | separate flames (a pierced slit between each pair), the foot a narrowing spiral, the crest C on E2's run-then-curl, no bottom C, deeper flutes, a bowed stem | 6 | 4 | 5 | **5.5** | 5 | 4 | 2 | 2 | 3 | 4 |
+| F4 | no closed rings: open, tightening, reeded hooks; the foot an open spiral; the stem close to the band; deeper C channels | 6.5 | 4.5 | 5.5 | **5.8** | 4 | 4 | 5 | 6 | 5 | 4 |
+| F5 | depth along each element (low root, high end), the flames over the stem, swelling flames | 6 | 4.5 | 6.5 | **6.0** | 3 | 5 | 4 | 5 | 5 | 4 |
+| F6 | the shoulder C on E1's held arc (no tail volute), handing its volute to the crest C; one dominant flame; the stem fused under the flames' root; the near-slits closed | 6 | 5 | 6.5 | **6.0** | 4 | 3.5 | 4 | 4.5 | 5 | 3 |
+
+M3 read 5.5 to every critic of every round. Coverage of the zone (§10.2's instrument; the bronze 59.3 %):
+
+| | F1 | F2 | F3 | F4 | F5 | F6 (kept) |
+|---|---|---|---|---|---|---|
+| oval | 58.6 % | 61.8 % | 62.0 % | 60.3 % | 60.2 % | 56.1 % |
+| rectangle | 47.6 % | 53.7 % | 52.6 % | 51.8 % | 51.9 % | 51.8 % |
+| arch | 45.4 % | 46.7 % | 60.2 % | 64.2 % | 64.2 % | 59.2 % |
+
+**Stopped after F6**: the brief's ~6 rounds, and F6 added nothing over F5 (6.0 both). **The kept state is F6**, the
+same score as F5 with every gate clause passing and the better rectangle. `docs/img/frame-flow-f6.png` is its sheet
+without the reference crops (the photographs are stock and never committed). Every critique, condensed:
+- **F1:** islands with gaps; flat planar spirals; reeds running into the eye like fingerprints; the flank flames one
+  paddle with a row of hooks; the crest C's ring handles; a needle artefact across the shoulder C's eye.
+- **F2:** the flank flames fused into one reeded wing; the foot a bagel; the arch's lower ornament floating; the lower
+  stem a straight bar; the crest C's kidney pads with drill holes; the shell flat.
+- **F3:** every end a doughnut (a constant-section torus); islands; the bowed stem a bucket handle; the rectangle's
+  shoulder C a blob; the flames a feather duster; no channels.
+- **F4:** every element a cookie-cutter extrusion (one plateau); the flames a comb of parallel hooks; no corner source
+  on the rectangle; the flank's hand-off broken.
+- **F5:** islands, not one flow; the shoulder C a doughnut; the flames repeat; the foot loops sideways rather than
+  under; no relief hierarchy; the shell a flat fan on a plinth.
+- **F6:** every element an extruded slab with grooves cut into it; the shell a flat half-sun on a shelf; the volutes
+  pigtails in oversized holes; the oval flank a sliver plus a trident; the stems ribbon cables; the rectangle's corners
+  bare.
+
+Two of the critics' requests pulled against each other between rounds, which is worth knowing before another
+algorithmic round is bought: F2 asked for the stem to bow off the band and F3 read the bow as a bucket handle;
+F1 asked for the reeds to die out before the curl and F3 asked for them to carry into it.
+
+### 11.4 Did measured forms beat carved mass?
+
+**No — not by the bar.** The kept state reads 6.0 against M3's 5.5, half a point, where the bar was a full point
+(6.5). What changed is real, and every critic from F2 on said so: the web-behind-a-wire is gone, the elements can be
+named (a shell, a C-scroll, a flame, a foot), the oval's silhouette has the bronze's envelope, and the arch read best
+of anything built (6.5 twice). What did not change across six rounds is the same verdict in different words —
+*islands*, *an extrusion*, *stamped sheet*, *appliqués glued to a ring*. Two causes, both structural:
+- **The relief is a height field over a plan.** Every element is an outline raised to a profile, so nothing can
+  roll forward OVER itself, be undercut, or lie over a neighbour; the depth rounds (F5) bought a slope, not a layer.
+  The bronze's carving is exactly the thing a height field cannot hold.
+- **Every element is a parametric stand-in for a drawn form.** Each was fitted to the measured profile in one or two
+  numbers (a curvature law, a width profile, a turn), and the per-element scores stayed between 3 and 6 whatever was
+  tuned: the measured profile constrains a centreline and a width, and the critics scored the OUTLINE — where a lobe
+  steps, where a strap thickens into its volute, how a shell's lobe turns over — which no profile records.
+
+**Recommendation: (b), the hand-drawn route.** **[Nov 14: RULED (b) by Eva; the pipeline and the drawing template are §12.]** Eva draws SVG outlines of the scroll bodies, the leaf flames and the
+volutes (and the shell), and the generator bends and places them along the composed flow, which this round shows
+works: the placements, the chain, the depth hierarchy, the coverage and every print clause are already here.
+
+### 11.5 Measurements
+
+`node tools/verify-frame-flow.mjs --only forms`, the kept state, 180 mm (EXPORT):
+
+| | oval | rectangle | arch | rectangle at 300 mm |
+|---|---|---|---|---|
+| fill / attachment | 56.1 % / 86.4 % | 51.8 % / 77.0 % | 59.2 % / 83.7 % | 50.5 % / 71.9 % |
+| narrowest solid feature (raster) | 3.40 mm | 1.24 mm | 1.40 mm | 2.60 mm |
+| narrowest pierced neck outside the frame | 1.00 mm | 1.00 mm | 1.40 mm | 1.00 mm |
+| C volutes: turns · eye (FE's figure) | 1.10 / 1.20 · 3.12 / 2.56 mm | 1.20 / 1.30 / 1.42 · 2.57 / 2.44 / 2.33 mm | 1.10 / 1.20 / 1.30 · 2.62 / 2.55 / 2.44 mm | four C's, 2.33–2.60 mm |
+| triangles (of the 1.5 M budget) | 1,016,028 (67.7 %) | 941,856 (62.8 %) | 762,796 (50.9 %) | 495,436 (33.0 %) |
+| boundary edges · voxel regions | 0 · 1 | 0 · 1 | 0 · 1 | 0 · 1 |
+
+Every clause passes on all four rows (FW, FC, FT, FB, FP, FM, FV, FE, FD, FR), and FF0: with `ornFlow` absent the
+STL and SVG are `main`'s to the byte. **Build time is 14–21 s a frame in Node**, round 3's order, so this too is a
+study and not an interactive layout. The forms are ~1.5× M3's triangles, all inside the budget.
+
+### 11.6 Options for Eva
+
+- **(a) Ship the forms as a layout choice.** Not recommended. It is the best-scoring algorithmic layout (6.0, the
+  arch 6.5) and it prints clean, but it misses the bar, it reads as appliqués, and it costs 14–21 s a rebuild.
+- **(b) The hand-drawn vocabulary next — recommended.** Eva draws the outlines (two or three C-scroll bodies, a leaf
+  flame, a volute, a shell) as SVG; the generator reads each as a closed outline with a spine, bends it along the
+  composed flow (the spine mapped onto the side's frame), sizes it from the measured lengths, and stacks the drawn
+  pieces at the depth levels this round built. Reusable as they stand: `composeFor`'s placements and keypoints, the
+  raster, union and close/open, the depth hierarchy, the watertight element, the coverage tool, every gate clause
+  (FW…FR) and the sheet tool. What changes is only where an outline comes from.
+- **(c) Another algorithmic round.** Not recommended: the bar was not nearly met (6.0 against 6.5), the last two
+  rounds were flat, and the critics' remaining complaint — layering and rolled-over carving — is the height field's
+  limit, not a parameter.
+
+### 11.7 Decisions made alone (round 4)
+
+- **The brief's "comma ~1 M wide" was not built**: the measurements (grammar §9) say the bronze's bodies are straps
+  of near-constant width and only the flame swells, so the outlines follow the measurements.
+- **Volutes are drawn larger than the reference's.** A ≥ 1-turn volute with a pierced eye and ≥ 1 mm gaps between
+  coils needs 1.2–1.4 M; the bronze's crest volute is 0.55 M. The print rule won.
+- **The eye is a ball concentric in a 1.3 mm ring, joined to the coil's end by a 1.1 mm bridge.** A ball touching the
+  coil left the ring tapering to a sub-millimetre wedge (FP); a ball pierced through its centre read as two dots.
+- **The flames are separated by pierced slits** (1.5 mm, or 2.4 raster cells at a larger print) cut along the
+  midline between each pair, where both keep ≥ 1 mm beside the slit.
+- **No bottom C.** The foot's strap is what pours from under the bottom shell; a C there collided with the foot's
+  curl in every version tried.
+- **No crest C where the crest-to-waist run is under 2.2 M** (the rectangle's short top): it clotted with the
+  shoulder C round one hole.
+- **A cramped corner's flames run past it** only where the corner turns less than 45° (the arch's springing);
+  a rectangle's corner keeps its bundle, or the flames wrapped round it.
+- **The inner flame is capped at 4.5 M** from the high, so a long side gets long flames without wrapping a corner.
+- **The molding's height is sampled over the whole band, eased at its foot and blurred** (σ 1.6 mm): the round-3
+  strip (1.4 M from the edge) left a straight scratch across every element lying further in.
+- **A last close after the open** fills a one-cell notch the open can leave; a close only fills.
+- **The critic's prompt grew one sentence per round** naming what had changed (hand-offs, depth), so each fresh
+  critic knew what the round claimed; the scoring question and M3's anchor (5.5) never changed.
+- **Stopped at six rounds** (the brief's ~6), F6 level with F5.
+
+### 11.8 Reproduce (round 4)
+
+- `node tools/frame-forms-trace.mjs [--json] [--png <file>] [--refs <dir>]`: the traced elements and their profiles.
+- `node tools/shot-frame-forms.mjs <dir> --round <n> [--refs <dir>] [--png <file>]`: the sheet (M3 beside the forms,
+  close-ups, and with `--refs` the reference crops and the element pairs).
+- `node tools/frame-mass-coverage.mjs --modes mass,forms`: coverage.
+- `node tools/verify-frame-flow.mjs --only forms [--base <wt>]`: the gate's forms rows. They carry:
+  - FW, FC, FT, FB;
+  - FP: no near-slit outside the frame;
+  - FM: mirrored to the bit;
+  - FV: coverage within 10 points of 2.webp;
+  - FE: every C volute ≥ 1.1 turns round a pierced eye;
+  - FD: node motifs differ in kind by place;
+  - FR: no two elements of one kind share a shape.
+
+## 12. The hand-drawn filigree: the importer and the drawing template (`ornFlow: 'drawn'`, Nov 14)
+
+**Eva ruled option (b) of §11.6.** She draws the elements as SVG. The generator bends each drawing along the composed
+flow, sizes it to its placement, stacks it at a depth, and builds the relief exactly as the forms round does.
+This session built that pipeline and the template to draw into. **Nothing has been drawn yet**: every frame below is
+built from PLACEHOLDERS, made from the forms round's own outlines, so the pipeline runs end to end today. A
+placeholder is the forms round's profile laid out straight in the element's own frame.
+
+The person drawing reads **`docs/frame-drawing-guide.md`** (the contract, one page) and draws into
+**`docs/frame-drawing-template.svg`**.
+
+### 12.1 The pipeline, as built
+
+- **The placements are the forms round's own.** `formsFor(…, { slotsOnly: true })` runs the round-4 assembly and
+  records each SLOT in the side's local frame: its spine, its width, and the centre its end curls round. The slots
+  are the crest and bottom shells, the crest, shoulder and corner C's, the flank flames, the stem, the foot, the fan,
+  the sheath and the curl-under. The record is read, never acted on, so the forms build is byte-identical. The forms
+  STL hashes were checked before and after the refactor on four rows.
+- **The relief is the forms round's own.** The back end was extracted from `formsFor` as `reliefFromOwners` (union,
+  close, open, holes, heights, the watertight element) and the grid as `ownersGrid`. Both builds call them.
+- **The importer** (`frame-svg-import.js`) reads one SVG and needs no DOM, so it runs in Node and on the page:
+  - each element is a group named `<kind>-<n>`, with role layers (`outline[-back|-mid|-front]`, `detail`, `groove`,
+    `holes`, `guides`);
+  - the frame comes from the `root` guide (origin, +x along, y UP), the units from the `ruler` guide (1 mm at
+    180 mm), and the fit from the `size` box;
+  - it reports open paths, self-crossings, holes under the floor, pieces closer than the floor, and a hole drawn in
+    `outline`.
+- **The placement** (`frame-drawn.js`):
+  - **Choice of variant:** each slot takes the variant of its kind that needs the least scaling, counting the
+    stretch along and the scale across.
+  - **Bodies are BENT** by the skeletal map (S(sx·x) + sy·y·N; §12.2).
+  - **Ends (volutes) are placed WHOLE** at their body's end, along its end tangent, curling to the slot's own side,
+    scaled so their entry width is the body's end width.
+  - **The shells are placed whole** on the axis.
+  - **Depth:** each outline part has a depth (back / mid / front, or its kind's default), which sets its level and
+    its priority. Where a part covers a lower one, its level is held at least `DRAWN.stack` (0.4 mm) above that
+    part's own height there.
+  - **Holes** cut their element and what lies beneath it.
+  - **Lines:** detail lines become ridges and groove lines grooves.
+- **Fills use nonzero winding**, so a fold can never punch a hole.
+
+### 12.2 The warp, and where it distorts
+
+The skeletal map keeps exactly the arc length along the spine and the offset across it. On a straight spine it is a
+rigid map, and on a circle it is (R − sy·y)·(cos, sin)(sx·x / R): W1 and W2 check both.
+
+What distorts is the material on the INSIDE of a turn, compressed along the spine by (1 − κ·y); the outside is
+stretched by (1 + κ·y). Three defences apply, in order, and every placement reports what each did:
+
+1. **The spine is RELAXED** where it turns tighter than the drawing is wide there: the drawing's reach on the turn's
+   inside, near that station, may reach `DRAWN.relax` (0.8) of the radius. A Laplacian step is applied on the
+   offending stations only, with both ends held. On the placeholders this relaxed:
+   - the oval's middle and dominant flames (6 and 24 passes) and its foot;
+   - the foot on every frame.
+2. **An offset still past `DRAWN.fold` (0.9) of the radius is HELD there** and counted. It is 0 on every placeholder
+   build.
+3. **A spine the side's map JUMPS across** (a point offset outward at a convex corner lands on the next side, about
+   15 mm in one step) is cut there, and the longer piece kept. The rectangle's fan leaf did this. The forms round's
+   capsules had bridged the jump; a bent drawing folded across it.
+
+Anisotropy (sx/sy) runs 0.63–1.25 on the placeholders. It is printed per placement and is what drives the variant
+choice.
+
+### 12.3 The proof: the placeholders reproduce F6
+
+`docs/img/frame-drawn-proof.png` (`node tools/shot-frame-drawn.mjs <dir> --png …`) shows:
+- the three frames from the placeholders beside F6;
+- the PLAN of where every drawing lands, coloured by depth;
+- close-ups;
+- the template itself.
+
+Measured at the default 180 mm print (EXPORT relief, the sheet's `metrics.json` and the flow gate):
+
+| frame | fill of the zone (F6 → drawn; the bronze 59.3 %) | attached (F6 → drawn) | plan agreement (IoU of the solid cells) | triangles (F6 → drawn) | narrowest solid feature (F6 → drawn) |
+|---|---|---|---|---|---|
+| oval | 56.1 % → 57.5 % | 86.4 % → 84.7 % | 82.3 % | 1,016,028 → 1,034,712 | 3.40 → 1.50 mm |
+| rect | 51.8 % → 49.7 % | 77.0 % → 75.5 % | 81.5 % | 941,856 → 941,816 | 1.24 → 1.24 mm |
+| arch | 59.2 % → 60.7 % | 83.7 % → 79.9 % | 75.0 % | 762,796 → 813,924 | 1.40 → 1.24 mm |
+
+Every drawn row is one region, watertight, inside the 1.5 M budget (69.0 / 62.8 / 54.3 %), and above the 1 mm floor.
+The narrowest pierced neck is 1.80 / 1.00 / 1.00 mm. The arch's lower agreement is the volutes: they are larger
+and stand clear of F6's.
+
+The drawn volutes are larger than F6's: the placeholder closed curl uses the forms round's GROWN coil radius (0.7 M),
+because at the ungrown radius its first inner coil pinched the entry to 2.8 mm. The template's foot curl and the
+stem's node are likewise one drawing each where F6 drew each from its own numbers. The plan agreement says what the
+eye sees: the same composition, with the same elements in the same places, and the same print readings.
+
+### 12.4 The gates (none in CI, as before)
+
+- **`node tools/verify-frame-flow.mjs --only drawn [--base <main worktree>]`** runs the drawn rows (oval, rect, arch,
+  rect at 300 mm). They carry the forms round's relief clauses (FW, FC, FT, FB, FP, FM, FV) and the drawn ones:
+  - **DI** the drawing imports with no error or warning, and the generator's copy is the template, to the byte;
+  - **DP** every slot is placed, and every body with an end has its volute;
+  - **DW** the bend folds nothing: every bent outline is still a simple ring, and 0 points are held;
+  - **DL** a part declared deeper owns the cells it shares;
+  - **DD** a part over a lower one stands a step above it, on the LEVEL field the relief is built from;
+  - **DE** every volute curls to its slot's own side;
+  - **DH** every drawn hole is open.
+
+  DD is not read on the finished relief: there it is confounded by a thin coil's edge rounding and a back leaf's own
+  midrib (it read −0.16 mm on a pair the level field stacks by exactly 0.4).
+- **`node tools/verify-frame-drawn.mjs`** has two families:
+  - the importer on written-down SVGs: the frame and the units (I1), the four errors (I2–I5), Illustrator and
+    Inkscape names (I6), transforms (I7), every path command (I8), the template (I9);
+  - the bend on spines with closed-form images (W1–W3).
+
+  **`--negative-control`** runs twelve mutants in copies (every anchor checked first), each reddening exactly what it
+  names, across this file's checks and the flow gate's rectangle row. One mutant's collateral (depth collapsed shuts
+  a hole: DH) is allowed and named.
+- **`node tools/frame-drawing-template.mjs --check`**: the template and the generator's copy are fresh.
+- **`node tools/frame-drawn-check.mjs <drawing.svg> [--stl <dir>]`**: the drawing's report and the three frames.
+
+### 12.5 Decisions made alone
+
+- **Bodies are drawn STRAIGHTENED and the composition supplies the curve.** The alternative, drawing the curve and
+  placing it whole, is available per element (the `rigid` guide), but then the drawing no longer follows the flow.
+- **Ends are separate drawings, placed whole.** Bending a spiral along a spine folds it, so a C-scroll is a `c-scroll`
+  body plus a `volute` end.
+- **Each slot takes the variant needing the least scaling** (both axes), not a fixed assignment. This keeps the
+  stretch near 1.
+- **The fallbacks:** a `leaf` kind (optional) was added for the fan, the sheath and the curl-under. It is not in the
+  brief's list; missing, those slots take a flame. The S-scrolls fill the stem slots.
+- **A part standing inside a hole must be one depth in front** (holes cut their own element and what is beneath). So
+  the closed volute's band defaults to mid and its ball is drawn at the front.
+- **Stacking is enforced, not just ordered:** a covering part's level is held 0.4 mm above what it covers. Without
+  that, a front flame rooted low (its rise along its length) sat 0.2–0.5 mm BELOW the back leaf it covers.
+- **Units come from the ruler**, so the file may be drawn at any scale; the template uses 10 units per mm.
+
+### 12.6 Reproduce (§12)
+
+- `node tools/frame-drawing-template.mjs [--check]`: the template and `frame-drawn-placeholders.js`.
+- `node tools/frame-drawn-check.mjs [<drawing.svg>] [--stl <dir>]`: try a drawing.
+- `node tools/shot-frame-drawn.mjs <dir> [--drawing <svg>] [--png <file>]`: the proof sheet.
+- `node tools/verify-frame-drawn.mjs [--negative-control]` and `node tools/verify-frame-flow.mjs --only drawn [--base <wt>]`.
