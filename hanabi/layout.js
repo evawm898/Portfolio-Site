@@ -11,6 +11,8 @@
 import { cardGeom, suitById } from './deck.js';
 import { SYMBOLS, DIGITS, DIGIT_BOX, TOKEN_GLYPHS } from './symbols.js';
 import { fireworkSpec, fireworkSpecAt, renderFirework, renderTier, defaultSpec, FIELD_MOTIFS } from './firework.js';
+// Style 2's card-level helpers (version 8)
+import { discsFirst, paperGrain } from './style2.js';
 
 const f = (v) => +v.toFixed(3);
 
@@ -371,13 +373,13 @@ function centreArt(design, suit, rank, g, ix, bursts = null) {
     const slot = a.h / 5;
     const r = Math.min(slot * 0.46, (a.w - 2 * k.w) * 0.42);
     const top = cy - (rank * slot) / 2;
-    let art = '';
-    for (let i = 0; i < rank; i++) { push(one, cx, top + slot * (i + 0.5), r); art += renderFirework({ ...one, seed: one.seed + i * 7919 }, { cx, cy: top + slot * (i + 0.5), r }); }
-    return art;
+    const art = [];
+    for (let i = 0; i < rank; i++) { push(one, cx, top + slot * (i + 0.5), r); art.push(renderFirework({ ...one, seed: one.seed + i * 7919 }, { cx, cy: top + slot * (i + 0.5), r })); }
+    return discsFirst(art);
   }
   if (compose === 'count' || compose === 'countscale') {
     const ar = cellArrangement(design, suit.id, rank);
-    return countArt(design, suit, rank, countPlacement(fieldArea(a, k), ar.items, ar.fitted, pipGrid(design, ix)), bursts).join('');
+    return discsFirst(countArt(design, suit, rank, countPlacement(fieldArea(a, k), ar.items, ar.fitted, pipGrid(design, ix)), bursts));
   }
   const sp = scaleBurst(design, suit, rank, g, ix, spec);
   const p = sp.place;
@@ -614,6 +616,8 @@ export function backgroundArt(design, g, bursts, rank, p) {
     defs += `<linearGradient id="${p}hz" gradientUnits="userSpaceOnUse" x1="0" y1="${f(y0)}" x2="0" y2="${f(A.y + A.h)}"><stop offset="0" stop-color="${hc}" stop-opacity="0"/><stop offset="1" stop-color="${hc}" stop-opacity="${f(0.45 * b.horizon)}"/></linearGradient>`;
     ground += `<rect class="hb-horizon" x="${f(A.x)}" y="${f(y0)}" width="${f(A.w)}" height="${f(A.h * 0.4)}" fill="url(#${p}hz)"/>`;
   }
+  // the paper grain (version 8): a faint speckle over the ground, the deck's own
+  if (b.grain > 0) ground += paperGrain(b.grain, A, b.smoke.seed);
   const grads = new Set();
   const grad = (kind, c, stops) => {
     const id = `${p}${kind}${c.slice(1)}`;

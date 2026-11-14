@@ -91,6 +91,20 @@
          and renders byte-identically; a new design with both off is the version-6 default to the byte
      H39 greyscale: every mark of every suit's rank 5 against the ground composited under it (restated) at
          3:1 or better, the smoke costing at most a tenth of it (HANABI_REPORT=1 prints the table)
+     H40 the style switcher (version 8): a new design opens in Line with the balanced Style 2 blend RESTATED;
+         Paper & Thread redraws every card and no back or token; every Style 2 spec is the Style 1 spec plus
+         its style; Line -> Paper & Thread -> Line (and through the file) is every Style 1 face byte for byte
+     H41 a version-7 design (BASE7, 7ae2ba4, read from git) opens in Line with no note and renders byte-identically
+     H42 Style 2 draws every type and motif well-formed and inside its box; every type and counted motif draws
+         exactly its count (min, default, max; Detail 0-2; Count and Scale; every preset) — counted off the
+         main elements' data-m tags against the RESTATED tables; the catalogue's escalation; the dressed motifs
+         no wider than their Style 1 drawing; the tier; discs before marks; the shapes and Mixing dials
+     H43 Style 2 is a pure function of its spec (no clock; two renders one drawing; another seed another)
+     H44 the presets RESTATED; each round-trips through the file; a suit's own subset reaches its row only and
+         round-trips; bad values told; Charcoal paper and its grain
+     H45 the nine silhouettes stay apart in Style 2 (discs and glows aside), the blend and every preset
+     H46 Style 2 in greyscale: ranks 1 and 5 of every suit tell apart; every main mark against the composited
+         ground and its disc at 3:1 or better (HANABI_REPORT=1 prints the table, disc on and off)
    PART TWO — Chromium, the real page (cdnjs served from node_modules, fonts blocked)
      B1  the page loads with no page error, grayscale and guides toggles act on the stage
      B2  the Centres view renders the viewed suit under each of the five compositions
@@ -123,6 +137,10 @@
          rasterised at the export's size, at poker and mini, its white border pure white; the board's
          thumbnail carries the same haze (B3 prints one PDF with the 3 mm border and one without)
 
+     B15 the style switcher (top right; lossless both ways), Style 2's dials deck-wide and for one suit (marked,
+         handed back), a preset chip, reset, Charcoal paper; the exported Style 2 red 5 equal pixel for pixel to
+         the preview's, the board's thumbnail the same fireworks, at poker and mini; the Style 2 PDF at both
+
    --negative-control re-runs against deliberately broken copies (of the modules, or of the
    page script for what only the board shows); each must fail the check that names it.
    A mutant may name `mayAlso`: collateral it is allowed but not required to redden (the clock mutant
@@ -146,7 +164,7 @@ const KEEP = ARGS.includes('--keep') ? ARGS[ARGS.indexOf('--keep') + 1] : null; 
 const ONLY = (ARGS.find((x) => x.startsWith('--mutant=')) || '').slice(9).split(',').filter(Boolean);   // a subset, said as one
 const DESIGN = ARGS.includes('--design') ? ARGS[ARGS.indexOf('--design') + 1] : null;   // the greyscale report on a saved design
 
-const MODULES = ['deck.js', 'symbols.js', 'firework.js', 'layout.js', 'export.js'];
+const MODULES = ['deck.js', 'symbols.js', 'firework.js', 'layout.js', 'export.js', 'style2.js'];
 
 const MUTANTS = [
   { id: 'distribution-wrong', file: 'deck.js', from: "COPIES = { 1: 3, 2: 2, 3: 2, 4: 2, 5: 1 }", to: "COPIES = { 1: 3, 2: 2, 3: 2, 4: 2, 5: 2 }", breaks: ['H1'] },
@@ -285,6 +303,23 @@ const MUTANTS = [
   { id: 'export-draws-another-haze', file: 'export.js', from: "cache.set(key, await svgToCanvas(renderFace(design, c, { px }), px.w, px.h));", to: "cache.set(key, await svgToCanvas(renderFace({ ...design, background: { ...design.background, smoke: { ...design.background.smoke, seed: design.background.smoke.seed + 1 } } }, c, { px }), px.w, px.h));", breaks: ['B14'] },
   { id: 'master-toggle-dead', file: '../hanabi.js', from: "bindValue('bgOn', () => design.background.on, (v) => { design.background.on = v; }, 'change'),", to: "bindValue('bgOn', () => design.background.on, () => {}, 'change'),", breaks: ['B14'] },
   { id: 'rounded-preview-not-passed', file: '../hanabi.js', from: "{ guides: view.guides, round: view.round, idPrefix: `p${uid++}` }), `${suit.name}", to: "{ guides: view.guides, idPrefix: `p${uid++}` }), `${suit.name}", breaks: ['B13'] },
+  // version 8: styles (H40-H46, B15)
+  { id: 'line-draws-paper', file: 'firework.js', from: "if (!st || st === 'line' || !STYLE_SPECS[st]) return spec;", to: "if (!STYLE_SPECS[st]) return { ...spec, style: 'paper', paper: STYLE_SPECS.paper(design, suit) };", breaks: ['H40', 'H41'], mayAlso: ['H3', 'H4', 'H11', 'H13', 'H14', 'H15', 'H16', 'H17', 'H18', 'H22', 'H23', 'H24', 'H25', 'H26', 'H27', 'H28', 'H29', 'H30', 'H31', 'H32', 'H33', 'H34', 'H35', 'H36', 'H37', 'H38', 'H39', 'H2', 'H12', 'H20', 'B2', 'B5', 'B7', 'B9', 'B11', 'B12', 'B13', 'B14', 'B15'] },
+  { id: 'new-designs-open-in-paper', file: 'deck.js', from: "    style: 'line',\n", to: "    style: 'paper',\n", breaks: ['H40', 'H41'], mayAlso: ['H3', 'H4', 'H11', 'H13', 'H14', 'H15', 'H16', 'H17', 'H18', 'H22', 'H23', 'H24', 'H25', 'H26', 'H27', 'H28', 'H29', 'H30', 'H31', 'H32', 'H33', 'H34', 'H35', 'H36', 'H37', 'H38', 'H39', 'H2', 'H12', 'H20', 'H43', 'H44', 'B2', 'B5', 'B7', 'B9', 'B11', 'B12', 'B13', 'B14', 'B15'] },
+  { id: 'style2-fit-drops-main-marks', file: 'style2.js', from: "if (K.items[i].det && reachOf(K.items[i], cx, cy) > R + 1e-9) K.items.splice(i, 1);", to: "if (reachOf(K.items[i], cx, cy) > R * 0.96) K.items.splice(i, 1);", breaks: ['H42'], mayAlso: ['H45', 'H46', 'H43', 'H44'] },
+  { id: 'style2-reads-the-clock', file: 'style2.js', from: "  const rnd = rng((seed ^ 0x5bd1e995) >>> 0);", to: "  const rnd = rng((Math.random() * 4e9) >>> 0);", breaks: ['H40', 'H43', 'H44'], mayAlso: ['H42', 'H45', 'H46', 'B15'] },
+  { id: 'thread-preset-drifts', file: 'style2.js', from: "values: { disc: false, discOpacity: 0.35, discSize: 1.15, discTone: 'dark', grain: 0, wobble: 0.85,", to: "values: { disc: false, discOpacity: 0.35, discSize: 1.15, discTone: 'dark', grain: 0, wobble: 0.6,", breaks: ['H44', 'B15'] },
+  { id: 'suit-style2-ignored', file: 'style2.js', from: "...((suit && suit.style2) || {}) };", to: "};", breaks: ['H44', 'B15'] },
+  { id: 'paper-grain-not-drawn', file: 'layout.js', from: "if (b.grain > 0) ground += paperGrain(b.grain, A, b.smoke.seed);", to: ";", breaks: ['H44', 'B15'] },
+  { id: 'tier-stays-in-line', file: 'firework.js', from: "  if (spec.style && STYLE_TIERS[spec.style]) return STYLE_TIERS[spec.style](spec, rect);", to: "", breaks: ['H42'] },
+  { id: 'style2-not-fitted', file: 'style2.js', from: "  const sc = reach > R ? R / reach : 1;", to: "  const sc = 1;", breaks: ['H42'], mayAlso: ['H45', 'H46'] },
+  { id: 'disc-too-light', file: 'style2.js', from: "return P.discTone === 'dark' ? mix(base, '#000000', 0.7)", to: "return P.discTone === 'dark' ? mix(base, '#000000', 0.2)", breaks: ['H46'] },
+  { id: 'discs-drawn-with-their-firework', file: 'layout.js', from: "return discsFirst(countArt(design, suit, rank,", to: "return ((a) => a.join(''))(countArt(design, suit, rank,", breaks: ['H42'], mayAlso: ['H17', 'H22', 'H26', 'H29', 'H30', 'H31', 'H32', 'H34', 'H36', 'H37', 'H38', 'H39', 'H15', 'H23', 'H25', 'H27', 'H40', 'H41', 'H43', 'H44', 'H46', 'B5', 'B7', 'B9', 'B11', 'B12', 'B13', 'B14', 'B15', 'H18', 'H2', 'H33', 'H35', 'H28', 'H10', 'H14', 'H20', 'H24', 'B2', 'B3', 'B4', 'B1', 'B8', 'B10', 'H11', 'H16', 'H21', 'H3', 'H4', 'H5', 'H12', 'H13', 'H19'] },
+  { id: 'mixing-ignored', file: 'style2.js', from: "const groupMixes = (g, m) => (g === 0 ? m >= 0.9 : (((g - 1) * 0.6180339887) % 1) < m);", to: "const groupMixes = () => false;", breaks: ['H42'], mayAlso: ['H44', 'H45', 'H46'] },
+  { id: 'shapes-list-ignored', file: 'style2.js', from: "  const prim = allowed.includes(primary) ? primary : allowed[0];", to: "  const prim = primary;", breaks: ['H42'], mayAlso: ['H44', 'H45', 'H46', 'B15'] },
+  { id: 'style2-not-read-from-the-file', file: 'deck.js', from: "  if (raw.style2 !== undefined) d.style2 = readPaper(raw.style2, (m) => notes.push(m));", to: "", breaks: ['H44'] },
+  { id: 'switcher-dead', file: '../hanabi.js', from: "  design.style = b.dataset.style; changed();", to: "  changed();", breaks: ['B15'] },
+  { id: 'suit-dial-writes-the-deck', file: '../hanabi.js', from: "  if (s2target === 'deck') design.style2[k] = v;", to: "  if (true) design.style2[k] = v;", breaks: ['B15'] },
 ];
 
 // The catalogue motifs: every motif that is neither a firework type nor phase 1's.
@@ -303,11 +338,14 @@ const BASE4 = 'd8286f1';
 const BASE5 = '5771675';
 // The polish pass as it shipped (#552; schema version 6): H38's reference.
 const BASE6 = 'c7d4ba6';
+// The background and the white border as they shipped (#554; schema version 7): H41's reference.
+const BASE7 = '7ae2ba4';
 const baseDirs = {};
 async function baseModules(commit = BASE) {
   if (baseDirs[commit]) return baseDirs[commit];
   const dir = baseDirs[commit] = fs.mkdtempSync(path.join(os.tmpdir(), 'hanabi-base-'));
-  for (const f of MODULES) fs.writeFileSync(path.join(dir, f), execFileSync('git', ['-C', REPO, 'show', `${commit}:hanabi/${f}`]));
+  // a module the commit predates (style2.js, version 8) is simply not there
+  for (const f of MODULES) { try { fs.writeFileSync(path.join(dir, f), execFileSync('git', ['-C', REPO, 'show', `${commit}:hanabi/${f}`], { stdio: ['ignore', 'pipe', 'ignore'] })); } catch { /* not in this commit */ } }
   return dir;
 }
 
@@ -1245,7 +1283,7 @@ async function partOne(dir) {
       if (!notes.length) return 'the hand-set peony count and Detail were not migrated (no note)';
       // and it reads as the base read it, but for the count keys version 5 rewrites
       // (and version 6's and 7's new fields, which the old schema had none of: H32 and H38 hold their reading)
-      const strip = (x) => JSON.stringify(x, (k, v) => (['count', 'density', 'legacy', 'version', 'stems', 'pips', 'frame', 'border', 'background'].includes(k) ? undefined : v));
+      const strip = (x) => JSON.stringify(x, (k, v) => (['count', 'density', 'legacy', 'version', 'stems', 'pips', 'frame', 'border', 'background', 'style', 'style2'].includes(k) ? undefined : v));
       if (strip(design) !== strip(bd.normaliseDesign(file, S.SYMBOL_IDS).design)) return 'the version-3 file reads differently here';
       for (const c of D.deckCards(design)) {
         n++;
@@ -1654,7 +1692,7 @@ async function partOne(dir) {
 
   // ---- H36-H39: version 7 — the face background and the white print border. Every
   // number here is RESTATED from Eva's choices (Nov 11), never read from the module.
-  const BG_WANT = { on: true, sky: { on: true, top: '#0B1530', bottom: '#020409' }, horizon: 0.55, glow: 0.25, smoke: { amount: 0.1, drift: 1, lit: 1, color: '#9AA3B4', rank: true } };
+  const BG_WANT = { on: true, sky: { on: true, top: '#0B1530', bottom: '#020409' }, horizon: 0.55, glow: 0.25, grain: 0, smoke: { amount: 0.1, drift: 1, lit: 1, color: '#9AA3B4', rank: true } };
   const SKY_WANT = { night: ['#0B1530', '#020409'], petrol: ['#0E3236', '#030809'], indigo: ['#1E1F55', '#05050F'], ink: ['#101317', '#07090B'] };
   const rgbR = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
   const hexR = (c) => '#' + c.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('').toUpperCase();
@@ -1678,7 +1716,7 @@ async function partOne(dir) {
     for (const [k, [t, bt]] of Object.entries(SKY_WANT)) if (!D.SKY_PRESETS[k] || D.SKY_PRESETS[k].top !== t || D.SKY_PRESETS[k].bottom !== bt) return `sky preset ${k} is not ${t} -> ${bt}`;
     // every field round-trips; out of range is clamped; a bad seed is told
     const e = D.defaultDesign(); e.border = 1.75;
-    e.background = { on: false, sky: { on: false, top: '#123456', bottom: '#654321' }, horizon: 0.3, glow: 0.8, smoke: { amount: 0.42, drift: 2.7, lit: 0.35, color: '#ABCDEF', rank: false, seed: 987654321 } };
+    e.background = { on: false, sky: { on: false, top: '#123456', bottom: '#654321' }, horizon: 0.3, glow: 0.8, grain: 0.45, smoke: { amount: 0.42, drift: 2.7, lit: 0.35, color: '#ABCDEF', rank: false, seed: 987654321 } };
     const back = D.normaliseDesign(JSON.parse(D.serialiseDesign(e)), S.SYMBOL_IDS);
     if (back.notes.length) return `a version-7 file read with notes: ${back.notes.join('; ')}`;
     if (JSON.stringify(back.design.background) !== JSON.stringify(e.background) || back.design.border !== 1.75) return `the background did not round-trip: ${JSON.stringify(back.design.background)}, border ${back.design.border}`;
@@ -1873,6 +1911,327 @@ async function partOne(dir) {
     if (process.env.HANABI_REPORT) console.log('H39 worst mark contrast, rank 5: ' + report.join('; '));
     return true;
   });
+
+  // ================================================================ STYLES (version 8)
+  // Style 2, "Paper & Thread" (hanabi/style2.js): a second renderer over the one spec.
+  const S2 = await imp('style2.js');
+  // Style 2's s2Balanced blend and its three presets, RESTATED (Eva rules on them from the sheet)
+  const ALL_SHAPES = ['dot', 'star', 'diamond', 'teardrop', 'petal', 'confetti'];
+  const PAPER_WANT = { disc: true, discOpacity: 0.5, discSize: 1.1, discTone: 'dark', grain: 0.35, wobble: 0.4, stitch: 0.3, weight: 1, shapes: ALL_SHAPES, mix: 0.5, glow: 0.4 };
+  const PRESET_WANT = {
+    flat:   { disc: false, discOpacity: 0.35, discSize: 1.15, discTone: 'light', grain: 0, wobble: 0, stitch: 0, weight: 1, shapes: ALL_SHAPES, mix: 1, glow: 0 },
+    paper:  { disc: true, discOpacity: 0.85, discSize: 1.3, discTone: 'dark', grain: 0.7, wobble: 0.1, stitch: 0, weight: 0.9, shapes: ['dot', 'teardrop', 'petal'], mix: 0.3, glow: 0.8 },
+    thread: { disc: false, discOpacity: 0.35, discSize: 1.15, discTone: 'dark', grain: 0, wobble: 0.85, stitch: 0.75, weight: 1.3, shapes: ['dot', 'teardrop', 'petal', 'confetti'], mix: 0.35, glow: 0 },
+  };
+  const s2Spec = (sp, settings) => ({ ...sp, style: 'paper', paper: { ...PAPER_WANT, ...settings, suitColors: [sp.colors[0], sp.colors[1] || sp.colors[0]] } });
+  // a firework's marks: its hb-firework group (the disc and the glow are not marks)
+  const s2Marks = (svg) => svg.split('<g class="hb-firework"').slice(1).map((g) => g.slice(0, g.indexOf('</g>'))).join('');
+  const s2Strip = (svg) => svg.replace(/<g class="hb-disc">[\s\S]*?<\/g>/g, '').replace(/<g class="hb-glow2">[\s\S]*?<\/g>/g, '');
+  // the main elements: every node carries data-m="i"; the count is the number of indices,
+  // and they must run 0..N-1 with no gap (a dropped element leaves one)
+  const s2Mains = (svg) => {
+    const ix = [...s2Marks(svg).matchAll(/data-m="(\d+)"/g)].map((m) => +m[1]);
+    const u = [...new Set(ix)].sort((a, b) => a - b);
+    return u.every((v, i) => v === i) ? u.length : NaN;
+  };
+  // every point a Style 2 mark puts down (circles with their radius, path vertices; Style 2's
+  // paths are M/L/Z polygons by contract and the gate refuses anything else)
+  const s2Points = (body) => {
+    const out = [];
+    for (const m of body.matchAll(/<circle cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)"/g)) out.push([+m[1], +m[2], +m[3]]);
+    for (const m of body.matchAll(/<path d="([^"]+)"([^>]*)>/g)) {
+      if (/[^MLZ\d\s.\-]/.test(m[1])) throw new Error(`a Style 2 path command other than M/L/Z: ${m[1].slice(0, 40)}`);
+      const sw = /stroke-width="([\d.]+)"/.exec(m[2]), pad = sw ? +sw[1] / 2 : 0, n = (m[1].match(/-?[\d.]+/g) || []).map(Number);
+      for (let i = 0; i + 1 < n.length; i += 2) out.push([n[i], n[i + 1], pad]);
+    }
+    return out;
+  };
+  const s2Balanced = (svg) => (svg.match(/<g\b/g) || []).length === (svg.match(/<\/g>/g) || []).length;
+  const s2Rich = () => {
+    const d = D.defaultDesign(); d.rainbow = true;
+    d.suits.find((x) => x.id === 'yellow').centre.compose = 'scale';
+    d.suits.find((x) => x.id === 'green').centre = { compose: 'column', motif: 'spoke', tier: 'none' };
+    d.suits.find((x) => x.id === 'white').centre = { compose: 'scale', motif: 'teardrop', tier: 'rosettes' };
+    d.suits.find((x) => x.id === 'red').firework = { count: 30, starSize: 1.4 };
+    d.fireworks = { blue: { 3: { trail: 0.4, items: [{ x: 0.2, y: 0.25, s: 0.8, rot: 10, n: 2 }, { x: 0.65, y: 0.5, s: 0.6, rot: 0, n: 0 }, { x: 0.45, y: 0.85, s: 0.9, rot: -30, n: 1 }] } }, yellow: { 2: { place: { x: 0.4, y: 0.6, s: 1.2, rot: 15 } } } };
+    D.setFireworkStyle(d, 'red', 4, 2, 'motif', 'crossette');
+    d.arrangements = { 5: [{ x: 0.2, y: 0.2, s: 0.5, rot: 0 }, { x: 0.8, y: 0.2, s: 0.5, rot: 0 }, { x: 0.5, y: 0.5, s: 0.7, rot: 30 }, { x: 0.2, y: 0.8, s: 0.5, rot: 0 }, { x: 0.8, y: 0.8, s: 0.5, rot: 0 }] };
+    d.scene.on = true;
+    return d;
+  };
+  const s2Faces = (d) => [...D.deckCards(d).filter((c, i, a) => a.findIndex((x) => x.kind === c.kind && x.suitId === c.suitId && x.rank === c.rank) === i).map((c) => L.renderFace(d, c, { idPrefix: 'x' })), L.renderBack(d), L.renderFace(d, { kind: 'clue' }), L.renderFace(d, { kind: 'fuse' })];
+
+  check('H40', 'the style switcher: Line -> Paper & Thread -> Line gives Style 1 back byte for byte; nothing Eva designed moves; the defaults and the file', () => {
+    const d = s2Rich();
+    if (d.style !== 'line') return `a new design opens in style ${d.style} (want line)`;
+    if (JSON.stringify(d.style2) !== JSON.stringify(PAPER_WANT)) return `the default Style 2 blend is ${JSON.stringify(d.style2)}`;
+    const line = s2Faces(d), keep = JSON.stringify({ ...d, style: undefined });
+    d.style = 'paper';
+    const paper = s2Faces(d);
+    const kinds = [...D.deckCards(d).filter((c, i, a) => a.findIndex((x) => x.kind === c.kind && x.suitId === c.suitId && x.rank === c.rank) === i).map((c) => c.kind), 'back', 'clue', 'fuse'];
+    const moved = paper.filter((s, i) => s !== line[i]).length, cards = kinds.filter((k) => k === 'card').length;
+    if (paper.some((s, i) => kinds[i] !== 'card' && s !== line[i])) return 'a back or token changed with the style';
+    if (moved !== cards) return `${moved} of ${cards} card faces drew differently in Style 2 (every card must)`;
+    // every spec is the Style 1 spec plus its style: nothing Eva designed is re-read
+    for (const s of D.activeSuits(d)) for (const r of D.RANKS) {
+      const a = F.fireworkSpec({ ...d, style: 'line' }, s, r), b = F.fireworkSpec(d, s, r);
+      const { style, paper: pp, ...rest } = b;
+      if (style !== 'paper' || !pp || JSON.stringify(rest) !== JSON.stringify(a)) return `${s.id} ${r}: the Style 2 spec is not the Style 1 spec plus its style`;
+      for (const n of [0, 1, 2]) {
+        const a2 = F.fireworkSpecAt({ ...d, style: 'line' }, s, r, n), b2 = F.fireworkSpecAt(d, s, r, n);
+        const { style: _s, paper: _p, ...rest2 } = b2;
+        if (JSON.stringify(rest2) !== JSON.stringify(a2)) return `${s.id} ${r} firework ${n}: a per-firework style differs between the styles`;
+      }
+    }
+    if (JSON.stringify({ ...d, style: undefined }) !== keep) return 'switching the style wrote into the design';
+    // through the file in Paper & Thread, then back to Line
+    const back = D.normaliseDesign(JSON.parse(D.serialiseDesign(d)), S.SYMBOL_IDS);
+    if (back.notes.length) return `a version-8 file read with notes: ${back.notes.join('; ')}`;
+    if (back.design.style !== 'paper' || s2Faces(back.design).some((s, i) => s !== paper[i])) return 'a Paper & Thread design did not round-trip through its file';
+    back.design.style = 'line';
+    const again = s2Faces(back.design);
+    const off = again.findIndex((s, i) => s !== line[i]);
+    if (off >= 0) return `Line -> Paper & Thread -> Line: face ${off} is not the Style 1 face it was`;
+    // an unknown style is told and Line kept
+    const bad = D.normaliseDesign({ ...JSON.parse(D.serialiseDesign(d)), style: 'watercolour' }, S.SYMBOL_IDS);
+    if (bad.design.style !== 'line' || !bad.notes.some((x) => /unknown style/.test(x))) return 'an unknown style was not refused and told';
+    return true;
+  });
+
+  // ---- H41: a version-7 design (BASE7, 7ae2ba4, read from git) opens in Style 1 with no note and renders byte-identically
+  await checkAsync('H41', 'a version-7 design (7ae2ba4) opens in Style 1, with no note, and renders byte-identically', async () => {
+    const base = await baseModules(BASE7), bimp = (m) => import(pathToFileURL(path.join(base, m)).href + `?t=${Date.now()}`);
+    const bd = await bimp('deck.js'), bl = await bimp('layout.js'), bs = await bimp('symbols.js');
+    let n = 0;
+    for (const [preset, w, h] of [['poker', 63.5, 88.9], ['mini', 44, 63]]) for (const v of ['default', 'rich', 'plain']) {
+      const d = bd.defaultDesign(); d.size = { preset, w, h };
+      if (v !== 'default') { d.rainbow = true; d.suits.find((x) => x.id === 'yellow').centre.compose = 'scale'; d.suits.find((x) => x.id === 'white').centre = { compose: 'scale', motif: 'teardrop', tier: 'rosettes' }; d.suits.find((x) => x.id === 'red').firework = { count: 30 }; }
+      if (v === 'plain') { d.border = 0; d.background.on = false; d.face.frame = 'inner'; }
+      if (v === 'rich') d.background.smoke.amount = 0.4;
+      const file = JSON.parse(bd.serialiseDesign(d));
+      if (file.version !== 7) return `the base wrote version ${file.version}`;
+      const { design, notes } = D.normaliseDesign(file, S.SYMBOL_IDS);
+      if (notes.length) return `a version-7 file read with notes: ${notes.join('; ')}`;
+      if (design.style !== 'line' || design.background.grain !== 0) return 'a version-7 file did not open in Style 1 with no grain';
+      const ref = bd.normaliseDesign(file, bs.SYMBOL_IDS).design;
+      const cards = [...D.deckCards(design), { kind: 'clue' }, { kind: 'fuse' }];
+      for (const c of cards) { n++; if (L.renderFace(design, c, { idPrefix: 'x' }) !== bl.renderFace(ref, c, { idPrefix: 'x' })) return `${preset} ${v}: ${c.suitId || c.kind} ${c.rank || ''} differs from 7ae2ba4`; }
+      if (L.renderBack(design) !== bl.renderBack(ref)) return `${preset} ${v}: the back differs`;
+      for (const r of D.RANKS) if (L.renderFace(design, { kind: 'card', suitId: 'red', rank: r }, { centreOnly: true, idPrefix: 'b' }) !== bl.renderFace(ref, { kind: 'card', suitId: 'red', rank: r }, { centreOnly: true, idPrefix: 'b' })) return `${preset} ${v}: the board thumbnail of red ${r} differs`;
+    }
+    // a new design (Style 1, no grain) is 7ae2ba4's default face to the byte
+    const nd = D.defaultDesign(), bd0 = bd.defaultDesign();
+    for (const c of D.deckCards(nd)) { n++; if (L.renderFace(nd, c, { idPrefix: 'x' }) !== bl.renderFace(bd0, c, { idPrefix: 'x' })) return `the new default ${c.suitId} ${c.rank} differs from 7ae2ba4's`; }
+    return n > 200 || `only ${n} faces compared`;
+  });
+
+  check('H42', 'Style 2 draws every type and motif: well-formed, inside its box, and every type and counted motif draws exactly its count at its min, default and max', () => {
+    const box = { cx: 40, cy: 40, r: 26 };
+    let n = 0;
+    const inside = (svg, what, rect = null) => {
+      for (const [x, y, pad] of s2Points(s2Marks(svg))) {
+        if (rect) { if (x - pad < rect.x - 2e-3 || x + pad > rect.x + rect.w + 2e-3 || y - pad < rect.y - 2e-3 || y + pad > rect.y + rect.h + 2e-3) return `${what}: a mark at ${x.toFixed(2)},${y.toFixed(2)} leaves its rect`; }
+        else if (Math.hypot(x - box.cx, y - box.cy) + pad > box.r + 2e-3) return `${what}: a mark reaches ${(Math.hypot(x - box.cx, y - box.cy) + pad).toFixed(3)} past r ${box.r}`;
+      }
+      return null;
+    };
+    for (const t of F.TYPE_IDS) {
+      const [, lo, dflt, hi] = COUNT_TABLE[t];
+      for (const v of [lo, dflt, hi]) for (const den of [0, 1, 2]) for (const [comp, rank] of [['count', 2], ['scale', 5]]) for (const set of [{}, PRESET_WANT.flat, PRESET_WANT.paper, PRESET_WANT.thread]) {
+        const sp = s2Spec({ ...F.defaultSpec({ id: `p${n % 7}`, primary: '#E5484D', secondary: '#F2C230' }, rank, [], t, 'none', comp), count: v, density: den, rotation: (n % 5) * 25 }, set);
+        const svg = F.renderFirework(sp, box); n++;
+        if (!s2Balanced(svg) || !/data-style="paper"/.test(svg)) return `${t}: not a well-formed Style 2 drawing`;
+        const got = s2Mains(svg);
+        if (got !== v) return `${t} count ${v}, detail ${den}, ${comp} ${rank}, ${JSON.stringify(set).slice(0, 30)}: drew ${got} ${COUNT_TABLE[t][0].toLowerCase()}`;
+        const out = inside(svg, `${t} ${v}`); if (out) return out;
+      }
+    }
+    for (const m of Object.keys(CAT_TABLE)) {
+      const [, lo, dflt, hi] = CAT_TABLE[m], field = F.FIELD_MOTIFS.includes(m), rect = { x: 14, y: 10, w: 52, h: 64 };
+      for (const v of [lo, dflt, hi]) for (const set of [{}, PRESET_WANT.flat, PRESET_WANT.thread]) {
+        const sp = s2Spec({ ...F.defaultSpec({ id: 'q', primary: '#3E8EF0', secondary: '#9BD3F7' }, 5, [], m, 'none', 'count'), count: v }, set);
+        const b = field ? { ...box, rect } : box, svg = F.renderFirework(sp, b); n++;
+        if (s2Mains(svg) !== v) return `${m} count ${v}: drew ${s2Mains(svg)}`;
+        const out = inside(svg, `${m} ${v}`, field ? rect : null); if (out) return out;
+      }
+      // under Scale the lower ranks draw the catalogue's own escalation
+      for (const r of D.RANKS) {
+        const sp = s2Spec(F.defaultSpec({ id: 'q', primary: '#3E8EF0', secondary: '#9BD3F7' }, r, [], m, 'none', 'scale'), {});
+        const svg = F.renderFirework(sp, field ? { ...box, rect } : box); n++;
+        if (s2Mains(svg) !== CAT_ESC[m][r - 1]) return `${m} Scale rank ${r}: drew ${s2Mains(svg)}, the catalogue escalates to ${CAT_ESC[m][r - 1]}`;
+      }
+    }
+    // every other motif (the catalogue and phase 1, dressed) is drawn, well-formed, in Style 2
+    for (const m of F.MOTIF_IDS.filter((x) => !F.TYPE_IDS.includes(x) && !CAT_TABLE[x])) for (const r of [1, 5]) {
+      const sp = s2Spec(F.defaultSpec({ id: 'q', primary: '#F2C230', secondary: '#FFF0A8' }, r, [], m, 'none', 'scale'), {});
+      const svg = F.renderFirework(sp, box), s1 = F.renderFirework({ ...sp, style: undefined, paper: undefined }, box); n++;
+      if (!s2Balanced(svg) || !/data-style="paper"/.test(svg) || s2Points(s2Marks(svg)).length < 5) return `${m} ${r}: no Style 2 drawing`;
+      // its reach is no further than the Style 1 drawing it dresses
+      const reach = (body) => Math.max(...s2Points(body).map(([x, y, p]) => Math.hypot(x - box.cx, y - box.cy) + p));
+      const r1 = Math.max(...[...s2Marks(s1).matchAll(/<circle cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)"/g)].map((q) => Math.hypot(q[1] - box.cx, q[2] - box.cy) + +q[3]), ...[...s2Marks(s1).matchAll(/x2="([-\d.]+)" y2="([-\d.]+)"/g)].map((q) => Math.hypot(q[1] - box.cx, q[2] - box.cy)), box.r * 0.5);
+      if (reach(s2Marks(svg)) > Math.max(box.r, r1 * 1.25) + 1e-3) return `${m} ${r}: Style 2 reaches ${reach(s2Marks(svg)).toFixed(2)} where Style 1 reaches ${r1.toFixed(2)}`;
+    }
+    // the tier under a Scale burst is Style 2 too, inside its rect
+    const d = D.defaultDesign(); d.style = 'paper';
+    const w = d.suits.find((x) => x.id === 'white'); w.centre = { compose: 'scale', motif: 'peony', tier: 'rosettes' };
+    const t5 = L.renderFace(d, { kind: 'card', suitId: 'white', rank: 5 });
+    if (!/<g class="hb-tier" data-tier="rosettes" data-style="paper">/.test(t5)) return 'the second tier is not drawn in Style 2';
+    // on a card of several fireworks every disc is drawn before any firework's marks, so a
+    // disc never covers another firework's stars (discs overlap discs)
+    const red4 = L.renderFace(d, { kind: 'card', suitId: 'red', rank: 4 });
+    const lastDisc = red4.lastIndexOf('<g class="hb-disc">'), firstMark = red4.indexOf('<g class="hb-firework"');
+    if ((red4.match(/<g class="hb-disc">/g) || []).length !== 4 || !(lastDisc < firstMark)) return 'a Count card\'s discs are not all drawn under every firework';
+    // the shapes allowed are the shapes drawn; Mixing 0 is one shape a firework, 1 mixes the rings
+    const shapesOf = (svg) => {
+      const out = new Set();
+      for (const m of s2Marks(svg).matchAll(/<(circle|path)\b[^>]*data-m="\d+"[^>]*\/>/g)) out.add(m[1] === 'circle' ? 'dot' : `poly${(m[0].match(/ L/g) || []).length}`);
+      return out;
+    };
+    const pe = (set) => F.renderFirework(s2Spec(F.defaultSpec({ id: 'k', primary: '#E5484D', secondary: '#F2C230' }, 5, [], 'peony', 'none', 'count'), set), box);
+    if ([...shapesOf(pe({ shapes: ['dot'], mix: 1 }))].join() !== 'dot') return 'shapes: dots only still drew another shape';
+    if (shapesOf(pe({ shapes: ['star'], mix: 1 })).has('dot')) return 'shapes: stars only still drew a dot';
+    if (shapesOf(pe({ mix: 0.5 })).size < 2) return `Mixing 0.5 drew one shape in a peony of ${F.starPlan('peony', 43, 1).length} rings`;
+    if (shapesOf(pe({ mix: 0 })).size !== 1) return `Mixing 0 drew ${shapesOf(pe({ mix: 0 })).size} shapes in one peony`;
+    if (shapesOf(pe({ mix: 1 })).size < 3) return `Mixing 1 drew ${shapesOf(pe({ mix: 1 })).size} shapes in one peony`;
+    return n > 700 || `only ${n} drawn`;
+  });
+
+  check('H43', 'Style 2 is a pure function of its spec: no clock, no Math.random; the same card twice is one drawing; another seed another', () => {
+    const src = fs.readFileSync(path.join(dir, 'style2.js'), 'utf8').replace(/\/\/.*$/gm, '');
+    if (/Math\.random|Date\.now|new Date|performance\.now/.test(src)) return 'style2.js reads the clock or Math.random';
+    const d = s2Rich(); d.style = 'paper';
+    for (const c of D.deckCards(d)) {
+      const a = L.renderFace(d, c, { idPrefix: 'x' }), b = L.renderFace(JSON.parse(JSON.stringify(d)), c, { idPrefix: 'x' });
+      if (a !== b) return `${c.suitId} ${c.rank}: two renders differ`;
+    }
+    for (const t of F.TYPE_IDS) {
+      const s1 = s2Spec(F.defaultSpec({ id: 'a', primary: '#E5484D', secondary: '#F2C230' }, 5, [], t, 'none', 'count'), {});
+      if (F.renderFirework(s1, { cx: 40, cy: 40, r: 26 }) === F.renderFirework({ ...s1, seed: s1.seed + 7919 }, { cx: 40, cy: 40, r: 26 })) return `${t}: another seed drew the same`;
+    }
+    return true;
+  });
+
+  check('H44', 'Style 2 settings: the s2Balanced blend and the three presets restated, each round-trips through the file deck-wide and per suit, a suit overrides the deck, bad values told', () => {
+    for (const [k, want] of Object.entries(PRESET_WANT)) if (!S2.PAPER_PRESETS[k] || JSON.stringify(S2.PAPER_PRESETS[k].values) !== JSON.stringify(want)) return `preset ${k} is ${JSON.stringify(S2.PAPER_PRESETS[k] && S2.PAPER_PRESETS[k].values)}`;
+    if (Object.keys(S2.PAPER_PRESETS).join() !== 'flat,paper,thread') return `the presets are ${Object.keys(S2.PAPER_PRESETS)}`;
+    const faces = (d) => D.activeSuits(d).flatMap((s) => D.RANKS.map((r) => L.renderFace(d, { kind: 'card', suitId: s.id, rank: r }, { idPrefix: 'x' })));
+    const seen = new Set();
+    for (const [k, v] of Object.entries(PRESET_WANT)) {
+      const d = s2Rich(); d.style = 'paper'; d.style2 = JSON.parse(JSON.stringify(v));
+      const before = faces(d), back = D.normaliseDesign(JSON.parse(D.serialiseDesign(d)), S.SYMBOL_IDS);
+      if (back.notes.length) return `${k}: read with notes ${back.notes.join('; ')}`;
+      if (JSON.stringify(back.design.style2) !== JSON.stringify(v)) return `${k}: the settings did not round-trip`;
+      if (faces(back.design).some((s, i) => s !== before[i])) return `${k}: a face changed through the file`;
+      seen.add(before.join(''));
+    }
+    if (seen.size !== 3) return 'two presets draw the same deck';
+    // a suit's own subset overrides the deck, reaches its row only, and round-trips
+    const d = s2Rich(); d.style = 'paper';
+    const ref = faces(d), red = d.suits.find((x) => x.id === 'red');
+    red.style2 = { wobble: 1, disc: false };
+    const own = faces(d), suits = D.activeSuits(d).map((s) => s.id);
+    for (const [i, s] of own.entries()) { const sid = suits[Math.floor(i / 5)]; if ((s !== ref[i]) !== (sid === 'red')) return `${sid} ${i % 5 + 1}: a red-only setting ${sid === 'red' ? 'did not reach' : 'reached'} it`; }
+    if (/hb-disc/.test(L.renderFace(d, { kind: 'card', suitId: 'red', rank: 3 }))) return 'the red suit\'s own disc: off did not hold';
+    const rb = D.normaliseDesign(JSON.parse(D.serialiseDesign(d)), S.SYMBOL_IDS);
+    if (JSON.stringify(rb.design.suits.find((x) => x.id === 'red').style2) !== JSON.stringify({ wobble: 1, disc: false }) || rb.notes.length) return 'a suit\'s own settings did not round-trip';
+    // bad values are told and dropped; out of range clamped
+    const raw = JSON.parse(D.serialiseDesign(d));
+    raw.style2 = { ...raw.style2, wobble: 7, discTone: 'plaid', shapes: ['hexagon'], glow: 'lots' };
+    const bad = D.normaliseDesign(raw, S.SYMBOL_IDS);
+    if (bad.design.style2.wobble !== 1) return `wobble 7 read as ${bad.design.style2.wobble}`;
+    if (bad.notes.length !== 3 || bad.design.style2.discTone !== PAPER_WANT.discTone || JSON.stringify(bad.design.style2.shapes) !== JSON.stringify(ALL_SHAPES)) return `bad values: ${bad.notes.join('; ')}`;
+    // Charcoal paper: a flat #1F2023 ground with a faint grain, drawn only when asked
+    const cp = D.SKY_PRESETS.charcoal;
+    if (!cp || cp.top !== '#1F2023' || cp.bottom !== '#1F2023' || !(cp.grain > 0)) return 'no Charcoal paper preset';
+    const g = D.defaultDesign(); g.background.sky.top = g.background.sky.bottom = cp.top; g.background.grain = cp.grain;
+    const gs = L.renderFace(g, { kind: 'card', suitId: 'red', rank: 1 }, { idPrefix: 'x' });
+    if (!/<g class="hb-grain">/.test(gs) || gs.indexOf('hb-grain') > gs.indexOf('hb-firework')) return 'the paper grain is not drawn on the ground under the fireworks';
+    g.background.grain = 0; if (/hb-grain/.test(L.renderFace(g, { kind: 'card', suitId: 'red', rank: 1 }, { idPrefix: 'x' }))) return 'grain 0 still draws a grain';
+    return true;
+  });
+
+  check('H45', 'Style 2 keeps the nine silhouettes: every type nearer its own centroid than any other by 1.25 (discs and glow aside), under the default blend and every preset', () => {
+    const box = { cx: 40, cy: 40, r: 26 }, N = 12;
+    for (const set of [{}, PRESET_WANT.flat, PRESET_WANT.paper, PRESET_WANT.thread]) {
+      const desc = {};
+      for (const t of F.TYPE_IDS) desc[t] = [...Array(N)].map((_, k) => describe(raster(s2Strip(F.renderFirework(s2Spec(F.defaultSpec({ id: `q${k}`, primary: '#E5484D', secondary: '#9FB4C8' }, 1 + (k % 5), [], t, 'none', 'count'), set), box)), box)));
+      const cen = (arr, skip) => { const a = arr.filter((_, i) => i !== skip); return a[0].map((_, j) => a.reduce((x, v) => x + v[j], 0) / a.length); };
+      const cens = Object.fromEntries(F.TYPE_IDS.map((t) => [t, cen(desc[t], -1)]));
+      let worst = Infinity, at = '';
+      for (const t of F.TYPE_IDS) desc[t].forEach((v, i) => {
+        const own = sdist(v, cen(desc[t], i));
+        for (const u of F.TYPE_IDS) if (u !== t) { const m = sdist(v, cens[u]) / Math.max(own, 1e-3); if (m < worst) { worst = m; at = `${t} seed ${i} vs ${u}`; } }
+      });
+      if (!(worst >= 1.25)) return `${JSON.stringify(set).slice(0, 24)}: ${at}: margin ${worst.toFixed(2)} (want >= 1.25)`;
+    }
+    return true;
+  });
+
+  check('H46', 'Style 2 in greyscale: every suit\'s rank 1 and 5 tell apart from the others, and each mark stands off the ground and its disc (worst contrast reported, disc on and off)', () => {
+    const lerpC = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+    const over = (dst, col, al) => lerpC(dst, rgbR(col), Math.max(0, Math.min(1, al)));
+    const report = [];
+    const d = D.defaultDesign(); d.rainbow = true; d.style = 'paper';
+    // tell apart: each card's fireworks as silhouettes (H28's description), the threshold
+    // measured from Style 2's own types (two draws of one type), never typed
+    const look = (dd, s, r) => {
+      const count = D.COUNT_MODES.includes(s.centre.compose);
+      const items = count ? L.placementFor(dd, s, r).items : [{ n: 0, rot: 0 }];
+      const ds = items.map((it) => { const sp = count ? F.fireworkSpecAt(dd, s, r, it.n) : F.fireworkSpec(dd, s, r); return describe(raster(s2Strip(F.renderFirework({ ...sp, seed: sp.seed + it.n * 7919, rotation: (+sp.rotation || 0) + it.rot }, LBOX)), LBOX)); });
+      return ds[0].map((_, j) => ds.reduce((a, v) => a + v[j], 0) / ds.length);
+    };
+    const spread = F.TYPE_IDS.map((t) => {
+      const ds = [...Array(12)].map((_, k) => describe(raster(s2Strip(F.renderFirework(s2Spec(F.defaultSpec({ id: `q${k}`, primary: '#E5484D', secondary: '#9FB4C8' }, 1 + (k % 5), [], t, 'none', 'count'), {}), LBOX)), LBOX)));
+      const c = ds[0].map((_, j) => ds.reduce((a, v) => a + v[j], 0) / ds.length);
+      return Math.max(...ds.map((v) => sdist(v, c)));
+    }).sort((a, b) => a - b);
+    const likenessS2 = 2 * spread[Math.floor(spread.length / 2)];
+    for (const r of [1, 5]) {
+      const suits = D.activeSuits(d), looks = suits.map((s) => look(d, s, r));
+      for (let i = 0; i < suits.length; i++) for (let j = i + 1; j < suits.length; j++) {
+        const x = sdist(looks[i], looks[j]);
+        if (x < likenessS2) return `${suits[i].id} and ${suits[j].id} rank ${r} draw alike in greyscale in Style 2 (${x.toFixed(3)} < ${likenessS2.toFixed(3)})`;
+      }
+    }
+    // stand off: every opaque mark against the ground composited under it — the sky, the
+    // horizon, the burst glows, the smoke and (disc on) every disc
+    const A = artR(d);
+    for (const s of D.activeSuits(d)) {
+      const row = {};
+      for (const disc of [true, false]) {
+        const dd = JSON.parse(JSON.stringify(d)); dd.style2.disc = disc;
+        let worst = Infinity;
+        for (const rank of [1, 5]) {
+          const svg = L.renderFace(dd, { kind: 'card', suitId: s.id, rank }, { idPrefix: 'x' });
+          const gl = glowsOf(svg), el = ellipsesOf(svg);
+          const discs = [...svg.matchAll(/<g class="hb-disc"><circle cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)" fill="(#[0-9A-F]{6})" fill-opacity="([\d.]+)"\/>/g)].map((m) => ({ cx: +m[1], cy: +m[2], r: +m[3], col: m[4], op: +m[5] }));
+          if (disc !== (discs.length > 0)) return `${s.id} ${rank}: disc ${disc ? 'on draws none' : 'off still draws one'}`;
+          const ground = (x, y) => {
+            let c = lerpC(rgbR(BG_WANT.sky.top), rgbR(BG_WANT.sky.bottom), Math.min(1, Math.max(0, (y - A.y) / A.h)));
+            const y0 = A.y + 0.6 * A.h;
+            if (y > y0) c = over(c, mixR(BG_WANT.sky.bottom, '#8F96C0', 0.55), 0.45 * 0.55 * (y - y0) / (0.4 * A.h));
+            for (const q of gl) { const t = Math.hypot(x - q.cx, y - q.cy) / q.r; if (t < 1) c = over(c, q.col, q.op * (1 - t)); }
+            for (const p of el) { const t = Math.hypot((x - p.cx) / p.rx, (y - p.cy) / p.ry); if (t < 1) c = over(c, p.col, p.op * (t < 0.55 ? 1 - 0.5 * t / 0.55 : 0.5 * (1 - (t - 0.55) / 0.45))); }
+            for (const q of discs) if (Math.hypot(x - q.cx, y - q.cy) <= q.r) c = over(c, q.col, q.op);
+            return hexR(c);
+          };
+          for (const m of s2Marks(svg).matchAll(/<(circle|path)\b([^>]*)\/>/g)) {
+            const at = m[2]; if (!/data-m=/.test(at)) continue;   // the main elements: the count's own marks
+            const col = (/(?:fill|stroke)="(#[0-9A-Fa-f]{6})"/.exec(at) || [])[1], op = +((/(?:fill-|stroke-)opacity="([\d.]+)"/.exec(at) || [])[1] ?? 1);
+            if (!col || op < 0.8) continue;
+            const p = m[1] === 'circle' ? /cx="([-\d.]+)" cy="([-\d.]+)"/.exec(at) : /d="M([-\d.]+) ([-\d.]+)/.exec(at);
+            worst = Math.min(worst, L.contrast(col.toUpperCase(), ground(+p[1], +p[2])));
+          }
+        }
+        row[disc] = worst;
+      }
+      report.push(`${s.id} ${row.true.toFixed(2)} (no disc ${row.false.toFixed(2)})`);
+      if (!(row.true >= 3)) return `${s.id}: a main mark at ${row.true.toFixed(2)}:1 against its disc and ground (below 3) — ${report.join(', ')}`;
+    }
+    if (process.env.HANABI_REPORT) console.log('H46 Style 2, worst main-mark contrast, ranks 1 and 5, poker: ' + report.join('; '));
+    return true;
+  });
+
 
   return res;
 }
@@ -2435,6 +2794,94 @@ async function partTwo(overrides = {}) {
         if (cmp.diff) return `${preset}: the export's red 5 differs from the preview's in ${cmp.diff} of ${cmp.n} channel values`;
         if (cmp.whites.some((c) => c.some((v) => v !== 255)) || cmp.inside.every((v) => v > 120)) return `${preset}: the exported border is ${JSON.stringify(cmp.whites)}, inside ${cmp.inside}`;
         if (!cmp.hazeSame) return `${preset}: the board's thumbnail does not carry the preview's haze`;
+      }
+      await page.evaluate(() => { const el = document.getElementById('sizePreset'); el.value = 'poker'; el.dispatchEvent(new Event('change')); });
+      return true;
+    });
+
+    // ---- B15: the style switcher and Style 2's dials in the real page; preview = board = export
+    // pixel for pixel in Style 2 (its randomness seeded), at poker and mini; and the PDF in Style 2.
+    await check('B15', 'the style switcher (Line <-> Paper & Thread, lossless) and Style 2\'s dials, deck-wide and per suit, presets; preview = board = export pixel for pixel; the PDF at poker and mini', async () => {
+      await page.reload(); await page.waitForFunction(() => window.__hanabi);
+      await page.evaluate(() => document.getElementById('resetDesign').click());
+      await page.evaluate(() => { document.querySelector('[data-view="suit"]').click(); const s = document.getElementById('viewSuit'); s.value = 'red'; s.dispatchEvent(new Event('change')); if (document.getElementById('roundCorners').checked) document.getElementById('roundCorners').click(); if (document.getElementById('guides').checked) document.getElementById('guides').click(); document.getElementById('sec-style2').open = true; });
+      const card = (i) => page.evaluate((i) => document.querySelectorAll('#stage .hb-card svg')[i].outerHTML.replace(/ id="p\d+/g, ' id="p').replace(/#p\d+/g, '#p'), i);
+      const seg = () => page.evaluate(() => [...document.querySelectorAll('#styleSeg [aria-checked="true"]')].map((b) => b.dataset.style).join());
+      // top right of the page, Line by default
+      const where = await page.evaluate(() => { const r = document.getElementById('styleSeg').getBoundingClientRect(); return { right: innerWidth - r.right, top: r.top }; });
+      if (where.right > 60 || where.top > 80) return `the switcher is not at the top right (${JSON.stringify(where)})`;
+      if (await seg() !== 'line') return `a new design opens in ${await seg()}`;
+      const line5 = await card(4);
+      await page.click('[data-style="paper"]');
+      const paper5 = await card(4);
+      if (await seg() !== 'paper' || await page.evaluate(() => window.__hanabi.design().style) !== 'paper' || !/data-style="paper"/.test(paper5)) return 'Paper & Thread did not reach the design and the cards';
+      await page.click('[data-style="line"]');
+      if (await card(4) !== line5) return 'Line -> Paper & Thread -> Line: the red 5 is not what it was';
+      await page.click('[data-style="paper"]');
+      // a deck-wide dial: the design, its readout, the card
+      await page.evaluate(() => { const el = document.getElementById('s2-wobble'); el.value = '0.9'; el.dispatchEvent(new Event('input', { bubbles: true })); });
+      const wb = await page.evaluate(() => [window.__hanabi.design().style2.wobble, document.querySelector('[data-s2o="wobble"]').textContent]);
+      if (wb[0] !== 0.9 || wb[1] !== '0.90' || await card(4) === paper5) return `the wobble dial wrote ${wb[0]}, reads ${wb[1]}, or did not reach the card`;
+      // one suit's own: disc off for Red only — its cards lose their discs, Blue keeps its
+      await page.selectOption('#style2Target', 'red');
+      await page.click('[data-s2="disc"]');
+      const own = await page.evaluate(() => ({ red: window.__hanabi.design().suits.find((s) => s.id === 'red').style2, deck: window.__hanabi.design().style2.disc, mark: document.querySelector('[data-s2row="disc"]').classList.contains('is-own') }));
+      if (JSON.stringify(own.red) !== '{"disc":false}' || own.deck !== true || !own.mark) return `Red only: ${JSON.stringify(own)}`;
+      if (/hb-disc/.test(await card(4))) return 'Red\'s own disc: off did not reach its card';
+      await page.evaluate(() => { const s = document.getElementById('viewSuit'); s.value = 'blue'; s.dispatchEvent(new Event('change')); });
+      if (!/hb-disc/.test(await card(4))) return 'Red\'s own setting reached Blue';
+      await page.evaluate(() => { const s = document.getElementById('viewSuit'); s.value = 'red'; s.dispatchEvent(new Event('change')); });
+      await page.click('[data-s2row="disc"] [data-s2clear]');
+      if (await page.evaluate(() => window.__hanabi.design().suits.find((s) => s.id === 'red').style2) !== undefined || !/hb-disc/.test(await card(4))) return '↺ did not hand Red\'s disc back to the deck';
+      // a preset chip, then its reset
+      await page.selectOption('#style2Target', 'deck');
+      await page.click('#style2Presets [data-s2preset="thread"]');
+      const th = await page.evaluate(() => [window.__hanabi.design().style2, [...document.querySelectorAll('#style2Presets [aria-pressed="true"]')].map((c) => c.dataset.s2preset).join()]);
+      if (th[0].wobble !== 0.85 || th[0].disc !== false || th[1] !== 'thread') return `the Thread chip: ${JSON.stringify(th)}`;
+      await page.click('#style2Reset');
+      if (await page.evaluate(() => window.__hanabi.design().style2.wobble) !== 0.4) return 'reset did not restore the balanced blend';
+      // Charcoal paper: a flat ground with its grain
+      await page.evaluate(() => { document.getElementById('sec-bg').open = true; document.getElementById('sub-sky').open = true; });
+      await page.click('#skyPresets [data-sky="charcoal"]');
+      const ch = await page.evaluate(() => [window.__hanabi.design().background, document.getElementById('bgGrainVal').textContent]);
+      if (ch[0].sky.top !== '#1F2023' || ch[0].grain !== 0.35 || ch[1] !== '0.35' || !/hb-grain/.test(await card(4))) return `Charcoal paper: ${JSON.stringify(ch)}`;
+      // preview = board = export, pixel for pixel, in Style 2 (with the grain), at poker and mini
+      for (const preset of ['poker', 'mini']) {
+        await page.evaluate((preset) => { const el = document.getElementById('sizePreset'); el.value = preset; el.dispatchEvent(new Event('change')); }, preset);
+        const cmp = await page.evaluate(async () => {
+          const ex = await import('./hanabi/export.js');
+          const svg = document.querySelectorAll('#stage .hb-card svg')[4].outerHTML;
+          const zip = await window.JSZip.loadAsync(await window.__hanabi.exportZip({ returnBlob: true }));
+          const name = Object.keys(zip.files).find((n) => /-red-5a\.png$/.test(n));
+          const bmp = await createImageBitmap(await zip.file(name).async('blob'));
+          const c1 = document.createElement('canvas'); c1.width = bmp.width; c1.height = bmp.height; c1.getContext('2d').drawImage(bmp, 0, 0);
+          const c2 = await ex.svgToCanvas(svg.replace(' preserveAspectRatio', ` width="${bmp.width}" height="${bmp.height}" preserveAspectRatio`), bmp.width, bmp.height);
+          const a = c1.getContext('2d').getImageData(0, 0, bmp.width, bmp.height).data, b = c2.getContext('2d').getImageData(0, 0, bmp.width, bmp.height).data;
+          let diff = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) diff++;
+          document.querySelector('[data-view="fireworks"]').click();
+          const thumb = document.querySelector('#stage [data-cell="red:5"] svg');
+          const marks = (s) => ((s || '').match(/<g class="hb-firework"[\s\S]*?<\/g>/g) || []).join('') + ((s || '').match(/<g class="hb-disc">[\s\S]*?<\/g>/g) || []).join('');
+          const same = !!thumb && marks(thumb.outerHTML) === marks(svg) && /data-style="paper"/.test(marks(svg));
+          document.querySelector('[data-view="suit"]').click();
+          return { diff, n: a.length, same };
+        });
+        if (cmp.diff) return `${preset}: the exported Style 2 red 5 differs from the preview's in ${cmp.diff} of ${cmp.n} channel values`;
+        if (!cmp.same) return `${preset}: the board's thumbnail does not draw the preview's Style 2 fireworks and discs`;
+        // the PDF in Style 2: every page, and page 1's first card is art
+        const pdf = await page.evaluate(async () => {
+          const d = window.__hanabi.design(); d.rainbow = false; d.print = { ...d.print, paper: 'letter', orientation: 'auto', cut: 'separate', duplex: false, cropMarks: true }; window.__hanabi.setDesign(d);
+          const { doc, pages, imp } = await window.__hanabi.exportPdf({ returnDoc: true });
+          return { b64: doc.output('datauristring').split(',')[1], pages, perSheet: imp.perSheet };
+        });
+        const dir = fs.mkdtempSync(path.join(tmp, `s2${preset}`)), file = path.join(dir, 'deck.pdf');
+        fs.writeFileSync(file, Buffer.from(pdf.b64, 'base64'));
+        if (KEEP) { fs.mkdirSync(KEEP, { recursive: true }); fs.copyFileSync(file, path.join(KEEP, `hanabi-style2-${preset}.pdf`)); }
+        const pages = +/Pages:\s+(\d+)/.exec(execFileSync('pdfinfo', [file]).toString())[1];
+        if (pages !== pdf.pages || pages !== Math.ceil(61 / pdf.perSheet) + 1) return `${preset}: the Style 2 PDF has ${pages} pages`;
+        execFileSync('pdftoppm', ['-r', '50', '-f', '1', '-l', '1', file, path.join(dir, 'p')]);
+        const ppm = readPpm(fs.readdirSync(dir).filter((f) => f.endsWith('.ppm')).map((f) => path.join(dir, f))[0]);
+        let dark = 0; for (let y = 0; y < ppm.h; y += 3) for (let x = 0; x < ppm.w; x += 3) { const [r, g, b] = ppm.px(x, y); if (r + g + b < 200) dark++; }
+        if (dark < 200) return `${preset}: page 1 of the Style 2 PDF carries no card art`;
       }
       await page.evaluate(() => { const el = document.getElementById('sizePreset'); el.value = 'poker'; el.dispatchEvent(new Event('change')); });
       return true;

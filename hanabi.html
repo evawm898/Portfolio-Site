@@ -27,6 +27,14 @@
   <p class="hb-sub">Five suits of fireworks, ranks one to five <span class="hb-sep">&mdash;</span> every suit carries a symbol and its own firework as well as a colour, so the deck reads in greyscale. One corner index for the whole deck; the <b>Fireworks</b> board designs the art of every suit &times; rank; then a size and a back, and an imposed print PDF or 300&nbsp;dpi PNGs.</p>
 </header>
 
+<div class="hb-stylebar">
+  <span class="hb-stylebar__label" id="styleLabel">Style</span>
+  <div class="hb-seg" id="styleSeg" role="radiogroup" aria-labelledby="styleLabel" title="How every firework of the deck is drawn. Switching keeps every setting of both styles.">
+    <button type="button" data-style="line" role="radio" title="Style 1: the fine line drawing">Line</button>
+    <button type="button" data-style="paper" role="radio" title="Style 2: shapes, a paper disc behind each firework, hand-made line">Paper &amp; Thread</button>
+  </div>
+</div>
+
 <main class="hb-body">
 
 <aside class="hb-panel" id="deckPanel" aria-label="Deck controls">
@@ -116,6 +124,7 @@
         <div class="hb-chips" id="skyPresets" role="group" aria-label="Sky presets"></div>
         <div class="hb-row"><label for="skyTop">Top</label><input type="color" id="skyTop"></div>
         <div class="hb-row"><label for="skyBottom">Bottom</label><input type="color" id="skyBottom"></div>
+        <div class="hb-row hb-row--slider"><label for="bgGrain" title="A faint paper speckle over the ground (Charcoal paper sets it)">Paper grain</label><input type="range" id="bgGrain" min="0" max="1" step="0.05"><output class="hb-val" for="bgGrain" id="bgGrainVal"></output></div>
         <div class="hb-row hb-row--slider"><label for="bgHorizon">Horizon glow</label><input type="range" id="bgHorizon" min="0" max="1" step="0.05"><output class="hb-val" for="bgHorizon" id="bgHorizonVal"></output></div>
         <div class="hb-row hb-row--slider"><label for="bgGlow">Burst glow</label><input type="range" id="bgGlow" min="0" max="1" step="0.05"><output class="hb-val" for="bgGlow" id="bgGlowVal"></output></div>
       </details>
@@ -132,8 +141,17 @@
     </div>
   </details>
 
+  <details class="hb-sec" id="sec-style2">
+    <summary><span class="hb-num">05</span>Style 2 &middot; Paper &amp; Thread <output class="hb-val" id="style2Val"></output></summary>
+    <p class="hb-note" id="style2Note"></p>
+    <div class="hb-row"><label for="style2Target">Edit for</label><select id="style2Target"></select></div>
+    <div class="hb-chips" id="style2Presets" role="group" aria-label="Style 2 presets"></div>
+    <div id="style2Rows"></div>
+    <div class="hb-actions"><button type="button" class="hb-btn hb-btn--ghost" id="style2Reset">Reset to the balanced blend</button></div>
+  </details>
+
   <details class="hb-sec" id="sec-back">
-    <summary><span class="hb-num">05</span>Card back</summary>
+    <summary><span class="hb-num">06</span>Card back</summary>
     <div class="hb-row"><label for="backBg">Ground</label><input type="color" id="backBg"></div>
     <div class="hb-row"><label for="backFg">Ink</label><input type="color" id="backFg"></div>
     <div class="hb-row">
@@ -147,7 +165,7 @@
   </details>
 
   <details class="hb-sec" id="sec-tokens">
-    <summary><span class="hb-num">06</span>Tokens <span class="hb-dim">8 clue &middot; 3 fuse</span></summary>
+    <summary><span class="hb-num">07</span>Tokens <span class="hb-dim">8 clue &middot; 3 fuse</span></summary>
     <div class="hb-row"><label for="clueBg">Clue ground</label><input type="color" id="clueBg"></div>
     <div class="hb-row"><label for="clueFg">Clue ink</label><input type="color" id="clueFg"></div>
     <div class="hb-row"><label for="fuseBg">Fuse ground</label><input type="color" id="fuseBg"></div>
@@ -156,7 +174,7 @@
   </details>
 
   <details class="hb-sec" id="sec-firework">
-    <summary><span class="hb-num">07</span>Firework spec <span class="hb-dim">read only</span></summary>
+    <summary><span class="hb-num">08</span>Firework spec <span class="hb-dim">read only</span></summary>
     <p class="hb-note">Each card's centre art is drawn from a spec: the type's defaults, then the suit's parameters, then the card's own. The <b>Fireworks</b> board edits them; this shows the merged spec for one card.</p>
     <div class="hb-row"><label for="specSuit">Suit</label><select id="specSuit"></select></div>
     <div class="hb-row"><label for="specRank">Rank</label><select id="specRank"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
@@ -164,7 +182,7 @@
   </details>
 
   <details class="hb-sec" id="sec-export" open>
-    <summary><span class="hb-num">08</span>Export</summary>
+    <summary><span class="hb-num">09</span>Export</summary>
     <div class="hb-row">
       <label for="paper">Paper</label>
       <select id="paper"><option value="letter">Letter &mdash; 8.5 &times; 11 in</option><option value="a4">A4 &mdash; 210 &times; 297 mm</option></select>
@@ -192,7 +210,7 @@
   </details>
 
   <details class="hb-sec" id="sec-file">
-    <summary><span class="hb-num">09</span>Design file</summary>
+    <summary><span class="hb-num">10</span>Design file</summary>
     <div class="hb-actions">
       <button type="button" class="hb-btn hb-btn--ghost" id="saveJson">Save .json</button>
       <label class="hb-btn hb-btn--ghost">Load .json<input type="file" id="loadJson" accept=".json,application/json" hidden></label>
