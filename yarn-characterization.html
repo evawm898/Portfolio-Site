@@ -44,7 +44,8 @@
       <ul class="tx-toc__list">
         <li><a href="#units"><span class="n">01</span>Units &amp; Terminology</a></li>
         <li><a href="#yarn-construction"><span class="n">02</span>Yarn Construction</a></li>
-        <li><a href="#covered-yarn-twist"><span class="n">03</span>Covered Yarn &mdash; Twist Direction</a></li>
+        <li><a href="#twist"><span class="n">03</span>Twist</a></li>
+        <li><a href="#covered-yarn-twist"><span class="n">03b</span>Covered Yarn &mdash; Twist Direction</a></li>
       </ul>
     </nav>
   </div>
@@ -229,13 +230,126 @@
     </div>
   </section>
 
-  <!-- ---------- 03 · COVERED YARN — TWIST DIRECTION ----------
+  <!-- ---------- 03 · TWIST ----------
+       Arithmetic: yarn-twist.js (pure, gated in Node by
+       tools/verify-yarn-characterization.mjs). DOM: yarn-twist-ui.js. -->
+  <section class="tx-topic" id="twist">
+    <div class="tx-topic-head">
+      <h2>Twist</h2>
+      <div class="tx-topic-copy">
+        <p>Twist is the biggest single lever on how a spun yarn behaves. It decides how strong the yarn is, how hard or soft it feels, how much it shines, and whether it lies still or kinks back on itself.</p>
+        <p class="muted">Turns per length tell you how much twist was put in. The twist multiplier tells you what that twist <em>does</em>, and only the multiplier compares across yarn counts.</p>
+      </div>
+    </div>
+
+    <!-- twist · counting twist -->
+    <div class="yc-sub">Counting twist, and why turns alone mislead</div>
+    <div class="yc-prose">
+      <p>Twist is counted as <b>turns per metre (TPM)</b> or <b>turns per inch (TPI)</b>; 1 TPI = 39.37 TPM. Its direction is S or Z (section 01).</p>
+      <p>But 800 TPM means different things on different yarns. What the yarn feels is the angle its surface fibres make with its axis. For a yarn of diameter <i>d</i> with <i>T</i> turns per length, that angle obeys:</p>
+    </div>
+    <div class="yc-rule yc-rule--eq">
+      <p class="yt-eq">tan&thinsp;&theta; = &pi; &middot; <i>d</i> &middot; <i>T</i></p>
+      <p class="muted">A yarn&rsquo;s diameter grows as the square root of its linear density. So a thicker yarn reaches the same angle with <em>fewer</em> turns: the same 800 TPM is a hard twist on a coarse yarn and a soft one on a fine yarn.</p>
+    </div>
+    <div class="yc-prose">
+      <p>The <b>twist multiplier</b> folds the diameter in. It is turns scaled by the square root of the count, so equal multipliers mean equal surface angles at any count:</p>
+    </div>
+    <dl class="yc-notation">
+      <div><dt>TM = TPI &divide; &radic;Ne</dt><dd>The cotton-system twist multiplier (also called the twist factor). The usual figure on a spinning spec.</dd></div>
+      <div><dt>&alpha;<sub>tex</sub> = TPM &times; &radic;tex</dt><dd>The metric twist factor. Because Ne &times; tex = 590.5, it is the same number in other units: &alpha;<sub>tex</sub> &asymp; 957 &times; TM.</dd></div>
+    </dl>
+    <p class="yc-prose yc-prose--note">Twist is measured by untwisting a known length until the fibres lie parallel and counting the turns (ISO 2061, ASTM D1422).</p>
+
+    <!-- twist · the interactive -->
+    <div class="yc-tool yt" data-yt>
+      <div class="yc-tool__head">
+        <span class="yc-tool__label">Twist</span>
+        <span class="yc-tool__hint">drag the twist multiplier; change the count to see which quantity holds</span>
+      </div>
+
+      <div class="yt-controls">
+        <div class="yt-ctrl">
+          <span class="yt-ctrl__label">Yarn</span>
+          <div class="yt-seg" role="group" aria-label="Yarn type">
+            <button type="button" class="yc-chip" data-yt-kind="staple">staple</button>
+            <button type="button" class="yc-chip" data-yt-kind="filament">filament</button>
+          </div>
+        </div>
+        <label class="yt-ctrl">
+          <span class="yt-ctrl__label">Count</span>
+          <select class="yt-select" data-yt-count aria-label="Yarn count"></select>
+        </label>
+        <div class="yt-ctrl">
+          <span class="yt-ctrl__label">When the count changes, keep</span>
+          <div class="yt-seg" role="group" aria-label="What stays fixed when the count changes">
+            <button type="button" class="yc-chip" data-yt-hold="tm">the TM</button>
+            <button type="button" class="yc-chip" data-yt-hold="tpm">the turns</button>
+          </div>
+        </div>
+        <label class="yt-ctrl yt-ctrl--wide">
+          <span class="yt-ctrl__label">Twist multiplier <span class="yt-ctrl__val" data-yt-out="tm"></span></span>
+          <input class="yt-range" type="range" min="0" max="7" step="0.05" data-yt-tm aria-label="Twist multiplier, cotton system">
+        </label>
+      </div>
+
+      <dl class="yt-read" aria-live="polite">
+        <div><dt>TPM</dt><dd data-yt-out="tpm"></dd></div>
+        <div><dt>TPI</dt><dd data-yt-out="tpi"></dd></div>
+        <div><dt class="yt-nocaps">&alpha;<sub>tex</sub></dt><dd data-yt-out="alpha"></dd></div>
+        <div><dt>Surface angle</dt><dd data-yt-out="theta"></dd></div>
+        <div class="yt-read__wide"><dt>Usual use</dt><dd data-yt-out="band"></dd></div>
+      </dl>
+      <p class="yt-note" data-yt-out="note" aria-live="polite"></p>
+
+      <figure class="yt-fig">
+        <svg data-yt-yarn role="img" aria-label="A yarn drawn side on. Its surface fibres run at the helix angle the twist gives; staple yarns show fibre ends that stick out less as the twist rises."></svg>
+        <figcaption data-yt-out="yarncap"></figcaption>
+      </figure>
+
+      <div class="yt-pair">
+        <figure class="yt-fig yt-fig--chart">
+          <div class="yt-scroll"><svg data-yt-chart role="img" aria-label="Relative strength against twist multiplier. The staple curve, solid, rises from zero, peaks near TM 4.2 and falls. The filament curve, dashed, starts high, peaks at low twist and falls. A vertical marker shows the current twist."></svg></div>
+          <figcaption>Schematic: these curves show the <em>shape</em> the literature reports, not a measurement of any one yarn. Strength at the marker: <span data-yt-out="strength"></span>.</figcaption>
+        </figure>
+        <div class="yt-side">
+          <div class="yt-gauges" aria-label="Qualitative effects of the current twist">
+            <div class="yt-gauge"><span class="yt-gauge__name">Hand</span><span class="yt-gauge__bar" data-yt-gauge="hand"></span><span class="yt-gauge__ends">soft &mdash; hard</span></div>
+            <div class="yt-gauge"><span class="yt-gauge__name">Liveliness</span><span class="yt-gauge__bar" data-yt-gauge="lively"></span><span class="yt-gauge__ends">lies still &mdash; kinks</span></div>
+            <div class="yt-gauge"><span class="yt-gauge__name">Luster</span><span class="yt-gauge__bar" data-yt-gauge="luster"></span><span class="yt-gauge__ends">matte &mdash; bright</span></div>
+            <div class="yt-gauge"><span class="yt-gauge__name">Hairiness</span><span class="yt-gauge__bar" data-yt-gauge="hairy"></span><span class="yt-gauge__ends">smooth &mdash; hairy <span class="yt-gauge__na">n/a for filament</span></span></div>
+            <p class="yt-gauges__note">Directions, not measurements.</p>
+          </div>
+          <div class="yt-snarl">
+            <svg data-yt-snarl role="img" aria-label="A loop of single yarn: held taut it is straight; let go slack, a lively high-twist single twists back on itself."></svg>
+            <button type="button" class="yc-chip yt-snarl__btn" data-yt-slack aria-pressed="false">Let it go slack</button>
+            <p class="yt-snarl__note" data-yt-snarl-note></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- twist · cause and effect -->
+    <div class="yc-sub">What more twist does</div>
+    <dl class="yc-notation yt-effects">
+      <div><dt>Strength rises, then falls</dt><dd>A <b>staple</b> yarn holds together only by friction between its short fibres, and twist supplies that friction. An untwisted sliver has almost no strength, and strength climbs steeply as twist rises. Past an optimum the fibres lean further from the axis, so each carries less of the pull (the obliquity loss, roughly cos&sup2;&theta;), and strength falls again. A <b>filament</b> yarn&rsquo;s fibres are continuous and carry load without friction, so twist adds only a little by making the filaments share load evenly. Its optimum is at low twist, and the obliquity loss starts almost at once.</dd></div>
+      <div><dt>Hand</dt><dd>Low twist is soft, lofty and full. High twist packs the fibres tight: lean, firm, crisp, sometimes harsh.</dd></div>
+      <div><dt>Luster</dt><dd>Flat, untwisted filament reflects most, because long parallel surfaces act as mirrors. Twist turns them away from the light and dulls it. On a staple yarn, moderate twist first tucks in the stray fibre ends and smooths the surface, then breaks it up at high twist.</dd></div>
+      <div><dt>Liveliness and snarling</dt><dd>Twist stores torque. A highly twisted single tries to untwist; let it go slack and it twists back on itself in a snarl. A lively yarn tangles in handling and can make a single-jersey fabric spiral (the wales twist on the bias).</dd></div>
+      <div><dt>Crepe</dt><dd>Very high twist (TM above about 5.5) made deliberately. When the fabric is wetted and relaxed in finishing, the yarns try to untwist and kink, and the fabric shrinks into a pebbled crepe surface.</dd></div>
+      <div><dt>Ply balancing</dt><dd>Plying two singles together with twist in the <em>opposite</em> direction (Z singles, S ply) cancels their torque. A balanced ply hangs in a loop without turning. That is the practical test: the ply twist that balances is found by trial, and it is usually less than the singles twist. A balanced yarn lies still, knits square and does not snarl. Covered yarn uses the same idea: the double covering in the next section wraps Z, then S.</dd></div>
+    </dl>
+
+    <p class="yc-sources"><span class="yc-sources__label">Sources</span> Hearle, Grosberg &amp; Backer, <em>Structural Mechanics of Fibers, Yarns and Fabrics</em> (the helix geometry, the obliquity law after G&eacute;gauff, staple vs filament strength); Lord, <em>Handbook of Yarn Production</em> (twist multipliers and their typical ranges by end use); ISO 2061 and ASTM D1422 (measuring twist); ISO 2 (twist direction). The strength curves are schematic: a friction term times cos&sup2;&theta; for staple, a small consolidation term times cos&sup2;&theta; for filament, with the surface angle from a yarn packed at about 60% of its fibre&rsquo;s density.</p>
+  </section>
+
+  <!-- ---------- 03b · COVERED YARN — TWIST DIRECTION ----------
        A copy of /lab #covered-yarn-twist. -->
   <section class="tx-topic" id="covered-yarn-twist">
     <div class="tx-topic-head">
       <h2>Covered Yarn &mdash; Twist Direction</h2>
       <div class="tx-topic-copy">
-        <p>A covered yarn wraps a cover yarn around an elastic core. Single covered yarn (SCY) has one wrap, in either twist direction &mdash; S or Z, named for which way the diagonal of the letter runs. Double covered yarn (DCY) wraps twice: the inner layer goes on Z, then the outer layer wraps S over it, so the two torques cancel.</p>
+        <p>A covered yarn wraps a cover yarn around an elastic core. Single covered yarn (SCY) has one wrap, in either twist direction &mdash; S or Z, named for which way the diagonal of the letter runs. Double covered yarn (DCY) wraps twice: the inner layer goes on Z, then the outer layer wraps S over it, so the two torques cancel &mdash; the <a href="#twist">ply balancing</a> of section 03, applied to a covered yarn.</p>
         <p class="muted">Plays once on scroll into view; hover a diagram to replay it and hold the S or Z on screen.</p>
       </div>
     </div>
@@ -301,6 +415,7 @@
 
 <script src="yarn-diagrams.js"></script>
 <script type="module" src="yarn-units.js"></script>
+<script type="module" src="yarn-twist-ui.js"></script>
 
 </body>
 </html>
