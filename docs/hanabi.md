@@ -284,6 +284,130 @@ git) against that page byte for byte, and a new design with the background off a
 version-6 default to the byte. A design kept in this browser's storage opens the same way (no note):
 turn the background on and set the border, or *Reset*.
 
+## Styles — Line and Paper & Thread (schema version 8, Nov 14)
+
+The look the deck is drawn in is one deck-wide choice, **Style** (top right of the page, a
+segmented control): **Line** (Style 1 — every drawing above) or **Paper & Thread** (Style 2).
+A style changes how a firework is DRAWN and nothing else. Suits, colours, symbols, each suit's
+type, the rank composition, every card's arrangement and placement, per-firework styles, the
+count and Detail sliders, rotation, centring, the background, the white border, the frame,
+the indices, the back, the tokens and the export are the deck's, in either style.
+
+- **One spec, a renderer per style.** `fireworkSpec` is the spec it always was; under Style 2
+  it also carries `style: 'paper'` and `paper`, the suit's resolved Style 2 settings, and
+  `renderFirework` hands it to `renderPaper` (`hanabi/style2.js`). H40 holds every Style 2
+  spec to the Style 1 spec plus those two keys. **Adding a Style 3** is one renderer and one
+  settings block: an entry in `STYLE_RENDERERS`, `STYLE_TIERS` and `STYLE_SPECS`
+  (`firework.js`) and its own settings in the design; nothing in `layout.js` or the board.
+- **Lossless both ways.** `design.style` is the only thing the switcher writes; Style 2's
+  dials live in `design.style2` (deck-wide) and `suit.style2` (any subset, per suit), which
+  Style 1 never reads. Line → Paper & Thread → Line draws every card byte for byte as it was
+  (H40, B15).
+- **Saved designs open in Line, unchanged.** A file before version 8 has no style: it opens in
+  Line with no note and renders byte-identically to `7ae2ba4` (H41, read from git); a new
+  design opens in Line too (the switch is a choice, not a default change).
+
+### What Style 2 takes from each reference
+
+| reference | what Style 2 takes |
+|---|---|
+| 1, the flat vector cluster | the SHAPE vocabulary: stars made of shapes — round dots, five-point stars, diamonds, teardrops, petals, confetti — in rings that may mix shapes |
+| 2, the soft paper discs | a filled translucent COLOUR DISC behind each firework, with a fine seeded paper grain; a soft glow on dot tips; discs overlapping discs on a card of several fireworks |
+| 3, the hand-drawn charcoal | HAND-MADE LINE: strokes of irregular width that wobble, some as stitch-like dashes; lollipop spokes; a spoke wheel of short strokes; a flat charcoal ground with paper grain (a background option) |
+
+No reference is copied; Style 2 dresses the deck's own geometry. A type's Style 2 drawing
+starts from the SAME primitives and fit as its Style 1 drawing (`typeLayout`), so the count,
+the geometry, Detail, length, trail, star size, tips, core and rotation all act identically;
+Style 2 is bolder (`SHAPE_K` 1.7 × a dot's radius, `STROKE_K` 1.9 × a stroke) and is refitted
+so every mark stays inside the firework's reach.
+
+### Every type and motif in Style 2
+
+| type / motif | Style 2 drawing | the count (one main element) |
+|---|---|---|
+| peony | concentric rings of stars as shapes — the outer ring dots, the inner rings stars, diamonds, teardrops as the Mixing dial says; a dot core | each star |
+| chrysanthemum | lollipop spokes: a hand-made spoke ending in a bold club; the faint inner trails as faint stitches | each spoke |
+| ring | a dashed ring of stitches along the circle; inner rings (Detail) in shapes | each stitch / star |
+| willow | drooping hand-drawn trails, tapering, some stitched; a teardrop hanging at each end | each trail |
+| palm | a few thick brushed fronds with wobbling edges, a club at each tip; leaflets as short strokes | each frond |
+| crossette | brushed arms that split; every tine ends in a small five-point star | each arm |
+| dahlia | fat teardrop petals (point inward, round head out) round a core of shapes; Detail's spokes as stitches | each petal |
+| glitter | a confetti scatter: each spark a small turned slip of paper, each round star a dot; a multicolour suit uses every colour | each spark / star |
+| blossom | hand-cut petals (their outline jittered), stitched veins, lollipop stamens | each petal |
+| spoke disc | a spoke wheel: thin spokes with dot tips, and rings of short tangential strokes between them (ref 3's web) | each spoke |
+| spoke disc with a core | the wheel from 0.36 of the reach, round a ring of teardrops | each outer spoke |
+| rosette field | little flowers of lollipop petals, each on a small disc of its own | each rosette |
+| starfield | a field of five-point stars that glow | each star |
+| every other catalogue burst and phase 1's | its Style 1 drawing DRESSED: dots become shapes, lines hand-made strokes (a dotted trail stitched), filled shapes cut by hand | — |
+| the second tier (Scale, ranks 4–5) | the rosette field above, in its rect | — |
+
+Every node of a main element carries `data-m="i"`; H42 counts the indices (they must run
+0..N−1) at every type's and counted motif's min, default and max, at Detail 0/1/2, under Count
+and Scale, at every preset — a count off the TAG, not off the geometry (Style 2's shapes vary by
+design), with the expected count restated from the control's table.
+
+### The dials (panel section 05, Style 2 · Paper & Thread)
+
+Deck-wide, and per suit: *Edit for* picks every suit (the deck) or one suit, whose own settings
+(•) override the deck's; ↺ hands one back. Ignored under Line.
+
+| group | dial | range | balanced blend (default) |
+|---|---|---|---|
+| Disc | Disc | on / off | on |
+| | Opacity | 0–1 | 0.5 |
+| | Size (radius over the burst's reach) | 0.6–1.6 | 1.1 |
+| | Colour | lighter (suit colour 30% to white) / darker (70% to black) / the suit's secondary | darker |
+| | Grain | 0–1 | 0.35 |
+| Line | Wobble (0 clean vector, 1 a brush pen) | 0–1 | 0.4 |
+| | Stitch (share of strokes drawn as dashes) | 0–1 | 0.3 |
+| | Weight | 0.5–2 | 1 |
+| Shapes | allowed: dots, stars, diamonds, teardrops, petals, confetti | at least one | all six |
+| | Mixing (0 one shape a firework, 1 every ring its own) | 0–1 | 0.5 |
+| Glow | Glow on dot tips | 0–1 | 0.4 |
+
+**Presets** (chips; each sets every dial): **Flat** (ref 1: no disc, clean line, every shape,
+full mixing, no glow), **Paper** (ref 2: a deep grained disc, nearly clean line, round shapes,
+strong glow), **Thread** (ref 3: no disc, wobble 0.85, stitch 0.75, weight 1.3). Their values
+are restated in the gate (H44). **Every random choice is seeded** from the firework's seed on a
+stream of its own (wobble, grain, stitch angles, confetti turns) and the shape mixing is a
+golden-ratio stamp per ring, the same on every firework of a design, so the preview, the board
+thumbnails and the export are one drawing (H43; B15 compares the exported PNG with the preview
+pixel for pixel at poker and mini).
+
+**The markup.** A Style 2 firework is `<g class="hb-disc">` (the disc and its grain),
+`<g class="hb-glow2">` (the glows), `<g class="hb-firework" data-style="paper">` (the marks, all
+absolute circles and M/L/Z paths). On a card of several fireworks `discsFirst` (`style2.js`)
+draws every disc, then every glow, then every firework's marks, so discs overlap discs and a
+disc never covers another firework's stars. Only the marks are a firework's extent (centring).
+
+### The background: Charcoal paper
+
+A fifth sky preset, **Charcoal paper** (`#1F2023` flat), with **Paper grain** (`background.grain`,
+0–1, 0 by default; the preset sets 0.35, the other skies 0): a faint seeded speckle over the
+ground, under the scene band and the fireworks. It works in either style; Night sky stays the
+default.
+
+### Greyscale
+
+H46: in Style 2 at the balanced blend, every suit's rank 1 and rank 5 sit apart from every
+other suit's as silhouettes (the likeness threshold measured from Style 2's own types), and every
+main mark is read against the ground composited under it — sky, horizon, burst glows, smoke and,
+disc on, every disc. Worst main-mark contrast, ranks 1 and 5, poker (disc on / off):
+| suit | disc on | disc off |
+|---|---|---|
+| white (ring) | 9.74 | 11.91 |
+| red (peony) | 4.10 | 4.23 |
+| blue (willow) | 4.59 | 4.81 |
+| yellow (chrysanthemum) | 7.70 | 8.81 |
+| green (palm) | 5.69 | 6.08 |
+| rainbow (glitter) | 3.07 | 3.67 |
+
+The disc costs 3–18% of the weakest mark's contrast; the rainbow is the nearest (its blue and green
+confetti on the violet-grey disc). The first default, a LIGHTER disc at 0.35, put the rainbow at 2.16
+and was moved to the darker disc for that reason.
+The gate holds 3:1 with the discs on. H45 holds the nine silhouettes apart in Style 2 under the
+balanced blend and every preset (discs and glows aside).
+
 ## The fireworks
 
 **Nine firework TYPES** (phase 2) — each a distinct silhouette, not a recolour (H16): `peony`
@@ -404,6 +528,7 @@ with a button to use it.
 | `hanabi/deck.js` | the MODEL, pure: suits, the 3/2/2/2/1 distribution, sizes, the design schema and its file, the imposition |
 | `hanabi/symbols.js` | suit symbols, the rank numerals and the token glyphs as SVG path data |
 | `hanabi/firework.js` | **the phase-2 slot**: the firework spec, the motifs and their renderers |
+| `hanabi/style2.js` | Style 2 (Paper & Thread): its settings, presets and renderer over the same spec; the paper grain |
 | `hanabi/layout.js` | card faces (corner index + per-suit centre), the back and the tokens, as SVG strings |
 | `hanabi/export.js` | the imposed print PDF (jsPDF) and the 300 dpi PNG zip (JSZip) |
 | `hanabi.js` | the page: DOM, state, localStorage, the preview |
@@ -459,7 +584,7 @@ each face sheet, each back in the slot mirrored for a long- or short-edge flip.
 
 ## Verify
 
-`node tools/verify-hanabi.mjs` — H1–H39 in Node, B1–B14 in Chromium (the PDF is rasterised by
+`node tools/verify-hanabi.mjs` — H1–H46 in Node, B1–B15 in Chromium (the PDF is rasterised by
 `pdftoppm` and its crop marks and edges read against an imposition RESTATED in the gate).
 H10 holds the corner index to one style across suits, H11 a suit's centre to its own cards,
 H12 the tier to ranks 4–5 and clear of the index, H13 every motif to its box, H14 the rainbow index (B6 its control) — read off every
@@ -486,4 +611,11 @@ exported border pure white; B3 now prints one PDF with the 3 mm border (the art 
 without. `--design <file>` prints the likeness report for a saved design
 (non-blocking). `--negative-control` runs 121 mutants, twenty of them of the page script;
 `--keep <dir>` saves the PDFs. Not in CI.
+**Version 8 (styles):** H40 the switcher (lossless both ways, every Style 2 spec the Style 1 spec plus its
+style), H41 version-7 designs unchanged against `7ae2ba4`, H42 every type and motif drawn in Style 2 inside its
+box with its count exact, H43 determinism, H44 the presets and per-suit settings through the file and Charcoal
+paper, H45 the silhouettes in Style 2, H46 greyscale in Style 2; B15 the switcher and dials in the page,
+preview = board = export pixel for pixel in Style 2, and the Style 2 PDF at poker and mini. The style sheet is
+`node tools/shot-hanabi-style2.mjs <png>` (`docs/img/hanabi-style2.png`, quantised to 256 colours for the repo).
+`--negative-control` runs 137 mutants, sixteen of them Style 2's.
 Dev deps: `npm i --no-save jspdf@2.5.1 jszip@3.10.1 playwright-core`; needs `pdfinfo`/`pdftoppm`.

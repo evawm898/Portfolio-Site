@@ -12967,5 +12967,14 @@ H36–H39 / B14) — Eva's choices are the defaults (Night sky, horizon 0.55, bu
 the art panel's edge; the bleed is white and everything is clipped to the art; backs and tokens take the border too;
 0 mm is the full bleed byte for byte. A file before v7 opens with both off and one note (H38 vs `c7d4ba6`). The preview
 inlines a card's SVG without the export's pixel size and a rasteriser treats the two sizes differently (pre-existing):
-B14 compares the export with the preview's markup given that size. Gate: `node tools/verify-hanabi.mjs` (H1–H39, B1–B14;
-`--negative-control` 121 mutants, `--mutant=a,b` a subset), not in CI.
+B14 compares the export with the preview's markup given that size. **Nov 14 (schema v8): STYLES** (read "Styles" in
+`docs/hanabi.md` before touching `hanabi/style2.js`, `withStyle` / `STYLE_RENDERERS` in `firework.js`, `discsFirst`,
+`paperGrain` or H40–H46 / B15) — a deck-wide switch, top right: **Line** (Style 1, everything above) or **Paper &
+Thread** (Style 2). A style is a renderer over the ONE spec (the spec plus `style`/`paper`; H40); Style 2 dresses each
+type's own `typeLayout` primitives (shapes, a translucent grained disc, hand-made wobbling/stitched line, tip glow), so
+count, Detail, arrangement, centring and every override carry across; its dials are `design.style2` with a per-suit
+subset `suit.style2`, three presets (Flat/Paper/Thread) and a balanced default — **all Eva's to rule from
+`docs/img/hanabi-style2.png`** (`node tools/shot-hanabi-style2.mjs <png>`). Switching is lossless both ways; every
+file before v8 (and every new design) opens in Line, byte-identical to `7ae2ba4` (H41). Main elements carry `data-m`
+(H42 counts them). Charcoal paper is a sky preset with `background.grain`. Gate: `node tools/verify-hanabi.mjs`
+(H1–H46, B1–B15; `--negative-control` 137 mutants, `--mutant=a,b` a subset), not in CI.

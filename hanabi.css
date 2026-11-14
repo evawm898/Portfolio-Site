@@ -229,3 +229,20 @@ input[type=range] { accent-color: var(--color-petrol); }
   .hb-board__suit { flex-direction: column; align-items: flex-start; font-size: 9.5px; }
   .hb-board__suit .hb-dim { display: none; }
 }
+
+/* version 8: the style switcher, top right of the page, and Style 2's dials */
+.hb-stylebar { position: absolute; top: 26px; right: 22px; display: flex; align-items: center; gap: 8px; z-index: 3; }
+.hb-stylebar__label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-ink-2); }
+.hb-stylebar .hb-seg button { font-size: 12px; padding: 6px 14px; }
+.hb-s2group { margin: 8px 0 4px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-ink-2); }
+.hb-s2row.is-own label::after { content: " •"; color: var(--color-petrol); }
+.hb-s2shapes { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.hb-s2shapes .hb-check { font-size: 11px; }
+@media (max-width: 900px) {
+  .hb-stylebar { position: static; margin: 0 22px 14px 38px; }
+}
+.hb-s2row.hb-row { grid-template-columns: 70px minmax(0, 1fr) 14px; margin: 5px 0; }
+.hb-s2row.hb-row--slider { grid-template-columns: 70px minmax(0, 1fr) 36px 14px; }
+.hb-s2row.is-own .hb-clear { visibility: visible; color: var(--color-petrol); }
+.hb-s2row .hb-clear[hidden] { display: none; }
+div.hb-s2row:not(.hb-row) { display: flex; align-items: flex-start; gap: 6px; }
