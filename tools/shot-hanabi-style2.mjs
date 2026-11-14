@@ -6,6 +6,7 @@
    Colour on the left, greyscale on the right (CSS grayscale, the page's own toggle):
      - the full board (every suit x rank, the rainbow suit on) in Style 2 at the balanced
        blend, the default background;
+     - every type and the four counted catalogue motifs, one card each;
      - one block each for the Flat, Paper and Thread presets (every suit at rank 1, then 5);
      - Thread on the Charcoal paper ground (ref 3);
      - Style 1 (Line) at rank 1 for reference.
@@ -40,6 +41,19 @@ function block(title, note, d, ranks, board = false) {
 const sections = [];
 const def = base();
 sections.push(block('Style 2 · Paper &amp; Thread — the balanced blend (default)', `every suit × rank; disc ${def.style2.discTone} at ${def.style2.discOpacity}, grain ${def.style2.grain}, wobble ${def.style2.wobble}, stitch ${def.style2.stitch}, mixing ${def.style2.mix}, glow ${def.style2.glow}; Night sky`, def, D.RANKS, true));
+// every type and the four counted catalogue motifs, one card each (rank 1, Count), on a suit whose colours suit it
+{
+  const F = await imp('firework.js');
+  const motifs = [...F.TYPE_IDS, 'spoke', 'spokecore', 'rosettes', 'starfield'];
+  const suitFor = ['red', 'yellow', 'white', 'blue', 'green', 'red', 'yellow', 'rainbow', 'red', 'yellow', 'blue', 'green', 'yellow'];
+  const cells = [];
+  motifs.forEach((m, i) => {
+    const d = base(), s = D.suitById(d, suitFor[i]);
+    s.centre = { compose: 'count', motif: m, tier: 'none' };
+    cells.push(`<div><div class="lab">${F.MOTIFS[m].label}</div>${face(d, s.id, 1)}</div>`);
+  });
+  sections.push(`<section><h2>Every type and counted motif — the balanced blend, rank 1</h2><p>the nine types and the four catalogue motifs with a count of their own</p><div class="row wrap">${cells.slice(0, 7).join('')}</div><div class="row wrap">${cells.slice(7).join('')}</div></section>`);
+}
 for (const k of ['flat', 'paper', 'thread']) sections.push(block(`Preset · ${S2.PAPER_PRESETS[k].label}`, `${S2.PAPER_PRESETS[k].note} — every suit at rank 1, then 5`, withPreset(k), [1, 5]));
 const ch = withPreset('thread'); ch.background.sky.top = ch.background.sky.bottom = D.SKY_PRESETS.charcoal.top; ch.background.grain = D.SKY_PRESETS.charcoal.grain;
 sections.push(block('Thread on Charcoal paper', 'the Thread preset on the flat charcoal ground with its paper grain (the background option, ref 3)', ch, [1, 5]));
@@ -52,7 +66,7 @@ body{margin:0;background:#16181C;color:#D8DCE2;font:12px/1.4 ui-monospace,Menlo,
 h1{font:600 20px Georgia,serif;margin:0 0 4px} h2{font-size:12px;letter-spacing:.06em;margin:16px 0 2px;color:#fff}
 p{margin:0 0 6px;color:#9AA3B4} .cols{display:flex;gap:28px} .col{flex:none}
 .row{display:flex;gap:6px;margin-bottom:6px} .c{background:#fff;border-radius:4px}
-.grey{filter:grayscale(1)} .tag{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#6FB7AE;margin-bottom:4px}
+.grey{filter:grayscale(1)} .lab{font-size:10px;color:#9AA3B4;margin-bottom:2px} .tag{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#6FB7AE;margin-bottom:4px}
 </style></head><body>
 <h1>Hanabi — Style 2, Paper &amp; Thread</h1>
 <p>The style changes how fireworks are drawn; suits, colours, symbols, types, counts, arrangements and the background are the deck's. Rule from this sheet: the default blend, and any type to redraw.</p>
