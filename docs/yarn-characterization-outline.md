@@ -1,9 +1,12 @@
 # Yarn Characterization — proposed outline for the deep expansion
 
-**Status: PROPOSAL, nothing below is written yet.** This is the section order and the scope of each section for
-Eva to approve or edit before any content is drafted. The page today (`yarn-characterization.html`) holds two
-sections copied from `/lab`: **Yarn Construction** and **Covered Yarn — Twist Direction**. Both are animated by
-`yarn-diagrams.js` / `yarn-diagrams.css`. Where they end up in the order below is marked **[built]**.
+**Status: APPROVED (Eva, Nov 14).** Section 01 (Units & terminology) is **written** and on the page, with its count
+converter and spec decoder (`yarn-count.js` for the arithmetic, `yarn-units.js` for the DOM, gated by
+`node tools/verify-yarn-characterization.mjs [--browser] [--negative-control]`). Sections 03 and 05–10 are not
+written yet. The page also holds two sections copied from `/lab`, **Yarn Construction** and **Covered Yarn — Twist
+Direction**, animated by `yarn-diagrams.js` / `yarn-diagrams.css`. Where they sit in the order below is marked
+**[built]**. Until Twist is written, the page numbers them 01 Units, 02 Construction, 03 Covered Yarn; the covered
+section becomes 03b when Twist lands as 03.
 
 ## Ground rules for the whole page
 
@@ -29,7 +32,7 @@ sections copied from `/lab`: **Yarn Construction** and **Covered Yarn — Twist 
 
 | # | Section | Interactive | Needs sources |
 |---|---|---|---|
-| 01 | Units & terminology | Count converter + spec decoder | yes (conversion constants, standards) |
+| 01 | Units & terminology **[written]** | Count converter + spec decoder | yes (conversion constants, standards) |
 | 02 | Yarn construction **[built]** | The four animated builds (existing) | light |
 | 03 | Twist | Twist slider → yarn render + strength / hand curves | yes |
 | 04 | Covered yarn — twist direction **[built]**, folded under Twist as 03b | SCY S/Z, DCY (existing) | light |
@@ -45,7 +48,7 @@ to post-spinning processes, to what is put in the polymer. Each section only use
 
 ---
 
-## 01 · Units & terminology
+## 01 · Units & terminology **[written, Nov 14]**
 
 **Scope.** This is the vocabulary every later section needs: the four questions a yarn label answers (how heavy
 per length, how many filaments, how many plies, how it was processed). It covers two families of count. **Direct**

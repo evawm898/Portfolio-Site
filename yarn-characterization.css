@@ -1,0 +1,415 @@
+/* ---------------------------------------------------
+   yarn-characterization.css — what is unique to the Yarn
+   Characterization field note beyond textile-101.css's tx-topic
+   layout and yarn-diagrams.css's two animated grids: section 01's
+   cards, notation list, process states, and its two tools.
+   Tokens only (DESIGN.md): text is ink / ink-2 / dim / faint /
+   petrol / seafoam; deep is a rule or a fill, never text; the
+   companions are diagram marks only.
+--------------------------------------------------- */
+
+#units { --yc-gap: clamp(1rem, 2.5vw, 1.75rem); }
+
+.yc-sub {
+  margin-top: 4rem;
+  margin-bottom: 1.5rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--color-deep);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-seafoam);
+}
+
+.yc-prose,
+.yc-prose p {
+  max-width: 68ch;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--color-ink);
+  margin: 0 0 1.1rem;
+}
+
+.yc-prose--note {
+  font-size: 13px;
+  color: var(--color-dim);
+}
+
+.yc-prose b,
+.yc-card b,
+.yc-rule b,
+.yc-notation b { color: var(--color-ink); font-weight: 500; }
+
+.sep { color: var(--color-faint); }
+
+/* ---------- cards ---------- */
+.yc-two,
+.yc-three {
+  display: grid;
+  gap: var(--yc-gap);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.yc-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.yc-card {
+  border: 1px solid var(--color-line);
+  border-left: 2px solid var(--color-deep);
+  background: var(--color-raised);
+  padding: 1.5rem 1.5rem 1.25rem;
+}
+
+.yc-card__head {
+  font-family: var(--type-serif);
+  font-weight: 500;
+  font-size: 1.15rem;
+  color: var(--color-ink);
+  margin-bottom: 0.75rem;
+}
+
+.yc-card p {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--color-ink-2);
+  margin: 0 0 0.9rem;
+}
+
+.yc-card p:last-child { margin-bottom: 0; }
+
+.yc-units {
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.yc-units div {
+  display: grid;
+  grid-template-columns: 11rem 1fr;
+  gap: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--color-line);
+}
+
+.yc-units dt { font-size: 13px; color: var(--color-ink); }
+.yc-units dt span { color: var(--color-petrol); margin-left: 0.35em; }
+.yc-units dd { margin: 0; font-size: 13px; color: var(--color-dim); }
+
+/* ---------- the conversion rule ---------- */
+.yc-rule {
+  margin-top: var(--yc-gap);
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--color-line);
+}
+
+.yc-rule p {
+  margin: 0 0 0.75rem;
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--color-ink-2);
+}
+
+.yc-rule p:last-child { margin-bottom: 0; }
+.yc-rule .muted { color: var(--color-dim); font-size: 13px; }
+
+/* ---------- tools (converter, decoder) ---------- */
+.yc-tool {
+  margin-top: 2.5rem;
+  border: 1px solid var(--color-line);
+  border-left: 2px solid var(--color-deep);
+  background: var(--color-raised);
+  padding: 1.5rem clamp(1rem, 3vw, 2rem) 1.5rem;
+}
+
+.yc-tool__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.yc-tool__label {
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-petrol);
+}
+
+.yc-tool__hint {
+  font-size: 12px;
+  color: var(--color-dim);
+}
+
+.yc-tool__status {
+  margin: 1.25rem 0 0;
+  font-size: 12.5px;
+  color: var(--color-ink-2);
+}
+
+/* converter */
+.yc-conv {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: var(--yc-gap);
+  align-items: center;
+}
+
+.yc-conv__rows { display: grid; gap: 0.5rem; }
+
+.yc-conv__row {
+  display: grid;
+  grid-template-columns: 10rem 8rem minmax(0, 1fr);
+  grid-template-areas: "name input def" "name input dir";
+  column-gap: 1rem;
+  align-items: center;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.yc-conv__name { grid-area: name; font-size: 13px; color: var(--color-ink); }
+.yc-conv__unit { color: var(--color-petrol); margin-left: 0.35em; }
+.yc-conv__def { grid-area: def; font-size: 12px; color: var(--color-dim); }
+.yc-conv__dir { grid-area: dir; font-size: 11px; letter-spacing: 0.04em; color: var(--color-dim); }
+
+.yc-conv__input { grid-area: input; }
+
+.yc-conv__input,
+.yc-dec__input {
+  width: 100%;
+  font-family: var(--type-mono);
+  font-size: 14px;
+  color: var(--color-ink);
+  background: var(--color-ground);
+  border: 1px solid var(--color-line-strong);
+  border-radius: 0;
+  padding: 0.45rem 0.6rem;
+}
+
+.yc-conv__input:focus,
+.yc-dec__input:focus {
+  outline: none;
+  border-color: var(--color-petrol);
+}
+
+.yc-conv__xsec { margin: 0; text-align: center; }
+.yc-conv__xsec svg { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }
+.yc-conv__xsec figcaption {
+  margin-top: 0.5rem;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--color-dim);
+}
+
+.yc-xsec__ref { fill: none; stroke: var(--color-ink-2); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.yc-xsec__this { fill: var(--color-indigo); fill-opacity: 0.85; stroke: var(--color-indigo); stroke-width: 1.5; }
+.yc-xsec__label { font-family: var(--type-mono); font-size: 11px; fill: var(--color-dim); letter-spacing: 0.04em; }
+
+/* decoder */
+.yc-dec__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.yc-chip {
+  font-family: var(--type-mono);
+  font-size: 12px;
+  color: var(--color-ink-2);
+  background: transparent;
+  border: 1px solid var(--color-line-strong);
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.yc-chip:hover { border-color: var(--color-petrol); color: var(--color-ink); }
+.yc-chip[aria-pressed="true"] {
+  background: var(--color-petrol);
+  border-color: var(--color-petrol);
+  color: var(--color-ground);
+}
+
+.yc-dec__field {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 24rem);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.yc-dec__field-label {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+
+.yc-dec__help {
+  margin: 0.75rem 0 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--color-dim);
+  max-width: 70ch;
+}
+
+.yc-dec__out { margin-top: 1.5rem; }
+
+.yc-dec__fields { margin: 0; display: grid; gap: 0; }
+
+.yc-dec__fields div {
+  display: grid;
+  grid-template-columns: 12rem minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.yc-dec__fields dt {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-petrol);
+  padding-top: 0.15rem;
+}
+
+.yc-dec__fields dd { margin: 0; font-size: 13px; line-height: 1.6; color: var(--color-ink); }
+
+.yc-dec__note {
+  margin: 0.75rem 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-dim);
+}
+
+.yc-dec__error {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-line-strong);
+  font-size: 13px;
+  color: var(--color-ink);
+}
+
+.yc-dec__more {
+  margin: 1.25rem 0 0;
+  font-size: 12px;
+  color: var(--color-dim);
+}
+
+.yc-dec__more a,
+.yc-prose a { color: var(--color-petrol); border-bottom: 1px solid transparent; }
+.yc-dec__more a:hover,
+.yc-prose a:hover { border-color: var(--color-petrol); }
+
+/* ---------- notation list ---------- */
+.yc-notation {
+  margin: 0 0 1.25rem;
+  display: grid;
+  gap: 0;
+  max-width: 62rem;
+}
+
+.yc-notation div {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.yc-notation dt { font-size: 14px; color: var(--color-petrol); }
+.yc-notation dd { margin: 0; font-size: 13.5px; line-height: 1.65; color: var(--color-ink-2); }
+
+/* ---------- process states ---------- */
+.yc-states {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--color-line);
+  margin-bottom: 1.1rem;
+}
+
+.yc-state {
+  padding: 1.25rem 1.25rem 1.1rem;
+  border-right: 1px solid var(--color-line);
+}
+
+.yc-state:last-child { border-right: none; }
+
+.yc-state__tag {
+  display: block;
+  font-family: var(--type-serif);
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: var(--color-seafoam);
+  line-height: 1.1;
+}
+
+.yc-state__name {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+
+.yc-state p {
+  margin: 0.8rem 0 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--color-ink-2);
+}
+
+/* ---------- S vs Z ---------- */
+.yc-sz { display: block; width: 100%; max-width: 220px; margin: 0 auto 0.9rem; }
+.yc-sz__yarn rect { fill: none; stroke: var(--color-ink); stroke-width: 1.5; }
+.yc-sz__fibre line { stroke: var(--color-petrol); stroke-width: 3; stroke-linecap: round; }
+.yc-sz__letter { font-family: var(--type-serif); font-size: 18px; fill: var(--color-ink); }
+
+/* ---------- sources ---------- */
+.yc-sources {
+  margin: 3rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--color-line);
+  max-width: 80ch;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--color-dim);
+}
+
+.yc-sources__label {
+  margin-right: 0.75em;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-2);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 1000px) {
+  .yc-states { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .yc-state:nth-child(2n) { border-right: none; }
+  .yc-state:nth-child(-n+2) { border-bottom: 1px solid var(--color-line); }
+  .yc-three { grid-template-columns: 1fr; }
+  .yc-conv { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .yc-two { grid-template-columns: 1fr; }
+  .yc-units div,
+  .yc-notation div,
+  .yc-dec__fields div { grid-template-columns: 1fr; gap: 0.25rem; }
+  .yc-conv__row {
+    grid-template-columns: minmax(0, 1fr) 7.5rem;
+    grid-template-areas: "name input" "def def" "dir dir";
+    row-gap: 0.3rem;
+  }
+  .yc-dec__field { grid-template-columns: 1fr; gap: 0.4rem; }
+}
+
+@media (max-width: 560px) {
+  .yc-states { grid-template-columns: 1fr; }
+  .yc-state { border-right: none; border-bottom: 1px solid var(--color-line); }
+  .yc-state:last-child { border-bottom: none; }
+}
