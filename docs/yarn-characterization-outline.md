@@ -2,11 +2,10 @@
 
 **Status: APPROVED (Eva, Nov 14).** Section 01 (Units & terminology) is **written** and on the page, with its count
 converter and spec decoder (`yarn-count.js` for the arithmetic, `yarn-units.js` for the DOM, gated by
-`node tools/verify-yarn-characterization.mjs [--browser] [--negative-control]`). Sections 03 and 05–10 are not
-written yet. The page also holds two sections copied from `/lab`, **Yarn Construction** and **Covered Yarn — Twist
+`node tools/verify-yarn-characterization.mjs [--browser] [--negative-control]`). Section 03 (Twist) is **written** too, with its twist
+multiplier interactive (`yarn-twist.js` / `yarn-twist-ui.js`, same gate). Sections 05–10 are not written yet. The page also holds two sections copied from `/lab`, **Yarn Construction** and **Covered Yarn — Twist
 Direction**, animated by `yarn-diagrams.js` / `yarn-diagrams.css`. Where they sit in the order below is marked
-**[built]**. Until Twist is written, the page numbers them 01 Units, 02 Construction, 03 Covered Yarn; the covered
-section becomes 03b when Twist lands as 03.
+**[built]**. The page numbers them 01 Units, 02 Construction, 03 Twist, 03b Covered Yarn.
 
 ## Ground rules for the whole page
 
@@ -34,7 +33,7 @@ section becomes 03b when Twist lands as 03.
 |---|---|---|---|
 | 01 | Units & terminology **[written]** | Count converter + spec decoder | yes (conversion constants, standards) |
 | 02 | Yarn construction **[built]** | The four animated builds (existing) | light |
-| 03 | Twist | Twist slider → yarn render + strength / hand curves | yes |
+| 03 | Twist **[written]** | Twist slider → yarn render + strength / hand curves | yes |
 | 04 | Covered yarn — twist direction **[built]**, folded under Twist as 03b | SCY S/Z, DCY (existing) | light |
 | 05 | Strength & what changes it | Stress–strain plot with toggles | yes |
 | 06 | Filament count & fineness | Same-denier filament-split slider | yes |
@@ -94,7 +93,7 @@ cheaper, faster covering than twist covering. Each type links forward to the sec
 
 ---
 
-## 03 · Twist
+## 03 · Twist **[written, Nov 14]**
 
 **Scope.** Twist is the single biggest lever on how a spun yarn behaves. This section defines how twist is counted
 (TPM, TPI; 1 TPI = 39.37 TPM). It then explains why a raw twist count cannot be compared across counts and the
