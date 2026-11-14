@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="textile-101.css">
 <link rel="stylesheet" href="yarn-diagrams.css">
+<link rel="stylesheet" href="yarn-characterization.css">
 </head>
 <body id="top">
 
@@ -36,18 +37,155 @@
     </div>
     <h1 class="project__title">Yarn Characterization</h1>
     <p class="project__lede">Understanding how fiber, count, twist, ply, structure, and other yarn variables influence textile behavior.</p>
-    <p class="yd-lede-sub">Starts from how a yarn is put together. Builds on <a href="textile-101.html#yarn-spec">Textile 101 &mdash; Reading a Yarn Spec</a>.</p>
+    <p class="yd-lede-sub">Starts with how a yarn is named and how it is put together. Builds on <a href="textile-101.html#yarn-spec">Textile 101 &mdash; Reading a Yarn Spec</a>.</p>
 
     <nav class="tx-toc" aria-label="On this page">
       <div class="tx-toc__label">On This Page</div>
       <ul class="tx-toc__list">
-        <li><a href="#yarn-construction"><span class="n">01</span>Yarn Construction</a></li>
-        <li><a href="#covered-yarn-twist"><span class="n">02</span>Covered Yarn &mdash; Twist Direction</a></li>
+        <li><a href="#units"><span class="n">01</span>Units &amp; Terminology</a></li>
+        <li><a href="#yarn-construction"><span class="n">02</span>Yarn Construction</a></li>
+        <li><a href="#covered-yarn-twist"><span class="n">03</span>Covered Yarn &mdash; Twist Direction</a></li>
       </ul>
     </nav>
   </div>
 
-  <!-- ---------- 01 · YARN CONSTRUCTION ----------
+  <!-- ---------- 01 · UNITS & TERMINOLOGY ----------
+       Arithmetic: yarn-count.js (pure, gated in Node by
+       tools/verify-yarn-characterization.mjs). DOM: yarn-units.js. -->
+  <section class="tx-topic" id="units">
+    <div class="tx-topic-head">
+      <h2>Units &amp; Terminology</h2>
+      <div class="tx-topic-copy">
+        <p>A yarn label answers four questions: how heavy the yarn is for its length, how many filaments are in it, how many strands are twisted together, and what was done to it after spinning. Every later section on this page uses this vocabulary.</p>
+        <p class="muted">The trap is that there are two kinds of count, and they run in opposite directions.</p>
+      </div>
+    </div>
+
+    <!-- 01a · two families of count -->
+    <div class="yc-sub">Two families of count</div>
+    <div class="yc-two">
+      <div class="yc-card">
+        <div class="yc-card__head">Direct &mdash; mass per length</div>
+        <p>Weigh a fixed length. A heavier, thicker yarn gives a <b>bigger</b> number. Synthetic filament, silk and most technical yarns are sold this way.</p>
+        <dl class="yc-units">
+          <div><dt>Denier <span>D</span></dt><dd>grams per 9,000 m</dd></div>
+          <div><dt>Decitex <span>dtex</span></dt><dd>grams per 10,000 m</dd></div>
+          <div><dt>Tex <span>tex</span></dt><dd>grams per 1,000 m &mdash; the SI-coherent base unit</dd></div>
+        </dl>
+      </div>
+      <div class="yc-card">
+        <div class="yc-card__head">Indirect &mdash; length per mass</div>
+        <p>Count how much length fits in a fixed weight. A heavier, thicker yarn gives a <b>smaller</b> number. Spun cotton and wool yarns are usually sold this way.</p>
+        <dl class="yc-units">
+          <div><dt>Cotton count <span>Ne</span></dt><dd>840-yard hanks per pound</dd></div>
+          <div><dt>Metric count <span>Nm</span></dt><dd>kilometres per kilogram</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <div class="yc-rule">
+      <p><b>Conversions, through tex.</b> dtex = 1.111 &times; D &nbsp;<span class="sep">&mdash;</span>&nbsp; tex = D &divide; 9 &nbsp;<span class="sep">&mdash;</span>&nbsp; Nm = 9,000 &divide; D = 1,000 &divide; tex &nbsp;<span class="sep">&mdash;</span>&nbsp; Ne = 5,315 &divide; D = 590.5 &divide; tex &nbsp;<span class="sep">&mdash;</span>&nbsp; Ne = 0.5905 &times; Nm.</p>
+      <p class="muted">The 590.5 is not a fitted number: 840 yards is 768.096 m and a pound is 453.59237 g, so a yarn of Ne 1 weighs 453.59 g per 0.768 km &mdash; 590.5 g per km. Mixing up the direction is the most common spec error: &ldquo;Ne 40&rdquo; is <em>finer</em> than &ldquo;Ne 20&rdquo;, and &ldquo;40 D&rdquo; is finer than &ldquo;80 D&rdquo;.</p>
+    </div>
+
+    <!-- 01b · the count converter -->
+    <div class="yc-tool" data-yc-converter>
+      <div class="yc-tool__head">
+        <span class="yc-tool__label">Count converter</span>
+        <span class="yc-tool__hint">type in any row &mdash; the others follow</span>
+      </div>
+      <div class="yc-conv">
+        <div class="yc-conv__rows" data-yc-rows></div>
+        <figure class="yc-conv__xsec">
+          <svg data-yc-xsec role="img" aria-label="Two circles: a dashed outline for a 150 denier reference yarn and a filled circle for the yarn entered, with diameters in proportion to the square root of tex"></svg>
+          <figcaption>Relative diameter at the same fibre density (diameter grows as &radic;tex). The dashed outline is the 150 D reference.</figcaption>
+        </figure>
+      </div>
+      <p class="yc-tool__status" data-yc-status aria-live="polite"></p>
+    </div>
+
+    <!-- 01c · denier per filament and notation -->
+    <div class="yc-sub">Filaments, denier per filament, and how a spec is written</div>
+    <div class="yc-prose">
+      <p>A filament yarn is a bundle of continuous filaments. Its count is the whole bundle; divide by the number of filaments to get <b>denier per filament (dpf)</b>, the fineness of each one. 150 D in 48 filaments is 3.1 dpf; 150 D in 288 filaments is 0.52 dpf. Below about 1 dpf a yarn is usually called a <em>microfiber</em>. That is a naming threshold, not a quality grade, and the cut-off varies by region and trade body.</p>
+      <p>The common ways of writing it:</p>
+    </div>
+    <dl class="yc-notation">
+      <div><dt>150D/48F</dt><dd>150 denier, 48 filaments. The same yarn in decitex is <b>167dtex/48f</b> (150 &times; 1.111).</dd></div>
+      <div><dt>2/150/48</dt><dd>Plies / denier / filaments: two 150D/48F yarns twisted together, 300 D and 96 filaments in all.</dd></div>
+      <div><dt>75D/72F &times; 2</dt><dd>The same idea, with the ply count written after.</dd></div>
+      <div><dt>2/30s</dt><dd>Cotton count: two Ne 30 singles plied. Because the system is indirect, the resultant is about Ne 15 (30 &divide; 2), heavier than each single.</dd></div>
+      <div><dt>Nm 48/2</dt><dd>Metric count with the plies written after: two Nm 48 singles, about Nm 24 together.</dd></div>
+    </dl>
+    <p class="yc-prose yc-prose--note">Regions write ply and count in either order in the indirect systems (2/30s and 30/2 mean the same yarn), so the decoder below reads the smaller number as the plies. A plied yarn also weighs a few percent more than plies &times; count, because twisting takes up length.</p>
+
+    <!-- 01d · the spec decoder -->
+    <div class="yc-tool" data-yc-decoder>
+      <div class="yc-tool__head">
+        <span class="yc-tool__label">Spec decoder</span>
+        <span class="yc-tool__hint">pick one, or type your own</span>
+      </div>
+      <div class="yc-dec__presets" role="group" aria-label="Example specs">
+        <button type="button" class="yc-chip" data-yc-preset="150D/48F DTY polyester">150D/48F DTY</button>
+        <button type="button" class="yc-chip" data-yc-preset="167dtex/48f">167dtex/48f</button>
+        <button type="button" class="yc-chip" data-yc-preset="2/150/48 FDY">2/150/48 FDY</button>
+        <button type="button" class="yc-chip" data-yc-preset="75D/72F x2 nylon">75D/72F &times; 2 nylon</button>
+        <button type="button" class="yc-chip" data-yc-preset="2/30s cotton">2/30s cotton</button>
+        <button type="button" class="yc-chip" data-yc-preset="Nm 48/2 wool">Nm 48/2 wool</button>
+        <button type="button" class="yc-chip" data-yc-preset="40D spandex">40D spandex</button>
+      </div>
+      <label class="yc-dec__field">
+        <span class="yc-dec__field-label">Spec</span>
+        <input class="yc-dec__input" type="text" data-yc-spec autocomplete="off" spellcheck="false" aria-describedby="yc-dec-help">
+      </label>
+      <p id="yc-dec-help" class="yc-dec__help">Reads 150D/48F, 167dtex/48f, 2/150/48, 75D/72F x2, 30s, 2/30s, Ne 30, Nm 48/2, plus POY, FDY, DTY or ATY and a fibre name. The filament diameter assumes a round, solid filament.</p>
+      <div class="yc-dec__out" data-yc-out aria-live="polite"></div>
+      <p class="yc-dec__more">Three more worked specs are in <a href="textile-101.html#yarn-spec">Textile 101 &mdash; Reading a Yarn Spec</a>.</p>
+    </div>
+
+    <!-- 01e · process states, filament vs staple, singles vs plied, S vs Z -->
+    <div class="yc-sub">Process states of synthetic filament</div>
+    <p class="yc-prose">A polyester or nylon filament yarn passes through named states between the spinneret and the fabric. The label tells you which state you are buying.</p>
+    <div class="yc-states">
+      <div class="yc-state"><span class="yc-state__tag">POY</span><span class="yc-state__name">Partially oriented yarn</span><p>Spun fast and only partly drawn, so its molecules are only partly aligned. It stretches easily and is unstable. A feedstock for texturing, not a yarn for fabric.</p></div>
+      <div class="yc-state"><span class="yc-state__tag">FDY</span><span class="yc-state__name">Fully drawn yarn</span><p>Drawn to full orientation as it is spun. Flat, smooth, strong and lustrous, with no crimp.</p></div>
+      <div class="yc-state"><span class="yc-state__tag">DTY</span><span class="yc-state__name">Draw-textured yarn</span><p>POY drawn and false-twist textured in one step. Each filament keeps a heat-set helical crimp: bulk, softness and some stretch.</p></div>
+      <div class="yc-state"><span class="yc-state__tag">ATY</span><span class="yc-state__name">Air-textured yarn</span><p>Filament overfed into an air jet that blows loops into it. Matte and spun-like, with little stretch.</p></div>
+    </div>
+    <p class="yc-prose yc-prose--note">POY &rarr; FDY is drawing; POY &rarr; DTY is drawing plus false-twist texturing; ATY is made from POY or FDY. How texturing works, and what each type does to a fabric, is a later section.</p>
+
+    <div class="yc-sub">Three distinctions that recur</div>
+    <div class="yc-three">
+      <div class="yc-card">
+        <div class="yc-card__head">Filament vs staple</div>
+        <p><b>Filament</b> is continuous, kilometres long: smooth, lustrous, with no ends to fuzz. <b>Staple</b> is short fibre, millimetres to centimetres, drafted into overlap and twisted. Its ends stick out, making it soft, matte and warmer to the touch. Synthetics can be either; cotton and wool are only staple.</p>
+      </div>
+      <div class="yc-card">
+        <div class="yc-card__head">Singles vs plied</div>
+        <p>A <b>single</b> is one strand. A <b>plied</b> yarn twists two or more singles together, usually in the opposite direction to their own twist. Plying evens out weak spots, balances the twist&rsquo;s torque and adds strength, at the cost of more processing.</p>
+      </div>
+      <div class="yc-card yc-card--sz">
+        <div class="yc-card__head">S vs Z twist</div>
+        <svg class="yc-sz" viewBox="0 0 220 150" role="img" aria-label="Two vertical yarns. The left one, labelled S, has its fibres sloping down to the right like the middle of the letter S. The right one, labelled Z, has its fibres sloping down to the left like the middle of the letter Z.">
+          <g class="yc-sz__yarn">
+            <rect x="35" y="14" width="30" height="110" rx="15"/>
+            <rect x="155" y="14" width="30" height="110" rx="15"/>
+          </g>
+          <g class="yc-sz__fibre">
+            <line x1="37" y1="22" x2="63" y2="44"/><line x1="37" y1="44" x2="63" y2="66"/><line x1="37" y1="66" x2="63" y2="88"/><line x1="37" y1="88" x2="63" y2="110"/>
+            <line x1="183" y1="22" x2="157" y2="44"/><line x1="183" y1="44" x2="157" y2="66"/><line x1="183" y1="66" x2="157" y2="88"/><line x1="183" y1="88" x2="157" y2="110"/>
+          </g>
+          <text class="yc-sz__letter" x="50" y="146" text-anchor="middle">S</text>
+          <text class="yc-sz__letter" x="170" y="146" text-anchor="middle">Z</text>
+        </svg>
+        <p>Hold the yarn upright. If the fibres slope like the middle stroke of an <b>S</b>, it is S-twist; like the middle of a <b>Z</b>, Z-twist. Singles are most often Z, and the ply twist over them S. Section 03 shows both directions wrapping a core.</p>
+      </div>
+    </div>
+
+    <p class="yc-sources"><span class="yc-sources__label">Sources</span> ISO 1144 and ASTM D861 (the tex system); ASTM D2260 (conversion factors between yarn numbering systems); ISO 2060 and ASTM D1907 (linear density by the skein method); ISO 2 (designation of twist direction). Fibre densities used for the filament diameter: Morton &amp; Hearle, <em>Physical Properties of Textile Fibres</em>.</p>
+  </section>
+
+  <!-- ---------- 02 · YARN CONSTRUCTION ----------
        The diagrams are drawn by yarn-diagrams.js (a copy of the /lab
        #yarn-construction builders; /lab is left untouched). -->
   <section class="tx-topic" id="yarn-construction">
@@ -91,7 +229,7 @@
     </div>
   </section>
 
-  <!-- ---------- 02 · COVERED YARN — TWIST DIRECTION ----------
+  <!-- ---------- 03 · COVERED YARN — TWIST DIRECTION ----------
        A copy of /lab #covered-yarn-twist. -->
   <section class="tx-topic" id="covered-yarn-twist">
     <div class="tx-topic-head">
@@ -162,6 +300,7 @@
 <a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
 
 <script src="yarn-diagrams.js"></script>
+<script type="module" src="yarn-units.js"></script>
 
 </body>
 </html>
