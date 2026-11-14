@@ -30,6 +30,21 @@
 //   V19 the Hard round is 8 items, interleaved, and an arrow grid missed last time comes first
 //   V20 chapter 06's lab formulas (Poisson width and volume, the stretched conductor's R, its gauge factor, copper's
 //       yield) against the physics restated in the gate, and every stretch challenge reachable on the sliders
+//   V21 chapter-check options are shuffled once per question per visit: over 12 fresh loads the right answer of each
+//       chapter's first question lands on every letter (each letter 6 to 34 times of 72) and moves in every chapter;
+//       a question shown again in the same visit keeps its order; the "It's X" letter is the right answer's letter as
+//       shown, never its position in the data, and the right answer is the option marked right (six questions, so a
+//       mapping mixed up between shown and data order can't pass by luck)
+//   V22 the question set: no id used twice (check questions and the sensor questions share one record), no
+//       throwaway option, and the right answer is the strictly longest option on at most a quarter of questions
+//   V23 arrow grids: every item has three rows, no item points all one way, and no direction is right on more than a
+//       third of the rows; reports what answering "up" everywhere scores
+//   V24 tap targets: every control in the progress panel and the chapters is at least 32 px tall at 1280 and 44 px at
+//       390 (the sliders' hit area included)
+//   V25 the corrected copy, as served: none of the audit's wrong statements anywhere in the page text, the scenes'
+//       drawings or the three study modules; permittivity written εᵣ; the contact line read from one place (card,
+//       caption, drawing, cloze); one explanation of the harder games, in chapter 01; PEDOT:PSS's best figure and the
+//       heater yarns' labels
 // --negative-control [--mutant=a,b] re-serves the page with a defect planted, one at a time, and requires the named check
 // to fail: storage never written (V6, V11), the Next button shown early (V7), Build the Stack accepting any
 // layer (V9), a slider that writes nothing (V5), the mixed round unranked (V10), Type the line accepting
@@ -304,16 +319,23 @@ async function run(patch = {}, quiet = false) {
           const f1 = await findFault();
           await tap(f1.gap != null ? `${F} .sx-gap-btn[data-gap="${f1.gap}"]` : `${F} .sx-fault-layer[data-pos="${f1.pos}"]`);
           const why1 = await page.$eval(`${F} .sx-why`, e => e.textContent);
-          // a wrong tap of each kind: a layer tapped when one is missing, a gap tapped when two are swapped
-          const wrongs = [];
+          // a wrong tap of each kind: a layer tapped when one is missing, a gap tapped when two are swapped.
+          // "Another one" stays hidden until a fault is answered, so a fault of the other kind is answered
+          // first, with a tap that is wrong by construction (a gap on a swap, a layer on a missing one), and
+          // counted. Without that the search got one draw, and a swap at position 0 made the "wrong" layer
+          // tap right about one run in five.
+          const wrongs = []; let skipped = 0, found = 0;
+          const wrongTap = f => tap(f.gap != null ? `${F} .sx-fault-layer[data-pos="0"]` : `${F} .sx-gap-btn[data-gap="0"]`);
           for (const kind of ['gap', 'pos']) {
-            let f2 = null;
-            for (let k = 0; k < 40; k++) { await tap(`${F} [data-a="more"]`); f2 = await findFault(); if (f2[kind] != null) break; }
-            await tap(kind === 'gap' ? `${F} .sx-fault-layer[data-pos="0"]` : `${F} .sx-gap-btn[data-gap="0"]`);
+            await tap(`${F} [data-a="more"]`);
+            let f2 = await findFault();
+            for (let k = 0; k < 40 && f2[kind] == null; k++) { await wrongTap(f2); skipped++; await tap(`${F} [data-a="more"]`); f2 = await findFault(); }
+            if (f2[kind] != null) found++;
+            await wrongTap(f2);
             wrongs.push(await page.$eval(`${F} .sx-why`, e => e.textContent));
           }
           const fRec = (await store()).hard?.fault?.all;
-          ok('V17', /^✓ Right/.test(why1) && wrongs.every(w => /^✕/.test(w)) && fRec?.right === 1 && fRec?.wrong === 2, `right tap "${why1.slice(0, 7)}"; wrong layer tap "${wrongs[0].slice(0, 26)}", wrong gap tap "${wrongs[1].slice(0, 26)}"; stored ${JSON.stringify(fRec)}`);
+          ok('V17', /^✓ Right/.test(why1) && found === 2 && wrongs.every(w => /^✕/.test(w)) && /missing/.test(wrongs[0]) && /swapped/.test(wrongs[1]) && fRec?.right === 1 && fRec?.wrong === 2 + skipped, `right tap "${why1.slice(0, 7)}"; wrong layer tap on a missing layer "${wrongs[0].slice(0, 26)}", wrong gap tap on a swap "${wrongs[1].slice(0, 26)}" (${skipped} of the other kind answered on the way); stored ${JSON.stringify(fRec)}`);
         } catch (e) { ok('V17', false, 'threw: ' + String(e.message).split('\n')[0]); }
         try {
           // V18 lab challenges
@@ -368,7 +390,98 @@ async function run(patch = {}, quiet = false) {
           const led = firsts.filter(f => f === miss.q).length;
           ok('V19', led === 3 && /^1 of 8 · Up, down or same\?/.test(bar), `missed arrow grid (${miss.id}) led ${led} of 3 fresh rounds; "${bar}"`);
         } catch (e) { ok('V19', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V21 option order: spread over fresh loads, stable within one, and the feedback letter as shown
+          await page.evaluate(() => localStorage.clear());
+          const letters = { A: 0, B: 0, C: 0, D: 0 }, perCh = {}, LOADS = 12;
+          for (let k = 0; k < LOADS; k++) {
+            await page.reload(); await page.waitForTimeout(250);
+            const got = await page.$$eval('[data-sx-quiz] .sx-q', qs => qs.map(q => ({ id: q.dataset.q, ch: q.closest('[data-sx-quiz]').dataset.sxQuiz, opts: [...q.querySelectorAll('.sx-opt')].map(o => ({ key: o.dataset.key, i: +o.dataset.i })) })));
+            for (const g of got) { const it = DATA.QUIZ.find(x => x.id === g.id), key = g.opts.find(o => o.i === it.a)?.key; if (key) letters[key]++; (perCh[g.ch] ||= new Set()).add(key); }
+          }
+          const nSamples = Object.values(letters).reduce((a, b) => a + b, 0);
+          const spread = Object.values(letters).every(n => n >= 6 && n <= 34);
+          const moved = Object.values(perCh).every(set => set.size >= 2);
+          // stable within the visit, and the feedback letter: answer every flow question wrong, then start over
+          const Q = '[data-sx-quiz="flow"]', order = () => page.$$eval(`${Q} .sx-opt`, os => os.map(o => o.dataset.i).join(''));
+          const order0 = await order(), letterBad = [];
+          for (let n = 0; n < 12; n++) {
+            const qid = await page.$eval(`${Q} .sx-q`, e => e.dataset.q).catch(() => null); if (!qid) break;
+            const it = DATA.QUIZ.find(x => x.id === qid);
+            await tap(`${Q} .sx-opt[data-i="${it.a === 0 ? 1 : 0}"]`);
+            const fb = await page.$eval(Q, (e, a) => ({ said: ((e.querySelector('.sx-why b')?.textContent || '').match(/It’s ([A-D])/) || [])[1], key: e.querySelector(`.sx-opt[data-i="${a}"]`).dataset.key, mark: e.querySelector(`.sx-opt[data-i="${a}"]`).dataset.r }), it.a);
+            if (fb.said !== fb.key) letterBad.push(`${qid} said ${fb.said}, shown ${fb.key}`);
+            if (fb.mark !== 'right') letterBad.push(`${qid} right answer marked ${fb.mark}`);
+            if (!await tap(`${Q} [data-a="next"]`)) break;
+          }
+          await tap(`${Q} [data-a="all"]`);
+          const order1 = await order();
+          ok('V21', nSamples === 6 * LOADS && spread && moved && order0 === order1 && !letterBad.length,
+            `right answer over ${LOADS} loads × 6 chapters: ${Object.entries(letters).map(([k, n]) => `${k} ${n}`).join(', ')}; moved in every chapter ${moved}; same order after starting over ${order0 === order1}; feedback letter ${letterBad.length ? 'wrong: ' + letterBad.slice(0, 2).join(' | ') : 'is the shown letter, and the right answer is marked right'}`);
+        } catch (e) { ok('V21', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V22 the question set, as served
+          const r22 = await page.evaluate(async () => {
+            const D = await import('/smart-textiles-study-data.js'), H = await import('/smart-textiles-study-hard.js');
+            const dup = a => a.filter((x, i) => a.indexOf(x) !== i);
+            const longest = D.QUIZ.filter(q => { const L = q.o.map(x => x.length), m = Math.max(...L); return L[q.a] === m && L.filter(x => x === m).length === 1; }).map(q => q.id);
+            const junk = D.QUIZ.flatMap(q => q.o.filter(o => /magnetic|fashion|in the dark|weighing it|melts at body|drops to zero|goes negative|flip sign/i.test(o)).map(o => `${q.id}: ${o}`));
+            return { n: D.QUIZ.length, dq: dup(D.QUIZ.map(q => q.id).concat(D.WHICH_SENSOR.map(w => `w-${w.id}`))), dc: dup(D.CARDS.map(c => c.id)), da: dup(H.ARROWS.map(a => a.id)), longest, junk };
+          });
+          ok('V22', !r22.dq.length && !r22.dc.length && !r22.da.length && !r22.junk.length && r22.longest.length <= r22.n / 4,
+            `${r22.n} questions; ids used twice: ${[...r22.dq, ...r22.dc, ...r22.da].join(', ') || 'none'}; throwaway options: ${r22.junk.join(' | ') || 'none'}; right answer strictly longest on ${r22.longest.length} (at most ${r22.n / 4})`);
+        } catch (e) { ok('V22', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V23 arrow grids, as served
+          const r23 = await page.evaluate(async () => {
+            const H = await import('/smart-textiles-study-hard.js'), c = { up: 0, down: 0, same: 0 }, short = [], mono = [];
+            let rows = 0;
+            for (const a of H.ARROWS) { if (a.rows.length < 3) short.push(a.id); if (new Set(a.rows.map(r => r[1])).size === 1) mono.push(a.id); for (const r of a.rows) { c[r[1]]++; rows++; } }
+            const allOne = d => H.ARROWS.filter(a => a.rows.every(r => r[1] === d)).length;
+            return { n: H.ARROWS.length, c, rows, short, mono, upItems: allOne('up') };
+          });
+          const share = d => r23.c[d] / r23.rows, pc = x => `${(x * 100).toFixed(1)}%`;
+          ok('V23', !r23.short.length && !r23.mono.length && ['up', 'down', 'same'].every(d => share(d) <= 1 / 3 + 1e-9),
+            `${r23.n} items, ${r23.rows} rows: up ${r23.c.up}, down ${r23.c.down}, same ${r23.c.same}; under three rows: ${r23.short.join(', ') || 'none'}; all one way: ${r23.mono.join(', ') || 'none'}; answering up everywhere: ${pc(share('up'))} of rows, ${r23.upItems} of ${r23.n} items (chance is 33.3% of rows)`);
+        } catch (e) { ok('V23', false, 'threw: ' + String(e.message).split('\n')[0]); }
+        try {
+          // V25 the corrected copy and notation, everywhere the page says it
+          const r25 = await page.evaluate(async () => {
+            const D = await import('/smart-textiles-study-data.js'), S = await import('/smart-textiles-study-scenes.js');
+            const svgs = window.__sxPlayers.map(p => [0.15, 0.5, 0.85].map(t => p.scene.draw(t, { ...p.state })).join(' ')).join(' ');
+            const mods = (await Promise.all(['/smart-textiles-study-data.js', '/smart-textiles-study-hard.js', '/smart-textiles-study-scenes.js'].map(u => fetch(u).then(r => r.text())))).join(' ');
+            const all = document.body.innerText + ' ' + svgs + ' ' + mods;
+            const FORBID = [/every contact is a toll booth/i, /C = εA/, /\(ε ≈/, /ε the material filling/, /Water’s permittivity is/, /10⁻⁵ at best/, /often 100× higher/, /silver-plated, 10 Ω\/m/i, /silver-plated yarn \(10/i, /150 times that/, /A plain solid material/, /a hundredth of what the liquid metal takes/, /0\.05–0\.2%/, /its low Ω\/m means long lines/, /40× copper/, /40× worse than copper/];
+            const hits = FORBID.filter(re => re.test(all)).map(String);
+            const cap = document.querySelector('[data-sx-line="contact"]')?.textContent.trim();
+            const card = D.CARDS.find(c => c.id === 'toll'), more = D.CARD_MORE.toll;
+            const contacts = window.__sxPlayers.find(p => p.name === 'contacts');
+            const drawn = contacts ? contacts.scene.draw(0.3, { ...contacts.state }) : '';
+            const whole = w => new RegExp(`(^|[^\\p{L}])${w}([^\\p{L}]|$)`, 'u').test(D.CONTACT.hook);
+            const contact = D.CONTACT_LINES.length >= 2 && D.CONTACT_LINES.includes(D.CONTACT) && cap === D.CONTACT.hook && card.hook === D.CONTACT.hook && drawn.includes(D.CONTACT.hook) && more.cloze.join() === D.CONTACT.cloze.join() && D.CONTACT.cloze.every(whole);
+            const help = document.querySelectorAll('[data-sx-harder-help]'), notes = document.querySelectorAll('.sx-sub-note');
+            const harder = help.length === 1 && notes.length === 1 && !!help[0].closest('#flow');
+            const pedot = D.METALS.find(m => m.id === 'pedot').rho, yarn = S.HEATER_YARNS[10];
+            return { hits, contact, cap, harder, nHelp: help.length, nNotes: notes.length, pedot, yarn };
+          });
+          ok('V25', !r25.hits.length && r25.contact && r25.harder && r25.pedot <= 3e-6 && !/silver/i.test(r25.yarn),
+            `wrong statements found: ${r25.hits.join(' ') || 'none'}; contact line "${r25.cap}" in card, caption, drawing and blanks ${r25.contact}; harder-games help ${r25.nHelp}, notes ${r25.nNotes}, in chapter 01 ${r25.harder}; PEDOT best ρ ${r25.pedot}; 10 Ω/m yarn "${r25.yarn}"`);
+        } catch (e) { ok('V25', false, 'threw: ' + String(e.message).split('\n')[0]); }
       }
+
+      // V24 tap targets: every control in the progress panel and the chapters, prose links excepted
+      const minH = w < 700 ? 44 : 32;
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const small = await page.evaluate(min => {
+        const out = [];
+        for (const e of document.querySelectorAll('#progress a, #progress button, #smart button, #smart input, #smart select')) {
+          const r = e.getBoundingClientRect();
+          if (!r.width || !r.height || e.closest('p, figcaption, .st-credit')) continue;
+          if (r.height < min - 0.5) out.push(`${e.tagName.toLowerCase()}.${String(e.className || e.type).split(' ')[0]} "${(e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 18)}" ${Math.round(r.height)}px`);
+        }
+        return { out, n: document.querySelectorAll('#progress a, #progress button, #smart button, #smart input, #smart select').length };
+      }, minH);
+      ok('V24', !small.out.length, `${w}px ${small.n} controls, ${small.out.length} under ${minH} px${small.out.length ? ': ' + small.out.slice(0, 5).join(' | ') : ''}`);
 
       const sw = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       ok('V12', !errs.length && sw <= 0, `${w}px page errors ${errs.length}${errs.length ? ' ' + errs[0] : ''}; horizontal overflow ${sw}px`);
@@ -395,6 +508,21 @@ if (process.argv.includes('--negative-control')) {
     ['gauge-ignores-thinning', { 'smart-textiles-study-scenes.js': ['ratio = (1 + e) ** (1 + 2 * g.nu)', 'ratio = (1 + e)'] }, ['V20', 'V18']],
     ['challenge-never-advances', { 'smart-textiles-study-hard.js': ['if (at < spec.targets.length && spec.targets[at][1](v))', 'if (false)'] }, ['V18']],
     ['hard-round-unranked', { 'smart-textiles-study.js': ["ranked('arrows', ARROWS).slice(0, 3)", 'shuffle(ARROWS).slice(0, 3)'] }, ['V19']],
+    ['options-not-shuffled', { 'smart-textiles-study.js': ['OPT_ORDER.set(q.id, shuffle(q.o.map((_, i) => i)))', 'OPT_ORDER.set(q.id, q.o.map((_, i) => i))'] }, ['V21']],
+    ['options-reshuffled-every-render', { 'smart-textiles-study.js': ['if (!OPT_ORDER.has(q.id)) OPT_ORDER.set(', 'if (true) OPT_ORDER.set('] }, ['V21']],
+    ['marking-by-shown-position', { 'smart-textiles-study.js': ["opts.forEach(o => { const k = +o.dataset.i; o.disabled = true;", "opts.forEach((o, k) => { o.disabled = true;"] }, ['V21']],
+    ['feedback-letter-from-data-order', { 'smart-textiles-study.js': ['`✕ It’s ${rightKey}.`', "`✕ It’s ${'ABCD'[q.a]}.`"] }, ['V21']],
+    ['throwaway-option', { 'smart-textiles-study-data.js': ["o: ['Silver', 'Gold', 'Nickel', 'Copper']", "o: ['Silver', 'Gold', 'Nickel', 'Copper, because it’s magnetic']"] }, ['V22']],
+    ['right-answer-longest', { 'smart-textiles-study-data.js': ['export const STATS = [', "QUIZ.forEach(q => { q.o[q.a] += ', which is the fully worked-out answer'; });\nexport const STATS = ["] }, ['V22']],
+    ['duplicate-question-id', { 'smart-textiles-study-data.js': ["{ id: 'q-creep',", "{ id: 'q-drift',"] }, ['V22']],
+    ['arrow-item-two-rows', { 'smart-textiles-study-hard.js': [", ['LED brightness', 'down']]", ']'] }, ['V23']],
+    ['arrows-lean-up', { 'smart-textiles-study-hard.js': ["['Its resistance once it cools back to 20 °C', 'same']", "['Its resistance once it cools back to 20 °C', 'up']"] }, ['V23']],
+    ['small-slider-hit-area', { 'smart-textiles-study.css': ['  .sx-slider input[type="range"] { height: 44px; }\n', ''] }, ['V24']],
+    ['toll-booth-line-back', { 'smart-textiles-study-scenes.js': ['s += T(40, 224, CONTACT.hook, { size: 9.5 });', "s += T(40, 224, 'Every contact is a toll booth.', { size: 9.5 });"] }, ['V25']],
+    ['contact-caption-not-read', { 'smart-textiles-study.js': ["for (const el of $$('[data-sx-line=\"contact\"]')) el.textContent = CONTACT.hook;", ''] }, ['V25']],
+    ['permittivity-without-r', { 'smart-textiles-study-hard.js': ['fill the gap with polyester (εᵣ ≈ 3)', 'fill the gap with polyester (ε ≈ 3)'] }, ['V25']],
+    ['harder-help-repeated', { 'smart-textiles-study.html': ['<div class="sx-hard" data-sx-hard="resist"></div>', '<p class="sx-sub-note" data-sx-harder-help>Again.</p>\n    <div class="sx-hard" data-sx-hard="resist"></div>'] }, ['V25']],
+    ['pedot-figure-back', { 'smart-textiles-study-data.js': ["rho: 2.3e-6, rhoNote: '≈ 2 × 10⁻⁶ at best (acid-treated film); 10⁻³–10⁻² untreated',", "rho: 1e-5, rhoNote: '≈ 10⁻⁵ at best; often 100× higher',"] }, ['V25']],
   ];
   let failed = 0;
   const only = (process.argv.find(a => a.startsWith('--mutant=')) || '').slice(9).split(',').filter(Boolean);

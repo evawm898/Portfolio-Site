@@ -288,3 +288,20 @@
 }
 .sx-mini .alts { font-size: 11.5px; line-height: 1.55; color: var(--ink-dim); margin-top: 0.45rem; }
 .sx-btn--go:disabled { background: transparent; border-color: var(--line); color: var(--color-faint); }
+
+/* ---------- tap targets ----------
+   Every control is at least 32 px tall with a mouse, and 44 px on a touch or narrow screen (the slider's
+   hit area, not its track: the range input is made tall and the track stays thin). Checked by V24 in
+   tools/smart-textiles/verify-study.mjs. */
+.sx-btn, .sx-opt, .sx-chip, .sx-layer-btn, .sx-order-item, .sx-fault-layer, .sx-gap-btn, .sx-input, .sx-dir { min-height: 32px; }
+.sx-slider input[type="range"] { height: 32px; margin: 0; }
+.sx-chapters li a { min-height: 32px; }
+.sx-cta { display: inline-flex; align-items: center; min-height: 32px; border-bottom: none; text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 640px), (pointer: coarse) {
+  .sx-btn, .sx-opt, .sx-chip, .sx-layer-btn, .sx-order-item, .sx-fault-layer, .sx-gap-btn, .sx-input, .sx-dir, .sx-mode .st-btn { min-height: 44px; }
+  .sx-dir { min-width: 44px; }
+  .sx-slider input[type="range"] { height: 44px; }
+  .sx-chapters li a { min-height: 44px; }
+  .sx-cta { min-height: 44px; }
+  .sx-gap { min-height: 44px; }
+}

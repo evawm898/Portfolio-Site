@@ -231,7 +231,7 @@
       <figure class="st-cell" data-st="capacitive">
         <div class="st-anim"><svg role="img" aria-label="Two conductive electrode fabrics sit either side of a spacer fabric of pile yarns. A fingertip presses, the pile yarns bend and the gap closes; more charge collects on the facing surfaces and the capacitance trace rises."></svg></div>
         <figcaption><span class="label">Capacitive pressure</span><span class="state">Press &rarr; gap closes &rarr; C rises</span>
-          <span class="sub">Two conductive layers separated by a spacer fabric form a capacitor. Capacitance is <i>C = &epsilon;A / d</i>: press, the gap <i>d</i> shrinks, and the layers hold more charge. No current flows through the stack, so it drifts less than a resistive sensor and can sense through clothing.</span></figcaption>
+          <span class="sub">Two conductive layers separated by a spacer fabric form a capacitor. Capacitance is <i>C = &epsilon;<sub>0</sub>&epsilon;<sub>r</sub>A / d</i>, where &epsilon;<sub>r</sub> is how well the spacer holds a field: press, the gap <i>d</i> shrinks, and the layers hold more charge. A springy spacer comes back to the same gap, so it drifts less than a resistive sensor, whose carbon-polymer layer creeps; and because a hand is a conductor, it can sense one through clothing.</span></figcaption>
       </figure>
       <figure class="st-cell" data-st="matrix">
         <div class="st-anim"><svg role="img" aria-label="Rows and columns of conductive yarn cross in an 8 by 8 grid. The electronics drive one row at a time and read every column; a pressed region lights up, and beside it a heat map of all 64 crossings builds up as the scan runs."></svg></div>
@@ -251,7 +251,7 @@
       <figure class="st-cell" data-st="temperature">
         <div class="st-anim"><svg role="img" aria-label="A close-up of a metal wire: as it warms, its atoms vibrate harder and electrons passing through scatter more. The temperature readout and resistance rise together, and the resistance-versus-temperature plot is a straight line."></svg></div>
         <figcaption><span class="label">Temperature</span><span class="state">Hotter &rarr; atoms shake &rarr; R rises</span>
-          <span class="sub">A fine metal wire knitted or woven into the fabric. Warmer atoms vibrate harder and scatter the electrons moving through them, so resistance rises in a nearly straight line &mdash; platinum by about 0.39 % per degree. Carbon composites do the opposite and drop.</span></figcaption>
+          <span class="sub">A fine metal wire knitted or woven into the fabric. Warmer atoms vibrate harder and scatter the electrons moving through them, so resistance rises in a nearly straight line &mdash; platinum by about 0.39 % per degree. Carbon fibre goes slightly the other way and drops; carbon-black composites usually rise steeply near a threshold, which is how self-regulating heaters limit themselves.</span></figcaption>
       </figure>
       <figure class="st-cell" data-st="emg">
         <div class="st-anim"><svg role="img" aria-label="Two textile electrodes on the skin over a muscle, wired to an amplifier. The muscle fibers fire and contract, and the EMG trace bursts with a fast, noisy signal, then goes quiet at rest."></svg></div>
@@ -272,8 +272,8 @@
     <div class="st-grid st-grid--2">
       <figure class="st-cell" data-st="heater">
         <div class="st-anim"><svg role="img" aria-label="A switch closes and current runs through a serpentine resistive yarn, which glows warm; the temperature curve rises toward a plateau while the current is on and falls back when it switches off."></svg></div>
-        <figcaption><span class="label">Heating</span><span class="state">P = I&sup2;R</span>
-          <span class="sub">Current through a resistive yarn turns into heat, in proportion to its resistance and the square of the current. The yarn&rsquo;s resistance per metre and the length of the serpentine set how much heat a given battery delivers.</span></figcaption>
+        <figcaption><span class="label">Heating</span><span class="state">P = I&sup2;R = V&sup2;/R</span>
+          <span class="sub">Current through a resistive yarn turns into heat: P = I&sup2;R. A battery fixes the voltage, though, so the power is V&sup2;/R, and a longer or higher-resistance line makes <i>less</i> heat, not more. The yarn&rsquo;s resistance per metre and the length of the serpentine set how much heat a given battery delivers.</span></figcaption>
       </figure>
       <figure class="st-cell" data-st="peltier">
         <div class="st-anim"><svg role="img" aria-label="A Peltier element of alternating n and p legs sits under a fabric printed with thermochromic ink. Current through the legs pumps heat up into the fabric, the fabric warms past the ink's switching temperature and the ink clears; reversing the current pumps heat down and the ink darkens again. The fabric temperature follows a dashed setpoint."></svg></div>
@@ -305,7 +305,7 @@
       <figure class="st-cell" data-st="antenna">
         <div class="st-anim"><svg role="img" aria-label="A conductive ground fabric, a felt layer and a silver patch stack together and the patch radiates. When the felt is pressed thinner, the dip in the return-loss plot slides to a lower frequency."></svg></div>
         <figcaption><span class="label">Textile antenna</span><span class="state">Patch &middot; felt &middot; ground fabric</span>
-          <span class="sub">A conductive patch over a felt spacer over a conductive ground layer: a microstrip patch antenna made of cloth. Its frequency is set by the patch size and the felt&rsquo;s thickness, so crushing, stretching or wetting the felt detunes it.</span></figcaption>
+          <span class="sub">A conductive patch over a felt spacer over a conductive ground layer: a microstrip patch antenna made of cloth. Its frequency is set mainly by the patch&rsquo;s length and the felt&rsquo;s permittivity (&epsilon;<sub>r</sub>, how well it holds a field); the felt&rsquo;s thickness matters less and mostly sets the bandwidth. Stretching the patch, crushing the felt, or wetting it (water raises &epsilon;<sub>r</sub>) detunes it.</span></figcaption>
       </figure>
       <figure class="st-cell" data-st="tribo">
         <div class="st-anim"><svg role="img" aria-label="A nylon layer and a PTFE layer press together and pull apart. On contact, nylon gives up electrons to the PTFE; as they separate, charge flows through a load one way, and back the other way as they touch again."></svg></div>
@@ -320,7 +320,7 @@
       <figure class="st-cell" data-st="thermoE">
         <div class="st-anim"><svg role="img" aria-label="Alternating n-type and p-type legs connected in series stand between warm skin and cooler air. Heat flows up through them, carriers drift from the warm end to the cool end, and the voltage rises with the temperature difference."></svg></div>
         <figcaption><span class="label">Thermoelectric</span><span class="state">Body heat &rarr; voltage</span>
-          <span class="sub">Legs of p-type and n-type material connected in series, warm skin on one side and cooler air on the other. The temperature difference drives carriers along each leg and adds up to a voltage. Tens of microvolts per degree per leg: many legs, and still microwatts.</span></figcaption>
+          <span class="sub">Legs of p-type and n-type material connected in series, warm skin on one side and cooler air on the other. The temperature difference drives carriers along each leg and adds up to a voltage: tens of microvolts per degree per leg in printed and polymer materials, about 200 in bismuth telluride. Many legs, a few degrees across the fabric, and still microwatts.</span></figcaption>
       </figure>
     </div>
   </section>

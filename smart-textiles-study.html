@@ -116,7 +116,7 @@
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="flow"></div>
     <h3 class="st-sub">Harder: no options to pick from</h3>
-    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
+    <p class="sx-sub-note" data-sx-harder-help>Every chapter ends with a set like this one. There&rsquo;s nothing to recognise, so you have to produce the answer. <b>Up, down or same?</b> gives you a change and three quantities: pick &uarr;, &darr; or = (stays the same) for each row, then check. <b>Work it out</b> wants a number: within 3% counts, a wrong one tells you whether you were high or low, and Hint gives the formula, then the numbers. <b>Put it in order</b>: tap two items to swap them, and each check locks whatever is already in place. <b>Spot the fault</b> (chapter 05): tap the layer that&rsquo;s in the wrong place, or the gap where one is missing.</p>
     <div class="sx-hard" data-sx-hard="flow"></div>
   </section>
 
@@ -156,16 +156,16 @@
       </figure>
       <figure class="st-cell" data-st="contacts">
         <div class="st-anim"><svg role="img" aria-label="A conductive weft knit is stretched sideways. Its loops widen, the points where neighbouring loops touch light up less and less, and a plot of resistance rises while it's stretched and falls when it relaxes."></svg></div>
-        <figcaption><span class="label">Why a knit senses stretch</span><span class="state">Every contact is a toll booth</span><span class="sub">The metal barely strains. What changes is how many loops touch and how hard. This knit loses contacts as it stretches, so its resistance rises; some structures do the opposite at first. The direction depends on the knit.</span></figcaption>
+        <figcaption><span class="label">Why a knit senses stretch</span><span class="state" data-sx-line="contact"></span><span class="sub">The metal barely strains. What changes is how many loops touch and how hard. This knit loses contacts as it stretches, so its resistance rises; some structures do the opposite at first. The direction depends on the knit.</span></figcaption>
       </figure>
     </div>
 
     <h3 class="st-sub">Play: design a heater</h3>
     <figure class="st-cell sx-wide sx-lab" data-st="heater">
       <div class="st-toggles" role="group" aria-label="Heater yarn">
-        <button type="button" class="st-btn" data-st-for="heater" data-st-key="yarn" data-st-value="10" aria-pressed="false">Silver-plated, 10 &Omega;/m</button>
+        <button type="button" class="st-btn" data-st-for="heater" data-st-key="yarn" data-st-value="10" aria-pressed="false">Ag&ndash;Cu wrapped, 10 &Omega;/m</button>
         <button type="button" class="st-btn" data-st-for="heater" data-st-key="yarn" data-st-value="30" aria-pressed="true">Stainless, 30 &Omega;/m</button>
-        <button type="button" class="st-btn" data-st-for="heater" data-st-key="yarn" data-st-value="100" aria-pressed="false">Carbon, 100 &Omega;/m</button>
+        <button type="button" class="st-btn" data-st-for="heater" data-st-key="yarn" data-st-value="100" aria-pressed="false">Carbon fibre tow, 100 &Omega;/m</button>
       </div>
       <div class="st-anim"><svg role="img" aria-label="A heated panel run from a 5 volt battery: one or more serpentine lines of heater yarn connected in parallel between a plus bus and a return bus. The lines glow from cool to hot with the watts per metre. A checklist shows resistance, current, power and how much yarn is laid, with a hint when it isn't workable."></svg></div>
       <div class="sx-controls">
@@ -181,7 +181,6 @@
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="resist"></div>
     <h3 class="st-sub">Harder: no options to pick from</h3>
-    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
     <div class="sx-hard" data-sx-hard="resist"></div>
   </section>
 
@@ -229,7 +228,6 @@
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="metals"></div>
     <h3 class="st-sub">Harder: no options to pick from</h3>
-    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
     <div class="sx-hard" data-sx-hard="metals"></div>
   </section>
 
@@ -254,11 +252,11 @@
         <caption>Side by side</caption>
         <thead><tr><th scope="col"></th><th scope="col">Resistive</th><th scope="col">Capacitive</th></tr></thead>
         <tbody>
-          <tr><th scope="row">What changes</th><td>Resistance: how easily current passes through</td><td>Capacitance: how much charge the plates hold (C = &epsilon;A/d)</td></tr>
+          <tr><th scope="row">What changes</th><td>Resistance: how easily current passes through</td><td>Capacitance: how much charge the plates hold (C = &epsilon;<sub>0</sub>&epsilon;<sub>r</sub>A/d)</td></tr>
           <tr><th scope="row">Pressing does</th><td>More conductive paths touch, so R falls</td><td>The gap closes, so C rises</td></tr>
           <tr><th scope="row">Needs force?</th><td>Yes, contact and pressure</td><td>No. It can sense a hand that only comes near</td></tr>
           <tr><th scope="row">Read by</th><td>A voltage divider: measure a voltage</td><td>Timing a charge, or an oscillator&rsquo;s frequency</td></tr>
-          <tr><th scope="row">Water and sweat</th><td>Conducts: can short the electrodes</td><td>Permittivity about 80: reads as a big touch</td></tr>
+          <tr><th scope="row">Water and sweat</th><td>Conducts: can short the electrodes</td><td>Relative permittivity &epsilon;<sub>r</sub> about 80: reads as a big touch</td></tr>
           <tr><th scope="row">Drift</th><td>Polymer layers creep and show hysteresis</td><td>Stable if the spacer springs back</td></tr>
           <tr><th scope="row">Body nearby</th><td>Ignores it</td><td>Feels it unless a grounded shield blocks it</td></tr>
           <tr><th scope="row">Textile build</th><td>Two conductive fabrics with a carbon-loaded layer between</td><td>Two conductive fabrics with a spacer fabric between, plus a shield</td></tr>
@@ -321,7 +319,6 @@
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="sense"></div>
     <h3 class="st-sub">Harder: no options to pick from</h3>
-    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
     <div class="sx-hard" data-sx-hard="sense"></div>
   </section>
 
@@ -351,7 +348,6 @@
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="stack"></div>
     <h3 class="st-sub">Harder: no options to pick from</h3>
-    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
     <div class="sx-hard" data-sx-hard="stack"></div>
   </section>
 
@@ -368,20 +364,20 @@
     <h3 class="st-sub">Watch</h3>
     <figure class="st-cell sx-wide" data-st="curves">
       <div class="st-toggles" role="group" aria-label="Material">
-        <button type="button" class="st-btn" data-st-for="curves" data-st-key="mat" data-st-value="metal" aria-pressed="true">Copper</button>
+        <button type="button" class="st-btn" data-st-for="curves" data-st-key="mat" data-st-value="metal" aria-pressed="true">Copper (annealed)</button>
         <button type="button" class="st-btn" data-st-for="curves" data-st-key="mat" data-st-value="fibre" aria-pressed="false">Polyester fibre</button>
         <button type="button" class="st-btn" data-st-for="curves" data-st-key="mat" data-st-value="knit" aria-pressed="false">Knit</button>
         <button type="button" class="st-btn" data-st-for="curves" data-st-key="mat" data-st-value="rubber" aria-pressed="false">Silicone</button>
       </div>
       <div class="st-anim"><svg role="img" aria-label="A bar of the chosen material is pulled and let go, beside its stress-strain curve traced as it happens. Copper rises steeply, bends over almost at once, and comes back down to a permanent stretch. Polyester fibre goes up and down one steep straight line. A knit traces a J: flat then steep. Silicone stretches a long way at very low stress and comes back."></svg></div>
-      <figcaption><span class="label">Pull it, let go</span><span class="state">Stiffness is stress over strain</span><span class="sub">The slope of the first straight part is Young&rsquo;s modulus. Note each material&rsquo;s axes: copper&rsquo;s run to 1% stretch, silicone&rsquo;s to 150%. Copper&rsquo;s straight part ends almost immediately, and after that it doesn&rsquo;t come all the way back.</span></figcaption>
+      <figcaption><span class="label">Pull it, let go</span><span class="state">Stiffness is stress over strain</span><span class="sub">The slope of the first straight part is Young&rsquo;s modulus. Note each material&rsquo;s axes: copper&rsquo;s run to 1% stretch, silicone&rsquo;s to 150%. Copper&rsquo;s straight part ends almost immediately (this is soft, annealed copper; hard-drawn lasts to about 0.2%), and after that it doesn&rsquo;t come all the way back.</span></figcaption>
     </figure>
     <div class="sx-panel sx-panel--solo">
       <span class="sx-eyebrow">The units, as a cheat sheet</span>
       <dl class="sx-units">
         <dt>&epsilon; &middot; strain</dt><dd><b>The stretch.</b> Change in length &divide; original length. No units: 0.1 is 10%.</dd>
         <dt>&sigma; &middot; stress</dt><dd><b>The pull, spread out.</b> Force &divide; cross-section area, in pascals. 1 MPa = 1 N on each square millimetre.</dd>
-        <dt>E &middot; Young&rsquo;s modulus</dt><dd><b>The stiffness.</b> &sigma; &divide; &epsilon; in the straight region. Copper ~120 GPa, polyester fibre ~10 GPa, silicone ~1 MPa.</dd>
+        <dt>E &middot; Young&rsquo;s modulus</dt><dd><b>The stiffness.</b> &sigma; &divide; &epsilon; in the straight region. Copper ~120 GPa, polyester fibre ~10 GPa, silicone ~1 MPa (the softest grades ~0.05 MPa).</dd>
         <dt>&nu; &middot; Poisson&rsquo;s ratio</dt><dd><b>The narrowing.</b> Sideways strain &divide; stretch, with a minus sign. Cork 0, metal ~0.3, rubber 0.5, auxetics below 0.</dd>
         <dt>GF &middot; gauge factor</dt><dd><b>The sensitivity.</b> Fractional change in resistance &divide; strain. About 2 for metal and liquid metal; far higher for carbon-loaded rubber.</dd>
       </dl>
@@ -407,14 +403,14 @@
     <h3 class="st-sub">Play: stretch a conductor</h3>
     <figure class="st-cell sx-wide sx-lab" data-st="gauge">
       <div class="st-toggles" role="group" aria-label="Conductor">
-        <button type="button" class="st-btn" data-st-for="gauge" data-st-key="mat" data-st-value="metal" aria-pressed="false">Straight copper trace</button>
+        <button type="button" class="st-btn" data-st-for="gauge" data-st-key="mat" data-st-value="metal" aria-pressed="false">Straight copper trace (hard-drawn)</button>
         <button type="button" class="st-btn" data-st-for="gauge" data-st-key="mat" data-st-value="liquid" aria-pressed="true">Liquid metal in silicone</button>
       </div>
       <div class="st-anim"><svg role="img" aria-label="A conductor drawn at its rest length and width, then at the stretch you set: longer, and narrower by Poisson's ratio. Electrons run along it, slower as resistance rises. The read-out gives the resistance ratio and the gauge factor; past about 0.2% the copper trace shows cracks."></svg></div>
       <div class="sx-controls">
         <label class="sx-slider"><span>Stretch</span><input type="range" min="0" max="0.3" step="0.001" value="0.1" data-sx-for="gauge" data-sx-key="strain"><output data-sx-out="gauge.strain">10.0%</output></label>
       </div>
-      <figcaption><span class="label">Gauge factor lab</span><span class="state">Longer and thinner: hit twice</span><span class="sub">R = &rho;L/A, so stretching raises R by the extra length <i>and</i> the smaller cross-section. That&rsquo;s a stretch sensor in one line. It&rsquo;s also why the copper is hopeless here: it stops springing back at about 0.2%, a hundredth of what the liquid metal takes.</span></figcaption>
+      <figcaption><span class="label">Gauge factor lab</span><span class="state">Longer and thinner: hit twice</span><span class="sub">R = &rho;L/A, so stretching raises R by the extra length <i>and</i> the smaller cross-section. That&rsquo;s a stretch sensor in one line. It&rsquo;s also why the copper is hopeless here: even hard-drawn, it stops springing back at about 0.2%, while liquid metal in silicone carries on past 200%.</span></figcaption>
     </figure>
     <div class="sx-chal" data-sx-chal="gauge"></div>
 
@@ -444,7 +440,6 @@
     <h3 class="st-sub">Check</h3>
     <div class="sx-quiz" data-sx-quiz="stretch"></div>
     <h3 class="st-sub">Harder: no options to pick from</h3>
-    <p class="sx-sub-note">Nothing to recognise here: say which way each thing moves, type the number, put the steps in order. A wrong number tells you whether you were high or low, and hints give the formula, then the numbers.</p>
     <div class="sx-hard" data-sx-hard="stretch"></div>
   </section>
 

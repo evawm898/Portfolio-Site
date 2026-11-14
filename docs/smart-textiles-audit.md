@@ -214,3 +214,21 @@ Cost: S is under half a day, M about a day, L several days. "Removes or restruct
 **Suggested first build** if you want one PR to start: ranks 1, 3, 5, 9, 12 and 13. They are small and don't change the structure, and they remove the guessability and the wrong facts. Ranks 4, 6, 7 and 16 are the large ones and are better as their own PRs.
 
 **The existing gates** would be extended for each: option shuffle and letter spread (V7); no inner horizontal scroller (V12); rendered label size; the duplicate-id guard (one id per item across QUIZ, ARROWS and SENSOR_Q); tap-target size; each with a negative-control mutant in `verify-study.mjs`.
+
+---
+
+## 7. Status (Eva's rulings, 14 Nov 2026)
+
+- **#559 merged** as the record of this audit.
+- **PR 1, correctness**, built:
+  - **Questions.** Options shuffled once per question per visit. Distractors rewritten: the right answer is now the strictly longest option on 2 of 56 questions (was 32), and there are no throwaway options. The duplicate id is fixed (`q-drift` in chapter 04 is now `q-creep`).
+  - **Facts and notation.** Every correction in §2 is made, on both pages and inside the diagrams, and εᵣ is used for permittivity throughout.
+  - **The contact line.** The toll-booth line is replaced by one of three candidates (`CONTACT_LINES`, picked by `CONTACT_PICK`). The toll booth stays as an alternate, scoped to joints in series.
+  - **Arrow grids.** Every item has three rows, split 36 up / 36 down / 36 same. Answering "up" everywhere scores 33.3% of rows and 0 of 36 items.
+  - **Layout.** Tap targets are 44 px on touch or narrow screens, with taller slider hit areas. The five repeated "Harder" paragraphs are one explanation at chapter 01.
+  - **Gates.** V21–V25 in `verify-study.mjs` and S9–S10 in `verify-page.mjs`, each with mutants. A pre-existing V17 flake is fixed.
+- **Queued, not started:**
+  - PR 2: wrong-answer feedback (§1 P2, §6 rank 4).
+  - PR 3: mobile lab layouts, the diagram text floor, chapter navigation and back-to-top (§3, §4; §6 ranks 6–8).
+  - PR 4: a study chapter for the note's parts 05–07 (§1 P7, §6 rank 16).
+- **Not ruled yet:** the weaker hooks (§1 P6, §6 rank 14), the forward references (rank 15), aligning the diagram keys (rank 17) and the Leitner / progress explainer (§1 P8).

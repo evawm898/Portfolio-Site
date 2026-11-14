@@ -87,7 +87,7 @@ const capacitive = {
     s += tag(232, (top + bot) / 2, 'spacer fabric');
     s += tag(232, (top + bot) / 2 + 9, '(air + pile yarns)');
     s += tag(232, bot + 5, 'electrode');
-    s += txt(232, 140, 'C = εA / d', { size: 10, fill: C.ink });
+    s += txt(232, 140, 'C = ε₀εᵣA / d', { size: 10, fill: C.ink });
     s += txt(232, 152, 'smaller gap d,', { size: 8, fill: C.faint }) + txt(232, 162, 'more charge stored', { size: 8, fill: C.faint });
     const Cap = v => 1 / (1 - 0.42 * v);
     s += plot({ x: 30, y: 158, w: 170, h: 50, u: fr(t), f: v => (Cap(press(v)) - 1) / 0.75 * 0.85 + 0.08, title: 'capacitance', readout: `${(12 * Cap(F)).toFixed(1)} pF`, xl: 'time', grid: [], color: C.indigo });

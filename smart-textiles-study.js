@@ -10,7 +10,7 @@
 
 import { mount } from './smart-textiles-core.js';
 import { STUDY_SCENES, FILS } from './smart-textiles-study-scenes.js';
-import { CHAPTERS, CARDS, CARD_MORE, QUIZ, STATS, METALS, PICK_METAL, WHICH_SENSOR, STACKS } from './smart-textiles-study-data.js';
+import { CHAPTERS, CARDS, CARD_MORE, QUIZ, STATS, METALS, PICK_METAL, WHICH_SENSOR, STACKS, CONTACT } from './smart-textiles-study-data.js';
 import { ARROWS, PROBLEMS, ORDERS, CHALLENGES, renderArrow, renderProblem, renderOrder, renderFault, renderCloze, altsHTML, mountChallenge } from './smart-textiles-study-hard.js';
 
 const KEY = 'st-study.v1';
@@ -52,6 +52,9 @@ function paintProgress() {
   $('[data-sx-total]').textContent = `${Math.round(total * 100)}%`;
   $('[data-sx-totalbar]').style.width = `${Math.round(total * 100)}%`;
 }
+
+// the contact line is data (CONTACT in the data file), so the figure caption reads it too
+for (const el of $$('[data-sx-line="contact"]')) el.textContent = CONTACT.hook;
 
 // ---------------------------------------------------------------------------------------------
 // scenes and labs
@@ -183,23 +186,34 @@ const refreshDecks = except => { for (const d of decks) if (d !== except && d.da
 decks.forEach(makeDeck);
 
 // ---------------------------------------------------------------------------------------------
-// one multiple-choice question, used by the chapter checks and the mixed round
+// one multiple-choice question, used by the chapter checks and the mixed round. The options are shown
+// in an order shuffled once per question per visit: the right answer's letter is no guide, but it
+// doesn't move while you look, and a question that comes round again (a retry, the mixed round) keeps
+// its order. q.fixed keeps the data order (Which Sensor's Resistive / Capacitive / Either).
 // ---------------------------------------------------------------------------------------------
+const OPT_ORDER = new Map();
+const optOrder = q => {
+  if (q.fixed) return q.o.map((_, i) => i);
+  if (!OPT_ORDER.has(q.id)) OPT_ORDER.set(q.id, shuffle(q.o.map((_, i) => i)));
+  return OPT_ORDER.get(q.id);
+};
+window.__sxOptOrder = id => OPT_ORDER.get(id);   // test hook, read by tools/smart-textiles/verify-study.mjs
 function questionHTML(q, n, total) {
   return `<div class="sx-q" data-q="${q.id}">
     <span class="sx-q__n">${n != null ? `Question ${n}${total ? ` of ${total}` : ''}` : ''}</span>
     <p class="sx-q__q">${esc(q.q)}</p>
-    <div class="sx-opts">${q.o.map((o, i) => `<button type="button" class="sx-opt" data-key="${'ABCD'[i]}" data-i="${i}">${esc(o)}</button>`).join('')}</div>
+    <div class="sx-opts">${optOrder(q).map((i, k) => `<button type="button" class="sx-opt" data-key="${'ABCD'[k]}" data-i="${i}">${esc(q.o[i])}</button>`).join('')}</div>
     <div class="sx-why" hidden></div></div>`;
 }
 function wireQuestion(el, q, onAnswer, link = false) {
   const opts = $$('.sx-opt', el);
   for (const b of opts) b.addEventListener('click', () => {
     const i = +b.dataset.i, ok = i === q.a;
-    opts.forEach((o, k) => { o.disabled = true; o.dataset.r = k === q.a ? 'right' : k === i ? 'wrong' : 'dim'; });
+    opts.forEach(o => { const k = +o.dataset.i; o.disabled = true; o.dataset.r = k === q.a ? 'right' : k === i ? 'wrong' : 'dim'; });
     const why = $('.sx-why', el);
     why.hidden = false;
-    why.innerHTML = `<b>${ok ? '✓ Right.' : `✕ It’s ${'ABCD'[q.a]}.`}</b> ${esc(q.why)}${link && q.ch ? ` <a href="${chName(q.ch)?.anchor}">Back to chapter ${chName(q.ch)?.n} &rarr;</a>` : ''}`;
+    const rightKey = opts.find(o => +o.dataset.i === q.a)?.dataset.key;
+    why.innerHTML = `<b>${ok ? '✓ Right.' : `✕ It’s ${rightKey}.`}</b> ${esc(q.why)}${link && q.ch ? ` <a href="${chName(q.ch)?.anchor}">Back to chapter ${chName(q.ch)?.n} &rarr;</a>` : ''}`;
     const rec = S.quiz[q.id] || { right: 0, wrong: 0, last: false };
     rec[ok ? 'right' : 'wrong']++; rec.last = ok; S.quiz[q.id] = rec; save();
     onAnswer?.(ok);
@@ -364,7 +378,7 @@ function lower(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1).replace(/\
 // mixed round: ten questions across every chapter and the sensor game. Missed-last-time first,
 // then never-seen, then the rest; interleaved so two in a row rarely share a chapter.
 // ---------------------------------------------------------------------------------------------
-const SENSOR_Q = WHICH_SENSOR.map(w => ({ id: `w-${w.id}`, ch: 'sense', q: `Which sensor? ${w.prompt}`, o: ['Resistive', 'Capacitive', 'Either works'], a: { R: 0, C: 1, E: 2 }[w.a], why: w.why }));
+const SENSOR_Q = WHICH_SENSOR.map(w => ({ id: `w-${w.id}`, ch: 'sense', q: `Which sensor? ${w.prompt}`, o: ['Resistive', 'Capacitive', 'Either works'], a: { R: 0, C: 1, E: 2 }[w.a], why: w.why, fixed: true }));
 const ALL_Q = QUIZ.concat(SENSOR_Q);
 function pickRound(n = 10) {
   const rank = q => { const r = S.quiz[q.id]; return !r ? 1 : r.last ? 2 : 0; };   // 0 missed, 1 new, 2 right
