@@ -12918,6 +12918,21 @@ Reality toggles. Copy stays generic — no internal product, project or band nam
 - Gate: `node tools/dyeing-proto/verify-page.mjs` (1280 and 390). Nothing runs in CI — no workflow
   names these files. Recordings: `node tools/dyeing-proto/shoot.mjs <dir>`.
 
+## `/textile-101` — the section figures (pointer only)
+
+Sections 02, 03 and 08 of `textile-101.html` are drawn by `textile-101-figures.js` (a moisture-regain chart, eight fibre
+cross-sections, plain / twill / satin each beside its draft). Read `docs/textile-101-audit.md` and
+`docs/textile-101-accuracy.md` (every claim, its source, and the "Eva to verify" list) before changing the copy.
+- One stroke language (`DRAW`), one player: `mountScenes` in `textile-taxonomy.js` plays the panel (`[data-tx-scene]`),
+  the figures (`[data-tx-fig]`) and nothing else; section 09's baked knit panels follow the same rule through
+  `mountKnitDiagram` (once on scroll-in, hold, replay on hover / tap; reduced motion = the finished drawing).
+- The weaves are `/weave-draft.js`'s `drawdown()` of its own presets, so cloth and draft cannot disagree.
+- New figures draw in tokens. `DRAW.INK` / `DRAW.ACCENT` are still the pre-token hexes, because `textile-dyeing.js`
+  parses `DRAW.INK` as a hex (decision D3, open for Eva).
+- Gate: `node tools/textile-101-proto/verify-page.mjs` and `node tools/textile-taxonomy-proto/verify-page.mjs
+  textile-101.html` (1280 and 390). Shots and recordings: `node tools/textile-101-proto/shoot.mjs <dir> [--video]`.
+  Not in CI.
+
 ## `/hanabi` — the Hanabi deck designer (pointer only)
 
 Hidden page (`hanabi.html`, `hanabi.css`, `hanabi.js`, `hanabi/*.js`; `noindex`, unlinked). Read

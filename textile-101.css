@@ -142,31 +142,24 @@
   letter-spacing: 0.06em;
 }
 
-/* draw-on animation shared by the warp/weft weave and weft/warp knit
-   diagrams — a continuous strand traces its path, holds, then resets. */
-.yarn-path,
-.weave-path {
+/* the weft/warp knit panels: each strand draws on ONCE when the diagram scrolls into view, then
+   holds; hover / tap replays (mountKnitDiagram in /textile-101-figures.js adds the classes).
+   With no script, or reduced motion, the finished drawing is shown. */
+.yarn-path {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.yarn-path {
   stroke-dasharray: 900;
-  stroke-dashoffset: 900;
-  animation: tx-draw 5.4s ease-in-out infinite;
+  stroke-dashoffset: 0;
 }
+.tx-diagram--knit { cursor: pointer; }
+.tx-diagram--knit.is-armed:not(.is-done) .yarn-path { stroke-dashoffset: 900; }
+.tx-diagram--knit.is-playing .yarn-path { animation: tx-draw 2.4s ease-in-out both; }
 
-.weave-path {
-  stroke-dasharray: 700;
-  stroke-dashoffset: 700;
-  animation: tx-draw 4.2s ease-in-out infinite;
-}
-
-.yarn-path.delay1 { animation-delay: 0.22s; }
-.yarn-path.delay2 { animation-delay: 0.45s; }
-.yarn-path.delay3 { animation-delay: 0.68s; }
-.yarn-path.delay4 { animation-delay: 0.9s; }
+.tx-diagram--knit.is-playing .yarn-path.delay1 { animation-delay: 0.22s; }
+.tx-diagram--knit.is-playing .yarn-path.delay2 { animation-delay: 0.45s; }
+.tx-diagram--knit.is-playing .yarn-path.delay3 { animation-delay: 0.68s; }
+.tx-diagram--knit.is-playing .yarn-path.delay4 { animation-delay: 0.9s; }
 
 /* weft/warp knit: two generated panels (tools/knit-diagram/), side by side, stacked under 560px */
 .tx-diagram__panels {
@@ -193,18 +186,8 @@
 }
 
 @keyframes tx-draw {
-  0%   { stroke-dashoffset: 900; }
-  45%  { stroke-dashoffset: 0; }
-  80%  { stroke-dashoffset: 0; }
-  100% { stroke-dashoffset: -900; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .yarn-path,
-  .weave-path {
-    animation: none;
-    stroke-dashoffset: 0;
-  }
+  from { stroke-dashoffset: 900; }
+  to   { stroke-dashoffset: 0; }
 }
 
 /* a line of copy after a bullet list (#fibers' pointer to the fiber row) */
@@ -619,3 +602,56 @@ details.tx-advanced-panel[open] summary .plus {
     padding: 4rem 6vw;
   }
 }
+
+/* ---------- Section figures (/textile-101-figures.js): same cell, same player as the panel above ---------- */
+.tx-anim--xs { aspect-ratio: 320 / 112; }
+.tx-anim--weave { aspect-ratio: 498 / 262; }
+.tx-anim--regain { aspect-ratio: 360 / 330; }
+.tx-fig-t { font-family: var(--mono); font-size: 11.5px; fill: var(--ink); }
+.tx-fig-t--dim { fill: var(--ink-dim); font-size: 11px; }
+.tx-fig-t--head { font-size: 10.5px; letter-spacing: 0.12em; fill: var(--ink-dim); }
+
+/* figure cells outside the taxonomy panel */
+.tx-tax--figs { margin-top: 3rem; }
+.tx-tax__row--gap { margin-top: 2.2rem !important; }
+.tx-tax--figs .tx-tax__cell .label { font-size: 1.05rem; }
+.tx-tax--figs .sub em, .tx-weave .sub em { font-style: italic; color: var(--ink); }
+@media (max-width: 700px) { .tx-tax--figs .tx-tax__grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; } .tx-tax--figs .tx-tax__cell { padding: 0.7rem 0.7rem 1rem; } }
+@media (max-width: 420px) { .tx-tax--figs .tx-tax__grid--4 { grid-template-columns: 1fr; } }
+.tx-note { margin-top: 1.1rem; font-size: 12px; color: var(--ink-dim); }
+.tx-note a, .tx-topic-copy a { color: var(--petrol-bright); }
+
+/* ---------- Section 02: the three fibre classes ---------- */
+.tx-class { margin-top: 3rem; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.tx-class__col { background: var(--black); padding: 1.6rem 1.4rem 1.8rem; }
+.tx-class__head { display: flex; align-items: baseline; gap: 0.6rem; }
+.tx-class__head svg { width: 11px; height: 11px; flex: none; }
+.tx-class__head h3 { margin: 0; font-family: var(--serif); font-weight: 500; font-size: 1.2rem; line-height: 1.25; color: var(--ink); }
+.tx-class__how { margin: 0.7rem 0 1.2rem; font-size: 12.5px; line-height: 1.6; color: var(--ink-dim); }
+.tx-class dl { margin: 0; display: grid; gap: 0.9rem; }
+.tx-class dt { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); margin-bottom: 0.2rem; }
+.tx-class dd { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink-dim); }
+.tx-fibre-data { margin-top: 1.25rem; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 1.25rem 3rem; align-items: start; }
+.tx-figure { cursor: pointer; }
+.tx-fibre-data__notes h3 { margin: 0.4rem 0 0; font-family: var(--mono); font-weight: 500; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink); }
+.tx-fibre-data__notes .tx-def-list { margin-top: 1.4rem; }
+.tx-tri-compare--labels { margin-top: 2.5rem; }
+@media (max-width: 860px) {
+  .tx-class { grid-template-columns: 1fr; }
+  .tx-fibre-data { grid-template-columns: 1fr; }
+}
+
+/* ---------- Section 08: a weave beside its draft ---------- */
+.tx-weaves { margin-top: 3rem; display: grid; gap: 1.25rem; }
+.tx-weaves__key { display: flex; flex-wrap: wrap; gap: 0.5rem 1.6rem; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; color: var(--ink-dim); }
+.tx-weaves__key span { display: inline-flex; align-items: center; gap: 0.5rem; }
+.tx-weaves__key .k { display: inline-block; width: 22px; height: 6px; border-radius: 3px; background: var(--ink); }
+.tx-weaves__key .k--warp { width: 6px; height: 18px; opacity: 0.6; }
+.tx-weaves__key .k--pick { background: var(--petrol-bright); }
+.tx-weaves__key .k--up { width: 12px; height: 12px; border-radius: 0; opacity: 0.88; }
+.tx-weaves__key .k--float { width: 5px; height: 16px; border-radius: 0; background: none; border: 2px solid var(--petrol-bright); border-right: 0; }
+.tx-weave { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1rem 2.5rem; align-items: center; padding: 1.4rem 1.6rem; }
+.tx-weave .tx-anim { margin: 0; }
+.tx-weave .sub { font-size: 13px; line-height: 1.65; }
+@media (max-width: 860px) { .tx-weave { grid-template-columns: 1fr; padding: 1rem 1rem 1.3rem; } }
+.tx-advanced-note { margin: 0 0 1.4rem; font-size: 12.5px; color: var(--ink-dim); max-width: 70ch; }
