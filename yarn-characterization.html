@@ -47,6 +47,7 @@
         <li><a href="#twist"><span class="n">03</span>Twist</a></li>
         <li><a href="#covered-yarn-twist"><span class="n">03b</span>Covered Yarn &mdash; Twist Direction</a></li>
         <li><a href="#strength"><span class="n">04</span>Strength</a></li>
+        <li><a href="#fineness"><span class="n">05</span>Filament Count &amp; Fineness</a></li>
       </ul>
     </nav>
   </div>
@@ -469,7 +470,7 @@
         <p><b>Twist.</b> For a staple yarn, strength rises with twist to an optimum and then falls (<a href="#twist">section 03</a>). Filament yarns gain little.</p>
         <p><b>Irregularity.</b> A yarn breaks at its weakest place, so variation matters more than the average. The thin places of an uneven yarn set its strength, and its evenness (CV% of mass) is part of its strength spec.</p>
         <p><b>Plying.</b> A plied yarn&rsquo;s weak places rarely line up, so it is more even and usually has a higher tenacity than its singles.</p>
-        <p><b>Filament count.</b> At the same total denier, strength follows the polymer and the drawing, not the number of filaments. Finer filaments do make a softer yarn that abrades and pills sooner (a later section).</p>
+        <p><b>Filament count.</b> At the same total denier, strength follows the polymer and the drawing, not the number of filaments. Finer filaments do make a softer yarn that abrades and pills sooner (<a href="#fineness">section 05</a>).</p>
       </div>
     </div>
 
@@ -554,6 +555,76 @@
     <p class="yc-sources"><span class="yc-sources__label">Sources</span> Morton &amp; Hearle, <em>Physical Properties of Textile Fibres</em> (tenacity, elongation and density ranges); Hearle, Grosberg &amp; Backer, <em>Structural Mechanics of Fibers, Yarns and Fabrics</em> (spun vs filament yarn strength); F. T. Peirce, &ldquo;Tensile tests for cotton yarns, v. &lsquo;The weakest link&rsquo;&rdquo;, <em>Journal of the Textile Institute</em> 17 (1926); ASTM D2256 and ISO 2062 (single-end tensile testing of yarn). The curves and the weakest-link figures are illustrative models (the second a seeded simulation of normally scattered segments), not measurements.</p>
   </section>
 
+  <!-- ---------- 05 · FILAMENT COUNT & FINENESS ----------
+       (the outline's §06.) Arithmetic: yarn-fineness.js (pure, gated by
+       tools/verify-yarn-characterization.mjs). DOM: yarn-fineness-ui.js. -->
+  <section class="tx-topic" id="fineness">
+    <div class="tx-topic-head">
+      <h2>Filament Count &amp; Fineness</h2>
+      <div class="tx-topic-copy">
+        <p>Take one filament yarn and split the same weight into more, finer filaments. The yarn gets softer, drapes more, covers more and wicks more, but it also snags, pills and wears sooner. All of it comes from one number: how fine each filament is.</p>
+        <p class="muted"><b>Everything in this section compares yarns of the same total denier.</b> 150D/48F against 150D/144F changes only the fineness. 150D/48F against 75D/72F changes the fineness <em>and</em> halves the yarn, and the two effects cannot be pulled apart.</p>
+      </div>
+    </div>
+
+    <div class="yc-sub">From filament count to fineness</div>
+    <div class="yc-prose">
+      <p>Denier per filament is the total denier divided by the filament count (section 01). A filament&rsquo;s diameter grows with the square root of its dpf, so halving the dpf narrows each filament to about 71%: 3.1 dpf polyester is about 18&nbsp;&micro;m across, 0.5 dpf about 7&nbsp;&micro;m.</p>
+    </div>
+    <dl class="yc-notation">
+      <div><dt>Stiffness</dt><dd>A rod&rsquo;s bending stiffness goes with its diameter to the <b>fourth</b> power, so one filament of half the dpf is a quarter as stiff. There are twice as many of them, so the bundle as a whole is about half as stiff. This assumes the filaments slide past each other freely, as in a soft, lightly twisted yarn; a tightly bonded bundle bends more like one rod. Half the dpf gives a yarn about half as stiff: the softer hand and fuller drape of microfiber.</dd></div>
+      <div><dt>Surface and cover</dt><dd>Surface per gram grows as the filaments thin, by &radic;2 for each halving of the dpf. The same yarn laid flat covers more ground for the same reason. More surface means more cover and opacity in a fabric, and more contact with skin and water.</dd></div>
+      <div><dt>Wicking</dt><dd>More filaments mean more, narrower channels between them, and a narrower capillary pulls liquid harder. That is why fine-filament fabrics are used to move sweat. Very fine channels also resist flow more, so the gain is not without limit.</dd></div>
+      <div><dt>Wear</dt><dd>Each finer filament is weaker on its own: at the same tenacity, one filament&rsquo;s breaking force is proportional to its dpf. A snag or a rub breaks and pulls out fine filaments more easily, so finer yarns snag, fuzz and pill sooner and resist abrasion less.</dd></div>
+      <div><dt>Colour</dt><dd>More surface scatters more light, so a fine-filament yarn looks lighter and duller at the same dye uptake, and takes more dye to reach the same depth of shade.</dd></div>
+    </dl>
+
+    <!-- fineness · the splitter -->
+    <div class="yc-tool yf" data-yf>
+      <div class="yc-tool__head">
+        <span class="yc-tool__label">Same-denier splitter</span>
+        <span class="yc-tool__hint">split one total into more filaments; compared against 150D/48F</span>
+      </div>
+      <div class="yf-controls">
+        <label class="yt-ctrl yt-ctrl--wide">
+          <span class="yt-ctrl__label">Filaments <span class="yt-ctrl__val" data-yf-o="n"></span></span>
+          <input class="yt-range" type="range" min="0" step="1" data-yf-n aria-label="Filament count">
+        </label>
+        <div class="yt-ctrl">
+          <span class="yt-ctrl__label">Total denier</span>
+          <div class="yf-total">
+            <button type="button" class="yc-chip" data-yf-lock aria-pressed="true">locked at 150 D</button>
+            <select class="yt-select" data-yf-total aria-label="Total denier"></select>
+          </div>
+        </div>
+      </div>
+      <figure class="yt-fig">
+        <div class="yt-scroll"><svg data-yf-svg role="img" aria-label="Two cross-sections drawn to one micrometre scale: the reference 150 denier 48 filament yarn with dashed outlines, and the yarn chosen with solid outlines (side by side, or stacked on a narrow screen); finer filaments draw as more, smaller circles."></svg></div>
+        <figcaption>Cross-sections to one scale, filaments drawn as undyed outlines and packed as tightly as circles can be. At the same total denier the two bundles hold the same amount of polymer.</figcaption>
+      </figure>
+      <dl class="yt-read">
+        <div><dt>Denier per filament</dt><dd data-yf-o="dpf"></dd></div>
+        <div><dt>Filament diameter</dt><dd data-yf-o="d"></dd></div>
+        <div><dt>Breaks one filament</dt><dd data-yf-o="force"></dd></div>
+      </dl>
+      <div class="yf-bars" aria-label="Ratios against the 150D/48F reference, on a log scale from a quarter to four times">
+        <div class="yf-bar" data-yf-bar="stiff"><span class="yf-bar__name">Bending stiffness (bundle)</span><span class="yf-bar__track"></span><span class="yf-bar__val"></span></div>
+        <div class="yf-bar" data-yf-bar="surface"><span class="yf-bar__name">Surface per gram</span><span class="yf-bar__track"></span><span class="yf-bar__val"></span></div>
+        <div class="yf-bar" data-yf-bar="cover"><span class="yf-bar__name">Cover (laid flat)</span><span class="yf-bar__track"></span><span class="yf-bar__val"></span></div>
+        <div class="yf-bar" data-yf-bar="force"><span class="yf-bar__name">Breaking force, one filament</span><span class="yf-bar__track"></span><span class="yf-bar__val"></span></div>
+        <div class="yf-bar yf-bar--risk"><span class="yf-bar__name">Snag, pill and abrasion risk</span><span class="yf-risk" data-yf-risk></span><span class="yf-bar__val">direction only</span></div>
+      </div>
+      <p class="yt-note" data-yf-o="note" aria-live="polite"></p>
+    </div>
+
+    <div class="yc-sub">Microfiber</div>
+    <div class="yc-prose">
+      <p>Below about <b>1 dpf</b> (about 1.1 dtex) a filament is usually called a <em>microfiber</em>, and below about <b>0.3 dpf</b> a super- or ultra-microfiber. These are naming conventions, not standards: some sources draw the line at 1 dtex rather than 1 denier, and none of them is a quality grade. The finest filaments are rarely spun at that size. They are made by spinning two polymers together and then splitting them, or dissolving one away, after the yarn is made (a later section, on cross-sections).</p>
+    </div>
+
+    <p class="yc-sources"><span class="yc-sources__label">Sources</span> Morton &amp; Hearle, <em>Physical Properties of Textile Fibres</em> (fibre bending rigidity, which scales with the fourth power of diameter, and specific surface area); Hearle, Grosberg &amp; Backer, <em>Structural Mechanics of Fibers, Yarns and Fabrics</em> (yarn bending between the free-sliding and the solid-rod limits). Every ratio in the splitter follows from geometry at fixed total denier and an assumed polyester density of 1.38&nbsp;g/cm&sup3;; the risk bar is a direction, not a measurement.</p>
+  </section>
+
   <nav class="project__nav">
     <a href="field-notes.html" class="project__nav-link">&larr; Back to Field Notes</a>
   </nav>
@@ -583,6 +654,7 @@
 <script type="module" src="yarn-units.js"></script>
 <script type="module" src="yarn-twist-ui.js"></script>
 <script type="module" src="yarn-strength-ui.js"></script>
+<script type="module" src="yarn-fineness-ui.js"></script>
 
 </body>
 </html>

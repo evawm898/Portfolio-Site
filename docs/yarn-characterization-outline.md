@@ -3,11 +3,11 @@
 **Status: APPROVED (Eva, Nov 14).** Section 01 (Units & terminology) is **written** and on the page, with its count
 converter and spec decoder (`yarn-count.js` for the arithmetic, `yarn-units.js` for the DOM, gated by
 `node tools/verify-yarn-characterization.mjs [--browser] [--negative-control]`). Section 03 (Twist) is **written** too, with its twist
-multiplier interactive (`yarn-twist.js` / `yarn-twist-ui.js`, same gate). Section 05 (Strength) is **written** too (`yarn-strength.js` / `yarn-strength-ui.js`, same gate). Sections 06–10 are not written yet.
+multiplier interactive (`yarn-twist.js` / `yarn-twist-ui.js`, same gate). Section 05 (Strength) is **written** too (`yarn-strength.js` / `yarn-strength-ui.js`, same gate). Section 06 (Filament count & fineness) is **written** too (`yarn-fineness.js` / `yarn-fineness-ui.js`, same gate). Sections 07–10 are not written yet.
 
 **Page numbering.** Because Covered Yarn folded in as 03b, the page numbers its sections one lower than this outline from Strength on: outline 05 Strength is page **04**, and 06–10 will be page 05–09. This doc keeps its own numbers so earlier references stay valid. The page also holds two sections copied from `/lab`, **Yarn Construction** and **Covered Yarn — Twist
 Direction**, animated by `yarn-diagrams.js` / `yarn-diagrams.css`. Where they sit in the order below is marked
-**[built]**. The page numbers them 01 Units, 02 Construction, 03 Twist, 03b Covered Yarn, 04 Strength.
+**[built]**. The page numbers them 01 Units, 02 Construction, 03 Twist, 03b Covered Yarn, 04 Strength, 05 Filament Count & Fineness.
 
 ## Ground rules for the whole page
 
@@ -38,7 +38,7 @@ Direction**, animated by `yarn-diagrams.js` / `yarn-diagrams.css`. Where they si
 | 03 | Twist **[written]** | Twist slider → yarn render + strength / hand curves | yes |
 | 04 | Covered yarn — twist direction **[built]**, folded under Twist as 03b | SCY S/Z, DCY (existing) | light |
 | 05 | Strength & what changes it **[written — page 04]** | Stress–strain plot with toggles | yes |
-| 06 | Filament count & fineness | Same-denier filament-split slider | yes |
+| 06 | Filament count & fineness **[written — page 05]** | Same-denier filament-split slider | yes |
 | 07 | Cross-sections | Cross-section picker with light / wicking / cover read-outs | yes |
 | 08 | Texturing | Four-way process comparison, before/after yarn | yes |
 | 09 | Air intermingling / interlacing | Nip-spacing diagram (**placeholder: Eva's images and papers**) | yes (Eva's papers) |
@@ -172,7 +172,7 @@ ISO 2062. Preset curves labelled "typical, illustrative".
 
 ---
 
-## 06 · Filament count & fineness
+## 06 · Filament count & fineness **[written, Nov 14 — page 05]**
 
 **Scope.** What happens when you split the same total denier into more, finer filaments. **The caveat goes up
 front and in bold: everything here holds at the SAME total denier.** Comparing 150D/48F with 75D/72F mixes two

@@ -19,6 +19,8 @@
           every curve ends at its own (Eb, Tb), the levers' directions,
           the weak place, work of rupture by an independent integral,
           and the weakest link against tabled order statistics
+     YF1-3 §05 (yarn-fineness.js): fineness restated, the geometry's
+          exponents at fixed total denier, the circle packing
 
    Part two (--browser) drives the real page at 1280 and 390 px:
      YP1  the converter: typing in one row rewrites the others to the
@@ -30,6 +32,8 @@
           told clamp, the snarl loop and the filament mode
      YQ1-3 §04's tenacity converter and table, the stress–strain
           explorer's levers, and the weakest-link panel
+     YG1-2 §05's splitter: circles drawn, ratios on the bars, the
+          microfiber label, and the total-denier lock
 
    --negative-control runs part one against mutated copies of
    yarn-count.js; every mutant must turn at least one named check red,
@@ -57,6 +61,7 @@ async function partOne(dirUrl) {
   const M = await import(dirUrl + 'yarn-count.js');
   const Y = await import(dirUrl + 'yarn-twist.js');
   const Z = await import(dirUrl + 'yarn-strength.js');
+  const FN = await import(dirUrl + 'yarn-fineness.js');
   const results = [];
   const check = (id, name, ok, detail = '') => results.push({ id, name, ok: !!ok, detail });
 
@@ -219,6 +224,36 @@ async function partOne(dirUrl) {
   check('YS4', 'deterministic (a fixed seed)', Z.weakLinkMean(0.15, 30) === Z.weakLinkMean(0.15, 30));
   // expected minimum of n normals: for n = 20, E[min Z] ≈ −1.867 (tabled order statistics)
   check('YS4', 'n = 20 at CV 10% reads ≈ 1 − 0.1867 (expected minimum of 20 normals)', Math.abs(w20 - (1 - 0.1867)) < 0.01, w20);
+
+  /* ---------- §05 fineness (yarn-fineness.js) ---------- */
+  const fa = FN.bundle(150, 48), fb2 = FN.bundle(150, 96), fb6 = FN.bundle(150, 288);
+  // YF1 — fineness, restated: dpf = D/n; d = √(4·dtex·1e-4 / (π·ρ·1e6)) m
+  const dUmRef = (den, rho) => Math.sqrt(4 * (den * 10 / 9) * 1e-4 / (Math.PI * rho * 1e6)) * 1e6;
+  check('YF1', '150D/48F is 3.125 dpf, ≈ 17.9 µm polyester', fa.dpf === 3.125 && near(fa.dUm, dUmRef(3.125, 1.38)) && Math.abs(fa.dUm - 17.9) < 0.05, fa.dUm);
+  check('YF1', 'one filament breaks at tenacity × its dtex (4.2 × 3.47 cN)', near(fa.filForceCn, 4.2 * 3.125 * 10 / 9), fa.filForceCn);
+  check('YF1', 'microfiber below 1 dpf, super-micro below 0.3; 1.0 itself is regular',
+    FN.microClass(1).id === 'regular' && FN.microClass(0.99).id === 'micro' && FN.microClass(0.3).id === 'micro' && FN.microClass(0.29).id === 'super');
+  check('YF1', 'invalid bundles are refused', FN.bundle(0, 48) === null && FN.bundle(150, 0) === null && FN.bundle(150, 2.5) === null);
+  // YF2 — halving the dpf at the same total: the geometry's exponents
+  const r2 = FN.ratios(fa, fb2), r6 = FN.ratios(fa, fb6);
+  check('YF2', 'half the dpf: diameter × 1/√2', near(r2.dUm, Math.SQRT1_2, 1e-12), r2.dUm);
+  check('YF2', 'half the dpf: one filament × 1/4 as stiff (d⁴), the bundle × 1/2', near(r2.filStiff, 0.25, 1e-12) && near(r2.bundleStiff, 0.5, 1e-12), [r2.filStiff, r2.bundleStiff]);
+  check('YF2', 'half the dpf: surface per gram and cover × √2', near(r2.surfacePerMass, Math.SQRT2, 1e-12) && near(r2.cover, Math.SQRT2, 1e-12));
+  check('YF2', 'half the dpf: one filament breaks at × 1/2', near(r2.filForceCn, 0.5, 1e-12));
+  check('YF2', '48 → 288 filaments: bundle stiffness × 1/6, surface × √6', near(r6.bundleStiff, 1 / 6, 1e-12) && near(r6.surfacePerMass, Math.sqrt(6), 1e-12));
+  check('YF2', 'the same total holds the same polymer: n·d² is unchanged', near(fb6.n * fb6.dUm ** 2, fa.n * fa.dUm ** 2, 1e-12));
+  check('YF2', 'risk rises as filaments get finer, clamped 0..1', FN.fineRisk(3) === 0 && FN.fineRisk(0.3) === 1 && FN.fineRisk(1) > FN.fineRisk(2));
+  // YF3 — packing
+  let packOk = true, packWhy = '';
+  for (const n of FN.FILAMENT_STEPS) {
+    const p = FN.packCircles(n, 1);
+    if (p.length !== n) { packOk = false; packWhy += n + ':count '; continue; }
+    let m = Infinity;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) m = Math.min(m, Math.hypot(p[i].x - p[j].x, p[i].y - p[j].y));
+    if (n > 1 && m < 2 - 1e-9) { packOk = false; packWhy += n + ':overlap ' + m + ' '; }
+  }
+  check('YF3', 'every filament count packs exactly n circles with none overlapping', packOk, packWhy);
+  check('YF3', 'packing is deterministic', JSON.stringify(FN.packCircles(96)) === JSON.stringify(FN.packCircles(96)));
   return results;
 }
 
@@ -256,13 +291,20 @@ const MUTANTS = [
   { file: 'yarn-strength.js', id: 'flaw-never-breaks-early', from: 'if (!c.flaw) return { eps: c.Eb, sigma: stressAt(c, c.Eb) };', to: 'return { eps: c.Eb, sigma: stressAt(c, c.Eb) };', breaks: ['YS3'] },
   { file: 'yarn-strength.js', id: 'curve-misses-its-end', from: 'let k = (Tb - lin) / Math.pow(Eb, p);', to: 'let k = Tb / Math.pow(Eb, p);', breaks: ['YS2'] },
   { file: 'yarn-strength.js', id: 'weak-link-reads-the-mean', from: 'for (let i = 0; i < n; i++) m = Math.min(m, 1 + cv * normal(rand));', to: 'm = 0; for (let i = 0; i < n; i++) m += (1 + cv * normal(rand)) / n;', breaks: ['YS4'] },
-  { file: 'yarn-strength.js', id: 'twist-lever-on-filament', from: 'if (P.spun && opts.twist', to: 'if (opts.twist', breaks: ['YS3'] }
+  { file: 'yarn-strength.js', id: 'twist-lever-on-filament', from: 'if (P.spun && opts.twist', to: 'if (opts.twist', breaks: ['YS3'] },
+  // §05 — yarn-fineness.js
+  { file: 'yarn-fineness.js', id: 'stiffness-goes-as-d-squared', from: 'filStiff: dUm ** 4,', to: 'filStiff: dUm ** 2,', breaks: ['YF2'] },
+  { file: 'yarn-fineness.js', id: 'bundle-stiffness-is-one-filaments', from: 'bundleStiff: n * dUm ** 4,', to: 'bundleStiff: dUm ** 4,', breaks: ['YF2'] },
+  { file: 'yarn-fineness.js', id: 'surface-grows-with-diameter', from: 'surfacePerMass: 1 / dUm,', to: 'surfacePerMass: dUm,', breaks: ['YF2'] },
+  { file: 'yarn-fineness.js', id: 'microfiber-line-in-dtex', from: 'if (dpf < DPF_MICRO) return', to: 'if (dpf * 10 / 9 < DPF_MICRO) return', breaks: ['YF1'] },
+  { file: 'yarn-fineness.js', id: 'packing-pitch-too-tight', from: 'const pitch = 2 * r, rows', to: 'const pitch = 1.8 * r, rows', breaks: ['YF3'] }
 ];
 
 async function negativeControl() {
   const SRC = { 'yarn-count.js': fs.readFileSync(path.join(ROOT, 'yarn-count.js'), 'utf8'),
                 'yarn-twist.js': fs.readFileSync(path.join(ROOT, 'yarn-twist.js'), 'utf8'),
-                'yarn-strength.js': fs.readFileSync(path.join(ROOT, 'yarn-strength.js'), 'utf8') };
+                'yarn-strength.js': fs.readFileSync(path.join(ROOT, 'yarn-strength.js'), 'utf8'),
+                'yarn-fineness.js': fs.readFileSync(path.join(ROOT, 'yarn-fineness.js'), 'utf8') };
   let missing = 0;
   for (const m of MUTANTS) {
     const n = SRC[m.file || 'yarn-count.js'].split(m.from).length - 1;
@@ -463,6 +505,34 @@ async function browser() {
     check('YQ3', 'weakest link: CV 0 reads 100%; at CV 10% a 50-segment test reads weaker than a 1-segment one' + w,
       k0.mean === 1 && k1.mean > k50.mean && /reads, on average, \d+%/.test(await q('[data-ys-w="read"]')), JSON.stringify([k0, k1, k50]));
 
+    // YG — §05 the same-denier splitter
+    const yf = async () => JSON.parse(await page.getAttribute('[data-yf]', 'data-yf-state'));
+    const f0 = await yf();
+    const ref0 = await page.$$eval('[data-yf-bundle="yf-ref"] circle', c => c.length);
+    check('YG1', 'opens on 150D/48F against itself: 48 circles each side, every ratio ×1' + w,
+      f0.n === 48 && f0.total === 150 && f0.locked && f0.circles === 48 && ref0 === 48 && f0.stiff === 1 && f0.surface === 1, JSON.stringify(f0));
+    const layout = await page.getAttribute('[data-yf-svg]', 'data-yf-layout');
+    check('YG1', 'the two bundles sit side by side on a wide screen, stacked on a phone' + w, layout === (width < 600 ? 'stacked' : 'side'), layout);
+    const idx = n => String([24, 36, 48, 72, 96, 144, 192, 288, 576].indexOf(n));
+    await page.locator('[data-yf-n]').fill(idx(96));
+    const f1 = await yf();
+    const stiffVal = (await page.textContent('[data-yf-bar="stiff"] .yf-bar__val')).trim();
+    check('YG1', '96 filaments: 96 circles, dpf 1.56, bundle stiffness ×0.5 on the bar' + w,
+      f1.n === 96 && f1.circles === 96 && Math.abs(f1.dpf - 1.5625) < 1e-9 && f1.stiff === 0.5 && stiffVal === '×0.5', JSON.stringify(f1) + ' ' + stiffVal);
+    await page.locator('[data-yf-n]').fill(idx(576));
+    const dpfTxt = (await page.textContent('[data-yf-o="dpf"]')).trim();
+    check('YG1', '576 filaments read as super-microfiber' + w, /super-microfiber/.test(dpfTxt), dpfTxt);
+    const totalDisabled = await page.$eval('[data-yf-total]', e => e.disabled);
+    check('YG2', 'the total denier is locked while the lock is on' + w, totalDisabled);
+    await page.click('[data-yf-lock]');
+    await page.selectOption('[data-yf-total]', '75');
+    const f2 = await yf(), note2 = (await page.textContent('[data-yf-o="note"]')).trim();
+    check('YG2', 'unlocked to 75 D: the panel says two things moved at once' + w, f2.total === 75 && !f2.locked && /^! the total denier changed too/.test(note2), note2);
+    await page.click('[data-yf-lock]');
+    const f3 = await yf();
+    check('YG2', 'locking again puts the total back to 150 D' + w, f3.locked && f3.total === 150, JSON.stringify(f3));
+    await page.locator('[data-yf-n]').fill(idx(48));
+
     // YP4
     const hs = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     check('YP4', 'no horizontal scroll' + w, hs <= 0, hs);
@@ -476,7 +546,7 @@ async function browser() {
 }
 
 /* ---------- main ---------- */
-let bad = report(await partOne(pathToFileURL(ROOT + path.sep).href), 'PART ONE (yarn-count.js, yarn-twist.js, yarn-strength.js)');
+let bad = report(await partOne(pathToFileURL(ROOT + path.sep).href), 'PART ONE (yarn-count / twist / strength / fineness)');
 if (flag('--browser')) bad += report(await browser(), 'PART TWO (the page)');
 if (flag('--negative-control')) bad += await negativeControl();
 console.log(bad ? 'VERDICT: FAIL' : 'VERDICT: PASS');
