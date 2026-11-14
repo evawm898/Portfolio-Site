@@ -46,6 +46,7 @@
         <li><a href="#yarn-construction"><span class="n">02</span>Yarn Construction</a></li>
         <li><a href="#twist"><span class="n">03</span>Twist</a></li>
         <li><a href="#covered-yarn-twist"><span class="n">03b</span>Covered Yarn &mdash; Twist Direction</a></li>
+        <li><a href="#strength"><span class="n">04</span>Strength</a></li>
       </ul>
     </nav>
   </div>
@@ -388,6 +389,171 @@
     </div>
   </section>
 
+  <!-- ---------- 04 · STRENGTH ----------
+       (the outline's §05; numbered 04 on the page because Covered Yarn
+       folded in as 03b.) Arithmetic: yarn-strength.js (pure, gated by
+       tools/verify-yarn-characterization.mjs). DOM: yarn-strength-ui.js. -->
+  <section class="tx-topic" id="strength">
+    <div class="tx-topic-head">
+      <h2>Strength</h2>
+      <div class="tx-topic-copy">
+        <p>&ldquo;Strong&rdquo; is several properties: how much force breaks the yarn, how far it stretches first, how stiff it is in the first few percent, and how much work it soaks up before it fails. They trade against each other, and the levers that raise one often lower another.</p>
+        <p class="muted">Some levers act on the polymer before there is a yarn, and some on the yarn itself. A test reports the yarn&rsquo;s weakest place, not its average.</p>
+      </div>
+    </div>
+
+    <!-- strength · the four numbers -->
+    <div class="yc-sub">Four numbers from one test</div>
+    <div class="yc-prose">
+      <p>A tensile test grips a fixed length of yarn and stretches it at a steady rate until it breaks, recording force against extension (ASTM D2256, ISO 2062). Four numbers come off the curve:</p>
+    </div>
+    <dl class="yc-notation">
+      <div><dt>Tenacity</dt><dd>Breaking force divided by linear density: cN/dtex, cN/tex or gf/den. Dividing by the count is what lets a fine yarn and a coarse one be compared. Raw breaking force mostly says how thick the yarn is.</dd></div>
+      <div><dt>Elongation at break</dt><dd>How far it stretched before it broke, as a percentage of the gauge length.</dd></div>
+      <div><dt>Initial modulus</dt><dd>The slope at the start: resistance to the small stretches of everyday wear. It sets how firm or limp a yarn feels and how well a fabric keeps its shape.</dd></div>
+      <div><dt>Work of rupture</dt><dd>The area under the curve: the energy the yarn absorbs before it fails. Toughness, as distinct from strength. A yarn that stretches a long way at moderate force can absorb more than a stronger, stiffer one.</dd></div>
+    </dl>
+
+    <!-- strength · tenacity units -->
+    <div class="yc-tool" data-ys-units>
+      <div class="yc-tool__head">
+        <span class="yc-tool__label">Tenacity units</span>
+        <span class="yc-tool__hint">1 gf/den = 0.8826 cN/dtex; tenacity &times; fibre density = stress</span>
+      </div>
+      <div class="ys-units">
+        <label class="ys-units__in">
+          <span class="yt-ctrl__label">Tenacity</span>
+          <span class="ys-units__row">
+            <input class="yc-dec__input" type="number" min="0" step="any" inputmode="decimal" data-ys-ten aria-label="Tenacity value">
+            <select class="yt-select" data-ys-unit aria-label="Tenacity unit">
+              <option value="gpd">gf/den</option>
+              <option value="cndtex">cN/dtex</option>
+              <option value="cntex">cN/tex</option>
+            </select>
+          </span>
+        </label>
+        <label class="ys-units__in">
+          <span class="yt-ctrl__label">Fibre (for stress)</span>
+          <select class="yt-select" data-ys-fibre aria-label="Fibre density"></select>
+        </label>
+      </div>
+      <dl class="yt-read">
+        <div><dt>cN/dtex</dt><dd data-ys-o="cndtex"></dd></div>
+        <div><dt>cN/tex</dt><dd data-ys-o="cntex"></dd></div>
+        <div><dt>gf/den</dt><dd data-ys-o="gpd"></dd></div>
+        <div><dt>Stress, GPa</dt><dd data-ys-o="gpa"></dd></div>
+      </dl>
+      <p class="yt-note" data-ys-o="status" aria-live="polite"></p>
+    </div>
+
+    <div class="yc-sub">Typical ranges</div>
+    <div class="ys-table-wrap">
+      <table class="ys-table">
+        <thead><tr><th scope="col">Fibre or filament yarn</th><th scope="col">Tenacity, cN/dtex</th><th scope="col">gf/den</th><th scope="col">Elongation, %</th></tr></thead>
+        <tbody data-ys-table></tbody>
+      </table>
+    </div>
+    <p class="yc-prose yc-prose--note">Rounded typical ranges; individual products sit anywhere in them or beyond. A <b>spun</b> yarn realises only about half its fibres&rsquo; tenacity, because short fibres hold together by friction and never all carry load at once: a ring-spun cotton yarn of 15&ndash;20 cN/tex from fibres of 30&ndash;40.</p>
+
+    <!-- strength · levers -->
+    <div class="yc-sub">What changes it</div>
+    <div class="yc-two">
+      <div class="yc-card">
+        <div class="yc-card__head">Before there is a yarn &mdash; the polymer</div>
+        <p><b>Molecular weight.</b> Longer chains entangle and share load over more of their length, so tenacity rises with chain length, up to the point where the melt is too viscous to spin. It is usually quoted as intrinsic viscosity: around 0.6&ndash;0.65 dL/g for textile polyester, 0.9 and above for high-tenacity industrial yarn.</p>
+        <p><b>Draw ratio and orientation.</b> Stretching the freshly spun filament lines its molecules up along the axis. More draw gives more tenacity and modulus and less elongation; this is the POY &rarr; FDY step in section 01.</p>
+        <p><b>Crystallinity and heat setting.</b> Ordered, crystalline regions carry load and resist heat. Heat setting anneals the structure so the yarn stops shrinking in later hot processing, usually for a small cost in peak tenacity.</p>
+      </div>
+      <div class="yc-card">
+        <div class="yc-card__head">In the yarn</div>
+        <p><b>Twist.</b> For a staple yarn, strength rises with twist to an optimum and then falls (<a href="#twist">section 03</a>). Filament yarns gain little.</p>
+        <p><b>Irregularity.</b> A yarn breaks at its weakest place, so variation matters more than the average. The thin places of an uneven yarn set its strength, and its evenness (CV% of mass) is part of its strength spec.</p>
+        <p><b>Plying.</b> A plied yarn&rsquo;s weak places rarely line up, so it is more even and usually has a higher tenacity than its singles.</p>
+        <p><b>Filament count.</b> At the same total denier, strength follows the polymer and the drawing, not the number of filaments. Finer filaments do make a softer yarn that abrades and pills sooner (a later section).</p>
+      </div>
+    </div>
+
+    <!-- strength · curve explorer -->
+    <div class="yc-tool ys" data-ys-curve>
+      <div class="yc-tool__head">
+        <span class="yc-tool__label">Stress&ndash;strain</span>
+        <span class="yc-tool__hint">pick a yarn, then move a lever; the dashed curve is the yarn as it starts</span>
+      </div>
+      <div class="yc-dec__presets" role="group" aria-label="Yarn">
+        <button type="button" class="yc-chip" data-ys-preset="pet">Polyester FDY</button>
+        <button type="button" class="yc-chip" data-ys-preset="pet-ht">Polyester, high-tenacity</button>
+        <button type="button" class="yc-chip" data-ys-preset="pa66">Nylon 6,6</button>
+        <button type="button" class="yc-chip" data-ys-preset="cotton">Cotton, ring-spun</button>
+        <button type="button" class="yc-chip" data-ys-preset="elastane">Elastane</button>
+      </div>
+      <div class="ys-levers">
+        <div class="yt-ctrl ys-lever" data-ys-lever="draw">
+          <span class="yt-ctrl__label">Draw ratio</span>
+          <div class="yt-seg" role="group" aria-label="Draw ratio">
+            <button type="button" class="yc-chip" data-ys-draw="lower">lower</button>
+            <button type="button" class="yc-chip" data-ys-draw="standard">standard</button>
+            <button type="button" class="yc-chip" data-ys-draw="higher">higher</button>
+          </div>
+        </div>
+        <div class="yt-ctrl ys-lever" data-ys-lever="heat">
+          <span class="yt-ctrl__label">Heat set</span>
+          <div class="yt-seg"><button type="button" class="yc-chip" data-ys-heatset aria-pressed="false">heat set</button></div>
+        </div>
+        <div class="yt-ctrl ys-lever" data-ys-lever="twist">
+          <span class="yt-ctrl__label">Twist</span>
+          <div class="yt-seg" role="group" aria-label="Twist">
+            <button type="button" class="yc-chip" data-ys-twist="low">TM 2.8</button>
+            <button type="button" class="yc-chip" data-ys-twist="standard">TM 3.8</button>
+            <button type="button" class="yc-chip" data-ys-twist="high">TM 5.5</button>
+          </div>
+        </div>
+        <div class="yt-ctrl ys-lever">
+          <span class="yt-ctrl__label">A weak place</span>
+          <div class="yt-seg"><button type="button" class="yc-chip" data-ys-flaw aria-pressed="false">add one</button></div>
+        </div>
+      </div>
+      <figure class="yt-fig">
+        <div class="yt-scroll"><svg data-ys-chart role="img" aria-label="Tenacity against elongation for the chosen yarn. A solid curve rises from the origin to a cross at the break; the shaded area under it is the work of rupture. When a lever is moved, a dashed curve shows the yarn as it started."></svg></div>
+        <figcaption>Illustrative curves: each preset ends at a typical mid-range tenacity and elongation, and the shapes and directions follow the literature. They are not a test of any one yarn. The short dotted line is the initial modulus; the shaded area is the work of rupture.</figcaption>
+      </figure>
+      <dl class="yt-read">
+        <div><dt>Tenacity</dt><dd data-ys-r="ten"></dd></div>
+        <div><dt>Elongation</dt><dd data-ys-r="elong"></dd></div>
+        <div><dt>Work of rupture</dt><dd data-ys-r="work"></dd></div>
+        <div><dt>Initial stiffness</dt><dd data-ys-r="stiff"></dd></div>
+      </dl>
+      <p class="yt-note" data-ys-r="why" aria-live="polite"></p>
+    </div>
+
+    <!-- strength · weakest link -->
+    <div class="yc-sub">The weakest link</div>
+    <div class="yc-prose">
+      <p>Pull a chain and it breaks at its weakest link. A yarn is the same: under test it fails at the weakest place within the gauge length. A longer specimen contains more places, and so is more likely to hold a weak one, so the same yarn reads <em>weaker</em> the longer the test length. F. T. Peirce worked this out for cotton yarns in 1926. It is why a test standard fixes the gauge length, and why two labs quoting the same yarn at different lengths disagree.</p>
+    </div>
+    <div class="yc-tool" data-ys-weak>
+      <div class="yc-tool__head">
+        <span class="yc-tool__label">Weakest link</span>
+        <span class="yc-tool__hint">a yarn as segments whose strength varies; a test reads the weakest one in the gauge</span>
+      </div>
+      <div class="ys-weak-ctrls">
+        <label class="yt-ctrl">
+          <span class="yt-ctrl__label">Variation along the yarn (CV) <span class="yt-ctrl__val" data-ys-w="cv"></span></span>
+          <input class="yt-range" type="range" min="0" max="25" step="1" value="10" data-ys-cv aria-label="Coefficient of variation of segment strength, percent">
+        </label>
+        <label class="yt-ctrl">
+          <span class="yt-ctrl__label">Gauge length <span class="yt-ctrl__val" data-ys-w="n"></span> segments</span>
+          <input class="yt-range" type="range" min="1" max="50" step="1" value="20" data-ys-gauge aria-label="Gauge length in segments">
+        </label>
+      </div>
+      <figure class="yt-fig">
+        <div class="yt-scroll"><svg data-ys-weak-chart role="img" aria-label="Mean measured strength, as a percentage of a segment's mean strength, falling as the gauge length grows; a dot marks the chosen gauge length."></svg></div>
+      </figure>
+      <p class="yt-note" data-ys-w="read" aria-live="polite"></p>
+    </div>
+
+    <p class="yc-sources"><span class="yc-sources__label">Sources</span> Morton &amp; Hearle, <em>Physical Properties of Textile Fibres</em> (tenacity, elongation and density ranges); Hearle, Grosberg &amp; Backer, <em>Structural Mechanics of Fibers, Yarns and Fabrics</em> (spun vs filament yarn strength); F. T. Peirce, &ldquo;Tensile tests for cotton yarns, v. &lsquo;The weakest link&rsquo;&rdquo;, <em>Journal of the Textile Institute</em> 17 (1926); ASTM D2256 and ISO 2062 (single-end tensile testing of yarn). The curves and the weakest-link figures are illustrative models (the second a seeded simulation of normally scattered segments), not measurements.</p>
+  </section>
+
   <nav class="project__nav">
     <a href="field-notes.html" class="project__nav-link">&larr; Back to Field Notes</a>
   </nav>
@@ -416,6 +582,7 @@
 <script src="yarn-diagrams.js"></script>
 <script type="module" src="yarn-units.js"></script>
 <script type="module" src="yarn-twist-ui.js"></script>
+<script type="module" src="yarn-strength-ui.js"></script>
 
 </body>
 </html>

@@ -15,6 +15,10 @@
      YT1-4 §03 (yarn-twist.js): the twist multipliers from their
           definitions, the surface angle restated (tan θ = π d T), the
           schematic strength curves' shape, the usual-use bands
+     YS1-4 §04 (yarn-strength.js): tenacity units from standard gravity,
+          every curve ends at its own (Eb, Tb), the levers' directions,
+          the weak place, work of rupture by an independent integral,
+          and the weakest link against tabled order statistics
 
    Part two (--browser) drives the real page at 1280 and 390 px:
      YP1  the converter: typing in one row rewrites the others to the
@@ -24,6 +28,8 @@
      YP4  no console errors, no horizontal scroll
      YW1-3 §03's twist panel: the readouts, hold-TM vs hold-turns, the
           told clamp, the snarl loop and the filament mode
+     YQ1-3 §04's tenacity converter and table, the stress–strain
+          explorer's levers, and the weakest-link panel
 
    --negative-control runs part one against mutated copies of
    yarn-count.js; every mutant must turn at least one named check red,
@@ -50,6 +56,7 @@ const near = (a, b, rel = 1e-9) => Math.abs(a - b) <= rel * Math.max(1, Math.abs
 async function partOne(dirUrl) {
   const M = await import(dirUrl + 'yarn-count.js');
   const Y = await import(dirUrl + 'yarn-twist.js');
+  const Z = await import(dirUrl + 'yarn-strength.js');
   const results = [];
   const check = (id, name, ok, detail = '') => results.push({ id, name, ok: !!ok, detail });
 
@@ -162,6 +169,56 @@ async function partOne(dirUrl) {
   check('YT4', 'TM 3.8 reads weft, 4.0 warp, 6 crepe, 1 below range',
     Y.bandOf(3.8).id === 'weft' && Y.bandOf(4).id === 'warp' && Y.bandOf(6).id === 'crepe' && Y.bandOf(1).id === 'low');
   check('YT4', 'a single snarls when slack at TM 4.5, not at TM 2.5', Y.snarls(4.5) && !Y.snarls(2.5));
+
+  /* ---------- §04 strength (yarn-strength.js) ---------- */
+  // YS1 — units: 1 gf = 9.80665 mN; 1 den = 1/9 tex  →  1 gf/den = 9 × 0.980665 cN/tex
+  check('YS1', '1 gf/den = 0.8826 cN/dtex (standard gravity, 1 den = 1/9 tex)', near(Z.gpdToCnDtex(1), 9 * 0.980665 / 10), Z.gpdToCnDtex(1));
+  check('YS1', 'gf/den ↔ cN/dtex round-trips', near(Z.cnDtexToGpd(Z.gpdToCnDtex(4.5)), 4.5, 1e-12));
+  check('YS1', 'para-aramid 20 cN/dtex at 1.44 g/cm³ is 2.88 GPa (N/tex × ρ)', near(Z.cnDtexToGpa(20, 1.44), 2.88), Z.cnDtexToGpa(20, 1.44));
+  check('YS1', 'typical ranges are ordered and positive', Z.TYPICAL.every(t => t.ten[0] > 0 && t.ten[0] < t.ten[1] && t.elong[0] < t.elong[1] && t.density > 0));
+
+  // YS2 — every preset × lever: the curve starts at 0, rises monotonically, ends exactly at (Eb, Tb)
+  const levers = [{}, { draw: 'lower' }, { draw: 'higher' }, { heatset: true }, { twist: 'low' }, { twist: 'high' }];
+  let bad2 = [];
+  for (const id of Object.keys(Z.PRESETS)) for (const o of levers) {
+    const c = Z.curveParams(id, o);
+    let prev = -1, mono = true;
+    for (let i = 0; i <= 400; i++) { const v = Z.stressAt(c, c.Eb * i / 400); if (v < prev) mono = false; prev = v; }
+    // the slope tends to M as ε → 0; the k·ε^p term adds k·p·ε^(p−1), which for p = 1.4 (cotton)
+    // is still ~3e-4 of M at ε = 1e-9, so probe at 1e-14 and allow 1e-3
+    const slope0 = Z.stressAt(c, 1e-14) / 1e-14;
+    if (!(c.k > 0) || !mono || !near(Z.stressAt(c, c.Eb), c.Tb, 1e-9) || Z.stressAt(c, 0) !== 0 || Math.abs(slope0 / c.M - 1) > 1e-3) bad2.push(id + JSON.stringify(o) + ' slope0/M ' + (slope0 / c.M));
+  }
+  check('YS2', 'every curve starts at 0 with slope M, rises monotonically and ends at (Eb, Tb)', bad2.length === 0, bad2.join(' '));
+
+  // YS3 — lever directions (the claims the page makes)
+  const pet = Z.curveParams('pet'), hi = Z.curveParams('pet', { draw: 'higher' }), lo = Z.curveParams('pet', { draw: 'lower' });
+  check('YS3', 'more draw: tenacity and stiffness up, elongation down', hi.Tb > pet.Tb && hi.M > pet.M && hi.Eb < pet.Eb && lo.Tb < pet.Tb && lo.Eb > pet.Eb);
+  const hs = Z.curveParams('pet', { heatset: true });
+  check('YS3', 'heat setting: slightly less peak tenacity', hs.Tb < pet.Tb && hs.Tb > 0.9 * pet.Tb);
+  const cot = Z.curveParams('cotton'), cLo = Z.curveParams('cotton', { twist: 'low' }), cHi = Z.curveParams('cotton', { twist: 'high' });
+  check('YS3', 'cotton twist follows §03: TM 2.8 and TM 5.5 both weaker than TM 3.8',
+    cLo.Tb < cot.Tb && cHi.Tb < cot.Tb && near(cLo.Tb / cot.Tb, Y.relativeStrength('staple', 2.8) / Y.relativeStrength('staple', 3.8)));
+  check('YS3', 'fibre-making levers do nothing to a spun yarn, twist nothing to a filament',
+    Z.curveParams('cotton', { draw: 'higher', heatset: true }).Tb === cot.Tb && Z.curveParams('pet', { twist: 'high' }).Tb === pet.Tb);
+  const fl = Z.curveParams('pet', { flaw: true }), bF = Z.breakPoint(fl), bS = Z.breakPoint(pet);
+  check('YS3', 'a weak place breaks at 70% of the load, earlier, on the same curve',
+    near(bF.sigma, 0.7 * bS.sigma, 1e-9) && bF.eps < bS.eps && Math.abs(Z.stressAt(fl, bF.eps) - bF.sigma) < 1e-9 * bS.sigma, JSON.stringify([bF, bS]));
+  check('YS3', 'the weak place costs most of the work of rupture', Z.workOfRupture(fl) < 0.7 * Z.workOfRupture(pet));
+  // work of rupture against an independent Simpson integral
+  const simpson = (c, b, n = 2000) => { const h = b / n; let a = Z.stressAt(c, 0) + Z.stressAt(c, b); for (let i = 1; i < n; i++) a += (i % 2 ? 4 : 2) * Z.stressAt(c, i * h); return a * h / 3; };
+  check('YS3', 'work of rupture is the area under the curve (Simpson, independently)', Math.abs(Z.workOfRupture(pet) / simpson(pet, pet.Eb) - 1) < 1e-4);
+  check('YS3', 'J/g: 1 cN/dtex × unit strain = 0.1 N/tex = 100 J/g', Z.workToJg(1) === 100);
+
+  // YS4 — the weakest link
+  const w1 = Z.weakLinkMean(0.1, 1), w20 = Z.weakLinkMean(0.1, 20), w50 = Z.weakLinkMean(0.1, 50);
+  check('YS4', 'a one-segment test reads the mean (within sampling)', Math.abs(w1 - 1) < 0.02, w1);
+  check('YS4', 'longer gauge reads weaker', w1 > w20 && w20 > w50, [w1, w20, w50].join(', '));
+  check('YS4', 'more variation reads weaker at the same gauge', Z.weakLinkMean(0.2, 20) < w20);
+  check('YS4', 'no variation, no weak place: every gauge reads 1', [1, 10, 50].every(n => Z.weakLinkMean(0, n) === 1));
+  check('YS4', 'deterministic (a fixed seed)', Z.weakLinkMean(0.15, 30) === Z.weakLinkMean(0.15, 30));
+  // expected minimum of n normals: for n = 20, E[min Z] ≈ −1.867 (tabled order statistics)
+  check('YS4', 'n = 20 at CV 10% reads ≈ 1 − 0.1867 (expected minimum of 20 normals)', Math.abs(w20 - (1 - 0.1867)) < 0.01, w20);
   return results;
 }
 
@@ -191,12 +248,21 @@ const MUTANTS = [
   { file: 'yarn-twist.js', id: 'inch-taken-as-25mm', from: 'export const IN_PER_M = 1 / 0.0254;', to: 'export const IN_PER_M = 1 / 0.025;', breaks: ['YT1'] },
   { file: 'yarn-twist.js', id: 'helix-uses-radius', from: 'return Math.atan(Math.PI * d * tpm) * 180 / Math.PI;', to: 'return Math.atan(Math.PI * d / 2 * tpm) * 180 / Math.PI;', breaks: ['YT2'] },
   { file: 'yarn-twist.js', id: 'staple-needs-no-grip', from: 'const g = 1 - Math.exp(-Math.pow(tm / STAPLE_GRIP.a, STAPLE_GRIP.b));', to: 'const g = 1;', breaks: ['YT3'] },
-  { file: 'yarn-twist.js', id: 'filament-ignores-obliquity', from: 'return c * cos2(tm, YARN_TYPES.filament.density);', to: 'return c;', breaks: ['YT3'] }
+  { file: 'yarn-twist.js', id: 'filament-ignores-obliquity', from: 'return c * cos2(tm, YARN_TYPES.filament.density);', to: 'return c;', breaks: ['YT3'] },
+  // §04 — yarn-strength.js
+  { file: 'yarn-strength.js', id: 'gf-taken-as-1-cn', from: 'export const GF_CN = G_N / 10;', to: 'export const GF_CN = 1;', breaks: ['YS1'] },
+  { file: 'yarn-strength.js', id: 'gpa-ignores-density', from: 'export const cnDtexToGpa = (c, density) => (c / 10) * density;', to: 'export const cnDtexToGpa = (c, density) => c / 10;', breaks: ['YS1'] },
+  { file: 'yarn-strength.js', id: 'draw-direction-inverted', from: "higher:   { label: 'higher',   Tb: 1.15, Eb: 0.65, stiff: 1.25 }", to: "higher:   { label: 'higher',   Tb: 0.85, Eb: 1.35, stiff: 0.75 }", breaks: ['YS3'] },
+  { file: 'yarn-strength.js', id: 'flaw-never-breaks-early', from: 'if (!c.flaw) return { eps: c.Eb, sigma: stressAt(c, c.Eb) };', to: 'return { eps: c.Eb, sigma: stressAt(c, c.Eb) };', breaks: ['YS3'] },
+  { file: 'yarn-strength.js', id: 'curve-misses-its-end', from: 'let k = (Tb - lin) / Math.pow(Eb, p);', to: 'let k = Tb / Math.pow(Eb, p);', breaks: ['YS2'] },
+  { file: 'yarn-strength.js', id: 'weak-link-reads-the-mean', from: 'for (let i = 0; i < n; i++) m = Math.min(m, 1 + cv * normal(rand));', to: 'm = 0; for (let i = 0; i < n; i++) m += (1 + cv * normal(rand)) / n;', breaks: ['YS4'] },
+  { file: 'yarn-strength.js', id: 'twist-lever-on-filament', from: 'if (P.spun && opts.twist', to: 'if (opts.twist', breaks: ['YS3'] }
 ];
 
 async function negativeControl() {
   const SRC = { 'yarn-count.js': fs.readFileSync(path.join(ROOT, 'yarn-count.js'), 'utf8'),
-                'yarn-twist.js': fs.readFileSync(path.join(ROOT, 'yarn-twist.js'), 'utf8') };
+                'yarn-twist.js': fs.readFileSync(path.join(ROOT, 'yarn-twist.js'), 'utf8'),
+                'yarn-strength.js': fs.readFileSync(path.join(ROOT, 'yarn-strength.js'), 'utf8') };
   let missing = 0;
   for (const m of MUTANTS) {
     const n = SRC[m.file || 'yarn-count.js'].split(m.from).length - 1;
@@ -347,6 +413,56 @@ async function browser() {
     check('YW3', 'filament: hairiness reads n/a and the dashed filament curve is active' + w, na && active.length === 1 && /filament/.test(active[0]), na + ' ' + active);
     await page.click('[data-yt-kind="staple"]');
 
+    // YQ — §04 strength tools
+    const q = async sel => (await page.textContent(sel)).trim();
+    check('YQ1', 'the tenacity converter opens on 4.5 gf/den = 3.97 cN/dtex' + w, (await q('[data-ys-o="cndtex"]')) === '3.97', await q('[data-ys-o="cndtex"]'));
+    await page.selectOption('[data-ys-unit]', 'cntex');
+    await page.fill('[data-ys-ten]', '40');
+    check('YQ1', '40 cN/tex = 4 cN/dtex = 0.552 GPa in polyester (1.38 g/cm³)' + w,
+      (await q('[data-ys-o="cndtex"]')) === '4' && (await q('[data-ys-o="gpa"]')) === '0.552', (await q('[data-ys-o="cndtex"]')) + ' / ' + (await q('[data-ys-o="gpa"]')));
+    const rows = await page.$$eval('[data-ys-table] tr', r => r.length);
+    check('YQ1', 'the typical-ranges table has its 11 rows' + w, rows === 11, rows);
+    const ys = async () => JSON.parse(await page.getAttribute('[data-ys-curve]', 'data-ys-state'));
+    let c0 = await ys();
+    const ghost0 = await page.$$eval('[data-ys-ghost]', g => g.length);
+    check('YQ2', 'opens on polyester FDY at 4.2 cN/dtex / 30%, no dashed "as shipped" curve' + w, c0.preset === 'pet' && c0.Tb === 4.2 && c0.Eb === 0.3 && ghost0 === 0, JSON.stringify(c0) + ' ghosts ' + ghost0);
+    await page.click('[data-ys-draw="higher"]');
+    let c1 = await ys();
+    const ghost1 = await page.$$eval('[data-ys-ghost]', g => g.length);
+    check('YQ2', 'higher draw: stronger, less stretch, and the as-shipped curve appears dashed' + w, c1.Tb > c0.Tb && c1.Eb < c0.Eb && ghost1 === 1, JSON.stringify(c1));
+    await page.click('[data-ys-flaw]');
+    let c2 = await ys();
+    const brk = Number(await page.getAttribute('[data-ys-break]', 'data-ys-break'));
+    check('YQ2', 'a weak place breaks earlier at 70% of the load, and the drawn cross moves with it' + w,
+      c2.Eb < c1.Eb && Math.abs(c2.Tb / c1.Tb - 0.7) < 1e-3 && Math.abs(brk - c2.Eb) < 1e-5, JSON.stringify(c2) + ' cross ' + brk);
+    await page.click('[data-ys-flaw]');
+    await page.click('[data-ys-preset="cotton"]');
+    const drawDisabled = await page.$$eval('[data-ys-draw]', bs => bs.every(b => b.disabled));
+    const twistEnabled = await page.$$eval('[data-ys-twist]', bs => bs.every(b => !b.disabled));
+    let c3 = await ys();
+    check('YQ2', 'cotton: draw and heat set are switched off, twist is on, and a stale draw lever does nothing' + w,
+      drawDisabled && twistEnabled && c3.Tb === 1.6 && c3.draw === 'higher', JSON.stringify(c3));
+    await page.click('[data-ys-twist="low"]');
+    let c4 = await ys();
+    check('YQ2', 'cotton at TM 2.8 is weaker than at TM 3.8' + w, c4.Tb < 1.6, JSON.stringify(c4));
+    await page.click('[data-ys-twist="standard"]');
+    await page.click('[data-ys-preset="elastane"]');
+    const ticks = await page.$$eval('[data-ys-chart] text', ts => ts.map(t => t.textContent));
+    check('YQ2', 'elastane: the elongation axis rescales to hundreds of percent' + w, ticks.includes('500%'), ticks.join(' '));
+    await page.click('[data-ys-preset="pet"]');
+    await page.click('[data-ys-draw="standard"]');
+    // weakest link
+    const wk = async () => JSON.parse(await page.getAttribute('[data-ys-weak]', 'data-ys-weak'));
+    await page.locator('[data-ys-cv]').fill('0');
+    const k0 = await wk();
+    await page.locator('[data-ys-cv]').fill('10');
+    await page.locator('[data-ys-gauge]').fill('1');
+    const k1 = await wk();
+    await page.locator('[data-ys-gauge]').fill('50');
+    const k50 = await wk();
+    check('YQ3', 'weakest link: CV 0 reads 100%; at CV 10% a 50-segment test reads weaker than a 1-segment one' + w,
+      k0.mean === 1 && k1.mean > k50.mean && /reads, on average, \d+%/.test(await q('[data-ys-w="read"]')), JSON.stringify([k0, k1, k50]));
+
     // YP4
     const hs = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     check('YP4', 'no horizontal scroll' + w, hs <= 0, hs);
@@ -360,7 +476,7 @@ async function browser() {
 }
 
 /* ---------- main ---------- */
-let bad = report(await partOne(pathToFileURL(ROOT + path.sep).href), 'PART ONE (yarn-count.js, yarn-twist.js)');
+let bad = report(await partOne(pathToFileURL(ROOT + path.sep).href), 'PART ONE (yarn-count.js, yarn-twist.js, yarn-strength.js)');
 if (flag('--browser')) bad += report(await browser(), 'PART TWO (the page)');
 if (flag('--negative-control')) bad += await negativeControl();
 console.log(bad ? 'VERDICT: FAIL' : 'VERDICT: PASS');
