@@ -3,9 +3,11 @@
 **Status: APPROVED (Eva, Nov 14).** Section 01 (Units & terminology) is **written** and on the page, with its count
 converter and spec decoder (`yarn-count.js` for the arithmetic, `yarn-units.js` for the DOM, gated by
 `node tools/verify-yarn-characterization.mjs [--browser] [--negative-control]`). Section 03 (Twist) is **written** too, with its twist
-multiplier interactive (`yarn-twist.js` / `yarn-twist-ui.js`, same gate). Sections 05–10 are not written yet. The page also holds two sections copied from `/lab`, **Yarn Construction** and **Covered Yarn — Twist
+multiplier interactive (`yarn-twist.js` / `yarn-twist-ui.js`, same gate). Section 05 (Strength) is **written** too (`yarn-strength.js` / `yarn-strength-ui.js`, same gate). Sections 06–10 are not written yet.
+
+**Page numbering.** Because Covered Yarn folded in as 03b, the page numbers its sections one lower than this outline from Strength on: outline 05 Strength is page **04**, and 06–10 will be page 05–09. This doc keeps its own numbers so earlier references stay valid. The page also holds two sections copied from `/lab`, **Yarn Construction** and **Covered Yarn — Twist
 Direction**, animated by `yarn-diagrams.js` / `yarn-diagrams.css`. Where they sit in the order below is marked
-**[built]**. The page numbers them 01 Units, 02 Construction, 03 Twist, 03b Covered Yarn.
+**[built]**. The page numbers them 01 Units, 02 Construction, 03 Twist, 03b Covered Yarn, 04 Strength.
 
 ## Ground rules for the whole page
 
@@ -35,7 +37,7 @@ Direction**, animated by `yarn-diagrams.js` / `yarn-diagrams.css`. Where they si
 | 02 | Yarn construction **[built]** | The four animated builds (existing) | light |
 | 03 | Twist **[written]** | Twist slider → yarn render + strength / hand curves | yes |
 | 04 | Covered yarn — twist direction **[built]**, folded under Twist as 03b | SCY S/Z, DCY (existing) | light |
-| 05 | Strength & what changes it | Stress–strain plot with toggles | yes |
+| 05 | Strength & what changes it **[written — page 04]** | Stress–strain plot with toggles | yes |
 | 06 | Filament count & fineness | Same-denier filament-split slider | yes |
 | 07 | Cross-sections | Cross-section picker with light / wicking / cover read-outs | yes |
 | 08 | Texturing | Four-way process comparison, before/after yarn | yes |
@@ -138,7 +140,7 @@ the two.
 
 ---
 
-## 05 · Strength & what changes it
+## 05 · Strength & what changes it **[written, Nov 14 — page 04]**
 
 **Scope.** What "strong" means for a yarn and which levers move it. **Tenacity** is breaking force per linear
 density (g/den, cN/dtex; 1 g/den ≈ 0.883 cN/dtex), and it is the only way to compare yarns of different counts.
