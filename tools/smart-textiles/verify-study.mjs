@@ -500,8 +500,8 @@ async function run(patch = {}, quiet = false) {
                 if (seen.has(nt)) bad.push(`${q.id}[${i}]: same as ${seen.get(nt)}`); else seen.set(nt, `${q.id}[${i}]`);
               });
             }
-            // the 21 explanations the audit found restating the line (1 = it had a line to keep)
-            const SHORT = { 'q-doubleR': 1, 'q-square': 1, 'q-rank': 1, 'q-core': 1, 'q-halfgap': 1, 'q-area': 1, 'q-eps': 1, 'q-water': 1, 'q-creep': 1, 'q-switch': 1, 'q-tpubase': 1, 'q-baretrace': 1, 'q-heaterins': 1, 'q-young': 1, 'q-auxetic': 1, 'q-island': 1, 'q-serp': 1, 'q-compress': 1, 'q-poisson': 0, 'q-rubber': 0, 'q-cap': 0 };
+            // the 21 explanations the audit found restating the line, and q-shield (1 = it had a line to keep)
+            const SHORT = { 'q-doubleR': 1, 'q-square': 1, 'q-rank': 1, 'q-core': 1, 'q-halfgap': 1, 'q-area': 1, 'q-eps': 1, 'q-water': 1, 'q-creep': 1, 'q-switch': 1, 'q-tpubase': 1, 'q-baretrace': 1, 'q-heaterins': 1, 'q-young': 1, 'q-auxetic': 1, 'q-island': 1, 'q-serp': 1, 'q-compress': 1, 'q-shield': 1, 'q-poisson': 0, 'q-rubber': 0, 'q-cap': 0 };
             for (const [id, line] of Object.entries(SHORT)) {
               const q = D.QUIZ.find(x => x.id === id); if (!q) { bad.push(`${id}: gone`); continue; }
               if (q.why.length < 70 || hooks.has(norm(q.why)) || (q.hook && norm(q.why).includes(norm(q.hook)))) bad.push(`${id}: the reason restates the line`);
