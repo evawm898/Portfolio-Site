@@ -13,6 +13,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="textile-101.css">
+<link rel="stylesheet" href="yarn-diagrams.css">
 </head>
 <body id="top">
 
@@ -34,18 +36,105 @@
     </div>
     <h1 class="project__title">Yarn Characterization</h1>
     <p class="project__lede">Understanding how fiber, count, twist, ply, structure, and other yarn variables influence textile behavior.</p>
+    <p class="yd-lede-sub">Starts from how a yarn is put together. Builds on <a href="textile-101.html#yarn-spec">Textile 101 &mdash; Reading a Yarn Spec</a>.</p>
+
+    <nav class="tx-toc" aria-label="On this page">
+      <div class="tx-toc__label">On This Page</div>
+      <ul class="tx-toc__list">
+        <li><a href="#yarn-construction"><span class="n">01</span>Yarn Construction</a></li>
+        <li><a href="#covered-yarn-twist"><span class="n">02</span>Covered Yarn &mdash; Twist Direction</a></li>
+      </ul>
+    </nav>
   </div>
 
-  <div class="project__body">
-
-    <section class="project__section">
-      <h2 class="project__section-title"><span>01</span>Coming Soon</h2>
-      <div class="project__section-body">
-        <p>Full write-up in progress &mdash; check back soon.</p>
+  <!-- ---------- 01 · YARN CONSTRUCTION ----------
+       The diagrams are drawn by yarn-diagrams.js (a copy of the /lab
+       #yarn-construction builders; /lab is left untouched). -->
+  <section class="tx-topic" id="yarn-construction">
+    <div class="tx-topic-head">
+      <h2>Yarn Construction</h2>
+      <div class="tx-topic-copy">
+        <p>Four structural approaches to assembling a yarn. A <em>single</em> is one strand; a <em>plied</em> yarn twists two or more singles together; a <em>core-spun</em> yarn wraps fiber around a spandex core; a <em>drawn covered</em> yarn entangles filament around the core with air.</p>
+        <p class="muted">Each one plays once the first time it scrolls into view &mdash; after that, hover a type (or tap it) to replay it on its own.</p>
       </div>
-    </section>
+    </div>
 
-  </div>
+    <div class="yd-block">
+      <div class="yarn-grid" data-yarn-grid>
+
+        <div class="yarn-panel" data-yarn="single">
+          <div class="yarn-panel__stage" data-yarn-stage role="img" aria-label="One strand drawn top to bottom, settling into place"></div>
+          <div class="yarn-panel__label" data-yarn-label>Single Yarn</div>
+          <div class="yarn-panel__caption">Unplied strand</div>
+        </div>
+
+        <div class="yarn-panel" data-yarn="plied">
+          <div class="yarn-panel__stage" data-yarn-stage role="img" aria-label="Two strands, one ink and one petrol, twisting around each other"></div>
+          <div class="yarn-panel__label" data-yarn-label>Plied Yarn</div>
+          <div class="yarn-panel__caption">Two strands, twisted</div>
+        </div>
+
+        <div class="yarn-panel" data-yarn="core-spun">
+          <div class="yarn-panel__stage" data-yarn-stage role="img" aria-label="A grey spandex core appears, then a petrol wrap coils around it"></div>
+          <div class="yarn-panel__label" data-yarn-label>Core-Spun Yarn</div>
+          <div class="yarn-panel__caption">Spandex core, wrapped</div>
+        </div>
+
+        <div class="yarn-panel" data-yarn="drawn-covered">
+          <div class="yarn-panel__stage" data-yarn-stage role="img" aria-label="A grey core with a fine petrol filament caught around it in loose tangled clusters"></div>
+          <div class="yarn-panel__label" data-yarn-label>Drawn Covered Yarn</div>
+          <div class="yarn-panel__caption">Filament, air-covered</div>
+        </div>
+
+      </div>
+      <div class="yd-block__note">Single <span class="sep">&mdash;</span> plied <span class="sep">&mdash;</span> core-spun <span class="sep">&mdash;</span> drawn covered</div>
+    </div>
+  </section>
+
+  <!-- ---------- 02 · COVERED YARN — TWIST DIRECTION ----------
+       A copy of /lab #covered-yarn-twist. -->
+  <section class="tx-topic" id="covered-yarn-twist">
+    <div class="tx-topic-head">
+      <h2>Covered Yarn &mdash; Twist Direction</h2>
+      <div class="tx-topic-copy">
+        <p>A covered yarn wraps a cover yarn around an elastic core. Single covered yarn (SCY) has one wrap, in either twist direction &mdash; S or Z, named for which way the diagonal of the letter runs. Double covered yarn (DCY) wraps twice: the inner layer goes on Z, then the outer layer wraps S over it, so the two torques cancel.</p>
+        <p class="muted">Plays once on scroll into view; hover a diagram to replay it and hold the S or Z on screen.</p>
+      </div>
+    </div>
+
+    <div class="yd-block">
+      <div class="covered-grid" data-covered-grid>
+
+        <div class="covered-panel" data-covered-panel="scy">
+          <div class="covered-panel__label">SCY</div>
+          <div class="covered-mini-row">
+            <div class="covered-mini" data-covered="scy-s">
+              <div class="covered-mini__stage" data-covered-stage role="img" aria-label="A single wrap coiling around the core in the S direction"></div>
+              <div class="covered-mini__dir" data-covered-dir>S</div>
+            </div>
+            <div class="covered-mini" data-covered="scy-z">
+              <div class="covered-mini__stage" data-covered-stage role="img" aria-label="A single wrap coiling around the core in the Z direction"></div>
+              <div class="covered-mini__dir" data-covered-dir>Z</div>
+            </div>
+          </div>
+          <div class="covered-panel__caption">Single covered yarn</div>
+        </div>
+
+        <div class="covered-panel" data-covered-panel="dcy">
+          <div class="covered-panel__label">DCY</div>
+          <div class="covered-mini-row covered-mini-row--single">
+            <div class="covered-mini covered-mini--wide" data-covered="dcy">
+              <div class="covered-mini__stage" data-covered-stage role="img" aria-label="An inner fine wrap in the Z direction, then a coarser outer wrap in the S direction over it"></div>
+              <div class="covered-mini__dir" data-covered-dir>Z &rarr; S</div>
+            </div>
+          </div>
+          <div class="covered-panel__caption">Double covered yarn</div>
+        </div>
+
+      </div>
+      <div class="yd-block__note">Inner wrap: deep petrol <span class="sep">&mdash;</span> outer wrap: petrol, coarser and wider</div>
+    </div>
+  </section>
 
   <nav class="project__nav">
     <a href="field-notes.html" class="project__nav-link">&larr; Back to Field Notes</a>
@@ -71,6 +160,8 @@
 </footer>
 
 <a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
+
+<script src="yarn-diagrams.js"></script>
 
 </body>
 </html>

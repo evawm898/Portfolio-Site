@@ -1,0 +1,248 @@
+/* ---------------------------------------------------
+   yarn-diagrams.css — the animated yarn construction diagrams
+   (Yarn Characterization field note; drawn by yarn-diagrams.js).
+
+   A COPY of the yarn-grid and covered-grid rules in lab.css, so /lab
+   stays untouched. Restyled for the field notes: tokens.css only
+   (var(--color-*), var(--type-*)), the grids sit inside a framed
+   diagram block with a petrol left rule, and the panel labels are
+   Fraunces over IBM Plex Mono captions.
+--------------------------------------------------- */
+
+/* ---------- The framed block both grids sit in ---------- */
+.yd-block {
+  margin-top: 3rem;
+  border: 1px solid var(--color-line);
+  border-left: 2px solid var(--color-deep);
+  background: var(--color-raised);
+}
+
+.yd-block__note {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--color-line);
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+
+.yd-block__note .sep { color: var(--color-faint); }
+
+/* ---------- Yarn construction grid ---------- */
+.yarn-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.yarn-panel {
+  border-right: 1px solid var(--color-line);
+  padding: 2.5rem 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: background-color 0.2s ease;
+  cursor: default;
+}
+
+.yarn-grid .yarn-panel:nth-child(4n) { border-right: none; }
+
+.yarn-panel.is-playing { background: var(--color-ground); }
+
+.yarn-panel__stage {
+  width: 100%;
+  max-width: 110px;
+  aspect-ratio: 120 / 260;
+}
+
+.yarn-panel__svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+.yarn-panel__label {
+  margin-top: 1.75rem;
+  font-family: var(--type-serif);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-ink);
+  transition: color 0.2s ease;
+}
+
+.yarn-panel__label.is-active {
+  color: var(--color-petrol);
+  font-weight: 600;
+}
+
+.yarn-panel__caption {
+  margin-top: 0.4rem;
+  font-family: var(--type-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+
+/* ---------- Construction animations (driven by yarn-diagrams.js) ---------- */
+.js-strand {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.js-strand.is-settling {
+  animation: ydYarnSettle 700ms cubic-bezier(.34, 1.15, .4, 1) both;
+}
+
+@keyframes ydYarnSettle {
+  0%   { transform: translateY(-5px) rotate(-2.5deg) scaleY(0.92); opacity: 0.55; }
+  55%  { transform: translateY(2px) rotate(1.4deg) scaleY(1.02); opacity: 1; }
+  100% { transform: translateY(0) rotate(0deg) scaleY(1); opacity: 1; }
+}
+
+.js-core {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  transform: scaleY(0.85);
+}
+
+.js-core.is-appearing {
+  animation: ydCoreAppear 350ms ease-out both;
+}
+
+@keyframes ydCoreAppear {
+  0%   { opacity: 0; transform: scaleY(0.85); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+
+/* Opacity is driven entirely by JS (inline style + transition) so it can
+   react to hover in real time. */
+.js-direction-letter {
+  font-family: var(--type-serif);
+  font-weight: 600;
+  font-size: 150px;
+  fill: var(--color-ink);
+  opacity: 0;
+}
+
+/* ---------- Covered yarn — twist direction (SCY / DCY) ---------- */
+.covered-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.covered-panel {
+  border-right: 1px solid var(--color-line);
+  padding: 2.5rem 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.covered-grid .covered-panel:last-child { border-right: none; }
+
+.covered-panel__label {
+  font-family: var(--type-serif);
+  font-weight: 500;
+  font-size: 1.15rem;
+  letter-spacing: 0.03em;
+  color: var(--color-ink);
+  margin-bottom: 2rem;
+}
+
+.covered-mini-row {
+  display: flex;
+  gap: 2.5rem;
+  justify-content: center;
+}
+
+.covered-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.covered-mini.is-playing,
+.covered-mini:hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-ground);
+}
+
+.covered-mini__stage {
+  width: 100%;
+  max-width: 74px;
+  aspect-ratio: 120 / 260;
+}
+
+.covered-mini--wide .covered-mini__stage { max-width: 110px; }
+
+.covered-mini__stage svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+.covered-mini__dir {
+  margin-top: 1rem;
+  font-family: var(--type-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+  transition: color 0.2s ease;
+}
+
+.covered-mini__dir.is-active,
+.covered-mini:hover .covered-mini__dir {
+  color: var(--color-petrol);
+  font-weight: 500;
+}
+
+.covered-panel__caption {
+  margin-top: 1.75rem;
+  font-family: var(--type-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .yarn-grid { grid-template-columns: repeat(2, 1fr); }
+  .yarn-grid .yarn-panel:nth-child(4n) { border-right: 1px solid var(--color-line); }
+  .yarn-grid .yarn-panel:nth-child(2n) { border-right: none; }
+  .yarn-grid .yarn-panel:nth-child(-n+2) { border-bottom: 1px solid var(--color-line); }
+}
+
+@media (max-width: 560px) {
+  .yarn-grid,
+  .covered-grid { grid-template-columns: 1fr; }
+  .yarn-grid .yarn-panel,
+  .covered-grid .covered-panel {
+    border-right: none !important;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .yarn-grid .yarn-panel:last-child,
+  .covered-grid .covered-panel:last-child { border-bottom: none; }
+}
+
+/* ---------- The hero's second line (the field notes' "builds on" note) ---------- */
+.yd-lede-sub {
+  font-family: var(--type-mono);
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--color-dim);
+  max-width: 42rem;
+  margin-top: 1rem;
+}
+
+.yd-lede-sub a { color: var(--color-petrol); }
