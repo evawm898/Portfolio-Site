@@ -13,6 +13,10 @@
 //   S6  the wrapped yarn's cover toggle changes the drawing and its aria-pressed pair
 //   S7  prefers-reduced-motion: every scene draws one still frame and holds it; a click plays it
 //   S8  no page errors, no horizontal scroll
+//   S9  the corrected copy, as served: none of the audit's wrong statements in the page text or any scene's
+//       drawing (heater power at a fixed voltage, carbon composites, capacitive drift, the antenna's frequency,
+//       thermoelectric µV per leg, C written without εᵣ), and the corrections present
+//   S10 every toggle button is at least 32 px tall at 1280 and 44 px at 390
 // --negative-control re-serves the page with the player's draw loop removed (a page of still frames) and
 // requires S2 to fail; then with one scene's label pushed outside its frame and requires S4 to fail.
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
@@ -104,6 +108,19 @@ async function run(patch = {}, quiet = false) {
     const after = await page.evaluate(() => window.__st.find(p => p.name === 'wrapped').scene.draw(0.4, { cover: 'double' }));
     const pressed = await page.$$eval('[data-st-for="wrapped"]', bs => bs.map(b => b.getAttribute('aria-pressed')).join(','));
     ok('S6', st === 'double' && before !== after && pressed === 'false,true', `${w}px double cover: state ${st}, drawing changes, buttons ${pressed}`);
+    // S9 the corrected copy, in the page text and in every scene's drawing at three points in its loop
+    const s9 = await page.evaluate(() => {
+      const svgs = window.__st.map(p => [0.15, 0.5, 0.85].map(t => p.scene.draw(t, { ...p.state })).join(' ')).join(' ');
+      const all = document.body.innerText + ' ' + svgs;
+      const FORBID = [/C = εA/, /in proportion to its resistance and the square/, /Carbon composites do the opposite and drop/, /No current flows through the stack, so it drifts less/, /patch size and the felt/, /patch size and felt thickness/, /Tens of microvolts per degree per leg:/, /the yarn’s own resistance makes/];
+      const NEED = [/V²\/R/, /bismuth telluride/, /felt’s permittivity/, /self-regulating heaters/, /spacer comes back to the same gap/, /ε0εrA \/ d/];
+      return { hits: FORBID.filter(re => re.test(all)).map(String), missing: NEED.filter(re => !re.test(all)).map(String) };
+    });
+    ok('S9', !s9.hits.length && !s9.missing.length, `${w}px wrong statements found: ${s9.hits.join(' ') || 'none'}; corrections missing: ${s9.missing.join(' ') || 'none'}`);
+    // S10 toggle buttons
+    const minH = w < 700 ? 44 : 32;
+    const s10 = await page.$$eval('.st-btn', (bs, min) => bs.filter(b => b.getBoundingClientRect().height && b.getBoundingClientRect().height < min - 0.5).map(b => `${b.textContent.trim()} ${Math.round(b.getBoundingClientRect().height)}px`), minH);
+    ok('S10', !s10.length, `${w}px toggle buttons under ${minH} px: ${s10.join(', ') || 'none'}`);
     // S8
     const sw = await page.evaluate(() => document.documentElement.scrollWidth);
     ok('S8', sw <= w, `${w}px no horizontal scroll (scrollWidth ${sw})`);
@@ -131,6 +148,10 @@ if (process.argv.includes('--negative-control')) {
     ['the draw loop is removed: a page of still frames', { 'smart-textiles-core.js': ['requestAnimationFrame(frame);\n  return players;', 'return players;'] }, 'S2'],
     ['a label is pushed outside its frame', { 'smart-textiles-yarns.js': ["s += tag(18, yc - 52, 'from the carriers');", "s += tag(318, yc - 52, 'from the carriers');"] }, 'S4'],
     ['a hex colour is written into a scene', { 'smart-textiles-sense.js': ['stroke: C.plum, \'stroke-width\': 4.5', "stroke: '#a98cc8', 'stroke-width': 4.5"] }, 'S5'],
+    ['the capacitance formula loses εᵣ in a drawing', { 'smart-textiles-sense.js': ["'C = ε₀εᵣA / d'", "'C = εA / d'"] }, 'S9'],
+    ['the antenna caption goes back to the felt thickness', { 'smart-textiles-act.js': ["['Frequency: patch length and', 'the felt’s permittivity (εᵣ).',", "['Its frequency is set by the', 'patch size and felt thickness.',"] }, 'S9'],
+    ['the heater copy goes back to "in proportion to its resistance"', { 'smart-textiles.html': ['Current through a resistive yarn turns into heat: P = I&sup2;R.', 'Current through a resistive yarn turns into heat, in proportion to its resistance and the square of the current.'] }, 'S9'],
+    ['the toggles lose their touch size', { 'smart-textiles.css': ['  .st-btn { min-height: 44px; padding-top: 0.5rem; padding-bottom: 0.5rem; }\n', ''] }, 'S10'],
   ];
   for (const [name, patch, want] of legs) {
     const { fails } = await run(patch, true);

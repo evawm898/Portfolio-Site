@@ -11,7 +11,7 @@ import {
   C, TAU, clamp, lerp, ease, seg, eseg, fr, pulse, rng, mix, poly, path, line, rect, circ, txt, tag,
   arrow, measure, at, electrons, sample, plot, grp,
 } from './smart-textiles-core.js';
-import { STACKS } from './smart-textiles-study-data.js';
+import { STACKS, CONTACT } from './smart-textiles-study-data.js';
 import { JERSEY_REST, weftCourse } from './textile-knit-loops.js';
 
 // bigger type than the note: this page is read closely and on phones
@@ -254,7 +254,7 @@ const lanes = {
     const ys = 50, segs = [[30, 110], [130, 210], [230, 310]];
     for (const [a, b] of segs) s += line(a, ys, b, ys, { stroke: C.steel, 'stroke-width': 4, 'stroke-linecap': 'round' });
     for (const x of [120, 220]) s += rect(x - 7, ys - 7, 14, 14, { fill: C.raised, stroke: C.ink2, 'stroke-width': 1 });
-    s += L(170, ys + 26, 'every contact is a toll booth', { anchor: 'middle' });
+    s += L(170, ys + 26, 'every joint in series is a toll booth', { anchor: 'middle' });
     // electrons slow at each booth: positions follow a warped clock
     const n = 9;
     for (let i = 0; i < n; i++) {
@@ -293,14 +293,16 @@ const contacts = {
     s += arrow(36, 76, 14, 76, { color: C.plum, op: f2(st) }) + arrow(324, 76, 346, 76, { color: C.plum, op: f2(st) });
     s += L(180, 22, `${on} of ${all} loop-to-loop contacts touching`, { anchor: 'middle' });
     s += plot({ x: 40, y: 160, w: 280, h: 40, u: fr(t), f: v => 0.2 + 0.7 * pulse(fr(v), 0.12, 0.38, 0.6, 0.86), title: 'resistance', xl: 'time', grid: [], color: C.petrol, readout: st > 0.5 ? 'stretched: fewer contacts' : 'relaxed: many contacts' });
-    s += T(40, 224, 'Every contact is a toll booth.', { size: 9.5 });
+    s += T(40, 224, CONTACT.hook, { size: 9.5 });
     return s;
   },
 };
 const strandK = pts => path(poly(pts), { stroke: C.bg, 'stroke-width': 5.4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }) + path(poly(pts), { stroke: C.silver, 'stroke-width': 2.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' });
 
 // Heater lab: one battery (5 V), n parallel lines of length L, choose the yarn.
-export const HEATER_YARNS = { 10: 'silver-plated, 10 Ω/m', 30: 'stainless steel, 30 Ω/m', 100: 'carbon, 100 Ω/m' };
+// Ω/m from real yarn kinds: Ag–Cu wire wrapped on a core (0.3–20 Ω/m), 3-ply stainless thread (about 33),
+// a carbon-fibre tow (about 75 for 6K, 150 for 3K). Common silver-plated sewing threads run 100–300 Ω/m.
+export const HEATER_YARNS = { 10: 'Ag–Cu wrapped, 10 Ω/m', 30: 'stainless steel, 30 Ω/m', 100: 'carbon fibre tow, 100 Ω/m' };
 export function heaterHint(c) {
   if (c.okP && c.okI && c.okC) return ['✓ A workable heater.'];
   if (c.I > 2) return ['! Too much current:', 'lengthen the lines or use fewer.'];
@@ -356,7 +358,7 @@ const heater = {
 // =============================================================================================
 const RHO_BARS = [
   ['silver', 1.59e-8, C.silver, 'Ag'], ['copper', 1.68e-8, C.copper, 'Cu'], ['gold', 2.44e-8, 'var(--st-gold)', 'Au'], ['aluminium', 2.65e-8, C.steel, 'Al'],
-  ['nickel', 6.99e-8, 'var(--st-nickel)'], ['stainless steel', 7.2e-7, C.steel], ['nichrome', 1.10e-6, C.steel], ['carbon fibre', 1.5e-5, C.carbon], ['PEDOT:PSS, at best', 1e-5 * 1.0, C.pedot],
+  ['nickel', 6.99e-8, 'var(--st-nickel)'], ['stainless steel', 7.2e-7, C.steel], ['nichrome', 1.10e-6, C.steel], ['PEDOT:PSS, best film', 2.3e-6, C.pedot], ['carbon fibre', 1.5e-5, C.carbon],
 ];
 const ladder = {
   vb: '0 0 720 270', dur: 9000,
@@ -635,7 +637,7 @@ const water = {
     if (r > 0.5) s += path(`M${lx - r},${dy + r * 0.4} Q${lx - r},${dy - r} ${lx},${dy - r * 1.4} Q${lx + r},${dy - r} ${lx + r},${dy + r * 0.4} Q${lx},${dy + r * 1.1} ${lx - r},${dy + r * 0.4}Z`, { fill: C.indigo, 'fill-opacity': 0.18, stroke: C.ink2, 'stroke-width': 1 });
     const spike = fall > 0.99 ? 1 - dry : 0;
     s += plot({ x: 30, y: 150, w: 120, h: 44, u: fr(t), f: v => 0.15 + 0.8 * (v > 0.25 ? 1 - eseg(v, 0.8, 0.98) : 0), title: 'reads as', readout: spike > 0.5 ? 'a touch' : 'idle', grid: [], color: C.indigo });
-    s += T(lx, 222, 'Water fools C (ε ≈ 80).', { anchor: 'middle', size: 9.5 });
+    s += T(lx, 222, 'Water fools C (εᵣ ≈ 80).', { anchor: 'middle', size: 9.5 });
     // resistive (right): two traces, droplet bridges them at the edge
     const rx = 270;
     s += L(rx, 22, 'resistive', { anchor: 'middle' });
@@ -788,8 +790,8 @@ function drawRings(S, t, sel) {
 // stays stretched; polyester fibre springs back; a knit makes a J; rubber is soft and springs back.
 // Axes are each material's own, because they differ by a factor of a thousand in stress.
 export const CURVES = {
-  metal: { name: 'copper wire', xr: 0.01, yr: 120, xl: '1%', yl: '120 MPa', nu: 0.34, emax: 0.008, exag: 40,
-    E: 120000, sy: 70, H: 3000, eLabel: 'E ≈ 120 GPa, but it yields at about 0.06%',
+  metal: { name: 'annealed copper wire', xr: 0.01, yr: 120, xl: '1%', yl: '120 MPa', nu: 0.34, emax: 0.008, exag: 40,
+    E: 120000, sy: 70, H: 3000, eLabel: 'E ≈ 120 GPa, but soft copper yields at about 0.06%',
     note: ['Let go and it stays about 0.7% longer.', 'It yielded almost at once.'] },
   fibre: { name: 'polyester fibre', xr: 0.02, yr: 200, xl: '2%', yl: '200 MPa', nu: 0.4, emax: 0.012, exag: 25,
     E: 10000, eLabel: 'E ≈ 10 GPa', note: ['Below its yield it springs straight back.', 'Stiff: a fibre barely stretches.'] },
@@ -893,7 +895,7 @@ const poisson = {
 
 // Gauge lab: stretch a conductor; R goes up from length AND from the thinner cross-section.
 export const GAUGE = {
-  metal: { name: 'straight copper trace', nu: 0.34, yieldAt: 0.002 },
+  metal: { name: 'straight hard-drawn copper trace', nu: 0.34, yieldAt: 0.002 },
   liquid: { name: 'liquid metal in silicone', nu: 0.5, yieldAt: Infinity },
 };
 export const gaugeCalc = (mat, strain) => { const g = GAUGE[mat] || GAUGE.liquid, e = +strain, ratio = (1 + e) ** (1 + 2 * g.nu); return { g, e, ratio, gf: e > 0 ? (ratio - 1) / e : 1 + 2 * g.nu, yielded: e > g.yieldAt }; };
@@ -916,7 +918,7 @@ const gauge = {
     s += H(40, 186, `R × ${fmt(c.ratio, 3)}  (+${fmt((c.ratio - 1) * 100, 1)}%)`);
     s += T(40, 206, `gauge factor over this stretch: ${fmt(c.gf, 2)}   (≈ 1 + 2ν = ${fmt(1 + 2 * g.nu, 2)} for small stretches)`);
     s += T(40, 226, 'R = ρL/A: longer AND thinner, so R gets hit twice.', { fill: C.ink });
-    if (k === 'metal') s += T(40, 246, c.yielded ? `! ${fmt(c.e * 100, 1)}% is far past copper’s yield (about 0.2%): it stays stretched, then cracks.` : 'Still springy: copper yields at only about 0.2%.', { fill: c.yielded ? C.ink : C.dim });
+    if (k === 'metal') s += T(40, 246, c.yielded ? `! ${fmt(c.e * 100, 1)}% is far past hard-drawn copper’s yield (about 0.2%): it stays stretched, then cracks.` : 'Still springy: even hard-drawn copper yields at only about 0.2%.', { fill: c.yielded ? C.ink : C.dim });
     else s += T(40, 246, 'A liquid can’t crack: stretch it as far as the silicone allows.');
     // R vs strain plot
     s += plot({ x: 520, y: 40, w: 170, h: 110, u: clamp(c.e / 0.3), grid: [0.5], f: v => (((1 + 0.3 * v) ** (1 + 2 * g.nu)) - 1) / ((1.3 ** (1 + 2 * g.nu)) - 1), title: 'R vs stretch', xl: '30%', xl0: '0', color: k === 'metal' ? C.copper : C.petrol });

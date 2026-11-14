@@ -40,8 +40,8 @@ const heater = {
     // supply and switch
     s += strand(`M40,52 L14,52 L14,190 L60,190`, C.silver, 1.4, { halo: 0.8 }) + strand(`M200,154 L200,178 L100,178 L100,190 L84,190`, C.silver, 1.4, { halo: 0.8 });
     s += switchIcon(62, 190, on) + rect(110, 182, 22, 16, { fill: 'none', stroke: C.dim, rx: 2 }) + tag(121, 193, 'batt', { anchor: 'middle', size: 6 });
-    s += txt(232, 34, 'P = I²R', { size: 11, fill: C.ink });
-    s += txt(232, 48, 'the yarn’s own', { size: 8, fill: C.faint }) + txt(232, 59, 'resistance makes', { size: 8, fill: C.faint }) + txt(232, 70, 'the heat', { size: 8, fill: C.faint });
+    s += txt(232, 34, 'P = I²R = V²/R', { size: 11, fill: C.ink });
+    s += txt(232, 48, 'a battery fixes V:', { size: 8, fill: C.faint }) + txt(232, 59, 'less R, more heat', { size: 8, fill: C.faint }) + txt(232, 70, '(longer is colder)', { size: 8, fill: C.faint });
     s += plot({ x: 232, y: 112, w: 112, h: 60, u: T, f: v => 0.08 + 0.82 * firstOrder(v, 0.06, 0.5, 0.11), title: 'temperature', readout: `${Math.round(22 + 18 * temp)} °C`, grid: [], color: C.plum });
     s += plot({ x: 232, y: 196, w: 112, h: 14, u: T, f: v => (v > 0.06 && v < 0.5 ? 0.85 : 0.1), title: '', grid: [], color: C.petrol, n: 200 });
     s += tag(232, 192, 'current');
@@ -202,11 +202,11 @@ const antenna = {
       const r = 8 + fr(T * 6 + k / 4) * 52, o = 1 - r / 62;
       s += path(`M${cx - 28 - r * 0.7},${py - 13 - r * 0.7} A${r},${r} 0 0 1 ${cx + 32 + r * 0.7},${py - 13 - r * 0.7}`, { stroke: C.petrol, 'stroke-width': 1, 'stroke-opacity': o * 0.8 });
     }
-    // squash it and the resonance moves: thinner felt, lower and narrower resonance
+    // squash it and the resonance moves: denser, thinner felt raises εᵣ and narrows the band
     if (squash > 0.05) s += arrow(cx - 66, py - 46, cx - 66, py - 16, { color: C.ink, op: squash }) + tag(cx - 72, py - 36, 'pressed', { anchor: 'end', op: squash });
     const f0 = 0.55 - 0.16 * squash;
     s += plot({ x: 220, y: 160, w: 120, h: 46, n: 120, u: f0, f: v => 0.9 - 0.75 * Math.exp(-(((v - f0) / 0.07) ** 2)), mode: 'time', title: 'return loss', readout: `${(2.45 - 0.35 * squash).toFixed(2)} GHz`, xl: 'freq →', grid: [], color: C.petrol, ref: [{ v: 0.9 - 0.75 }] });
-    ['Its frequency is set by the', 'patch size and felt thickness.', 'Crush, stretch or wet the', 'felt and it detunes.'].forEach((l, i) => { s += txt(20, 170 + i * 11, l, { size: 8, fill: C.faint }); });
+    ['Frequency: patch length and', 'the felt’s permittivity (εᵣ).', 'Crush, stretch or wet the', 'felt and it detunes.'].forEach((l, i) => { s += txt(20, 170 + i * 11, l, { size: 8, fill: C.faint }); });
     return s;
   },
 };
@@ -285,7 +285,7 @@ const thermoE = {
       for (let k = 0; k < 2; k++) { const u = fr(k / 2 + T * 3 * dT + i * 0.13), y = lerp(yh - 12, yc + 12, u); s += isP ? circ(x, y, 1.5, { fill: 'none', stroke: C.petrol, 'stroke-width': 0.9, 'stroke-opacity': dT + 0.1 }) : circ(x, y, 1.4, { fill: C.petrol, 'fill-opacity': dT + 0.1 }); }
     }
     s += plot({ x: 40, y: 168, w: 140, h: 40, mode: 'xy', u: dT, curve: v => ({ x: v, y: 0.1 + 0.8 * v }), title: 'voltage vs ΔT', xl: 'ΔT →', grid: [], color: C.petrol });
-    s += txt(204, 178, 'Tens of µV per kelvin per', { size: 8, fill: C.faint }) + txt(204, 189, 'leg: many legs in series,', { size: 8, fill: C.faint }) + txt(204, 200, 'and still only microwatts.', { size: 8, fill: C.faint });
+    s += txt(204, 178, 'Per leg: tens of µV per', { size: 8, fill: C.faint }) + txt(204, 189, 'kelvin in polymers, ~200 in', { size: 8, fill: C.faint }) + txt(204, 200, 'Bi₂Te₃. Many legs in series,', { size: 8, fill: C.faint }) + txt(204, 211, 'and still only microwatts.', { size: 8, fill: C.faint });
     return s;
   },
 };

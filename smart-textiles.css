@@ -75,3 +75,9 @@
 .st-study-link__eyebrow { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--petrol-bright); }
 .st-study-link__title { display: block; font-family: var(--serif); font-size: 1.3rem; color: var(--ink); margin-top: 0.35rem; }
 .st-study-link__sub { display: block; font-size: 12.5px; line-height: 1.6; color: var(--ink-dim); margin-top: 0.35rem; }
+
+/* ---------- tap targets: a toggle is at least 32 px tall, 44 px on a touch or narrow screen ---------- */
+.st-btn { min-height: 32px; }
+@media (max-width: 640px), (pointer: coarse) {
+  .st-btn { min-height: 44px; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+}
