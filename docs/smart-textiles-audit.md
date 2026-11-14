@@ -234,7 +234,12 @@ Cost: S is under half a day, M about a day, L several days. "Removes or restruct
   - **The 21 short explanations** now say why the right answer is right, with the line kept as a second line (`hook`).
   - **Arrow grids.** Each of the 108 rows has a one-line reason, shown under a row answered wrong.
   - **Gates.** V26–V28, with 18 new mutants.
+- **PR 2 merged** (#563), after four "has to change" why-nots were rewritten to name the misconception and q-shield's explanation was given its reason.
+- **PR 3, mobile and navigation**, built:
+  - **Study labs at 390.** Nothing scrolls sideways inside a lab or the comparison table. A wide lab is redrawn as panels: windows onto the same drawing, stacked in a narrow viewBox. Its read-out text moves into HTML lines under the drawing (16 scenes, 21 panels). The ladder has its own column layout. Labels render at 10 px or more on every scene, by a text floor in `mount()`. The table stacks into labelled rows under 680 px.
+  - **Note diagrams.** Tap to enlarge, not a text floor. 38 diagrams have a label under 10 px at 390 (as small as 3 px on the tiers and the ladder). Raising the text to 10 px would mean up to 3.3× larger labels in drawings composed to fit, and they would collide. Any diagram whose smallest label renders under 10 px gets an Enlarge button. It opens the same live drawing in a dialog, sized so the smallest label is 10.2 px, panning where it is wider than the screen.
+  - **Study navigation.** A jump bar sticks to the top: one link per chapter with that chapter's progress, plus the two rounds, with the chapter on screen marked. A link lands its chapter just below the bar. A back-to-top link sits at the end.
+  - **Gates.** V29–V30 in `verify-study.mjs` with 11 mutants; V3 judges each label against its own panel. S11 in `verify-page.mjs` with 5 mutants.
 - **Queued, not started:**
-  - PR 3: mobile lab layouts, the diagram text floor, chapter navigation and back-to-top (§3, §4; §6 ranks 6–8).
   - PR 4: a study chapter for the note's parts 05–07 (§1 P7, §6 rank 16).
 - **Not ruled yet:** the weaker hooks (§1 P6, §6 rank 14), the forward references (rank 15), aligning the diagram keys (rank 17) and the Leitner / progress explainer (§1 P8).

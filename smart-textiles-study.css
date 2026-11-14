@@ -185,7 +185,7 @@ div.sx-why > p:first-child { margin-top: 0; }
 
 /* the comparison table */
 .sx-table-wrap { overflow-x: auto; margin-top: 2.4rem; }
-.sx-table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 12.5px; line-height: 1.55; }
+.sx-table { border-collapse: collapse; width: 100%; min-width: 0; font-size: 12.5px; line-height: 1.55; }
 .sx-table caption { text-align: left; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); padding-bottom: 0.7rem; }
 .sx-table th, .sx-table td { text-align: left; vertical-align: top; padding: 0.6rem 0.8rem; border-top: 1px solid var(--line); }
 .sx-table thead th { font-family: var(--serif); font-weight: 500; font-size: 1.05rem; color: var(--ink); border-top: none; }
@@ -292,12 +292,9 @@ div.sx-why > p:first-child { margin-top: 0; }
   .sx-arrow-mark { grid-column: 1 / -1; }
 }
 
-/* The wide diagrams are drawn at 720 units; at phone width their labels would fall to about 5 px.
-   They keep a readable size and scroll sideways inside their own frame instead. */
-@media (max-width: 680px) {
-  .sx-wide .st-anim { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .sx-wide .st-anim svg { min-width: 640px; }
-}
+/* The wide diagrams are drawn at 720 units. On a narrow screen the player shows each as its panels stacked
+   one above the next, with every label at least 10 px (smart-textiles-core.js, narrowMarkup): nothing scrolls
+   sideways inside a frame. */
 .sx-mini .alts { font-size: 11.5px; line-height: 1.55; color: var(--ink-dim); margin-top: 0.45rem; }
 .sx-btn--go:disabled { background: transparent; border-color: var(--line); color: var(--color-faint); }
 
@@ -316,4 +313,36 @@ div.sx-why > p:first-child { margin-top: 0; }
   .sx-chapters li a { min-height: 44px; }
   .sx-cta { min-height: 44px; }
   .sx-gap { min-height: 44px; }
+}
+
+/* a narrow lab's read-out, set as text under its drawing (smart-textiles-core.js, splitReadout) */
+.st-readout { margin: 0.5rem 0.3rem 0.2rem; font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--ink-dim); }
+.st-readout[hidden] { display: none; }
+.st-readout p { margin: 0 0 0.3rem; }
+.st-readout [data-big] { font-size: 13.5px; }
+
+/* the chapter jump bar: sticks to the top while the chapters scroll past; one link per chapter with its
+   progress, then the two rounds. Section anchors land below it. */
+.sx-jump { position: sticky; top: 0; z-index: 15; margin-top: 2rem; background: var(--black); border-bottom: 1px solid var(--line); }
+.sx-jump ol { list-style: none; margin: 0; padding: 0.3rem 0.2rem; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0.2rem; max-width: 52rem; }
+.sx-jump a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; min-height: 40px; padding: 0 0.15rem; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; color: var(--ink-dim); text-decoration: none; border-radius: 4px; }
+.sx-jump a:hover { color: var(--ink); }
+.sx-jump a[aria-current="true"] { color: var(--ink); background: var(--black-raised); }
+.sx-jump .n { color: var(--color-seafoam); }
+.sx-jump a[aria-current="true"] .n { color: var(--petrol-bright); }
+.sx-jump .nm { display: none; }
+.sx-jump__bar { display: block; width: 70%; height: 3px; border-radius: 2px; background: var(--color-line-strong); overflow: hidden; }
+.sx-jump__bar > span { display: block; height: 100%; background: var(--petrol-bright); }
+@media (min-width: 700px) { .sx-jump .nm { display: block; white-space: nowrap; } }
+@media (max-width: 640px), (pointer: coarse) { .sx-jump a { min-height: 44px; } }
+[data-sx-chapter], #round, #hard-round { scroll-margin-top: 64px; }
+
+/* on a phone the table is a list: each row's name, then its two cells, each named */
+@media (max-width: 680px) {
+  .sx-table thead { display: none; }
+  .sx-table, .sx-table tbody, .sx-table tr, .sx-table th, .sx-table td { display: block; width: auto; }
+  .sx-table tr { border-top: 1px solid var(--line); padding: 0.5rem 0 0.4rem; }
+  .sx-table th, .sx-table td { border-top: none; padding: 0.15rem 0; }
+  .sx-table tbody th { width: auto; }
+  .sx-table td::before { content: attr(data-label) ": "; color: var(--ink); }
 }

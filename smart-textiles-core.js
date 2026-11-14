@@ -159,6 +159,44 @@ export function plot(o) {
 // (~30 fps; the markup is rebuilt each frame, which is cheap at this size). Controls:
 // <button data-st-for="name" data-st-key="k" data-st-value="v"> sets state (a choice), or toggles it
 // without data-st-value. prefers-reduced-motion: one still frame per scene, and a click plays it.
+// Narrow screens (opts.textFloor, the study page). A scene shown narrower than its `narrow.below` (560 px by
+// default) is laid out again from the markup its draw() returns, so a read-out and the drawing it describes
+// can't disagree; the layout only decides what sits where:
+//   narrow.panels   [x, y, w, h] windows onto the drawing, stacked one above the next (default: the whole vb)
+//   narrow.readout  [x, y, w, h] boxes whose text leaves the drawing and is set as lines of HTML under it,
+//                   where it wraps instead of running off the side
+// In every window a label that would render under MIN_TEXT_PX is enlarged to it, and a drawing shown whole
+// (any width, any scene) gets the same floor. st._narrow tells a scene which layout it is drawing for.
+export const MIN_TEXT_PX = 10;
+export const NARROW_W = 340, PANEL_GAP = 12;
+export function floorText(markup, w, px, floorPx = MIN_TEXT_PX) {
+  const floor = floorPx * 1.02 * w / px;   // units per rendered px is w / px
+  return markup.replace(/font-size="([\d.]+)"/g, (a, v) => +v < floor ? `font-size="${floor.toFixed(2)}"` : a);
+}
+const TEXT_RE = /<text x="([-\d.]+)" y="([-\d.]+)" fill="([^"]*)"[^>]*?font-size="([\d.]+)"[^>]*>([\s\S]*?)<\/text>/g;
+export function splitReadout(markup, boxes) {
+  const lines = [];
+  const rest = markup.replace(TEXT_RE, (all, x, y, fill, size, s) => {
+    const inBox = boxes.some(([x0, y0, w, h]) => +x >= x0 && +x <= x0 + w && +y >= y0 && +y <= y0 + h);
+    if (!inBox || !s.trim()) return all;
+    lines.push({ x: +x, y: +y, fill, size: +size, s });
+    return '';
+  });
+  lines.sort((a, b) => a.y - b.y || a.x - b.x);
+  const rows = [];
+  for (const l of lines) { const r = rows[rows.length - 1]; if (r && Math.abs(r.y - l.y) < 4) r.parts.push(l); else rows.push({ y: l.y, parts: [l] }); }
+  const html = rows.map(r => `<p>${r.parts.map(q => `<span style="color:${q.fill}"${q.size >= 12 ? ' data-big' : ''}>${q.s}</span>`).join(' ')}</p>`).join('');
+  return { rest, html, n: lines.length };
+}
+export function narrowMarkup(markup, panels, px, floorPx = MIN_TEXT_PX) {
+  let y = 0, out = '';
+  for (const [x0, y0, w, h] of panels) {
+    const ph = h * NARROW_W / w;
+    out += `<svg x="0" y="${f1(y)}" width="${NARROW_W}" height="${f1(ph)}" viewBox="${x0} ${y0} ${w} ${h}" overflow="hidden" data-panel="${x0} ${y0} ${w} ${h}">${floorText(markup, w, px, floorPx)}</svg>`;
+    y += ph + PANEL_GAP;
+  }
+  return { vb: `0 0 ${NARROW_W} ${f1(y - PANEL_GAP)}`, out };
+}
 export function mount(SCENES, root = document, opts = {}) {
   const reduce = opts.reducedMotion ?? (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const players = [];
@@ -169,8 +207,39 @@ export function mount(SCENES, root = document, opts = {}) {
     const svg = holder.querySelector('svg') || holder.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'svg'));
     svg.setAttribute('viewBox', scene.vb);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    const p = { name, host, svg, scene, state: { ...(scene.state || {}) }, t0: performance.now() - (scene.offset || 0) * scene.dur, last: -1e9, visible: false, running: !reduce };
-    p.draw = t => { try { svg.innerHTML = scene.draw(t, p.state); } catch (e) { console.error('[smart-textiles]', name, e); p.running = false; } };
+    const p = { name, host, svg, scene, state: { ...(scene.state || {}) }, t0: performance.now() - (scene.offset || 0) * scene.dur, last: -1e9, visible: false, running: !reduce, px: 0, narrow: false };
+    const [, , vw, vh] = scene.vb.split(/\s+/).map(Number);
+    const panels = scene.narrow?.panels || [[0, 0, vw, vh]];
+    p.draw = t => {
+      try {
+        if (opts.textFloor) p.state._narrow = p.narrow;
+        let m = scene.draw(t, p.state);
+        if (p.narrow) {
+          let html = '';
+          if (scene.narrow.readout) ({ rest: m, html } = splitReadout(m, scene.narrow.readout));
+          const n = narrowMarkup(m, panels, p.px);
+          if (svg.getAttribute('viewBox') !== n.vb) svg.setAttribute('viewBox', n.vb);
+          svg.innerHTML = n.out;
+          if (p.readout && p.readout.innerHTML !== html) p.readout.innerHTML = html;
+        } else { if (svg.getAttribute('viewBox') !== scene.vb) svg.setAttribute('viewBox', scene.vb); svg.innerHTML = p.px ? floorText(m, vw, p.px) : m; }
+        if (p.mirror) p.mirror.innerHTML = svg.innerHTML;
+        p.lastT = t;
+      } catch (e) { console.error('[smart-textiles]', name, e); p.running = false; }
+    };
+    if (opts.textFloor && typeof ResizeObserver === 'function') {
+      const fit = () => {
+        const px = holder.clientWidth - (parseFloat(getComputedStyle(holder).paddingLeft) || 0) - (parseFloat(getComputedStyle(holder).paddingRight) || 0);
+        const narrow = !!scene.narrow && px > 0 && px < (scene.narrow.below ?? 560);
+        if (px !== p.px || narrow !== p.narrow) {
+          p.px = px; p.narrow = !!narrow; svg.dataset.narrow = String(p.narrow);
+          if (scene.narrow?.readout && !p.readout) { p.readout = document.createElement('div'); p.readout.className = 'st-readout'; holder.appendChild(p.readout); }
+          if (p.readout) { p.readout.hidden = !p.narrow; if (!p.narrow) p.readout.innerHTML = ''; }
+          p.draw(p.lastT ?? (opts.at ?? scene.still ?? 0.55));
+        }
+      };
+      new ResizeObserver(fit).observe(holder);
+      p.fit = fit;
+    }
     p.draw(opts.at ?? scene.still ?? 0.55);
     if (reduce) host.addEventListener('click', () => { p.running = !p.running; p.t0 = performance.now(); });
     players.push(p);
@@ -192,7 +261,7 @@ export function mount(SCENES, root = document, opts = {}) {
   if (opts.static) return players;
   const frame = now => {
     for (const p of players) {
-      if (!p.visible || !p.running || now - p.last < 32) continue;
+      if (!(p.visible || p.mirror) || !p.running || now - p.last < 32) continue;
       p.last = now; p.draw(fr((now - p.t0) / p.scene.dur));
     }
     requestAnimationFrame(frame);
