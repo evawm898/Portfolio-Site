@@ -52,6 +52,8 @@
 //
 // Every renderer is deterministic: the same spec always draws the same SVG.
 
+import { renderPaper, renderPaperTier, resolvePaper } from './style2.js';
+
 export const SPEC_VERSION = 3;
 export const BURST_TYPES = ['peony', 'chrysanthemum', 'willow', 'crossette'];
 // Phase 1's four one-type radial bursts. Their ids now name the phase-2 TYPES,
@@ -232,12 +234,13 @@ function hashSeed(str) {
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
-function rng(seed) {
+export function rng(seed) {
   let s = seed >>> 0 || 1;
   return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; };
 }
 
 // Count+Scale: N fireworks, each growing with rank.
+export { COUNTS };
 export const COUNTSCALE_SIZES = [0.62, 0.72, 0.82, 0.91, 1.0];
 
 // The default spec for a suit's rank under a motif, tier and composition. The
@@ -282,7 +285,13 @@ export function cellOverride(design, suitId, rank) {
 // colours, and the suit's and the card's parameters reach it only as colours —
 // they were set for the card's own type. Absent, or the card's own type, this
 // is the card's spec exactly.
+// The spec a card's firework is drawn from, in the design's STYLE (version 8):
+// under Style 2 (design.style 'paper') it also carries the suit's resolved Style 2
+// settings, which its renderer reads; under Style 1 it is the spec it always was.
 export function fireworkSpec(design, suit, rank, motifAt) {
+  return withStyle(design, suit, baseSpec(design, suit, rank, motifAt));
+}
+function baseSpec(design, suit, rank, motifAt) {
   const c = suit.centre || {};
   const compose = c.compose || 'scale';
   const tier = compose === 'scale' ? c.tier : 'none';
@@ -392,7 +401,7 @@ const P = (x, y) => `${f(x)} ${f(y)}`;
 const line = (x0, y0, x1, y1, col, w, extra = '') =>
   `<line x1="${f(x0)}" y1="${f(y0)}" x2="${f(x1)}" y2="${f(y1)}" stroke="${col}" stroke-width="${f(w)}" stroke-linecap="round"${extra}/>`;
 const dot = (x, y, r, col, extra = '') => `<circle cx="${f(x)}" cy="${f(y)}" r="${f(r)}" fill="${col}"${extra}/>`;
-const pick = (colors, i) => colors[i % colors.length];
+export const pick = (colors, i) => colors[i % colors.length];
 
 // A teardrop star: a round head of radius h centred at (hx, hy), its point
 // toward the burst's centre along the unit vector -u. Four cubics, so the
@@ -453,7 +462,7 @@ function canopy(cx, top, bottom, halfW, n, col, w) {
 // Scatter n items of radius rho in a rect without overlap. Deterministic in
 // the seed; if a dart cannot land, rho shrinks and the throw restarts, so all
 // n always land.
-function scatter(rect, n, rand, rhoFrac = 0.5) {
+export function scatter(rect, n, rand, rhoFrac = 0.5) {
   let rho = Math.min(Math.sqrt((rhoFrac * rect.w * rect.h) / (n * Math.PI)), Math.min(rect.w, rect.h) / 4);
   for (let tries = 0; tries < 40; tries++) {
     const pts = [];
@@ -577,7 +586,7 @@ const BURSTS = {
 
 // The rect a field motif fills: the layout's rect scaled about its middle by
 // the size, else the square inscribed in R.
-function fieldRect(box, R, size) {
+export function fieldRect(box, R, size) {
   if (!box.rect) return { x: box.cx - R * 0.7, y: box.cy - R * 0.7, w: R * 1.4, h: R * 1.4 };
   const q = box.rect, w = q.w * size, h = q.h * size;
   return { x: q.x + (q.w - w) / 2, y: q.y + (q.h - h) / 2, w, h };
@@ -586,6 +595,7 @@ function fieldRect(box, R, size) {
 // box = { cx, cy, r } in the caller's units (mm on a card).
 export function renderFirework(spec, box) {
   spec = withColours(spec);
+  if (spec.style && STYLE_RENDERERS[spec.style]) return STYLE_RENDERERS[spec.style](spec, box);
   const m = spec.motif;
   if (!m || m === 'classic' || RADIAL_IDS.includes(m) || !(m in MOTIFS)) return rotated(drawRadial(spec, box), spec, box);
   const { cx, cy, r } = box;
@@ -601,6 +611,21 @@ export function renderFirework(spec, box) {
   // caps land inside r rather than on it.
   const body = FIELDS[m] ? FIELDS[m](fieldRect(box, R, sz), s.count, colors, w, rand) : BURSTS[m](s, cx, cy, R - w, w, rand);
   return rotated(`<g class="hb-firework" data-motif="${m}">${body}</g>`, FIELDS[m] ? {} : spec, box);
+}
+
+// Style 1's drawing of a phase-1 or catalogue BURST, unrotated (Style 2 re-dresses
+// it). Under Style 1 renderFirework is the only caller of these painters.
+export function style1Body(spec, box) {
+  spec = withColours(spec);
+  const m = spec.motif;
+  if (!m || m === 'classic' || RADIAL_IDS.includes(m) || !(m in MOTIFS)) return drawRadial(spec, box);
+  const { cx, cy, r } = box;
+  const R = r * Math.max(0.05, Math.min(1, spec.size));
+  const w = Math.max(0.26, r * 0.022), colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];
+  const s = { ...spec, colors };
+  // (the counted motifs have Style 2 drawings of their own, style2.js; kept for any caller)
+  if (CATALOGUE_COUNT[m] && s.rank) s.count = catalogueCountAt(m, s.count, s.rank);
+  return BURSTS[m] ? BURSTS[m](s, cx, cy, R - w, w, rng(spec.seed)) : '';
 }
 
 // A phase-1 or catalogue burst turned by spec.rotation: about its centre, so
@@ -621,8 +646,10 @@ function withColours(spec) {
 }
 
 // The second tier, inside rect = { x, y, w, h }. Nothing when spec.tier is null.
+export { withColours };
 export function renderTier(spec, rect) {
   if (!spec.tier || !FIELDS[spec.tier.motif]) return '';
+  if (spec.style && STYLE_TIERS[spec.style]) return STYLE_TIERS[spec.style](spec, rect);
   const colors = spec.colors && spec.colors.length ? spec.colors : ['#FFFFFF'];
   const w = Math.max(0.26, Math.min(rect.w, rect.h) * 0.02);
   const rand = rng((spec.seed ^ 0x9e3779b9) >>> 0);
@@ -911,7 +938,10 @@ function glitterLegacyOf(s) {
   return +s.count === legacyGlitterCount(L) && +(s.density ?? 1) === 1 ? L : null;
 }
 
-function drawType(spec, cx, cy, R, w, rand, colors) {
+// A type's primitives in its unit frame, and k, the scale that fits their BASE
+// marks inside R (detail never rescales a burst). Style 1's drawType and Style 2
+// both start here, so a type has one geometry in every style.
+export function typeLayout(spec, R, w, rand, colors) {
   const s = { ...TYPES[spec.motif].defaults, ...spec };
   s.starSize = clampN(+s.starSize || 1, PARAMS.starSize.min, PARAMS.starSize.max);
   const cr = TYPES[spec.motif].count, count = clampN(Math.round(+s.count || cr.min), cr.min, cr.max);
@@ -934,6 +964,10 @@ function drawType(spec, cx, cy, R, w, rand, colors) {
   } };
   each((q, pad) => { const d = Math.hypot(q[0], q[1]); if (d > 1e-9) k = Math.min(k, (R - pad) / d); });
   k = Math.max(k, R * 0.05);
+  return { all, k, each };
+}
+function drawType(spec, cx, cy, R, w, rand, colors) {
+  const { all, k, each } = typeLayout(spec, R, w, rand, colors);
   // a ghost is fitted and not drawn; a detail mark that would reach past R is left out
   const prims = all.filter((p) => { if (p.ghost) return false; if (!p.det) return true; let ok = true; each((q, pad) => { if (Math.hypot(q[0], q[1]) * k + pad > R + 1e-9) ok = false; }, [p]); return ok; });
   const rot = ((+spec.rotation || 0) * Math.PI) / 180, cs = Math.cos(rot), sn = Math.sin(rot);
@@ -956,4 +990,18 @@ function drawType(spec, cx, cy, R, w, rand, colors) {
     const sg = p.segs;
     return `<path d="M${Pq(sg[0])} C${sg[1].map(Pq).join(' ')} L${Pq(sg[2])} L${Pq(sg[3])} C${sg[4].map(Pq).join(' ')} Z" fill="${p.col}"/>`;
   }).join('');
+}
+
+// ---------------------------------------------------------------- styles (version 8)
+// A STYLE is a renderer over the one spec: Style 1 ('line') is everything above;
+// every other style is one renderer, one tier painter and one settings block here
+// (hanabi/style2.js is 'paper'). A spec carries `style` only when its design is
+// drawn in another style (withStyle); under Style 1 it is the spec it always was.
+const STYLE_RENDERERS = { paper: (spec, box) => renderPaper(spec, box) };
+const STYLE_TIERS = { paper: (spec, rect) => renderPaperTier(spec, rect) };
+const STYLE_SPECS = { paper: (design, suit) => resolvePaper(design, suit) };
+function withStyle(design, suit, spec) {
+  const st = design && design.style;
+  if (!st || st === 'line' || !STYLE_SPECS[st]) return spec;
+  return { ...spec, style: st, [st]: STYLE_SPECS[st](design, suit) };
 }

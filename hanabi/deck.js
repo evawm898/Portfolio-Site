@@ -31,6 +31,7 @@
 // version-2 file's single/count/bleed as scale/column/bleed (V2_LAYOUTS), so
 // every saved design opens looking as it did.
 
+import { STYLE_IDS, readPaper, defaultPaper } from './style2.js';
 import { MOTIF_IDS, MOTIFS, TYPES, TIER_IDS, LEGACY_RADIAL, PARAMS, STYLE_MOTIFS, inheritKeys,
   ringCounts, peonyRingsFor, ringRingsFor, legacyGlitterCount, CATALOGUE_COUNT, catalogueCountAt, catalogueCountDefault } from './firework.js';
 
@@ -52,7 +53,13 @@ import { MOTIF_IDS, MOTIFS, TYPES, TIER_IDS, LEGACY_RADIAL, PARAMS, STYLE_MOTIFS
 // and the art, so edge wear does not show. New designs have both (3 mm, the
 // background on); a file saved before version 7 opens with neither, so it looks
 // exactly as it did, and is told.
-export const VERSION = 7;
+// 8 (Nov 14): STYLES. design.style picks the renderer the whole deck is drawn in —
+// 'line' (Style 1, everything before) or 'paper' (Style 2, "Paper & Thread",
+// hanabi/style2.js) — and design.style2 holds Style 2's dials, deck-wide, with any
+// suit's own subset in suit.style2. Switching is lossless both ways: neither style
+// writes anything the other reads. The background gains a paper GRAIN (0, off).
+// A file saved before version 8 has neither and opens in Style 1, drawn as it was.
+export const VERSION = 8;
 
 // The standard per-suit distribution: three 1s, two 2s, two 3s, two 4s, one 5.
 // The optional rainbow suit uses the same distribution (10 more cards).
@@ -145,9 +152,11 @@ export const SKY_PRESETS = {
   petrol: { label: 'Petrol dusk', top: '#0E3236', bottom: '#030809' },
   indigo: { label: 'Indigo',      top: '#1E1F55', bottom: '#05050F' },
   ink:    { label: 'Ink',         top: '#101317', bottom: '#07090B' },
+  // version 8: a flat charcoal with a faint paper grain (Style 2's ref 3)
+  charcoal: { label: 'Charcoal paper', top: '#1F2023', bottom: '#1F2023', grain: 0.35 },
 };
 // [min, max, step] of every slider, and the defaults Eva chose.
-export const BG_LIMITS = { horizon: [0, 1, 0.05], glow: [0, 1, 0.05], amount: [0, 1, 0.01], drift: [1, 4, 0.1], lit: [0, 1, 0.05] };
+export const BG_LIMITS = { grain: [0, 1, 0.05], horizon: [0, 1, 0.05], glow: [0, 1, 0.05], amount: [0, 1, 0.01], drift: [1, 4, 0.1], lit: [0, 1, 0.05] };
 export const SMOKE_SEED = 20251111;
 export function defaultBackground() {
   return {
@@ -155,6 +164,7 @@ export function defaultBackground() {
     sky: { on: true, top: SKY_PRESETS.night.top, bottom: SKY_PRESETS.night.bottom },
     horizon: 0.55,
     glow: 0.25,
+    grain: 0,
     smoke: { amount: 0.1, drift: 1, lit: 1, color: '#9AA3B4', rank: true, seed: SMOKE_SEED },
   };
 }
@@ -171,6 +181,7 @@ export function readBackground(raw, d, notes) {
   }
   const lim = (k, v, dv) => { const [lo, hi] = BG_LIMITS[k]; return clamp(num(v, dv), lo, hi); };
   d.horizon = lim('horizon', raw.horizon, d.horizon);
+  d.grain = lim('grain', raw.grain, d.grain);
   d.glow = lim('glow', raw.glow, d.glow);
   if (raw.smoke && typeof raw.smoke === 'object') {
     const m = raw.smoke, t = d.smoke;
@@ -232,6 +243,10 @@ export function defaultDesign() {
     scene: { on: false, kind: 'treeline', color: '#16222E', height: 0.18 },
     background: defaultBackground(),
     print: { paper: 'letter', orientation: 'auto', cut: 'separate', duplex: false, flip: 'long', cropMarks: true },
+    // version 8: the style the deck is drawn in, and Style 2's dials (a suit may
+    // carry its own subset as suit.style2)
+    style: 'line',
+    style2: defaultPaper(),
   };
 }
 
@@ -351,6 +366,10 @@ export function normaliseDesign(raw, symbolIds) {
         if (c.tier === undefined || TIER_IDS.includes(c.tier)) s.centre.tier = pick(c.tier, TIER_IDS, s.centre.tier);
         else notes.push(`suit ${s.id}: unknown second tier "${c.tier}" — none kept`);
       } else if (raw.version >= 2) notes.push(`suit ${s.id}: no centre — default kept`);
+      if (r.style2 !== undefined) {
+        const own = readPaper(r.style2, (m) => notes.push(`suit ${s.id}: ${m}`), true);
+        if (Object.keys(own).length) s.style2 = own;
+      }
       if (ver >= 3 && r.firework && typeof r.firework === 'object') {
         for (const [k, v] of Object.entries(r.firework)) {
           const ok = readParam(k, v);
@@ -443,6 +462,12 @@ export function normaliseDesign(raw, symbolIds) {
     d.scene.color = hex(raw.scene.color, d.scene.color);
     d.scene.height = clamp(num(raw.scene.height, d.scene.height), SCENE_HEIGHT.min, SCENE_HEIGHT.max);
   }
+  // version 8: a file before it is drawn in Style 1 (it has no style)
+  if (raw.style !== undefined) {
+    if (STYLE_IDS.includes(raw.style)) d.style = raw.style;
+    else notes.push(`unknown style "${raw.style}" — ${d.style} kept`);
+  }
+  if (raw.style2 !== undefined) d.style2 = readPaper(raw.style2, (m) => notes.push(m));
   if (raw.print) {
     d.print.paper = pick(raw.print.paper, Object.keys(PAPERS), d.print.paper);
     d.print.orientation = pick(raw.print.orientation, ORIENTATIONS, d.print.orientation);

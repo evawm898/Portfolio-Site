@@ -13,6 +13,7 @@ import { SYMBOLS, SYMBOL_IDS } from './hanabi/symbols.js';
 import { renderFace, renderBack, placementFor, scalePlacement, literalItems, centring } from './hanabi/layout.js';
 import { fireworkSpec, fireworkSpecAt, fireworkStyle, defaultSpec, renderFirework, motifParams, MOTIFS, MOTIF_IDS, STYLE_MOTIFS, TIERS, TIER_RANKS, TYPES, PARAMS, paramFor, stemDefault } from './hanabi/firework.js';
 import { exportPdf, exportZip, downloadBlob } from './hanabi/export.js';
+import { STYLES, PAPER_PARAMS, PAPER_KEYS, PAPER_PRESETS, SHAPES, DISC_TONES, resolvePaper, defaultPaper } from './hanabi/style2.js';
 
 const STORE_KEY = 'hanabi.design.v1';   // the key predates version 2; normaliseDesign migrates what it holds
 const VIEW_KEY = 'hanabi.view.v1';
@@ -174,6 +175,7 @@ const bindings = [
   bindValue('skyOn', () => design.background.sky.on, (v) => { design.background.sky.on = v; }, 'change'),
   bindValue('skyTop', () => design.background.sky.top.toLowerCase(), (v) => { design.background.sky.top = v.toUpperCase(); }),
   bindValue('skyBottom', () => design.background.sky.bottom.toLowerCase(), (v) => { design.background.sky.bottom = v.toUpperCase(); }),
+  bindValue('bgGrain', () => design.background.grain || 0, (v) => { design.background.grain = +v; }),
   bindValue('bgHorizon', () => design.background.horizon, (v) => { design.background.horizon = +v; }),
   bindValue('bgGlow', () => design.background.glow, (v) => { design.background.glow = +v; }),
   bindValue('smokeAmount', () => design.background.smoke.amount, (v) => { design.background.smoke.amount = +v; }),
@@ -215,6 +217,8 @@ function syncControls() {
   $('sizeW').disabled = !custom; $('sizeH').disabled = !custom;
   for (const btn of $('indexSeg').children) btn.setAttribute('aria-checked', String(btn.dataset.index === design.index));
   for (const btn of $('viewSeg').children) btn.setAttribute('aria-checked', String(btn.dataset.view === view.mode));
+  for (const btn of $('styleSeg').children) btn.setAttribute('aria-checked', String(btn.dataset.style === (design.style || 'line')));
+  syncStyle2();
   syncSuitRows();
 }
 
@@ -258,6 +262,7 @@ function syncBackground() {
   $('skyTop').disabled = $('skyBottom').disabled = !b.sky.on;
   for (const c of $('skyPresets').children) { c.setAttribute('aria-pressed', String(c.dataset.sky === pre && b.sky.on)); c.disabled = !b.sky.on; }
   $('bgHorizonVal').textContent = b.horizon.toFixed(2);
+  $('bgGrainVal').textContent = (b.grain || 0).toFixed(2);
   $('bgGlowVal').textContent = b.glow.toFixed(2);
   $('smokeAmountVal').textContent = sm.amount.toFixed(2);
   $('smokeDriftVal').textContent = `${sm.drift.toFixed(1)}×`;
@@ -274,7 +279,9 @@ function buildSkyChips() {
 }
 $('skyPresets').addEventListener('click', (e) => {
   const c = e.target.closest('[data-sky]'); if (!c) return;
-  const p = SKY_PRESETS[c.dataset.sky]; design.background.sky.top = p.top; design.background.sky.bottom = p.bottom; changed();
+  const p = SKY_PRESETS[c.dataset.sky]; design.background.sky.top = p.top; design.background.sky.bottom = p.bottom;
+  design.background.grain = p.grain || 0;   // a preset is a ground: Charcoal paper brings its grain, the skies none
+  changed();
 });
 $('smokeReroll').addEventListener('click', () => {
   let s; do { s = Math.floor(Math.random() * 2 ** 32); } while (s === design.background.smoke.seed);
@@ -393,7 +400,8 @@ function selItem(suit, rank) {
 }
 
 function motifThumb(suit, m) {
-  const spec = defaultSpec(suit, 5, design.suits, m, 'none', 'scale');
+  let spec = defaultSpec(suit, 5, design.suits, m, 'none', 'scale');
+  if (design.style === 'paper') spec = { ...spec, style: 'paper', paper: resolvePaper(design, suit) };   // the gallery in the deck's style
   return `<svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" fill="${design.face.bg}"/>${renderFirework(spec, { cx: 20, cy: 20, r: 18.5 })}</svg>`;
 }
 
@@ -844,6 +852,89 @@ $('stage').addEventListener('keydown', (e) => {
 });
 window.addEventListener('resize', () => applyCardZoom());
 
+// ---------- styles (version 8) ----------
+// The switcher (top right) picks the renderer for the whole deck; section 05 holds
+// Style 2's dials, for the deck or, picked in "Edit for", one suit's own subset.
+let s2target = 'deck';
+const s2table = () => (s2target === 'deck' ? (design.style2 ||= defaultPaper()) : null);
+function s2suit() { return s2target === 'deck' ? null : suitById(design, s2target); }
+const s2value = (k) => (s2target === 'deck' ? { ...defaultPaper(), ...design.style2 }[k] : resolvePaper(design, s2suit())[k]);
+function s2write(k, v) {
+  if (s2target === 'deck') design.style2[k] = v;
+  else (s2suit().style2 ||= {})[k] = v;
+  changed();
+}
+function buildStyle2() {
+  const groups = {};
+  for (const k of PAPER_KEYS) (groups[PAPER_PARAMS[k].group] ||= []).push(k);
+  $('style2Rows').innerHTML = Object.entries(groups).map(([g, ks]) => `<p class="hb-s2group">${g}</p>` + ks.map((k) => {
+    const P = PAPER_PARAMS[k], tip = P.note ? ` title="${escapeHtml(P.note)}"` : '', clr = `<button type="button" class="hb-clear" data-s2clear="${k}" title="Back to the deck's value">↺</button>`;
+    if (P.kind === 'bool') return `<label class="hb-check hb-s2row" data-s2row="${k}"${tip}><input type="checkbox" data-s2="${k}"> ${P.label}${clr}</label>`;
+    if (P.kind === 'tone') return `<div class="hb-row hb-s2row" data-s2row="${k}"${tip}><label for="s2-${k}">${P.label}</label><select id="s2-${k}" data-s2="${k}">${Object.entries(DISC_TONES).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>${clr}</div>`;
+    if (P.kind === 'shapes') return `<div class="hb-s2row" data-s2row="${k}"${tip}><div class="hb-s2shapes">${Object.entries(SHAPES).map(([v, l]) => `<label class="hb-check"><input type="checkbox" data-s2shape="${v}"> ${l}</label>`).join('')}</div>${clr}</div>`;
+    return `<div class="hb-row hb-row--slider hb-s2row" data-s2row="${k}"${tip}><label for="s2-${k}">${P.label}</label><input type="range" id="s2-${k}" data-s2="${k}" min="${P.min}" max="${P.max}" step="${P.step}"><output class="hb-val" data-s2o="${k}"></output>${clr}</div>`;
+  }).join('')).join('');
+  $('style2Presets').innerHTML = Object.entries(PAPER_PRESETS).map(([k, p]) => `<button type="button" class="hb-chip" data-s2preset="${k}" title="${escapeHtml(p.note)}">${p.label}</button>`).join('');
+}
+function syncStyle2() {
+  const sel = $('style2Target'), opts = `<option value="deck">Every suit (the deck)</option>` + activeSuits(design).map((s) => `<option value="${s.id}">${escapeHtml(s.name)} only</option>`).join('');
+  if (sel.dataset.sig !== opts) { sel.innerHTML = opts; sel.dataset.sig = opts; }
+  if (s2target !== 'deck' && !activeSuits(design).some((s) => s.id === s2target)) s2target = 'deck';
+  sel.value = s2target;
+  const own = s2suit() ? s2suit().style2 || {} : {};
+  for (const row of $('style2Rows').querySelectorAll('[data-s2row]')) {
+    const k = row.dataset.s2row, v = s2value(k);
+    row.classList.toggle('is-own', own[k] !== undefined);
+    const clr = row.querySelector('[data-s2clear]'); clr.disabled = s2target === 'deck' || own[k] === undefined;
+    if (k === 'shapes') { for (const c of row.querySelectorAll('[data-s2shape]')) c.checked = v.includes(c.dataset.s2shape); continue; }
+    const el = row.querySelector('[data-s2]');
+    if (el.type === 'checkbox') el.checked = !!v; else if (document.activeElement !== el) el.value = v;
+    const out = row.querySelector('[data-s2o]'); if (out) out.textContent = (+v).toFixed(2);
+  }
+  const vals = PAPER_KEYS.map((k) => JSON.stringify(s2value(k)));
+  const pre = Object.keys(PAPER_PRESETS).find((p) => PAPER_KEYS.every((k, i) => JSON.stringify(PAPER_PRESETS[p].values[k]) === vals[i]));
+  for (const c of $('style2Presets').children) c.setAttribute('aria-pressed', String(c.dataset.s2preset === pre));
+  const owners = activeSuits(design).filter((s) => s.style2 && Object.keys(s.style2).length).map((s) => s.name);
+  $('style2Val').textContent = `${(design.style || 'line') === 'paper' ? 'in use' : 'not in use'}${pre ? ` — ${PAPER_PRESETS[pre].label}` : ''}`;
+  $('style2Note').textContent = ((design.style || 'line') === 'paper' ? 'The deck is drawn in Paper & Thread: these dials shape every firework. ' : 'The deck is drawn in Line (switch at the top right); these dials are kept for Paper & Thread and change nothing until then. ')
+    + (s2target === 'deck' ? (owners.length ? `${owners.join(', ')} ${owners.length === 1 ? 'has' : 'have'} settings of ${owners.length === 1 ? 'its' : 'their'} own (•).` : 'Pick a suit under "Edit for" to give it settings of its own.')
+      : `${s2suit().name}'s own settings (•) override the deck's; ↺ hands one back.`);
+  $('style2Reset').textContent = s2target === 'deck' ? 'Reset to the balanced blend' : `Reset ${s2suit().name} to the deck`;
+}
+$('styleSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-style]'); if (!b || !STYLES[b.dataset.style]) return;
+  design.style = b.dataset.style; changed();
+});
+$('style2Target').addEventListener('change', (e) => { s2target = e.target.value; syncStyle2(); });
+$('style2Rows').addEventListener('input', (e) => {
+  const k = e.target.dataset.s2; if (!k) return;
+  const P = PAPER_PARAMS[k];
+  s2write(k, P.kind === 'bool' ? e.target.checked : P.kind === 'tone' ? e.target.value : +e.target.value);
+});
+$('style2Rows').addEventListener('change', (e) => {
+  if (e.target.dataset.s2shape) {
+    const on = [...$('style2Rows').querySelectorAll('[data-s2shape]')].filter((c) => c.checked).map((c) => c.dataset.s2shape);
+    if (!on.length) { e.target.checked = true; return; }   // at least one shape
+    s2write('shapes', on); return;
+  }
+  if (e.target.dataset.s2 && PAPER_PARAMS[e.target.dataset.s2].kind === 'tone') s2write(e.target.dataset.s2, e.target.value);
+});
+$('style2Rows').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-s2clear]'); if (!b || s2target === 'deck') return;
+  const st = s2suit().style2; if (st) { delete st[b.dataset.s2clear]; if (!Object.keys(st).length) delete s2suit().style2; }
+  changed();
+});
+$('style2Presets').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-s2preset]'); if (!c) return;
+  const v = PAPER_PRESETS[c.dataset.s2preset].values;
+  if (s2target === 'deck') design.style2 = { ...v, shapes: [...v.shapes] }; else s2suit().style2 = { ...v, shapes: [...v.shapes] };
+  changed();
+});
+$('style2Reset').addEventListener('click', () => {
+  if (s2target === 'deck') design.style2 = defaultPaper(); else delete s2suit().style2;
+  changed();
+});
+
 // ---------- wiring ----------
 $('indexSeg').addEventListener('click', (e) => {
   const b = e.target.closest('[data-index]'); if (!b) return;
@@ -912,6 +1003,7 @@ for (const el of document.querySelectorAll('.hb-panel .hb-row input[type=color]'
 $('zoom').value = view.zoom;
 applyLayout();
 buildSkyChips();
+buildStyle2();
 buildSuitRows();
 syncReadouts();
 renderPreview();
