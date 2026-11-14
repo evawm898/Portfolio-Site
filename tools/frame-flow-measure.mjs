@@ -73,7 +73,7 @@ export function flowMetrics(m, relief, { RL, FP, print = true } = {}) {
     return { tan: Math.abs(wrap(tc - tp)) * 180 / Math.PI, kap: Math.abs(kc - kp), off: nn.d };
   };
   let composedHand = null;
-  const comp = o.mode === 'composed' || o.mode === 'mass' || o.mode === 'forms';
+  const comp = o.mode === 'composed' || o.mode === 'mass' || o.mode === 'forms' || o.mode === 'drawn';
   if (comp) {
     // a hand-off is two back-to-back volutes with tangent centrelines: the builder's own measurement of each pair
     // (its least centreline gap, how far the two wires overlap there, the tangent angle there, and whether they join)

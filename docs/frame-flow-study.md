@@ -862,7 +862,7 @@ of anything built (6.5 twice). What did not change across six rounds is the same
   tuned: the measured profile constrains a centreline and a width, and the critics scored the OUTLINE — where a lobe
   steps, where a strap thickens into its volute, how a shell's lobe turns over — which no profile records.
 
-**Recommendation: (b), the hand-drawn route.** Eva draws SVG outlines of the scroll bodies, the leaf flames and the
+**Recommendation: (b), the hand-drawn route.** **[Nov 14: RULED (b) by Eva; the pipeline and the drawing template are §12.]** Eva draws SVG outlines of the scroll bodies, the leaf flames and the
 volutes (and the shell), and the generator bends and places them along the composed flow, which this round shows
 works: the placements, the chain, the depth hierarchy, the coverage and every print clause are already here.
 
@@ -935,3 +935,139 @@ study and not an interactive layout. The forms are ~1.5× M3's triangles, all in
   - FE: every C volute ≥ 1.1 turns round a pierced eye;
   - FD: node motifs differ in kind by place;
   - FR: no two elements of one kind share a shape.
+
+## 12. The hand-drawn filigree: the importer and the drawing template (`ornFlow: 'drawn'`, Nov 14)
+
+**Eva ruled option (b) of §11.6.** She draws the elements as SVG. The generator bends each drawing along the composed
+flow, sizes it to its placement, stacks it at a depth, and builds the relief exactly as the forms round does.
+This session built that pipeline and the template to draw into. **Nothing has been drawn yet**: every frame below is
+built from PLACEHOLDERS, made from the forms round's own outlines, so the pipeline runs end to end today. A
+placeholder is the forms round's profile laid out straight in the element's own frame.
+
+The person drawing reads **`docs/frame-drawing-guide.md`** (the contract, one page) and draws into
+**`docs/frame-drawing-template.svg`**.
+
+### 12.1 The pipeline, as built
+
+- **The placements are the forms round's own.** `formsFor(…, { slotsOnly: true })` runs the round-4 assembly and
+  records each SLOT in the side's local frame: its spine, its width, and the centre its end curls round. The slots
+  are the crest and bottom shells, the crest, shoulder and corner C's, the flank flames, the stem, the foot, the fan,
+  the sheath and the curl-under. The record is read, never acted on, so the forms build is byte-identical. The forms
+  STL hashes were checked before and after the refactor on four rows.
+- **The relief is the forms round's own.** The back end was extracted from `formsFor` as `reliefFromOwners` (union,
+  close, open, holes, heights, the watertight element) and the grid as `ownersGrid`. Both builds call them.
+- **The importer** (`frame-svg-import.js`) reads one SVG and needs no DOM, so it runs in Node and on the page:
+  - each element is a group named `<kind>-<n>`, with role layers (`outline[-back|-mid|-front]`, `detail`, `groove`,
+    `holes`, `guides`);
+  - the frame comes from the `root` guide (origin, +x along, y UP), the units from the `ruler` guide (1 mm at
+    180 mm), and the fit from the `size` box;
+  - it reports open paths, self-crossings, holes under the floor, pieces closer than the floor, and a hole drawn in
+    `outline`.
+- **The placement** (`frame-drawn.js`):
+  - **Choice of variant:** each slot takes the variant of its kind that needs the least scaling, counting the
+    stretch along and the scale across.
+  - **Bodies are BENT** by the skeletal map (S(sx·x) + sy·y·N; §12.2).
+  - **Ends (volutes) are placed WHOLE** at their body's end, along its end tangent, curling to the slot's own side,
+    scaled so their entry width is the body's end width.
+  - **The shells are placed whole** on the axis.
+  - **Depth:** each outline part has a depth (back / mid / front, or its kind's default), which sets its level and
+    its priority. Where a part covers a lower one, its level is held at least `DRAWN.stack` (0.4 mm) above that
+    part's own height there.
+  - **Holes** cut their element and what lies beneath it.
+  - **Lines:** detail lines become ridges and groove lines grooves.
+- **Fills use nonzero winding**, so a fold can never punch a hole.
+
+### 12.2 The warp, and where it distorts
+
+The skeletal map keeps exactly the arc length along the spine and the offset across it. On a straight spine it is a
+rigid map, and on a circle it is (R − sy·y)·(cos, sin)(sx·x / R): W1 and W2 check both.
+
+What distorts is the material on the INSIDE of a turn, compressed along the spine by (1 − κ·y); the outside is
+stretched by (1 + κ·y). Three defences apply, in order, and every placement reports what each did:
+
+1. **The spine is RELAXED** where it turns tighter than the drawing is wide there: the drawing's reach on the turn's
+   inside, near that station, may reach `DRAWN.relax` (0.8) of the radius. A Laplacian step is applied on the
+   offending stations only, with both ends held. On the placeholders this relaxed:
+   - the oval's middle and dominant flames (6 and 24 passes) and its foot;
+   - the foot on every frame.
+2. **An offset still past `DRAWN.fold` (0.9) of the radius is HELD there** and counted. It is 0 on every placeholder
+   build.
+3. **A spine the side's map JUMPS across** (a point offset outward at a convex corner lands on the next side, about
+   15 mm in one step) is cut there, and the longer piece kept. The rectangle's fan leaf did this. The forms round's
+   capsules had bridged the jump; a bent drawing folded across it.
+
+Anisotropy (sx/sy) runs 0.63–1.25 on the placeholders. It is printed per placement and is what drives the variant
+choice.
+
+### 12.3 The proof: the placeholders reproduce F6
+
+`docs/img/frame-drawn-proof.png` (`node tools/shot-frame-drawn.mjs <dir> --png …`) shows:
+- the three frames from the placeholders beside F6;
+- the PLAN of where every drawing lands, coloured by depth;
+- close-ups;
+- the template itself.
+
+Measured at the default 180 mm print (EXPORT relief, the sheet's `metrics.json` and the flow gate):
+
+| frame | fill of the zone (F6 → drawn; the bronze 59.3 %) | attached (F6 → drawn) | plan agreement (IoU of the solid cells) | triangles (F6 → drawn) | narrowest solid feature (F6 → drawn) |
+|---|---|---|---|---|---|
+| oval | 56.1 % → 57.5 % | 86.4 % → 84.7 % | 82.3 % | 1,016,028 → 1,034,712 | 3.40 → 1.50 mm |
+| rect | 51.8 % → 49.7 % | 77.0 % → 75.5 % | 81.5 % | 941,856 → 941,816 | 1.24 → 1.24 mm |
+| arch | 59.2 % → 60.7 % | 83.7 % → 79.9 % | 75.0 % | 762,796 → 813,924 | 1.40 → 1.24 mm |
+
+Every drawn row is one region, watertight, inside the 1.5 M budget (69.0 / 62.8 / 54.3 %), and above the 1 mm floor.
+The narrowest pierced neck is 1.80 / 1.00 / 1.00 mm. The arch's lower agreement is the volutes: they are larger
+and stand clear of F6's.
+
+The drawn volutes are larger than F6's: the placeholder closed curl uses the forms round's GROWN coil radius (0.7 M),
+because at the ungrown radius its first inner coil pinched the entry to 2.8 mm. The template's foot curl and the
+stem's node are likewise one drawing each where F6 drew each from its own numbers. The plan agreement says what the
+eye sees: the same composition, with the same elements in the same places, and the same print readings.
+
+### 12.4 The gates (none in CI, as before)
+
+- **`node tools/verify-frame-flow.mjs --only drawn [--base <main worktree>]`** runs the drawn rows (oval, rect, arch,
+  rect at 300 mm). They carry the forms round's relief clauses (FW, FC, FT, FB, FP, FM, FV) and the drawn ones:
+  - **DI** the drawing imports with no error or warning, and the generator's copy is the template, to the byte;
+  - **DP** every slot is placed, and every body with an end has its volute;
+  - **DW** the bend folds nothing: every bent outline is still a simple ring, and 0 points are held;
+  - **DL** a part declared deeper owns the cells it shares;
+  - **DD** a part over a lower one stands a step above it, on the LEVEL field the relief is built from;
+  - **DE** every volute curls to its slot's own side;
+  - **DH** every drawn hole is open.
+
+  DD is not read on the finished relief: there it is confounded by a thin coil's edge rounding and a back leaf's own
+  midrib (it read −0.16 mm on a pair the level field stacks by exactly 0.4).
+- **`node tools/verify-frame-drawn.mjs`** has two families:
+  - the importer on written-down SVGs: the frame and the units (I1), the four errors (I2–I5), Illustrator and
+    Inkscape names (I6), transforms (I7), every path command (I8), the template (I9);
+  - the bend on spines with closed-form images (W1–W3).
+
+  **`--negative-control`** runs twelve mutants in copies (every anchor checked first), each reddening exactly what it
+  names, across this file's checks and the flow gate's rectangle row. One mutant's collateral (depth collapsed shuts
+  a hole: DH) is allowed and named.
+- **`node tools/frame-drawing-template.mjs --check`**: the template and the generator's copy are fresh.
+- **`node tools/frame-drawn-check.mjs <drawing.svg> [--stl <dir>]`**: the drawing's report and the three frames.
+
+### 12.5 Decisions made alone
+
+- **Bodies are drawn STRAIGHTENED and the composition supplies the curve.** The alternative, drawing the curve and
+  placing it whole, is available per element (the `rigid` guide), but then the drawing no longer follows the flow.
+- **Ends are separate drawings, placed whole.** Bending a spiral along a spine folds it, so a C-scroll is a `c-scroll`
+  body plus a `volute` end.
+- **Each slot takes the variant needing the least scaling** (both axes), not a fixed assignment. This keeps the
+  stretch near 1.
+- **The fallbacks:** a `leaf` kind (optional) was added for the fan, the sheath and the curl-under. It is not in the
+  brief's list; missing, those slots take a flame. The S-scrolls fill the stem slots.
+- **A part standing inside a hole must be one depth in front** (holes cut their own element and what is beneath). So
+  the closed volute's band defaults to mid and its ball is drawn at the front.
+- **Stacking is enforced, not just ordered:** a covering part's level is held 0.4 mm above what it covers. Without
+  that, a front flame rooted low (its rise along its length) sat 0.2–0.5 mm BELOW the back leaf it covers.
+- **Units come from the ruler**, so the file may be drawn at any scale; the template uses 10 units per mm.
+
+### 12.6 Reproduce (§12)
+
+- `node tools/frame-drawing-template.mjs [--check]`: the template and `frame-drawn-placeholders.js`.
+- `node tools/frame-drawn-check.mjs [<drawing.svg>] [--stl <dir>]`: try a drawing.
+- `node tools/shot-frame-drawn.mjs <dir> [--drawing <svg>] [--png <file>]`: the proof sheet.
+- `node tools/verify-frame-drawn.mjs [--negative-control]` and `node tools/verify-frame-flow.mjs --only drawn [--base <wt>]`.
