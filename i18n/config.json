@@ -6,17 +6,14 @@
     "zh-Hans": {
       "dir": "zh",
       "label": "中文",
-      "published": false
+      "published": true
     }
   },
   "pages": [
     {
       "src": "textile-101.html",
-      "js": [],
-      "hold": [
-        "fibers",
-        "cross-sections",
-        "warp-weft"
+      "js": [
+        "textile-101-figures.js"
       ]
     },
     {

@@ -17,6 +17,7 @@
 // (each also named by its group heading and marker shape, never by colour alone).
 // Every scene is { viewBox, duration, markup(t) }: a pure function of t in [0, 1].
 import { DRAW } from './textile-basics.js';
+import { tr, msg } from './textile-i18n.js';
 import { TUBE_KIT, mountScenes } from './textile-taxonomy.js';
 import { blankState, applyPreset, drawdown } from './weave-draft.js';
 
@@ -254,9 +255,9 @@ const WEAVES = {
 // Moisture regain measured at 65 % RH, 20 C, % of oven-dry mass: [name, bar value, label]. The bar
 // is the middle of the quoted range (docs/textile-101-accuracy.md has each figure's source).
 export const REGAIN = [
-  { cls: 'Natural', color: MINT, mark: 'circle', rows: [['Wool', 16, '14\u201318'], ['Silk', 10.5, '10\u201311'], ['Cotton', 7.5, '7\u20138']] },
-  { cls: 'Manufactured \u00b7 cellulosic', color: INDIGO, mark: 'square', rows: [['Viscose', 13, '12\u201314'], ['Lyocell', 11.5, '11\u201313'], ['Acetate', 6.5, '6\u20136.5']] },
-  { cls: 'Manufactured \u00b7 synthetic', color: PLUM, mark: 'diamond', rows: [['Nylon 6,6', 4.1, '3.8\u20134.5'], ['Acrylic', 1.5, '1\u20132'], ['Polyester', 0.4, '0.4'], ['Polypropylene', 0, '~0']] },
+  { cls: msg('Natural'), color: MINT, mark: 'circle', rows: [[msg('Wool'), 16, '14\u201318'], [msg('Silk'), 10.5, '10\u201311'], [msg('Cotton'), 7.5, '7\u20138']] },
+  { cls: msg('Manufactured · cellulosic'), color: INDIGO, mark: 'square', rows: [[msg('Viscose'), 13, '12\u201314'], [msg('Lyocell'), 11.5, '11\u201313'], [msg('Acetate'), 6.5, '6\u20136.5']] },
+  { cls: msg('Manufactured · synthetic'), color: PLUM, mark: 'diamond', rows: [[msg('Nylon 6,6'), 4.1, '3.8\u20134.5'], [msg('Acrylic'), 1.5, '1\u20132'], [msg('Polyester'), 0.4, '0.4'], [msg('Polypropylene'), 0, '~0']] },
 ];
 const RG = { w: 360, x0: 116, perPct: 11.2, row: 22, head: 26, top: 8 };
 const marker = (kind, x, y, c) => kind === 'circle' ? `<circle cx="${x}" cy="${y}" r="4.2" fill="${c}"/>`
@@ -274,11 +275,11 @@ const regainScene = (() => {
         s += `<path d="M${x},${RG.top}V${yAxis}" stroke="${LINE}" stroke-width="1"${p ? ' stroke-dasharray="2 4"' : ''}/><text x="${x}" y="${H - 6}" text-anchor="middle" class="tx-fig-t tx-fig-t--dim">${p}%</text>`;
       }
       for (const g of REGAIN) {
-        s += marker(g.mark, 10, y + RG.head / 2 + 2, g.color) + `<text x="22" y="${y + RG.head / 2 + 6}" class="tx-fig-t tx-fig-t--head">${g.cls.toUpperCase()}</text>`;
+        s += marker(g.mark, 10, y + RG.head / 2 + 2, g.color) + `<text x="22" y="${y + RG.head / 2 + 6}" class="tx-fig-t tx-fig-t--head">${tr(g.cls).toUpperCase()}</text>`;
         y += RG.head;
         for (const [name, v, label] of g.rows) {
           const k = ease(seg(t, 0.04 + idx * 0.045, 0.42 + idx * 0.045)), w = Math.max(v * RG.perPct * k, v === 0 ? 0 : 1.5);
-          s += `<text x="${RG.x0 - 8}" y="${y + RG.row / 2 + 4}" text-anchor="end" class="tx-fig-t">${name}</text>`;
+          s += `<text x="${RG.x0 - 8}" y="${y + RG.row / 2 + 4}" text-anchor="end" class="tx-fig-t">${tr(name)}</text>`;
           if (v > 0) s += `<rect x="${RG.x0}" y="${y + 5}" width="${f1(w)}" height="${RG.row - 10}" fill="${g.color}"/>`;
           else s += `<path d="M${RG.x0},${y + 4}V${y + RG.row - 4}" stroke="${g.color}" stroke-width="2"/>`;
           s += fade(`<text x="${f1(RG.x0 + v * RG.perPct + 6)}" y="${y + RG.row / 2 + 4}" class="tx-fig-t tx-fig-t--dim">${label}</text>`, seg(k, 0.85, 1));

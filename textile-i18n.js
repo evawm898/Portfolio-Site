@@ -15,6 +15,9 @@ const load = () => {
   } catch { table = {}; }
   return table;
 };
+// msg('English') marks a string held in DATA (a table of labels) for translation; it returns it
+// unchanged, and the code that draws it calls tr() on the value.
+export const msg = s => s;
 export const tr = (s, vars) => {
   const out = (table || load())[s] || s;
   return vars ? out.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : out;

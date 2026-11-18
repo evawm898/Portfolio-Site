@@ -4,547 +4,547 @@
   "strings": {
     "meta.title1": {
       "en": "Dyeing — Field Notes — Eva Maskalenko",
-      "zh-Hans": ""
+      "zh-Hans": "染色 — 札记 — Eva Maskalenko"
     },
     "meta.description1": {
       "en": "Field Notes: Dyeing — where color enters the fiber-to-fabric chain, pigment vs. dye, why each fiber needs its own dye class, and cross dyeing two fibers in one bath. Animated.",
-      "zh-Hans": ""
+      "zh-Hans": "札记：染色。颜色从纤维到面料的哪一步进入，颜料与染料的区别，为什么每种纤维要用自己的染料类别，以及两种纤维同浴染出两种颜色。配有动画。"
     },
     "page.a1": {
       "en": "← Field Notes",
-      "zh-Hans": ""
+      "zh-Hans": "← 札记"
     },
     "page.div1": {
       "en": "No. 08 / 09",
-      "zh-Hans": ""
+      "zh-Hans": "No. 08 / 09"
     },
     "hero.span1": {
       "en": "Field Notes",
-      "zh-Hans": ""
+      "zh-Hans": "札记"
     },
     "hero.h11": {
       "en": "Dyeing",
-      "zh-Hans": ""
+      "zh-Hans": "染色"
     },
     "hero.p1": {
       "en": "Color can go in at almost any point in the chain — into the polymer before there is a fiber, into loose fiber, into yarn, or into finished fabric. Where it goes in, and which dye is used, decides how the color behaves for the rest of the product’s life.",
-      "zh-Hans": ""
+      "zh-Hans": "颜色几乎可以在产业链的任何一步加进去：纤维还没成形时加到聚合物里，加到散纤维上，加到纱线上，或者加到织好的面料上。在哪一步上色、用哪一类染料，决定了这个颜色在产品整个使用寿命里的表现。"
     },
     "hero.p2": {
       "en": "The fiber decides the dye: each fiber only takes the dye chemistry that can get into it, or hold on to it. Builds on <a href=\"textile-101.html\">Textile 101</a>.",
-      "zh-Hans": ""
+      "zh-Hans": "纤维决定染料：每种纤维只接受能进入它内部、或能抓住它的那一类染料。本篇以<a href=\"textile-101.html\">纺织基础</a>为基础。"
     },
     "hero.aria1": {
       "en": "On this page",
-      "zh-Hans": ""
+      "zh-Hans": "本页目录"
     },
     "hero.div1": {
       "en": "On This Page",
-      "zh-Hans": ""
+      "zh-Hans": "本页目录"
     },
     "hero.a1": {
       "en": "<span class=\"n\">01</span>Where Color Enters",
-      "zh-Hans": ""
+      "zh-Hans": "<span class=\"n\">01</span>颜色从哪一步进入"
     },
     "hero.a2": {
       "en": "<span class=\"n\">02</span>Inside, On, or Into",
-      "zh-Hans": ""
+      "zh-Hans": "<span class=\"n\">02</span>在里面、在表面，还是进到里面"
     },
     "hero.a3": {
       "en": "<span class=\"n\">03</span>Why the Fiber Decides the Dye",
-      "zh-Hans": ""
+      "zh-Hans": "<span class=\"n\">03</span>为什么纤维决定染料"
     },
     "hero.a4": {
       "en": "<span class=\"n\">04</span>One Bath, Two Dyes",
-      "zh-Hans": ""
+      "zh-Hans": "<span class=\"n\">04</span>一浴两种染料"
     },
     "where-color-enters.h21": {
       "en": "Where Color Enters",
-      "zh-Hans": ""
+      "zh-Hans": "颜色从哪一步进入"
     },
     "where-color-enters.p1": {
       "en": "Pick a stage and watch the dye go in there. Everything after it inherits the color; everything before it is still undyed.",
-      "zh-Hans": ""
+      "zh-Hans": "选一个阶段，看染料从那里进入。它之后的每一步都带上这个颜色，它之前的每一步仍是未染色的。"
     },
     "where-color-enters.p2": {
       "en": "The trade is always the same: the earlier the color goes in, the deeper and steadier it is — and the earlier you have to commit to it.",
-      "zh-Hans": ""
+      "zh-Hans": "取舍始终是同一个：颜色进得越早，就越深、越稳定，但也必须越早把颜色定下来。"
     },
     "where-color-enters.aria1": {
       "en": "Dye stage",
-      "zh-Hans": ""
+      "zh-Hans": "染色阶段"
     },
     "where-color-enters.span1": {
       "en": "Before the yarn",
-      "zh-Hans": ""
+      "zh-Hans": "成纱之前"
     },
     "where-color-enters.button1": {
       "en": "Solution (dope)",
-      "zh-Hans": ""
+      "zh-Hans": "原液着色"
     },
     "where-color-enters.button2": {
       "en": "Fiber (stock)*",
-      "zh-Hans": ""
+      "zh-Hans": "散纤维染色*"
     },
     "where-color-enters.span2": {
       "en": "Yarn",
-      "zh-Hans": ""
+      "zh-Hans": "纱线"
     },
     "where-color-enters.button3": {
       "en": "Skein",
-      "zh-Hans": ""
+      "zh-Hans": "绞纱"
     },
     "where-color-enters.button4": {
       "en": "Package",
-      "zh-Hans": ""
+      "zh-Hans": "筒子纱"
     },
     "where-color-enters.button5": {
       "en": "Warp beam",
-      "zh-Hans": ""
+      "zh-Hans": "经轴"
     },
     "where-color-enters.span3": {
       "en": "Fabric",
-      "zh-Hans": ""
+      "zh-Hans": "面料"
     },
     "where-color-enters.button6": {
       "en": "Piece",
-      "zh-Hans": ""
+      "zh-Hans": "匹染"
     },
     "where-color-enters.aria2": {
       "en": "Four panels left to right: polymer, fiber, yarn, fabric. Dye drops into the chosen stage; that stage and every stage after it turn the dye color, the ones before it stay white.",
-      "zh-Hans": ""
+      "zh-Hans": "从左到右四格：聚合物、纤维、纱线、面料。染料落进所选的阶段；这一阶段和它之后的各阶段变成染料的颜色，之前的各阶段保持白色。"
     },
     "where-color-enters.span4": {
       "en": "Polymer",
-      "zh-Hans": ""
+      "zh-Hans": "聚合物"
     },
     "where-color-enters.span5": {
       "en": "Fiber",
-      "zh-Hans": ""
+      "zh-Hans": "纤维"
     },
     "where-color-enters.span6": {
       "en": "Yarn",
-      "zh-Hans": ""
+      "zh-Hans": "纱线"
     },
     "where-color-enters.span7": {
       "en": "Fabric",
-      "zh-Hans": ""
+      "zh-Hans": "面料"
     },
     "where-color-enters.span8": {
       "en": "<b>Color goes in deeper and steadier</b> — less structure already built to distort",
-      "zh-Hans": ""
+      "zh-Hans": "<b>颜色进得更深、更稳定</b>：已经成形、可能被染色破坏的结构更少"
     },
     "where-color-enters.span9": {
       "en": "<b>Color decided later</b> — more flexibility, shorter lead time",
-      "zh-Hans": ""
+      "zh-Hans": "<b>颜色定得更晚</b>：更灵活，交货期更短"
     },
     "where-color-enters.p3": {
       "en": "Pigment goes into the melted polymer before the fiber exists, so the color <em>is</em> the fiber. The most fade-resistant in sunlight, and there’s no dye bath, so no dye effluent. But the color is chosen before anything else is.",
-      "zh-Hans": ""
+      "zh-Hans": "纤维还不存在时，颜料就加进了熔融的聚合物，所以颜色<em>就是</em>纤维本身。它在日晒下最不容易褪色；因为不用染浴，也就没有染色废水。但颜色必须在其他一切之前定下来。"
     },
     "where-color-enters.p4": {
       "en": "Loose fiber is dyed before it’s spun into yarn, so the color runs all the way through every yarn made from it.<span class=\"note\">* Staple fibers only — the short kind (cotton, wool, cut polyester or nylon). A continuous filament can’t be dyed loose.</span>",
-      "zh-Hans": ""
+      "zh-Hans": "散纤维在纺成纱之前染色，所以用它纺出的每一根纱，颜色都是里外一致的。<span class=\"note\">* 只适用于短纤维，也就是较短的那一类（棉、羊毛、切断的聚酯纤维（涤纶）或聚酰胺纤维（锦纶））。连续的长丝没法以散纤维的形式染色。</span>"
     },
     "where-color-enters.p5": {
       "en": "Yarn dyed in big, loose loops — relaxed, so it keeps its bulk and a soft hand. Dyed yarn is what makes stripes, checks and heathers possible.<span class=\"note\">If elastane is already in the yarn or fabric, the hot dye bath can cost it stretch. Color put in earlier, or into the polymer, avoids that.</span>",
-      "zh-Hans": ""
+      "zh-Hans": "纱线绕成松散的大圈来染。纱处于松弛状态，所以能保持蓬松和柔软的手感。有了染好色的纱，才织得出条纹、格子和[[heather!]]。<span class=\"note\">若纱线或面料里已经含有氨纶，高温染浴可能让它损失弹性。把上色提前，或直接在聚合物阶段着色，就能避开这个问题。</span>"
     },
     "where-color-enters.p6": {
       "en": "Yarn wound tight on a perforated core, with the dye pumped through it under pressure. Dyed yarn is what makes stripes, checks and heathers possible.<span class=\"note\">If elastane is already in the yarn or fabric, the hot dye bath can cost it stretch. Color put in earlier, or into the polymer, avoids that.</span>",
-      "zh-Hans": ""
+      "zh-Hans": "纱线紧紧卷绕在多孔筒管上，染液在压力下被泵送穿过纱层。有了染好色的纱，才织得出条纹、格子和[[heather]]。不同颜色的纤维混在同一根纱里，就会形成这种深浅夹杂的外观。<span class=\"note\">若纱线或面料里已经含有氨纶，高温染浴可能让它损失弹性。把上色提前，或直接在聚合物阶段着色，就能避开这个问题。</span>"
     },
     "where-color-enters.p7": {
       "en": "A whole sheet of warp yarns, side by side under tension, dyed together on one beam — ready to weave.<span class=\"note\">If elastane is already in the yarn or fabric, the hot dye bath can cost it stretch. Color put in earlier, or into the polymer, avoids that.</span>",
-      "zh-Hans": ""
+      "zh-Hans": "整幅经纱在张力下并排卷在一根经轴上一起染色，染完就可以上机织造。<span class=\"note\">若纱线或面料里已经含有氨纶，高温染浴可能让它损失弹性。把上色提前，或直接在聚合物阶段着色，就能避开这个问题。</span>"
     },
     "where-color-enters.p8": {
       "en": "The finished fabric is dyed. The color is decided last, with the shortest lead time — but everything is already built: in a tight fabric the dye may not reach the middle of every yarn.<span class=\"note\">If elastane is already in the fabric, the hot dye bath can cost it stretch. Garments can be dyed later still, after they’re sewn.</span>",
-      "zh-Hans": ""
+      "zh-Hans": "织好的面料再染色。颜色最后才定，交货期最短；但一切结构都已成形：在紧密的面料里，染料可能到不了每根纱线的中心。<span class=\"note\">若面料里已经含有氨纶，高温染浴可能让它损失弹性。成衣还可以更晚染色，缝好以后再染。</span>"
     },
     "where-color-enters.div1": {
       "en": "Three ways to dye yarn — three different states of the yarn",
-      "zh-Hans": ""
+      "zh-Hans": "染纱的三种方式，纱线的三种状态"
     },
     "where-color-enters.aria3": {
       "en": "Loose loops of yarn hang from a rod; the dye bath rises around them and the loops take the color",
-      "zh-Hans": ""
+      "zh-Hans": "松散的纱圈挂在一根杆上；染浴在四周升起，纱圈染上颜色"
     },
     "where-color-enters.span10": {
       "en": "Skein (hank)",
-      "zh-Hans": ""
+      "zh-Hans": "绞纱"
     },
     "where-color-enters.span11": {
       "en": "Relaxed",
-      "zh-Hans": ""
+      "zh-Hans": "松弛"
     },
     "where-color-enters.span12": {
       "en": "Loose loops hang in the bath, so the yarn stays lofty and soft — but it has to be rewound before it can be used.",
-      "zh-Hans": ""
+      "zh-Hans": "松散的纱圈悬挂在染浴里，所以纱线保持蓬松柔软；但使用前必须重新络纱。"
     },
     "where-color-enters.aria4": {
       "en": "Cross-section of yarn wound in rings around a perforated core; dye is pumped out through the core, then back in, until every ring is colored",
-      "zh-Hans": ""
+      "zh-Hans": "纱线一圈圈卷绕在多孔筒管上的截面；染液先从筒管向外泵出，再向内泵回，直到每一圈都染上颜色"
     },
     "where-color-enters.span13": {
       "en": "Package",
-      "zh-Hans": ""
+      "zh-Hans": "筒子纱"
     },
     "where-color-enters.span14": {
       "en": "Controlled compression",
-      "zh-Hans": ""
+      "zh-Hans": "受控压紧"
     },
     "where-color-enters.span15": {
       "en": "Wound to a set density on a perforated core; the dye is pumped through, inside out and then outside in.",
-      "zh-Hans": ""
+      "zh-Hans": "按设定的密度卷绕在多孔筒管上；染液被泵送穿过纱层，先由内向外，再由外向内。"
     },
     "where-color-enters.aria5": {
       "en": "Parallel yarns stretched between a bar and a perforated beam; dye rises up through all of them at once",
-      "zh-Hans": ""
+      "zh-Hans": "平行的纱线绷在一根横杆和一根多孔经轴之间；染液同时穿过所有纱线向上升"
     },
     "where-color-enters.span16": {
       "en": "Warp beam",
-      "zh-Hans": ""
+      "zh-Hans": "经轴"
     },
     "where-color-enters.span17": {
       "en": "Aligned under tension",
-      "zh-Hans": ""
+      "zh-Hans": "在张力下排齐"
     },
     "where-color-enters.span18": {
       "en": "The whole warp, side by side on one perforated beam, dyed in one go.",
-      "zh-Hans": ""
+      "zh-Hans": "整幅经纱并排卷在一根多孔经轴上，一次染完。"
     },
     "where-color-enters.div2": {
       "en": "How far the dye gets: one yarn, cut across",
-      "zh-Hans": ""
+      "zh-Hans": "染料能到多深：一根纱线的横截面"
     },
     "where-color-enters.aria6": {
       "en": "Cross-section of a round yarn made of many fibers; the color moves in from the outside until every fiber is colored",
-      "zh-Hans": ""
+      "zh-Hans": "由许多纤维组成的圆形纱线的截面；颜色从外向内推进，直到每根纤维都染上颜色"
     },
     "where-color-enters.span19": {
       "en": "Dyed as yarn",
-      "zh-Hans": ""
+      "zh-Hans": "以纱线状态染色"
     },
     "where-color-enters.span20": {
       "en": "The dye has room to reach every fiber, right to the middle.",
-      "zh-Hans": ""
+      "zh-Hans": "染料有足够的空间到达每一根纤维，一直到纱线中心。"
     },
     "where-color-enters.aria7": {
       "en": "Cross-section of a yarn squeezed flat by its neighbours in a fabric; the outer fibers take the color but the middle ones stay mostly undyed",
-      "zh-Hans": ""
+      "zh-Hans": "面料中被相邻纱线挤扁的一根纱线的截面；外层纤维染上了颜色，中间的纤维大多没有染上"
     },
     "where-color-enters.span21": {
       "en": "Dyed as fabric",
-      "zh-Hans": ""
+      "zh-Hans": "以面料状态染色"
     },
     "where-color-enters.span22": {
       "en": "Squeezed by its neighbours in a tight fabric, the yarn can take the color mostly at its surface and leave its middle under-dyed — called ring dyeing.",
-      "zh-Hans": ""
+      "zh-Hans": "在紧密的面料里，纱线被相邻的纱挤紧，颜色可能主要留在纱线表层，芯部染得偏浅：这种现象叫[[ring-dyeing]]。"
     },
     "pigment-vs-dye.h21": {
       "en": "Inside, On, or Into",
-      "zh-Hans": ""
+      "zh-Hans": "在里面、在表面，还是进到里面"
     },
     "pigment-vs-dye.p1": {
       "en": "Pigment and dye are different things. Pigment is solid particles; it has no hold on a fiber of its own, so it’s either locked inside the polymer or glued onto the surface. Dye is molecules that go <em>into</em> the fiber.",
-      "zh-Hans": ""
+      "zh-Hans": "颜料和染料是两回事。颜料是固体颗粒，自己抓不住纤维，所以要么被锁在聚合物内部，要么被粘在纤维表面。染料是分子，会<em>进入</em>纤维内部。"
     },
     "pigment-vs-dye.aria1": {
       "en": "Cross-section of a fiber; pigment particles are stirred into it while it is still melted, then it sets with particles all through it",
-      "zh-Hans": ""
+      "zh-Hans": "一根纤维的截面；纤维还处于熔融状态时颜料颗粒被搅拌进去，凝固后颗粒遍布整根纤维"
     },
     "pigment-vs-dye.span1": {
       "en": "Solution-dyed",
-      "zh-Hans": ""
+      "zh-Hans": "原液着色"
     },
     "pigment-vs-dye.span2": {
       "en": "Pigment inside",
-      "zh-Hans": ""
+      "zh-Hans": "颜料在里面"
     },
     "pigment-vs-dye.span3": {
       "en": "Pigment mixed into the polymer before it’s spun. The color is part of the fiber.",
-      "zh-Hans": ""
+      "zh-Hans": "纺丝之前把颜料混进聚合物。颜色是纤维的一部分。"
     },
     "pigment-vs-dye.aria2": {
       "en": "Cross-section of a white fiber; pigment particles land on its top surface and a binder film coats over them; the inside stays white",
-      "zh-Hans": ""
+      "zh-Hans": "一根白色纤维的截面；颜料颗粒落在它的上表面，一层粘合剂薄膜覆盖其上；内部仍是白色"
     },
     "pigment-vs-dye.span4": {
       "en": "Pigment printed",
-      "zh-Hans": ""
+      "zh-Hans": "涂料印花"
     },
     "pigment-vs-dye.span5": {
       "en": "Pigment on the surface",
-      "zh-Hans": ""
+      "zh-Hans": "颜料在表面"
     },
     "pigment-vs-dye.span6": {
       "en": "Particles held on by a binder. A stiff print can restrict stretch and crack; heavy pigment changes the hand, and it can rub off.",
-      "zh-Hans": ""
+      "zh-Hans": "颗粒靠粘合剂固定在表面。印得硬会限制拉伸并开裂；颜料上得厚会改变手感，还可能被摩擦掉。"
     },
     "pigment-vs-dye.aria3": {
       "en": "Cross-section of a fiber in a dye bath; small dye molecules move from the bath into the fiber and spread through it",
-      "zh-Hans": ""
+      "zh-Hans": "染浴中一根纤维的截面；细小的染料分子从染浴进入纤维，并在其中扩散开"
     },
     "pigment-vs-dye.span7": {
       "en": "Dyed",
-      "zh-Hans": ""
+      "zh-Hans": "染色"
     },
     "pigment-vs-dye.span8": {
       "en": "Dye into the fiber",
-      "zh-Hans": ""
+      "zh-Hans": "染料进入纤维"
     },
     "pigment-vs-dye.span9": {
       "en": "Dye molecules go into the fiber — dissolved in it, or bonded to it, depending on the dye.",
-      "zh-Hans": ""
+      "zh-Hans": "染料分子进入纤维内部：有的溶在里面，有的与纤维成键，取决于染料的种类。"
     },
     "dye-classes.h21": {
       "en": "Why the Fiber Decides the Dye",
-      "zh-Hans": ""
+      "zh-Hans": "为什么纤维决定染料"
     },
     "dye-classes.p1": {
       "en": "Zoom into a fiber and it’s long chains of molecules. A dye only works on a fiber if it can get in among those chains and stay there — and each fiber offers a different way to hold on.",
-      "zh-Hans": ""
+      "zh-Hans": "把纤维放大看，它是一条条长长的分子链。染料要对某种纤维起作用，就得能钻进这些链之间并留在那里；而每种纤维留住染料的方式各不相同。"
     },
     "dye-classes.p2": {
       "en": "So each fiber has its dye class: disperse for polyester, acid for nylon, reactive for cotton.",
-      "zh-Hans": ""
+      "zh-Hans": "所以每种纤维有自己的染料类别：聚酯纤维（涤纶）用分散染料，聚酰胺纤维（锦纶）用酸性染料，棉用活性染料。"
     },
     "dye-classes.aria1": {
       "en": "Polyester chains, packed tight; heat to 130 degrees loosens them, small round dye molecules slip in between, then the chains close and trap them",
-      "zh-Hans": ""
+      "zh-Hans": "紧密排列的涤纶分子链；加热到 130 度使它们松开，小而圆的染料分子钻进链间，随后分子链合拢，把染料困在里面"
     },
     "dye-classes.span1": {
       "en": "Disperse → polyester",
-      "zh-Hans": ""
+      "zh-Hans": "分散染料 → 涤纶"
     },
     "dye-classes.span2": {
       "en": "Trapped",
-      "zh-Hans": ""
+      "zh-Hans": "被困住"
     },
     "dye-classes.span3": {
       "en": "Polyester has nothing for a dye to grab. Hot and under pressure, its chains loosen; tiny dye molecules slip in and stay trapped when it cools.",
-      "zh-Hans": ""
+      "zh-Hans": "涤纶上没有可供染料抓住的位置。在高温高压下，它的分子链松开；细小的染料分子钻进去，冷却后就被困在里面。"
     },
     "dye-classes.aria2": {
       "en": "Nylon chains with a few sites; in an acid bath each site gains a plus sign; dye molecules marked minus move in and pair with the plus sites",
-      "zh-Hans": ""
+      "zh-Hans": "带有少量位点的锦纶分子链；在酸性浴中每个位点得到一个正号；带负号的染料分子靠过来，与带正号的位点配对"
     },
     "dye-classes.span4": {
       "en": "Acid → nylon (and wool)",
-      "zh-Hans": ""
+      "zh-Hans": "酸性染料 → 锦纶（以及羊毛）"
     },
     "dye-classes.span5": {
       "en": "Ionic bond",
-      "zh-Hans": ""
+      "zh-Hans": "离子键"
     },
     "dye-classes.span6": {
       "en": "In an acid bath the fiber’s sites pick up a + charge; the dye carries a &minus;, and they pair up. Nylon has only a few of these sites, wool many.",
-      "zh-Hans": ""
+      "zh-Hans": "在酸性浴中，纤维上的[[dye-sites]]带上正电荷；染料带负电荷，两者配成一对。这种位置锦纶上只有少量，羊毛上很多。"
     },
     "dye-classes.aria3": {
       "en": "Cotton chains; dye molecules settle onto them, then with alkali each forms a solid bond to the chain; dye that reacted with the water instead is washed away",
-      "zh-Hans": ""
+      "zh-Hans": "棉的分子链；染料分子落在链上，加碱后各自与分子链形成牢固的键；与水反应掉的染料被洗去"
     },
     "dye-classes.span7": {
       "en": "Reactive → cotton",
-      "zh-Hans": ""
+      "zh-Hans": "活性染料 → 棉"
     },
     "dye-classes.span8": {
       "en": "Covalent bond",
-      "zh-Hans": ""
+      "zh-Hans": "共价键"
     },
     "dye-classes.span9": {
       "en": "With alkali, the dye bonds to the cotton itself. Some dye reacts with the water instead — it can’t bond, so it’s washed off.",
-      "zh-Hans": ""
+      "zh-Hans": "加碱后，染料与棉本身成键。一部分染料却与水发生了反应，无法再成键，所以要洗掉。"
     },
     "cross-dyeing.h21": {
       "en": "One Bath, Two Dyes — Cross Dyeing",
-      "zh-Hans": ""
+      "zh-Hans": "一浴两种染料：异色效果"
     },
     "cross-dyeing.p1": {
       "en": "Because each dye only takes to its own fiber, a fabric woven from two fibers — here a polyester warp and a nylon weft — can go into one bath with two dyes and come out two colors. That’s cross dyeing.",
-      "zh-Hans": ""
+      "zh-Hans": "因为每种染料只上自己的那种纤维，一块由两种纤维[[interwoven]]的面料（这里经纱是涤纶，纬纱是锦纶）可以放进同一个染浴、用两种染料，染出两种颜色。这就是[[cross-dyeing]]。"
     },
     "cross-dyeing.p2": {
       "en": "Choose the two dyes to match instead and the same bath gives one solid color: union dyeing.",
-      "zh-Hans": ""
+      "zh-Hans": "如果把两种染料选配成同一个颜色，同一个染浴染出的就是单色：这叫[[union-dyeing]]。"
     },
     "cross-dyeing.aria1": {
       "en": "Cross dyeing options",
-      "zh-Hans": ""
+      "zh-Hans": "异色染色的选项"
     },
     "cross-dyeing.button1": {
       "en": "Reserve: leave the acid dye out",
-      "zh-Hans": ""
+      "zh-Hans": "留白：不加酸性染料"
     },
     "cross-dyeing.button2": {
       "en": "Reality: cross-staining",
-      "zh-Hans": ""
+      "zh-Hans": "实际情况：沾色"
     },
     "cross-dyeing.aria2": {
       "en": "A swatch woven with a polyester warp and a nylon weft sits in a dye bath with round disperse dye molecules and diamond-shaped acid dye molecules; each kind moves to its own fiber, so the polyester turns one color and the nylon another",
-      "zh-Hans": ""
+      "zh-Hans": "一块经纱为涤纶、纬纱为锦纶的机织小样浸在染浴里，浴中有圆形的分散染料分子和菱形的酸性染料分子；两种分子各自移向自己的纤维，于是涤纶变成一种颜色，锦纶变成另一种颜色"
     },
     "cross-dyeing.span1": {
       "en": "<b>Disperse dye</b> → polyester, the warp: the smooth, straight filaments running up and down",
-      "zh-Hans": ""
+      "zh-Hans": "<b>分散染料</b> → 涤纶（经纱）：上下方向、平滑挺直的长丝"
     },
     "cross-dyeing.span2": {
       "en": "<b>Acid dye</b> → nylon, the weft: the crimped filaments running across",
-      "zh-Hans": ""
+      "zh-Hans": "<b>酸性染料</b> → 锦纶（纬纱）：横向、带卷曲的长丝"
     },
     "cross-dyeing.p3": {
-      "en": "<b>Reserve dyeing.</b> Leave one dye out and that fiber comes out undyed — a two-tone, or a heather if the two fibers are blended in the yarn instead.",
-      "zh-Hans": ""
+      "en": "<b>Reserve dyeing.</b> Leave one dye out and that fiber comes out undyed — a two-tone, or a heather if the two fibers are blended in the yarn instead. In practice disperse dye stains nylon slightly, so a true white reserve is easier on polyester/cotton.",
+      "zh-Hans": "<b>[[reserve-dyeing]]。</b>少加一种染料，对应的那种纤维就不上色：得到双色效果；如果两种纤维是混纺在同一根纱里的，得到的就是{{heather}}。实际生产中，分散染料会让锦纶轻微[[cross-staining]]，所以要留出真正的白色，涤纶/棉更容易做到。"
     },
     "cross-dyeing.p4": {
       "en": "<b>Polyester with cotton</b> is harder: disperse dye wants a hot, acidic bath and reactive dye an alkaline one. So the two usually run in the same bath as two steps, one after the other.",
-      "zh-Hans": ""
+      "zh-Hans": "<b>涤纶配棉</b>更难：分散染料要高温的酸性浴，活性染料要碱性浴。所以两者通常在同一个染浴里分两步进行，一先一后。"
     },
     "page.a2": {
       "en": "← Previous note",
-      "zh-Hans": ""
+      "zh-Hans": "← 上一篇"
     },
     "page.a3": {
       "en": "Back to Field Notes",
-      "zh-Hans": ""
+      "zh-Hans": "返回札记"
     },
     "js:Polymer": {
       "en": "Polymer",
-      "zh-Hans": ""
+      "zh-Hans": "聚合物"
     },
     "js:Fiber": {
       "en": "Fiber",
-      "zh-Hans": ""
+      "zh-Hans": "纤维"
     },
     "js:Yarn": {
       "en": "Yarn",
-      "zh-Hans": ""
+      "zh-Hans": "纱线"
     },
     "js:Fabric": {
       "en": "Fabric",
-      "zh-Hans": ""
+      "zh-Hans": "面料"
     },
     "js:↓ dye here · ": {
       "en": "↓ dye here · ",
-      "zh-Hans": ""
+      "zh-Hans": "↓ 在此染色 · "
     },
     "js:pumped through: inside → out": {
       "en": "pumped through: inside → out",
-      "zh-Hans": ""
+      "zh-Hans": "泵送染液：由内 → 向外"
     },
     "js:then outside → in": {
       "en": "then outside → in",
-      "zh-Hans": ""
+      "zh-Hans": "再由外 → 向内"
     },
     "js:every layer dyed, wound tight": {
       "en": "every layer dyed, wound tight",
-      "zh-Hans": ""
+      "zh-Hans": "每一层都染到，卷绕紧密"
     },
     "js:every end dyed together, side by side": {
       "en": "every end dyed together, side by side",
-      "zh-Hans": ""
+      "zh-Hans": "每根经纱并排一起染"
     },
     "js:pigment stirred into the melt": {
       "en": "pigment stirred into the melt",
-      "zh-Hans": ""
+      "zh-Hans": "颜料搅拌进熔体"
     },
     "js:set as a fiber: pigment all through it": {
       "en": "set as a fiber: pigment all through it",
-      "zh-Hans": ""
+      "zh-Hans": "凝固成纤维：颜料遍布其中"
     },
     "js:binder": {
       "en": "binder",
-      "zh-Hans": ""
+      "zh-Hans": "粘合剂"
     },
     "js:glued to the surface: the inside stays bare": {
       "en": "glued to the surface: the inside stays bare",
-      "zh-Hans": ""
+      "zh-Hans": "粘在表面：内部没有颜色"
     },
     "js:pigment printed onto the surface": {
       "en": "pigment printed onto the surface",
-      "zh-Hans": ""
+      "zh-Hans": "颜料印在表面"
     },
     "js:dye molecules in the bath": {
       "en": "dye molecules in the bath",
-      "zh-Hans": ""
+      "zh-Hans": "染浴中的染料分子"
     },
     "js:taken into the fiber itself": {
       "en": "taken into the fiber itself",
-      "zh-Hans": ""
+      "zh-Hans": "进入纤维内部"
     },
     "js:bath": {
       "en": "bath",
-      "zh-Hans": ""
+      "zh-Hans": "染浴"
     },
     "js:fiber": {
       "en": "fiber",
-      "zh-Hans": ""
+      "zh-Hans": "纤维"
     },
     "js:heating · {temp} °C": {
       "en": "heating · {temp} °C",
-      "zh-Hans": ""
+      "zh-Hans": "升温 · {temp} °C"
     },
     "js:130 °C, under pressure: the chains loosen": {
       "en": "130 °C, under pressure: the chains loosen",
-      "zh-Hans": ""
+      "zh-Hans": "130 °C，加压：分子链松开"
     },
     "js:cooled: the dye is trapped, not bonded": {
       "en": "cooled: the dye is trapped, not bonded",
-      "zh-Hans": ""
+      "zh-Hans": "冷却：染料被困住，没有成键"
     },
     "js:acid bath: the fiber’s sites pick up a +": {
       "en": "acid bath: the fiber’s sites pick up a +",
-      "zh-Hans": ""
+      "zh-Hans": "酸性浴：纤维上的位点带上 +"
     },
     "js:dye molecules carry a − ...": {
       "en": "dye molecules carry a − ...",
-      "zh-Hans": ""
+      "zh-Hans": "染料分子带 − ……"
     },
     "js:... + meets −: an ionic bond": {
       "en": "... + meets −: an ionic bond",
-      "zh-Hans": ""
+      "zh-Hans": "…… + 遇到 −：形成离子键"
     },
     "js:dye settles onto the cotton ...": {
       "en": "dye settles onto the cotton ...",
-      "zh-Hans": ""
+      "zh-Hans": "染料落在棉上 ……"
     },
     "js:add alkali: it bonds to the fiber (covalent)": {
       "en": "add alkali: it bonds to the fiber (covalent)",
-      "zh-Hans": ""
+      "zh-Hans": "加碱：与纤维成键（共价键）"
     },
     "js:wash off the dye that reacted with water": {
       "en": "wash off the dye that reacted with water",
-      "zh-Hans": ""
+      "zh-Hans": "洗掉与水反应的染料"
     },
     "js:what stays is bonded to the cotton": {
       "en": "what stays is bonded to the cotton",
-      "zh-Hans": ""
+      "zh-Hans": "留下的已与棉成键"
     },
     "js:one bath, one dye: the acid dye is left out": {
       "en": "one bath, one dye: the acid dye is left out",
-      "zh-Hans": ""
+      "zh-Hans": "一浴一种染料：不加酸性染料"
     },
     "js:one bath, two dyes": {
       "en": "one bath, two dyes",
-      "zh-Hans": ""
+      "zh-Hans": "一浴两种染料"
     },
     "js:a clearing rinse takes the stray dye back off the nylon": {
       "en": "a clearing rinse takes the stray dye back off the nylon",
-      "zh-Hans": ""
+      "zh-Hans": "清洗把沾错的染料从锦纶上洗掉"
     },
     "js:some disperse dye lands on the nylon too": {
       "en": "some disperse dye lands on the nylon too",
-      "zh-Hans": ""
+      "zh-Hans": "有些分散染料也沾到了锦纶上"
     },
     "js:disperse dye finds the polyester; the nylon stays undyed": {
       "en": "disperse dye finds the polyester; the nylon stays undyed",
-      "zh-Hans": ""
+      "zh-Hans": "分散染料上到涤纶；锦纶不上色"
     },
     "js:each dye goes to its own fiber": {
       "en": "each dye goes to its own fiber",
-      "zh-Hans": ""
+      "zh-Hans": "每种染料各上各的纤维"
     }
   }
 }

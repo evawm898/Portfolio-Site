@@ -24,7 +24,7 @@
     },
     {
       "id": "extrude",
-      "en": "extrude (through a spinneret)",
+      "en": "extrude",
       "term": "经喷丝板挤出",
       "aka": [
         "纺丝",
@@ -47,7 +47,7 @@
     },
     {
       "id": "core-sheath",
-      "en": "core / sheath (of a core-spun yarn)",
+      "en": "core / sheath",
       "term": "芯丝 / 外包纤维",
       "aka": [
         "芯纱",
@@ -150,7 +150,7 @@
     },
     {
       "id": "cover",
-      "en": "cover (of a yarn)",
+      "en": "cover",
       "term": "覆盖性",
       "aka": [
         "遮盖性"
@@ -161,7 +161,7 @@
     },
     {
       "id": "weld",
-      "en": "weld (thermoplastic fabrics)",
+      "en": "weld",
       "term": "焊接",
       "aka": [
         "超声波焊接",
@@ -173,19 +173,19 @@
     },
     {
       "id": "air-jet",
-      "en": "air-jet spinning",
-      "term": "喷气涡流纺",
+      "en": "air-jet spinning (including vortex)",
+      "term": "喷气纺",
       "aka": [
-        "涡流纺",
-        "喷气纺"
+        "喷气涡流纺",
+        "涡流纺"
       ],
-      "desc": "用高速气流使纤维包缠成纱的纺纱方法，纱线毛羽很少。",
+      "desc": "用高速气流使纤维包缠成纱的纺纱方法；其中较新的喷气涡流纺，纱线毛羽特别少。",
       "confidence": "Decided",
       "group": "纤维与纱线"
     },
     {
       "id": "flat-filament",
-      "en": "flat (untextured) filament",
+      "en": "flat filament",
       "term": "未变形长丝",
       "aka": [
         "牵伸丝",
@@ -209,7 +209,7 @@
     },
     {
       "id": "ends",
-      "en": "ends (yarns fed together)",
+      "en": "ends",
       "term": "并合根数",
       "aka": [
         "并纱"
@@ -231,7 +231,7 @@
     },
     {
       "id": "yarn-characterization",
-      "en": "yarn characterization (page title)",
+      "en": "yarn characterization",
       "term": "纱线规格与标示",
       "aka": [
         "纱线规格"
@@ -253,7 +253,7 @@
     },
     {
       "id": "braid",
-      "en": "braid / braided",
+      "en": "braid",
       "term": "编织",
       "aka": [
         "编织物",
@@ -265,7 +265,7 @@
     },
     {
       "id": "bonded",
-      "en": "bonded (nonwoven)",
+      "en": "bonded",
       "term": "纤网加固",
       "aka": [
         "固结",
@@ -344,7 +344,7 @@
     },
     {
       "id": "triaxial",
-      "en": "triaxial (woven)",
+      "en": "triaxial weave",
       "term": "三轴向机织物",
       "aka": [
         "三轴机织物",
@@ -380,7 +380,7 @@
     },
     {
       "id": "bias",
-      "en": "bias (the diagonal)",
+      "en": "bias",
       "term": "斜向",
       "aka": [
         "斜丝",
@@ -392,7 +392,7 @@
     },
     {
       "id": "fray",
-      "en": "fray (cut edge)",
+      "en": "fray",
       "term": "脱散",
       "aka": [
         "散边",
@@ -404,7 +404,7 @@
     },
     {
       "id": "ladder",
-      "en": "ladder (run)",
+      "en": "ladder",
       "term": "梯脱",
       "aka": [
         "脱散",
@@ -416,7 +416,7 @@
     },
     {
       "id": "draft",
-      "en": "draft (weave diagram)",
+      "en": "weave draft",
       "term": "组织图",
       "aka": [
         "意匠图"
@@ -427,7 +427,7 @@
     },
     {
       "id": "tie-down",
-      "en": "tie-down (single binding point)",
+      "en": "tie-down",
       "term": "单独组织点",
       "aka": [
         "接结点"
@@ -438,7 +438,7 @@
     },
     {
       "id": "overlap",
-      "en": "overlap (warp knitting)",
+      "en": "overlap",
       "term": "针前垫纱",
       "aka": [
         "针前横移"
@@ -449,7 +449,7 @@
     },
     {
       "id": "underlap",
-      "en": "underlap (warp knitting)",
+      "en": "underlap",
       "term": "针背垫纱",
       "aka": [
         "针背横移",
@@ -529,7 +529,7 @@
     },
     {
       "id": "under-dyed",
-      "en": "under-dyed (middle of the yarn)",
+      "en": "under-dyed",
       "term": "未染透",
       "aka": [
         "透染不良"
@@ -564,7 +564,7 @@
     },
     {
       "id": "interwoven",
-      "en": "interwoven (two fibers, warp and weft)",
+      "en": "interwoven",
       "term": "交织",
       "aka": [
         "交织物"

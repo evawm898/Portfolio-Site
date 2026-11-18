@@ -1,6 +1,7 @@
 # Page translations
 
-**Status: tooling only. No locale is published and no page copy is translated.**
+**Status: zh-Hans is translated and marked published on the PR branch, for review. A Chinese reader has not
+checked the copy yet.**
 The term glossary is in [`docs/i18n/textile-glossary-zh.md`](../docs/i18n/textile-glossary-zh.md).
 
 ## How it works
@@ -19,7 +20,7 @@ strings live in `i18n/<locale>/<page>.json`, and a generator writes a static pag
 | Captions drawn by JavaScript | wrapped in `tr('…')` from `textile-i18n.js` |
 
 Generated pages go to `zh/textile-101.html`, `zh/dyeing.html` and `zh/glossary.html`, served as
-`/zh/textile-101`, `/zh/dyeing` and `/zh/glossary`. They are written only when the locale has `"published": true`.
+`/zh/textile-101`, `/zh/dyeing` and `/zh/glossary`. They are written only when the locale has `"published": true`, and are committed.
 
 ## Translating
 
@@ -77,13 +78,11 @@ node tools/i18n/fonts.mjs --check
 `fonts.mjs --build` needs `pip install fonttools brotli`. Font sources are npm packages pinned by
 version and integrity in `i18n/config.json`; they are cached in `tools/.cache/` and never committed.
 
-None of this runs in CI yet.
+None of this runs in CI yet. After any change to a page's copy, a strings file or the glossary, run
+`build.mjs --annotate`, `--extract`, `--build`, then `fonts.mjs --build`, and commit the results.
 
-## To publish zh-Hans (after the copy is translated)
+## What a published locale adds to the English pages
 
-1. Remove the `hold` list from `textile-101.html` in `i18n/config.json`, then `--annotate` and `--extract`.
-   Sections 02, 03 and 08 are on hold while they are rewritten.
-2. Wrap the labels drawn by `textile-101-figures.js` in `tr()` and list the file under the page's `js`.
-3. Fill the strings files. Set `"published": true`.
-4. `build.mjs --build`, `fonts.mjs --build`, commit `zh/` and `assets/fonts/zh-Hans/`.
-5. Add the `EN / 中文` link, the `hreflang` links and `textile-i18n.css` to the two English pages.
+Each English page carries three things per published locale, and `--check` fails if one is missing:
+the `hreflang` links in the head, the `EN / 中文` link in the top nav (marked `data-i18n-skip`), and a link to
+`textile-i18n.css`.

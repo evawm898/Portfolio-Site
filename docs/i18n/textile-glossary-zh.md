@@ -532,3 +532,25 @@ the entry on the generated glossary page (`i18n/zh-Hans/glossary.json` is the da
 5. **Reserve dyeing on polyester/nylon.** One trade source says the nylon cannot be left white in a
    nylon/polyester fabric, because disperse dye stains it. That bears on the Reserve toggle in the dyeing figure.
 6. **Clearing.** Nothing found states the process order for disperse plus acid dyes on polyester/nylon. Still open.
+
+### Rulings on the above (Eva, 2026-11-18)
+
+1. **Hemp:** 汉麻 stays, with 大麻 as the also-known-as.
+2. **Air-jet:** the English sentence now reads "Air-jet spinning (and its newer vortex form) … a parallel core held
+   together by wrapper fibers; vortex yarns have especially low hairiness." The glossary term is 喷气纺, with
+   喷气涡流纺 as the also-known-as. (The page spells "fibers" the American way throughout, so the fix does too.)
+3. **Reserve toggle:** the figure stays. The Reserve caption gained one sentence in both languages: in practice
+   disperse dye stains nylon slightly, so a true white reserve is easier on polyester/cotton. **Pending the reviewer.**
+4. **Network:** not opened. The evidence pass stands as it is; corrections come through the reviewer and the
+   feedback line on the pages.
+
+## 6. Translation status
+
+Both pages are translated into `i18n/zh-Hans/` (435 strings) using the glossary and the first-mention pattern.
+The Chinese was written in this session and **has not been read by a native speaker**. The 49 glossary
+descriptions are in the same state. Things a reader should look at first:
+
+- The site section name "Field Notes" is rendered 札记, and the page title "Textile 101" is 纺织基础.
+- "Yarn Characterization" (a page that is still English-only) is rendered 纱线规格与标示.
+- In the structural-variations list, glossary terms appear as linked terms and the rest as bold labels.
+- "Ends": the Chinese explains the English word's second sense in a bracket, since Chinese has no such clash.

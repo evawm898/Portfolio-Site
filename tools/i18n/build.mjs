@@ -27,6 +27,7 @@
 //   [[id]]  the FIRST mention on a page: the term, linked to its glossary entry, followed by
 //           （又称 X、Y；英文 term）
 //   {{id}}  every later mention: the recommended term alone
+//   [[id!]] a first mention repeated in copy that is shown INSTEAD of the first one (alternates of a picker)
 // so a correction made in glossary.json reaches every page on the next --build. The same file
 // generates <dir>/glossary.html and the "know a better term?" line in the footer.
 // A section listed in a page's `hold` is skipped whole (it is being rewritten elsewhere); --check
@@ -117,7 +118,7 @@ export function units(src, page) {
   walk(root, el => {
     if (el.name === '#root') return;
     if (hold.has(attr(el, 'id'))) { held.push(attr(el, 'id')); return false; }
-    if (el.name === 'script' || el.name === 'style') return false;
+    if (el.name === 'script' || el.name === 'style' || el.attrs.has('data-i18n-skip')) return false;
     const scope = scopeOf(el), auto = !!regionOf(el) , region = regionOf(el);
     for (const a of el.name === 'meta' && attr(el, 'name') === 'description' ? ['content'] : ATTRS) {
       const v = el.attrs.get(a); if (!v || !hasLetters(v.value)) continue;
@@ -162,7 +163,7 @@ export function annotate(src, page) {
 }
 
 // ---------------------------------------------------------------- strings a module draws
-const TR = /\btr\(\s*('(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*")/g;
+const TR = /\b(?:tr|msg)\(\s*('(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*")/g;
 export function jsStrings(page) {
   const out = [];
   for (const f of page.js || []) for (const m of read(f).matchAll(TR)) { const s = new Function(`return ${m[1]}`)(); if (!out.includes(s)) out.push(s); }
@@ -208,9 +209,10 @@ export const firstMention = (t, G, href = 'glossary.html') => {
 };
 // expand [[id]] and {{id}} in one string; `plain` (attributes, drawn captions) cannot hold a link
 export function expandTerms(text, G, seen, where, problems, plain = false) {
-  return text.replace(/\[\[([\w-]+)\]\]|\{\{([\w-]+)\}\}/g, (m, first, later) => {
+  return text.replace(/\[\[([\w-]+)(!?)\]\]|\{\{([\w-]+)\}\}/g, (m, first, again, later) => {
     const id = first || later, t = G?.terms.find(x => x.id === id);
     if (!t) { problems.push(`${where}: unknown glossary term ${m}`); return m; }
+    if (first && again && !plain) return firstMention(t, G);   // [[id!]]: an alternate shown INSTEAD of the first mention (a stage picker's copy)
     if (first && !plain) { if (seen.has(id)) problems.push(`${where}: [[${id}]] is a second first-mention on this page — use {{${id}}}`); seen.add(id); return firstMention(t, G); }
     if (first) problems.push(`${where}: [[${id}]] cannot be linked here (an attribute or a drawn caption) — use {{${id}}}`);
     return t.term;
@@ -275,7 +277,11 @@ export function buildPage(page, locale, L, table, G = null, problems = []) {
   const apply = (text, list) => { list.sort((x, y) => y.a - x.a || y.b - x.b); for (const e of list) text = text.slice(0, e.a) + e.text + text.slice(e.b); return text; };
   const src = apply(src0, strings), root = parse(src), edits = [];
   let nav = null, lastSheet = null, head = null, footer = null;
+  let toggle = null, hasAlt = false, hasCss = false;
   walk(root, el => {
+    if (classes(el).includes('site-nav__lang')) { toggle = el; return false; }
+    if (el.name === 'link' && attr(el, 'hreflang')) hasAlt = true;
+    if (el.name === 'link' && /(^|\/)textile-i18n\.css$/.test(attr(el, 'href') || '')) hasCss = true;
     if (el.name === 'html' && el.attrs.get('lang')) { const p = el.attrs.get('lang'); edits.push({ a: p.vs, b: p.ve, text: locale }); }
     if (el.name === 'head') head = el;
     if (el.name === 'footer') footer = el;
@@ -302,15 +308,20 @@ export function buildPage(page, locale, L, table, G = null, problems = []) {
   });
   if (!head || !nav || !lastSheet) throw new Error(`${page.src}: needs a <head>, a nav.site-nav and a local stylesheet`);
   const name = pageName(page), site = CONFIG.siteUrl.replace(/\/$/, '');
-  edits.push({ a: lastSheet.openEnd, b: lastSheet.openEnd, text: `\n<link rel="stylesheet" href="${up1}${CONFIG.fontsDir}/${locale}/fonts.css">\n<link rel="stylesheet" href="${up1}textile-i18n.css">` });
+  edits.push({ a: lastSheet.openEnd, b: lastSheet.openEnd, text: `\n<link rel="stylesheet" href="${up1}${CONFIG.fontsDir}/${locale}/fonts.css">${hasCss ? '' : `\n<link rel="stylesheet" href="${up1}textile-i18n.css">`}` });
   const js = Object.fromEntries(jsStrings(page).map(s => [s, expandTerms(t(`js:${s}`), G, seen, `${page.src} js:${s}`, problems, true)]).filter(([, v]) => v));
   if (G && footer) edits.push({ a: footer.closeStart, b: footer.closeStart, text: `  <p class="footer__terms">${feedback(G)} · <a href="glossary.html">${G.page.title}</a></p>\n` });
   edits.push({ a: head.closeStart, b: head.closeStart, text:
-    `<link rel="alternate" hreflang="en" href="${site}/${name}">\n<link rel="alternate" hreflang="${locale}" href="${site}/${L.dir}/${name}">\n<link rel="alternate" hreflang="x-default" href="${site}/${name}">\n`
+    (hasAlt ? '' : alternates(page, locale, L))
     + `<script type="application/json" id="i18n-strings">${JSON.stringify(js).replace(/</g, '\\u003c')}</script>\n` });
-  edits.push({ a: nav.closeStart, b: nav.closeStart, text: `  <span class="site-nav__lang"><a href="${up1}${page.src}" hreflang="en" lang="en">EN</a> / <span aria-current="true">${L.label}</span></span>\n` });
+  const tg = `<span class="site-nav__lang"><a href="${up1}${page.src}" hreflang="en" lang="en">EN</a> / <span aria-current="true">${L.label}</span></span>`;
+  edits.push(toggle ? { a: toggle.openStart, b: toggle.closeEnd, text: tg } : { a: nav.closeStart, b: nav.closeStart, text: `  ${tg}\n` });
   return apply(src, edits).replace(/(<!DOCTYPE html>\n?)/i, `$1<!-- GENERATED by tools/i18n/build.mjs from /${page.src} and /i18n/${locale}/. Do not edit: edit those, then rebuild. -->\n`);
 }
+// what an ENGLISH page carries once a locale is published: the alternates and the language link
+export const alternates = (page, locale, L) => { const site = CONFIG.siteUrl.replace(/\/$/, ''), name = pageName(page);
+  return `<link rel="alternate" hreflang="en" href="${site}/${name}">\n<link rel="alternate" hreflang="${locale}" href="${site}/${L.dir}/${name}">\n<link rel="alternate" hreflang="x-default" href="${site}/${name}">\n`; };
+export const englishToggle = (page, locale, L) => `<span class="site-nav__lang" data-i18n-skip><span aria-current="true">EN</span> / <a href="${L.dir}/${page.src}" hreflang="${locale}" lang="${locale}">${L.label}</a></span>`;
 const tableFor = (locale, page) => ({ ...loadStrings(locale, 'chrome').strings, ...loadStrings(locale, pageName(page)).strings });
 
 // ---------------------------------------------------------------- the commands
@@ -346,6 +357,9 @@ if (has('--annotate')) {
     if (s.done < s.total) bad.push(`${locale} is published with ${s.total - s.done} untranslated string(s)`);
     if (s.stale) bad.push(`${locale} is published with ${s.stale} stale string(s) (the English changed; re-check and remove "stale" and "was")`);
     const G = loadGlossary(locale);
+    for (const page of CONFIG.pages) { const en = read(page.src);
+      for (const [what, text] of [['the hreflang links', alternates(page, locale, L)], ['the language link', englishToggle(page, locale, L)], ['textile-i18n.css', '<link rel="stylesheet" href="textile-i18n.css">']])
+        if (!en.includes(text)) bad.push(`${page.src} lacks ${what} for ${locale}; it should contain:\n${text}`); }
     if (!problems.length) for (const page of CONFIG.pages) built[`${L.dir}/${page.src}`] = buildPage(page, locale, L, { ...JSON.parse(files[stringsPath(locale, 'chrome')]).strings, ...JSON.parse(files[stringsPath(locale, pageName(page))]).strings }, G, bad);
     if (G && !problems.length) built[`${L.dir}/glossary.html`] = buildGlossary(built[`${L.dir}/${CONFIG.pages[0].src}`], G);
   }
