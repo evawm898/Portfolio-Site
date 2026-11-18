@@ -1,0 +1,550 @@
+{
+  "locale": "zh-Hans",
+  "source": "dyeing.html",
+  "strings": {
+    "meta.title1": {
+      "en": "Dyeing — Field Notes — Eva Maskalenko",
+      "zh-Hans": ""
+    },
+    "meta.description1": {
+      "en": "Field Notes: Dyeing — where color enters the fiber-to-fabric chain, pigment vs. dye, why each fiber needs its own dye class, and cross dyeing two fibers in one bath. Animated.",
+      "zh-Hans": ""
+    },
+    "page.a1": {
+      "en": "← Field Notes",
+      "zh-Hans": ""
+    },
+    "page.div1": {
+      "en": "No. 08 / 09",
+      "zh-Hans": ""
+    },
+    "hero.span1": {
+      "en": "Field Notes",
+      "zh-Hans": ""
+    },
+    "hero.h11": {
+      "en": "Dyeing",
+      "zh-Hans": ""
+    },
+    "hero.p1": {
+      "en": "Color can go in at almost any point in the chain — into the polymer before there is a fiber, into loose fiber, into yarn, or into finished fabric. Where it goes in, and which dye is used, decides how the color behaves for the rest of the product’s life.",
+      "zh-Hans": ""
+    },
+    "hero.p2": {
+      "en": "The fiber decides the dye: each fiber only takes the dye chemistry that can get into it, or hold on to it. Builds on <a href=\"textile-101.html\">Textile 101</a>.",
+      "zh-Hans": ""
+    },
+    "hero.aria1": {
+      "en": "On this page",
+      "zh-Hans": ""
+    },
+    "hero.div1": {
+      "en": "On This Page",
+      "zh-Hans": ""
+    },
+    "hero.a1": {
+      "en": "<span class=\"n\">01</span>Where Color Enters",
+      "zh-Hans": ""
+    },
+    "hero.a2": {
+      "en": "<span class=\"n\">02</span>Inside, On, or Into",
+      "zh-Hans": ""
+    },
+    "hero.a3": {
+      "en": "<span class=\"n\">03</span>Why the Fiber Decides the Dye",
+      "zh-Hans": ""
+    },
+    "hero.a4": {
+      "en": "<span class=\"n\">04</span>One Bath, Two Dyes",
+      "zh-Hans": ""
+    },
+    "where-color-enters.h21": {
+      "en": "Where Color Enters",
+      "zh-Hans": ""
+    },
+    "where-color-enters.p1": {
+      "en": "Pick a stage and watch the dye go in there. Everything after it inherits the color; everything before it is still undyed.",
+      "zh-Hans": ""
+    },
+    "where-color-enters.p2": {
+      "en": "The trade is always the same: the earlier the color goes in, the deeper and steadier it is — and the earlier you have to commit to it.",
+      "zh-Hans": ""
+    },
+    "where-color-enters.aria1": {
+      "en": "Dye stage",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span1": {
+      "en": "Before the yarn",
+      "zh-Hans": ""
+    },
+    "where-color-enters.button1": {
+      "en": "Solution (dope)",
+      "zh-Hans": ""
+    },
+    "where-color-enters.button2": {
+      "en": "Fiber (stock)*",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span2": {
+      "en": "Yarn",
+      "zh-Hans": ""
+    },
+    "where-color-enters.button3": {
+      "en": "Skein",
+      "zh-Hans": ""
+    },
+    "where-color-enters.button4": {
+      "en": "Package",
+      "zh-Hans": ""
+    },
+    "where-color-enters.button5": {
+      "en": "Warp beam",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span3": {
+      "en": "Fabric",
+      "zh-Hans": ""
+    },
+    "where-color-enters.button6": {
+      "en": "Piece",
+      "zh-Hans": ""
+    },
+    "where-color-enters.aria2": {
+      "en": "Four panels left to right: polymer, fiber, yarn, fabric. Dye drops into the chosen stage; that stage and every stage after it turn the dye color, the ones before it stay white.",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span4": {
+      "en": "Polymer",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span5": {
+      "en": "Fiber",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span6": {
+      "en": "Yarn",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span7": {
+      "en": "Fabric",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span8": {
+      "en": "<b>Color goes in deeper and steadier</b> — less structure already built to distort",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span9": {
+      "en": "<b>Color decided later</b> — more flexibility, shorter lead time",
+      "zh-Hans": ""
+    },
+    "where-color-enters.p3": {
+      "en": "Pigment goes into the melted polymer before the fiber exists, so the color <em>is</em> the fiber. The most fade-resistant in sunlight, and there’s no dye bath, so no dye effluent. But the color is chosen before anything else is.",
+      "zh-Hans": ""
+    },
+    "where-color-enters.p4": {
+      "en": "Loose fiber is dyed before it’s spun into yarn, so the color runs all the way through every yarn made from it.<span class=\"note\">* Staple fibers only — the short kind (cotton, wool, cut polyester or nylon). A continuous filament can’t be dyed loose.</span>",
+      "zh-Hans": ""
+    },
+    "where-color-enters.p5": {
+      "en": "Yarn dyed in big, loose loops — relaxed, so it keeps its bulk and a soft hand. Dyed yarn is what makes stripes, checks and heathers possible.<span class=\"note\">If elastane is already in the yarn or fabric, the hot dye bath can cost it stretch. Color put in earlier, or into the polymer, avoids that.</span>",
+      "zh-Hans": ""
+    },
+    "where-color-enters.p6": {
+      "en": "Yarn wound tight on a perforated core, with the dye pumped through it under pressure. Dyed yarn is what makes stripes, checks and heathers possible.<span class=\"note\">If elastane is already in the yarn or fabric, the hot dye bath can cost it stretch. Color put in earlier, or into the polymer, avoids that.</span>",
+      "zh-Hans": ""
+    },
+    "where-color-enters.p7": {
+      "en": "A whole sheet of warp yarns, side by side under tension, dyed together on one beam — ready to weave.<span class=\"note\">If elastane is already in the yarn or fabric, the hot dye bath can cost it stretch. Color put in earlier, or into the polymer, avoids that.</span>",
+      "zh-Hans": ""
+    },
+    "where-color-enters.p8": {
+      "en": "The finished fabric is dyed. The color is decided last, with the shortest lead time — but everything is already built: in a tight fabric the dye may not reach the middle of every yarn.<span class=\"note\">If elastane is already in the fabric, the hot dye bath can cost it stretch. Garments can be dyed later still, after they’re sewn.</span>",
+      "zh-Hans": ""
+    },
+    "where-color-enters.div1": {
+      "en": "Three ways to dye yarn — three different states of the yarn",
+      "zh-Hans": ""
+    },
+    "where-color-enters.aria3": {
+      "en": "Loose loops of yarn hang from a rod; the dye bath rises around them and the loops take the color",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span10": {
+      "en": "Skein (hank)",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span11": {
+      "en": "Relaxed",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span12": {
+      "en": "Loose loops hang in the bath, so the yarn stays lofty and soft — but it has to be rewound before it can be used.",
+      "zh-Hans": ""
+    },
+    "where-color-enters.aria4": {
+      "en": "Cross-section of yarn wound in rings around a perforated core; dye is pumped out through the core, then back in, until every ring is colored",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span13": {
+      "en": "Package",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span14": {
+      "en": "Controlled compression",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span15": {
+      "en": "Wound to a set density on a perforated core; the dye is pumped through, inside out and then outside in.",
+      "zh-Hans": ""
+    },
+    "where-color-enters.aria5": {
+      "en": "Parallel yarns stretched between a bar and a perforated beam; dye rises up through all of them at once",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span16": {
+      "en": "Warp beam",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span17": {
+      "en": "Aligned under tension",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span18": {
+      "en": "The whole warp, side by side on one perforated beam, dyed in one go.",
+      "zh-Hans": ""
+    },
+    "where-color-enters.div2": {
+      "en": "How far the dye gets: one yarn, cut across",
+      "zh-Hans": ""
+    },
+    "where-color-enters.aria6": {
+      "en": "Cross-section of a round yarn made of many fibers; the color moves in from the outside until every fiber is colored",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span19": {
+      "en": "Dyed as yarn",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span20": {
+      "en": "The dye has room to reach every fiber, right to the middle.",
+      "zh-Hans": ""
+    },
+    "where-color-enters.aria7": {
+      "en": "Cross-section of a yarn squeezed flat by its neighbours in a fabric; the outer fibers take the color but the middle ones stay mostly undyed",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span21": {
+      "en": "Dyed as fabric",
+      "zh-Hans": ""
+    },
+    "where-color-enters.span22": {
+      "en": "Squeezed by its neighbours in a tight fabric, the yarn can take the color mostly at its surface and leave its middle under-dyed — called ring dyeing.",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.h21": {
+      "en": "Inside, On, or Into",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.p1": {
+      "en": "Pigment and dye are different things. Pigment is solid particles; it has no hold on a fiber of its own, so it’s either locked inside the polymer or glued onto the surface. Dye is molecules that go <em>into</em> the fiber.",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.aria1": {
+      "en": "Cross-section of a fiber; pigment particles are stirred into it while it is still melted, then it sets with particles all through it",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.span1": {
+      "en": "Solution-dyed",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.span2": {
+      "en": "Pigment inside",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.span3": {
+      "en": "Pigment mixed into the polymer before it’s spun. The color is part of the fiber.",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.aria2": {
+      "en": "Cross-section of a white fiber; pigment particles land on its top surface and a binder film coats over them; the inside stays white",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.span4": {
+      "en": "Pigment printed",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.span5": {
+      "en": "Pigment on the surface",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.span6": {
+      "en": "Particles held on by a binder. A stiff print can restrict stretch and crack; heavy pigment changes the hand, and it can rub off.",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.aria3": {
+      "en": "Cross-section of a fiber in a dye bath; small dye molecules move from the bath into the fiber and spread through it",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.span7": {
+      "en": "Dyed",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.span8": {
+      "en": "Dye into the fiber",
+      "zh-Hans": ""
+    },
+    "pigment-vs-dye.span9": {
+      "en": "Dye molecules go into the fiber — dissolved in it, or bonded to it, depending on the dye.",
+      "zh-Hans": ""
+    },
+    "dye-classes.h21": {
+      "en": "Why the Fiber Decides the Dye",
+      "zh-Hans": ""
+    },
+    "dye-classes.p1": {
+      "en": "Zoom into a fiber and it’s long chains of molecules. A dye only works on a fiber if it can get in among those chains and stay there — and each fiber offers a different way to hold on.",
+      "zh-Hans": ""
+    },
+    "dye-classes.p2": {
+      "en": "So each fiber has its dye class: disperse for polyester, acid for nylon, reactive for cotton.",
+      "zh-Hans": ""
+    },
+    "dye-classes.aria1": {
+      "en": "Polyester chains, packed tight; heat to 130 degrees loosens them, small round dye molecules slip in between, then the chains close and trap them",
+      "zh-Hans": ""
+    },
+    "dye-classes.span1": {
+      "en": "Disperse → polyester",
+      "zh-Hans": ""
+    },
+    "dye-classes.span2": {
+      "en": "Trapped",
+      "zh-Hans": ""
+    },
+    "dye-classes.span3": {
+      "en": "Polyester has nothing for a dye to grab. Hot and under pressure, its chains loosen; tiny dye molecules slip in and stay trapped when it cools.",
+      "zh-Hans": ""
+    },
+    "dye-classes.aria2": {
+      "en": "Nylon chains with a few sites; in an acid bath each site gains a plus sign; dye molecules marked minus move in and pair with the plus sites",
+      "zh-Hans": ""
+    },
+    "dye-classes.span4": {
+      "en": "Acid → nylon (and wool)",
+      "zh-Hans": ""
+    },
+    "dye-classes.span5": {
+      "en": "Ionic bond",
+      "zh-Hans": ""
+    },
+    "dye-classes.span6": {
+      "en": "In an acid bath the fiber’s sites pick up a + charge; the dye carries a &minus;, and they pair up. Nylon has only a few of these sites, wool many.",
+      "zh-Hans": ""
+    },
+    "dye-classes.aria3": {
+      "en": "Cotton chains; dye molecules settle onto them, then with alkali each forms a solid bond to the chain; dye that reacted with the water instead is washed away",
+      "zh-Hans": ""
+    },
+    "dye-classes.span7": {
+      "en": "Reactive → cotton",
+      "zh-Hans": ""
+    },
+    "dye-classes.span8": {
+      "en": "Covalent bond",
+      "zh-Hans": ""
+    },
+    "dye-classes.span9": {
+      "en": "With alkali, the dye bonds to the cotton itself. Some dye reacts with the water instead — it can’t bond, so it’s washed off.",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.h21": {
+      "en": "One Bath, Two Dyes — Cross Dyeing",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.p1": {
+      "en": "Because each dye only takes to its own fiber, a fabric woven from two fibers — here a polyester warp and a nylon weft — can go into one bath with two dyes and come out two colors. That’s cross dyeing.",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.p2": {
+      "en": "Choose the two dyes to match instead and the same bath gives one solid color: union dyeing.",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.aria1": {
+      "en": "Cross dyeing options",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.button1": {
+      "en": "Reserve: leave the acid dye out",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.button2": {
+      "en": "Reality: cross-staining",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.aria2": {
+      "en": "A swatch woven with a polyester warp and a nylon weft sits in a dye bath with round disperse dye molecules and diamond-shaped acid dye molecules; each kind moves to its own fiber, so the polyester turns one color and the nylon another",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.span1": {
+      "en": "<b>Disperse dye</b> → polyester, the warp: the smooth, straight filaments running up and down",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.span2": {
+      "en": "<b>Acid dye</b> → nylon, the weft: the crimped filaments running across",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.p3": {
+      "en": "<b>Reserve dyeing.</b> Leave one dye out and that fiber comes out undyed — a two-tone, or a heather if the two fibers are blended in the yarn instead.",
+      "zh-Hans": ""
+    },
+    "cross-dyeing.p4": {
+      "en": "<b>Polyester with cotton</b> is harder: disperse dye wants a hot, acidic bath and reactive dye an alkaline one. So the two usually run in the same bath as two steps, one after the other.",
+      "zh-Hans": ""
+    },
+    "page.a2": {
+      "en": "← Previous note",
+      "zh-Hans": ""
+    },
+    "page.a3": {
+      "en": "Back to Field Notes",
+      "zh-Hans": ""
+    },
+    "js:Polymer": {
+      "en": "Polymer",
+      "zh-Hans": ""
+    },
+    "js:Fiber": {
+      "en": "Fiber",
+      "zh-Hans": ""
+    },
+    "js:Yarn": {
+      "en": "Yarn",
+      "zh-Hans": ""
+    },
+    "js:Fabric": {
+      "en": "Fabric",
+      "zh-Hans": ""
+    },
+    "js:↓ dye here · ": {
+      "en": "↓ dye here · ",
+      "zh-Hans": ""
+    },
+    "js:pumped through: inside → out": {
+      "en": "pumped through: inside → out",
+      "zh-Hans": ""
+    },
+    "js:then outside → in": {
+      "en": "then outside → in",
+      "zh-Hans": ""
+    },
+    "js:every layer dyed, wound tight": {
+      "en": "every layer dyed, wound tight",
+      "zh-Hans": ""
+    },
+    "js:every end dyed together, side by side": {
+      "en": "every end dyed together, side by side",
+      "zh-Hans": ""
+    },
+    "js:pigment stirred into the melt": {
+      "en": "pigment stirred into the melt",
+      "zh-Hans": ""
+    },
+    "js:set as a fiber: pigment all through it": {
+      "en": "set as a fiber: pigment all through it",
+      "zh-Hans": ""
+    },
+    "js:binder": {
+      "en": "binder",
+      "zh-Hans": ""
+    },
+    "js:glued to the surface: the inside stays bare": {
+      "en": "glued to the surface: the inside stays bare",
+      "zh-Hans": ""
+    },
+    "js:pigment printed onto the surface": {
+      "en": "pigment printed onto the surface",
+      "zh-Hans": ""
+    },
+    "js:dye molecules in the bath": {
+      "en": "dye molecules in the bath",
+      "zh-Hans": ""
+    },
+    "js:taken into the fiber itself": {
+      "en": "taken into the fiber itself",
+      "zh-Hans": ""
+    },
+    "js:bath": {
+      "en": "bath",
+      "zh-Hans": ""
+    },
+    "js:fiber": {
+      "en": "fiber",
+      "zh-Hans": ""
+    },
+    "js:heating · {temp} °C": {
+      "en": "heating · {temp} °C",
+      "zh-Hans": ""
+    },
+    "js:130 °C, under pressure: the chains loosen": {
+      "en": "130 °C, under pressure: the chains loosen",
+      "zh-Hans": ""
+    },
+    "js:cooled: the dye is trapped, not bonded": {
+      "en": "cooled: the dye is trapped, not bonded",
+      "zh-Hans": ""
+    },
+    "js:acid bath: the fiber’s sites pick up a +": {
+      "en": "acid bath: the fiber’s sites pick up a +",
+      "zh-Hans": ""
+    },
+    "js:dye molecules carry a − ...": {
+      "en": "dye molecules carry a − ...",
+      "zh-Hans": ""
+    },
+    "js:... + meets −: an ionic bond": {
+      "en": "... + meets −: an ionic bond",
+      "zh-Hans": ""
+    },
+    "js:dye settles onto the cotton ...": {
+      "en": "dye settles onto the cotton ...",
+      "zh-Hans": ""
+    },
+    "js:add alkali: it bonds to the fiber (covalent)": {
+      "en": "add alkali: it bonds to the fiber (covalent)",
+      "zh-Hans": ""
+    },
+    "js:wash off the dye that reacted with water": {
+      "en": "wash off the dye that reacted with water",
+      "zh-Hans": ""
+    },
+    "js:what stays is bonded to the cotton": {
+      "en": "what stays is bonded to the cotton",
+      "zh-Hans": ""
+    },
+    "js:one bath, one dye: the acid dye is left out": {
+      "en": "one bath, one dye: the acid dye is left out",
+      "zh-Hans": ""
+    },
+    "js:one bath, two dyes": {
+      "en": "one bath, two dyes",
+      "zh-Hans": ""
+    },
+    "js:reduction clearing strips the stray dye off the nylon": {
+      "en": "reduction clearing strips the stray dye off the nylon",
+      "zh-Hans": ""
+    },
+    "js:some disperse dye lands on the nylon too": {
+      "en": "some disperse dye lands on the nylon too",
+      "zh-Hans": ""
+    },
+    "js:disperse dye finds the polyester; the nylon stays undyed": {
+      "en": "disperse dye finds the polyester; the nylon stays undyed",
+      "zh-Hans": ""
+    },
+    "js:each dye goes to its own fiber": {
+      "en": "each dye goes to its own fiber",
+      "zh-Hans": ""
+    }
+  }
+}

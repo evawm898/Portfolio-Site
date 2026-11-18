@@ -12993,3 +12993,13 @@ subset `suit.style2`, three presets (Flat/Paper/Thread) and a balanced default �
 file before v8 (and every new design) opens in Line, byte-identical to `7ae2ba4` (H41). Main elements carry `data-m`
 (H42 counts them). Charcoal paper is a sky preset with `background.grain`. Gate: `node tools/verify-hanabi.mjs`
 (H1–H46, B1–B15; `--negative-control` 137 mutants, `--mutant=a,b` a subset), not in CI.
+
+## Page translations (i18n) — tooling only, nothing published (pointer only)
+
+Read `i18n/README.md` before touching `data-i18n` keys, `i18n/`, `tools/i18n/`, `textile-i18n.js` or `textile-i18n.css`.
+The English page is the source; `tools/i18n/build.mjs` (`--annotate`, `--extract`, `--build`, `--check`, `--self-test`)
+writes static pages per locale from `i18n/<locale>/*.json`, and `tools/i18n/fonts.mjs` cuts self-hosted font subsets
+(npm sources pinned by integrity, cached in `tools/.cache/`). zh-Hans is NOT published: no `zh/` pages exist and no copy
+is translated (glossary: `docs/i18n/textile-glossary-zh.md`). Sections 02, 03 and 08 of `textile-101.html` are on `hold`
+in `i18n/config.json` and carry no keys until the overhaul merges. After editing either page's copy run `--annotate`
+then `--extract`. Captions a module draws go through `tr('English')`. Not in CI.

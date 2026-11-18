@@ -1,0 +1,738 @@
+{
+  "locale": "zh-Hans",
+  "source": "textile-101.html",
+  "strings": {
+    "meta.title1": {
+      "en": "Textile 101 — Field Notes — Eva Maskalenko",
+      "zh-Hans": ""
+    },
+    "meta.description1": {
+      "en": "Field Notes: Textile 101 — the fiber-to-yarn-to-fabric basics: natural, regenerated and synthetic fibers, fiber cross-sections, yarn construction, reading a yarn spec, wovens, knits, nonwovens, and plain, twill and satin weaves.",
+      "zh-Hans": ""
+    },
+    "page.a1": {
+      "en": "← Field Notes",
+      "zh-Hans": ""
+    },
+    "page.div1": {
+      "en": "BASICS",
+      "zh-Hans": ""
+    },
+    "hero.span1": {
+      "en": "Field Notes",
+      "zh-Hans": ""
+    },
+    "hero.h11": {
+      "en": "Textile 101",
+      "zh-Hans": ""
+    },
+    "hero.p1": {
+      "en": "The foundation for performance materials — fibers, yarns, and the structures they become. Everything here is groundwork for the rest of the field notes.",
+      "zh-Hans": ""
+    },
+    "hero.aria1": {
+      "en": "On this page",
+      "zh-Hans": ""
+    },
+    "hero.div1": {
+      "en": "On This Page",
+      "zh-Hans": ""
+    },
+    "hero.a1": {
+      "en": "<span class=\"n\">01</span>What Is a Textile?",
+      "zh-Hans": ""
+    },
+    "hero.a2": {
+      "en": "<span class=\"n\">02</span>Fibers: Natural &amp; Manufactured",
+      "zh-Hans": ""
+    },
+    "hero.a3": {
+      "en": "<span class=\"n\">03</span>Fiber Cross-Sections",
+      "zh-Hans": ""
+    },
+    "hero.a4": {
+      "en": "<span class=\"n\">04</span>Yarn Construction Types",
+      "zh-Hans": ""
+    },
+    "hero.a5": {
+      "en": "<span class=\"n\">05</span>Reading a Yarn Spec",
+      "zh-Hans": ""
+    },
+    "hero.a6": {
+      "en": "<span class=\"n\">06</span>Wovens, Knits &amp; Nonwovens",
+      "zh-Hans": ""
+    },
+    "hero.a7": {
+      "en": "<span class=\"n\">07</span>Wovens vs. Knits",
+      "zh-Hans": ""
+    },
+    "hero.a8": {
+      "en": "<span class=\"n\">08</span>Inside a Woven",
+      "zh-Hans": ""
+    },
+    "hero.a9": {
+      "en": "<span class=\"n\">09</span>Weft vs. Warp Knitting",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.h21": {
+      "en": "What Is a Textile?",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.p1": {
+      "en": "Every textile — no matter how technical — comes from the same three-step chain. A fiber gets twisted or spun into a yarn, and that yarn becomes a fabric: woven, braided, knit, or — skipping the yarn — bonded straight into a nonwoven.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.p2": {
+      "en": "Everything downstream — strength, stretch, moisture management, durability — traces back to choices made at each of these three steps.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.h31": {
+      "en": "Fiber",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.p3": {
+      "en": "the base ingredient: short, or endless",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria1": {
+      "en": "Short, crimped fibers with loose ends drift, then line up into an overlapping strand; one is teal",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span1": {
+      "en": "Staple",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span2": {
+      "en": "Short fibers with ends — cotton, wool, chopped polyester. Drafted into overlap, then twisted.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria2": {
+      "en": "One continuous strand comes out of a spinneret and runs on, in long loops, out of the picture",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span3": {
+      "en": "Filament",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span4": {
+      "en": "One continuous strand — silk from the worm, polyester and nylon from a spinneret. It has no ends.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.div1": {
+      "en": "spun, extruded, twisted, plied",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.h32": {
+      "en": "Yarn and cord",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.p4": {
+      "en": "fibers, made continuous and strong",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria3": {
+      "en": "The overlapping staple fibers twist tight into a yarn; fiber ends stick out of its surface",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span5": {
+      "en": "Spun staple",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span6": {
+      "en": "Staple fibers twisted together. The ends poke out — soft, fuzzy, matte.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria4": {
+      "en": "A single thick, smooth strand is extruded straight out of a spinneret",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span7": {
+      "en": "Monofilament",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span8": {
+      "en": "A single thick filament is the whole yarn — smooth, stiff, strong. Fishing line.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria5": {
+      "en": "A bundle of continuous filaments twists into a smooth yarn with no loose ends",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span9": {
+      "en": "Twisted filament",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span10": {
+      "en": "Many fine filaments, lightly twisted — smooth and lustrous, with no ends to fuzz.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria6": {
+      "en": "Two twisted yarns wind around each other the opposite way",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span11": {
+      "en": "Plied",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span12": {
+      "en": "Two or more yarns twisted together, the ply twist (S) opposite to the yarns’ own (Z).",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria7": {
+      "en": "Staple fibers wrap around a smooth core strand, which runs on bare past the end of the wrap",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span13": {
+      "en": "Corespun",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span14": {
+      "en": "A filament core — often spandex — wrapped in a sheath of staple fiber.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria8": {
+      "en": "Three strands plait over and under each other into one cord",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span15": {
+      "en": "Braided",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span16": {
+      "en": "Three or more strands interlaced into a cord — rope, shoelaces.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.div2": {
+      "en": "woven, braided, knit — or bonded, with no yarn at all",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.h33": {
+      "en": "Textile structure",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.p5": {
+      "en": "how the yarn becomes cloth",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria9": {
+      "en": "Crosswise yarns are laid one by one, over and under a set of lengthwise yarns",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span17": {
+      "en": "Woven",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span18": {
+      "en": "Two sets of yarns interlaced at right angles — strong, stable, structured.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria10": {
+      "en": "Two sets of diagonal yarns interlace, over two and under two, as the braid grows upward",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span19": {
+      "en": "Braid",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span20": {
+      "en": "Yarns interlaced on the diagonal — tubes, sleeves, straps.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria11": {
+      "en": "Loops of yarn form course by course into jersey knit",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span21": {
+      "en": "Knit",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span22": {
+      "en": "One system of yarn, interlooped — stretchy, soft, flexible.",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.aria12": {
+      "en": "Loose fibers settle into a web, are pressed flat, and are fused at bond points",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span23": {
+      "en": "Nonwoven",
+      "zh-Hans": ""
+    },
+    "what-is-a-textile.span24": {
+      "en": "Fibers bonded directly, no yarn at all — light, cheap, less durable.",
+      "zh-Hans": ""
+    },
+    "yarn-types.h21": {
+      "en": "Yarn Construction Types",
+      "zh-Hans": ""
+    },
+    "yarn-types.p1": {
+      "en": "Fibers become yarn in a handful of standard ways, and each one leaves a fingerprint on how the finished fabric feels and behaves.",
+      "zh-Hans": ""
+    },
+    "yarn-types.p2": {
+      "en": "The six common constructions — spun staple, monofilament, twisted filament, plied, corespun and braided — are drawn in the <a href=\"#what-is-a-textile\">yarn and cord row above</a>. Three more things a spec will tell you about them:",
+      "zh-Hans": ""
+    },
+    "yarn-types.span1": {
+      "en": "How a staple yarn was spun",
+      "zh-Hans": ""
+    },
+    "yarn-types.dd1": {
+      "en": "Ring spinning is the slowest and gives the strongest, hairiest, softest yarn. Rotor (open-end) spinning is faster and more even, with wrapper fibers around a twisted core. Air-jet spinning is faster again: a parallel core bound by wrapper fibers, with very low hairiness.",
+      "zh-Hans": ""
+    },
+    "yarn-types.span2": {
+      "en": "Flat or textured filament",
+      "zh-Hans": ""
+    },
+    "yarn-types.dd2": {
+      "en": "Filament straight off the spinneret is flat: smooth, lustrous, compact. Texturing adds crimp or loops so it has bulk, stretch and a softer hand — see FDY, DTY and ATY below.",
+      "zh-Hans": ""
+    },
+    "yarn-types.span3": {
+      "en": "Twist direction: S or Z",
+      "zh-Hans": ""
+    },
+    "yarn-types.dd3": {
+      "en": "Hold the yarn upright: if the fibers slope like the middle of a Z, it is Z twist; like the middle of an S, S twist. Plied yarns are usually plied in the opposite direction to their singles, so the two twists balance.",
+      "zh-Hans": ""
+    },
+    "yarn-spec.h21": {
+      "en": "Reading a Yarn Spec",
+      "zh-Hans": ""
+    },
+    "yarn-spec.p1": {
+      "en": "A yarn on a spec sheet is a short code: how heavy it is, how many filaments it holds, how many strands are combined, and how it was processed. Once you know the pattern, you can read a lot of the fabric’s behavior off the label.",
+      "zh-Hans": ""
+    },
+    "yarn-spec.dt1": {
+      "en": "<span class=\"accent\">Denier (D)</span> and <span class=\"accent\">decitex (dtex)</span>",
+      "zh-Hans": ""
+    },
+    "yarn-spec.dd1": {
+      "en": "Linear density: the weight of a fixed length of yarn. Denier is grams per 9,000&nbsp;m; decitex is grams per 10,000&nbsp;m (1 D = 1.11 dtex). A higher number is a heavier, thicker yarn.",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span1": {
+      "en": "Filament count (F)",
+      "zh-Hans": ""
+    },
+    "yarn-spec.dd2": {
+      "en": "How many individual filaments make up the yarn. Divide denier by filaments for <em>denier per filament</em> (dpf): the same 75 D yarn is crisper with 36 coarse filaments and softer with 144 fine ones.",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span2": {
+      "en": "Ply",
+      "zh-Hans": ""
+    },
+    "yarn-spec.dd3": {
+      "en": "The number of single yarns twisted together into one. Two plies of 75 D make a yarn of about 150 D.",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span3": {
+      "en": "Ends",
+      "zh-Hans": ""
+    },
+    "yarn-spec.dd4": {
+      "en": "The number of separate yarns fed side by side into one position — for example, two ends knitted as one. They run parallel and are not twisted together. Weaving uses the same word for something else: there, an “end” is one warp yarn.",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span4": {
+      "en": "Covered yarns",
+      "zh-Hans": ""
+    },
+    "yarn-spec.dd5": {
+      "en": "An elastane (spandex) core wrapped in another yarn, so the stretch is hidden and protected. The elastane is stretched — typically to 3–4 times its length — while it is covered, so it adds much less weight than its nominal denier suggests.",
+      "zh-Hans": ""
+    },
+    "yarn-spec.dt2": {
+      "en": "<span class=\"accent\">FDY</span>, <span class=\"accent\">DTY</span>, <span class=\"accent\">ATY</span>",
+      "zh-Hans": ""
+    },
+    "yarn-spec.dd6": {
+      "en": "FDY (fully drawn yarn) is flat filament: smooth and lustrous. DTY (draw-textured yarn) is twisted, heat-set and untwisted so every filament is crimped: bulky, soft and stretchy, the workhorse of knitted performance wear. ATY (air-textured yarn) is tangled into small loops by an air jet: matte and cotton-like, with little stretch.",
+      "zh-Hans": ""
+    },
+    "yarn-spec.div1": {
+      "en": "TRY IT — DECODE THREE SPECS",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span5": {
+      "en": "2/75/72 DTY polyester",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span6": {
+      "en": "PLIES",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span7": {
+      "en": "EACH PLY",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span8": {
+      "en": "75 D, 72 filaments",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span9": {
+      "en": "TOTAL",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span10": {
+      "en": "150 D, 144 filaments",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span11": {
+      "en": "PER FILAMENT",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span12": {
+      "en": "1.04 dpf — fine, soft",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span13": {
+      "en": "PROCESS",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span14": {
+      "en": "Draw-textured: crimped, stretchy",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span15": {
+      "en": "78dtex/68f × 2 textured nylon 6,6",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span16": {
+      "en": "UNIT",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span17": {
+      "en": "Decitex, not denier",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span18": {
+      "en": "EACH YARN",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span19": {
+      "en": "78 dtex (70 D), 68 filaments",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span20": {
+      "en": "COMBINED",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span21": {
+      "en": "× 2 → 156 dtex (140 D), 136 filaments",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span22": {
+      "en": "PER FILAMENT",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span23": {
+      "en": "1.15 dtex (1.03 dpf)",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span24": {
+      "en": "40D elastane, single-covered with 70D/68F nylon",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span25": {
+      "en": "CORE",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span26": {
+      "en": "40 D elastane",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span27": {
+      "en": "COVER",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span28": {
+      "en": "One wrap of 70 D / 68 F nylon",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span29": {
+      "en": "WEIGHT",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span30": {
+      "en": "Not 110 D: stretched 3× as it is covered, the core adds about 13 D → roughly 85 D in all",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span31": {
+      "en": "BEHAVIOR",
+      "zh-Hans": ""
+    },
+    "yarn-spec.span32": {
+      "en": "Stretch from the core; hand and dyeability from the nylon",
+      "zh-Hans": ""
+    },
+    "yarn-spec.p2": {
+      "en": "More notations, a count converter and a live decoder are in <a href=\"yarn-characterization.html\">Yarn Characterization</a>.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.h21": {
+      "en": "Wovens, Knits &amp; Nonwovens",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.p1": {
+      "en": "Nearly all fabric is made one of three ways: yarns interlaced, yarns interlooped, or fibers bonded directly with no yarn at all. Each gives a fundamentally different material. (Braids — yarns interlaced on the diagonal — are a fourth, smaller family, mostly cords, tubes and tapes.)",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.h31": {
+      "en": "Woven",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.p2": {
+      "en": "Two sets of yarns — warp and weft — interlaced at 90° on a loom. Strong and dimensionally stable along both yarn directions. Shirting, denim, outerwear shells, webbing, airbags.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.h32": {
+      "en": "Knit",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.p3": {
+      "en": "Yarn formed into rows of loops, each pulled through the one before. The loops can change shape, so the fabric stretches and recovers. T-shirts, leggings, sweaters, hosiery.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.h33": {
+      "en": "Nonwoven",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.p4": {
+      "en": "A web of fibers or filaments held together by entangling, heat or adhesive — no weaving or knitting, and usually no yarn. Fast and inexpensive to make; properties range from disposable wipes and filters to durable felts and geotextiles.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.summary1": {
+      "en": "GO DEEPER: STRUCTURAL VARIATIONS <span class=\"plus\">+</span>",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.p5": {
+      "en": "The families as they are usually charted for reinforcement and technical textiles, where extra straight (“laid-in”) yarns are added to carry load.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.h41": {
+      "en": "WOVEN STRUCTURES",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li1": {
+      "en": "<strong>Biaxial —</strong> the ordinary woven: yarns at 0° and 90°.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li2": {
+      "en": "<strong>High modulus —</strong> a biaxial weave built from stiff, high-modulus yarns such as glass, carbon or aramid.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li3": {
+      "en": "<strong>Multilayer —</strong> several woven layers bound together through the thickness.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li4": {
+      "en": "<strong>Triaxial —</strong> three yarn sets at 0°/+60°/&minus;60°, so strength is more even in every direction.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.h42": {
+      "en": "BRAIDED STRUCTURES",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li5": {
+      "en": "<strong>Tubular —</strong> diagonal interlacing that forms a seamless tube.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li6": {
+      "en": "<strong>Tubular, laid-in warp —</strong> a tube with straight lengthwise yarns added.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li7": {
+      "en": "<strong>Flat —</strong> the same interlacing in a flat strip: tapes and straps.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li8": {
+      "en": "<strong>Square —</strong> a dense braid with a square cross-section.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li9": {
+      "en": "<strong>3-D —</strong> interlaced through the thickness, into near-solid shapes.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.h43": {
+      "en": "KNITTED STRUCTURES",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li10": {
+      "en": "<strong>Weft knit —</strong> loops formed across the fabric; the stretchiest.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li11": {
+      "en": "<strong>Weft knit, laid-in —</strong> straight yarns laid in crosswise or lengthwise to limit stretch.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li12": {
+      "en": "<strong>Warp knit —</strong> loops formed along the fabric from many yarns; more stable.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li13": {
+      "en": "<strong>Weft-inserted warp knit —</strong> straight crosswise yarns held by warp-knit loops.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.h44": {
+      "en": "NONWOVEN / BONDED",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li14": {
+      "en": "<strong>Fiber mat —</strong> randomly laid fibers, bonded.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li15": {
+      "en": "<strong>Stitchbonded —</strong> a web or layers of yarn held by rows of stitching.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li16": {
+      "en": "<strong>Biaxial bonded —</strong> two straight yarn layers, bonded rather than interlaced.",
+      "zh-Hans": ""
+    },
+    "wovens-knits-nonwovens.li17": {
+      "en": "<strong>XYZ laid-in —</strong> straight yarns in three perpendicular directions.",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.h21": {
+      "en": "Wovens vs. Knits, Side by Side",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.p1": {
+      "en": "In a woven the yarns lie nearly straight, so the fabric can only stretch as far as the yarns do. In a knit the yarn runs in loops, and loops can change shape. Most of the differences follow from that.",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.h31": {
+      "en": "Wovens",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.li1": {
+      "en": "Yarns interlaced at right angles.",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.li2": {
+      "en": "Little stretch along warp or weft unless elastane is added; noticeably more on the bias (the diagonal).",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.li3": {
+      "en": "Crisper and more stable — holds a shape, takes a crease.",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.li4": {
+      "en": "Cut edges fray; a snag pulls one yarn.",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.h32": {
+      "en": "Knits",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.li5": {
+      "en": "Yarn formed into interlocking loops.",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.li6": {
+      "en": "Stretches because the loops deform — in weft knits, usually most across the width.",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.li7": {
+      "en": "Softer and more flexible — conforms to the body, resists wrinkles.",
+      "zh-Hans": ""
+    },
+    "wovens-vs-knits.li8": {
+      "en": "Weft knits can ladder from a broken loop, and plain jersey curls at cut edges.",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.h21": {
+      "en": "Weft vs. Warp Knitting",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.p1": {
+      "en": "Every knit fabric is loops — the question is which direction they're built in, and that single choice decides how the fabric stretches, unravels, and holds its shape.",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.p2": {
+      "en": "Two reference directions show up on every spec sheet: <strong style=\"color: var(--ink);\">wale</strong>, the vertical column a loop stack runs in, and <strong style=\"color: var(--ink);\">course</strong>, the horizontal row a single pass of yarn makes.",
+      "zh-Hans": ""
+    },
+    "knit-diagram.weft-knitting-one-yarn-forms-a-course-of-interlo": {
+      "en": "Weft knitting: one yarn forms a course of interlocking loops",
+      "zh-Hans": ""
+    },
+    "knit-diagram.wale": {
+      "en": "WALE ↑",
+      "zh-Hans": ""
+    },
+    "knit-diagram.course": {
+      "en": "COURSE →",
+      "zh-Hans": ""
+    },
+    "knit-diagram.weft-knitting": {
+      "en": "WEFT KNITTING",
+      "zh-Hans": ""
+    },
+    "knit-diagram.warp-knitting-each-yarn-laps-between-two-neighbo": {
+      "en": "Warp knitting: each yarn laps between two neighbouring wales",
+      "zh-Hans": ""
+    },
+    "knit-diagram.warp-knitting": {
+      "en": "WARP KNITTING",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.div1": {
+      "en": "In weft knits, <span class=\"accent\">one yarn</span> loops its way across an entire course, each new loop pulled up through the loop below it. In warp knits, <span class=\"accent\">each yarn</span> zigzags between two neighbouring wales — it is lapped around a needle to form a loop in one wale, then crosses to the next as an <em>underlap</em> — so the loops lock sideways as well as up the wale.",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.h31": {
+      "en": "Weft Knitting",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.li1": {
+      "en": "Yarn runs horizontally, forming loops side to side across the fabric.",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.li2": {
+      "en": "The default for apparel — t-shirts, sweaters, leggings.",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.li3": {
+      "en": "Naturally stretchy, especially widthwise.",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.li4": {
+      "en": "Can unravel or ladder easily if cut or snagged.",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.h32": {
+      "en": "Warp Knitting",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.li5": {
+      "en": "Yarns run lengthwise; each is lapped around a needle to make a loop, then crosses to a neighbouring column as an underlap.",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.li6": {
+      "en": "Made on dedicated warp knitting machines.",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.li7": {
+      "en": "More stable and less stretchy — better for technical or structured builds.",
+      "zh-Hans": ""
+    },
+    "weft-warp-knit.li8": {
+      "en": "Doesn't ladder or unravel as easily.",
+      "zh-Hans": ""
+    },
+    "page.a2": {
+      "en": "← Back to Field Notes",
+      "zh-Hans": ""
+    },
+    "page.a3": {
+      "en": "Next: Dyeing →",
+      "zh-Hans": ""
+    }
+  }
+}

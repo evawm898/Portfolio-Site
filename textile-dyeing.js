@@ -20,6 +20,7 @@
 // scrolled away mid-play it jumps to the end; hover / tap replays; a control (stage picker,
 // toggles) replays its scene with the new state; prefers-reduced-motion draws end frames only.
 import { DRAW, VIEW } from './textile-basics.js';
+import { tr } from './textile-i18n.js';
 import { dyedPiece, dyedWeave, yarnOn, glyph } from './textile-dyeing-draw.js';
 
 const { INK, BG, SW, SEED, TAU, rng, seg, ease, lerp, f1, poly, runsMarkup, makeFibre, posedPoints, lineSeg, arcSeg, centreline } = DRAW;
@@ -88,7 +89,7 @@ export const CHAIN_LAYOUT = {
     arrows: [{ x: 165, y: 88, ang: 0 }, { x: 304, y: 185, ang: Math.PI / 2 }, { x: 165, y: 282, ang: Math.PI }], labels: true,
   },
 };
-const PANEL_NAMES = ['Polymer', 'Fiber', 'Yarn', 'Fabric'];
+const PANEL_NAMES = [tr('Polymer'), tr('Fiber'), tr('Yarn'), tr('Fabric')];
 const shift = (L, i) => ({ dx: L.at[i].x - PANEL_X[i], dy: L.at[i].y - PANEL_Y });
 function chainPanels(stage, layout = 'row') {
   const L = CHAIN_LAYOUT[layout], parts = chainParts(stage);
@@ -163,7 +164,7 @@ const chainScene = {
     // the GRID layout carries its own labels (the ROW layout's are HTML, under the svg)
     if (L.labels) PANEL_NAMES.forEach((n, i) => {
       const P = L.at[i], entry = i === e;
-      dyn += text(P.x, P.y + 74 + 14, (entry ? '\u2193 dye here \u00b7 ' : '') + n.toUpperCase(), { anchor: 'middle', size: 10, fill: entry ? DYE.colour : DIM });
+      dyn += text(P.x, P.y + 74 + 14, (entry ? tr('↓ dye here · ') : '') + n.toUpperCase(), { anchor: 'middle', size: 10, fill: entry ? DYE.colour : DIM });
     });
     // the dye going in: drops falling into the entry panel (and, for solution dyeing, pigment into the melt)
     const { dx, dy } = shift(L, e), cx = PANEL_X[e] + dx, r = rng(SEED + 70 + e);
@@ -254,7 +255,7 @@ const packageScene = (() => {
         dyn += arrowHead(x + 1.5 * Math.cos(ang), y + 1.5 * Math.sin(ang), ang, 6, DYE.colour, o).replace('stroke-width="1.3"', 'stroke-width="2"');
         }
       }
-      dyn += text(160, 214, t < 0.53 ? 'pumped through: inside → out' : t < 0.92 ? 'then outside → in' : 'every layer dyed, wound tight', { anchor: 'middle' });
+      dyn += text(160, 214, t < 0.53 ? tr('pumped through: inside → out') : t < 0.92 ? tr('then outside → in') : tr('every layer dyed, wound tight'), { anchor: 'middle' });
       return { vars, dyn };
     },
   };
@@ -283,7 +284,7 @@ const beamScene = (() => {
         const ph = (seg(t, 0.06, 0.94) * 3 + r()) % 1, x = 50 + r() * 220, yy = lerp(BEAM + 2, Math.max(TOP, y - 6), ph);
         dyn += `<circle cx="${f1(x)}" cy="${f1(yy)}" r="1.8" fill="${DYE.colour}"${op(Math.sin(ph * Math.PI) * 0.9)}/>`;
       }
-      dyn += text(160, 214, 'every end dyed together, side by side', { anchor: 'middle' });
+      dyn += text(160, 214, tr('every end dyed together, side by side'), { anchor: 'middle' });
       return { vars: {}, dyn };
     },
   };
@@ -354,7 +355,7 @@ const solutionScene = (() => {
       });
       dyn += `<circle cx="${FIB.x}" cy="${FIB.y}" r="${FIB.r}" fill="none" stroke="${INK}" stroke-width="${SW}" stroke-dasharray="${f1(TAU * FIB.r * set)} 999" transform="rotate(-90 ${FIB.x} ${FIB.y})"/>`;
       if (set < 0.99) dyn += `<circle cx="${FIB.x}" cy="${FIB.y}" r="${FIB.r}" fill="none" stroke="${INK}" stroke-width="1" stroke-opacity="0.35" stroke-dasharray="2 4"/>`;
-      dyn += text(160, 212, set < 0.5 ? 'pigment stirred into the melt' : 'set as a fiber: pigment all through it', { anchor: 'middle' });
+      dyn += text(160, 212, set < 0.5 ? tr('pigment stirred into the melt') : tr('set as a fiber: pigment all through it'), { anchor: 'middle' });
       return { vars: {}, dyn };
     },
   };
@@ -382,8 +383,8 @@ const printedScene = (() => {
         const x = lerp(p.x0, end.x, smooth(u)), y = lerp(-10, end.y, u * u);
         if (u > 0) dyn += particle(x, y, 3.6, i * 1.7, DYE.colour);
       });
-      if (film > 0.6) dyn += text(FIB.x + 66, FIB.y - 68, 'binder', { op: Math.min(1, (film - 0.6) / 0.3).toFixed(2) });
-      dyn += text(160, 212, film > 0.3 ? 'glued to the surface: the inside stays bare' : 'pigment printed onto the surface', { anchor: 'middle' });
+      if (film > 0.6) dyn += text(FIB.x + 66, FIB.y - 68, tr('binder'), { op: Math.min(1, (film - 0.6) / 0.3).toFixed(2) });
+      dyn += text(160, 212, film > 0.3 ? tr('glued to the surface: the inside stays bare') : tr('pigment printed onto the surface'), { anchor: 'middle' });
       return { vars: {}, dyn };
     },
   };
@@ -403,7 +404,7 @@ const dyedScene = (() => {
         const q = arcPath(start, p, (p.rnd - 0.5) * 0.6, u);
         dyn += glyph('disperse', q.x, q.y, DYE.colour, 0.72);
       });
-      dyn += text(160, 212, t < 0.5 ? 'dye molecules in the bath' : 'taken into the fiber itself', { anchor: 'middle' });
+      dyn += text(160, 212, t < 0.5 ? tr('dye molecules in the bath') : tr('taken into the fiber itself'), { anchor: 'middle' });
       return { vars: {}, dyn };
     },
   };
@@ -420,7 +421,7 @@ function chainPath(j, s, ph = 0) {
 }
 const chainY = (j, x, s, ph = 0) => CH.mid + (j - (CH.n - 1) / 2) * CH.gap * s + 2.2 * Math.sin(x * 0.075 + j * 1.9 + ph);
 const surface = () => `<path d="M${CH.x0},${f1(CH.mid - CH.gap * 3.6)}H${CH.x1}" stroke="${LINE}" stroke-width="1" stroke-dasharray="3 3"/>`
-  + text(CH.x1, CH.mid - CH.gap * 3.6 - 5, 'bath', { anchor: 'end', size: 9 }) + text(CH.x1, CH.mid - CH.gap * 3.6 + 12, 'fiber', { anchor: 'end', size: 9 });
+  + text(CH.x1, CH.mid - CH.gap * 3.6 - 5, tr('bath'), { anchor: 'end', size: 9 }) + text(CH.x1, CH.mid - CH.gap * 3.6 + 12, tr('fiber'), { anchor: 'end', size: 9 });
 const chainsMarkup = (s, ph = 0, o = 0.6) => `<path d="${Array.from({ length: CH.n }, (_, j) => poly(chainPath(j, s, ph))).join('')}" stroke="${INK}" stroke-width="${SW}" stroke-opacity="${o}" fill="none"/>`;
 
 const disperseScene = (() => {
@@ -439,7 +440,7 @@ const disperseScene = (() => {
         dyn += glyph('disperse', q.x, q.y, DYE.disperse, 1);
       }
       const temp = Math.round(lerp(60, 130, smooth(seg(t, 0.06, 0.3))) - 70 * smooth(seg(t, 0.78, 0.94)));
-      const label = t < 0.3 ? `heating · ${temp} °C` : t < 0.78 ? '130 °C, under pressure: the chains loosen' : 'cooled: the dye is trapped, not bonded';
+      const label = t < 0.3 ? tr('heating · {temp} °C', { temp }) : t < 0.78 ? tr('130 °C, under pressure: the chains loosen') : tr('cooled: the dye is trapped, not bonded');
       dyn += text(CH.x0, 14, label, { fill: INK, size: 10 });
       return { vars: {}, dyn };
     },
@@ -471,7 +472,7 @@ const acidScene = (() => {
         if (u >= 1) dyn += `<path d="M${p.x + 3},${f1(p.y - 2.5)}L${f1(dock.x - 3)},${f1(dock.y + 2)}" stroke="${DYE.acid}" stroke-width="1.1" stroke-dasharray="1.6 1.6"/>`;
         dyn += glyph('acid', q.x, q.y, DYE.acid, 1.25);
       }
-      const label = t < 0.32 ? 'acid bath: the fiber’s sites pick up a +' : t < 0.8 ? 'dye molecules carry a − ...' : '... + meets −: an ionic bond';
+      const label = t < 0.32 ? tr('acid bath: the fiber’s sites pick up a +') : t < 0.8 ? tr('dye molecules carry a − ...') : tr('... + meets −: an ionic bond');
       dyn += text(CH.x0, 14, label, { fill: INK, size: 10 });
       return { vars: {}, dyn };
     },
@@ -508,7 +509,7 @@ const reactiveScene = (() => {
         dyn += glyph('reactive', h.x, y, DYE.reactive, 1.3).replace('/>', `${op(1 - 0.45 * hyd)}/>`);
         if (hyd > 0) dyn += `<circle cx="${h.x + 5}" cy="${f1(y + 3)}" r="1.9" fill="none" stroke="${DYE.reactive}" stroke-width="1"${op(hyd * (1 - 0.45 * hyd))}/>`;
       }
-      const label = t < 0.38 ? 'dye settles onto the cotton ...' : t < 0.66 ? 'add alkali: it bonds to the fiber (covalent)' : t < 0.95 ? 'wash off the dye that reacted with water' : 'what stays is bonded to the cotton';
+      const label = t < 0.38 ? tr('dye settles onto the cotton ...') : t < 0.66 ? tr('add alkali: it bonds to the fiber (covalent)') : t < 0.95 ? tr('wash off the dye that reacted with water') : tr('what stays is bonded to the cotton');
       dyn += text(CH.x0, 14, label, { fill: INK, size: 10 });
       return { vars: {}, dyn };
     },
@@ -577,10 +578,10 @@ const crossScene = {
         if (q.y > D_BATH.y - 20 && o > 0.02) dyn += glyph('disperse', q.x, q.y, DYE.crossPoly, 1.35).replace(/\/>/, `${op(o)}/>`);
       }
     }
-    const label = t < 0.12 ? (reserve ? 'one bath, one dye: the acid dye is left out' : 'one bath, two dyes')
-      : reality && t > T.clear0 ? 'a clearing rinse takes the stray dye back off the nylon'
-      : reality && t > 0.42 ? 'some disperse dye lands on the nylon too'
-      : reserve ? 'disperse dye finds the polyester; the nylon stays undyed' : 'each dye goes to its own fiber';
+    const label = t < 0.12 ? (reserve ? tr('one bath, one dye: the acid dye is left out') : tr('one bath, two dyes'))
+      : reality && t > T.clear0 ? tr('reduction clearing strips the stray dye off the nylon')
+      : reality && t > 0.42 ? tr('some disperse dye lands on the nylon too')
+      : reserve ? tr('disperse dye finds the polyester; the nylon stays undyed') : tr('each dye goes to its own fiber');
     dyn += text(D_BATH.x, 26, label, { fill: INK, size: 13 });
     return { vars, dyn };
   },

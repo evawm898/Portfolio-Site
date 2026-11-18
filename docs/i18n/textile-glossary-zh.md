@@ -10,6 +10,15 @@ inside the diagrams and the captions the animations write.
 - Section 1 lists only the 46 medium and low terms. A reviewer short on time can read that section alone.
 - Section 2 is the full list, grouped the way the pages are.
 
+## Decisions so far
+
+Eva decided six terms on 2026-11-18; they are marked **Decided** in the tables: hemp, air-jet spinning,
+ring dyeing, cross dyeing, polyester, polyamide (nylon). Everything else waits for the reviewer.
+
+The English copy was also changed where this glossary found one word doing two jobs ("lap", "ends",
+"blended", "clearing rinse"), so rows D-15, G-5, I-19 and I-22 now describe wording that has been made
+unambiguous in the source.
+
 ## How to review
 
 For each row, the reviewer either accepts the 标准中文 column or writes the term they would use.
@@ -38,7 +47,7 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | A-25 | core / sheath | 芯丝（芯纱）/ 外包纤维 | Medium | 皮芯 is used for bicomponent fibers; for yarn use 芯 / 外包. |
 | A-26 | braid / braided | 编织物 / 编织 | Medium | 编织 is also used loosely for weaving and knitting, so the first mention needs a gloss (斜向交织). |
 | A-32 | bonded (fibers) | 固结；粘合 | Medium | Nonwoven standard speaks of 纤网加固; 粘合 is narrower (adhesive/thermal). |
-| B-13 | hemp | 大麻 | Medium | Industry prefers 汉麻 to avoid the drug association. Reviewer to choose. |
+| B-13 | hemp | 汉麻 | Decided | Eva, Nov 18: use 汉麻. |
 | B-28 | cellulose ester (fiber) | 纤维素酯纤维 | Medium | Rare as a heading; some texts file acetate under 再生纤维 or 半合成纤维. |
 | B-42 | recycled (polymer / fiber) | 循环再利用（纤维） | Medium | TRAP: trade says 再生涤纶 for recycled polyester, but 再生纤维 also means regenerated. Section 02 has both ideas on one screen. |
 | B-43 | functionalized (fiber) | 功能性纤维 | Medium | 功能化 is the literal verb form; 功能性纤维 is the usual noun. |
@@ -48,7 +57,7 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | C-24 | wicking | 芯吸；导湿 | Medium | Marketing says 吸湿排汗; the physical effect is 芯吸. The page puts "wicking" in quotes on purpose. |
 | C-26 | fiberfill | 填充纤维 | Medium |  |
 | C-27 | cover (of a yarn) | 覆盖性 | Medium |  |
-| D-3 | air-jet spinning | 喷气纺 | Medium | The page's description (parallel core, wrapper fibers, very low hairiness) fits 喷气涡流纺 best. Reviewer to choose. |
+| D-3 | air-jet spinning | 喷气涡流纺 | Decided | Eva, Nov 18: use 喷气涡流纺. |
 | D-6 | flat (untextured) filament | 未变形长丝 | Low | I am not sure which trade word mills use for "flat yarn". Reviewer to supply. |
 | D-8 | spec sheet | 规格书 | Medium | Not a technical term; pick by audience. |
 | D-15 | ends (yarns fed together) | 并合根数 | Medium | English "ends" has two senses (this, and a warp yarn). Chinese uses different words, so the parenthetical in the copy must be rewritten, not translated. |
@@ -68,10 +77,10 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | F-21 | ripstop | 防撕裂布 | Medium |  |
 | G-5 | lap (warp knitting) | 延展线 | Medium | 延展线 = the yarn length between wales (underlap); 垫纱 = the lapping motion. The page uses "lap" for both. |
 | H-17 | heather | 混色效果 | Medium | No single word. 麻灰 / 花灰 are what merchandisers say, but they imply grey. |
-| H-18 | ring dyeing | 环染 | Low | The page uses it at YARN level (surface dyed, middle pale). In Chinese 环染 is mostly FIBER level; the yarn-level fault is usually called 白芯. Reviewer must decide. |
+| H-18 | ring dyeing | （描述）纱线表层着色、芯部发白，俗称“白芯” | Decided | Eva, Nov 18: describe it; do not use 环染. |
 | H-19 | under-dyed (middle of the yarn) | 染不透 | Medium | Positive form is 透染 / 匀透. |
 | I-6 | dye sites (in nylon, wool) | 染座 | Medium | 染座 is textbook; some reviewers find it old-fashioned. |
-| I-14 | cross dyeing | 异色染色 | Low | No settled term. Textbooks describe blend effects as 同色 / 留白 / 异色 (双色) / 闪色. 交叉染色 is a calque that some dictionaries list. |
+| I-14 | cross dyeing | （描述）异色（双色）效果 | Decided | Eva, Nov 18: describe the effect with an explanation; do not coin a term. |
 | I-15 | union dyeing | 同色染色 | Medium | Not 一浴法: that means "one bath", a different idea. |
 | I-16 | reserve dyeing | 留白染色 | Medium | 留白 is the working word; the -染色 suffix is my addition. |
 | I-18 | cross-staining | 沾色 | Medium | 沾色 is the standard word for staining of an adjacent fiber; "cross-" may not need its own word. |
@@ -155,7 +164,7 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | B-10 | cotton | 棉 | GB/T 11951 | 棉花 | High |  |
 | B-11 | seed hair (fiber) | 种子纤维 | GB/T 11951 | 种毛纤维 | High |  |
 | B-12 | flax / linen | 亚麻 | GB/T 11951 | — | High | One word covers both plant and cloth. |
-| B-13 | hemp | 大麻 | GB/T 11951 | 汉麻；工业大麻 | **Medium** | Industry prefers 汉麻 to avoid the drug association. Reviewer to choose. |
+| B-13 | hemp | 汉麻 | GB/T 11951 | 汉麻；工业大麻 | **Decided** | Eva, Nov 18: use 汉麻. |
 | B-14 | jute | 黄麻 | GB/T 11951 | — | High |  |
 | B-15 | sisal | 剑麻 | GB/T 11951 | 西沙尔麻 | High |  |
 | B-16 | stem (bast) fiber / leaf fiber | 韧皮纤维 / 叶纤维 | GB/T 11951 | — | High |  |
@@ -173,9 +182,9 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | B-28 | cellulose ester (fiber) | 纤维素酯纤维 | 《纺织材料学》 | — | **Medium** | Rare as a heading; some texts file acetate under 再生纤维 or 半合成纤维. |
 | B-29 | acetate | 醋酯纤维 | GB/T 4146.1-2020 | 醋酸纤维；二醋酯 | High |  |
 | B-30 | triacetate | 三醋酯纤维 | GB/T 4146.1-2020 | 三醋酸纤维 | High |  |
-| B-31 | polyester (fiber) | 聚酯纤维 | GB/T 4146.1-2020 | 涤纶 | High | 涤纶 is the everyday and trade name; suggest 聚酯纤维（涤纶） once, then 涤纶. |
+| B-31 | polyester (fiber) | 聚酯纤维（涤纶）, then 涤纶 | GB/T 4146.1-2020 | 涤纶 | **Decided** | Eva, Nov 18: full name once, then 涤纶. |
 | B-32 | PET | 聚对苯二甲酸乙二醇酯（PET） | GB/T 4146.1-2020 | — | High |  |
-| B-33 | polyamide (nylon) | 聚酰胺纤维 | GB/T 4146.1-2020 | 锦纶；尼龙 | High | 锦纶 is the PRC label name; 尼龙 is universal in speech. |
+| B-33 | polyamide (nylon) | 聚酰胺纤维（锦纶）, then 锦纶 | GB/T 4146.1-2020 | 锦纶；尼龙 | **Decided** | Eva, Nov 18: full name once, then 锦纶. |
 | B-34 | nylon 6 / nylon 6,6 | 锦纶6 / 锦纶66 | GB/T 4146.1-2020 | 尼龙6 / 尼龙66 | High |  |
 | B-35 | acrylic | 聚丙烯腈纤维 | GB/T 4146.1-2020 | 腈纶 | High |  |
 | B-36 | olefin (fiber) | 聚烯烃纤维 | GB/T 4146.1-2020 | — | High |  |
@@ -230,7 +239,7 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 |---|---|---|---|---|---|---|
 | D-1 | ring spinning | 环锭纺 | 《纺纱学》 | — | High |  |
 | D-2 | rotor (open-end) spinning | 转杯纺 | 《纺纱学》 | 气流纺；OE纺 | High | 气流纺 is the mill word; it must not be confused with air-jet (next row). |
-| D-3 | air-jet spinning | 喷气纺 | 《纺纱学》 | 喷气涡流纺；涡流纺（MVS） | **Medium** | The page's description (parallel core, wrapper fibers, very low hairiness) fits 喷气涡流纺 best. Reviewer to choose. |
+| D-3 | air-jet spinning | 喷气涡流纺 | 《纺纱学》 | 喷气涡流纺；涡流纺（MVS） | **Decided** | Eva, Nov 18: use 喷气涡流纺. |
 | D-4 | wrapper fibers | 包缠纤维 | 《纺纱学》 | — | High |  |
 | D-5 | hairiness | 毛羽 | 《纺纱学》 | — | High |  |
 | D-6 | flat (untextured) filament | 未变形长丝 | GB/T 4146.2 | 平丝；直丝 | **LOW** | I am not sure which trade word mills use for "flat yarn". Reviewer to supply. |
@@ -352,7 +361,7 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | H-15 | lead time | 交货期 | — | 交期 | High | Trade word, not technical. |
 | H-16 | stripes, checks | 条、格 | 《织物结构与设计》 | 色织条格 | High |  |
 | H-17 | heather | 混色效果 | — | 麻灰；花灰；夹花 | **Medium** | No single word. 麻灰 / 花灰 are what merchandisers say, but they imply grey. |
-| H-18 | ring dyeing | 环染 | 《染整工艺与原理》 | 白芯（mill word for an undyed yarn core） | **LOW** | The page uses it at YARN level (surface dyed, middle pale). In Chinese 环染 is mostly FIBER level; the yarn-level fault is usually called 白芯. Reviewer must decide. |
+| H-18 | ring dyeing | （描述）纱线表层着色、芯部发白，俗称“白芯” | 《染整工艺与原理》 | 白芯（mill word for an undyed yarn core） | **Decided** | Eva, Nov 18: describe it; do not use 环染. |
 | H-19 | under-dyed (middle of the yarn) | 染不透 | 《染整工艺与原理》 | 未透染 | **Medium** | Positive form is 透染 / 匀透. |
 | H-20 | fade resistance in sunlight | 耐光色牢度 | GB/T 8427、GB/T 3920、GB/T 251 | 日晒牢度 | High |  |
 | H-21 | rub off | 摩擦掉色 → 耐摩擦色牢度 | GB/T 8427、GB/T 3920、GB/T 251 | — | High |  |
@@ -376,7 +385,7 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | I-11 | wash off (unfixed dye) | 洗除浮色；皂洗 | 《染整工艺与原理》 | — | High |  |
 | I-12 | hot and under pressure (130 °C) | 高温高压染色 | 《染整工艺与原理》 | HT 染色 | High |  |
 | I-13 | acid bath | 酸性浴 | 《染整工艺与原理》 | — | High |  |
-| I-14 | cross dyeing | 异色染色 | 《染整工艺与原理》 | 交叉染色；双色染色 | **LOW** | No settled term. Textbooks describe blend effects as 同色 / 留白 / 异色 (双色) / 闪色. 交叉染色 is a calque that some dictionaries list. |
+| I-14 | cross dyeing | （描述）异色（双色）效果 | 《染整工艺与原理》 | 交叉染色；双色染色 | **Decided** | Eva, Nov 18: describe the effect with an explanation; do not coin a term. |
 | I-15 | union dyeing | 同色染色 | 《染整工艺与原理》 | 同色；匀染一色 | **Medium** | Not 一浴法: that means "one bath", a different idea. |
 | I-16 | reserve dyeing | 留白染色 | 《染整工艺与原理》 | 留白 | **Medium** | 留白 is the working word; the -染色 suffix is my addition. |
 | I-17 | two-tone | 双色效果 | 《染整工艺与原理》 | — | High |  |
