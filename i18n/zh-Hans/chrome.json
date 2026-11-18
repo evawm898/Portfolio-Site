@@ -1,0 +1,42 @@
+{
+  "locale": "zh-Hans",
+  "source": "shared site chrome",
+  "strings": {
+    "chrome.work": {
+      "en": "Work",
+      "zh-Hans": "作品"
+    },
+    "chrome.about": {
+      "en": "About",
+      "zh-Hans": "关于"
+    },
+    "chrome.field-notes": {
+      "en": "Field Notes",
+      "zh-Hans": "札记"
+    },
+    "chrome.contact": {
+      "en": "Contact",
+      "zh-Hans": "联系"
+    },
+    "chrome.ewmaskalenko-gmail-com": {
+      "en": "ewmaskalenko@gmail.com",
+      "zh-Hans": "ewmaskalenko@gmail.com"
+    },
+    "chrome.elsewhere": {
+      "en": "Elsewhere",
+      "zh-Hans": "其他平台"
+    },
+    "chrome.linkedin": {
+      "en": "LinkedIn",
+      "zh-Hans": "LinkedIn"
+    },
+    "chrome.2026-eva-maskalenko": {
+      "en": "© 2026 Eva Maskalenko",
+      "zh-Hans": "© 2026 Eva Maskalenko"
+    },
+    "chrome.top": {
+      "en": "<span class=\"back-to-top__arrow\">↑</span>Top",
+      "zh-Hans": "<span class=\"back-to-top__arrow\">↑</span>顶部"
+    }
+  }
+}

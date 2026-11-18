@@ -1,0 +1,110 @@
+{
+  "siteUrl": "https://eva-maskalenko.com",
+  "contactEmail": "ewmaskalenko@gmail.com",
+  "fontsDir": "assets/fonts",
+  "locales": {
+    "zh-Hans": {
+      "dir": "zh",
+      "label": "中文",
+      "published": true
+    }
+  },
+  "pages": [
+    {
+      "src": "textile-101.html",
+      "js": [
+        "textile-101-figures.js"
+      ]
+    },
+    {
+      "src": "dyeing.html",
+      "js": [
+        "textile-dyeing.js"
+      ]
+    }
+  ],
+  "autoRegions": [
+    {
+      "start": "<!-- knit-diagram:start",
+      "end": "<!-- knit-diagram:end -->",
+      "scope": "knit-diagram"
+    }
+  ],
+  "fonts": {
+    "cache": "tools/.cache/i18n-fonts",
+    "sources": [
+      {
+        "id": "noto-serif-sc",
+        "family": "Noto Serif SC",
+        "set": "cjk",
+        "license": "OFL-1.1",
+        "pkg": "@expo-google-fonts/noto-serif-sc@0.4.4",
+        "integrity": "sha512-RIPZykLmhdnqjaYuIVNA7btxvd8OwKNK1CSqLiszCOVJAIhkud9cSrOoecYiwU3HetKGaHEZWzD2jbWd43D6mA==",
+        "files": [
+          {
+            "weight": "500",
+            "path": "500Medium/NotoSerifSC_500Medium.ttf"
+          },
+          {
+            "weight": "600",
+            "path": "600SemiBold/NotoSerifSC_600SemiBold.ttf"
+          }
+        ]
+      },
+      {
+        "id": "ibm-plex-sans-sc",
+        "family": "IBM Plex Sans SC",
+        "set": "cjk",
+        "license": "OFL-1.1",
+        "pkg": "@ibm/plex-sans-sc@1.1.0",
+        "integrity": "sha512-IkhORwgw/CrsUss7uW9Rj6KKSsGQoIyIaNWjjju/7sV7SYS3yk0c/DgZN/leIG3Co5lN/X4Or/sQaL+SdvmSIg==",
+        "files": [
+          {
+            "weight": "400",
+            "path": "fonts/complete/woff2/hinted/IBMPlexSansSC-Regular.woff2"
+          },
+          {
+            "weight": "500",
+            "path": "fonts/complete/woff2/hinted/IBMPlexSansSC-Medium.woff2"
+          }
+        ]
+      },
+      {
+        "id": "fraunces",
+        "family": "Fraunces",
+        "set": "latin",
+        "license": "OFL-1.1",
+        "pkg": "@fontsource-variable/fraunces@5.3.0",
+        "integrity": "sha512-9BYGySn4AHEJdgp9Z28tQ3X+laJMEOITXkQarZXeloWQZDq5oOvXJ3kDA8c7MGIfpogIaZfjrQBqmda8POOCKA==",
+        "files": [
+          {
+            "weight": "100 900",
+            "path": "files/fraunces-latin-opsz-normal.woff2"
+          }
+        ]
+      },
+      {
+        "id": "ibm-plex-mono",
+        "family": "IBM Plex Mono",
+        "set": "latin",
+        "license": "OFL-1.1",
+        "pkg": "@ibm/plex-mono@2.5.0",
+        "integrity": "sha512-STBJIPxPomOYPmBMO7z5TKPJUotAF9u3gAUumTqVgwgrAO+K4FRNh0MlhsoJjKhJKsMbBJR10/bk4inkj/wc1w==",
+        "files": [
+          {
+            "weight": "400",
+            "path": "fonts/complete/woff2/IBMPlexMono-Regular.woff2"
+          },
+          {
+            "weight": "500",
+            "path": "fonts/complete/woff2/IBMPlexMono-Medium.woff2"
+          },
+          {
+            "weight": "700",
+            "path": "fonts/complete/woff2/IBMPlexMono-Bold.woff2"
+          }
+        ]
+      }
+    ]
+  }
+}

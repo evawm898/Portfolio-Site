@@ -12993,3 +12993,18 @@ subset `suit.style2`, three presets (Flat/Paper/Thread) and a balanced default �
 file before v8 (and every new design) opens in Line, byte-identical to `7ae2ba4` (H41). Main elements carry `data-m`
 (H42 counts them). Charcoal paper is a sky preset with `background.grain`. Gate: `node tools/verify-hanabi.mjs`
 (H1–H46, B1–B15; `--negative-control` 137 mutants, `--mutant=a,b` a subset), not in CI.
+
+## Page translations (i18n) — zh-Hans of Textile 101 and Dyeing (pointer only)
+
+Read `i18n/README.md` before touching `data-i18n` keys, `i18n/`, `tools/i18n/`, `textile-i18n.js` or `textile-i18n.css`.
+The English page is the source; `tools/i18n/build.mjs` (`--annotate`, `--extract`, `--build`, `--check`, `--self-test`)
+writes static pages per locale from `i18n/<locale>/*.json`, and `tools/i18n/fonts.mjs` cuts self-hosted font subsets
+(npm sources pinned by integrity, cached in `tools/.cache/`). zh-Hans is published: `zh/textile-101.html`, `zh/dyeing.html`,
+`zh/glossary.html` and `assets/fonts/zh-Hans/` are GENERATED and committed — never edit them by hand. The Chinese copy was
+written by a session and awaits a native reader (glossary: `docs/i18n/textile-glossary-zh.md`). After editing either page's
+copy run `--annotate`, `--extract`, translate the new or `stale` strings, then `--build` and `fonts.mjs --build`; `--check`
+must pass. Captions a module draws go through `tr('English')`. Not in CI.
+`i18n/zh-Hans/glossary.json` is the one owner of a term's Chinese wording: strings name a term as `[[id]]` (first mention,
+linked, with 又称 and the English) or `{{id}}` (later mentions), and the same file generates `zh/glossary.html` and the
+footer feedback line. The evidence behind each term, and its limits (search snippets only), is section 5 of the glossary
+doc and `docs/i18n/evidence/`.

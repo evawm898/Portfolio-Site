@@ -1,0 +1,60 @@
+/* textile-i18n.css — what a translated page needs on top of the site's own sheets.
+   Linked by the generated pages (tools/i18n/build.mjs), after the page's own CSS, and by an
+   English page once it carries the language link. Colours are the site tokens; nothing new. */
+
+/* The language link in the top nav: "EN / 中文", the current one not a link. */
+.site-nav__lang {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--ink-dim);
+  padding-bottom: 0.3rem;
+  white-space: nowrap;
+}
+.site-nav__lang a { color: var(--ink-dim); }
+.site-nav__lang a:hover { color: var(--ink); }
+.site-nav__lang [aria-current] { color: var(--ink); }
+
+/* A link that leaves the translation for an English-only page says so. */
+.lang-mark { font-family: var(--mono); font-size: 0.8em; letter-spacing: 0.06em; color: var(--ink-dim); white-space: nowrap; }
+
+/* ---- Simplified Chinese ----
+   The Latin faces stay first, so numerals, units and codes (75D/72F, dtex, FDY) keep the look of
+   the English page; Chinese falls through to the self-hosted subsets, then to the system fonts.
+   Headings: Noto Serif SC 500/600. Text and labels: IBM Plex Sans SC 400/500. */
+:root:lang(zh-Hans) {
+  --serif: "Fraunces", "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --mono: "IBM Plex Mono", "IBM Plex Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+/* Chinese has no capitals and no italic, and wide tracking pulls characters apart rather than
+   setting a label. :lang() follows the nearest lang attribute, so anything marked lang="en"
+   inside the page (the EN link, the (EN) marks) keeps the English treatment. */
+:lang(zh-Hans) {
+  text-transform: none !important;
+  font-style: normal !important;
+  letter-spacing: normal !important;
+  font-synthesis: none;
+}
+/* Emphasis that was italic: carried by weight instead. */
+:lang(zh-Hans) :is(em, i, cite) { font-weight: 500; }
+/* Chinese text reads better with a little more leading than the Latin setting. */
+:lang(zh-Hans) :is(p, li, dd, figcaption) { line-height: 1.85; }
+
+/* ---- Glossary terms ----
+   A first mention links to its glossary entry; the link is quiet (a dotted rule), not a nav link. */
+a.term { color: inherit; text-decoration: underline dotted; text-decoration-color: var(--ink-dim); text-underline-offset: 0.25em; }
+a.term:hover { text-decoration-color: var(--petrol-bright); }
+
+/* The footer line asking for better terms. */
+.footer__terms { margin: 2rem 0 0; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
+.footer__terms a { color: var(--ink); text-decoration: underline; text-underline-offset: 0.25em; }
+
+/* The glossary page: generated from i18n/<locale>/glossary.json. */
+.gl__list { margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 26rem), 1fr)); gap: 0 3rem; }
+.gl__term { padding: 1.25rem 0; border-top: 1px solid var(--line); scroll-margin-top: 2rem; }
+.gl__term:target dt { color: var(--petrol-bright); }
+.gl__term dt { font-family: var(--serif); font-weight: 500; font-size: 1.25rem; color: var(--ink); }
+.gl__term dd { margin: 0.4rem 0 0; color: var(--ink-dim); }
+.gl__term .gl__en { font-family: var(--mono); font-size: 12px; color: var(--ink); }
+.gl__k { color: var(--ink-dim); margin-left: 0.75em; }
+.gl__k:first-child { margin-left: 0; }

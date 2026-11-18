@@ -1,0 +1,1166 @@
+{
+  "locale": "zh-Hans",
+  "source": "textile-101.html",
+  "strings": {
+    "meta.title1": {
+      "en": "Textile 101 — Field Notes — Eva Maskalenko",
+      "zh-Hans": "纺织基础 — 札记 — Eva Maskalenko"
+    },
+    "meta.description1": {
+      "en": "Field Notes: Textile 101 — the fiber-to-yarn-to-fabric basics: natural, regenerated and synthetic fibers, fiber cross-sections, yarn construction, reading a yarn spec, wovens, knits, nonwovens, and plain, twill and satin weaves.",
+      "zh-Hans": "札记：纺织基础。从纤维到纱线再到面料的基本知识：天然纤维、再生纤维与合成纤维，纤维截面，纱线结构，怎样读纱线规格，机织物、针织物与非织造布，以及平纹、斜纹和缎纹。"
+    },
+    "page.a1": {
+      "en": "← Field Notes",
+      "zh-Hans": "← 札记"
+    },
+    "page.div1": {
+      "en": "BASICS",
+      "zh-Hans": "基础"
+    },
+    "hero.span1": {
+      "en": "Field Notes",
+      "zh-Hans": "札记"
+    },
+    "hero.h11": {
+      "en": "Textile 101",
+      "zh-Hans": "纺织基础"
+    },
+    "hero.p1": {
+      "en": "The foundation for performance materials — fibers, yarns, and the structures they become. Everything here is groundwork for the rest of the field notes.",
+      "zh-Hans": "功能性材料的基础：纤维、纱线，以及它们构成的各种结构。这里的内容是其余各篇札记的铺垫。"
+    },
+    "hero.aria1": {
+      "en": "On this page",
+      "zh-Hans": "本页目录"
+    },
+    "hero.div1": {
+      "en": "On This Page",
+      "zh-Hans": "本页目录"
+    },
+    "hero.a1": {
+      "en": "<span class=\"n\">01</span>What Is a Textile?",
+      "zh-Hans": "<span class=\"n\">01</span>什么是纺织品？"
+    },
+    "hero.a2": {
+      "en": "<span class=\"n\">02</span>Fibers: Natural &amp; Manufactured",
+      "zh-Hans": "<span class=\"n\">02</span>纤维：天然纤维与化学纤维"
+    },
+    "hero.a3": {
+      "en": "<span class=\"n\">03</span>Fiber Cross-Sections",
+      "zh-Hans": "<span class=\"n\">03</span>纤维截面"
+    },
+    "hero.a4": {
+      "en": "<span class=\"n\">04</span>Yarn Construction Types",
+      "zh-Hans": "<span class=\"n\">04</span>纱线的结构类型"
+    },
+    "hero.a5": {
+      "en": "<span class=\"n\">05</span>Reading a Yarn Spec",
+      "zh-Hans": "<span class=\"n\">05</span>怎样读纱线规格"
+    },
+    "hero.a6": {
+      "en": "<span class=\"n\">06</span>Wovens, Knits &amp; Nonwovens",
+      "zh-Hans": "<span class=\"n\">06</span>机织物、针织物与非织造布"
+    },
+    "hero.a7": {
+      "en": "<span class=\"n\">07</span>Wovens vs. Knits",
+      "zh-Hans": "<span class=\"n\">07</span>机织物与针织物对比"
+    },
+    "hero.a8": {
+      "en": "<span class=\"n\">08</span>Inside a Woven",
+      "zh-Hans": "<span class=\"n\">08</span>机织物的内部"
+    },
+    "hero.a9": {
+      "en": "<span class=\"n\">09</span>Weft vs. Warp Knitting",
+      "zh-Hans": "<span class=\"n\">09</span>纬编与经编"
+    },
+    "what-is-a-textile.h21": {
+      "en": "What Is a Textile?",
+      "zh-Hans": "什么是纺织品？"
+    },
+    "what-is-a-textile.p1": {
+      "en": "Every textile — no matter how technical — comes from the same three-step chain. A fiber gets twisted or spun into a yarn, and that yarn becomes a fabric: woven, braided, knit, or — skipping the yarn — bonded straight into a nonwoven.",
+      "zh-Hans": "任何纺织品，不管技术含量多高，都出自同一条三步的链条。纤维经加捻或纺纱成为纱线，纱线再成为织物：机织、编织、针织；或者跳过纱线这一步，把纤维直接加固成非织造布（无纺布）。"
+    },
+    "what-is-a-textile.p2": {
+      "en": "Everything downstream — strength, stretch, moisture management, durability — traces back to choices made at each of these three steps.",
+      "zh-Hans": "后面的一切性能，强度、弹性、湿气管理、耐用性，都可以追溯到这三步中每一步所做的选择。"
+    },
+    "what-is-a-textile.h31": {
+      "en": "Fiber",
+      "zh-Hans": "纤维"
+    },
+    "what-is-a-textile.p3": {
+      "en": "the base ingredient: short, or endless",
+      "zh-Hans": "最基本的原料：短的，或无限长的"
+    },
+    "what-is-a-textile.aria1": {
+      "en": "Short, crimped fibers with loose ends drift, then line up into an overlapping strand; one is teal",
+      "zh-Hans": "带卷曲、两端松散的短纤维飘动着，随后排成相互搭接的一束；其中一根是青色的"
+    },
+    "what-is-a-textile.span1": {
+      "en": "Staple",
+      "zh-Hans": "短纤维"
+    },
+    "what-is-a-textile.span2": {
+      "en": "Short fibers with ends — cotton, wool, chopped polyester. Drafted into overlap, then twisted.",
+      "zh-Hans": "有头有尾的短纤维：棉、羊毛、切断的聚酯纤维（涤纶）。先牵伸成相互搭接的须条，再加捻。"
+    },
+    "what-is-a-textile.aria2": {
+      "en": "One continuous strand comes out of a spinneret and runs on, in long loops, out of the picture",
+      "zh-Hans": "一根连续的丝从喷丝板中出来，绕着长长的圈一直延伸到画面之外"
+    },
+    "what-is-a-textile.span3": {
+      "en": "Filament",
+      "zh-Hans": "长丝"
+    },
+    "what-is-a-textile.span4": {
+      "en": "One continuous strand — silk from the worm, polyester and nylon from a spinneret. It has no ends.",
+      "zh-Hans": "一根连续不断的丝：蚕吐出的蚕丝，或[[extrude]]的涤纶和聚酰胺纤维（锦纶）。它没有端头。"
+    },
+    "what-is-a-textile.div1": {
+      "en": "spun, extruded, twisted, plied",
+      "zh-Hans": "纺纱、挤出、加捻、合股"
+    },
+    "what-is-a-textile.h32": {
+      "en": "Yarn and cord",
+      "zh-Hans": "纱线与绳"
+    },
+    "what-is-a-textile.p4": {
+      "en": "fibers, made continuous and strong",
+      "zh-Hans": "让纤维变得连续而结实"
+    },
+    "what-is-a-textile.aria3": {
+      "en": "The overlapping staple fibers twist tight into a yarn; fiber ends stick out of its surface",
+      "zh-Hans": "相互搭接的短纤维被紧紧捻成一根纱；纤维的端头从纱的表面伸出"
+    },
+    "what-is-a-textile.span5": {
+      "en": "Spun staple",
+      "zh-Hans": "短纤纱"
+    },
+    "what-is-a-textile.span6": {
+      "en": "Staple fibers twisted together. The ends poke out — soft, fuzzy, matte.",
+      "zh-Hans": "短纤维加捻在一起。纤维端头露在外面，所以柔软、有毛感、无光泽。"
+    },
+    "what-is-a-textile.aria4": {
+      "en": "A single thick, smooth strand is extruded straight out of a spinneret",
+      "zh-Hans": "一根粗而光滑的单丝从喷丝板中直接挤出"
+    },
+    "what-is-a-textile.span7": {
+      "en": "Monofilament",
+      "zh-Hans": "单丝"
+    },
+    "what-is-a-textile.span8": {
+      "en": "A single thick filament is the whole yarn — smooth, stiff, strong. Fishing line.",
+      "zh-Hans": "一根粗长丝就是整根纱：光滑、硬挺、结实。例如钓鱼线。"
+    },
+    "what-is-a-textile.aria5": {
+      "en": "A bundle of continuous filaments twists into a smooth yarn with no loose ends",
+      "zh-Hans": "一束连续的长丝捻成一根光滑的纱，没有松散的端头"
+    },
+    "what-is-a-textile.span9": {
+      "en": "Twisted filament",
+      "zh-Hans": "{{twisted-filament}}"
+    },
+    "what-is-a-textile.span10": {
+      "en": "Many fine filaments, lightly twisted — smooth and lustrous, with no ends to fuzz.",
+      "zh-Hans": "[[twisted-filament]]：许多根细长丝轻轻加捻而成，光滑而有光泽，没有会起毛的端头。"
+    },
+    "what-is-a-textile.aria6": {
+      "en": "Two twisted yarns wind around each other the opposite way",
+      "zh-Hans": "两根加了捻的纱以相反的方向相互缠绕"
+    },
+    "what-is-a-textile.span11": {
+      "en": "Plied",
+      "zh-Hans": "股线"
+    },
+    "what-is-a-textile.span12": {
+      "en": "Two or more yarns twisted together, the ply twist (S) opposite to the yarns’ own (Z).",
+      "zh-Hans": "两根或更多根纱捻合在一起，合股的捻向（S）与单纱本身的捻向（Z）相反。"
+    },
+    "what-is-a-textile.aria7": {
+      "en": "Staple fibers wrap around a smooth core strand, which runs on bare past the end of the wrap",
+      "zh-Hans": "短纤维包缠在一根光滑的芯丝外面，芯丝在包缠结束处裸露着继续延伸"
+    },
+    "what-is-a-textile.span13": {
+      "en": "Corespun",
+      "zh-Hans": "包芯纱"
+    },
+    "what-is-a-textile.span14": {
+      "en": "A filament core — often spandex — wrapped in a sheath of staple fiber.",
+      "zh-Hans": "中间是一根长丝（常用氨纶），外面包着一层短纤维。[[core-sheath]]：中间的长丝叫芯丝，外面的短纤维叫外包纤维。"
+    },
+    "what-is-a-textile.aria8": {
+      "en": "Three strands plait over and under each other into one cord",
+      "zh-Hans": "三股纱线上下交替相互编结，成为一根绳"
+    },
+    "what-is-a-textile.span15": {
+      "en": "Braided",
+      "zh-Hans": "编织绳"
+    },
+    "what-is-a-textile.span16": {
+      "en": "Three or more strands interlaced into a cord — rope, shoelaces.",
+      "zh-Hans": "三股或更多股纱线相互交叉编成的[[cord]]，例如绳索、鞋带。"
+    },
+    "what-is-a-textile.div2": {
+      "en": "woven, braided, knit — or bonded, with no yarn at all",
+      "zh-Hans": "机织、编织、针织；或者不经过纱线，直接加固"
+    },
+    "what-is-a-textile.h33": {
+      "en": "Textile structure",
+      "zh-Hans": "织物结构"
+    },
+    "what-is-a-textile.p5": {
+      "en": "how the yarn becomes cloth",
+      "zh-Hans": "纱线怎样变成布"
+    },
+    "what-is-a-textile.aria9": {
+      "en": "Crosswise yarns are laid one by one, over and under a set of lengthwise yarns",
+      "zh-Hans": "横向的纱线一根根织入，在一组纵向纱线的上下交替穿过"
+    },
+    "what-is-a-textile.span17": {
+      "en": "Woven",
+      "zh-Hans": "机织物"
+    },
+    "what-is-a-textile.span18": {
+      "en": "Two sets of yarns interlaced at right angles — strong, stable, structured.",
+      "zh-Hans": "两组纱线成直角相互交织：结实、稳定、挺括。"
+    },
+    "what-is-a-textile.aria10": {
+      "en": "Two sets of diagonal yarns interlace, over two and under two, as the braid grows upward",
+      "zh-Hans": "两组斜向的纱线以“二上二下”的规律相互交织，编织物向上延伸"
+    },
+    "what-is-a-textile.span19": {
+      "en": "Braid",
+      "zh-Hans": "编织物"
+    },
+    "what-is-a-textile.span20": {
+      "en": "Yarns interlaced on the diagonal — tubes, sleeves, straps.",
+      "zh-Hans": "[[braid]]：纱线沿斜向相互交叉，常见于管、套、带。"
+    },
+    "what-is-a-textile.aria11": {
+      "en": "Loops of yarn form course by course into jersey knit",
+      "zh-Hans": "纱线一个横列接一个横列地形成线圈，织成纬平针织物"
+    },
+    "what-is-a-textile.span21": {
+      "en": "Knit",
+      "zh-Hans": "针织物"
+    },
+    "what-is-a-textile.span22": {
+      "en": "One system of yarn, interlooped — stretchy, soft, flexible.",
+      "zh-Hans": "一个系统的纱线相互串套成线圈：有弹性、柔软、易弯曲。"
+    },
+    "what-is-a-textile.aria12": {
+      "en": "Loose fibers settle into a web, are pressed flat, and are fused at bond points",
+      "zh-Hans": "松散的纤维落成纤网，被压平，并在粘合点处熔合"
+    },
+    "what-is-a-textile.span23": {
+      "en": "Nonwoven",
+      "zh-Hans": "非织造布"
+    },
+    "what-is-a-textile.span24": {
+      "en": "Fibers bonded directly, no yarn at all — light, cheap, less durable.",
+      "zh-Hans": "纤维不经过纱线、直接固定成布，这一步叫[[bonded]]。轻、便宜，耐用性较差。"
+    },
+    "fibers.h21": {
+      "en": "Fibers: Natural &amp; Manufactured",
+      "zh-Hans": "纤维：天然纤维与化学纤维"
+    },
+    "fibers.p1": {
+      "en": "Fibers are the smallest unit in any textile. Most of what a fabric can do — how strong it is, how it handles water, what heat does to it — it inherits from the fiber, and the fiber inherits it from its polymer.",
+      "zh-Hans": "纤维是任何纺织品中最小的单元。一块面料能做到什么，它有多结实，遇水怎样，受热怎样，大部分来自纤维；而纤维的这些性质又来自它的聚合物。"
+    },
+    "fibers.p2": {
+      "en": "“Natural vs. synthetic” is one class short. Viscose, modal and lyocell are <em>manufactured</em>, but from a natural polymer: wood-pulp cellulose, dissolved and extruded. They behave like cotton’s relatives, not like polyester’s. So there are three classes, sorted by where the polymer comes from.",
+      "zh-Hans": "“天然纤维和合成纤维”这种分法少了一类。粘胶纤维、莫代尔纤维和莱赛尔纤维是<em>人工制造</em>的，但用的是天然聚合物：把木浆中的纤维素溶解后再挤出成丝。它们的性能像棉的近亲，而不像涤纶的近亲。所以一共有三类，按聚合物的来源划分。"
+    },
+    "fibers.p3": {
+      "en": "The other split — short staple fibers or endless filaments — is drawn in the <a href=\"#what-is-a-textile\">fiber row above</a>.",
+      "zh-Hans": "另一种分法，短纤维还是无限长的长丝，画在<a href=\"#what-is-a-textile\">上面的“纤维”一行</a>里。"
+    },
+    "fibers.h31": {
+      "en": "Natural",
+      "zh-Hans": "天然纤维"
+    },
+    "fibers.p4": {
+      "en": "Grown or mined as a fiber. Harvested, cleaned, spun.",
+      "zh-Hans": "以纤维的形态生长或开采出来。收获、清理、纺纱。"
+    },
+    "fibers.dt1": {
+      "en": "Cellulosic — plant",
+      "zh-Hans": "纤维素纤维：来自植物"
+    },
+    "fibers.dd1": {
+      "en": "Cotton (seed hair) · flax/linen, hemp, jute (stem) · sisal (leaf)",
+      "zh-Hans": "棉（种子纤维）· 亚麻、[[hemp]]、黄麻（韧皮纤维）· 剑麻（叶纤维）"
+    },
+    "fibers.dt2": {
+      "en": "Protein — animal",
+      "zh-Hans": "蛋白质纤维：来自动物"
+    },
+    "fibers.dd2": {
+      "en": "Wool and other hair (keratin) · silk (fibroin)",
+      "zh-Hans": "羊毛及其他动物毛（角蛋白）· 蚕丝（丝素）"
+    },
+    "fibers.dt3": {
+      "en": "Mineral",
+      "zh-Hans": "矿物纤维"
+    },
+    "fibers.dd3": {
+      "en": "Asbestos — the main natural mineral fiber, no longer used in textiles",
+      "zh-Hans": "石棉：最主要的天然矿物纤维，现已不再用于纺织品"
+    },
+    "fibers.h32": {
+      "en": "Manufactured — from natural polymers",
+      "zh-Hans": "化学纤维：以天然聚合物为原料"
+    },
+    "fibers.p5": {
+      "en": "A natural polymer, usually wood-pulp cellulose, dissolved and extruded through a spinneret.",
+      "zh-Hans": "把天然聚合物（通常是木浆纤维素）溶解，再经喷丝板挤出。"
+    },
+    "fibers.dt4": {
+      "en": "Regenerated cellulose",
+      "zh-Hans": "再生纤维素纤维"
+    },
+    "fibers.dd4": {
+      "en": "Viscose (rayon) · modal · lyocell · cupro. Chemically still cellulose, like cotton.",
+      "zh-Hans": "粘胶纤维（人造丝）· 莫代尔纤维 · 莱赛尔纤维 · 铜氨纤维。化学成分仍是纤维素，和棉一样。"
+    },
+    "fibers.dt5": {
+      "en": "Cellulose esters",
+      "zh-Hans": "{{cellulose-ester}}"
+    },
+    "fibers.dd5": {
+      "en": "Acetate · triacetate. Cellulose that has been chemically modified, so it behaves differently: it absorbs less water, and it melts.",
+      "zh-Hans": "醋酯纤维 · 三醋酯纤维。[[cellulose-ester]]：纤维素经过了化学改性，所以性能不同，吸水更少，而且会熔融。"
+    },
+    "fibers.h33": {
+      "en": "Manufactured — synthetic",
+      "zh-Hans": "化学纤维：合成纤维"
+    },
+    "fibers.p6": {
+      "en": "The polymer itself is synthesized from small molecules, then extruded.",
+      "zh-Hans": "聚合物本身由小分子合成，再挤出成丝。"
+    },
+    "fibers.dt6": {
+      "en": "Polyester",
+      "zh-Hans": "聚酯纤维（涤纶）"
+    },
+    "fibers.dd6": {
+      "en": "Mostly PET",
+      "zh-Hans": "主要是 PET（聚对苯二甲酸乙二醇酯）"
+    },
+    "fibers.dt7": {
+      "en": "Polyamide (nylon)",
+      "zh-Hans": "聚酰胺纤维（锦纶）"
+    },
+    "fibers.dd7": {
+      "en": "Nylon 6 · nylon 6,6",
+      "zh-Hans": "锦纶6 · 锦纶66"
+    },
+    "fibers.dt8": {
+      "en": "Others",
+      "zh-Hans": "其他"
+    },
+    "fibers.dd8": {
+      "en": "Acrylic · elastane (spandex) · olefin (polypropylene, polyethylene)",
+      "zh-Hans": "聚丙烯腈纤维（腈纶）· 氨纶 · 聚烯烃纤维（聚丙烯纤维即丙纶、聚乙烯纤维即乙纶）"
+    },
+    "fibers.aria1": {
+      "en": "Bar chart of moisture regain at 65 percent relative humidity. Natural: wool 14 to 18 percent, silk 10 to 11, cotton 7 to 8. Manufactured cellulosic: viscose 12 to 14, lyocell 11 to 13, acetate about 6.5. Synthetic: nylon 6,6 about 4, acrylic 1 to 2, polyester 0.4, polypropylene about 0.",
+      "zh-Hans": "相对湿度 65% 时回潮率的条形图。天然纤维：羊毛 14% 至 18%，蚕丝 10% 至 11%，棉 7% 至 8%。化学纤维（纤维素类）：粘胶纤维 12% 至 14%，莱赛尔纤维 11% 至 13%，醋酯纤维约 6.5%。合成纤维：锦纶66 约 4%，腈纶 1% 至 2%，涤纶 0.4%，丙纶约为 0。"
+    },
+    "fibers.span1": {
+      "en": "Moisture regain",
+      "zh-Hans": "回潮率"
+    },
+    "fibers.span2": {
+      "en": "Water a dry fiber takes up from ordinary air (65% relative humidity, about 20&nbsp;°C), as a share of its dry weight. Typical measured ranges; the bar is the middle of the range.",
+      "zh-Hans": "干燥的纤维从普通空气中（相对湿度 65%，约 20&nbsp;°C）吸收的水分，以占其干重的百分比表示。图中是常见的实测范围，色条取范围的中间值。"
+    },
+    "fibers.h34": {
+      "en": "What the class predicts",
+      "zh-Hans": "类别能预示什么"
+    },
+    "fibers.span3": {
+      "en": "Water",
+      "zh-Hans": "水"
+    },
+    "fibers.dd9": {
+      "en": "Cellulose and protein fibers absorb water into the fiber itself: comfortable against skin, slow to dry. Most synthetics take up very little, so they dry fast, hold static, and have to move sweat along their surface instead.",
+      "zh-Hans": "纤维素纤维和蛋白质纤维把水吸进纤维内部：贴身舒适，但干得慢。大多数合成纤维吸水很少，所以干得快、容易带静电，汗水只能沿着纤维表面被带走。"
+    },
+    "fibers.span4": {
+      "en": "Strength when wet",
+      "zh-Hans": "湿态强力"
+    },
+    "fibers.dd10": {
+      "en": "Cotton and flax get stronger wet. Wool and silk get weaker. Viscose typically keeps only about half its dry strength; lyocell keeps most of it (about 85%). Polyester does not change, and nylon loses roughly 10–15%.",
+      "zh-Hans": "棉和亚麻遇湿后更结实。羊毛和蚕丝遇湿变弱。粘胶纤维的湿强力通常只有干强力的一半左右；莱赛尔纤维能保持大部分（约 85%）。涤纶没有变化，锦纶大约损失 10–15%。"
+    },
+    "fibers.span5": {
+      "en": "Heat",
+      "zh-Hans": "热"
+    },
+    "fibers.dd11": {
+      "en": "Natural and regenerated-cellulose fibers do not melt: they scorch and char. Wool chars and tends to self-extinguish. Synthetics are thermoplastic and melt — polypropylene at about 160–175&nbsp;°C, nylon 6 at 215–220&nbsp;°C, polyester and nylon 6,6 at about 250–265&nbsp;°C — which is why they can be heat-set, textured and welded. Acetate also melts (about 230–250&nbsp;°C); acrylic softens and decomposes rather than melting cleanly.",
+      "zh-Hans": "天然纤维和再生纤维素纤维不会熔融：它们会烧焦、炭化。羊毛炭化后往往自行熄灭。合成纤维是热塑性的，会熔融：丙纶约在 160–175&nbsp;°C，锦纶6 在 215–220&nbsp;°C，涤纶和锦纶66 约在 250–265&nbsp;°C。正因如此，它们可以热定形、做变形加工，也可以[[weld]]。醋酯纤维也会熔融（约 230–250&nbsp;°C）；腈纶则是软化并分解，不会干净利落地熔融。"
+    },
+    "fibers.h35": {
+      "en": "Bio-based",
+      "zh-Hans": "生物基"
+    },
+    "fibers.p7": {
+      "en": "Says where the raw material came from, not what the fiber is. Polyamide 11 made from castor oil is still a synthetic polyamide; PLA, made from plant sugars, is still a synthetic polyester.",
+      "zh-Hans": "说的是原料从哪里来，而不是纤维属于哪一类。用蓖麻油制成的聚酰胺11 仍是合成的聚酰胺；用植物糖制成的聚乳酸（PLA）纤维仍是合成的聚酯。"
+    },
+    "fibers.h36": {
+      "en": "Recycled",
+      "zh-Hans": "循环再利用"
+    },
+    "fibers.p8": {
+      "en": "Says the polymer has had an earlier life — most often polyester remelted from bottles, or nylon recovered from waste. The class does not change.",
+      "zh-Hans": "说的是这种聚合物以前用过：最常见的是用饮料瓶重新熔融纺成的涤纶，或从废料中回收的锦纶。这就是[[recycled]]。纤维的类别不变。"
+    },
+    "fibers.h37": {
+      "en": "Functionalized",
+      "zh-Hans": "功能性"
+    },
+    "fibers.p9": {
+      "en": "Says something was added in or on the fiber — a conductive, antimicrobial or flame-retardant component. Any class can carry one.",
+      "zh-Hans": "说的是在纤维内部或表面加了东西：导电、抗菌或阻燃的成分。这就是[[functional-fiber]]。任何一类纤维都可以这样处理。"
+    },
+    "fibers.p10": {
+      "en": "Three labels that cut across the classes. None of them is a fiber class of its own.",
+      "zh-Hans": "这三个标签横跨各个类别。它们本身都不是一个纤维类别。"
+    },
+    "cross-sections.h21": {
+      "en": "Fiber Cross-Sections",
+      "zh-Hans": "纤维截面"
+    },
+    "cross-sections.p1": {
+      "en": "Cut a fiber across and look at the end. The shape decides how the fiber reflects light, how it packs against its neighbours, and where water can go.",
+      "zh-Hans": "把纤维横着切开，看它的端面。这个形状决定了纤维怎样反射光线、怎样和相邻的纤维挤在一起，以及水能往哪里走。"
+    },
+    "cross-sections.p2": {
+      "en": "A natural fiber’s shape is whatever it grew as. A melt-spun filament takes the shape of the hole it was extruded through, so the same polyester can be made round, lobed, hollow or grooved.",
+      "zh-Hans": "天然纤维长成什么形状就是什么形状。熔体纺丝的长丝则是喷丝孔什么形状，它就是什么形状，所以同样是涤纶，可以做成圆形、多叶形、中空或带沟槽的。"
+    },
+    "cross-sections.span1": {
+      "en": "A",
+      "zh-Hans": "A"
+    },
+    "cross-sections.h31": {
+      "en": "Grown, or set in the bath",
+      "zh-Hans": "天然长成，或在凝固浴中定形"
+    },
+    "cross-sections.p3": {
+      "en": "the fiber from the side, then cut",
+      "zh-Hans": "先看纤维的侧面，再看截面"
+    },
+    "cross-sections.aria1": {
+      "en": "A cotton fiber seen from the side is a flat ribbon with twists; cut across, it is kidney-shaped with a flattened slit, the lumen, in the middle",
+      "zh-Hans": "棉纤维从侧面看是一条带扭转的扁平带子；横切后呈腰圆形，中间有一条压扁的缝，就是中腔"
+    },
+    "cross-sections.span2": {
+      "en": "Cotton",
+      "zh-Hans": "棉"
+    },
+    "cross-sections.span3": {
+      "en": "A tube that collapsed as it dried: kidney-shaped, its hollow <em>lumen</em> flattened to a slit. From the side it is a twisted ribbon. The uneven surface scatters light, so cotton is matte.",
+      "zh-Hans": "一根干燥后塌瘪的管子：截面呈腰圆形，中空的[[lumen]]被压扁成一条缝。从侧面看是一条扭转的带子（天然转曲）。表面不平整，光线被散射，所以棉没有光泽。"
+    },
+    "cross-sections.aria2": {
+      "en": "A wool fiber seen from the side is covered in overlapping scales pointing one way; cut across, it is roughly round with a thin scaly skin",
+      "zh-Hans": "羊毛纤维从侧面看覆盖着朝同一方向、相互重叠的鳞片；横切后大致呈圆形，外面有一层薄薄的鳞片层"
+    },
+    "cross-sections.span4": {
+      "en": "Wool",
+      "zh-Hans": "羊毛"
+    },
+    "cross-sections.span5": {
+      "en": "Roughly round, with a skin of overlapping scales that all point to the tip. Fibers slide one way and catch the other — that ratchet is why wool felts.",
+      "zh-Hans": "截面大致呈圆形，表面有一层相互重叠的鳞片，全都指向纤维尖端。纤维朝一个方向容易滑动，朝另一个方向就被卡住；羊毛会毡缩，就是因为这种“棘轮”效应。"
+    },
+    "cross-sections.aria3": {
+      "en": "A silk filament seen from the side is smooth; cut across, it is two rounded triangles side by side inside a dashed coat of gum",
+      "zh-Hans": "蚕丝从侧面看是光滑的；横切后是并排的两个圆角三角形，包在一层用虚线表示的丝胶里"
+    },
+    "cross-sections.span6": {
+      "en": "Silk",
+      "zh-Hans": "蚕丝"
+    },
+    "cross-sections.span7": {
+      "en": "The silkworm lays two filaments at once, each a rounded triangle, in a coat of gum (dashed) that is later washed off. The flat faces reflect light like a prism: silk’s luster.",
+      "zh-Hans": "蚕一次吐出两根丝，每根的截面都是圆角三角形，外面裹着一层丝胶（虚线），丝胶后来会被洗掉（脱胶）。平整的侧面像棱镜一样反射光线：这就是蚕丝的光泽。"
+    },
+    "cross-sections.aria4": {
+      "en": "A viscose filament seen from the side has fine lines running along it; cut across, its outline is serrated",
+      "zh-Hans": "粘胶长丝从侧面看有沿长度方向的细纹；横切后轮廓呈锯齿形"
+    },
+    "cross-sections.span8": {
+      "en": "Viscose",
+      "zh-Hans": "粘胶纤维"
+    },
+    "cross-sections.span9": {
+      "en": "Extruded into a chemical bath, where it sets with a serrated outline. From the side the grooves show as fine lengthwise lines. Lyocell, by contrast, is typically round and smooth.",
+      "zh-Hans": "挤入凝固浴后定形，截面轮廓呈锯齿形。从侧面看，这些沟纹是沿长度方向的细线。相比之下，莱赛尔纤维通常是圆而光滑的。"
+    },
+    "cross-sections.span10": {
+      "en": "B",
+      "zh-Hans": "B"
+    },
+    "cross-sections.h32": {
+      "en": "Engineered at the spinneret",
+      "zh-Hans": "在喷丝板上设计出来"
+    },
+    "cross-sections.p4": {
+      "en": "the hole, then the polyester or nylon filament it makes",
+      "zh-Hans": "先看喷丝孔，再看它纺出的涤纶或锦纶长丝"
+    },
+    "cross-sections.aria5": {
+      "en": "A spinneret plate with a round hole, and the round filament it makes",
+      "zh-Hans": "带一个圆孔的喷丝板，以及它纺出的圆形长丝"
+    },
+    "cross-sections.span11": {
+      "en": "Round",
+      "zh-Hans": "圆形"
+    },
+    "cross-sections.span12": {
+      "en": "The default. A round hole gives a smooth, even filament.",
+      "zh-Hans": "默认的形状。圆孔纺出光滑、均匀的长丝。"
+    },
+    "cross-sections.aria6": {
+      "en": "A spinneret plate with a Y-shaped hole, and the three-lobed filament it makes",
+      "zh-Hans": "带一个 Y 形孔的喷丝板，以及它纺出的三叶形长丝"
+    },
+    "cross-sections.span13": {
+      "en": "Trilobal",
+      "zh-Hans": "三叶形"
+    },
+    "cross-sections.span14": {
+      "en": "A Y-shaped hole gives three lobes. Their flatter sides reflect more light — a brighter, sparkling yarn with more cover. Common in lustrous fabrics and carpet yarns.",
+      "zh-Hans": "Y 形孔纺出三个叶瓣。叶瓣较平的侧面反射更多的光，纱线更亮、有闪光，[[cover]]也更好。常用于有光泽的面料和地毯纱。"
+    },
+    "cross-sections.aria7": {
+      "en": "A spinneret plate with three arc-shaped slots in a ring, and the hollow filament they make, with air in its core",
+      "zh-Hans": "带三条弧形狭缝、围成一圈的喷丝板，以及它们纺出的中空长丝，丝的中心是空气"
+    },
+    "cross-sections.span15": {
+      "en": "Hollow",
+      "zh-Hans": "中空"
+    },
+    "cross-sections.span16": {
+      "en": "Arc-shaped slots whose streams fuse into a tube. The air inside adds bulk and insulation for less weight — fiberfill, thermal layers.",
+      "zh-Hans": "几条弧形狭缝挤出的细流合拢成一根管子。里面的空气增加了蓬松度和保暖性，重量却更轻。用于[[fiberfill]]和保暖层。"
+    },
+    "cross-sections.aria8": {
+      "en": "A spinneret plate with a cross-shaped hole, and the grooved filament it makes, with water held in its four grooves",
+      "zh-Hans": "带一个十字形孔的喷丝板，以及它纺出的带沟槽的长丝，四条沟槽里存着水"
+    },
+    "cross-sections.span17": {
+      "en": "Channelled",
+      "zh-Hans": "沟槽形"
+    },
+    "cross-sections.span18": {
+      "en": "Deep grooves run the length of the filament. Water is pulled along them by capillary action — this, not a hollow core, is the shape behind most “wicking” polyester.",
+      "zh-Hans": "这是[[grooved]]：深深的沟槽沿着长丝的长度方向延伸，水靠毛细作用顺着沟槽被带走，这种现象叫[[wicking]]。市面上大多数“吸湿排汗”涤纶靠的是这种截面，而不是中空的芯。"
+    },
+    "yarn-types.h21": {
+      "en": "Yarn Construction Types",
+      "zh-Hans": "纱线的结构类型"
+    },
+    "yarn-types.p1": {
+      "en": "Fibers become yarn in a handful of standard ways, and each one leaves a fingerprint on how the finished fabric feels and behaves.",
+      "zh-Hans": "纤维变成纱线，常用的方法就那么几种，每一种都会在成品面料的手感和性能上留下印记。"
+    },
+    "yarn-types.p2": {
+      "en": "The six common constructions — spun staple, monofilament, twisted filament, plied, corespun and braided — are drawn in the <a href=\"#what-is-a-textile\">yarn and cord row above</a>. Three more things a spec will tell you about them:",
+      "zh-Hans": "六种常见的结构，短纤纱、单丝、加捻长丝、股线、包芯纱和编织绳，画在<a href=\"#what-is-a-textile\">上面的“纱线与绳”一行</a>里。规格里还会告诉你另外三件事："
+    },
+    "yarn-types.span1": {
+      "en": "How a staple yarn was spun",
+      "zh-Hans": "短纤纱是怎样纺出来的"
+    },
+    "yarn-types.dd1": {
+      "en": "Ring spinning is the slowest and gives the strongest, hairiest, softest yarn. Rotor (open-end) spinning is faster and more even, with wrapper fibers around a twisted core. Air-jet spinning (and its newer vortex form) is faster again: a parallel core held together by wrapper fibers; vortex yarns have especially low hairiness.",
+      "zh-Hans": "环锭纺最慢，纺出的纱最结实、毛羽最多、也最柔软。转杯纺（气流纺）更快、更均匀，纱的结构是包缠纤维裹着一根加了捻的纱芯。[[air-jet]]还要更快：一束平行的纤维芯由包缠纤维束紧；其中较新的喷气涡流纺，纱线毛羽特别少。"
+    },
+    "yarn-types.span2": {
+      "en": "Flat or textured filament",
+      "zh-Hans": "未变形长丝，还是变形丝"
+    },
+    "yarn-types.dd2": {
+      "en": "Filament straight off the spinneret is flat: smooth, lustrous, compact. Texturing adds crimp or loops so it has bulk, stretch and a softer hand — see FDY, DTY and ATY below.",
+      "zh-Hans": "刚从喷丝板出来、没有再加工的长丝是[[flat-filament]]：平滑、有光泽、紧密。变形加工给它加上卷曲或小圈，于是有了蓬松度、弹性和更柔软的手感，见下面的 FDY、DTY 和 ATY。"
+    },
+    "yarn-types.span3": {
+      "en": "Twist direction: S or Z",
+      "zh-Hans": "捻向：S 捻或 Z 捻"
+    },
+    "yarn-types.dd3": {
+      "en": "Hold the yarn upright: if the fibers slope like the middle of a Z, it is Z twist; like the middle of an S, S twist. Plied yarns are usually plied in the opposite direction to their singles, so the two twists balance.",
+      "zh-Hans": "把纱竖直拿着看：如果纤维的倾斜方向像字母 Z 中间那一笔，就是 Z 捻；像字母 S 中间那一笔，就是 S 捻。股线的合股捻向通常与单纱的捻向相反，这样两种捻互相平衡。"
+    },
+    "yarn-spec.h21": {
+      "en": "Reading a Yarn Spec",
+      "zh-Hans": "怎样读纱线规格"
+    },
+    "yarn-spec.p1": {
+      "en": "A yarn on a spec sheet is a short code: how heavy it is, how many filaments it holds, how many strands are combined, and how it was processed. Once you know the pattern, you can read a lot of the fabric’s behavior off the label.",
+      "zh-Hans": "[[spec-sheet]]上的一根纱，是一串简短的代号：它有多重，含多少根单丝，由几股并合，经过了什么加工。熟悉了写法，就能从标签上读出面料的许多性能。"
+    },
+    "yarn-spec.dt1": {
+      "en": "<span class=\"accent\">Denier (D)</span> and <span class=\"accent\">decitex (dtex)</span>",
+      "zh-Hans": "<span class=\"accent\">旦尼尔（D）</span>和<span class=\"accent\">分特（dtex）</span>"
+    },
+    "yarn-spec.dd1": {
+      "en": "Linear density: the weight of a fixed length of yarn. Denier is grams per 9,000&nbsp;m; decitex is grams per 10,000&nbsp;m (1 D = 1.11 dtex). A higher number is a heavier, thicker yarn.",
+      "zh-Hans": "线密度：一定长度的纱线的重量。旦尼尔是每 9,000&nbsp;m 的克数；分特是每 10,000&nbsp;m 的克数（1 D = 1.11 dtex）。数字越大，纱越重、越粗。"
+    },
+    "yarn-spec.span1": {
+      "en": "Filament count (F)",
+      "zh-Hans": "单丝根数（F）"
+    },
+    "yarn-spec.dd2": {
+      "en": "How many individual filaments make up the yarn. Divide denier by filaments for <em>denier per filament</em> (dpf): the same 75 D yarn is crisper with 36 coarse filaments and softer with 144 fine ones.",
+      "zh-Hans": "组成这根纱的单丝有多少根。用旦数除以单丝根数，就得到<em>单丝线密度</em>（dpf）：同样是 75 D 的纱，由 36 根粗单丝组成时手感更挺爽，由 144 根细单丝组成时更柔软。"
+    },
+    "yarn-spec.span2": {
+      "en": "Ply",
+      "zh-Hans": "股数"
+    },
+    "yarn-spec.dd3": {
+      "en": "The number of single yarns twisted together into one. Two plies of 75 D make a yarn of about 150 D.",
+      "zh-Hans": "捻合成一根的单纱根数。两股 75 D 的纱合成一根约 150 D 的纱。"
+    },
+    "yarn-spec.span3": {
+      "en": "Ends",
+      "zh-Hans": "{{ends}}"
+    },
+    "yarn-spec.dd4": {
+      "en": "The number of separate yarns fed side by side into one position — for example, two ends knitted as one. They run parallel and are not twisted together. Weaving uses the same word for something else: there, an “end” is one warp yarn.",
+      "zh-Hans": "[[ends]]：并排喂入同一位置的单独纱线的根数，例如两根纱并在一起当一根来编织。它们彼此平行，不捻合在一起。（英文 ends 在机织里另有所指：那里的一根 end 是一根经纱。）"
+    },
+    "yarn-spec.span4": {
+      "en": "Covered yarns",
+      "zh-Hans": "包覆纱"
+    },
+    "yarn-spec.dd5": {
+      "en": "An elastane (spandex) core wrapped in another yarn, so the stretch is hidden and protected. The elastane is stretched — typically to 3–4 times its length — while it is covered, so it adds much less weight than its nominal denier suggests.",
+      "zh-Hans": "以氨纶为芯，外面包缠另一根纱，这样弹性被藏在里面并受到保护。包覆时氨纶处于拉伸状态，通常被拉到原长的 3–4 倍，所以它实际增加的重量远小于它的[[nominal-denier]]所显示的。"
+    },
+    "yarn-spec.dt2": {
+      "en": "<span class=\"accent\">FDY</span>, <span class=\"accent\">DTY</span>, <span class=\"accent\">ATY</span>",
+      "zh-Hans": "<span class=\"accent\">FDY</span>、<span class=\"accent\">DTY</span>、<span class=\"accent\">ATY</span>"
+    },
+    "yarn-spec.dd6": {
+      "en": "FDY (fully drawn yarn) is flat filament: smooth and lustrous. DTY (draw-textured yarn) is twisted, heat-set and untwisted so every filament is crimped: bulky, soft and stretchy, the workhorse of knitted performance wear. ATY (air-textured yarn) is tangled into small loops by an air jet: matte and cotton-like, with little stretch.",
+      "zh-Hans": "FDY（全拉伸丝）是未变形长丝：平滑而有光泽。DTY（拉伸变形丝）经过加捻、热定形、再解捻，每根单丝都带上卷曲：蓬松、柔软、有弹性，是针织功能性服装的主力。ATY（空气变形丝）由气流喷嘴吹成带小圈的缠结状：无光泽、像棉，弹性很小。"
+    },
+    "yarn-spec.div1": {
+      "en": "TRY IT — DECODE THREE SPECS",
+      "zh-Hans": "试一试：解读三个规格"
+    },
+    "yarn-spec.span5": {
+      "en": "2/75/72 DTY polyester",
+      "zh-Hans": "2/75/72 DTY 涤纶"
+    },
+    "yarn-spec.span6": {
+      "en": "PLIES",
+      "zh-Hans": "股数"
+    },
+    "yarn-spec.span7": {
+      "en": "EACH PLY",
+      "zh-Hans": "每股"
+    },
+    "yarn-spec.span8": {
+      "en": "75 D, 72 filaments",
+      "zh-Hans": "75 D，72 根单丝"
+    },
+    "yarn-spec.span9": {
+      "en": "TOTAL",
+      "zh-Hans": "合计"
+    },
+    "yarn-spec.span10": {
+      "en": "150 D, 144 filaments",
+      "zh-Hans": "150 D，144 根单丝"
+    },
+    "yarn-spec.span11": {
+      "en": "PER FILAMENT",
+      "zh-Hans": "每根单丝"
+    },
+    "yarn-spec.span12": {
+      "en": "1.04 dpf — fine, soft",
+      "zh-Hans": "1.04 dpf：细、柔软"
+    },
+    "yarn-spec.span13": {
+      "en": "PROCESS",
+      "zh-Hans": "加工"
+    },
+    "yarn-spec.span14": {
+      "en": "Draw-textured: crimped, stretchy",
+      "zh-Hans": "拉伸变形：带卷曲、有弹性"
+    },
+    "yarn-spec.span15": {
+      "en": "78dtex/68f × 2 textured nylon 6,6",
+      "zh-Hans": "78dtex/68f × 2 锦纶66 变形丝"
+    },
+    "yarn-spec.span16": {
+      "en": "UNIT",
+      "zh-Hans": "单位"
+    },
+    "yarn-spec.span17": {
+      "en": "Decitex, not denier",
+      "zh-Hans": "分特，不是旦尼尔"
+    },
+    "yarn-spec.span18": {
+      "en": "EACH YARN",
+      "zh-Hans": "每根纱"
+    },
+    "yarn-spec.span19": {
+      "en": "78 dtex (70 D), 68 filaments",
+      "zh-Hans": "78 dtex（70 D），68 根单丝"
+    },
+    "yarn-spec.span20": {
+      "en": "COMBINED",
+      "zh-Hans": "并合后"
+    },
+    "yarn-spec.span21": {
+      "en": "× 2 → 156 dtex (140 D), 136 filaments",
+      "zh-Hans": "× 2 → 156 dtex（140 D），136 根单丝"
+    },
+    "yarn-spec.span22": {
+      "en": "PER FILAMENT",
+      "zh-Hans": "每根单丝"
+    },
+    "yarn-spec.span23": {
+      "en": "1.15 dtex (1.03 dpf)",
+      "zh-Hans": "1.15 dtex（1.03 dpf）"
+    },
+    "yarn-spec.span24": {
+      "en": "40D elastane, single-covered with 70D/68F nylon",
+      "zh-Hans": "40D 氨纶，外包 70D/68F 锦纶（单包覆）"
+    },
+    "yarn-spec.span25": {
+      "en": "CORE",
+      "zh-Hans": "芯"
+    },
+    "yarn-spec.span26": {
+      "en": "40 D elastane",
+      "zh-Hans": "40 D 氨纶"
+    },
+    "yarn-spec.span27": {
+      "en": "COVER",
+      "zh-Hans": "外包"
+    },
+    "yarn-spec.span28": {
+      "en": "One wrap of 70 D / 68 F nylon",
+      "zh-Hans": "一层 70 D / 68 F 锦纶"
+    },
+    "yarn-spec.span29": {
+      "en": "WEIGHT",
+      "zh-Hans": "重量"
+    },
+    "yarn-spec.span30": {
+      "en": "Not 110 D: stretched 3× as it is covered, the core adds about 13 D → roughly 85 D in all",
+      "zh-Hans": "不是 110 D：包覆时芯丝被拉长到 3 倍，只增加约 13 D → 总共约 85 D"
+    },
+    "yarn-spec.span31": {
+      "en": "BEHAVIOR",
+      "zh-Hans": "性能"
+    },
+    "yarn-spec.span32": {
+      "en": "Stretch from the core; hand and dyeability from the nylon",
+      "zh-Hans": "弹性来自芯丝；手感和染色性能来自锦纶"
+    },
+    "yarn-spec.p2": {
+      "en": "More notations, a count converter and a live decoder are in <a href=\"yarn-characterization.html\">Yarn Characterization</a>.",
+      "zh-Hans": "更多的规格写法、支数换算器和实时解读工具，见<a href=\"yarn-characterization.html\">纱线规格与标示</a>。"
+    },
+    "wovens-knits-nonwovens.h21": {
+      "en": "Wovens, Knits &amp; Nonwovens",
+      "zh-Hans": "机织物、针织物与非织造布"
+    },
+    "wovens-knits-nonwovens.p1": {
+      "en": "Nearly all fabric is made one of three ways: yarns interlaced, yarns interlooped, or fibers bonded directly with no yarn at all. Each gives a fundamentally different material. (Braids — yarns interlaced on the diagonal — are a fourth, smaller family, mostly cords, tubes and tapes.)",
+      "zh-Hans": "几乎所有的面料都出自三种做法之一：纱线相互交织，纱线相互串套成线圈，或者不经过纱线、直接把纤维固定成布。每一种得到的都是性质截然不同的材料。（编织物，也就是纱线沿斜向交叉的结构，是较小的第四类，主要是绳、管和带。）"
+    },
+    "wovens-knits-nonwovens.h31": {
+      "en": "Woven",
+      "zh-Hans": "机织物"
+    },
+    "wovens-knits-nonwovens.p2": {
+      "en": "Two sets of yarns — warp and weft — interlaced at 90° on a loom. Strong and dimensionally stable along both yarn directions. Shirting, denim, outerwear shells, webbing, airbags.",
+      "zh-Hans": "两组纱线，经纱和纬纱，在织机上以 90° 相互交织。沿两个纱线方向都结实，尺寸稳定。衬衫面料、牛仔布、外套面料、织带、安全气囊。"
+    },
+    "wovens-knits-nonwovens.h32": {
+      "en": "Knit",
+      "zh-Hans": "针织物"
+    },
+    "wovens-knits-nonwovens.p3": {
+      "en": "Yarn formed into rows of loops, each pulled through the one before. The loops can change shape, so the fabric stretches and recovers. T-shirts, leggings, sweaters, hosiery.",
+      "zh-Hans": "纱线弯成一排排线圈，每个线圈都从前一个线圈中穿过。线圈可以变形，所以面料能拉伸，也能回弹。T 恤、紧身裤、毛衣、袜类。"
+    },
+    "wovens-knits-nonwovens.h33": {
+      "en": "Nonwoven",
+      "zh-Hans": "非织造布"
+    },
+    "wovens-knits-nonwovens.p4": {
+      "en": "A web of fibers or filaments held together by entangling, heat or adhesive — no weaving or knitting, and usually no yarn. Fast and inexpensive to make; properties range from disposable wipes and filters to durable felts and geotextiles.",
+      "zh-Hans": "由纤维或长丝组成的纤网，靠缠结、加热或粘合剂固定在一起：不织也不编，通常也不用纱线。生产快、成本低；性能跨度很大，从一次性擦拭布和过滤材料，到耐用的毡和土工布。"
+    },
+    "wovens-knits-nonwovens.summary1": {
+      "en": "GO DEEPER: STRUCTURAL VARIATIONS <span class=\"plus\">+</span>",
+      "zh-Hans": "深入一步：结构的变化 <span class=\"plus\">+</span>"
+    },
+    "wovens-knits-nonwovens.p5": {
+      "en": "The families as they are usually charted for reinforcement and technical textiles, where extra straight (“laid-in”) yarns are added to carry load.",
+      "zh-Hans": "下面是增强材料和产业用纺织品中常见的分类方式。这类结构里常常加入额外的平直纱线来承受载荷，针织物中的这种纱叫[[laid-in]]。"
+    },
+    "wovens-knits-nonwovens.h41": {
+      "en": "WOVEN STRUCTURES",
+      "zh-Hans": "机织结构"
+    },
+    "wovens-knits-nonwovens.li1": {
+      "en": "<strong>Biaxial —</strong> the ordinary woven: yarns at 0° and 90°.",
+      "zh-Hans": "<strong>双轴向：</strong>普通的机织物，纱线呈 0° 和 90°。"
+    },
+    "wovens-knits-nonwovens.li2": {
+      "en": "<strong>High modulus —</strong> a biaxial weave built from stiff, high-modulus yarns such as glass, carbon or aramid.",
+      "zh-Hans": "<strong>高模量：</strong>用玻璃纤维、碳纤维或芳纶等刚硬的高模量纱线织成的双轴向织物。"
+    },
+    "wovens-knits-nonwovens.li3": {
+      "en": "<strong>Multilayer —</strong> several woven layers bound together through the thickness.",
+      "zh-Hans": "<strong>多层：</strong>几层机织物沿厚度方向接结在一起。"
+    },
+    "wovens-knits-nonwovens.li4": {
+      "en": "<strong>Triaxial —</strong> three yarn sets at 0°/+60°/&minus;60°, so strength is more even in every direction.",
+      "zh-Hans": "[[triaxial]]：三组纱线呈 0°/+60°/&minus;60°，各个方向的强度更均匀。"
+    },
+    "wovens-knits-nonwovens.h42": {
+      "en": "BRAIDED STRUCTURES",
+      "zh-Hans": "编织结构"
+    },
+    "wovens-knits-nonwovens.li5": {
+      "en": "<strong>Tubular —</strong> diagonal interlacing that forms a seamless tube.",
+      "zh-Hans": "<strong>管状编织：</strong>纱线斜向交织，形成无缝的管子。"
+    },
+    "wovens-knits-nonwovens.li6": {
+      "en": "<strong>Tubular, laid-in warp —</strong> a tube with straight lengthwise yarns added.",
+      "zh-Hans": "<strong>管状编织，加轴纱：</strong>在管子里加入纵向的平直纱线。"
+    },
+    "wovens-knits-nonwovens.li7": {
+      "en": "<strong>Flat —</strong> the same interlacing in a flat strip: tapes and straps.",
+      "zh-Hans": "[[flat-braid]]：同样的交织方式，做成扁平的带子，如织带和带条。"
+    },
+    "wovens-knits-nonwovens.li8": {
+      "en": "<strong>Square —</strong> a dense braid with a square cross-section.",
+      "zh-Hans": "[[square-braid]]：截面为方形的紧密编织。"
+    },
+    "wovens-knits-nonwovens.li9": {
+      "en": "<strong>3-D —</strong> interlaced through the thickness, into near-solid shapes.",
+      "zh-Hans": "<strong>三维编织：</strong>沿厚度方向也相互交织，形成接近实心的形状。"
+    },
+    "wovens-knits-nonwovens.h43": {
+      "en": "KNITTED STRUCTURES",
+      "zh-Hans": "针织结构"
+    },
+    "wovens-knits-nonwovens.li10": {
+      "en": "<strong>Weft knit —</strong> loops formed across the fabric; the stretchiest.",
+      "zh-Hans": "<strong>纬编：</strong>线圈沿面料的横向形成；弹性最大。"
+    },
+    "wovens-knits-nonwovens.li11": {
+      "en": "<strong>Weft knit, laid-in —</strong> straight yarns laid in crosswise or lengthwise to limit stretch.",
+      "zh-Hans": "[[weft-knit-laid-in]]：沿横向或纵向夹入平直的纱线，以限制拉伸。"
+    },
+    "wovens-knits-nonwovens.li12": {
+      "en": "<strong>Warp knit —</strong> loops formed along the fabric from many yarns; more stable.",
+      "zh-Hans": "<strong>经编：</strong>由许多根纱线沿面料的纵向形成线圈；更稳定。"
+    },
+    "wovens-knits-nonwovens.li13": {
+      "en": "<strong>Weft-inserted warp knit —</strong> straight crosswise yarns held by warp-knit loops.",
+      "zh-Hans": "[[weft-inserted]]：横向的平直纱线由经编线圈固定住。"
+    },
+    "wovens-knits-nonwovens.h44": {
+      "en": "NONWOVEN / BONDED",
+      "zh-Hans": "非织造 / 粘合结构"
+    },
+    "wovens-knits-nonwovens.li14": {
+      "en": "<strong>Fiber mat —</strong> randomly laid fibers, bonded.",
+      "zh-Hans": "<strong>纤维毡：</strong>纤维随机铺放后加固而成。"
+    },
+    "wovens-knits-nonwovens.li15": {
+      "en": "<strong>Stitchbonded —</strong> a web or layers of yarn held by rows of stitching.",
+      "zh-Hans": "<strong>缝编：</strong>纤网或若干层纱线由成排的线迹固定。"
+    },
+    "wovens-knits-nonwovens.li16": {
+      "en": "<strong>Biaxial bonded —</strong> two straight yarn layers, bonded rather than interlaced.",
+      "zh-Hans": "[[biaxial-bonded]]：两层平直的纱线靠粘合固定，而不是相互交织。"
+    },
+    "wovens-knits-nonwovens.li17": {
+      "en": "<strong>XYZ laid-in —</strong> straight yarns in three perpendicular directions.",
+      "zh-Hans": "[[xyz]]：平直的纱线沿相互垂直的三个方向排列。"
+    },
+    "wovens-vs-knits.h21": {
+      "en": "Wovens vs. Knits, Side by Side",
+      "zh-Hans": "机织物与针织物对比"
+    },
+    "wovens-vs-knits.p1": {
+      "en": "In a woven the yarns lie nearly straight, so the fabric can only stretch as far as the yarns do. In a knit the yarn runs in loops, and loops can change shape. Most of the differences follow from that.",
+      "zh-Hans": "机织物里的纱线几乎是直的，所以纱线能伸长多少，面料就只能拉伸多少。针织物里的纱线弯成线圈，而线圈可以变形。两者的大多数差别都由此而来。"
+    },
+    "wovens-vs-knits.h31": {
+      "en": "Wovens",
+      "zh-Hans": "机织物"
+    },
+    "wovens-vs-knits.li1": {
+      "en": "Yarns interlaced at right angles.",
+      "zh-Hans": "纱线成直角相互交织。"
+    },
+    "wovens-vs-knits.li2": {
+      "en": "Little stretch along warp or weft unless elastane is added; noticeably more on the bias (the diagonal).",
+      "zh-Hans": "沿经向或纬向几乎没有弹性，除非加入氨纶；沿[[bias]]（对角线方向）则明显大一些。"
+    },
+    "wovens-vs-knits.li3": {
+      "en": "Crisper and more stable — holds a shape, takes a crease.",
+      "zh-Hans": "更挺括、更稳定：能保持形状，也压得出折痕。"
+    },
+    "wovens-vs-knits.li4": {
+      "en": "Cut edges fray; a snag pulls one yarn.",
+      "zh-Hans": "裁开的布边会[[fray]]；钩丝时被拉出的是一根纱。"
+    },
+    "wovens-vs-knits.h32": {
+      "en": "Knits",
+      "zh-Hans": "针织物"
+    },
+    "wovens-vs-knits.li5": {
+      "en": "Yarn formed into interlocking loops.",
+      "zh-Hans": "纱线弯成相互串套的线圈。"
+    },
+    "wovens-vs-knits.li6": {
+      "en": "Stretches because the loops deform — in weft knits, usually most across the width.",
+      "zh-Hans": "能拉伸是因为线圈会变形；纬编织物通常在横向拉伸最大。"
+    },
+    "wovens-vs-knits.li7": {
+      "en": "Softer and more flexible — conforms to the body, resists wrinkles.",
+      "zh-Hans": "更柔软、更易弯曲：贴合身体，不易起皱。"
+    },
+    "wovens-vs-knits.li8": {
+      "en": "Weft knits can ladder from a broken loop, and plain jersey curls at cut edges.",
+      "zh-Hans": "纬编织物的线圈断了一个，就可能出现[[ladder]]；纬平针织物裁开后布边会卷边。"
+    },
+    "warp-weft.h21": {
+      "en": "Inside a Woven: Warp &amp; Weft",
+      "zh-Hans": "机织物的内部：经纱与纬纱"
+    },
+    "warp-weft.p1": {
+      "en": "<strong>Warp</strong> yarns (“ends”) run the length of the cloth. They are held under tension on the loom and lifted and lowered thousands of times, so they are usually the stronger, more tightly twisted set.",
+      "zh-Hans": "<strong>经纱</strong>沿布的长度方向排列。它们在织机上始终绷着张力，还要被提起、放下成千上万次，所以通常是更结实、捻度更高的那一组纱。"
+    },
+    "warp-weft.p2": {
+      "en": "<strong>Weft</strong> yarns (“picks”) run across, inserted one at a time through the opening in the warp. A shuttle loom carries one continuous weft back and forth; most modern looms shoot each pick across with a rapier, a projectile, or a jet of air or water.",
+      "zh-Hans": "<strong>纬纱</strong>沿横向排列，一根一根地从经纱张开的梭口中穿过。有梭织机用梭子带着一根连续的纬纱来回穿梭；现代织机大多用剑杆、片梭，或一股气流、水流把每一根纬纱射过去。"
+    },
+    "warp-weft.p3": {
+      "en": "The <em>weave</em> is the rule for which ends are lifted on each pick. Three rules cover most cloth. Each is drawn below beside its <em>draft</em>, the weaver’s notation: one square per crossing, filled where the warp is on top.",
+      "zh-Hans": "<em>织物组织</em>就是规定每织一根纬纱时提起哪些经纱的规则。三种规则涵盖了大多数的布。下面每一种都画在它的[[draft]]旁边：这是织造用的记号。"
+    },
+    "warp-weft.span1": {
+      "en": "<i class=\"k k--warp\"></i>warp end (lengthwise)",
+      "zh-Hans": "<i class=\"k k--warp\"></i>经纱（纵向）"
+    },
+    "warp-weft.span2": {
+      "en": "<i class=\"k k--weft\"></i>weft pick (crosswise)",
+      "zh-Hans": "<i class=\"k k--weft\"></i>纬纱（横向）"
+    },
+    "warp-weft.span3": {
+      "en": "<i class=\"k k--pick\"></i>one pick, and its row in the draft",
+      "zh-Hans": "<i class=\"k k--pick\"></i>一根纬纱，以及它在组织图中对应的一行"
+    },
+    "warp-weft.span4": {
+      "en": "<i class=\"k k--up\"></i>warp over weft",
+      "zh-Hans": "<i class=\"k k--up\"></i>经纱在纬纱之上"
+    },
+    "warp-weft.span5": {
+      "en": "<i class=\"k k--float\"></i>a float",
+      "zh-Hans": "<i class=\"k k--float\"></i>一段浮长"
+    },
+    "warp-weft.aria1": {
+      "en": "Plain weave woven pick by pick: each crosswise yarn goes over one lengthwise yarn and under the next. Beside it, its draft is a checkerboard.",
+      "zh-Hans": "平纹一纬一纬地织出：每根横向的纱从一根纵向纱的上面过、从下一根的下面过。旁边是它的组织图，像一张棋盘。"
+    },
+    "warp-weft.span6": {
+      "en": "Plain weave",
+      "zh-Hans": "平纹"
+    },
+    "warp-weft.span7": {
+      "en": "Over one, under one; the next pick does the opposite. The draft is a checkerboard that repeats every 2 ends and 2 picks (dashed). The most interlacings any weave can have, so the cloth is firm and stable, with nothing loose to snag. Poplin, taffeta, canvas, ripstop.",
+      "zh-Hans": "一上一下；下一根纬纱正好相反。组织图是一张棋盘，每 2 根经纱、2 根纬纱重复一次（虚线框）。交织点是所有组织中最多的，所以布身紧实稳定，没有容易被钩住的松散部分。府绸、塔夫绸、帆布，以及[[ripstop]]。"
+    },
+    "warp-weft.aria2": {
+      "en": "A two-up two-down twill woven pick by pick: each yarn passes over two and under two, and the pattern shifts one yarn sideways on every pick. Beside it, the filled squares of its draft step up in a diagonal line.",
+      "zh-Hans": "二上二下斜纹一纬一纬地织出：每根纱从两根纱的上面过、再从两根的下面过，每织一纬，花纹横移一根纱。旁边的组织图中，涂黑的方格沿一条斜线逐级上升。"
+    },
+    "warp-weft.span8": {
+      "en": "Twill (2/2)",
+      "zh-Hans": "斜纹（2/2）"
+    },
+    "warp-weft.span9": {
+      "en": "Over two, under two — and each pick starts one end further along. The steps line up into the diagonal <em>twill line</em> (dashed, on the draft). The bracket marks one float: an end passing over two picks. Fewer interlacings than plain weave, so yarns pack closer and the cloth is denser yet drapes better. Denim is a twill, typically a 3/1 with the warp on the face.",
+      "zh-Hans": "二上二下，而且每一根纬纱的起点都比上一根横移一根经纱。这些台阶连成一条斜线，就是<em>斜纹线</em>（组织图上的虚线）。括号标出的是一段浮长：一根经纱连续浮在两根纬纱之上。交织点比平纹少，所以纱线可以排得更紧，布更密实，悬垂性反而更好。牛仔布是斜纹，通常是 3/1 斜纹，经纱在正面。"
+    },
+    "warp-weft.aria3": {
+      "en": "A five-end satin woven pick by pick: each lengthwise yarn passes over four crosswise yarns and under one, and the single tie-down points are scattered. Beside it, its draft is mostly filled, with one empty square in each row and column of the repeat.",
+      "zh-Hans": "五枚缎纹一纬一纬地织出：每根纵向的纱从四根横向纱的上面过、从一根的下面过，单独的组织点分散排列。旁边的组织图大部分涂黑，在一个组织循环内每行每列各有一个空格。"
+    },
+    "warp-weft.span10": {
+      "en": "Satin (5-end)",
+      "zh-Hans": "缎纹（五枚）"
+    },
+    "warp-weft.span11": {
+      "en": "Each end floats over four picks (bracket) and is tied down by just one. The tie-downs — the empty squares — shift two ends on every pick, so they never line up into a diagonal. Long floats make the face smooth and lustrous, and easier to snag. Warp floats on the face is a satin; weft floats, a sateen.",
+      "zh-Hans": "每根经纱连续浮在四根纬纱之上（括号），只被一根纬纱压住。这些压住浮线的点叫[[tie-down]]，也就是图中的空格；每织一纬，它横移两根经纱（飞数为 2），所以永远连不成一条斜线。长长的浮线使正面平滑而有光泽，也更容易钩丝。正面是经浮长的叫经面缎纹，正面是纬浮长的叫纬面缎纹。"
+    },
+    "weft-warp-knit.h21": {
+      "en": "Weft vs. Warp Knitting",
+      "zh-Hans": "纬编与经编"
+    },
+    "weft-warp-knit.p1": {
+      "en": "Every knit fabric is loops — the question is which direction they're built in, and that single choice decides how the fabric stretches, unravels, and holds its shape.",
+      "zh-Hans": "所有的针织物都是线圈；问题在于线圈是沿哪个方向形成的。这一个选择就决定了面料怎样拉伸、怎样脱散、怎样保持形状。"
+    },
+    "weft-warp-knit.p2": {
+      "en": "Two reference directions show up on every spec sheet: <strong style=\"color: var(--ink);\">wale</strong>, the vertical column a loop stack runs in, and <strong style=\"color: var(--ink);\">course</strong>, the horizontal row a single pass of yarn makes.",
+      "zh-Hans": "每一份规格书上都会出现两个参考方向：<strong style=\"color: var(--ink);\">纵行</strong>，线圈一个叠一个形成的竖列；以及<strong style=\"color: var(--ink);\">横列</strong>，纱线走一趟形成的一横排线圈。"
+    },
+    "knit-diagram.weft-knitting-one-yarn-forms-a-course-of-interlo": {
+      "en": "Weft knitting: one yarn forms a course of interlocking loops",
+      "zh-Hans": "纬编：一根纱线形成一个横列相互串套的线圈"
+    },
+    "knit-diagram.wale": {
+      "en": "WALE ↑",
+      "zh-Hans": "纵行 ↑"
+    },
+    "knit-diagram.course": {
+      "en": "COURSE →",
+      "zh-Hans": "横列 →"
+    },
+    "knit-diagram.weft-knitting": {
+      "en": "WEFT KNITTING",
+      "zh-Hans": "纬编"
+    },
+    "knit-diagram.warp-knitting-each-yarn-laps-between-two-neighbo": {
+      "en": "Warp knitting: each yarn laps between two neighbouring wales",
+      "zh-Hans": "经编：每根纱线在相邻的两个纵行之间来回垫纱"
+    },
+    "knit-diagram.warp-knitting": {
+      "en": "WARP KNITTING",
+      "zh-Hans": "经编"
+    },
+    "weft-warp-knit.div1": {
+      "en": "In weft knits, <span class=\"accent\">one yarn</span> loops its way across an entire course, each new loop pulled up through the loop below it. In warp knits, <span class=\"accent\">each yarn</span> zigzags between two neighbouring wales — it wraps a needle as an <em>overlap</em>, forming a loop in one wale, then crosses to the next wale as an <em>underlap</em> — so the loops lock sideways as well as up the wale.",
+      "zh-Hans": "在纬编织物中，<span class=\"accent\">一根纱线</span>沿着整个横列依次成圈，每个新线圈都从下面那个线圈中穿上来。在经编织物中，<span class=\"accent\">每根纱线</span>在相邻的两个纵行之间走“之”字形：先做[[overlap]]，绕到针上，在一个纵行里形成线圈；再做[[underlap]]，横移到下一个纵行。这样线圈不仅沿纵行相连，在横向上也相互锁住。"
+    },
+    "weft-warp-knit.h31": {
+      "en": "Weft Knitting",
+      "zh-Hans": "纬编"
+    },
+    "weft-warp-knit.li1": {
+      "en": "Yarn runs horizontally, forming loops side to side across the fabric.",
+      "zh-Hans": "纱线沿横向走，在面料上从一侧到另一侧依次成圈。"
+    },
+    "weft-warp-knit.li2": {
+      "en": "The default for apparel — t-shirts, sweaters, leggings.",
+      "zh-Hans": "服装的默认选择：T 恤、毛衣、紧身裤。"
+    },
+    "weft-warp-knit.li3": {
+      "en": "Naturally stretchy, especially widthwise.",
+      "zh-Hans": "天生有弹性，横向尤其明显。"
+    },
+    "weft-warp-knit.li4": {
+      "en": "Can unravel or ladder easily if cut or snagged.",
+      "zh-Hans": "剪开或钩丝后，容易脱散或{{ladder}}。"
+    },
+    "weft-warp-knit.h32": {
+      "en": "Warp Knitting",
+      "zh-Hans": "经编"
+    },
+    "weft-warp-knit.li5": {
+      "en": "Yarns run lengthwise; each wraps a needle as an overlap, forming a loop in one wale, then crosses to the next wale as an underlap.",
+      "zh-Hans": "纱线沿纵向走；每根纱先以{{overlap}}绕针，在一个纵行里形成线圈，再以{{underlap}}横移到下一个纵行。"
+    },
+    "weft-warp-knit.li6": {
+      "en": "Made on dedicated warp knitting machines.",
+      "zh-Hans": "在专用的经编机上生产。"
+    },
+    "weft-warp-knit.li7": {
+      "en": "More stable and less stretchy — better for technical or structured builds.",
+      "zh-Hans": "更稳定，弹性更小：更适合产业用途或需要挺括结构的设计。"
+    },
+    "weft-warp-knit.li8": {
+      "en": "Doesn't ladder or unravel as easily.",
+      "zh-Hans": "不那么容易{{ladder}}或脱散。"
+    },
+    "page.a2": {
+      "en": "← Back to Field Notes",
+      "zh-Hans": "← 返回札记"
+    },
+    "page.a3": {
+      "en": "Next: Dyeing →",
+      "zh-Hans": "下一篇：染色 →"
+    },
+    "js:Natural": {
+      "en": "Natural",
+      "zh-Hans": "天然纤维"
+    },
+    "js:Wool": {
+      "en": "Wool",
+      "zh-Hans": "羊毛"
+    },
+    "js:Silk": {
+      "en": "Silk",
+      "zh-Hans": "蚕丝"
+    },
+    "js:Cotton": {
+      "en": "Cotton",
+      "zh-Hans": "棉"
+    },
+    "js:Manufactured · cellulosic": {
+      "en": "Manufactured · cellulosic",
+      "zh-Hans": "化学纤维 · 纤维素类"
+    },
+    "js:Viscose": {
+      "en": "Viscose",
+      "zh-Hans": "粘胶纤维"
+    },
+    "js:Lyocell": {
+      "en": "Lyocell",
+      "zh-Hans": "莱赛尔纤维"
+    },
+    "js:Acetate": {
+      "en": "Acetate",
+      "zh-Hans": "醋酯纤维"
+    },
+    "js:Manufactured · synthetic": {
+      "en": "Manufactured · synthetic",
+      "zh-Hans": "化学纤维 · 合成纤维"
+    },
+    "js:Nylon 6,6": {
+      "en": "Nylon 6,6",
+      "zh-Hans": "锦纶66"
+    },
+    "js:Acrylic": {
+      "en": "Acrylic",
+      "zh-Hans": "腈纶"
+    },
+    "js:Polyester": {
+      "en": "Polyester",
+      "zh-Hans": "涤纶"
+    },
+    "js:Polypropylene": {
+      "en": "Polypropylene",
+      "zh-Hans": "丙纶"
+    }
+  }
+}
