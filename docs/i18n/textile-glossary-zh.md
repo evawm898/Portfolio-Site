@@ -9,6 +9,7 @@ inside the diagrams and the captions the animations write.
 - **242 terms**: 196 high confidence, 40 medium, 6 low.
 - Section 1 lists only the 46 medium and low terms. A reviewer short on time can read that section alone.
 - Section 2 is the full list, grouped the way the pages are.
+- **Section 5 is the evidence pass.** It re-rates every medium and low term from search results and gives the first-mention wording.
 
 ## Decisions so far
 
@@ -436,3 +437,98 @@ These are wording choices, not technical terms. They will be proposed with the c
 - Headings and running text.
 - Product examples (T-shirts, leggings, airbags, fishing line).
 - Latin notations that stay as they are: D, dtex, F, dpf, FDY, DTY, ATY, PET, PLA, S, Z, 2/75/72.
+
+## 5. Evidence pass (2026-11-18) and first-mention wording
+
+This section supersedes the confidence ratings above for the 49 terms it covers. The ratings now rest on
+what a web search actually returned, not on memory. After the pass: 4 High, 26 Medium,
+15 Low, 4 Decided by Eva.
+
+### What the evidence is, and is not
+
+- **Every attestation is a search-result snippet.** No source page could be opened from this session: the
+  network policy refused every host (Google Patents, std.samr.gov.cn, CNKI, Baidu Baike, 1688 and others). The
+  quotes are what the search tool returned for a URL; none was checked against its page.
+- **Not reached at all:** CNKI and Wanfang bilingual keyword lists, 1688 and Alibaba listings,
+  std.samr.gov.cn and openstd.samr.gov.cn, 术语在线, Baidu Baike. Standards titles came from third-party
+  catalogues. Chinese patents with English versions surfaced for some groups and not for the woven and knit group.
+- **"0 found" means not surfaced here.** It does not mean the term is unused.
+- Because of this, a term is rated High only where a standard's title or a bilingual dictionary entry carries it.
+- The full record, with every URL and quoted phrase, is in [`evidence/`](evidence/): `dyeing.md`,
+  `fiber-yarn.md`, `woven-knit.md`, `structures-misc.md`.
+
+Evidence counts are for the recommended term, as Academic / Patent / Trade / Standard / Reference. Where the
+recommended wording combines several words (ripstop, bias, heather, hemp), the count sums them; the evidence
+files have the per-word breakdown.
+
+### The copy pattern
+
+At a term's first mention on a page: **推荐术语（又称 X、Y；英文 term）** followed by one plain sentence saying
+what it is. After that, the recommended term alone. The wording below is what the page will print; it is also
+the entry on the generated glossary page (`i18n/zh-Hans/glossary.json` is the data file).
+
+| # | English | Recommended | 又称 | Confidence | Evidence | First-mention wording | Note |
+|---|---|---|---|---|---|---|---|
+| A-5 | cord | 绳 | 绳索、编织绳 | Medium → **Low** | 0/0/0/2/1 | 绳（又称 绳索、编织绳；英文 cord）：由多股纱线加捻或编织而成的较粗条状物，如绳索、鞋带。 | No source paired "cord" with a Chinese word; 线绳 and 绳带 were not found. |
+| A-10 | extrude (through a spinneret) | 经喷丝板挤出 | 纺丝、喷丝 | Medium → **Medium** | 2/1/0/0/0 | 经喷丝板挤出（又称 纺丝、喷丝；英文 extrude (through a spinneret)）：把熔融或溶解的聚合物从喷丝板的细孔中压出，形成连续的长丝。 |  |
+| A-20 | twisted filament yarn | 加捻长丝 | 有捻长丝 | Medium → **Low** | 0/0/0/0/0 | 加捻长丝（又称 有捻长丝；英文 twisted filament yarn）：把许多根细长丝并在一起、轻轻加捻而成的纱，表面光滑，没有毛羽。 | The compound was not found; only "长丝…加捻" as a process. |
+| A-25 | core / sheath (of a core-spun yarn) | 芯丝 / 外包纤维 | 芯纱、外包纱 | Medium → **Medium** | 2/1/0/1/0 | 芯丝 / 外包纤维（又称 芯纱、外包纱；英文 core / sheath (of a core-spun yarn)）：包芯纱中间的那根长丝叫芯丝，包在外面的短纤维叫外包纤维。 | 皮层 / 鞘 / 皮芯 never appeared for core-spun yarn. |
+| B-28 | cellulose ester fiber | 纤维素酯纤维 | 醋酯类纤维 | Medium → **Low** | 0/0/0/0/0 | 纤维素酯纤维（又称 醋酯类纤维；英文 cellulose ester fiber）：把纤维素经化学改性（酯化）后纺成的纤维，包括醋酯纤维和三醋酯纤维。 | Exact compound not found; 纤维素醋酯纤维 seen once. |
+| B-42 | recycled fiber | 循环再利用纤维 | 再生涤纶、再生锦纶 | Medium → **Medium** | 0/0/1/7/0 | 循环再利用纤维（又称 再生涤纶、再生锦纶；英文 recycled fiber）：用回收的瓶片或废料重新熔融纺成的纤维。注意“再生纤维”一词也指粘胶等再生纤维素纤维，两者不是一回事。 | Both senses of 再生 are live in current FZ/T titles; trap confirmed. |
+| B-43 | functionalized fiber | 功能性纤维 | 功能纤维 | Medium → **Medium** | 2/0/2/0/0 | 功能性纤维（又称 功能纤维；英文 functionalized fiber）：在纤维内部或表面加入导电、抗菌、阻燃等成分，使其具有额外功能的纤维。 |  |
+| B-13 | hemp | 汉麻 | 大麻、工业大麻 | Decided → **Decided** | 3/0/2/9/0 | 汉麻（又称 大麻、工业大麻；英文 hemp）：一种韧皮纤维作物。国家标准和行业标准的名称是“大麻”，行业为避免误解多称“汉麻”。 | Evidence runs against the decision on one point: every GB/T and FZ/T title seen says 大麻; 汉麻 was seen in company names. Counts are for both words together. |
+| C-12 | lumen | 中腔 | 胞腔 | Medium → **Medium** | 1/0/0/0/0 | 中腔（又称 胞腔；英文 lumen）：棉纤维中心的空腔，纤维干燥后被压扁成一条缝。 |  |
+| C-23 | channelled / grooved cross-section | 沟槽形截面 | 十字形截面、异形截面 | Medium → **Medium** | 2/4/0/0/0 | 沟槽形截面（又称 十字形截面、异形截面；英文 channelled / grooved cross-section）：纤维表面带有沿长度方向的深沟槽，水分可以顺着沟槽被带走。 |  |
+| C-24 | wicking | 芯吸 | 导湿 | Medium → **High** | 1/0/1/1/0 | 芯吸（又称 导湿；英文 wicking）：水分依靠毛细作用沿纤维或织物移动的现象。“吸湿排汗”“吸湿速干”是对应的宣传用语。 | GB/T 21655.1 uses 芯吸高度 for "wicking height". |
+| C-26 | fiberfill | 填充纤维 | 填充棉 | Medium → **Low** | 0/0/0/0/0 | 填充纤维（又称 填充棉；英文 fiberfill）：用作保暖填充物的蓬松散纤维。 | Exact compound not found. |
+| C-27 | cover (of a yarn) | 覆盖性 | 遮盖性 | Medium → **Low** | 0/0/0/0/0 | 覆盖性（又称 遮盖性；英文 cover (of a yarn)）：纱线或织物遮住底下、铺满面积的能力。 | Nothing attested. |
+| C-10 | weld (thermoplastic fabrics) | 焊接 | 超声波焊接、高频热合 | Medium → **Medium** | 0/0/4/0/0 | 焊接（又称 超声波焊接、高频热合；英文 weld (thermoplastic fabrics)）：利用合成纤维受热熔化的特性，把两层面料熔合在一起，不用缝线。 | 热熔接 was not found. |
+| D-3 | air-jet spinning | 喷气涡流纺 | 涡流纺、喷气纺 | Decided → **Decided** | 0/2/4/5/0 | 喷气涡流纺（又称 涡流纺、喷气纺；英文 air-jet spinning）：用高速气流使纤维包缠成纱的纺纱方法，纱线毛羽很少。 | FZ/T 12068-2021 pairs 喷气涡流纺 with "air-jet vortex spun". The English copy mixes two processes: "parallel core" describes classic 喷气纺, "very low hairiness" describes 喷气涡流纺. |
+| D-6 | flat (untextured) filament | 未变形长丝 | 牵伸丝、全拉伸丝（FDY） | Low → **Low** | 0/0/0/0/0 | 未变形长丝（又称 牵伸丝、全拉伸丝（FDY）；英文 flat (untextured) filament）：纺出后没有经过变形加工的长丝，表面平滑、有光泽、不蓬松。 | 未变形长丝 and 平丝 were not found. 牵伸丝 (3 standard titles) and 全拉伸丝 name the product. |
+| D-8 | spec sheet | 规格书 | 规格表、技术参数表 | Medium → **Low** | 0/0/1/0/0 | 规格书（又称 规格表、技术参数表；英文 spec sheet）：列出纱线或面料各项规格参数的文件。 | Chosen on general usage, not evidence. |
+| D-15 | ends (yarns fed together) | 并合根数 | 并纱 | Medium → **Low** | 0/0/0/0/0 | 并合根数（又称 并纱；英文 ends (yarns fed together)）：并排喂入同一位置、一起编织的纱线根数。这些纱彼此平行，不加捻。 | No term attested; the description carries the meaning. |
+| D-16 | nominal denier | 名义线密度 | 公称纤度 | Medium → **Medium** | 0/0/0/2/0 | 名义线密度（又称 公称纤度；英文 nominal denier）：产品标注的线密度。氨纶在包覆时被拉长，实际贡献的重量比标注值小。 | Seen in fiber standards, not spandex-specific. |
+| D-23 | yarn characterization (page title) | 纱线规格与标示 | 纱线规格 | Medium → **Low** | 0/0/0/1/0 | 纱线规格与标示（又称 纱线规格；英文 yarn characterization (page title)）：如何读懂纱线规格的各种写法。 | 表征 means laboratory characterisation and does not fit; this title is a construction. |
+| A-6 | textile structure | 织物结构 | 纺织结构 | Medium → **Medium** | 2/0/1/0/1 | 织物结构（又称 纺织结构；英文 textile structure）：纱线或纤维组成织物的方式：机织、编织、针织或非织造。 | Textbooks with this title cover wovens only. |
+| A-26 | braid / braided | 编织 | 编织物、编带 | Medium → **Medium** | 2/0/0/0/5 | 编织（又称 编织物、编带；英文 braid / braided）：多根纱线沿斜向相互交叉而成的结构，常见于绳、管、带。注意“编织”在日常用语中也泛指机织和针织。 | Trap confirmed: 编织 is also used for knitting. |
+| A-32 | bonded (nonwoven) | 纤网加固 | 固结、粘合 | Medium → **Medium** | 2/0/0/0/2 | 纤网加固（又称 固结、粘合；英文 bonded (nonwoven)）：用缠结、加热或粘合剂把纤维直接固定成布，不经过纱线。 | 粘合 alone is narrower: it leaves out needle-punch and spunlace. |
+| E-22 | laid-in yarn | 衬纬纱 | 衬垫纱、轴纱（编织物中） | Medium → **Medium** | 1/0/2/0/2 | 衬纬纱（又称 衬垫纱、轴纱（编织物中）；英文 laid-in yarn）：夹在织物中、保持平直而不成圈的纱线，用来限制拉伸或承受载荷。 | 衬垫纱 forms tuck arcs in textbooks, so it only partly matches. |
+| E-32 | weft knit, laid-in | 衬纬组织 | 纬编衬纬 | Medium → **Medium** | 1/0/2/0/2 | 衬纬组织（又称 纬编衬纬；英文 weft knit, laid-in）：在纬编线圈之间夹入平直纱线的针织结构。 | 衬垫组织 is a different structure. |
+| E-28 | flat braid | 扁平编织 | 扁带编织 | Medium → **Medium** | 0/3/1/0/0 | 扁平编织（又称 扁带编织；英文 flat braid）：织成扁平带状的编织，与管状编织相对。 |  |
+| E-29 | square braid | 方形编织 | 编织盘根 | Low → **Low** | 0/0/0/0/0 | 方形编织（又称 编织盘根；英文 square braid）：截面为方形的紧密编织，例如密封用的盘根。 | 方形编织 not found in this sense; 方型编织 in composites patents means 3-D rectangular braiding. |
+| E-36 | biaxial bonded | 双轴向粘合织物 | 双轴向无屈曲织物 | Low → **Low** | 0/0/0/0/0 | 双轴向粘合织物（又称 双轴向无屈曲织物；英文 biaxial bonded）：两层平直的纱线（0° 和 90°）叠在一起，靠粘合而不是交织固定。 | No Chinese term for the adhesive-bonded type was found; Chinese sources describe this fabric as stitched or warp-knitted. |
+| E-37 | XYZ laid-in | 三向正交结构 | 三维正交织物 | Low → **Medium** | 3/3/0/0/0 | 三向正交结构（又称 三维正交织物；英文 XYZ laid-in）：平直的纱线沿相互垂直的三个方向排列。 |  |
+| E-23 | triaxial (woven) | 三轴向机织物 | 三轴机织物、三向织物 | High → **Medium** | 3/1/0/0/0 | 三轴向机织物（又称 三轴机织物、三向织物；英文 triaxial (woven)）：三组纱线按 0°、+60°、−60° 交织，各方向的强度更均匀。 | Lowered: 三轴向 alone usually means a stitched 0/±45 fabric, so 机织 must stay in the term. |
+| E-33 | weft-inserted warp knit | 衬纬经编织物 | 全幅衬纬经编 | High → **Medium** | 0/4/0/0/0 | 衬纬经编织物（又称 全幅衬纬经编；英文 weft-inserted warp knit）：用经编线圈固定住横向平直纱线的织物。 | Lowered: patents only. |
+| F-21 | ripstop | 防撕裂格子布 | 格子布、抗撕裂布、ripstop | Medium → **Medium** | 0/0/9/0/1 | 防撕裂格子布（又称 格子布、抗撕裂布、ripstop；英文 ripstop）：在平纹底布中每隔一段织入较粗的加强纱，形成小方格，使撕裂不易扩大。 | 格子布 alone can read as an ordinary check. |
+| E-4 | bias (the diagonal) | 斜向 | 斜丝、正斜 | Medium → **Medium** | 0/0/5/0/3 | 斜向（又称 斜丝、正斜；英文 bias (the diagonal)）：与经纬纱成 45° 的方向，机织物在这个方向上最容易拉伸。 | 斜裁 is the cutting method ("bias cut"). |
+| E-5 | fray (cut edge) | 脱散 | 散边、散口 | Medium → **Low** | 0/0/1/0/3 | 脱散（又称 散边、散口；英文 fray (cut edge)）：机织物裁开后，边缘的纱线松脱散开。 |  |
+| E-7 | ladder (run) | 梯脱 | 脱散、抽丝 | Medium → **Medium** | 1/0/0/0/1 | 梯脱（又称 脱散、抽丝；英文 ladder (run)）：纬编织物上一个线圈断裂后，整列线圈顺着纵行依次脱开，形成梯子状的破口。 | 抽丝 is colloquial and one glossary defines it as a snag. |
+| F-6 | draft (weave diagram) | 组织图 | 意匠图 | Medium → **High** | 1/0/1/0/2 | 组织图（又称 意匠图；英文 draft (weave diagram)）：用方格表示织物组织的图：每一格代表一根经纱与一根纬纱的交叉，经纱在上时涂黑。 | 上机图 is the superset (adds threading and lifting plans). |
+| F-17 | tie-down (single binding point) | 单独组织点 | 接结点 | Medium → **Medium** | 1/0/0/0/2 | 单独组织点（又称 接结点；英文 tie-down (single binding point)）：缎纹中把长浮线固定住的那一个交织点。 |  |
+| G-5 | overlap (warp knitting) | 针前垫纱 | 针前横移 | Medium → **Low** | 0/0/3/0/0 | 针前垫纱（又称 针前横移；英文 overlap (warp knitting)）：经编时，导纱针在针钩一侧横移，把纱线垫到针上形成线圈。 | No page showed "overlap" beside a Chinese term. |
+| G-5 | underlap (warp knitting) | 针背垫纱 | 针背横移、延展线（留下的纱段） | Medium → **Medium** | 2/0/1/0/2 | 针背垫纱（又称 针背横移、延展线（留下的纱段）；英文 underlap (warp knitting)）：导纱针在针背一侧横移，把纱线带到相邻纵行。留在两个纵行之间的那段纱叫延展线。 | 延展线 = underlap is the attested pairing (counts are for 延展线). |
+| I-14 | cross dyeing | 异色（双色）效果 | 交染 | Decided → **Decided** | 0/0/3/0/3 | 异色（双色）效果（又称 交染；英文 cross dyeing）：两种纤维的织物在同一染浴中用两类染料染色，每种纤维各上各的染料，染出两种颜色。 | New: 交染 is the dictionary headword for "cross dyeing" (《英汉染整词汇》). 异色染色 and 交叉染色 were not found. |
+| I-15 | union dyeing | 同色效果 | 同色 | Medium → **Medium** | 3/0/4/0/0 | 同色效果（又称 同色；英文 union dyeing）：选配两类染料，使两种纤维染成同一种颜色，整块布看起来是单色。 | One trade article pairs 同色效果 with "union-dye effect". 同色染色 as a phrase was not found. |
+| I-16 | reserve dyeing | 留白效果 | 留白 | Medium → **Medium** | 0/0/3/0/1 | 留白效果（又称 留白；英文 reserve dyeing）：只用一类染料，让另一种纤维不上色、保持本白。 | 防染 is wrong here (resist printing). A trade source says nylon cannot be reserved in a nylon/polyester fabric because disperse dye stains it. |
+| I-18 | cross-staining | 沾色 | 沾污、交叉沾色 | Medium → **High** | 2/0/4/2/0 | 沾色（又称 沾污、交叉沾色；英文 cross-staining）：本该染甲纤维的染料，少量沾到了乙纤维上。 | 沾色 is the GB/T 251 word for "staining". |
+| I-19 | clearing rinse | 清洗 | 净洗、还原清洗（涤纶上常用） | Medium → **Medium** | 0/0/5/0/0 | 清洗（又称 净洗、还原清洗（涤纶上常用）；英文 clearing rinse）：染色后把浮在表面或沾错纤维的染料洗掉的工序。 | OPEN: nothing found states the order for disperse + acid dyes on polyester/nylon. One trade source says reduction clearing does not remove nylon staining. Counts are for 还原清洗. |
+| H-18 | ring dyeing | 白芯 | 环染 | Decided → **Decided** | 0/3/5/0/0 | 白芯（又称 环染；英文 ring dyeing）：纱线表层着色、芯部发白。在紧密的织物里，染料到不了纱线中心。 | New: 环染 IS used at yarn level (denim sources, "環染 Ring Dye"), so it can stand as the also-known-as. |
+| H-19 | under-dyed (middle of the yarn) | 未染透 | 透染不良 | Medium → **Low** | 0/0/2/0/0 | 未染透（又称 透染不良；英文 under-dyed (middle of the yarn)）：染料没有渗透到纱线或纤维内部，中间颜色偏浅。 | Only 透染 was seen; 染不透 and 未透染 were not found. |
+| I-6 | dye sites | 染座 | 染色位置、氨基端基 | Medium → **Medium** | 0/2/3/0/0 | 染座（又称 染色位置、氨基端基；英文 dye sites）：纤维分子上能与染料结合的位置。锦纶上数量少，羊毛上很多。 |  |
+| H-17 | heather | 混色效果 | 麻灰、花灰 | Medium → **Low** | 0/0/8/0/2 | 混色效果（又称 麻灰、花灰；英文 heather）：不同颜色的纤维混在同一根纱里，形成深浅夹杂的外观。 | 麻灰 / 花灰 are grey-specific; no English pairing found. |
+| I-22 | interwoven (two fibers, warp and weft) | 交织 | 交织物 | Medium → **High** | 1/1/4/0/1 | 交织（又称 交织物；英文 interwoven (two fibers, warp and weft)）：经纱用一种纤维、纬纱用另一种纤维织成的织物。它和“混纺”不同：混纺是两种纤维混在同一根纱里。 | The distinction is stated explicitly in the sources; 涤锦交织 is attested. |
+
+### Where the evidence disagrees with a decision or with the English copy
+
+1. **Hemp.** Eva decided 汉麻. Every GB/T and FZ/T title the search returned says 大麻; 汉麻 appeared in company
+   names. The first-mention wording keeps 汉麻 and gives 大麻 as the also-known-as, with the standards' name in the description.
+2. **Air-jet spinning.** The English sentence mixes two processes: "a parallel core bound by wrapper fibers" is
+   classic air-jet (喷气纺), and "very low hairiness" is vortex (喷气涡流纺). The decided term matches the second half.
+3. **Cross dyeing.** 交染 turned up as the headword in a published English–Chinese dyeing dictionary. The decided
+   wording describes the effect; 交染 is now its also-known-as.
+4. **Ring dyeing.** 环染 is used at yarn level in denim sources, so my earlier claim that it is mostly fiber-level
+   was too strong. The decided wording stands, with 环染 as the also-known-as.
+5. **Reserve dyeing on polyester/nylon.** One trade source says the nylon cannot be left white in a
+   nylon/polyester fabric, because disperse dye stains it. That bears on the Reserve toggle in the dyeing figure.
+6. **Clearing.** Nothing found states the process order for disperse plus acid dyes on polyester/nylon. Still open.

@@ -13003,3 +13003,7 @@ writes static pages per locale from `i18n/<locale>/*.json`, and `tools/i18n/font
 is translated (glossary: `docs/i18n/textile-glossary-zh.md`). Sections 02, 03 and 08 of `textile-101.html` are on `hold`
 in `i18n/config.json` and carry no keys until the overhaul merges. After editing either page's copy run `--annotate`
 then `--extract`. Captions a module draws go through `tr('English')`. Not in CI.
+`i18n/zh-Hans/glossary.json` is the one owner of a term's Chinese wording: strings name a term as `[[id]]` (first mention,
+linked, with 又称 and the English) or `{{id}}` (later mentions), and the same file generates `zh/glossary.html` and the
+footer feedback line. The evidence behind each term, and its limits (search snippets only), is section 5 of the glossary
+doc and `docs/i18n/evidence/`.
