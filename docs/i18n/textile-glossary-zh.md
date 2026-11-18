@@ -16,8 +16,8 @@ Eva decided six terms on 2026-11-18; they are marked **Decided** in the tables: 
 ring dyeing, cross dyeing, polyester, polyamide (nylon). Everything else waits for the reviewer.
 
 The English copy was also changed where this glossary found one word doing two jobs ("lap", "ends",
-"blended", "clearing rinse"), so rows D-15, G-5, I-19 and I-22 now describe wording that has been made
-unambiguous in the source.
+"blended"), so rows D-15, G-5 and I-22 now describe wording that has been made unambiguous in the source.
+"Clearing rinse" was left generic on purpose; see I-19 and I-20.
 
 ## How to review
 
@@ -75,7 +75,7 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | F-6 | draft (weave diagram) | 组织图 | Medium | 组织图 = the grid of filled squares the page draws. 上机图 would add threading and lifting plans, which the page does not draw. |
 | F-17 | tie-down (single binding point) | 单独组织点 | Medium |  |
 | F-21 | ripstop | 防撕裂布 | Medium |  |
-| G-5 | lap (warp knitting) | 延展线 | Medium | 延展线 = the yarn length between wales (underlap); 垫纱 = the lapping motion. The page uses "lap" for both. |
+| G-5 | overlap / underlap (warp knitting) | 针前垫纱 / 针背垫纱；延展线 | Medium | Eva, Nov 18: English copy now names both halves. Reviewer to confirm the pair, and 延展线 for the underlap yarn. |
 | H-17 | heather | 混色效果 | Medium | No single word. 麻灰 / 花灰 are what merchandisers say, but they imply grey. |
 | H-18 | ring dyeing | （描述）纱线表层着色、芯部发白，俗称“白芯” | Decided | Eva, Nov 18: describe it; do not use 环染. |
 | H-19 | under-dyed (middle of the yarn) | 染不透 | Medium | Positive form is 透染 / 匀透. |
@@ -84,7 +84,7 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | I-15 | union dyeing | 同色染色 | Medium | Not 一浴法: that means "one bath", a different idea. |
 | I-16 | reserve dyeing | 留白染色 | Medium | 留白 is the working word; the -染色 suffix is my addition. |
 | I-18 | cross-staining | 沾色 | Medium | 沾色 is the standard word for staining of an adjacent fiber; "cross-" may not need its own word. |
-| I-19 | clearing rinse | 清洗；净洗 | Medium | The copy says "clearing rinse", not "reduction clearing". |
+| I-19 | clearing rinse | 清洗；净洗 | Medium | The copy says "clearing rinse", not "reduction clearing". **OPEN (Nov 18):** the animation puts both dyes in, then clears; a reduction clear there would strip the acid dye. The page keeps the generic wording until the reviewer answers on process order. |
 | I-22 | blended (two fibers in one fabric) | 混纺；交织 | Medium | 混纺 = fibers mixed in the yarn; 交织 = different yarns in warp and weft. The cross-dye figure is 交织. Copy must say which. |
 
 **On the seven terms expected to be uncertain:**
@@ -94,7 +94,7 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | cross dyeing | Low. No settled term (I-14). |
 | union dyeing | Medium (I-15). |
 | reserve dyeing | Medium (I-16). |
-| reduction clearing | High as a term (还原清洗). The page itself says "clearing rinse", which is Medium (I-19, I-20). |
+| reduction clearing | High as a term (还原清洗), but whether it belongs in this figure is open: see I-19, I-20. |
 | ring dyeing | Low. The page's yarn-level meaning does not match the usual Chinese use of 环染 (H-18). |
 | regenerated cellulosic | High (再生纤维素纤维). The real risk nearby is "recycled" (B-42). |
 | corespun | High (包芯纱). Keep it apart from covered yarn, 包覆纱 (A-22, A-23). |
@@ -337,7 +337,7 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | G-2 | course | 线圈横列 | GB/T 5708-2001 | 横列 | High |  |
 | G-3 | loop | 线圈 | GB/T 5708-2001 | — | High |  |
 | G-4 | jersey (plain knit) | 纬平针织物 | GB/T 5708-2001 | 平针；汗布；单面布 | High |  |
-| G-5 | lap (warp knitting) | 延展线 | GB/T 5708-2001 | 垫纱 | **Medium** | 延展线 = the yarn length between wales (underlap); 垫纱 = the lapping motion. The page uses "lap" for both. |
+| G-5 | overlap / underlap (warp knitting) | 针前垫纱 / 针背垫纱；延展线 (the yarn length the underlap leaves) | GB/T 5708-2001 | 针前横移 / 针背横移 | **Medium** | Eva, Nov 18: the English copy now names both halves. Reviewer to confirm the pair, and 延展线 for the underlap yarn. |
 | G-6 | warp knitting machine | 经编机 | GB/T 5708-2001 | — | High |  |
 
 ### H. Dyeing: where color enters
@@ -390,8 +390,8 @@ Brand names (莱卡, 天丝) are listed only so they can be avoided.
 | I-16 | reserve dyeing | 留白染色 | 《染整工艺与原理》 | 留白 | **Medium** | 留白 is the working word; the -染色 suffix is my addition. |
 | I-17 | two-tone | 双色效果 | 《染整工艺与原理》 | — | High |  |
 | I-18 | cross-staining | 沾色 | GB/T 8427、GB/T 3920、GB/T 251 | 沾污；交叉沾色 | **Medium** | 沾色 is the standard word for staining of an adjacent fiber; "cross-" may not need its own word. |
-| I-19 | clearing rinse | 清洗；净洗 | 《染整工艺与原理》 | — | **Medium** | The copy says "clearing rinse", not "reduction clearing". |
-| I-20 | reduction clearing | 还原清洗 | 《染整工艺与原理》 | — | High | Fully established for polyester. Whether it is right for a polyester/nylon fabric is a process question for the reviewer; the term itself is safe. Appears only if the copy is tightened. |
+| I-19 | clearing rinse | 清洗；净洗 | 《染整工艺与原理》 | — | **Medium** | The copy says "clearing rinse", not "reduction clearing". **OPEN (Nov 18):** the animation puts both dyes in, then clears; a reduction clear there would strip the acid dye. The page keeps the generic wording until the reviewer answers on process order. |
+| I-20 | reduction clearing | 还原清洗 | 《染整工艺与原理》 | — | High | Fully established for polyester. Whether it is right for a polyester/nylon fabric is a process question for the reviewer; the term itself is safe. Appears only if the copy is tightened. **OPEN (Nov 18):** the animation puts both dyes in, then clears; a reduction clear there would strip the acid dye. The page keeps the generic wording until the reviewer answers on process order. |
 | I-21 | one bath, two steps | 一浴两步法 | 《染整工艺与原理》 | 一浴二步 | High |  |
 | I-22 | blended (two fibers in one fabric) | 混纺；交织 | 《织物结构与设计》 | — | **Medium** | 混纺 = fibers mixed in the yarn; 交织 = different yarns in warp and weft. The cross-dye figure is 交织. Copy must say which. |
 | I-23 | undyed | 未染色 | 《染整工艺与原理》 | 本白；留白 | High |  |

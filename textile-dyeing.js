@@ -579,7 +579,7 @@ const crossScene = {
       }
     }
     const label = t < 0.12 ? (reserve ? tr('one bath, one dye: the acid dye is left out') : tr('one bath, two dyes'))
-      : reality && t > T.clear0 ? tr('reduction clearing strips the stray dye off the nylon')
+      : reality && t > T.clear0 ? tr('a clearing rinse takes the stray dye back off the nylon')
       : reality && t > 0.42 ? tr('some disperse dye lands on the nylon too')
       : reserve ? tr('disperse dye finds the polyester; the nylon stays undyed') : tr('each dye goes to its own fiber');
     dyn += text(D_BATH.x, 26, label, { fill: INK, size: 13 });

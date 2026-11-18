@@ -683,7 +683,7 @@
       "zh-Hans": ""
     },
     "weft-warp-knit.div1": {
-      "en": "In weft knits, <span class=\"accent\">one yarn</span> loops its way across an entire course, each new loop pulled up through the loop below it. In warp knits, <span class=\"accent\">each yarn</span> zigzags between two neighbouring wales — it is lapped around a needle to form a loop in one wale, then crosses to the next as an <em>underlap</em> — so the loops lock sideways as well as up the wale.",
+      "en": "In weft knits, <span class=\"accent\">one yarn</span> loops its way across an entire course, each new loop pulled up through the loop below it. In warp knits, <span class=\"accent\">each yarn</span> zigzags between two neighbouring wales — it wraps a needle as an <em>overlap</em>, forming a loop in one wale, then crosses to the next wale as an <em>underlap</em> — so the loops lock sideways as well as up the wale.",
       "zh-Hans": ""
     },
     "weft-warp-knit.h31": {
@@ -711,7 +711,7 @@
       "zh-Hans": ""
     },
     "weft-warp-knit.li5": {
-      "en": "Yarns run lengthwise; each is lapped around a needle to make a loop, then crosses to a neighbouring column as an underlap.",
+      "en": "Yarns run lengthwise; each wraps a needle as an overlap, forming a loop in one wale, then crosses to the next wale as an underlap.",
       "zh-Hans": ""
     },
     "weft-warp-knit.li6": {
