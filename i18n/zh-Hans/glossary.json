@@ -1,0 +1,8 @@
+{
+  "locale": "zh-Hans",
+  "page": {
+    "title": "术语表", "lede": "x", "english": "英文", "aka": "又称",
+    "feedback": "术语有更准确的行业说法？", "feedbackLink": "欢迎告诉我们", "feedbackSubject": "术语建议"
+  },
+  "terms": [ { "id": "cross-staining", "en": "cross-staining", "term": "沾色", "aka": ["沾污"], "desc": "d", "group": "染色" } ]
+}

@@ -42,8 +42,8 @@ function charsOf(text) {
 function localeText(locale, L) {
   let text = L.label;
   const dir = join(ROOT, 'i18n', locale);
-  for (const f of existsSync(dir) ? readdirSync(dir) : []) for (const v of Object.values(JSON.parse(readFileSync(join(dir, f), 'utf8')).strings)) text += v[locale] || '';
-  for (const p of CONFIG.pages) { const f = join(ROOT, L.dir, p.src); if (existsSync(f)) text += readFileSync(f, 'utf8').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<[^>]+>/g, ' '); }
+  for (const f of existsSync(dir) ? readdirSync(dir) : []) text += readFileSync(join(dir, f), 'utf8');
+  for (const p of [...CONFIG.pages, { src: 'glossary.html' }]) { const f = join(ROOT, L.dir, p.src); if (existsSync(f)) text += readFileSync(f, 'utf8').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<[^>]+>/g, ' '); }
   return text;
 }
 function source(s) {                                        // the unpacked npm package, from the cache
